@@ -222,6 +222,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool areTimeseriesBucketsFixed() const {
+        MONGO_UNREACHABLE;
+    }
+
     bool isClustered() const {
         return false;
     }

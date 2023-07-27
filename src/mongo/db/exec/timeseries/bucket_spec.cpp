@@ -50,6 +50,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/timeseries/bucket_level_comparison_predicate_generator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -87,91 +88,33 @@ bool BucketSpec::fieldIsComputed(StringData field) const {
 }
 
 namespace {
-constexpr long long max32BitEpochMillis =
-    static_cast<long long>(std::numeric_limits<uint32_t>::max()) * 1000;
-
-/**
- * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'rhs' and
- * returns it as a Value.
- */
-template <typename MatchType>
-auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
-    // Indicates whether to initialize an ObjectId with a max or min value for the non-date bytes.
-    enum class OIDInit : bool { max, min };
-    // Make an ObjectId cooresponding to a date value. As a conversion from date to ObjectId will
-    // truncate milliseconds, we round up when needed to prevent missing results.
-    auto makeDateOID = [](auto&& date, auto&& maxOrMin, bool roundMillisUpToSecond = false) {
-        if (roundMillisUpToSecond && (date.toMillisSinceEpoch() % 1000 != 0)) {
-            date += Seconds{1};
-        }
-
-        auto oid = OID{};
-        oid.init(date, maxOrMin == OIDInit::max);
-        return oid;
-    };
-    // Make an ObjectId corresponding to a date value adjusted by the max bucket value for the
-    // time series view that this query operates on. This predicate can be used in a comparison
-    // to gauge a max value for a given bucket, rather than a min value.
-    auto makeMaxAdjustedDateOID = [&](auto&& date, auto&& maxOrMin) {
-        // Ensure we don't underflow.
-        if (date.toDurationSinceEpoch() >= Seconds{bucketMaxSpanSeconds})
-            // Subtract max bucket range.
-            return makeDateOID(date - Seconds{bucketMaxSpanSeconds}, maxOrMin);
-        else
-            // Since we're out of range, just make a predicate that is true for all dates.
-            // We'll never use an OID for a date < 0 due to OID range limitations, so we set the
-            // minimum date to 0.
-            return makeDateOID(Date_t::fromMillisSinceEpoch(0LL), OIDInit::min);
-    };
-
-    // Because the OID timestamp is only 4 bytes, we can't convert larger dates
-    invariant(rhs.date().toMillisSinceEpoch() >= 0LL);
-    invariant(rhs.date().toMillisSinceEpoch() <= max32BitEpochMillis);
-
-    // An ObjectId consists of a 4-byte timestamp, as well as a unique value and a counter, thus
-    // two ObjectIds initialized with the same date will have different values. To ensure that we
-    // do not incorrectly include or exclude any buckets, depending on the operator we will
-    // construct either the largest or the smallest ObjectId possible with the corresponding date.
-    // If the query operand is not of type Date, the original query will not match on any documents
-    // because documents in a time-series collection must have a timeField of type Date. We will
-    // make this case faster by keeping the ObjectId as the lowest or highest possible value so as
-    // to eliminate all buckets.
-    if constexpr (std::is_same_v<MatchType, LTMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::min, true /*roundMillisUpToSecond*/)};
-    } else if constexpr (std::is_same_v<MatchType, LTEMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::max, true /*roundMillisUpToSecond*/)};
-    } else if constexpr (std::is_same_v<MatchType, GTMatchExpression>) {
-        return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::max)};
-    } else if constexpr (std::is_same_v<MatchType, GTEMatchExpression>) {
-        return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::min)};
-    }
-    MONGO_UNREACHABLE_TASSERT(5756800);
-}
-
-/**
- * Makes a disjunction of the given predicates.
- *
- * - The result is non-null; it may be an OrMatchExpression with zero children.
- * - Any trivially-false arguments are omitted.
- * - If only one argument is nontrivial, returns that argument rather than adding an extra
- *   OrMatchExpression around it.
- */
-std::unique_ptr<MatchExpression> makeOr(std::vector<std::unique_ptr<MatchExpression>> predicates) {
-    std::vector<std::unique_ptr<MatchExpression>> nontrivial;
-    for (auto&& p : predicates) {
-        if (!p->isTriviallyFalse())
-            nontrivial.push_back(std::move(p));
+std::unique_ptr<MatchExpression> createTightExprComparisonPredicate(
+    const ExprMatchExpression* matchExpr,
+    const timeseries::BucketLevelComparisonPredicateGeneratorBase::Params params) {
+    using namespace timeseries;
+    auto rewriteMatchExpr =
+        RewriteExpr::rewrite(matchExpr->getExpression(), params.pExpCtx->getCollator())
+            .releaseMatchExpression();
+    if (rewriteMatchExpr &&
+        ComparisonMatchExpressionBase::isInternalExprComparison(rewriteMatchExpr->matchType())) {
+        auto compareMatchExpr =
+            checked_cast<const ComparisonMatchExpressionBase*>(rewriteMatchExpr.get());
+        return BucketLevelComparisonPredicateGenerator::createPredicate(
+                   compareMatchExpr, params, true /* tight */)
+            .matchExpr;
     }
 
-    if (nontrivial.size() == 1)
-        return std::move(nontrivial[0]);
-
-    return std::make_unique<OrMatchExpression>(std::move(nontrivial));
+    return BucketSpec::handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore,
+                                        matchExpr,
+                                        "can't handle non-comparison $expr match expression")
+        .tightPredicate;
 }
 
-BucketSpec::BucketPredicate handleIneligible(IneligiblePredicatePolicy policy,
-                                             const MatchExpression* matchExpr,
-                                             StringData message) {
+}  // namespace
+
+BucketSpec::BucketPredicate BucketSpec::handleIneligible(IneligiblePredicatePolicy policy,
+                                                         const MatchExpression* matchExpr,
+                                                         StringData message) {
     switch (policy) {
         case IneligiblePredicatePolicy::kError:
             uasserted(
@@ -184,500 +127,6 @@ BucketSpec::BucketPredicate handleIneligible(IneligiblePredicatePolicy policy,
     MONGO_UNREACHABLE_TASSERT(5916307);
 }
 
-/*
- * Creates a predicate that ensures that if there exists a subpath of matchExprPath such that the
- * type of `control.min.subpath` is not the same as `control.max.subpath` then we will match that
- * document.
- *
- * However, if the buckets collection has no mixed-schema data then this type-equality predicate is
- * unnecessary. In that case this function returns an empty, always-true predicate.
- */
-std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
-    boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    const StringData& matchExprPath,
-    bool assumeNoMixedSchemaData) {
-
-    std::vector<std::unique_ptr<MatchExpression>> typeEqualityPredicates;
-
-    if (assumeNoMixedSchemaData)
-        return makeOr(std::move(typeEqualityPredicates));
-
-    FieldPath matchExprField(matchExprPath);
-    using namespace timeseries;
-
-    // Assume that we're generating a predicate on "a.b"
-    for (size_t i = 0; i < matchExprField.getPathLength(); i++) {
-        auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprField.getSubpath(i);
-        auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprField.getSubpath(i);
-
-        // This whole block adds
-        // {$expr: {$ne: [{$type: "$control.min.a"}, {$type: "$control.max.a"}]}}
-        // in order to ensure that the type of `control.min.a` and `control.max.a` are the same.
-
-        // This produces {$expr: ... }
-        typeEqualityPredicates.push_back(std::make_unique<ExprMatchExpression>(
-            // This produces {$ne: ... }
-            make_intrusive<ExpressionCompare>(
-                pExpCtx.get(),
-                ExpressionCompare::CmpOp::NE,
-                // This produces [...]
-                makeVector<boost::intrusive_ptr<Expression>>(
-                    // This produces {$type: ... }
-                    make_intrusive<ExpressionType>(
-                        pExpCtx.get(),
-                        // This produces [...]
-                        makeVector<boost::intrusive_ptr<Expression>>(
-                            // This produces "$control.min.a"
-                            ExpressionFieldPath::createPathFromString(
-                                pExpCtx.get(), minPath, pExpCtx->variablesParseState))),
-                    // This produces {$type: ... }
-                    make_intrusive<ExpressionType>(
-                        pExpCtx.get(),
-                        // This produces [...]
-                        makeVector<boost::intrusive_ptr<Expression>>(
-                            // This produces "$control.max.a"
-                            ExpressionFieldPath::createPathFromString(
-                                pExpCtx.get(), maxPath, pExpCtx->variablesParseState))))),
-            pExpCtx));
-    }
-    return makeOr(std::move(typeEqualityPredicates));
-}
-
-boost::optional<StringData> checkComparisonPredicateErrors(
-    const MatchExpression* matchExpr,
-    const StringData matchExprPath,
-    const BSONElement& matchExprData,
-    const BucketSpec& bucketSpec,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
-    using namespace timeseries;
-    // The control field's min and max are chosen using a field-order insensitive comparator, while
-    // MatchExpressions use a comparator that treats field-order as significant. Because of this we
-    // will not perform this optimization on queries with operands of compound types.
-    if (matchExprData.type() == BSONType::Object || matchExprData.type() == BSONType::Array)
-        return "operand can't be an object or array"_sd;
-
-    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null} will
-    // match all documents where the field is either null or missing. Because this is different
-    // from both the comparison semantics that InternalExprComparison expressions and the control's
-    // min and max fields use, we will not perform this optimization on queries with null operands.
-    if (matchExprData.type() == BSONType::jstNULL)
-        return "can't handle {$eq: null}"_sd;
-
-    // The control field's min and max are chosen based on the collation of the collection. If the
-    // query's collation does not match the collection's collation and the query operand is a
-    // string or compound type (skipped above) we will not perform this optimization.
-    if (collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo &&
-        matchExprData.type() == BSONType::String) {
-        return "can't handle string comparison with a non-default collation"_sd;
-    }
-
-    // This function only handles time and measurement predicates--not metadata.
-    if (bucketSpec.metaField() &&
-        (matchExprPath == bucketSpec.metaField().value() ||
-         expression::isPathPrefixOf(bucketSpec.metaField().value(), matchExprPath))) {
-        tasserted(
-            6707200,
-            str::stream() << "createComparisonPredicate() does not handle metadata predicates: "
-                          << matchExpr);
-    }
-
-    // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
-    if (bucketSpec.fieldIsComputed(matchExprPath.toString())) {
-        return "can't handle a computed field"_sd;
-    }
-
-    // We must avoid mapping predicates on fields removed by $project.
-    if (!determineIncludeField(matchExprPath, bucketSpec.behavior(), bucketSpec.fieldSet())) {
-        return "can't handle a field removed by projection"_sd;
-    }
-
-    const auto isTimeField = (matchExprPath == bucketSpec.timeField());
-    if (isTimeField && matchExprData.type() != BSONType::Date) {
-        // Users are not allowed to insert non-date measurements into time field. So this query
-        // would not match anything. We do not need to optimize for this case.
-        return "This predicate will never be true, because the time field always contains a Date"_sd;
-    }
-
-    return boost::none;
-}
-
-std::unique_ptr<MatchExpression> createComparisonPredicate(
-    const ComparisonMatchExpressionBase* matchExpr,
-    const BucketSpec& bucketSpec,
-    int bucketMaxSpanSeconds,
-    boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    bool haveComputedMetaField,
-    bool includeMetaField,
-    bool assumeNoMixedSchemaData,
-    IneligiblePredicatePolicy policy) {
-    using namespace timeseries;
-    const auto matchExprPath = matchExpr->path();
-    const auto matchExprData = matchExpr->getData();
-
-    const auto error = checkComparisonPredicateErrors(
-        matchExpr, matchExprPath, matchExprData, bucketSpec, pExpCtx->collationMatchesDefault);
-    if (error) {
-        return handleIneligible(policy, matchExpr, *error).loosePredicate;
-    }
-
-    const auto isTimeField = (matchExprPath == bucketSpec.timeField());
-    auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
-    const StringData minPathStringData(minPath);
-    auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprPath;
-    const StringData maxPathStringData(maxPath);
-
-    BSONObj minTime;
-    BSONObj maxTime;
-    bool dateIsExtended = false;
-    if (isTimeField) {
-        auto timeField = matchExprData.Date();
-        minTime = BSON("" << timeField - Seconds(bucketMaxSpanSeconds));
-        maxTime = BSON("" << timeField + Seconds(bucketMaxSpanSeconds));
-
-        // The date is in the "extended" range if it doesn't fit into the bottom
-        // 32 bits.
-        long long timestamp = timeField.toMillisSinceEpoch();
-        dateIsExtended = timestamp < 0LL || timestamp > max32BitEpochMillis;
-    }
-
-    switch (matchExpr->matchType()) {
-        case MatchExpression::EQ:
-        case MatchExpression::INTERNAL_EXPR_EQ:
-            // For $eq, make both a $lte against 'control.min' and a $gte predicate against
-            // 'control.max'.
-            //
-            // If the comparison is against the 'time' field and we haven't stored a time outside of
-            // the 32 bit range, include a predicate against the _id field which is converted to
-            // the maximum for the corresponding range of ObjectIds and
-            // is adjusted by the max range for a bucket to approximate the max bucket value given
-            // the min. Also include a predicate against the _id field which is converted to the
-            // minimum for the range of ObjectIds corresponding to the given date. In
-            // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}} and
-            // a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}} predicate which will be
-            // helpful in reducing bounds for index scans on 'time' field and routing on mongos.
-            //
-            // The same procedure applies to aggregation expressions of the form
-            // {$expr: {$eq: [...]}} that can be rewritten to use $_internalExprEq.
-            if (!isTimeField) {
-                return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                      minPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                      maxPathStringData, matchExprData)),
-                    createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
-            } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                       minTime.firstElement()),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                       maxTime.firstElement()));
-            } else if (dateIsExtended) {
-                // Since by this point we know that no time value has been inserted which is
-                // outside the epoch range, we know that no document can meet this criteria
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            } else {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPathStringData,
-                                                                       matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                       minTime.firstElement()),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPathStringData,
-                                                                       matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                       maxTime.firstElement()),
-                    MatchExprPredicate<LTEMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                                   bucketMaxSpanSeconds)),
-                    MatchExprPredicate<GTEMatchExpression, Value>(
-                        kBucketIdFieldName,
-                        constructObjectIdValue<GTEMatchExpression>(matchExprData,
-                                                                   bucketMaxSpanSeconds)));
-            }
-            MONGO_UNREACHABLE_TASSERT(6646903);
-
-        case MatchExpression::GT:
-        case MatchExpression::INTERNAL_EXPR_GT:
-            // For $gt, make a $gt predicate against 'control.max'. In addition, if the comparison
-            // is against the 'time' field, and the collection doesn't contain times outside the
-            // 32 bit range, include a predicate against the _id field which is converted to the
-            // maximum for the corresponding range of ObjectIds and is adjusted by the max range
-            // for a bucket to approximate the max bucket value given the min.
-            //
-            // In addition, we include a {'control.min' : {$gt: 'time - bucketMaxSpanSeconds'}}
-            // predicate which will be helpful in reducing bounds for index scans on 'time' field
-            // and routing on mongos.
-            //
-            // The same procedure applies to aggregation expressions of the form
-            // {$expr: {$gt: [...]}} that can be rewritten to use $_internalExprGt.
-            if (!isTimeField) {
-                return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprGTMatchExpression>(maxPathStringData,
-                                                                    matchExprData),
-                    createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
-            } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
-                                                                      minTime.firstElement()));
-            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // every document must meet this criteria
-                return std::make_unique<AlwaysTrueMatchExpression>();
-            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
-                // Since by this point we know that no time value has been inserted >
-                // max32BitEpochMillis, we know that no document can meet this criteria
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            } else {
-                return makePredicate(MatchExprPredicate<InternalExprGTMatchExpression>(
-                                         maxPathStringData, matchExprData),
-                                     MatchExprPredicate<InternalExprGTMatchExpression>(
-                                         minPathStringData, minTime.firstElement()),
-                                     MatchExprPredicate<GTMatchExpression, Value>(
-                                         kBucketIdFieldName,
-                                         constructObjectIdValue<GTMatchExpression>(
-                                             matchExprData, bucketMaxSpanSeconds)));
-            }
-            MONGO_UNREACHABLE_TASSERT(6646904);
-
-        case MatchExpression::GTE:
-        case MatchExpression::INTERNAL_EXPR_GTE:
-            // For $gte, make a $gte predicate against 'control.max'. In addition, if the comparison
-            // is against the 'time' field, and the collection doesn't contain times outside the
-            // 32 bit range, include a predicate against the _id field which is
-            // converted to the minimum for the corresponding range of ObjectIds and is adjusted
-            // by the max range for a bucket to approximate the max bucket value given the min. In
-            // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}}
-            // predicate which will be helpful in reducing bounds for index scans on 'time' field
-            // and routing on mongos.
-            //
-            // The same procedure applies to aggregation expressions of the form
-            // {$expr: {$gte: [...]}} that can be rewritten to use $_internalExprGte.
-            if (!isTimeField) {
-                return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprGTEMatchExpression>(maxPathStringData,
-                                                                     matchExprData),
-                    createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
-            } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                    MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                       minTime.firstElement()));
-            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // every document must meet this criteria
-                return std::make_unique<AlwaysTrueMatchExpression>();
-            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
-                // Since by this point we know that no time value has been inserted > 0xffffffff,
-                // we know that no value can meet this criteria
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            } else {
-                return makePredicate(MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                         maxPathStringData, matchExprData),
-                                     MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                         minPathStringData, minTime.firstElement()),
-                                     MatchExprPredicate<GTEMatchExpression, Value>(
-                                         kBucketIdFieldName,
-                                         constructObjectIdValue<GTEMatchExpression>(
-                                             matchExprData, bucketMaxSpanSeconds)));
-            }
-            MONGO_UNREACHABLE_TASSERT(6646905);
-
-        case MatchExpression::LT:
-        case MatchExpression::INTERNAL_EXPR_LT:
-            // For $lt, make a $lt predicate against 'control.min'. In addition, if the comparison
-            // is against the 'time' field, include a predicate against the _id field which is
-            // converted to the minimum for the corresponding range of ObjectIds, unless the
-            // collection contain extended range dates which won't fit int the 32 bits allocated
-            // for _id.
-            //
-            // In addition, we include a {'control.max' : {$lt: 'time + bucketMaxSpanSeconds'}}
-            // predicate which will be helpful in reducing bounds for index scans on 'time' field
-            // and routing on mongos.
-            //
-            // The same procedure applies to aggregation expressions of the form
-            // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
-            if (!isTimeField) {
-                return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprLTMatchExpression>(minPathStringData,
-                                                                    matchExprData),
-                    createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
-            } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
-                                                                      maxTime.firstElement()));
-            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // we know that no document can meet this criteria
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
-                // Since by this point we know that no time value has been inserted > 0xffffffff
-                // every time value must be less than this value
-                return std::make_unique<AlwaysTrueMatchExpression>();
-            } else {
-                return makePredicate(MatchExprPredicate<InternalExprLTMatchExpression>(
-                                         minPathStringData, matchExprData),
-                                     MatchExprPredicate<InternalExprLTMatchExpression>(
-                                         maxPathStringData, maxTime.firstElement()),
-                                     MatchExprPredicate<LTMatchExpression, Value>(
-                                         kBucketIdFieldName,
-                                         constructObjectIdValue<LTMatchExpression>(
-                                             matchExprData, bucketMaxSpanSeconds)));
-            }
-            MONGO_UNREACHABLE_TASSERT(6646906);
-
-        case MatchExpression::LTE:
-        case MatchExpression::INTERNAL_EXPR_LTE:
-            // For $lte, make a $lte predicate against 'control.min'. In addition, if the comparison
-            // is against the 'time' field, and the collection doesn't contain times outside the
-            // 32 bit range, include a predicate against the _id field which is
-            // converted to the maximum for the corresponding range of ObjectIds. In
-            // addition, we include a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}}
-            // predicate which will be helpful in reducing bounds for index scans on 'time' field
-            // and routing on mongos.
-            //
-            // The same procedure applies to aggregation expressions of the form
-            // {$expr: {$lte: [...]}} that can be rewritten to use $_internalExprLte.
-            if (!isTimeField) {
-                return makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                    std::make_unique<InternalExprLTEMatchExpression>(minPathStringData,
-                                                                     matchExprData),
-                    createTypeEqualityPredicate(pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
-            } else if (bucketSpec.usesExtendedRange()) {
-                return makePredicate(
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                    MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                       maxTime.firstElement()));
-            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // we know that no document can meet this criteria
-                return std::make_unique<AlwaysFalseMatchExpression>();
-            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
-                // Since by this point we know that no time value has been inserted > 0xffffffff
-                // every document must be less than this value
-                return std::make_unique<AlwaysTrueMatchExpression>();
-            } else {
-                return makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                         minPathStringData, matchExprData),
-                                     MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                         maxPathStringData, maxTime.firstElement()),
-                                     MatchExprPredicate<LTEMatchExpression, Value>(
-                                         kBucketIdFieldName,
-                                         constructObjectIdValue<LTEMatchExpression>(
-                                             matchExprData, bucketMaxSpanSeconds)));
-            }
-            MONGO_UNREACHABLE_TASSERT(6646907);
-
-        default:
-            MONGO_UNREACHABLE_TASSERT(5348302);
-    }
-
-    MONGO_UNREACHABLE_TASSERT(5348303);
-}
-
-std::unique_ptr<MatchExpression> createTightComparisonPredicate(
-    const ComparisonMatchExpressionBase* matchExpr,
-    const BucketSpec& bucketSpec,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
-    using namespace timeseries;
-    const auto matchExprPath = matchExpr->path();
-    const auto matchExprData = matchExpr->getData();
-
-    const auto error = checkComparisonPredicateErrors(
-        matchExpr, matchExprPath, matchExprData, bucketSpec, collationMatchesDefault);
-    if (error) {
-        return handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore, matchExpr, *error)
-            .loosePredicate;
-    }
-
-    // We have to disable the tight predicate for the measurement field. There might be missing
-    // values in the measurements and the control fields ignore them on insertion. So we cannot use
-    // bucket min and max to determine the property of all events in the bucket. For measurement
-    // fields, there's a further problem that if the control field is an array, we cannot generate
-    // the tight predicate because the predicate will be implicitly mapped over the array elements.
-    if (matchExprPath != bucketSpec.timeField()) {
-        return handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore,
-                                matchExpr,
-                                "can't create tight predicate on non-time field")
-            .tightPredicate;
-    }
-
-    auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
-    const StringData minPathStringData(minPath);
-    auto maxPath = std::string{kControlMaxFieldNamePrefix} + matchExprPath;
-    const StringData maxPathStringData(maxPath);
-
-    switch (matchExpr->matchType()) {
-        // All events satisfy $eq if bucket min and max both satisfy $eq.
-        case MatchExpression::EQ:
-            return makePredicate(
-                MatchExprPredicate<EqualityMatchExpression>(minPathStringData, matchExprData),
-                MatchExprPredicate<EqualityMatchExpression>(maxPathStringData, matchExprData));
-        case MatchExpression::INTERNAL_EXPR_EQ:
-            return makePredicate(
-                MatchExprPredicate<InternalExprEqMatchExpression>(minPathStringData, matchExprData),
-                MatchExprPredicate<InternalExprEqMatchExpression>(maxPathStringData,
-                                                                  matchExprData));
-
-        // All events satisfy $gt if bucket min satisfy $gt.
-        case MatchExpression::GT:
-            return std::make_unique<GTMatchExpression>(minPathStringData, matchExprData);
-        case MatchExpression::INTERNAL_EXPR_GT:
-            return std::make_unique<InternalExprGTMatchExpression>(minPathStringData,
-                                                                   matchExprData);
-
-        // All events satisfy $gte if bucket min satisfy $gte.
-        case MatchExpression::GTE:
-            return std::make_unique<GTEMatchExpression>(minPathStringData, matchExprData);
-        case MatchExpression::INTERNAL_EXPR_GTE:
-            return std::make_unique<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                    matchExprData);
-
-        // All events satisfy $lt if bucket max satisfy $lt.
-        case MatchExpression::LT:
-            return std::make_unique<LTMatchExpression>(maxPathStringData, matchExprData);
-        case MatchExpression::INTERNAL_EXPR_LT:
-            return std::make_unique<InternalExprLTMatchExpression>(maxPathStringData,
-                                                                   matchExprData);
-
-        // All events satisfy $lte if bucket max satisfy $lte.
-        case MatchExpression::LTE:
-            return std::make_unique<LTEMatchExpression>(maxPathStringData, matchExprData);
-        case MatchExpression::INTERNAL_EXPR_LTE:
-            return std::make_unique<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                    matchExprData);
-
-        default:
-            MONGO_UNREACHABLE_TASSERT(7026901);
-    }
-}
-
-std::unique_ptr<MatchExpression> createTightExprComparisonPredicate(
-    const ExprMatchExpression* matchExpr,
-    const BucketSpec& bucketSpec,
-    boost::intrusive_ptr<ExpressionContext> pExpCtx) {
-    using namespace timeseries;
-    auto rewriteMatchExpr = RewriteExpr::rewrite(matchExpr->getExpression(), pExpCtx->getCollator())
-                                .releaseMatchExpression();
-    if (rewriteMatchExpr &&
-        ComparisonMatchExpressionBase::isInternalExprComparison(rewriteMatchExpr->matchType())) {
-        auto compareMatchExpr =
-            checked_cast<const ComparisonMatchExpressionBase*>(rewriteMatchExpr.get());
-        return createTightComparisonPredicate(
-            compareMatchExpr, bucketSpec, pExpCtx->collationMatchesDefault);
-    }
-
-    return handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore,
-                            matchExpr,
-                            "can't handle non-comparison $expr match expression")
-        .tightPredicate;
-}
-
-}  // namespace
-
 BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
     const MatchExpression* matchExpr,
     const BucketSpec& bucketSpec,
@@ -686,10 +135,13 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
     bool haveComputedMetaField,
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
-    IneligiblePredicatePolicy policy) {
+    IneligiblePredicatePolicy policy,
+    bool fixedBuckets) {
 
     tassert(5916304, "BucketSpec::createPredicatesOnBucketLevelField nullptr", matchExpr);
 
+    auto bucketPredicateParams = timeseries::BucketLevelComparisonPredicateGeneratorBase::Params{
+        bucketSpec, bucketMaxSpanSeconds, pExpCtx, assumeNoMixedSchemaData, policy, fixedBuckets};
     // If we have a leaf predicate on a meta field, we can map it to the bucket's meta field.
     // This includes comparisons such as $eq and $lte, as well as other non-comparison predicates
     // such as $exists, or $mod. Unrenamable expressions can't be split into a whole bucket level
@@ -726,6 +178,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         auto nextAnd = static_cast<const AndMatchExpression*>(matchExpr);
         auto looseAndExpression = std::make_unique<AndMatchExpression>();
         auto tightAndExpression = std::make_unique<AndMatchExpression>();
+        bool rewriteProvidesExactMatchPredicate = true;
         for (size_t i = 0; i < nextAnd->numChildren(); i++) {
             auto child = createPredicatesOnBucketLevelField(nextAnd->getChild(i),
                                                             bucketSpec,
@@ -734,7 +187,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                                                             haveComputedMetaField,
                                                             includeMetaField,
                                                             assumeNoMixedSchemaData,
-                                                            policy);
+                                                            policy,
+                                                            fixedBuckets);
             if (child.loosePredicate) {
                 looseAndExpression->add(std::move(child.loosePredicate));
             }
@@ -745,6 +199,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                 // For tight expression, null means always false, we can short circuit here.
                 tightAndExpression = nullptr;
             }
+            rewriteProvidesExactMatchPredicate =
+                rewriteProvidesExactMatchPredicate && child.rewriteProvidesExactMatchPredicate;
         }
 
         // For a loose predicate, if we are unable to generate an expression we can just treat it as
@@ -767,7 +223,9 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             tightExpression = std::move(tightAndExpression);
         }
 
-        return {std::move(looseExpression), std::move(tightExpression)};
+        return {std::move(looseExpression),
+                std::move(tightExpression),
+                rewriteProvidesExactMatchPredicate};
     } else if (matchExpr->matchType() == MatchExpression::OR) {
         // Given {$or: [A, B]}, suppose A, B can be pushed down as A', B'.
         // If an event matches {$or: [A, B]} then either:
@@ -777,6 +235,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         auto nextOr = static_cast<const OrMatchExpression*>(matchExpr);
         auto looseOrExpression = std::make_unique<OrMatchExpression>();
         auto tightOrExpression = std::make_unique<OrMatchExpression>();
+        bool rewriteProvidesExactMatchPredicate = true;
 
         for (size_t i = 0; i < nextOr->numChildren(); i++) {
             auto child = createPredicatesOnBucketLevelField(nextOr->getChild(i),
@@ -786,7 +245,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                                                             haveComputedMetaField,
                                                             includeMetaField,
                                                             assumeNoMixedSchemaData,
-                                                            policy);
+                                                            policy,
+                                                            fixedBuckets);
             if (looseOrExpression && child.loosePredicate) {
                 looseOrExpression->add(std::move(child.loosePredicate));
             } else {
@@ -799,6 +259,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             if (child.tightPredicate) {
                 tightOrExpression->add(std::move(child.tightPredicate));
             }
+            rewriteProvidesExactMatchPredicate =
+                rewriteProvidesExactMatchPredicate && child.rewriteProvidesExactMatchPredicate;
         }
 
         // For a loose predicate, if we are unable to generate an expression we can just treat it as
@@ -821,32 +283,31 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             tightExpression = std::move(tightOrExpression);
         }
 
-        return {std::move(looseExpression), std::move(tightExpression)};
+        return {std::move(looseExpression),
+                std::move(tightExpression),
+                rewriteProvidesExactMatchPredicate};
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr) ||
                ComparisonMatchExpressionBase::isInternalExprComparison(matchExpr->matchType())) {
-        return {
-            createComparisonPredicate(checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
-                                      bucketSpec,
-                                      bucketMaxSpanSeconds,
-                                      pExpCtx,
-                                      haveComputedMetaField,
-                                      includeMetaField,
-                                      assumeNoMixedSchemaData,
-                                      policy),
-            createTightComparisonPredicate(
-                checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
-                bucketSpec,
-                pExpCtx->collationMatchesDefault)};
+        auto result = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+            checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
+            bucketPredicateParams,
+            false /* tight */);
+
+        auto tightResult = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+            checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
+            bucketPredicateParams,
+            true /* tight */);
+        return {std::move(result.matchExpr),
+                std::move(tightResult.matchExpr),
+                result.rewriteProvidesExactMatchPredicate};
     } else if (matchExpr->matchType() == MatchExpression::EXPRESSION) {
         return {
             // The loose predicate will be pushed before the unpacking which will be inspected by
-            // the
-            // query planner. Since the classic planner doesn't handle the $expr expression, we
-            // don't
-            // generate the loose predicate.
+            // the query planner. Since the classic planner doesn't handle the $expr expression, we
+            // don't generate the loose predicate.
             nullptr,
-            createTightExprComparisonPredicate(
-                checked_cast<const ExprMatchExpression*>(matchExpr), bucketSpec, pExpCtx)};
+            createTightExprComparisonPredicate(checked_cast<const ExprMatchExpression*>(matchExpr),
+                                               bucketPredicateParams)};
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
         if (geoExpr.getPred() == GeoExpression::WITHIN ||
@@ -889,23 +350,21 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         auto result = std::make_unique<OrMatchExpression>();
 
         bool alwaysTrue = false;
+        bool rewriteProvidesExactMatchPredicate = true;
         for (auto&& elem : inExpr->getEqualities()) {
             // If inExpr is {$in: [X, Y]} then the elems are '0: X' and '1: Y'.
             auto eq = std::make_unique<EqualityMatchExpression>(
                 inExpr->path(), elem, nullptr /*annotation*/, inExpr->getCollator());
-            auto child = createComparisonPredicate(eq.get(),
-                                                   bucketSpec,
-                                                   bucketMaxSpanSeconds,
-                                                   pExpCtx,
-                                                   haveComputedMetaField,
-                                                   includeMetaField,
-                                                   assumeNoMixedSchemaData,
-                                                   policy);
+            auto child = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+                eq.get(), bucketPredicateParams, false /* tight */);
+            rewriteProvidesExactMatchPredicate =
+                rewriteProvidesExactMatchPredicate && child.rewriteProvidesExactMatchPredicate;
 
-            // As with OR, only add the child if it has been succesfully translated, otherwise the
-            // $in cannot be correctly mapped to bucket level fields and we should return nullptr.
-            if (child) {
-                result->add(std::move(child));
+            // As with OR, only add the child if it has been succesfully translated, otherwise
+            // the $in cannot be correctly mapped to bucket level fields and we should return
+            // nullptr.
+            if (child.matchExpr) {
+                result->add(std::move(child.matchExpr));
             } else {
                 alwaysTrue = true;
                 if (policy == IneligiblePredicatePolicy::kIgnore)
@@ -917,7 +376,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
 
         // As above, no special case for an empty IN: returning nullptr would be incorrect because
         // it means 'always-true', here.
-        return {std::move(result), nullptr};
+        return {std::move(result), nullptr, rewriteProvidesExactMatchPredicate};
     }
     return handleIneligible(policy, matchExpr, "can't handle this predicate");
 }
@@ -994,7 +453,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
               haveComputedMetaField,
               includeMetaField,
               assumeNoMixedSchemaData,
-              policy)
+              policy,
+              false /* fixedBuckets */)
               .loosePredicate
         : nullptr;
 

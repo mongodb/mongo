@@ -157,7 +157,16 @@ public:
         // A tight predicate is a predicate which returns true when all measures of a bucket
         // matches.
         std::unique_ptr<MatchExpression> tightPredicate;
+
+        // Is true iff all the predicates in the original match expression are rounded by
+        // 'bucketRoundingSeconds', the bucket parameters have not changed, and the predicate is not
+        // a date in the "extended range".
+        bool rewriteProvidesExactMatchPredicate = false;
     };
+
+    static BucketPredicate handleIneligible(IneligiblePredicatePolicy policy,
+                                            const MatchExpression* matchExpr,
+                                            StringData message);
 
     /**
      * Takes a predicate after $_internalUnpackBucket as an argument and attempts to rewrite it as
@@ -186,6 +195,10 @@ public:
      * If the provided predicate is ineligible for this mapping and using
      * IneligiblePredicatePolicy::kIgnore, both loose and tight predicates will be set to nullptr.
      * When using IneligiblePredicatePolicy::kError it raises a user error.
+     *
+     * If fixedBuckets is true and the predicate is on the timeField, the generated 'loose'
+     * predicate on the 'control.min.time' field will not be subtracted by 'bucketMaxSpanSeconds',
+     * and some queries will not have an 'eventFilter' nor 'wholeBucketFilter'.
      */
     static BucketPredicate createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr,
@@ -195,7 +208,8 @@ public:
         bool haveComputedMetaField,
         bool includeMetaField,
         bool assumeNoMixedSchemaData,
-        IneligiblePredicatePolicy policy);
+        IneligiblePredicatePolicy policy,
+        bool fixedBuckets);
 
     /**
      * Converts an event-level predicate to a bucket-level predicate, such that

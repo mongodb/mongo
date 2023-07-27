@@ -846,6 +846,13 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
     }
 }
 
+bool CollectionImpl::areTimeseriesBucketsFixed() const {
+    auto tsOptions = getTimeseriesOptions();
+    return tsOptions &&
+        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds() &&
+        !timeseriesBucketingParametersMayHaveChanged();
+}
+
 bool CollectionImpl::isClustered() const {
     return getClusteredInfo().has_value();
 }

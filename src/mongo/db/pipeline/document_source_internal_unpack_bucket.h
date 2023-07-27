@@ -74,6 +74,7 @@ public:
     static constexpr StringData kIncludeMaxTimeAsMetadata = "includeMaxTimeAsMetadata"_sd;
     static constexpr StringData kWholeBucketFilter = "wholeBucketFilter"_sd;
     static constexpr StringData kEventFilter = "eventFilter"_sd;
+    static constexpr StringData kFixedBuckets = "fixedBuckets"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -83,14 +84,16 @@ public:
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        BucketUnpacker bucketUnpacker,
                                        int bucketMaxSpanSeconds,
-                                       bool assumeNoMixedSchemaData = false);
+                                       bool assumeNoMixedSchemaData = false,
+                                       bool fixedBuckets = false);
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        BucketUnpacker bucketUnpacker,
                                        int bucketMaxSpanSeconds,
                                        const boost::optional<BSONObj>& eventFilterBson,
                                        const boost::optional<BSONObj>& wholeBucketFilterBson,
-                                       bool assumeNoMixedSchemaData = false);
+                                       bool assumeNoMixedSchemaData = false,
+                                       bool fixedBuckets = false);
 
     const char* getSourceName() const override {
         return kStageNameInternal.rawData();
@@ -295,6 +298,10 @@ private:
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.
     bool _assumeNoMixedSchemaData = false;
+
+    // This is true if 'bucketRoundingSeconds' and 'bucketMaxSpanSeconds' are set, equal, and
+    // unchanged. Then we can push down certain $match and $group queries.
+    bool _fixedBuckets = false;
 
     // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
     // the _id index, as _id is truncates to 32 bits

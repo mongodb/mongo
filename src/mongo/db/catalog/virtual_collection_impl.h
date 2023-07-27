@@ -298,6 +298,12 @@ public:
         unimplementedTasserted();
     }
 
+    bool areTimeseriesBucketsFixed() const final {
+        // A virtual collection is never a time-series collection, so it can never have fixed
+        // buckets.
+        return false;
+    }
+
     bool isClustered() const final {
         return false;
     }

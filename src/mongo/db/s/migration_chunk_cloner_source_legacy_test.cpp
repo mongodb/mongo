@@ -317,6 +317,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool areTimeseriesBucketsFixed() const override {
+        auto tsOptions = getTimeseriesOptions();
+        return tsOptions &&
+            tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds() &&
+            !timeseriesBucketingParametersMayHaveChanged();
+    }
+
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const override {
         return _coll->doesTimeseriesBucketsDocContainMixedSchemaData(bucketsDoc);
     }

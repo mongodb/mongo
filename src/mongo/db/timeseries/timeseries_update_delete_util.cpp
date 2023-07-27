@@ -331,7 +331,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
               false /*haveComputedMetaField*/,
               false /*includeMetaField*/,
               true /*assumeNoMixedSchemaData*/,
-              BucketSpec::IneligiblePredicatePolicy::kIgnore /*policy*/)
+              BucketSpec::IneligiblePredicatePolicy::kIgnore /*policy*/,
+              false /* fixedBuckets */)
               .loosePredicate
         : nullptr;
 

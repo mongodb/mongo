@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -1173,5 +1174,92 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
                                "] ] ]}},field: \"loc\"}}"));
     ASSERT_FALSE(predicate.tightPredicate);
 }
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeRemoveEventFilterOnTimePredicateWithFixedBuckets) {
+
+    auto date = Date_t::now();
+    auto roundedTime = timeseries::roundTimestampBySeconds(date, 3600);
+
+    // Validate 'rewriteProvidesExactMatchPredicate' is true when the predicate aligns with the
+    // bucket boundary.
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$gte" << roundedTime)));
+        auto pipeline =
+            Pipeline::parse(makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                                                "'time', bucketMaxSpanSeconds: 3600, "
+                                                "fixedBuckets: true }}"),
+                                       timePred),
+                            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(container.size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        ASSERT_TRUE(predicate.rewriteProvidesExactMatchPredicate);
+    }
+
+    // Validate 'rewriteProvidesExactMatchPredicate' is false when the predicate does not align with
+    // the bucket boundary.
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$gte" << date)));
+        auto pipeline =
+            Pipeline::parse(makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                                                "'time', bucketMaxSpanSeconds: 3600, "
+                                                "fixedBuckets: true }}"),
+                                       timePred),
+                            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(container.size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        ASSERT_FALSE(predicate.rewriteProvidesExactMatchPredicate);
+    }
+
+    // Validate 'rewriteProvidesExactMatchPredicate' is false when the predicate is before 1970.
+    {
+        auto minDate = Date_t::min() + Days(100);  // date before 1970.
+        auto timePred = BSON("$match" << BSON("time" << BSON("$gte" << minDate)));
+        auto pipeline =
+            Pipeline::parse(makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                                                "'time', bucketMaxSpanSeconds: 3600, "
+                                                "fixedBuckets: true }}"),
+                                       timePred),
+                            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(container.size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        ASSERT_FALSE(predicate.rewriteProvidesExactMatchPredicate);
+    }
+    // Validate 'rewriteProvidesExactMatchPredicate' is false when the buckets are not fixed, even
+    // if the bucket boundaries align.
+    {
+        auto timePred = BSON("$match" << BSON("time" << BSON("$gte" << roundedTime)));
+        auto pipeline =
+            Pipeline::parse(makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                                                "'time', bucketMaxSpanSeconds: 3600, "
+                                                "fixedBuckets: false }}"),
+                                       timePred),
+                            getExpCtx());
+        auto& container = pipeline->getSources();
+
+        ASSERT_EQ(container.size(), 2U);
+
+        auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+        auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                             ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+        ASSERT_FALSE(predicate.rewriteProvidesExactMatchPredicate);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

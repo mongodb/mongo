@@ -251,6 +251,8 @@ public:
     bool getRequiresTimeseriesExtendedRangeSupport() const final;
     void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const final;
 
+    bool areTimeseriesBucketsFixed() const final;
+
     /**
      * isClustered() relies on the object returned from getClusteredInfo(). If
      * ClusteredCollectionInfo exists, the collection is clustered.

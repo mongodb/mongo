@@ -319,6 +319,10 @@ Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& 
             getBucketRoundingSecondsFromGranularity(BucketGranularityEnum::Seconds));
     }
 
+    return roundTimestampBySeconds(time, roundingSeconds);
+}
+
+Date_t roundTimestampBySeconds(const Date_t& time, const long long roundingSeconds) {
     long long timeSeconds = durationCount<Seconds>(time.toDurationSinceEpoch());
     long long roundedTimeSeconds = (timeSeconds - (timeSeconds % roundingSeconds));
     return Date_t::fromDurationSinceEpoch(Seconds{roundedTimeSeconds});

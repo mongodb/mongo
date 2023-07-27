@@ -290,10 +290,11 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BucketUnpacker bucketUnpacker,
     int bucketMaxSpanSeconds,
-    bool assumeNoMixedSchemaData)
+    bool assumeNoMixedSchemaData,
+    bool fixedBuckets)
     : DocumentSource(kStageNameInternal, expCtx),
       _assumeNoMixedSchemaData(assumeNoMixedSchemaData),
-
+      _fixedBuckets(fixedBuckets),
       _bucketUnpacker(std::move(bucketUnpacker)),
       _bucketMaxSpanSeconds{bucketMaxSpanSeconds} {}
 
@@ -303,9 +304,13 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     int bucketMaxSpanSeconds,
     const boost::optional<BSONObj>& eventFilterBson,
     const boost::optional<BSONObj>& wholeBucketFilterBson,
-    bool assumeNoMixedSchemaData)
-    : DocumentSourceInternalUnpackBucket(
-          expCtx, std::move(bucketUnpacker), bucketMaxSpanSeconds, assumeNoMixedSchemaData) {
+    bool assumeNoMixedSchemaData,
+    bool fixedBuckets)
+    : DocumentSourceInternalUnpackBucket(expCtx,
+                                         std::move(bucketUnpacker),
+                                         bucketMaxSpanSeconds,
+                                         assumeNoMixedSchemaData,
+                                         fixedBuckets) {
     if (eventFilterBson) {
         _eventFilterBson = eventFilterBson->getOwned();
         _eventFilter =
@@ -346,6 +351,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     auto hasBucketMaxSpanSeconds = false;
     auto bucketMaxSpanSeconds = 0;
     auto assumeClean = false;
+    bool fixedBuckets = false;
     std::vector<std::string> computedMetaProjFields;
     boost::optional<BSONObj> eventFilterBson;
     boost::optional<BSONObj> wholeBucketFilterBson;
@@ -454,6 +460,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                                   << " field must be an object, got: " << elem.type(),
                     elem.type() == BSONType::Object);
             wholeBucketFilterBson = elem.Obj();
+        } else if (fieldName == kFixedBuckets) {
+            uassert(7823300,
+                    str::stream() << kFixedBuckets << " field must be a bool, got: " << elem.type(),
+                    elem.type() == BSONType::Bool);
+            fixedBuckets = elem.boolean();
         } else {
             uasserted(5346506,
                       str::stream()
@@ -473,7 +484,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                                                               bucketMaxSpanSeconds,
                                                               eventFilterBson,
                                                               wholeBucketFilterBson,
-                                                              assumeClean);
+                                                              assumeClean,
+                                                              fixedBuckets);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createFromBsonExternal(
@@ -523,7 +535,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         BucketUnpacker{std::move(bucketSpec)},
         // Using the bucket span associated with the default granularity seconds.
         timeseries::getMaxSpanSecondsFromGranularity(BucketGranularityEnum::Seconds),
-        assumeClean);
+        assumeClean,
+        false /* fixedBuckets */);
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& array,
@@ -594,6 +607,10 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     }
     if (_eventFilter) {
         out.addField(kEventFilter, Value{_eventFilter->serialize(opts)});
+    }
+
+    if (_fixedBuckets) {
+        out.addField(kFixedBuckets, opts.serializeLiteral(Value(_fixedBuckets)));
     }
 
     if (!explain) {
@@ -775,7 +792,8 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
         haveComputedMetaField(),
         _bucketUnpacker.includeMetaField(),
         _assumeNoMixedSchemaData,
-        BucketSpec::IneligiblePredicatePolicy::kIgnore);
+        BucketSpec::IneligiblePredicatePolicy::kIgnore,
+        _fixedBuckets);
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
@@ -1439,7 +1457,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Attempt to map predicates on bucketed fields to the predicates on the control field.
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get())) {
-
         // Merge multiple following $match stages.
         auto itrToMatch = std::next(itr);
         while (std::next(itrToMatch) != container->end() &&
@@ -1450,7 +1467,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         auto predicates = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression());
 
         // Try to create a tight bucket predicate to perform bucket level matching.
-        if (predicates.tightPredicate) {
+        // If we removed the _eventFilter with fixed buckets, we do not need a wholeBucketFilter.
+        if (predicates.tightPredicate && !predicates.rewriteProvidesExactMatchPredicate) {
             _wholeBucketFilterBson = predicates.tightPredicate->serialize();
             _wholeBucketFilter =
                 uassertStatusOK(MatchExpressionParser::parse(_wholeBucketFilterBson,
@@ -1460,18 +1478,20 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter));
         }
 
-        // Push the original event predicate into the unpacking stage.
-        _eventFilterBson = nextMatch->getQuery().getOwned();
-        _eventFilter =
-            uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
-                                                         pExpCtx,
-                                                         ExtensionsCallbackNoop(),
-                                                         Pipeline::kAllowedMatcherFeatures));
-        _eventFilter = MatchExpression::optimize(std::move(_eventFilter));
-        _eventFilterDeps = {};
-        match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
-        container->erase(std::next(itr));
+        if (!predicates.rewriteProvidesExactMatchPredicate) {
+            // Push the original event predicate into the unpacking stage.
+            _eventFilterBson = nextMatch->getQuery().getOwned();
+            _eventFilter =
+                uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
+                                                             pExpCtx,
+                                                             ExtensionsCallbackNoop(),
+                                                             Pipeline::kAllowedMatcherFeatures));
+            _eventFilter = MatchExpression::optimize(std::move(_eventFilter));
+            _eventFilterDeps = {};
+            match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+        }
 
+        container->erase(std::next(itr));
         // If the $match is not followed by other stages referencing fields (e.g. $count), we can
         // unpack directly to BSON so that data doesn't need to be materialized to Document.
         auto deps = getRestPipelineDependencies(itr, container, false /* includeEventFilter */);
