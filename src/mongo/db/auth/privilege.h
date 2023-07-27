@@ -96,7 +96,7 @@ public:
     Privilege& operator=(Privilege&&) = default;
 
     Privilege(const ResourcePattern& resource, ActionType action);
-    Privilege(const ResourcePattern& resource, const ActionSet& actions);
+    Privilege(const ResourcePattern& resource, ActionSet actions);
 
     // Transform a ParsedPrivilege into a concrete Privilege by adding tenantId
     // and turning string actions into ActionSet bits.

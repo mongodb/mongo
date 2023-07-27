@@ -299,7 +299,6 @@ enums:
                         - collStats
                         - compact
                         - compactStructuredEncryptionData
-                        - configureQueryAnalyzer # TODO (SERVER-75656): remove from serverlessActionTypes.
                         - convertToCapped
                         - createCollection
                         - createIndex
@@ -373,7 +372,6 @@ enums:
                         - collStats
                         - compact
                         - compactStructuredEncryptionData
-                        - configureQueryAnalyzer # TODO (SERVER-75656): remove from serverlessActionTypes.
                         - convertToCapped
                         - createCollection
                         - createIndex

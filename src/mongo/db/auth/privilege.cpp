@@ -95,8 +95,8 @@ Privilege::Privilege(const ResourcePattern& resource, const ActionType action)
     : _resource(resource) {
     _actions.addAction(action);
 }
-Privilege::Privilege(const ResourcePattern& resource, const ActionSet& actions)
-    : _resource(resource), _actions(actions) {}
+Privilege::Privilege(const ResourcePattern& resource, ActionSet actions)
+    : _resource(resource), _actions(std::move(actions)) {}
 
 Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>& tenantId,
                                                 const auth::ParsedPrivilege& pp,

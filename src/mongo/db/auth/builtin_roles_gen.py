@@ -62,6 +62,12 @@ The builtin_roles_spec YAML document is a mapping containing one toplevel field:
                             The elements are nominally strings matching those from action_types.yml,
                             however to make compositing lists easier, elements may be lists of strings
                             and will be flattened during the generation process.
+                `tenancy`: (one of 'any', 'single', 'multi', 'system', or 'tenant', default: any)
+                            'any': This privilege always applies to the role.
+                            'single': Only applies when in single-tenancy mode.
+                            'multi': Only applies when in multi-tenancy mode.
+                            'system': Only applies in single tenancy or to the "system" tenant in multi-tenancy
+                            'tenant': Only applies to non-system tenants in multi-tenancy.
 """
 
 def init_parser():
@@ -131,7 +137,7 @@ class InheritedRole:
 class Privilege:
     def __init__(self, spec):
 
-        check_allowed_fields(spec, ['matchType', 'db', 'collection', 'system_buckets', 'actions'])
+        check_allowed_fields(spec, ['matchType', 'db', 'collection', 'system_buckets', 'actions', 'tenancy'])
         check_required_fields(spec, ['matchType', 'actions'])
 
         self.matchType = get_nonempty_str_field(spec, 'matchType')
@@ -139,6 +145,7 @@ class Privilege:
         self.collection = None
         self.system_buckets = None
         self.actions = []
+        self.tenancy = 'any'
 
         db_valid_types = ['database', 'exact_namespace', 'system_buckets', 'any_system_buckets_in_db']
         if 'db' in spec:
@@ -170,6 +177,13 @@ class Privilege:
             else:
                 assert_str_field('actions', action)
                 self.actions.append(action)
+
+        if 'tenancy' in spec:
+            assert_str_field('tenancy', spec['tenancy'])
+            tenancy_options = ['any', 'single', 'multi', 'system', 'tenant']
+            if spec['tenancy'] not in tenancy_options:
+                raise Exception("Invalid value for enum field 'tenancy', got '%s', expeted one of %r" % (spec['tenancy'], tenancy_options))
+            self.tenancy = spec['tenancy']
 
 class BuiltinRole:
     def __init__(self, name, spec):

@@ -83,6 +83,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -1589,6 +1590,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
     using VTS = auth::ValidatedTenancyScope;

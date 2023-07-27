@@ -38,6 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/multitenancy_gen.h"
 
 namespace mongo {
 namespace {
@@ -63,6 +64,22 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
 //#end if
 //#end def
 
+//## Create a predicate for a privilege.
+//#def privCondition($priv)
+//#if $priv.tenancy == 'single'
+//#echo 'if (!gMultitenancySupport)'
+//#elif $priv.tenancy == 'multi'
+//#echo 'if (gMultitenancySupport)'
+//#elif $priv.tenancy == 'system'
+//#echo 'if (dbName.tenantId() == boost::none)'
+//#elif $priv.tenancy == 'tenant'
+//#echo 'if (dbName.tenantId() != boost::none)'
+//#else
+//#assert $priv.tenancy == 'any'
+//#end if
+//#end def
+
+
 //#for $role in $roles
 void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName& dbName) {
     //#if $role.adminOnly
@@ -75,40 +92,42 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
     //#end for
 
     //#for $priv in $role.privileges
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
-        Privilege(
-            //#if $priv.matchType == 'any'
-            ResourcePattern::forAnyResource(dbName.tenantId()),
-            //#elif $priv.matchType == 'any_normal'
-            ResourcePattern::forAnyNormalResource(dbName.tenantId()),
-            //#elif $priv.matchType == 'cluster'
-            ResourcePattern::forClusterResource(dbName.tenantId()),
-            //#elif $priv.matchType == 'database'
-            ResourcePattern::forDatabaseName($dbName($priv.db)),
-            //#elif $priv.matchType == 'collection'
-            ResourcePattern::forCollectionName(dbName.tenantId(), "$priv.collection"_sd),
-            //#elif $priv.matchType == 'exact_namespace'
-            ResourcePattern::forExactNamespace(NamespaceStringUtil::parseNamespaceFromDoc(
-                $dbName($priv.db), "$priv.collection"_sd)),
-            //#elif $priv.matchType == 'any_system_buckets'
-            ResourcePattern::forAnySystemBuckets(dbName.tenantId()),
-            //#elif $priv.matchType == 'system_buckets_in_any_db'
-            ResourcePattern::forAnySystemBucketsInAnyDatabase(dbName.tenantId(),
-                                                              "$priv.system_buckets"_sd),
-            //#elif $priv.matchType == 'system_buckets'
-            ResourcePattern::forExactSystemBucketsCollection($dbName($priv.db),
-                                                             "$priv.system_buckets"_sd),
-            //#elif $priv.matchType == 'any_system_buckets_in_db'
-            ResourcePattern::forAnySystemBucketsInDatabase($dbName($priv.db)),
-            //#else
-            //#assert False
-            //#end if
-            ActionSet({
-                //#for action in $priv.actions
-                ActionType::$action,
-                //#end for
-            })));
+    $privCondition($priv) {
+        Privilege::addPrivilegeToPrivilegeVector(
+            privileges,
+            Privilege(
+                //#if $priv.matchType == 'any'
+                ResourcePattern::forAnyResource(dbName.tenantId()),
+                //#elif $priv.matchType == 'any_normal'
+                ResourcePattern::forAnyNormalResource(dbName.tenantId()),
+                //#elif $priv.matchType == 'cluster'
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                //#elif $priv.matchType == 'database'
+                ResourcePattern::forDatabaseName($dbName($priv.db)),
+                //#elif $priv.matchType == 'collection'
+                ResourcePattern::forCollectionName(dbName.tenantId(), "$priv.collection"_sd),
+                //#elif $priv.matchType == 'exact_namespace'
+                ResourcePattern::forExactNamespace(NamespaceStringUtil::parseNamespaceFromDoc(
+                    $dbName($priv.db), "$priv.collection"_sd)),
+                //#elif $priv.matchType == 'any_system_buckets'
+                ResourcePattern::forAnySystemBuckets(dbName.tenantId()),
+                //#elif $priv.matchType == 'system_buckets_in_any_db'
+                ResourcePattern::forAnySystemBucketsInAnyDatabase(dbName.tenantId(),
+                                                                  "$priv.system_buckets"_sd),
+                //#elif $priv.matchType == 'system_buckets'
+                ResourcePattern::forExactSystemBucketsCollection($dbName($priv.db),
+                                                                 "$priv.system_buckets"_sd),
+                //#elif $priv.matchType == 'any_system_buckets_in_db'
+                ResourcePattern::forAnySystemBucketsInDatabase($dbName($priv.db)),
+                //#else
+                //#assert False
+                //#end if
+                ActionSet({
+                    //#for action in $priv.actions
+                    ActionType::$action,
+                    //#end for
+                })));
+    }
     //#end for
 
     //## Special case for __system.admin
@@ -117,7 +136,8 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
     ActionSet allActions;
     allActions.addAllActions();
     Privilege::addPrivilegeToPrivilegeVector(
-        privileges, Privilege(ResourcePattern::forAnyResource(dbName.tenantId()), allActions));
+        privileges,
+        Privilege(ResourcePattern::forAnyResource(dbName.tenantId()), std::move(allActions)));
     //#end if
 }
 

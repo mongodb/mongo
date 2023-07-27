@@ -94,7 +94,6 @@ roles:
                 - collMod
                 - collStats # clusterMonitor gets this also
                 - compact
-                - configureQueryAnalyzer # clusterManager gets this also
                 - convertToCapped # readWrite gets this also
                 - createCollection # readWrite gets this also
                 - dbStats # clusterMonitor gets this also
@@ -116,6 +115,11 @@ roles:
                 - renameCollectionSameDB # readWrite gets this also
                 - storageDetails
                 - validate
+
+            - matchType: database
+              tenancy: single # Not granted in multitenancy mode
+              actions: &dbAdminRoleSingleTenantActions
+                - configureQueryAnalyzer # clusterManager gets this also
 
             - matchType: exact_namespace
               collection: 'system.profile'
@@ -217,6 +221,9 @@ roles:
                   - applyOps
             - matchType: any_normal
               actions: *dbAdminRoleActions
+            - matchType: any_normal
+              tenancy: single
+              actions: *dbAdminRoleSingleTenantActions
             - matchType: collection
               collection: 'system.profile'
               actions:
