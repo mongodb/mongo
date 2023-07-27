@@ -810,6 +810,9 @@ enum class Builtin : uint8_t {
     aggRankFinalize,
     aggExpMovingAvg,
     aggExpMovingAvgFinalize,
+    aggRemovableSumAdd,
+    aggRemovableSumRemove,
+    aggRemovableSumFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -956,6 +959,21 @@ enum class AggArrayWithSize { kValues = 0, kSizeOfValues, kLast = kSizeOfValues 
  * This enum defines indices into an 'Array' that stores the state for $expMovingAvg accumulator
  */
 enum class AggExpMovingAvgElems { kResult, kAlpha, kIsDecimal, kSizeOfArray };
+
+/**
+ * This enum defines indices into an 'Array' that stores the state for $sum window function
+ * accumulator. Index `kSumAcc` stores the accumulator state of aggDoubleDoubleSum. Rest of the
+ * indices store respective count of values encountered.
+ */
+enum class AggRemovableSumElems {
+    kSumAcc,
+    kNanCount,
+    kPosInfinityCount,
+    kNegInfinityCount,
+    kDoubleCount,
+    kDecimalCount,
+    kSizeOfArray
+};
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1348,6 +1366,8 @@ private:
     void aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
                                       value::TypeTags rhsTag,
                                       value::Value rhsValue);
+    FastTuple<bool, value::TypeTags, value::Value> aggDoubleDoubleSumFinalizeImpl(
+        value::Array* accmulator);
 
     // This is an implementation of the following algorithm:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
@@ -1767,6 +1787,16 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRankFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggExpMovingAvg(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggExpMovingAvgFinalize(ArityType arity);
+    template <int sign>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSum(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableSumFinalize(ArityType arity);
+    template <int sign>
+    void aggRemovableSumImpl(value::Array* state, value::TypeTags rhsTag, value::Value rhsVal);
+    FastTuple<bool, value::TypeTags, value::Value> aggRemovableSumFinalizeImpl(value::Array* state);
+    template <class T, int sign>
+    void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
+                                             value::TypeTags rhsTag,
+                                             value::Value rhsVal);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

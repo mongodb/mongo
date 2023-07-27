@@ -209,6 +209,7 @@ env.CppUnitTest(
         'expressions/sbe_prim_unary_test.cpp',
         'expressions/sbe_rank_test.cpp',
         'expressions/sbe_regex_test.cpp',
+        'expressions/sbe_removable_sum_test.cpp',
         'expressions/sbe_replace_one_expression_test.cpp',
         'expressions/sbe_reverse_array_builtin_test.cpp',
         'expressions/sbe_round_builtin_test.cpp',

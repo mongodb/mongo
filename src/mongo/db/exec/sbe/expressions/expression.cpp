@@ -835,6 +835,12 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggExpMovingAvg, true}},
     {"aggExpMovingAvgFinalize",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggExpMovingAvgFinalize, false}},
+    {"aggRemovableSumAdd",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumAdd, true}},
+    {"aggRemovableSumRemove",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumRemove, true}},
+    {"aggRemovableSumFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableSumFinalize, false}},
 };
 
 /**

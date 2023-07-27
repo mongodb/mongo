@@ -413,6 +413,75 @@ void ByteCode::aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
     }
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggDoubleDoubleSumFinalizeImpl(
+    value::Array* arr) {
+    tassert(5755321,
+            str::stream() << "The result slot must have at least "
+                          << AggSumValueElems::kMaxSizeOfArray - 1
+                          << " elements but got: " << arr->size(),
+            arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
+
+    auto nonDecimalTotalTag = arr->getAt(AggSumValueElems::kNonDecimalTotalTag).first;
+    tassert(5755322,
+            "The nonDecimalTag can't be NumberDecimal",
+            nonDecimalTotalTag != value::TypeTags::NumberDecimal);
+    auto [sumTag, sum] = arr->getAt(AggSumValueElems::kNonDecimalTotalSum);
+    auto [addendTag, addend] = arr->getAt(AggSumValueElems::kNonDecimalTotalAddend);
+    tassert(5755323,
+            "The sum and addend must be NumberDouble",
+            sumTag == addendTag && sumTag == value::TypeTags::NumberDouble);
+
+    // We're guaranteed to always have a valid nonDecimalTotal value.
+    auto nonDecimalTotal = DoubleDoubleSummation::create(value::bitcastTo<double>(sum),
+                                                         value::bitcastTo<double>(addend));
+
+    if (auto nElems = arr->size(); nElems < AggSumValueElems::kMaxSizeOfArray) {
+        // We've not seen any decimal value.
+        switch (nonDecimalTotalTag) {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
+                if (nonDecimalTotal.fitsLong()) {
+                    auto longVal = nonDecimalTotal.getLong();
+                    if (int intVal = longVal;
+                        nonDecimalTotalTag == value::TypeTags::NumberInt32 && intVal == longVal) {
+                        return {true,
+                                value::TypeTags::NumberInt32,
+                                value::bitcastFrom<int32_t>(intVal)};
+                    } else {
+                        return {true,
+                                value::TypeTags::NumberInt64,
+                                value::bitcastFrom<int64_t>(longVal)};
+                    }
+                }
+
+                // Sum doesn't fit a NumberLong, so return a NumberDouble instead.
+                [[fallthrough]];
+            case value::TypeTags::NumberDouble:
+                return {true,
+                        value::TypeTags::NumberDouble,
+                        value::bitcastFrom<double>(nonDecimalTotal.getDouble())};
+            default:
+                MONGO_UNREACHABLE_TASSERT(5755324);
+        }
+    } else {
+        // We've seen a decimal value.
+        tassert(5755325,
+                str::stream() << "The result slot must have at most "
+                              << AggSumValueElems::kMaxSizeOfArray
+                              << " elements but got: " << arr->size(),
+                nElems == AggSumValueElems::kMaxSizeOfArray);
+        auto [decimalTotalTag, decimalTotalVal] = arr->getAt(AggSumValueElems::kDecimalTotal);
+        tassert(5755326,
+                "The decimalTotal must be NumberDecimal",
+                decimalTotalTag == value::TypeTags::NumberDecimal);
+
+        auto decimalTotal = value::bitcastTo<Decimal128>(decimalTotalVal);
+        auto [tag, val] = value::makeCopyDecimal(decimalTotal.add(nonDecimalTotal.getDecimal()));
+        return {true, tag, val};
+    }
+}
+
+
 void ByteCode::aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue) {
     if (!isNumber(rhsTag)) {
         return;

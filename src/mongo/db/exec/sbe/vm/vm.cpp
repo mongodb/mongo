@@ -1679,70 +1679,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSumF
     ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(0);
     auto arr = value::getArrayView(fieldValue);
-    tassert(5755321,
-            str::stream() << "The result slot must have at least "
-                          << AggSumValueElems::kMaxSizeOfArray - 1
-                          << " elements but got: " << arr->size(),
-            arr->size() >= AggSumValueElems::kMaxSizeOfArray - 1);
-
-    auto nonDecimalTotalTag = arr->getAt(AggSumValueElems::kNonDecimalTotalTag).first;
-    tassert(5755322,
-            "The nonDecimalTag can't be NumberDecimal",
-            nonDecimalTotalTag != value::TypeTags::NumberDecimal);
-    auto [sumTag, sum] = arr->getAt(AggSumValueElems::kNonDecimalTotalSum);
-    auto [addendTag, addend] = arr->getAt(AggSumValueElems::kNonDecimalTotalAddend);
-    tassert(5755323,
-            "The sum and addend must be NumberDouble",
-            sumTag == addendTag && sumTag == value::TypeTags::NumberDouble);
-
-    // We're guaranteed to always have a valid nonDecimalTotal value.
-    auto nonDecimalTotal = DoubleDoubleSummation::create(value::bitcastTo<double>(sum),
-                                                         value::bitcastTo<double>(addend));
-
-    if (auto nElems = arr->size(); nElems < AggSumValueElems::kMaxSizeOfArray) {
-        // We've not seen any decimal value.
-        switch (nonDecimalTotalTag) {
-            case value::TypeTags::NumberInt32:
-            case value::TypeTags::NumberInt64:
-                if (nonDecimalTotal.fitsLong()) {
-                    auto longVal = nonDecimalTotal.getLong();
-                    if (int intVal = longVal;
-                        nonDecimalTotalTag == value::TypeTags::NumberInt32 && intVal == longVal) {
-                        return {true,
-                                value::TypeTags::NumberInt32,
-                                value::bitcastFrom<int32_t>(intVal)};
-                    } else {
-                        return {true,
-                                value::TypeTags::NumberInt64,
-                                value::bitcastFrom<int64_t>(longVal)};
-                    }
-                }
-
-                // Sum doesn't fit a NumberLong, so return a NumberDouble instead.
-                [[fallthrough]];
-            case value::TypeTags::NumberDouble:
-                return {true,
-                        value::TypeTags::NumberDouble,
-                        value::bitcastFrom<double>(nonDecimalTotal.getDouble())};
-            default:
-                MONGO_UNREACHABLE_TASSERT(5755324);
-        }
-    } else {
-        // We've seen a decimal value.
-        tassert(5755325,
-                str::stream() << "The result slot must have at most "
-                              << AggSumValueElems::kMaxSizeOfArray
-                              << " elements but got: " << arr->size(),
-                nElems == AggSumValueElems::kMaxSizeOfArray);
-        auto [decimalTotalTag, decimalTotalVal] = arr->getAt(AggSumValueElems::kDecimalTotal);
-        tassert(5755326,
-                "The decimalTotal must be NumberDecimal",
-                decimalTotalTag == value::TypeTags::NumberDecimal);
-
-        auto decimalTotal = value::bitcastTo<Decimal128>(decimalTotalVal);
-        auto [tag, val] = value::makeCopyDecimal(decimalTotal.add(nonDecimalTotal.getDecimal()));
-        return {true, tag, val};
-    }
+    return aggDoubleDoubleSumFinalizeImpl(arr);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalize(
@@ -6849,6 +6786,265 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggExpMovingAvgF
     }
 }
 
+std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t> removableSumState(
+    value::Array* state) {
+    uassert(7795101,
+            "incorrect size of state array",
+            state->size() == static_cast<size_t>(AggRemovableSumElems::kSizeOfArray));
+
+    auto [sumAccTag, sumAccVal] = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
+    uassert(7795102,
+            "sum accumulator elem should be of array type",
+            sumAccTag == value::TypeTags::Array);
+    auto sumAcc = value::getArrayView(sumAccVal);
+
+    auto [nanCountTag, nanCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableSumElems::kNanCount));
+    uassert(7795103,
+            "nanCount elem should be of int64 type",
+            nanCountTag == value::TypeTags::NumberInt64);
+    auto nanCount = value::bitcastTo<int64_t>(nanCountVal);
+
+    auto [posInfinityCountTag, posInfinityCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableSumElems::kPosInfinityCount));
+    uassert(7795104,
+            "posInfinityCount elem should be of int64 type",
+            posInfinityCountTag == value::TypeTags::NumberInt64);
+    auto posInfinityCount = value::bitcastTo<int64_t>(posInfinityCountVal);
+
+    auto [negInfinityCountTag, negInfinityCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableSumElems::kNegInfinityCount));
+    uassert(7795105,
+            "negInfinityCount elem should be of int64 type",
+            negInfinityCountTag == value::TypeTags::NumberInt64);
+    auto negInfinityCount = value::bitcastTo<int64_t>(negInfinityCountVal);
+
+    auto [doubleCountTag, doubleCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableSumElems::kDoubleCount));
+    uassert(7795106,
+            "doubleCount elem should be of int64 type",
+            doubleCountTag == value::TypeTags::NumberInt64);
+    auto doubleCount = value::bitcastTo<int64_t>(doubleCountVal);
+
+    auto [decimalCountTag, decimalCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableSumElems::kDecimalCount));
+    uassert(7795107,
+            "decimalCount elem should be of int64 type",
+            decimalCountTag == value::TypeTags::NumberInt64);
+    auto decimalCount = value::bitcastTo<int64_t>(decimalCountVal);
+
+    return {sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount};
+}
+
+void updateRemovableSumState(value::Array* state,
+                             int64_t nanCount,
+                             int64_t posInfinityCount,
+                             int64_t negInfinityCount,
+                             int64_t doubleCount,
+                             int64_t decimalCount) {
+    state->setAt(static_cast<size_t>(AggRemovableSumElems::kNanCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(nanCount));
+    state->setAt(static_cast<size_t>(AggRemovableSumElems::kPosInfinityCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(posInfinityCount));
+    state->setAt(static_cast<size_t>(AggRemovableSumElems::kNegInfinityCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(negInfinityCount));
+    state->setAt(static_cast<size_t>(AggRemovableSumElems::kDoubleCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(doubleCount));
+    state->setAt(static_cast<size_t>(AggRemovableSumElems::kDecimalCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(decimalCount));
+}
+
+template <class T, int sign>
+void ByteCode::updateRemovableSumAccForIntegerType(value::Array* sumAcc,
+                                                   value::TypeTags rhsTag,
+                                                   value::Value rhsVal) {
+    auto value = value::bitcastTo<T>(rhsVal);
+    if (value == std::numeric_limits<T>::min() && sign == -1) {
+        // Avoid overflow by processing in two parts.
+        aggDoubleDoubleSumImpl(sumAcc, rhsTag, std::numeric_limits<T>::max());
+        aggDoubleDoubleSumImpl(sumAcc, rhsTag, value::bitcastFrom<T>(1));
+    } else {
+        aggDoubleDoubleSumImpl(sumAcc, rhsTag, value::bitcastFrom<T>(value * sign));
+    }
+}
+
+template <int sign>
+void ByteCode::aggRemovableSumImpl(value::Array* state,
+                                   value::TypeTags rhsTag,
+                                   value::Value rhsVal) {
+    static_assert(sign == 1 || sign == -1);
+    if (!value::isNumber(rhsTag)) {
+        return;
+    }
+
+    auto [sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount] =
+        removableSumState(state);
+
+    if (rhsTag == value::TypeTags::NumberInt32) {
+        updateRemovableSumAccForIntegerType<int32_t, sign>(sumAcc, rhsTag, rhsVal);
+    } else if (rhsTag == value::TypeTags::NumberInt64) {
+        updateRemovableSumAccForIntegerType<int64_t, sign>(sumAcc, rhsTag, rhsVal);
+    } else if (rhsTag == value::TypeTags::NumberDouble) {
+        doubleCount += sign;
+        auto value = value::bitcastTo<double>(rhsVal);
+        if (std::isnan(value)) {
+            nanCount += sign;
+        } else if (value == std::numeric_limits<double>::infinity()) {
+            posInfinityCount += sign;
+        } else if (value == -std::numeric_limits<double>::infinity()) {
+            negInfinityCount += sign;
+        } else {
+            if constexpr (sign == -1) {
+                value *= -1;
+            }
+            aggDoubleDoubleSumImpl(
+                sumAcc, value::TypeTags::NumberDouble, value::bitcastFrom<double>(value));
+        }
+        updateRemovableSumState(
+            state, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount);
+    } else if (rhsTag == value::TypeTags::NumberDecimal) {
+        decimalCount += sign;
+        auto value = value::bitcastTo<Decimal128>(rhsVal);
+        if (value.isNaN()) {
+            nanCount += sign;
+        } else if (value.isInfinite() && !value.isNegative()) {
+            posInfinityCount += sign;
+        } else if (value.isInfinite() && value.isNegative()) {
+            negInfinityCount += sign;
+        } else {
+            if constexpr (sign == -1) {
+                auto [negDecTag, negDecVal] = value::makeCopyDecimal(value.negate());
+                aggDoubleDoubleSumImpl(sumAcc, negDecTag, negDecVal);
+                value::releaseValue(negDecTag, negDecVal);
+            } else {
+                aggDoubleDoubleSumImpl(sumAcc, rhsTag, rhsVal);
+            }
+        }
+        updateRemovableSumState(
+            state, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount);
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggRemovableSumFinalizeImpl(
+    value::Array* state) {
+    auto [sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount] =
+        removableSumState(state);
+
+    if (nanCount > 0) {
+        if (decimalCount > 0) {
+            return {true,
+                    value::TypeTags::NumberDecimal,
+                    value::makeCopyDecimal(Decimal128::kPositiveNaN).second};
+        } else {
+            return {false,
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
+        }
+    }
+    if (posInfinityCount > 0 && negInfinityCount > 0) {
+        if (decimalCount > 0) {
+            return {true,
+                    value::TypeTags::NumberDecimal,
+                    value::makeCopyDecimal(Decimal128::kPositiveNaN).second};
+        } else {
+            return {false,
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
+        }
+    }
+    if (posInfinityCount > 0) {
+        if (decimalCount > 0) {
+            return {true,
+                    value::TypeTags::NumberDecimal,
+                    value::makeCopyDecimal(Decimal128::kPositiveInfinity).second};
+        } else {
+            return {false,
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(std::numeric_limits<double>::infinity())};
+        }
+    }
+    if (negInfinityCount > 0) {
+        if (decimalCount > 0) {
+            return {true,
+                    value::TypeTags::NumberDecimal,
+                    value::makeCopyDecimal(Decimal128::kNegativeInfinity).second};
+        } else {
+            return {false,
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(-std::numeric_limits<double>::infinity())};
+        }
+    }
+
+    auto [sumOwned, sumTag, sumVal] = aggDoubleDoubleSumFinalizeImpl(sumAcc);
+    value::ValueGuard sumGuard{sumOwned, sumTag, sumVal};
+
+    if (sumTag == value::TypeTags::NumberDecimal && decimalCount == 0) {
+        auto decimalVal = value::bitcastTo<Decimal128>(sumVal);
+        if (doubleCount > 0) {  // Narrow Decimal128 to double.
+            return {false,
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(decimalVal.toDouble())};
+        }
+        std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+        auto longVal = decimalVal.toLong(&signalingFlags);  // Narrow Decimal128 to integral.
+        if (signalingFlags == Decimal128::SignalingFlag::kNoFlag) {
+            auto [numTag, numVal] = value::makeIntOrLong(longVal);
+            return {false, numTag, numVal};
+        }
+        // Narrow Decimal128 to double if overflows long.
+        return {false,
+                value::TypeTags::NumberDouble,
+                value::bitcastFrom<double>(decimalVal.toDouble())};
+    }
+    if (sumTag == value::TypeTags::NumberDouble && doubleCount == 0 &&
+        value::bitcastTo<double>(sumVal) >= std::numeric_limits<long long>::min() &&
+        value::bitcastTo<double>(sumVal) <
+            static_cast<double>(std::numeric_limits<long long>::max())) {
+        // Narrow double to integral.
+        auto longVal = llround(value::bitcastTo<double>(sumVal));
+        auto [numTag, numVal] = value::makeIntOrLong(longVal);
+        return {false, numTag, numVal};
+    }
+    if (sumTag == value::TypeTags::NumberInt64) {  // Narrow long to int
+        auto longVal = value::bitcastTo<long long>(sumVal);
+        auto [numTag, numVal] = value::makeIntOrLong(longVal);
+        return {false, numTag, numVal};
+    }
+    sumGuard.reset();
+    return {sumOwned, sumTag, sumVal};
+}
+
+template <int sign>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSum(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    auto [_, fieldTag, fieldVal] = getFromStack(1);
+
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    uassert(7795108, "state should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    aggRemovableSumImpl<sign>(state, fieldTag, fieldVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSumFinalize(
+    ArityType arity) {
+    auto [_, stateTag, stateVal] = getFromStack(0);
+
+    uassert(7795109, "state should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+    return aggRemovableSumFinalizeImpl(state);
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -7175,6 +7371,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggExpMovingAvg(arity);
         case Builtin::aggExpMovingAvgFinalize:
             return builtinAggExpMovingAvgFinalize(arity);
+        case Builtin::aggRemovableSumAdd:
+            return builtinAggRemovableSum<1 /*sign*/>(arity);
+        case Builtin::aggRemovableSumRemove:
+            return builtinAggRemovableSum<-1 /*sign*/>(arity);
+        case Builtin::aggRemovableSumFinalize:
+            return builtinAggRemovableSumFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -7507,6 +7709,12 @@ std::string builtinToString(Builtin b) {
             return "aggExpMovingAvg";
         case Builtin::aggExpMovingAvgFinalize:
             return "aggExpMovingAvgFinalize";
+        case Builtin::aggRemovableSumAdd:
+            return "aggRemovableSumAdd";
+        case Builtin::aggRemovableSumRemove:
+            return "aggRemovableSumRemove";
+        case Builtin::aggRemovableSumFinalize:
+            return "aggRemovableSumFinalize";
         default:
             MONGO_UNREACHABLE;
     }
