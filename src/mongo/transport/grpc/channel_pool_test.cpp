@@ -39,6 +39,7 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::transport::grpc {
 namespace {
@@ -52,13 +53,17 @@ public:
     class DummyStub {};
     using PoolType = ChannelPool<DummyChannel, DummyStub>;
 
+    // The channel pool mock factory functions don't currently honor timeouts, so we use this to
+    // signal in tests that they should not expect timeout behavior.
+    static constexpr auto kNoTimeout = Milliseconds::max();
+
     void setUp() override {
         _clockSource = std::make_unique<ClockSourceMock>();
         _pool = std::make_shared<PoolType>(
             _clockSource.get(),
             [this](ConnectSSLMode mode) { return _resolveSSLMode(mode); },
             [this](const HostAndPort& remote, bool useSSL) { return _makeChannel(remote, useSSL); },
-            [this](DummyChannel& channel) { return _makeStub(channel); });
+            [this](DummyChannel& channel, Milliseconds) { return _makeStub(channel); });
     }
 
     void tearDown() override {
@@ -108,9 +113,9 @@ TEST_F(ChannelPoolTest, StartsEmpty) {
 
 TEST_F(ChannelPoolTest, CanReuseChannel) {
     HostAndPort remote("FakeHost", 123);
-    auto s1 = pool().createStub(remote, ConnectSSLMode::kDisableSSL);
+    auto s1 = pool().createStub(remote, ConnectSSLMode::kDisableSSL, kNoTimeout);
     ASSERT_EQ(pool().size(), 1);
-    auto s2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL);
+    auto s2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL, kNoTimeout);
     ASSERT_EQ(pool().size(), 1);
 }
 
@@ -118,9 +123,9 @@ TEST_F(ChannelPoolTest, ConsidersSSLMode) {
     setSSLMode(true);
     ON_BLOCK_EXIT([&] { setSSLMode(false); });
     HostAndPort remote("FakeHost", 123);
-    auto s1 = pool().createStub(remote, ConnectSSLMode::kEnableSSL);
+    auto s1 = pool().createStub(remote, ConnectSSLMode::kEnableSSL, kNoTimeout);
     ASSERT_EQ(pool().size(), 1);
-    auto s2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL);
+    auto s2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL, kNoTimeout);
     ASSERT_EQ(pool().size(), 2);
 }
 
@@ -128,7 +133,7 @@ TEST_F(ChannelPoolTest, DropUnusedChannel) {
     {
         // Create a new stub and immediately discard it. This should internally create a new
         // channel to `SomeHost:123`.
-        pool().createStub({"SomeHost", 123}, ConnectSSLMode::kDisableSSL);
+        pool().createStub({"SomeHost", 123}, ConnectSSLMode::kDisableSSL, kNoTimeout);
     }
     ASSERT_EQ(pool().size(), 1);
     clockSource().advance(Minutes{5});
@@ -138,7 +143,7 @@ TEST_F(ChannelPoolTest, DropUnusedChannel) {
 
 TEST_F(ChannelPoolTest, UpdatesLastUsed) {
     {
-        auto stub = pool().createStub({"Mongo", 123}, ConnectSSLMode::kDisableSSL);
+        auto stub = pool().createStub({"Mongo", 123}, ConnectSSLMode::kDisableSSL, kNoTimeout);
         ASSERT_EQ(pool().size(), 1);
         // Advance time before destroying `stub` to update the last-used-time for the channel. The
         // stub, which is the only active user of its channel, is removed as we leave this scope.
@@ -151,17 +156,17 @@ TEST_F(ChannelPoolTest, UpdatesLastUsed) {
 
 TEST_F(ChannelPoolTest, DropNotRecentlyUsedChannelsWithoutStubs) {
     HostAndPort remoteA("RemoteA", 123), remoteB("RemoteB", 123);
-    auto s1 = pool().createStub(remoteA, ConnectSSLMode::kDisableSSL);
+    auto s1 = pool().createStub(remoteA, ConnectSSLMode::kDisableSSL, kNoTimeout);
     {
         // Create a new stub and immediately discard it. This creates a new channel to `remoteB`.
-        pool().createStub(remoteB, ConnectSSLMode::kDisableSSL);
+        pool().createStub(remoteB, ConnectSSLMode::kDisableSSL, kNoTimeout);
     }
     ASSERT_EQ(pool().size(), 2);
     clockSource().advance(Minutes{2});
     ASSERT_EQ(pool().dropIdleChannels(Minutes{2}), 1);
 
     // Verifying that remoteA's channel remains open.
-    auto s2 = pool().createStub(remoteA, ConnectSSLMode::kDisableSSL);
+    auto s2 = pool().createStub(remoteA, ConnectSSLMode::kDisableSSL, kNoTimeout);
     ASSERT_EQ(pool().size(), 1);
 }
 
@@ -169,7 +174,7 @@ TEST_F(ChannelPoolTest, DropAllChannelsWithNoStubs) {
     const auto kNumChannels = 10;
     for (int i = 1; i <= kNumChannels; i++) {
         // Each iteration results in creating a new channel, targeting "FakeHost:(123 + i)".
-        pool().createStub({"FakeHost", 123 + i}, ConnectSSLMode::kDisableSSL);
+        pool().createStub({"FakeHost", 123 + i}, ConnectSSLMode::kDisableSSL, kNoTimeout);
     }
     ASSERT_EQ(pool().size(), kNumChannels);
     ASSERT_EQ(pool().dropAllChannels(), kNumChannels);
@@ -179,7 +184,8 @@ TEST_F(ChannelPoolTest, DropAllChannelsWithNoStubs) {
 DEATH_TEST_F(ChannelPoolTest, DropAllChannelsWithStubs, "invariant") {
     const auto kNumChannels = 10;
     for (int i = 1; i <= kNumChannels; i++) {
-        auto stub = pool().createStub({"FakeHost", 123 + i}, ConnectSSLMode::kDisableSSL);
+        auto stub =
+            pool().createStub({"FakeHost", 123 + i}, ConnectSSLMode::kDisableSSL, kNoTimeout);
         if (i == kNumChannels) {
             ASSERT_EQ(pool().size(), kNumChannels);
             pool().dropAllChannels();  // Must be fatal.
@@ -191,7 +197,7 @@ TEST_F(ChannelPoolTest, CannotDropIdleChannelWhileCreatingNewStub) {
     unittest::Barrier beforeCreatingStub(2);
     stdx::thread worker([&] {
         beforeCreatingStub.countDownAndWait();
-        auto stub = pool().createStub({"FakeHost", 123}, ConnectSSLMode::kDisableSSL);
+        auto stub = pool().createStub({"FakeHost", 123}, ConnectSSLMode::kDisableSSL, kNoTimeout);
     });
     ON_BLOCK_EXIT([&] { worker.join(); });
 
@@ -212,12 +218,12 @@ TEST_F(ChannelPoolTest, OneChannelForMultipleStubs) {
     stdx::thread channelCreator([&] {
         beforeCreatingFirstStub.countDownAndWait();
         // We create this one first, which should also create the underlying channel.
-        auto stub1 = pool().createStub(remote, ConnectSSLMode::kDisableSSL);
+        auto stub1 = pool().createStub(remote, ConnectSSLMode::kDisableSSL, kNoTimeout);
     });
     stdx::thread channelUser([&] {
         beforeCreatingSecondStub.countDownAndWait();
         // This one is created second, which should reuse the created channel.
-        auto stub2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL);
+        auto stub2 = pool().createStub(remote, ConnectSSLMode::kDisableSSL, kNoTimeout);
     });
     ON_BLOCK_EXIT([&] {
         channelCreator.join();

@@ -58,7 +58,7 @@ std::string formatHostAndPortForGRPC(const HostAndPort& address) {
     if (isUnixDomainSocket(address.host())) {
         return fmt::format("unix://{}", address.host());
     } else {
-        return fmt::format("{}:{}", address.host(), address.port());
+        return address.toString();
     }
 }
 

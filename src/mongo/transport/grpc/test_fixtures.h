@@ -161,13 +161,14 @@ class CommandServiceTestFixtures {
 public:
     static constexpr auto kBindAddress = "localhost";
     static constexpr auto kBindPort = 1234;
-    static constexpr auto kMaxThreads = 12;
-    static constexpr auto kServerCertificateKeyFile = "jstests/libs/server.pem";
+    static constexpr auto kMaxThreads = 100;
+    static constexpr auto kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
     static constexpr auto kClientCertificateKeyFile = "jstests/libs/client.pem";
     static constexpr auto kClientSelfSignedCertificateKeyFile =
         "jstests/libs/client-self-signed.pem";
     static constexpr auto kCAFile = "jstests/libs/ca.pem";
     static constexpr auto kMockedClientAddr = "client-def:123";
+    static constexpr auto kDefaultConnectTimeout = Milliseconds(5000);
 
     class Stub {
     public:
@@ -218,8 +219,7 @@ public:
 
     static Server::Options makeServerOptions() {
         Server::Options options;
-        options.addresses = std::vector<std::string>{kBindAddress};
-        options.port = kBindPort;
+        options.addresses = {HostAndPort(kBindAddress, kBindPort)};
         options.maxThreads = kMaxThreads;
         options.tlsCAFile = kCAFile;
         options.tlsPEMKeyFile = kServerCertificateKeyFile;
@@ -279,10 +279,6 @@ public:
             std::vector<std::unique_ptr<Server>> servers;
 
             for (auto& options : serverOptions) {
-                std::vector<HostAndPort> addresses;
-                for (auto& address : options.addresses) {
-                    addresses.push_back(HostAndPort(address, options.port));
-                }
                 auto handler = [rpcHandler, &options](auto session) {
                     ON_BLOCK_EXIT([&] { session->end(); });
                     rpcHandler(options, session);
@@ -317,7 +313,7 @@ public:
         std::vector<HostAndPort> addresses,
         std::function<void(HostAndPort, std::shared_ptr<IngressSession>)> rpcHandler,
         std::function<void(MockClient&, unittest::ThreadAssertionMonitor&)> clientThreadBody,
-        boost::optional<const BSONObj&> md = boost::none,
+        const BSONObj& md = makeClientMetadataDocument(),
         std::shared_ptr<WireVersionProvider> wvProvider = std::make_shared<WireVersionProvider>()) {
 
         unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {

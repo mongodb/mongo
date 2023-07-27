@@ -41,6 +41,7 @@
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #if defined(__OpenBSD__)
@@ -247,6 +248,19 @@ void setSocketKeepAliveParams(int sock,
 std::string makeUnixSockPath(int port) {
     return str::stream() << serverGlobalParams.socket << "/mongodb-" << port << ".sock";
 }
+
+#ifndef _WIN32
+void setUnixDomainSocketPermissions(const std::string& path, int permissions) {
+    if (::chmod(path.c_str(), permissions) == -1) {
+        auto ec = lastPosixError();
+        LOGV2_ERROR(23026,
+                    "Failed to chmod socket file",
+                    "path"_attr = path.c_str(),
+                    "error"_attr = errorMessage(ec));
+        fassertFailedNoTrace(40487);
+    }
+}
+#endif
 
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.

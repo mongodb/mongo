@@ -67,6 +67,9 @@ struct ServerGlobalParams {
         CryptDServerPort = 27020,
         DefaultDBPort = 27017,
         ShardServerPort = 27018,
+#ifdef MONGO_CONFIG_GRPC
+        DefaultGRPCServerPort = 27021,
+#endif
     };
 
     static std::string getPortSettingHelpText();
@@ -141,6 +144,11 @@ struct ServerGlobalParams {
 
     // True if the current binary version is an LTS Version.
     static constexpr bool kIsLTSBinaryVersion = false;
+
+#ifdef MONGO_CONFIG_GRPC
+    int grpcPort = DefaultGRPCServerPort;
+    int grpcServerMaxThreads = 1000;
+#endif
 
     struct FeatureCompatibility {
         using FCV = multiversion::FeatureCompatibilityVersion;

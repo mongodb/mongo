@@ -44,9 +44,7 @@ public:
         /**
          * List of IP addresses, hostnames, and/or Unix domain socket paths to bind to.
          */
-        std::vector<std::string> addresses;
-
-        int port;
+        std::vector<HostAndPort> addresses;
         size_t maxThreads;
         StringData tlsPEMKeyFile;
         boost::optional<StringData> tlsCAFile;

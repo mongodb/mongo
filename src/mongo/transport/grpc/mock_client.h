@@ -48,7 +48,7 @@ public:
     MockClient(TransportLayer* tl,
                HostAndPort local,
                MockResolver resolver,
-               boost::optional<const BSONObj&> metadata)
+               const BSONObj& metadata)
         : Client(tl, metadata), _local(std::move(local)), _resolver(std::move(resolver)) {}
 
     void start(ServiceContext* svcCtx) override {
@@ -58,13 +58,15 @@ public:
             [resolver = _resolver, local = _local](const HostAndPort& remote, bool) {
                 return std::make_shared<MockChannel>(local, remote, resolver(remote));
             },
-            [](std::shared_ptr<MockChannel>& channel) { return MockStub(channel); });
+            [](std::shared_ptr<MockChannel>& channel, Milliseconds) { return MockStub(channel); });
         Client::start(svcCtx);
     }
 
 private:
-    CtxAndStream _streamFactory(const HostAndPort& remote, const ConnectOptions& options) override {
-        auto stub = _pool->createStub(remote, ConnectSSLMode::kEnableSSL);
+    CtxAndStream _streamFactory(const HostAndPort& remote,
+                                Milliseconds timeout,
+                                const ConnectOptions& options) override {
+        auto stub = _pool->createStub(remote, ConnectSSLMode::kEnableSSL, timeout);
         auto ctx = std::make_shared<MockClientContext>();
         setMetadataOnClientContext(*ctx, options);
         if (options.authToken) {

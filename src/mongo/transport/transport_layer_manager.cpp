@@ -186,17 +186,7 @@ Status TransportLayerManager::rotateCertificates(std::shared_ptr<SSLManagerInter
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
 TransportLayerManager::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
-
-    Status firstError(ErrorCodes::InvalidSSLConfiguration,
-                      "Failure creating transient SSL context");
-    for (auto&& tl : _tls) {
-        auto statusOrContext = tl->createTransientSSLContext(transientSSLParams);
-        if (statusOrContext.isOK()) {
-            return std::move(statusOrContext.getValue());
-        }
-        firstError = statusOrContext.getStatus();
-    }
-    return firstError;
+    return _egressLayer->createTransientSSLContext(transientSSLParams);
 }
 
 #endif

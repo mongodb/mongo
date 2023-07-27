@@ -52,6 +52,10 @@ inline bool isUnixDomainSocket(const StringData& hostname) {
     return hostname.find('/') != std::string::npos;
 }
 
+#ifndef _WIN32
+void setUnixDomainSocketPermissions(const std::string& path, int permissions);
+#endif
+
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.
 std::string hostbyname(const char* hostname);

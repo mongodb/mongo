@@ -250,7 +250,6 @@ private:
 
     virtual bool _writeToStream(ConstSharedBuffer msg) = 0;
 
-    // TODO SERVER-74020: replace this with `GRPCTransportLayer`.
     TransportLayer* const _tl;
 
     const HostAndPort _remote;

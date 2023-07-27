@@ -54,7 +54,7 @@ public:
 
     using CtxAndStream = std::pair<std::shared_ptr<ClientContext>, std::shared_ptr<ClientStream>>;
 
-    explicit Client(TransportLayer* tl, boost::optional<const BSONObj&> md);
+    explicit Client(TransportLayer* tl, const BSONObj& clientMetadata);
 
     virtual ~Client() = default;
 
@@ -75,7 +75,9 @@ public:
         boost::optional<std::string> authToken = {};
     };
 
-    std::shared_ptr<EgressSession> connect(const HostAndPort& remote, ConnectOptions options);
+    std::shared_ptr<EgressSession> connect(const HostAndPort& remote,
+                                           Milliseconds timeout,
+                                           ConnectOptions options);
 
     /**
      * Get this client's current idea of what the cluster's maxWireVersion is. This will be updated
@@ -95,7 +97,9 @@ protected:
 private:
     enum class ClientState { kUninitialized, kStarted, kShutdown };
 
-    virtual CtxAndStream _streamFactory(const HostAndPort&, const ConnectOptions&) = 0;
+    virtual CtxAndStream _streamFactory(const HostAndPort&,
+                                        Milliseconds,
+                                        const ConnectOptions&) = 0;
 
     /**
      * Returns whether all outstanding sessions created by this client have been destroyed and this
@@ -105,12 +109,7 @@ private:
 
     TransportLayer* const _tl;
     const UUID _id;
-    /**
-     * If _clientMetadata is boost::none, it means the client did not send metadata.
-     * If _clientMetadata contains a value (including the empty string), it means the client
-     * explicitly set it to that.
-     */
-    boost::optional<std::string> _clientMetadata;
+    std::string _clientMetadata;
     std::shared_ptr<EgressSession::SharedState> _sharedState;
 
     mutable stdx::mutex _mutex;  // NOLINT
@@ -132,13 +131,13 @@ public:
         boost::optional<StringData> tlsCertificateKeyFile;
     };
 
-    GRPCClient(TransportLayer* tl, boost::optional<const BSONObj&> md, Options options);
+    GRPCClient(TransportLayer* tl, const BSONObj& clientMetadata, Options options);
 
     void start(ServiceContext* svcCtx) override;
     void shutdown() override;
 
 private:
-    CtxAndStream _streamFactory(const HostAndPort&, const ConnectOptions&) override;
+    CtxAndStream _streamFactory(const HostAndPort&, Milliseconds, const ConnectOptions&) override;
 
     std::unique_ptr<StubFactory> _stubFactory;
 };

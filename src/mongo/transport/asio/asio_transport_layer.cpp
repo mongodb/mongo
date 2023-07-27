@@ -1276,15 +1276,8 @@ Status AsioTransportLayer::setup() {
 
 #ifndef _WIN32
         if (addr.family() == AF_UNIX) {
-            if (::chmod(addr.toString().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
-                auto ec = lastPosixError();
-                LOGV2_ERROR(23026,
-                            "Failed to chmod socket file {path} {error}",
-                            "Failed to chmod socket file",
-                            "path"_attr = addr.toString().c_str(),
-                            "error"_attr = errorMessage(ec));
-                fassertFailedNoTrace(40487);
-            }
+            setUnixDomainSocketPermissions(addr.toString(),
+                                           serverGlobalParams.unixSocketPermissions);
         }
 #endif
         auto endpoint = acceptor.local_endpoint(ec);

@@ -35,6 +35,7 @@
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/transport/grpc/client.h"
+#include "mongo/transport/grpc/server.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -42,29 +43,59 @@
 namespace mongo::transport::grpc {
 
 /**
- * Wraps the Server and Client implementations of MongoDB's gRPC service. This abstraction layer
- * aims to hide gRPC-specific details from `SessionWorkflow`, `ServiceEntryPoint`, and the remainder
- * of the command execution path.
+ * Wraps the gRPC Server and Client implementations. This abstraction layer aims to hide
+ * gRPC-specific details from `SessionWorkflow`, `ServiceEntryPoint`, and the remainder of the
+ * command execution path.
  *
- * TODO SERVER-74020: extend this documentation with more details.
+ * The egress portion of this TransportLayer always communicates via the mongodb.CommandService,
+ * but other arbitrary gRPC services can be used in the ingress portion. Such services can be
+ * registered with this transport layer via registerService() before setup() is called.
  */
 class GRPCTransportLayer : public TransportLayer {
 public:
-    GRPCTransportLayer(ServiceContext* svcCtx, const WireSpec& wireSpec);
+    struct Options {
+        explicit Options(const ServerGlobalParams& params);
+        Options() : Options(ServerGlobalParams()) {}
+
+        bool enableEgress = false;
+        std::vector<std::string> bindIpList;
+        int bindPort;
+        bool useUnixDomainSockets;
+        int unixDomainSocketPermissions;
+        int maxServerThreads;
+        boost::optional<BSONObj> clientMetadata;
+    };
+
+    GRPCTransportLayer(ServiceContext* svcCtx, const WireSpec& wireSpec, Options options);
+
+    /**
+     * Add the service to the list that will be served once this transport layer has been started.
+     * If no services have been registered at the time when setup() is invoked, no server will be
+     * created. All services must be registered before setup() is invoked.
+     */
+    Status registerService(std::unique_ptr<Service> svc);
+
+    Status setup() override;
 
     Status start() override;
 
+    /**
+     * Cancels all outstanding RPCs (both ingress and egress) and blocks until they have completed.
+     * If egress mode is enabled, this entails waiting for all sessions to be destructed.
+     * If ingress mode is enabled, this entails waiting for all RPC handlers to return.
+     */
     void shutdown() override;
 
     StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
-        boost::optional<TransientSSLParams> transientSSLParams = boost::none) override {
-        // TODO SERVER-74020
-        MONGO_UNIMPLEMENTED;
-    }
+        boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
 
+    /**
+     * The server's current gRPC integration doesn't support async networking, so this is
+     * left unimplemented.
+     */
     Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
@@ -72,37 +103,42 @@ public:
         Milliseconds timeout,
         std::shared_ptr<ConnectionMetrics> connectionMetrics,
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) override {
-        // TODO SERVER-74020
         MONGO_UNIMPLEMENTED;
     }
 
-    Status setup() override {
-        // TODO SERVER-74020
-        MONGO_UNIMPLEMENTED;
-    }
-
+    /**
+     * Not applicable to gRPC networking.
+     */
     ReactorHandle getReactor(WhichReactor) override {
-        // TODO SERVER-74020
         MONGO_UNIMPLEMENTED;
     }
 
 #ifdef MONGO_CONFIG_SSL
+    /**
+     * gRPC's C++ library does not currently support rotating TLS certificates manually, so this
+     * just does nothing and logs a message.
+     */
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
-                              bool asyncOCSPStaple) override {
-        // TODO SERVER-74020
-        MONGO_UNIMPLEMENTED;
-    }
+                              bool asyncOCSPStaple) override;
 
+    /**
+     * The gRPC integration doesn't support the use of transient SSL contexts, so this always
+     * returns an error.
+     */
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> createTransientSSLContext(
-        const TransientSSLParams& transientSSLParams) override {
-        // TODO SERVER-74020
-        MONGO_UNIMPLEMENTED;
-    }
+        const TransientSSLParams& transientSSLParams) override;
 #endif
 
 private:
-    std::unique_ptr<Client> _client;
+    mutable stdx::mutex _mutex;
+    bool _isShutdown = false;
+
+    std::shared_ptr<Client> _client;
+    std::unique_ptr<Server> _server;
     ServiceContext* const _svcCtx;
+    // Invalidated after setup().
+    std::vector<std::unique_ptr<Service>> _services;
+    Options _options;
 };
 
 }  // namespace mongo::transport::grpc

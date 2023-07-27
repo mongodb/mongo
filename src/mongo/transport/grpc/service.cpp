@@ -200,7 +200,7 @@ auto makeRpcServiceMethod(CommandService* service, const char* name, HandlerType
 
 }  // namespace
 
-CommandService::CommandService(GRPCTransportLayer* tl,
+CommandService::CommandService(TransportLayer* tl,
                                RPCHandler callback,
                                std::shared_ptr<WireVersionProvider> wvProvider)
     : _tl{tl},

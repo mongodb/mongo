@@ -41,6 +41,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/grpc/util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -86,7 +87,8 @@ public:
 };
 
 TEST_F(ServerTest, MaxThreads) {
-    unittest::Barrier waitForWorkerThreads(CommandServiceTestFixtures::kMaxThreads);
+    constexpr auto kMaxThreads = 12;
+    unittest::Barrier waitForWorkerThreads(kMaxThreads);
     Notification<void> okayToReturn;
 
     auto callback = [&](auto session) {
@@ -102,7 +104,7 @@ TEST_F(ServerTest, MaxThreads) {
 
         // A minimum of one thread is reserved for the completion queue, so we can only create
         // kMaxThreads - 1 streams.
-        for (int i = 0; i < CommandServiceTestFixtures::kMaxThreads - 1; i++) {
+        for (int i = 0; i < kMaxThreads - 1; i++) {
             auto thread = monitor.spawn([&, i]() {
                 ::grpc::ClientContext ctx;
                 CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
@@ -130,7 +132,9 @@ TEST_F(ServerTest, MaxThreads) {
         }
     };
 
-    CommandServiceTestFixtures::runWithServer(callback, clientThread);
+    auto serverOptions = CommandServiceTestFixtures::makeServerOptions();
+    serverOptions.maxThreads = kMaxThreads;
+    CommandServiceTestFixtures::runWithServer(callback, clientThread, std::move(serverOptions));
 }
 
 TEST_F(ServerTest, ECDSACertificates) {
@@ -234,26 +238,21 @@ TEST_F(ServerTest, DisableCertificateValidation) {
 }
 
 TEST_F(ServerTest, MultipleAddresses) {
-    auto addresses = std::vector<std::string>{
-        "localhost", "127.0.0.1", "[::1]", makeUnixSockPath(CommandServiceTestFixtures::kBindPort)};
+    std::vector<HostAndPort> addresses{
+        HostAndPort("localhost", CommandServiceTestFixtures::kBindPort),
+        HostAndPort("127.0.0.1", CommandServiceTestFixtures::kBindPort),
+        HostAndPort("::1", CommandServiceTestFixtures::kBindPort),
+        HostAndPort(makeUnixSockPath(CommandServiceTestFixtures::kBindPort))};
 
     Server::Options options = CommandServiceTestFixtures::makeServerOptions();
     options.addresses = addresses;
-    // Use this certificate because the default one doesn't have SANs associated with all of the
-    // addresses being tested here.
-    options.tlsPEMKeyFile = "jstests/libs/server_SAN.pem";
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},
         [&addresses](auto&, auto&) {
             for (auto& address : addresses) {
-                std::string fullAddress;
-                if (isUnixDomainSocket(address)) {
-                    fullAddress = "unix://{}"_format(address);
-                } else {
-                    fullAddress = "{}:{}"_format(address, CommandServiceTestFixtures::kBindPort);
-                }
-                auto stub = CommandServiceTestFixtures::makeStub(fullAddress);
+                auto stub =
+                    CommandServiceTestFixtures::makeStub(util::formatHostAndPortForGRPC(address));
                 ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK)
                     << "failed to connect to " << address;
             }

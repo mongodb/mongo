@@ -49,6 +49,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -60,16 +61,12 @@ inline Status makeShutdownTerminationStatus() {
 }
 }  // namespace
 
-Client::Client(TransportLayer* tl, boost::optional<const BSONObj&> md)
-    : _tl(tl), _id(UUID::gen()), _sharedState(std::make_shared<EgressSession::SharedState>()) {
-    // TODO SERVER-74020: uncomment the following
-    // invariant(dynamic_cast<GRPCTransportLayer*>(tl),
-    // "An instance of gRPC transport layer is required");
+Client::Client(TransportLayer* tl, const BSONObj& clientMetadata)
+    : _tl(tl),
+      _id(UUID::gen()),
+      _clientMetadata(base64::encode(clientMetadata.objdata(), clientMetadata.objsize())),
+      _sharedState(std::make_shared<EgressSession::SharedState>()) {
     _sharedState->clusterMaxWireVersion.store(util::constants::kMinimumWireVersion);
-
-    if (md) {
-        _clientMetadata = base64::encode(md->objdata(), md->objsize());
-    }
 }
 
 void Client::start(ServiceContext*) {
@@ -115,9 +112,7 @@ void Client::setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions
         ctx.addMetadataEntry(util::constants::kAuthenticationTokenKey.toString(),
                              *options.authToken);
     }
-    if (_clientMetadata) {
-        ctx.addMetadataEntry(util::constants::kClientMetadataKey.toString(), *_clientMetadata);
-    }
+    ctx.addMetadataEntry(util::constants::kClientMetadataKey.toString(), _clientMetadata);
     ctx.addMetadataEntry(util::constants::kClientIdKey.toString(), _id.toString());
     ctx.addMetadataEntry(util::constants::kWireVersionKey.toString(),
                          std::to_string(getClusterMaxWireVersion()));
@@ -127,7 +122,9 @@ bool Client::_isShutdownComplete_inlock() {
     return _state == ClientState::kShutdown && _ongoingConnects == 0 && _sessions.empty();
 }
 
-std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote, ConnectOptions options) {
+std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote,
+                                               Milliseconds timeout,
+                                               ConnectOptions options) {
     // TODO: this implementation currently acquires _mutex twice, which will have negative
     // performance implications. Egress performance is not a priority at the moment, but we should
     // revisit how lock contention can be reduced here in the future.
@@ -149,7 +146,7 @@ std::shared_ptr<EgressSession> Client::connect(const HostAndPort& remote, Connec
         }
     });
 
-    auto [ctx, stream] = _streamFactory(remote, options);
+    auto [ctx, stream] = _streamFactory(remote, timeout, options);
     auto session =
         std::make_shared<EgressSession>(_tl, std::move(ctx), std::move(stream), _id, _sharedState);
 
@@ -276,13 +273,19 @@ public:
                 return ::grpc::CreateChannel(util::formatHostAndPortForGRPC(remote),
                                              ::grpc::SslCredentials(_sslOps));
             },
-            [](std::shared_ptr<::grpc::Channel>& channel) { return Stub(channel); });
+            [](std::shared_ptr<::grpc::Channel>& channel, Milliseconds connectTimeout) {
+                iassert(ErrorCodes::NetworkTimeout,
+                        "Timed out waiting for gRPC channel to establish",
+                        channel->WaitForConnected(
+                            (Date_t::now() + connectTimeout).toSystemTimePoint()));
+                return Stub(channel);
+            });
 
         _prunerService.start(svcCtx, _pool);
     }
 
-    auto createStub(const HostAndPort& remote) {
-        return _pool->createStub(std::move(remote), ConnectSSLMode::kEnableSSL);
+    auto createStub(const HostAndPort& remote, Milliseconds connectTimeout) {
+        return _pool->createStub(std::move(remote), ConnectSSLMode::kEnableSSL, connectTimeout);
     }
 
     void stop() {
@@ -296,8 +299,8 @@ private:
     ChannelPrunerService<decltype(_pool)> _prunerService;
 };
 
-GRPCClient::GRPCClient(TransportLayer* tl, boost::optional<const BSONObj&> md, Options options)
-    : Client(tl, std::move(md)) {
+GRPCClient::GRPCClient(TransportLayer* tl, const BSONObj& clientMetadata, Options options)
+    : Client(tl, clientMetadata) {
     _stubFactory = std::make_unique<StubFactoryImpl>(std::move(options));
 }
 
@@ -312,8 +315,10 @@ void GRPCClient::shutdown() {
 }
 
 Client::CtxAndStream GRPCClient::_streamFactory(const HostAndPort& remote,
+                                                Milliseconds connectTimeout,
                                                 const ConnectOptions& options) {
-    auto stub = static_cast<StubFactoryImpl&>(*_stubFactory).createStub(std::move(remote));
+    auto stub =
+        static_cast<StubFactoryImpl&>(*_stubFactory).createStub(std::move(remote), connectTimeout);
     auto ctx = std::make_shared<GRPCClientContext>();
     setMetadataOnClientContext(*ctx, options);
     if (options.authToken) {

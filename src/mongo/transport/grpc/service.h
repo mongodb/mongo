@@ -38,9 +38,9 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/grpc/grpc_session.h"
-#include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
+#include "mongo/transport/transport_layer.h"
 
 namespace mongo::transport::grpc {
 
@@ -86,7 +86,7 @@ public:
      * better to communicate errors to the client by writing messages to the stream rather than by
      * setting a termination status.
      */
-    CommandService(GRPCTransportLayer* tl,
+    CommandService(TransportLayer* tl,
                    RPCHandler callback,
                    std::shared_ptr<WireVersionProvider> wvProvider);
 
@@ -107,7 +107,7 @@ private:
 
     ::grpc::Status _handleAuthenticatedStream(ServerContext& serverCtx, ServerStream& stream);
 
-    GRPCTransportLayer* _tl;
+    TransportLayer* _tl;
     RPCHandler _callback;
     std::shared_ptr<WireVersionProvider> _wvProvider;
     std::unique_ptr<ClientCache> _clientCache;

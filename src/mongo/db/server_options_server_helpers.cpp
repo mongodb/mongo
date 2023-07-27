@@ -482,6 +482,15 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     }
 
+#ifdef MONGO_CONFIG_GRPC
+    if (params.count("net.grpc.port")) {
+        serverGlobalParams.grpcPort = params["net.grpc.port"].as<int>();
+    }
+    if (params.count("net.grpc.serverMaxThreads")) {
+        serverGlobalParams.grpcServerMaxThreads = params["net.grpc.serverMaxThreads"].as<int>();
+    }
+#endif
+
     return Status::OK();
 }
 

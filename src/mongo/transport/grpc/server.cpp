@@ -90,8 +90,7 @@ void Server::start() {
     auto credentials = _makeServerCredentials(_options);
 
     for (auto& address : _options.addresses) {
-        builder.AddListeningPort(
-            util::formatHostAndPortForGRPC(HostAndPort(address, _options.port)), credentials);
+        builder.AddListeningPort(util::formatHostAndPortForGRPC(address), credentials);
     }
     for (auto& service : _services) {
         builder.RegisterService(service.get());
@@ -110,14 +109,12 @@ void Server::start() {
                             {logv2::UserAssertAfterLog(ErrorCodes::UnknownError)},
                             "Failed to start gRPC server",
                             "addresses"_attr = _options.addresses,
-                            "port"_attr = _options.port,
                             "services"_attr = _services);
     }
 
     LOGV2_INFO(7401305,
                "Started gRPC server",
                "addresses"_attr = _options.addresses,
-               "port"_attr = _options.port,
                "services"_attr = _services);
 }
 

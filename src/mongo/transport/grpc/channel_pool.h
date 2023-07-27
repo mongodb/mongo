@@ -59,7 +59,7 @@ class ChannelPool : public std::enable_shared_from_this<ChannelPool<Channel, Stu
 public:
     using SSLModeResolver = unique_function<bool(ConnectSSLMode)>;
     using ChannelFactory = unique_function<Channel(const HostAndPort&, bool)>;
-    using StubFactory = unique_function<Stub(Channel&)>;
+    using StubFactory = unique_function<Stub(Channel&, Milliseconds)>;
 
     /**
      * Maintains state for an individual `Channel`: allows deferred creation of `Channel` as well as
@@ -152,7 +152,9 @@ public:
      * Creates a new stub to `remote` that uses `sslMode`. Internally, an existing channel is used
      * to create the new stub, if available. Otherwise, a new channel is created.
      */
-    std::unique_ptr<StubHandle> createStub(HostAndPort remote, ConnectSSLMode sslMode) {
+    std::unique_ptr<StubHandle> createStub(HostAndPort remote,
+                                           ConnectSSLMode sslMode,
+                                           Milliseconds timeout) {
         std::shared_ptr<ChannelState> cs = [&] {
             const auto useSSL = _sslModeResolver(sslMode);
             ChannelMapKeyType key{remote, useSSL};
@@ -173,7 +175,7 @@ public:
                 return state;
             }
         }();
-        auto stub = _stubFactory(cs->channel());
+        auto stub = _stubFactory(cs->channel(), timeout);
         return std::make_unique<StubHandle>(std::move(cs), std::move(stub));
     }
 
