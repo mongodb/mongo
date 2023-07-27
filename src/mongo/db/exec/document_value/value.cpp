@@ -151,7 +151,7 @@ void ValueStorage::putDocument(Document&& d) {
     putRefCountable(std::move(d._storage));
 }
 
-void ValueStorage::putVector(boost::intrusive_ptr<RCVector>&& vec) {
+void ValueStorage::putVector(boost::intrusive_ptr<RCVector<Value>>&& vec) {
     fassert(16485, bool(vec));
     putRefCountable(std::move(vec));
 }
@@ -214,7 +214,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         }
 
         case Array: {
-            auto vec = make_intrusive<RCVector>();
+            auto vec = make_intrusive<RCVector<Value>>();
             BSONForEach(sub, elem.embeddedObject()) {
                 vec->vec.push_back(Value(sub));
             }
@@ -276,7 +276,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
 }
 
 Value::Value(const BSONArray& arr) : _storage(Array) {
-    auto vec = make_intrusive<RCVector>();
+    auto vec = make_intrusive<RCVector<Value>>();
     BSONForEach(sub, arr) {
         vec->vec.push_back(Value(sub));
     }
@@ -284,7 +284,7 @@ Value::Value(const BSONArray& arr) : _storage(Array) {
 }
 
 Value::Value(const vector<BSONObj>& vec) : _storage(Array) {
-    auto storageVec = make_intrusive<RCVector>();
+    auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
         storageVec->vec.push_back(Value(obj));
@@ -293,7 +293,7 @@ Value::Value(const vector<BSONObj>& vec) : _storage(Array) {
 }
 
 Value::Value(const vector<Document>& vec) : _storage(Array) {
-    auto storageVec = make_intrusive<RCVector>();
+    auto storageVec = make_intrusive<RCVector<Value>>();
     storageVec->vec.reserve(vec.size());
     for (auto&& obj : vec) {
         storageVec->vec.push_back(Value(obj));
@@ -1185,7 +1185,7 @@ size_t Value::getApproximateSize() const {
 
         case Array: {
             size_t size = sizeof(Value);
-            size += sizeof(RCVector);
+            size += sizeof(RCVector<Value>);
             const size_t n = getArray().size();
             for (size_t i = 0; i < n; ++i) {
                 size += getArray()[i].getApproximateSize();

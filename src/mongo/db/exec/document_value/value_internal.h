@@ -116,11 +116,12 @@ private:
 
 // TODO: a MutableVector, similar to MutableDocument
 /// A heap-allocated reference-counted std::vector
+template <typename T>
 class RCVector : public RefCountable {
 public:
     RCVector() {}
-    RCVector(std::vector<Value> v) : vec(std::move(v)) {}
-    std::vector<Value> vec;
+    RCVector(std::vector<T> v) : vec(std::move(v)) {}
+    std::vector<T> vec;
 };
 
 class RCCodeWScope : public RefCountable {
@@ -195,7 +196,7 @@ public:
         type = t;
         putDocument(std::move(d));
     }
-    ValueStorage(BSONType t, boost::intrusive_ptr<RCVector>&& a) {
+    ValueStorage(BSONType t, boost::intrusive_ptr<RCVector<Value>>&& a) {
         zero();
         type = t;
         putVector(std::move(a));
@@ -298,7 +299,7 @@ public:
 
     /// These are only to be called during Value construction on an empty Value
     void putString(StringData s);
-    void putVector(boost::intrusive_ptr<RCVector>&& v);
+    void putVector(boost::intrusive_ptr<RCVector<Value>>&& v);
     void putDocument(const Document& d);
     void putDocument(Document&& d);
     void putRegEx(const BSONRegEx& re);
@@ -340,8 +341,8 @@ public:
     }
 
     const std::vector<Value>& getArray() const {
-        dassert(typeid(*genericRCPtr) == typeid(const RCVector));
-        const RCVector* arrayPtr = static_cast<const RCVector*>(genericRCPtr);
+        dassert(typeid(*genericRCPtr) == typeid(const RCVector<Value>));
+        const RCVector<Value>* arrayPtr = static_cast<const RCVector<Value>*>(genericRCPtr);
         return arrayPtr->vec;
     }
 
