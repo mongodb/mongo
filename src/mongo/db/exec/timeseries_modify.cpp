@@ -583,21 +583,31 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
-    auto status = handlePlanStageYield(
-        expCtx(),
-        "TimeseriesModifyStage restoreState",
-        [&] {
-            child()->restoreState(&collectionPtr());
-            return PlanStage::NEED_TIME;
-        },
-        // yieldHandler
-        // Note we don't need to retry anything in this case since the write already was committed.
-        // However, we still need to return the affected measurement (if it was requested). We don't
-        // need to rely on the storage engine to return the affected document since we already have
-        // it in memory.
-        [&] { /* noop */ });
+    //
+    // If this stage is already exhausted it won't use its children stages anymore and therefore
+    // there's no need to restore them. Avoid restoring them so that there's no possibility of
+    // requiring yielding at this point. Restoring from yield could fail due to a sharding
+    // placement change. Throwing a StaleConfig error is undesirable after an "single write"
+    // operation has already performed a write because the router would retry.
+    if (!isEOF()) {
+        auto status = handlePlanStageYield(
+            expCtx(),
+            "TimeseriesModifyStage restoreState",
+            [&] {
+                child()->restoreState(&collectionPtr());
+                return PlanStage::NEED_TIME;
+            },
+            // yieldHandler
+            // Note we don't need to retry anything in this case since the write already was
+            // committed. However, we still need to return the affected measurement (if it was
+            // requested). We don't need to rely on the storage engine to return the affected
+            // document since we already have it in memory.
+            [&] { /* noop */ });
 
-    return {true, status};
+        return {true, status};
+    } else {
+        return {true, PlanStage::NEED_TIME};
+    }
 }
 
 template <typename F>
@@ -764,6 +774,11 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         _prepareToReturnMeasurement(*out);
         status = PlanStage::ADVANCED;
     }
+
+    if (status == PlanStage::NEED_TIME && isEOF()) {
+        status = PlanStage::IS_EOF;
+    }
+
     return status;
 }
 
@@ -773,6 +788,12 @@ void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
             "Demoted from primary while removing from {}"_format(ns.toStringForErrorMsg()),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
+
+    const bool isSingleWriteAndAlreadyWrote = !_params.isMulti &&
+        (_specificStats.nMeasurementsModified || _specificStats.nMeasurementsUpserted > 0);
+    tassert(7940800,
+            "Single write should never restore after having already modified one document.",
+            !isSingleWriteAndAlreadyWrote || _params.isExplain);
 
     _preWriteFilter.restoreState();
 }
