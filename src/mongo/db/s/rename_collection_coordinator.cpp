@@ -179,6 +179,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto criticalSectionReason =
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
 
+                bool isCriticalSectionAcquired = false;
                 try {
                     uassert(ErrorCodes::InvalidOptions,
                             "Cannot provide an expected collection UUID when renaming between "
@@ -189,8 +190,18 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     {
                         AutoGetCollection coll{
                             opCtx, fromNss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+
+                        uassert(ErrorCodes::CommandNotSupportedOnView,
+                                str::stream() << "Can't rename source collection `" << fromNss
+                                              << "` because it is a view.",
+                                !coll.getView());
+
                         checkCollectionUUIDMismatch(
                             opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
+
+                        uassert(ErrorCodes::NamespaceNotFound,
+                                str::stream() << "Collection " << fromNss << " doesn't exist.",
+                                coll.getCollection());
 
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename an encrypted collection",
@@ -219,30 +230,39 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.setTargetIsSharded(targetIsSharded);
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
-
                     if (!targetIsSharded) {
-                        // (SERVER-67325) Acquire critical section on the target collection in order
-                        // to disallow concurrent `createCollection`. In case the collection does
-                        // not exist, it will be later released by the rename participant. In case
-                        // the collection exists and is unsharded, the critical section can be
-                        // released right away as the participant will re-acquire it when needed.
                         auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
-                        criticalSection->acquireRecoverableCriticalSectionBlockWrites(
-                            opCtx,
-                            toNss,
-                            criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
-                        criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                            opCtx,
-                            toNss,
-                            criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
+                        {
+                            // (SERVER-67325) Acquire critical section on the target collection in
+                            // order to disallow concurrent `createCollection`. In case the
+                            // collection does not exist, it will be later released by the rename
+                            // participant. In case the collection exists and is unsharded, the
+                            // critical section can be released right away as the participant will
+                            // re-acquire it when needed.
+                            try {
 
-                        // Make sure the target namespace is not a view
-                        uassert(ErrorCodes::CommandNotSupportedOnView,
-                                str::stream() << "Can't rename to target collection `" << toNss
-                                              << "` because it is a view.",
-                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
+                                criticalSection->acquireRecoverableCriticalSectionBlockWrites(
+                                    opCtx,
+                                    toNss,
+                                    criticalSectionReason,
+                                    ShardingCatalogClient::kLocalWriteConcern);
+                                isCriticalSectionAcquired = true;
+                                criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                                    opCtx,
+                                    toNss,
+                                    criticalSectionReason,
+                                    ShardingCatalogClient::kLocalWriteConcern);
+
+                            } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+
+                                // Target namespace should never be a view
+                                // We forcely throw NamespaceExists for compatibility with
+                                // replicaset
+                                uasserted(ErrorCodes::NamespaceExists,
+                                          str::stream()
+                                              << "a view already exists with that name: " << toNss);
+                            }
+                        }
 
                         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
                                                                                        toNss)) {
@@ -274,12 +294,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 } catch (const DBException&) {
                     auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
-                    criticalSection->releaseRecoverableCriticalSection(
-                        opCtx,
-                        toNss,
-                        criticalSectionReason,
-                        WriteConcerns::kLocalWriteConcern,
-                        false /* throwIfReasonDiffers */);
+                    if (isCriticalSectionAcquired)
+                        criticalSection->releaseRecoverableCriticalSection(
+                            opCtx,
+                            toNss,
+                            criticalSectionReason,
+                            WriteConcerns::kLocalWriteConcern,
+                            false /* throwIfReasonDiffers */);
                     _completeOnError = true;
                     throw;
                 }

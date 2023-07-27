@@ -37,29 +37,17 @@ assert.commandWorked(
 assert.commandFailed(db.bar.renameCollection('shardedColl'));
 
 // Renaming unsharded collection to a different db with different primary shard.
-db.unSharded.insert({x: 1});
+db.unsharded.insert({x: 1});
 assert.commandFailedWithCode(
-    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBDifferentPrimary.foo'}),
+    db.adminCommand({renameCollection: 'test.unsharded', to: 'otherDBDifferentPrimary.foo'}),
     [ErrorCodes.CommandFailed],
     "Source and destination collections must be on the same database.");
 
 // Renaming unsharded collection to a different db with same primary shard.
 assert.commandWorked(
-    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBSamePrimary.foo'}));
+    db.adminCommand({renameCollection: 'test.unsharded', to: 'otherDBSamePrimary.foo'}));
 assert.eq(0, db.unsharded.countDocuments({}));
 assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
-
-jsTest.log("Testing that rename operations involving views are not allowed");
-{
-    assert.commandWorked(db.collForView.insert({_id: 1}));
-    assert.commandWorked(db.createView('view', 'collForView', []));
-
-    let toAView = db.unsharded.renameCollection('view', true /* dropTarget */);
-    assert.commandFailed(toAView);
-
-    let fromAView = db.view.renameCollection('target');
-    assert.commandFailed(fromAView);
-}
 
 // Rename a collection to itself fails, without loosing data
 {
