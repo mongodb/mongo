@@ -23,23 +23,11 @@ for (var i = 0; i < docCount; i++) {
 assert.eq(coll.find().batchSize(1).itcount(), docCount);
 
 // Now try to run the same query with exhaust
-try {
-    assert.eq(coll.find().batchSize(1).addOption(DBQuery.Option.exhaust).itcount(), docCount);
-} catch (e) {
-    // The exhaust option is not valid against mongos, ensure that this query throws the right
-    // code
-    assert.eq(e.code, 18526, () => tojson(e));
-}
+assert.eq(coll.find().batchSize(1).addOption(DBQuery.Option.exhaust).itcount(), docCount);
 
 // Test a case where the amount of data requires a response to the initial find operation as well as
 // three getMore reply batches.
 (function() {
-// Skip this test case if we are connected to a mongos, since exhaust queries generally aren't
-// expected to work against a mongos.
-if (FixtureHelpers.isMongos(db)) {
-    return;
-}
-
 coll.drop();
 
 // Include a long string in each document so that the documents are a bit bigger than 16KB.

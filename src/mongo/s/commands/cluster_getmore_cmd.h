@@ -108,6 +108,11 @@ public:
 
             auto bob = reply->getBodyBuilder();
             auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, _cmd));
+            if (opCtx->isExhaust() && response.getCursorId() != 0) {
+                // Indicate that an exhaust message should be generated and the previous BSONObj
+                // command parameters should be reused as the next BSONObj command parameters.
+                reply->setNextInvocation(boost::none);
+            }
             response.addToBSON(CursorResponse::ResponseType::SubsequentResponse, &bob);
 
             if (getTestCommandsEnabled()) {

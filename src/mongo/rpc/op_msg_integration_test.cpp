@@ -366,8 +366,8 @@ void enableClientChecksum() {
 void exhaustGetMoreTest(bool enableChecksum) {
     auto conn = getIntegrationTestConnection();
 
-    // Only test exhaust against a standalone.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    // Only test exhaust against a standalone and mongos.
+    if (conn->isReplicaSetMember()) {
         return;
     }
 
@@ -459,8 +459,8 @@ TEST(OpMsg, ServerHandlesExhaustGetMoreCorrectlyWithChecksum) {
 TEST(OpMsg, FindIgnoresExhaust) {
     auto conn = getIntegrationTestConnection();
 
-    // Only test exhaust against a standalone.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    // Only test exhaust against a standalone and mongos.
+    if (conn->isReplicaSetMember()) {
         return;
     }
 
@@ -491,8 +491,8 @@ TEST(OpMsg, FindIgnoresExhaust) {
 TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     auto conn = getIntegrationTestConnection();
 
-    // Only test exhaust against a standalone.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    // Only test exhaust against a standalone and mongos.
+    if (conn->isReplicaSetMember()) {
         return;
     }
 
@@ -536,61 +536,11 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     ASSERT_NOT_OK(getStatusFromCommandResult(res));
 }
 
-TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
-    auto conn = getIntegrationTestConnection();
-
-    if (!conn->isMongos()) {
-        return;
-    }
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-
-    conn->dropCollection(nss);
-
-    // Insert a few documents.
-    for (int i = 0; i < 5; i++) {
-        conn->insert(nss, BSON("_id" << i));
-    }
-
-    // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
-    // guarantee their return order.
-    auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), findCmd);
-    auto request = opMsgRequest.serialize();
-
-    Message reply;
-    conn->call(request, reply);
-    auto res = OpMsg::parse(reply).body;
-    const long long cursorId = res["cursor"]["id"].numberLong();
-    ASSERT(res["cursor"]["firstBatch"].Array().empty());
-    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-
-    // Construct getMore request with exhaust flag.
-    int batchSize = 2;
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
-    getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), getMoreRequest.toBSON({}));
-    request = opMsgRequest.serialize();
-    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
-
-    // Run getMore. This should not start an exhaust stream.
-    conn->call(request, reply);
-    // The response should not have set moreToCome.
-    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
-    res = OpMsg::parse(reply).body;
-    ASSERT_OK(getStatusFromCommandResult(res));
-    ASSERT_EQ(res["cursor"]["id"].numberLong(), cursorId);
-    std::vector<BSONElement> nextBatch = res["cursor"]["nextBatch"].Array();
-    ASSERT_EQ(nextBatch.size(), 2U);
-    ASSERT_BSONOBJ_EQ(nextBatch[0].embeddedObject(), BSON("_id" << 0));
-    ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 1));
-}
-
 TEST(OpMsg, ExhaustWorksForAggCursor) {
     auto conn = getIntegrationTestConnection();
 
-    // Only test exhaust against a standalone.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    // Only test exhaust against a standalone and mongos.
+    if (conn->isReplicaSetMember()) {
         return;
     }
 
@@ -1267,8 +1217,8 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     // don't measure that here.
     auto conn = getIntegrationTestConnection();
 
-    // Only test exhaust against a standalone.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    // Only test exhaust against a standalone and mongos.
+    if (conn->isReplicaSetMember()) {
         return;
     }
 
