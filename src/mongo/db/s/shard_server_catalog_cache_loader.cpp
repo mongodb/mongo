@@ -52,12 +52,14 @@
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -70,6 +72,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -373,6 +376,34 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
 
     uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
         opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
+}
+
+void performNoopMajorityWriteLocally(OperationContext* opCtx, StringData msg) {
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+    {
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Not primary when performing noop write for {}"_format(msg),
+                replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin));
+
+        writeConflictRetry(
+            opCtx, "performNoopWrite", NamespaceString::kRsOplogNamespace, [&opCtx, &msg] {
+                WriteUnitOfWork wuow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                    opCtx, BSON("msg" << msg));
+                wuow.commit();
+            });
+    }
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    WriteConcernResult writeConcernResult;
+    uassertStatusOK(
+        waitForWriteConcern(opCtx,
+                            replClient.getLastOp(),
+                            WriteConcernOptions(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kWriteConcernTimeoutSharding),
+                            &writeConcernResult));
 }
 
 }  // namespace
@@ -1009,6 +1040,10 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChunksTask(
     OperationContext* opCtx, const NamespaceString& nss, CollAndChunkTask task) {
 
+    // Ensure that this node is primary before using or persisting the information fetched from the
+    // config server. This prevents using incorrect filtering information in split brain scenarios.
+    performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleCollAndChunksTask");
+
     {
         stdx::lock_guard<Latch> lock(_mutex);
 
@@ -1035,6 +1070,11 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
                                                                             StringData dbName,
                                                                             DBTask task) {
+
+    // Ensure that this node is primary before using or persisting the information fetched from the
+    // config server. This prevents using incorrect filtering information in split brain scenarios.
+    performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleDbTask");
+
     {
         stdx::lock_guard<Latch> lock(_mutex);
 
