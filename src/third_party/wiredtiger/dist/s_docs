@@ -217,9 +217,10 @@ EOF
 v=$(doxygen --version)
 case "$v" in
     1.8.17) doxyfile="Doxyfile";;
+    1.9.1) doxyfile="Doxyfile.9";;
     1.9.3) doxyfile="Doxyfile.9";;
     *)
-        echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17 or 1.9.3"
+        echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, or 1.9.3"
         exit 0
 esac
 

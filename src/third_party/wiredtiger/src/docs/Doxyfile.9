@@ -81,17 +81,6 @@ OUTPUT_DIRECTORY       = ../../docs
 
 CREATE_SUBDIRS         = NO
 
-# Controls the number of sub-directories that will be created when
-# CREATE_SUBDIRS tag is set to YES. Level 0 represents 16 directories, and every
-# level increment doubles the number of directories, resulting in 4096
-# directories at level 8 which is the default and also the maximum value. The
-# sub-directories are organized in 2 levels, the first level always has a fixed
-# numer of 16 directories.
-# Minimum value: 0, maximum value: 8, default value: 8.
-# This tag requires that the tag CREATE_SUBDIRS is set to YES.
-
-CREATE_SUBDIRS_LEVEL   = 8
-
 # If the ALLOW_UNICODE_NAMES tag is set to YES, doxygen will allow non-ASCII
 # characters to appear in the names of generated files. If set to NO, non-ASCII
 # characters will be escaped, for example _xE3_x81_x84 will be used for Unicode
@@ -662,12 +651,6 @@ HIDE_SCOPE_NAMES       = NO
 
 HIDE_COMPOUND_REFERENCE= NO
 
-# If the SHOW_HEADERFILE tag is set to YES then the documentation for a class
-# will show which file needs to be included to use the class.
-# The default value is: YES.
-
-SHOW_HEADERFILE        = YES
-
 # If the SHOW_INCLUDE_FILES tag is set to YES then doxygen will put a list of
 # the files that are included by a file in the documentation of that file.
 # The default value is: YES.
@@ -879,13 +862,6 @@ WARN_IF_UNDOCUMENTED   = YES
 
 WARN_IF_DOC_ERROR      = YES
 
-# If WARN_IF_INCOMPLETE_DOC is set to YES, doxygen will warn about incomplete
-# function parameter documentation. If set to NO, doxygen will accept that some
-# parameters have no documentation without warning.
-# The default value is: YES.
-
-WARN_IF_INCOMPLETE_DOC = YES
-
 # This WARN_NO_PARAMDOC option can be enabled to get warnings for functions that
 # are documented, but have no documentation for their parameters or return
 # value. If set to NO, doxygen will only warn about wrong parameter
@@ -916,16 +892,6 @@ WARN_AS_ERROR          = YES
 
 WARN_FORMAT            = "$file:$line: $text"
 
-# In the $text part of the WARN_FORMAT command it is possible that a reference
-# to a more specific place is given. To make it easier to jump to this place
-# (outside of doxygen) the user can define a custom "cut" / "paste" string.
-# Example:
-# WARN_LINE_FORMAT = "'vi $file +$line'"
-# See also: WARN_FORMAT
-# The default value is: at line $line of file $file.
-
-WARN_LINE_FORMAT       = "at line $line of file $file"
-
 # The WARN_LOGFILE tag can be used to specify a file to which warning and error
 # messages should be written. If left blank the output is written to standard
 # error (stderr). In case the file specified cannot be opened for writing the
@@ -948,26 +914,6 @@ WARN_LOGFILE           = doxygen.log
 INPUT                  = ../include/wiredtiger.in \
                          ../include/wiredtiger_ext.h \
                          .
-
-# This tag can be used to specify the character encoding of the source files
-# that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
-# libiconv (or the iconv built into libc) for the transcoding. See the libiconv
-# documentation (see:
-# https://www.gnu.org/software/libiconv/) for the list of possible encodings.
-# See also: INPUT_FILE_ENCODING
-# The default value is: UTF-8.
-
-INPUT_ENCODING         = UTF-8
-
-# This tag can be used to specify the character encoding of the source files
-# that doxygen parses The INPUT_FILE_ENCODING tag can be used to specify
-# character encoding on a per file pattern basis. Doxygen will compare the file
-# name with each pattern and apply the encoding instead of the default
-# INPUT_ENCODING) if there is a match. The character encodings are a list of the
-# form: pattern=encoding (like *.php=ISO-8859-1). See cfg_input_encoding
-# "INPUT_ENCODING" for further information on supported encodings.
-
-INPUT_FILE_ENCODING    =
 
 # If the value of the INPUT tag contains directories, you can use the
 # FILE_PATTERNS tag to specify one or more wildcard patterns (like *.cpp and
@@ -1160,15 +1106,6 @@ FILTER_SOURCE_PATTERNS =
 # and want to reuse the introduction page also for the doxygen output.
 
 USE_MDFILE_AS_MAINPAGE =
-
-# The Fortran standard specifies that for fixed formatted Fortran code all
-# characters from position 72 are to be considered as comment. A common
-# extension is to allow longer lines before the automatic comment starts. The
-# setting FORTRAN_COMMENT_AFTER will also make it possible that longer lines can
-# be processed before the automatic comment starts.
-# Minimum value: 7, maximum value: 10000, default value: 72.
-
-FORTRAN_COMMENT_AFTER  = 72
 
 #---------------------------------------------------------------------------
 # Configuration options related to source browsing
@@ -1364,23 +1301,6 @@ HTML_EXTRA_STYLESHEET  = style/wiredtiger.css
 
 HTML_EXTRA_FILES       =
 
-# The HTML_COLORSTYLE tag can be used to specify if the generated HTML output
-# should be rendered with a dark or light theme. Default setting AUTO_LIGHT
-# enables light output unless the user preference is dark output. Other options
-# are DARK to always use dark mode, LIGHT to always use light mode, AUTO_DARK to
-# default to dark mode unless the user prefers light mode, and TOGGLE to let the
-# user toggle between dark and light mode via a button.
-# Possible values are: LIGHT Always generate light output., DARK Always generate
-# dark output., AUTO_LIGHT Automatically set the mode according to the user
-# preference, use light mode if no preference is set (the default)., AUTO_DARK
-# Automatically set the mode according to the user preference, use dark mode if
-# no preference is set. and TOGGLE Allow to user to switch between light and
-# dark mode via a button..
-# The default value is: AUTO_LIGHT.
-# This tag requires that the tag GENERATE_HTML is set to YES.
-
-HTML_COLORSTYLE        = AUTO_LIGHT
-
 # The HTML_COLORSTYLE_HUE tag controls the color of the HTML output. Doxygen
 # will adjust the colors in the style sheet and background images according to
 # this color. Hue is specified as an angle on a color-wheel, see
@@ -1475,12 +1395,6 @@ GENERATE_DOCSET        = NO
 
 DOCSET_FEEDNAME        = "Doxygen generated docs"
 
-# This tag determines the URL of the docset feed. A documentation feed provides
-# an umbrella under which multiple documentation sets from a single provider
-# (such as a company or product suite) can be grouped.
-# This tag requires that the tag GENERATE_DOCSET is set to YES.
-
-DOCSET_FEEDURL         =
 
 # This tag specifies a string that should uniquely identify the documentation
 # set bundle. This should be a reverse domain-name style string, e.g.
@@ -1681,18 +1595,6 @@ DISABLE_INDEX          = NO
 
 GENERATE_TREEVIEW      = YES
 
-# When both GENERATE_TREEVIEW and DISABLE_INDEX are set to YES, then the
-# FULL_SIDEBAR option determines if the side bar is limited to only the treeview
-# area (value NO) or if it should extend to the full height of the window (value
-# YES). Setting this to YES gives a layout similar to
-# https://docs.readthedocs.io with more room for contents, but less room for the
-# project logo, title, and description. If either GENERATE_TREEVIEW or
-# DISABLE_INDEX is set to NO, this option has no effect.
-# The default value is: NO.
-# This tag requires that the tag GENERATE_HTML is set to YES.
-
-FULL_SIDEBAR           = NO
-
 # The ENUM_VALUES_PER_LINE tag can be used to set the number of enum values that
 # doxygen will group on one line in the generated HTML documentation.
 #
@@ -1716,13 +1618,6 @@ TREEVIEW_WIDTH         = 200
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
 EXT_LINKS_IN_WINDOW    = NO
-
-# If the OBFUSCATE_EMAILS tag is set to YES, doxygen will obfuscate email
-# addresses.
-# The default value is: YES.
-# This tag requires that the tag GENERATE_HTML is set to YES.
-
-OBFUSCATE_EMAILS       = YES
 
 # If the HTML_FORMULA_FORMAT option is set to svg, doxygen will use the pdf2svg
 # tool (see https://github.com/dawbarton/pdf2svg) or inkscape (see
@@ -1760,17 +1655,6 @@ FORMULA_MACROFILE      =
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
 USE_MATHJAX            = NO
-
-# With MATHJAX_VERSION it is possible to specify the MathJax version to be used.
-# Note that the different versions of MathJax have different requirements with
-# regards to the different settings, so it is possible that also other MathJax
-# settings have to be changed when switching between the different MathJax
-# versions.
-# Possible values are: MathJax_2 and MathJax_3.
-# The default value is: MathJax_2.
-# This tag requires that the tag USE_MATHJAX is set to YES.
-
-MATHJAX_VERSION        = MathJax_2
 
 # When MathJax is enabled you can set the default output format to be used for
 # the MathJax output. For more details about the output format see MathJax
@@ -2481,36 +2365,6 @@ HAVE_DOT               = NO
 
 DOT_NUM_THREADS        = 0
 
-# DOT_COMMON_ATTR is common attributes for nodes, edges and labels of
-# subgraphs. When you want a differently looking font in the dot files that
-# doxygen generates you can specify fontname, fontcolor and fontsize attributes.
-# For details please see <a href=https://graphviz.org/doc/info/attrs.html>Node,
-# Edge and Graph Attributes specification</a> You need to make sure dot is able
-# to find the font, which can be done by putting it in a standard location or by
-# setting the DOTFONTPATH environment variable or by setting DOT_FONTPATH to the
-# directory containing the font. Default graphviz fontsize is 14.
-# The default value is: fontname=Helvetica,fontsize=10.
-# This tag requires that the tag HAVE_DOT is set to YES.
-
-DOT_COMMON_ATTR        = "fontname=Helvetica,fontsize=10"
-
-# DOT_EDGE_ATTR is concatenated with DOT_COMMON_ATTR. For elegant style you can
-# add 'arrowhead=open, arrowtail=open, arrowsize=0.5'. <a
-# href=https://graphviz.org/doc/info/arrows.html>Complete documentation about
-# arrows shapes.</a>
-# The default value is: labelfontname=Helvetica,labelfontsize=10.
-# This tag requires that the tag HAVE_DOT is set to YES.
-
-DOT_EDGE_ATTR          = "labelfontname=Helvetica,labelfontsize=10"
-
-# DOT_NODE_ATTR is concatenated with DOT_COMMON_ATTR. For view without boxes
-# around nodes set 'shape=plain' or 'shape=plaintext' <a
-# href=https://www.graphviz.org/doc/info/shapes.html>Shapes specification</a>
-# The default value is: shape=box,height=0.2,width=0.4.
-# This tag requires that the tag HAVE_DOT is set to YES.
-
-DOT_NODE_ATTR          = "shape=box,height=0.2,width=0.4"
-
 # You can set the path where dot can find font specified with fontname in
 # DOT_COMMON_ATTR and others dot attributes.
 # This tag requires that the tag HAVE_DOT is set to YES.
@@ -2653,13 +2507,6 @@ GRAPHICAL_HIERARCHY    = YES
 # This tag requires that the tag HAVE_DOT is set to YES.
 
 DIRECTORY_GRAPH        = YES
-
-# The DIR_GRAPH_MAX_DEPTH tag can be used to limit the maximum number of levels
-# of child directories generated in directory dependency graphs by dot.
-# Minimum value: 1, maximum value: 25, default value: 1.
-# This tag requires that the tag DIRECTORY_GRAPH is set to YES.
-
-DIR_GRAPH_MAX_DEPTH    = 1
 
 # The DOT_IMAGE_FORMAT tag can be used to set the image format of the images
 # generated by dot. For an explanation of the image formats see the section
