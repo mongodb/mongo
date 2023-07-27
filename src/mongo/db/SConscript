@@ -2511,6 +2511,7 @@ env.Library(
         'op_observer/change_stream_pre_images_op_observer',
         'op_observer/fallback_op_observer',
         'op_observer/fcv_op_observer',
+        'op_observer/find_and_modify_images_op_observer',
         'op_observer/op_observer',
         'op_observer/oplog_writer_impl',
         'op_observer/oplog_writer_transaction_proxy',

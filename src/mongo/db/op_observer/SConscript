@@ -103,6 +103,16 @@ env.Library(
 )
 
 env.Library(
+    target='find_and_modify_images_op_observer',
+    source=[
+        'find_and_modify_images_op_observer.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='fcv_op_observer',
     source=[
         'fcv_op_observer.cpp',
