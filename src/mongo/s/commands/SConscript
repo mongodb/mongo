@@ -238,6 +238,7 @@ env.Library(
         'cluster_split_vector_cmd.cpp',
         'cluster_update_zone_key_range_cmd.cpp',
         'cluster_user_management_commands.cpp',
+        'create_unsplittable_collections_test_command.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',

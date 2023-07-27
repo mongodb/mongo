@@ -214,6 +214,7 @@ const allCommands = {
     createIndexes: {skip: isPrimaryOnly},
     createRole: {skip: isPrimaryOnly},
     createSearchIndexes: {skip: isNotAUserDataRead},
+    createUnsplittableCollection_FOR_TESTING: {skip: isPrimaryOnly},
     createUser: {skip: isPrimaryOnly},
     currentOp: {skip: isNotAUserDataRead},
     dataSize: {

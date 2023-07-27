@@ -75,7 +75,8 @@ public:
         bool presplitHashedZones,
         const std::vector<TagsType>& tags,
         size_t numShards,
-        bool collectionIsEmpty);
+        bool collectionIsEmpty,
+        bool isUnsplittable);
 
     virtual ~InitialSplitPolicy() {}
 

@@ -354,7 +354,8 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
     const bool presplitHashedZones,
     const std::vector<TagsType>& tags,
     size_t numShards,
-    bool collectionIsEmpty) {
+    bool collectionIsEmpty,
+    bool isUnsplittable) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "numInitialChunks is only supported when the collection is empty "
                              "and has a hashed field in the shard key pattern",
@@ -364,6 +365,11 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
                 << "When the prefix of the hashed shard key is a range field, "
                    "'numInitialChunks' can only be used when the 'presplitHashedZones' is true",
             !numInitialChunks || shardKeyPattern.hasHashedPrefix() || presplitHashedZones);
+
+    // if unsplittable, the collection is always equivalent to a single chunk collection
+    if (isUnsplittable) {
+        return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
+    }
 
     // If 'presplitHashedZones' flag is set, we always use 'PresplitHashedZonesSplitPolicy', to make
     // sure we throw the correct assertion if further validation fails.
