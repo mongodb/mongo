@@ -200,6 +200,11 @@ public:
 
     PlanExecutor::QueryFramework getQueryFramework() const override final;
 
+    bool usesCollectionAcquisitions() const override final {
+        // TODO SERVER-78724: Replace this whenever aggregations use shard role acquisitions.
+        return false;
+    }
+
 private:
     /**
      * Obtains the next document from the underlying Pipeline, and does change streams-related

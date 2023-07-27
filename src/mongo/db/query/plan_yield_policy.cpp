@@ -250,9 +250,9 @@ void PlanYieldPolicy::performYield(OperationContext* opCtx,
 void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
                                                    std::function<void()> whileYieldingFn) {
     // Things have to happen here in a specific order:
-    //   * Yield the acquired TransactionResources
     //   * Abandon the current storage engine snapshot.
     //   * Check for interrupt if the yield policy requires.
+    //   * Yield the acquired TransactionResources
     //   * Restore the yielded TransactionResources
     invariant(_policy == YieldPolicy::YIELD_AUTO || _policy == YieldPolicy::YIELD_MANUAL);
 
@@ -280,19 +280,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     }
 
     yieldFailedScopeGuard.dismiss();
-    try {
-        restoreTransactionResourcesToOperationContext(opCtx,
-                                                      std::move(yieldedTransactionResources));
-    } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
-        const auto extraInfo = ex.extraInfo<CollectionUUIDMismatchInfo>();
-        if (extraInfo->actualCollection()) {
-            throwCollectionRenamedError(NamespaceString(extraInfo->expectedCollection()),
-                                        NamespaceString(*extraInfo->actualCollection()),
-                                        extraInfo->collectionUUID());
-        } else {
-            throwCollectionDroppedError(extraInfo->collectionUUID());
-        }
-    }
+    restoreTransactionResourcesToOperationContext(opCtx, std::move(yieldedTransactionResources));
 }
 
 }  // namespace mongo

@@ -552,11 +552,22 @@ public:
             // virtual collections in the new 'opCtx'.
             ExternalDataSourceScopeGuard::updateOperationContext(cursorPin.getCursor(), opCtx);
 
+            boost::optional<HandleTransactionResourcesFromCursor> txnResourcesHandler;
+
             // On early return, typically due to a failed assertion, delete the cursor.
-            ScopeGuard cursorDeleter([&] { cursorPin.deleteUnderlying(); });
+            ScopeGuard cursorDeleter([&] {
+                if (txnResourcesHandler) {
+                    txnResourcesHandler->dismissRestoredResources();
+                }
+                cursorPin.deleteUnderlying();
+            });
 
             if (cursorPin->getExecutor()->lockPolicy() ==
                 PlanExecutor::LockPolicy::kLocksInternally) {
+                // TODO SERVER-78724: This invariant can be safely removed once aggregations uses
+                // collection acquisitions.
+                invariant(!cursorPin->getExecutor()->usesCollectionAcquisitions());
+
                 if (!nss.isCollectionlessCursorNamespace()) {
                     statsTracker.emplace(
                         opCtx,
@@ -569,25 +580,35 @@ public:
                 invariant(cursorPin->getExecutor()->lockPolicy() ==
                           PlanExecutor::LockPolicy::kLockExternally);
 
-                // Lock the backing collection by using the executor's namespace. Note that it may
-                // be different from the cursor's namespace. One such possible scenario is when
-                // getMore() is executed against a view. Technically, views are pipelines and under
-                // normal circumstances use 'kLocksInternally' policy, so we shouldn't be getting
-                // into here in the first place. However, if the pipeline was optimized away and
-                // replaced with a query plan, its lock policy would have also been changed to
-                // 'kLockExternally'. So, we'll use the executor's namespace to take the lock (which
-                // is always the backing collection namespace), but will use the namespace provided
-                // in the user request for profiling.
-                // Otherwise, these two namespaces will match.
-                // Note that some pipelines which were optimized away may require locking multiple
-                // namespaces. As such, we pass any secondary namespaces required by the pinned
-                // cursor's executor when constructing 'readLock'.
-                const auto& secondaryNamespaces =
-                    cursorPin->getExecutor()->getSecondaryNamespaces();
-                readLock.emplace(opCtx,
-                                 cursorPin->getExecutor()->nss(),
-                                 AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                     secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
+                if (cursorPin->getExecutor()->usesCollectionAcquisitions()) {
+                    // Restore the acquisitions used in the original call. This takes care of
+                    // checking that the preconditions for the original acquisition still hold and
+                    // restores any locks necessary.
+                    txnResourcesHandler.emplace(opCtx, cursorPin.getCursor());
+                } else {
+                    // Lock the backing collection by using the executor's namespace. Note that it
+                    // may be different from the cursor's namespace. One such possible scenario is
+                    // when getMore() is executed against a view. Technically, views are pipelines
+                    // and under normal circumstances use 'kLocksInternally' policy, so we shouldn't
+                    // be getting into here in the first place. However, if the pipeline was
+                    // optimized away and replaced with a query plan, its lock policy would have
+                    // also been changed to 'kLockExternally'. So, we'll use the executor's
+                    // namespace to take the lock (which is always the backing collection
+                    // namespace), but will use the namespace provided in the user request for
+                    // profiling.
+                    //
+                    // Otherwise, these two namespaces will match.
+                    //
+                    // Note that some pipelines which were optimized away may require locking
+                    // multiple namespaces. As such, we pass any secondary namespaces required by
+                    // the pinned cursor's executor when constructing 'readLock'.
+                    const auto& secondaryNamespaces =
+                        cursorPin->getExecutor()->getSecondaryNamespaces();
+                    readLock.emplace(opCtx,
+                                     cursorPin->getExecutor()->nss(),
+                                     AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                         secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
+                }
 
                 statsTracker.emplace(
                     opCtx,

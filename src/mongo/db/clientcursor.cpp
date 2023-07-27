@@ -152,6 +152,14 @@ ClientCursor::~ClientCursor() {
         // needs to keep data pinned.
         _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
     }
+
+    // We manually dispose of the PlanExecutor here to release all acquisitions. This must be
+    // deleted before the yielded acquisitions since the execution plan may maintain pointers to the
+    // TransactionResources.
+    _exec.reset();
+    // If we are holding transaction resources we must dispose of them before destroying the object.
+    // Not doing so is a programming failure.
+    _transactionResources.dispose();
 }
 
 void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now) {

@@ -92,6 +92,10 @@ TransactionResources& TransactionResources::get(OperationContext* opCtx) {
     return *transactionResources;
 }
 
+bool TransactionResources::isPresent(OperationContext* opCtx) {
+    return bool(getTransactionResources(opCtx));
+}
+
 std::unique_ptr<TransactionResources> TransactionResources::detachFromOpCtx(
     OperationContext* opCtx) {
     auto& transactionResources = getTransactionResources(opCtx);

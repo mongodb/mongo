@@ -455,6 +455,10 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
     return {};
 }
 
+bool PlanExecutorSBE::usesCollectionAcquisitions() const {
+    return _yieldPolicy->usesCollectionAcquisitions();
+}
+
 namespace {
 
 Document convertToDocument(const sbe::value::Object& obj);

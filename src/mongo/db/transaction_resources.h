@@ -108,37 +108,68 @@ struct AcquisitionPrerequisites {
 
 namespace shard_role_details {
 
+struct AcquisitionLocks {
+    // TODO SERVER-77213: This should mostly go away once the Locker resides inside
+    // TransactionResources and the underlying locks point to it instead of the opCtx.
+    LockMode globalLock = MODE_NONE;
+    Lock::GlobalLockSkipOptions globalLockOptions;
+    bool hasLockFreeReadsBlock = false;
+    bool canSkipPbwmLock = false;
+
+    LockMode dbLock = MODE_NONE;
+    Lock::DBLockSkipOptions dbLockOptions;
+
+    LockMode collLock = MODE_NONE;
+};
+
 struct AcquiredCollection {
-    AcquiredCollection(AcquisitionPrerequisites prerequisites,
-                       std::shared_ptr<Lock::DBLock> dbLock,
-                       boost::optional<Lock::CollectionLock> collectionLock,
-                       std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
-                       std::shared_ptr<Lock::GlobalLock> globalLock,
-                       boost::optional<ScopedCollectionDescription> collectionDescription,
-                       boost::optional<ScopedCollectionFilter> ownershipFilter,
-                       CollectionPtr collectionPtr)
-        : prerequisites(std::move(prerequisites)),
+    AcquiredCollection(
+        int acquireCollectionCallNum,
+        AcquisitionPrerequisites prerequisites,
+        std::shared_ptr<Lock::DBLock> dbLock,
+        boost::optional<Lock::CollectionLock> collectionLock,
+        std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
+        std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock,
+        std::shared_ptr<Lock::GlobalLock> globalLock,
+        AcquisitionLocks locksRequirements,
+        boost::optional<ScopedCollectionDescription> collectionDescription,
+        boost::optional<ScopedCollectionFilter> ownershipFilter,
+        CollectionPtr collectionPtr)
+        : acquireCollectionCallNum(acquireCollectionCallNum),
+          prerequisites(std::move(prerequisites)),
           dbLock(std::move(dbLock)),
           collectionLock(std::move(collectionLock)),
           lockFreeReadsBlock(std::move(lockFreeReadsBlock)),
+          skipPBWMLock(std::move(skipPBWMLock)),
           globalLock(std::move(globalLock)),
+          locks(std::move(locksRequirements)),
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
           collectionPtr(std::move(collectionPtr)),
           invalidated(false) {}
 
-    AcquiredCollection(AcquisitionPrerequisites prerequisites,
+    AcquiredCollection(int acquireCollectionCallNum,
+                       AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
                        boost::optional<Lock::CollectionLock> collectionLock,
+                       AcquisitionLocks locksRequirements,
                        CollectionPtr collectionPtr)
-        : AcquiredCollection(std::move(prerequisites),
+        : AcquiredCollection(acquireCollectionCallNum,
+                             std::move(prerequisites),
                              std::move(dbLock),
                              std::move(collectionLock),
                              nullptr,
                              nullptr,
+                             nullptr,
+                             std::move(locksRequirements),
                              boost::none,
                              boost::none,
                              std::move(collectionPtr)){};
+
+    // The number containing at which acquireCollection call this acquisition was built. All
+    // acquisitions created on the same call to acquireCollection will share the same number and
+    // contain shared_ptrs to the Global/DB/Lock-free locks shared amongst them.
+    int acquireCollectionCallNum;
 
     AcquisitionPrerequisites prerequisites;
 
@@ -146,8 +177,11 @@ struct AcquiredCollection {
     boost::optional<Lock::CollectionLock> collectionLock;
 
     std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
+    std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
     std::shared_ptr<Lock::GlobalLock> globalLock;  // Only for lock-free acquisitions. Otherwise the
                                                    // global lock is held by 'dbLock'.
+
+    AcquisitionLocks locks;
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
@@ -225,6 +259,8 @@ struct TransactionResources {
 
     static TransactionResources& get(OperationContext* opCtx);
 
+    static bool isPresent(OperationContext* opCtx);
+
     static std::unique_ptr<TransactionResources> detachFromOpCtx(OperationContext* opCtx);
     static void attachToOpCtx(OperationContext* opCtx,
                               std::unique_ptr<TransactionResources> transactionResources);
@@ -247,15 +283,18 @@ struct TransactionResources {
      *   never received an acquisition.
      * - ACTIVE: There is at least one acquisition in use and the resources have not been yielded.
      * - YIELDED: The resources are either yielded or in the process of reacquisition after a yield.
+     * - STASHED: The resources have been stashed for subsequent getMore operations.
      * - FAILED: The reacquisition after a yield failed, we cannot perform any new acquisitions and
      *   the operation must release all acquisitions. The operation must effectively cancel the
      *   current operation.
      *
      * The set of valid transitions are:
      * - EMPTY <-> ACTIVE <-> YIELDED
+     * - EMPTY <-> ACTIVE <-> STASHED
+     * - STASHED -> FAILED -> EMPTY
      * - YIELDED -> FAILED -> EMPTY
      */
-    enum class State { EMPTY, ACTIVE, YIELDED, FAILED };
+    enum class State { EMPTY, ACTIVE, STASHED, YIELDED, FAILED };
 
     State state{State::EMPTY};
 
@@ -290,6 +329,14 @@ struct TransactionResources {
         Locker::LockSnapshot yieldedLocker;
     };
     boost::optional<YieldedStateHolder> yielded;
+
+    // The number of times we have called acquireCollection* on these TransactionResources. The
+    // number is used to identify acquisitions that share the same global/db locks.
+    int currentAcquireCallCount = 0;
+
+    int increaseAcquireCollectionCallCount() {
+        return currentAcquireCallCount++;
+    }
 };
 
 }  // namespace shard_role_details

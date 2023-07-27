@@ -53,8 +53,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -209,13 +211,18 @@ protected:
     void testRestoreFailsIfCollectionIsNowAView(
         AcquisitionPrerequisites::OperationType operationType);
 
+    void changeOpCtx() {
+        _opCtx.reset();
+        _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
 void ShardRoleTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    changeOpCtx();
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
     const repl::ReplSettings replSettings = {};
@@ -402,8 +409,8 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
         const auto& acquisition = acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+            ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
 }
@@ -567,8 +574,8 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
         const auto& acquisition = acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+            ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
 }
@@ -648,8 +655,8 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
         const auto& acquisition = acquisitions.at(nssShardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
-        ASSERT_FALSE(
-            opCtx()->lockState()->isCollectionLockedForMode(nssShardedCollection1, MODE_IS));
+        ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+            ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
         validateAcquisition(acquisition);
     }
 }
@@ -935,7 +942,8 @@ TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMul
                                         {dbVersionTestDb, ShardVersion::UNSHARDED()},
                                         repl::ReadConcernArgs(),
                                         AcquisitionPrerequisites::kRead});
-    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+    ASSERT_FALSE(opCtx()->lockState()->isLockHeldForMode(
+        ResourceId{RESOURCE_COLLECTION, nssUnshardedCollection1}, MODE_IS));
 }
 
 DEATH_TEST_REGEX_F(ShardRoleTest,
@@ -1432,7 +1440,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            opCtx(), std::move(yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::CollectionUUIDMismatch);
+                       ErrorCodes::QueryPlanKilled);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionNoLongerExists) {
     testRestoreFailsIfCollectionNoLongerExists(AcquisitionPrerequisites::kRead);
@@ -1470,7 +1478,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            opCtx(), std::move(yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::CollectionUUIDMismatch);
+                       ErrorCodes::QueryPlanKilled);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionRenamed) {
     testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::kRead);
@@ -1502,7 +1510,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            opCtx(), std::move(yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::CollectionUUIDMismatch);
+                       ErrorCodes::QueryPlanKilled);
 }
 TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionDroppedAndRecreated) {
     testRestoreFailsIfCollectionDroppedAndRecreated(AcquisitionPrerequisites::kWrite);
@@ -1610,7 +1618,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            opCtx(), std::move(yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::CollectionUUIDMismatch);
+                       ErrorCodes::QueryPlanKilled);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionIsNowAView) {
     testRestoreFailsIfCollectionIsNowAView(AcquisitionPrerequisites::kRead);
@@ -1714,7 +1722,72 @@ TEST_F(ShardRoleTest,
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
                            opCtx(), std::move(yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::CollectionUUIDMismatch);
+                       ErrorCodes::QueryPlanKilled);
+}
+
+// ---------------------------------------------------------------------------
+// External yields
+
+TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
+    const auto& nss = nssUnshardedCollection1;
+    auto cursorId = [&] {
+        PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
+
+        const auto acquisition = acquireCollection(opCtx(),
+                                                   {nssUnshardedCollection1,
+                                                    placementConcern,
+                                                    repl::ReadConcernArgs(),
+                                                    AcquisitionPrerequisites::kWrite},
+                                                   MODE_IX);
+
+        auto params = std::make_unique<DeleteStageParams>();
+        auto exec = InternalPlanner::deleteWithCollectionScan(
+            opCtx(), acquisition, std::move(params), PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+        auto pinnedCursor = CursorManager::get(opCtx())->registerCursor(
+            opCtx(),
+            {std::move(exec),
+             nss,
+             AuthorizationSession::get(opCtx()->getClient())->getAuthenticatedUserName(),
+             APIParameters::get(opCtx()),
+             opCtx()->getWriteConcern(),
+             repl::ReadConcernArgs::get(opCtx()),
+             ReadPreferenceSetting::get(opCtx()),
+             BSON("x" << 1),
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+        PlanExecutor* cursorExec = pinnedCursor->getExecutor();
+
+        ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
+        // State will be restored on getMore.
+        cursorExec->saveState();
+        cursorExec->detachFromOperationContext();
+
+        stashTransactionResourcesFromOperationContext(opCtx(), pinnedCursor.getCursor());
+
+        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+
+        return pinnedCursor->cursorid();
+    }();
+
+    // Become a different operation so we can imitate the behaviour of getMore.
+    changeOpCtx();
+
+    auto cursorPinStatus = CursorManager::get(opCtx())->pinCursor(opCtx(), cursorId);
+    ASSERT_OK(cursorPinStatus);
+    auto& cursorPin = cursorPinStatus.getValue();
+
+    ON_BLOCK_EXIT([&] {
+        ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+        ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    });
+
+    HandleTransactionResourcesFromCursor handler(opCtx(), cursorPin.getCursor());
+
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 // ---------------------------------------------------------------------------

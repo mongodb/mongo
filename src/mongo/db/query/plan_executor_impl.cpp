@@ -756,4 +756,8 @@ MultiPlanStage* PlanExecutorImpl::getMultiPlanStage() const {
     invariant(ps == nullptr || ps->stageType() == StageType::STAGE_MULTI_PLAN);
     return static_cast<MultiPlanStage*>(ps);
 }
+
+bool PlanExecutorImpl::usesCollectionAcquisitions() const {
+    return _yieldPolicy->usesCollectionAcquisitions();
+}
 }  // namespace mongo

@@ -476,6 +476,13 @@ public:
      * Sets whether the executor needs to return owned data.
      */
     virtual void setReturnOwnedData(bool returnOwnedData){};
+
+    /** TODO: SERVER-76397 Remove this once we use acquisitions everywhere.
+     *
+     * Returns whether the plan executor uses shard role acquisitions or the legacy
+     * CollectionPtr/AutoGet approach.
+     */
+    virtual bool usesCollectionAcquisitions() const = 0;
 };
 
 }  // namespace mongo

@@ -188,6 +188,8 @@ public:
         _mustReturnOwnedBson = returnOwnedData;
     }
 
+    bool usesCollectionAcquisitions() const override final;
+
 private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);

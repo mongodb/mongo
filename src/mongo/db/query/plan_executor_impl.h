@@ -192,6 +192,8 @@ public:
         _mustReturnOwnedBson = returnOwnedData;
     }
 
+    bool usesCollectionAcquisitions() const override final;
+
 private:
     /**
      *  Executes the underlying PlanStage tree until it indicates EOF. Throws an exception if the
