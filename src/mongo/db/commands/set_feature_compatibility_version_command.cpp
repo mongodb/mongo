@@ -589,7 +589,7 @@ private:
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
 
-        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+        // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (isDowngrading &&
             feature_flags::gGlobalIndexesShardingCatalog
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
