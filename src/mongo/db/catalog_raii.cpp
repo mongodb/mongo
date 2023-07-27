@@ -185,8 +185,12 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
     Lock::DBLockSkipOptions dbLockOptions;
-    dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
-    dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
+    if (options._globalLockSkipOptions) {
+        dbLockOptions = *options._globalLockSkipOptions;
+    } else {
+        dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
+        dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
+    }
 
     return AutoGetDb(opCtx,
                      nsOrUUID.dbName(),

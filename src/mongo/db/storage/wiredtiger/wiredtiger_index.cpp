@@ -302,7 +302,9 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
                                const key_string::Value& keyString,
                                bool dupsAllowed,
                                IncludeDuplicateRecordId includeDuplicateRecordId) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    // We do not assert a write lock because index builds drain side write tables while blocking
+    // writes only with MODE_S collection lock.
+    dassert(opCtx->lockState()->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
@@ -317,7 +319,9 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
 void WiredTigerIndex::unindex(OperationContext* opCtx,
                               const key_string::Value& keyString,
                               bool dupsAllowed) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    // We do not assert a write lock because index builds drain side write tables while blocking
+    // writes only with MODE_S collection lock.
+    dassert(opCtx->lockState()->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);

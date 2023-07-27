@@ -521,6 +521,14 @@ RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
                                    : RecoveryUnit::ReadSource::kNoTimestamp;
 }
 
+/**
+ * Returns an AutoGetCollection::Options configured to skip the RSTL if 'skipRSTL' is true.
+ */
+AutoGetCollection::Options makeAutoGetCollectionOptions(bool skipRSTL) {
+    return AutoGetCollection::Options{}.globalLockSkipOptions(
+        Lock::GlobalLockSkipOptions{.skipRSTLLock = skipRSTL});
+}
+
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -794,6 +802,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         return {ErrorCodes::FailPointEnabled, "failSetUpResumeIndexBuild fail point is enabled"};
     }
 
+    // Don't use the AutoGet helpers because they require an open database, which may not be the
+    // case when an index build is resumed during recovery.
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
 
@@ -1464,11 +1474,9 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
         // Only on single phase builds, skip RSTL to avoid deadlocks with prepare conflicts and
         // state transitions caused by taking a strong collection lock. See SERVER-42621.
-        Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
-                                            /*.skipRSTLLock=*/IndexBuildProtocol::kSinglePhase ==
-                                                replState->protocol};
-        Lock::DBLock dbLock(opCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions);
-        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_X);
+        const auto lockOptions =
+            makeAutoGetCollectionOptions(IndexBuildProtocol::kSinglePhase == replState->protocol);
+        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_X, lockOptions);
         AutoGetCollection indexBuildEntryColl(
             opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
@@ -1482,7 +1490,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         // not have this restriction and may be aborted after a stepDown. Initial syncing nodes need
         // to be able to abort two phase index builds during the oplog replay phase.
         if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-            // The DBLock helper takes the RSTL implicitly.
+            // The AutoGetCollection helper takes the RSTL implicitly.
             invariant(opCtx->lockState()->isRSTLLocked());
 
             // Override the 'signalAction' as this is an initial syncing node.
@@ -1800,6 +1808,10 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                 // If the operation context is interrupted (shutdown, stepdown, killOp), stop the
                 // verification process and exit.
                 opCtx->checkForInterrupt();
+
+                // Some of the checks might have opened a snapshot. Abandon it before acquiring
+                // MODE_X lock during abort.
+                opCtx->recoveryUnit()->abandonSnapshot();
 
                 // All other errors must be due to key generation. Abort the build now, instead of
                 // failing later during the commit phase retry.
@@ -2217,7 +2229,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
         opCtx->recoveryUnit()->abandonSnapshot();
     }
     // Don't use the AutoGet helpers because they require an open database, which may not be the
-    // case when an index builds is restarted during recovery.
+    // case when an index build is restarted during recovery.
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
@@ -2256,23 +2268,17 @@ void IndexBuildsCoordinator::_waitIfNewIndexBuildsBlocked(OperationContext* opCt
     }
 }
 
-StatusWith<std::tuple<Lock::DBLock,
-                      CollectionNamespaceOrUUIDLock,
-                      repl::ReplicationStateTransitionLockGuard>>
+StatusWith<std::tuple<AutoGetCollection, repl::ReplicationStateTransitionLockGuard>>
 IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
                                                            ReplIndexBuildState* replState,
                                                            bool retry) {
-
+    const auto kAutoGetCollectionOptionsWithSkipRSTL =
+        makeAutoGetCollectionOptions(/*skipRSTL=*/true);
     while (true) {
-        // Skip the check for sharding's critical section check as it can only be acquired during a
-        // `movePrimary` or drop database operations. The only operation that would affect the index
-        // build is when the collection's data needs to get modified, but the only modification
-        // possible is to delete the entire collection, which will cause the index to be dropped.
-        Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
-                                            /*.skipRSTLLock=*/true};
-        Lock::DBLock dbLock{opCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions};
-        CollectionNamespaceOrUUIDLock collLock{
-            opCtx, {replState->dbName, replState->collectionUUID}, MODE_X};
+        AutoGetCollection autoGetColl(opCtx,
+                                      {replState->dbName, replState->collectionUUID},
+                                      MODE_X,
+                                      kAutoGetCollectionOptionsWithSkipRSTL);
 
         // If we can't acquire the RSTL within a given time period, there is an active state
         // transition and we should release our locks and try again. We would otherwise introduce a
@@ -2303,7 +2309,7 @@ IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opC
             continue;
         }
 
-        return std::make_tuple(std::move(dbLock), std::move(collLock), std::move(rstl));
+        return std::make_tuple(std::move(autoGetColl), std::move(rstl));
     }
 }
 
@@ -2407,7 +2413,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
     hangIndexBuildOnSetupBeforeTakingLocks.pauseWhileSet(opCtx);
 
-    auto [dbLock, collLock, rstl] =
+    auto [autoGetColl, rstl] =
         std::move(_acquireExclusiveLockWithRSTLRetry(opCtx, replState.get()).getValue());
 
     CollectionWriter collection(opCtx, replState->collectionUUID);
@@ -2762,12 +2768,11 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
         ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
         // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
         // taking a strong collection lock. See SERVER-42621.
-        Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
-                                            /*.skipRSTLLock=*/true};
-        Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions);
-
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
+        const auto kAutoGetCollectionOptionsWithSkipRSTL =
+            makeAutoGetCollectionOptions(/*skipRSTL=*/true);
+        AutoGetCollection autoGetColl(
+            abortCtx, dbAndUUID, MODE_X, kAutoGetCollectionOptionsWithSkipRSTL);
         AutoGetCollection indexBuildEntryColl(
             abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
         _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
@@ -2815,7 +2820,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 // Take RSTL to observe and prevent replication state from changing. This is
                 // done with the release/reacquire strategy to avoid deadlock with prepared
                 // txns.
-                auto [dbLock, collLock, rstl] = std::move(
+                auto [autoGetColl, rstl] = std::move(
                     _acquireExclusiveLockWithRSTLRetry(abortCtx, replState.get()).getValue());
 
                 const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
@@ -3160,9 +3165,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         // if it waited.
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
+        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
 
@@ -3190,9 +3194,8 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     // writers. Otherwise we risk never finishing the index build.
     ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
     {
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
+        AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
         uassertStatusOK(_indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(
@@ -3228,8 +3231,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
-        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
+        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
@@ -3265,11 +3267,10 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     {
         // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions. See
         // SERVER-42621.
-        Lock::DBLockSkipOptions lockOptions{/*.skipFlowControlTicket=*/false,
-                                            /*.skipRSTLLock=*/true};
-        Lock::DBLock autoDb{opCtx, replState->dbName, MODE_IX, Date_t::max(), lockOptions};
-
-        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_S);
+        const auto kAutoGetCollectionOptionsWithSkipRSTL =
+            makeAutoGetCollectionOptions(/*skipRSTL=*/true);
+        AutoGetCollection autoGetColl(
+            opCtx, dbAndUUID, MODE_S, kAutoGetCollectionOptionsWithSkipRSTL);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
@@ -3307,7 +3308,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         return CommitResult::kLockTimeout;
     }
 
-    auto [dbLock, collLock, rstl] = std::move(locksOrStatus.getValue());
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
