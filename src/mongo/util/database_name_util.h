@@ -79,6 +79,15 @@ public:
         const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
 
     /**
+     * To be used only for RemoteCommandRequest.
+     * We always include the tenant as prefixed in the `dbname` for the RemoteCommandRequest
+     * objects.
+     * TODO SERVER-73658: remove this function once RemoteCommandRequest is switched over to use
+     * DatabaseName.
+     */
+    static std::string serializeForRemoteCmdRequest(const DatabaseName& dbName);
+
+    /**
      * Deserializes StringData dbName to a DatabaseName object.
      *
      * If multitenancySupport is enabled and featureFlagRequireTenantID is enabled, then a

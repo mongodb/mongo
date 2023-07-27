@@ -53,6 +53,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/baton.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/async_rpc.h"
@@ -133,7 +134,7 @@ public:
      * notifies waiters that a new request has been scheduled.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        StringData dbName,
+        const DatabaseName& dbName,
         BSONObj cmdBSON,
         Targeter* targeter,
         OperationContext* opCtx,
@@ -148,7 +149,7 @@ public:
             .onError([](Status s) -> StatusWith<std::vector<HostAndPort>> {
                 return Status{AsyncRPCErrorInfo(s), "Remote command execution failed"};
             })
-            .then([=, this, f = std::move(f), p = std::move(p), dbName = dbName.toString()](
+            .then([=, this, f = std::move(f), p = std::move(p), dbName = dbName.toString_forTest()](
                       auto&& targets) mutable {
                 stdx::lock_guard lg{_m};
                 *targetsAttempted = targets;
@@ -248,7 +249,7 @@ public:
      * functions to inspect that state.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        StringData dbName,
+        const DatabaseName& dbName,
         BSONObj cmdBSON,
         Targeter* targeter,
         OperationContext* opCtx,
@@ -261,7 +262,7 @@ public:
         return targeter->resolve(token).thenRunOn(exec).then([this,
                                                               p = std::move(p),
                                                               cmdBSON,
-                                                              dbName = dbName.toString(),
+                                                              dbName = dbName.toString_forTest(),
                                                               targetsAttempted](auto&& targets) {
             *targetsAttempted = targets;
             stdx::lock_guard lg(_m);
@@ -408,7 +409,7 @@ public:
      * notifies waiters that a new request has been scheduled.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        StringData dbName,
+        const DatabaseName& dbName,
         BSONObj cmdBSON,
         Targeter* targeter,
         OperationContext* opCtx,

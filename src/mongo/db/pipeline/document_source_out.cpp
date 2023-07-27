@@ -115,7 +115,7 @@ DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
     if (spec.type() == BSONType::String) {
         outSpec.setColl(spec.valueStringData());
         // TODO SERVER-77000: access a SerializationContext object to serialize properly
-        outSpec.setDb(defaultDB.db());
+        outSpec.setDb(defaultDB.serializeWithoutTenantPrefix_UNSAFE());
     } else if (spec.type() == BSONType::Object) {
         // TODO SERVER-77000: access a SerializationContext object to pass into the IDLParserContext
         outSpec = mongo::DocumentSourceOutSpec::parse(IDLParserContext(kStageName),
@@ -198,10 +198,9 @@ void DocumentSourceOut::initialize() {
     // collection to be the target collection once we are done. Note that this temporary
     // collection name is used by MongoMirror and thus should not be changed without
     // consultation.
-    _tempNs = NamespaceStringUtil::parseNamespaceFromRequest(
-        getOutputNs().tenantId(),
-        str::stream() << getOutputNs().dbName().db() << "."
-                      << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
+    _tempNs = NamespaceStringUtil::deserialize(
+        getOutputNs().dbName(),
+        str::stream() << NamespaceString::kOutTmpCollectionPrefix << UUID::gen());
 
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
@@ -349,7 +348,7 @@ Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     // spec.setDb(DatabaseNameUtil::serialize(
     //     _outputNs.dbName(),
     //     SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)));
-    spec.setDb(_outputNs.dbName().db());
+    spec.setDb(_outputNs.dbName().serializeWithoutTenantPrefix_UNSAFE());
     spec.setColl(_outputNs.coll());
     spec.setTimeseries(_timeseries);
     spec.serialize(&bob, opts);
