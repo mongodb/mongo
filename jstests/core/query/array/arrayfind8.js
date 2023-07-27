@@ -1,7 +1,6 @@
 /**
  * Matching behavior for $elemMatch applied to a top level element.
  * Includes tests for bugs described in SERVER-1264 and SERVER-4180.
- * @tags: [ skip_for_query_stats ] # TODO SERVER-78862 reenable test in query_stats_passthrough
  */
 (function() {
 "use strict";
@@ -85,7 +84,6 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
     insertValueIfNotNull(bothMatch);
     insertValueIfNotNull(elemMatch);
     insertValueIfNotNull(nonElemMatch);
-
     checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, 'unindexed');
 
     // Check matching and index bounds for a single key index.

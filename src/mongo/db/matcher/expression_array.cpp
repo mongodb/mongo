@@ -107,6 +107,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
     BSONObjBuilder* bob, SerializationOptions opts) const {
     BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
+    opts.includePath = true;
     _sub->serialize(&elemMatchBob, opts);
     elemMatchBob.doneFast();
 }
