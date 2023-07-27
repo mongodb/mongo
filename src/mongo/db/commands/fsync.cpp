@@ -55,6 +55,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
@@ -62,6 +63,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -135,6 +137,19 @@ public:
         return Status::OK();
     }
 
+    void checkForInProgressDDLOperations(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        const auto numDDLDocuments =
+            client.count(NamespaceString::kShardingDDLCoordinatorsNamespace);
+
+        if (numDDLDocuments != 0) {
+            LOGV2_WARNING(781541, "Cannot take lock while DDL operations is in progress");
+            releaseLock();
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot take lock while DDL operation is in progress");
+        }
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -195,6 +210,9 @@ public:
                               "error"_attr = status);
                 uassertStatusOK(status);
             }
+        }
+        if (feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
+            checkForInProgressDDLOperations(opCtx);
         }
 
         LOGV2(20462,
