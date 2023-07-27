@@ -227,7 +227,9 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - amazon2-arm64-large
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: audit
@@ -386,7 +388,9 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-large
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
   - name: audit
@@ -543,7 +547,9 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023.0-arm64-large
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
   - name: audit

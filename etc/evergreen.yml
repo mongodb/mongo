@@ -1109,7 +1109,9 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.no_debug_mode
   - name: .aggregation !.feature_flag_guarded !.no_debug_mode
   - name: audit
@@ -1240,7 +1242,9 @@ buildvariants:
   - name: cqf_parallel
   - name: query_golden_classic
   - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -1466,7 +1470,9 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: sharding_api_version_jscore_passthrough_gen
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
   - name: vector_search
 
@@ -1495,7 +1501,9 @@ buildvariants:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: .cqf
   - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -1993,7 +2001,9 @@ buildvariants:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
   - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -2925,7 +2935,9 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: .lint
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: validate_commit_message
   - name: lint_large_files_check
   - name: check_feature_flag_tags
@@ -2979,7 +2991,9 @@ buildvariants:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
   - name: lint_fuzzer_sanity_patch
-  - name: test_api_version_compatibility
+  # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
+  # IDL compiler issue has been resolved.
+  # - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
