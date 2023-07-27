@@ -155,7 +155,6 @@ namespace mongo {
 namespace repl {
 namespace {
 using namespace fmt;
-const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
 
@@ -348,22 +347,16 @@ void TenantMigrationRecipientService::abortAllMigrations(OperationContext* opCtx
 ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
-               auto nss = getStateDocumentsNS();
-
                AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
-               DBDirectClient client(opCtx);
 
-               BSONObj result;
-               client.runCommand(
-                   nss.dbName(),
-                   BSON("createIndexes"
-                        << nss.coll().toString() << "indexes"
-                        << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
-                                                 << "expireAfterSeconds" << 0))),
-                   result);
-               uassertStatusOK(getStatusFromCommandResult(result));
+               auto status = StorageInterface::get(opCtx)->createCollection(
+                   opCtx, getStateDocumentsNS(), CollectionOptions());
+               if (!status.isOK() && status != ErrorCodes::NamespaceExists) {
+                   uassertStatusOK(status);
+               }
+               return Status::OK();
            })
         .until([token](Status status) { return status.isOK() || token.isCanceled(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
