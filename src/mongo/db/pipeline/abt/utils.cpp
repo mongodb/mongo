@@ -176,7 +176,7 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
         case sbe::value::TypeTags::ArraySet:
         case sbe::value::TypeTags::bsonArray:
             if (isMin) {
-                return {Constant::emptyArray(), true};
+                return {Constant::array(), true};
             } else {
                 const auto [tag1, val1] = sbe::value::makeValue(Value(BSONBinData()));
                 return {make<Constant>(sbe::value::TypeTags::bsonBinData, val1), false};

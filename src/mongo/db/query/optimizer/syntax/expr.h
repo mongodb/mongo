@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -74,6 +75,16 @@ public:
 
     static ABT emptyObject();
     static ABT emptyArray();
+
+    static ABT array(auto&&... elements) {
+        using namespace sbe::value;
+        auto [tag, val] = makeNewArray();
+        auto arr = getArrayView(val);
+        (arr->push_back(std::forward<decltype(elements)>(elements).first,
+                        std::forward<decltype(elements)>(elements).second),
+         ...);
+        return make<Constant>(tag, val);
+    }
 
     static ABT timestamp(const Timestamp& t);
     static ABT date(const Date_t& d);

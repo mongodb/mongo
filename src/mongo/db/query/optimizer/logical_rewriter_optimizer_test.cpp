@@ -2685,8 +2685,8 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
     ABT rootNode = NodeBuilder{}
                        .root("root")
                        .filter(_evalf(_get("a",
-                                           _composea(_cmp("Eq", _cemptyarr()),
-                                                     _traverse1(_cmp("Eq", _cemptyarr())))),
+                                           _composea(_cmp("Eq", _cemparray()),
+                                                     _traverse1(_cmp("Eq", _cemparray())))),
                                       "root"_var))
                        .finish(_scan("root", "c1"));
 
@@ -2721,6 +2721,60 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
         "Scan [c1, {root}]\n",
         rootNode);
 }
+
+TEST(LogicalRewriter, IsArrayConstantFolding) {
+    auto rootNode =
+        NodeBuilder{}
+            .root("p0")
+            .filter(
+                _evalf(_get("c",
+                            _traverse1(_cmp(
+                                "EqMember",
+                                _carray(std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(17.0000)},
+                                        std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(19.0000)},
+                                        std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(23.0000)},
+                                        std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(34.0000)},
+                                        std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(35.0000)},
+                                        std::pair{sbe::value::TypeTags::NumberDouble,
+                                                  sbe::value::bitcastFrom<double>(42.0000)},
+                                        std::pair{sbe::value::TypeTags::StringSmall,
+                                                  sbe::value::makeSmallString("abc"_sd).second})))),
+                       "p0"_var))
+            .finish(_scan("p0", "coll"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager({OptPhase::PathLower, OptPhase::ConstEvalPost},
+                                         prefixId,
+                                         Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    phaseManager.optimize(latest);
+
+    // We want to ensure no IsArray calls remain after folding.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{p0}]\n"
+        "Filter []\n"
+        "|   BinaryOp [FillEmpty]\n"
+        "|   |   Const [false]\n"
+        "|   FunctionCall [traverseF]\n"
+        "|   |   |   Const [false]\n"
+        "|   |   LambdaAbstraction [valCmp_0]\n"
+        "|   |   FunctionCall [isMember]\n"
+        "|   |   |   Const [[17, 19, 23, 34, 35, 42, \"abc\"]]\n"
+        "|   |   Variable [valCmp_0]\n"
+        "|   FunctionCall [getField]\n"
+        "|   |   Const [\"c\"]\n"
+        "|   Variable [p0]\n"
+        "Scan [coll, {p0}]\n",
+        latest);
+}
+
 
 }  // namespace
 }  // namespace mongo::optimizer

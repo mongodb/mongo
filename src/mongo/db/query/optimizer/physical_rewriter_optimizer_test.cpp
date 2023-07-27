@@ -3875,8 +3875,8 @@ TEST(PhysRewriter, PathObj) {
         "|   LimitSkip [limit: 1, skip: 0]\n"
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
         "Unique [{rid_0}]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [{"
-        "} | minKey], Const [[] | minKey])}]\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[{} | minKey], Const [[] | minKey])}]\n",
         optimized);
 }
 

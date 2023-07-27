@@ -98,8 +98,7 @@ ABT Constant::emptyObject() {
 }
 
 ABT Constant::emptyArray() {
-    auto [tag, val] = makeNewArray();
-    return make<Constant>(tag, val);
+    return array();
 }
 
 ABT Constant::nothing() {

@@ -30,8 +30,11 @@
 #pragma once
 
 #include <boost/core/demangle.hpp>
+#include <sstream>
+#include <string>
 #include <typeinfo>
 
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
@@ -120,9 +123,19 @@ inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};
 }
 
-// Empty array constant.
-inline auto _cemptyarr() {
+// Array constant.
+inline auto _carray(auto&&... elements) {
+    return ExprHolder{Constant::array(std::forward<decltype(elements)>(elements)...)};
+}
+
+// Empty Array constant.
+inline auto _cemparray() {
     return ExprHolder{Constant::emptyArray()};
+}
+
+// Empty Object constant.
+inline auto _cempobj() {
+    return ExprHolder{Constant::emptyObject()};
 }
 
 // Variable.
@@ -488,23 +501,67 @@ public:
      * ABT Expressions.
      */
     std::string transport(const Constant& expr) {
+        using namespace sbe::value;
+        auto getVal = [&]() -> std::string {
+            return str::stream{} << "\"" << expr.get() << "\"";
+        };
+
+        auto out = str::stream{};
         if (expr.isValueBool()) {
-            return str::stream() << "_cbool(" << (expr.getValueBool() ? "true" : "false") << ")";
-        }
+            out << "_cbool(" << (expr.getValueBool() ? "true" : "false") << ")";
+        } else if (expr.isArray()) {
+            if (getArrayView(expr.get().second)->size() == 0) {
+                out << "_cemparray()";
+            } else {
+                out << "_carray(";
+                auto shouldTruncate = true;
+                size_t iter = 0;
 
-        str::stream out;
-        out << "\"" << expr.get() << "\"";
-
-        if (expr.isValueInt32()) {
-            out << "_cint32";
-        } else if (expr.isValueInt64()) {
-            out << "_cint64";
-        } else if (expr.isValueDouble()) {
-            out << "_cdouble";
+                if (auto ae = ArrayEnumerator{TypeTags::Array, expr.get().second}; !ae.atEnd()) {
+                    while (iter < sbe::PrintOptions::kDefaultArrayObjectOrNestingMaxDepth) {
+                        auto getMaker = [](auto&& arg) -> std::string {
+                            switch (arg.first) {
+                                case TypeTags::NumberDouble:
+                                    return (std::stringstream{}
+                                            << "sbe::value::bitcastFrom<double>(" << std::showpoint
+                                            << arg << ")")
+                                        .str();
+                                case TypeTags::StringSmall:
+                                    return str::stream{} << "sbe::value::makeSmallString(" << arg
+                                                         << "_sd).second";
+                                default:
+                                    return str::stream{} << "unimplemented(" << arg << ")";
+                            }
+                        };
+                        auto aeView = ae.getViewOfValue();
+                        out << "std::pair{sbe::value::TypeTags::" << aeView.first << ", "
+                            << getMaker(aeView) << "}";
+                        ae.advance();
+                        if (ae.atEnd()) {
+                            shouldTruncate = false;
+                            break;
+                        }
+                        out << ", ";
+                        ++iter;
+                    }
+                    if (shouldTruncate) {
+                        out << "...";
+                    }
+                }
+                out << ")";
+            }
+        } else if (expr.isObject() && getObjectView(expr.get().second)->size() == 0) {
+            out << "_cempobj()";
         } else if (expr.isString()) {
-            out << "_cstr";
+            out << expr.get() << "_cstr";
+        } else if (expr.isValueInt32()) {
+            out << getVal() << "_cint32";
+        } else if (expr.isValueInt64()) {
+            out << getVal() << "_cint64";
+        } else if (expr.isValueDouble()) {
+            out << getVal() << "_cdouble";
         } else {
-            out << "<non-standard constant>";
+            out << getVal() << "<non-standard constant>";
         }
 
         return out;

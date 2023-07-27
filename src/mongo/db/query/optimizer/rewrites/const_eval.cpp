@@ -443,9 +443,7 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
         if (tag != sbe::value::TypeTags::Nothing) {
             swapAndUpdate(n, Constant::boolean(true));
         }
-    }
-
-    if (op.name() == "newArray") {
+    } else if (op.name() == "newArray") {
         bool allConstants = true;
         for (const ABT& arg : op.nodes()) {
             if (!arg.is<Constant>()) {
@@ -476,6 +474,12 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
                 swapAndUpdate(n, args.front());
             }
         }
+    } else if (op.name() == "isArray" && args.size() == 1 && args[0].is<Constant>()) {
+        auto [tag, _] = args[0].cast<Constant>()->get();
+        swapAndUpdate(n,
+                      tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::ArraySet
+                          ? Constant::boolean(true)
+                          : Constant::boolean(false));
     }
 }
 

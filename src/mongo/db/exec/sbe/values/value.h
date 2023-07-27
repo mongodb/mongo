@@ -895,6 +895,10 @@ public:
         }
     }
 
+    void push_back(std::pair<TypeTags, Value> val) {
+        push_back(val.first, val.second);
+    }
+
     void pop_back() {
         if (_vals.size() > 0) {
             releaseValue(_vals.back().first, _vals.back().second);
