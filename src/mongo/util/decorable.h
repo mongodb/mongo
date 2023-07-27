@@ -227,7 +227,7 @@ public:
         // The decoration block starts with a backlink to the decorable.
         const void* p = &t;
         const void* block = static_cast<const char*>(p) - _offset;
-        return **static_cast<const DecoratedType* const*>(block);
+        return *DecoratedType::downcastBackLink(*reinterpret_cast<const void* const*>(block));
     }
     DecoratedType& owner(DecorationType& t) const {
         return const_cast<DecoratedType&>(owner(std::as_const(t)));
@@ -283,13 +283,15 @@ public:
             _reg().template declare<T>(&lifecycleOperations<T, needCopy>)};
     }
 
-    explicit DecorationBuffer(DecoratedType* decorated) {
+    template <typename DecoratedBase>
+    explicit DecorationBuffer(DecoratedBase* decorated) {
         _setBackLink(decorated);
         _constructorCommon();
     }
 
     /** Used when copying, but we need the decorated's address. */
-    DecorationBuffer(DecoratedType* decorated, const DecorationBuffer& other) {
+    template <typename DecoratedBase>
+    DecorationBuffer(DecoratedBase* decorated, const DecorationBuffer& other) {
         _setBackLink(decorated);
         const auto& reg = _reg();
         size_t n = reg.size();
@@ -357,8 +359,10 @@ private:
         }
     }
 
-    void _setBackLink(DecoratedType* decorated) {
-        *reinterpret_cast<DecoratedType**>(_data) = decorated;
+    template <typename DecoratedBase>
+    void _setBackLink(const DecoratedBase* decorated) {
+        static_assert(std::is_base_of_v<DecoratedBase, DecoratedType>);
+        *reinterpret_cast<const void**>(_data) = DecoratedType::upcastBackLink(decorated);
     }
 
     std::unique_ptr<unsigned char[]> _makeData() {
@@ -379,15 +383,23 @@ public:
     template <typename T>
     using Decoration = decorable_detail::DecorationToken<DerivedType, T>;
 
+    static const DerivedType* downcastBackLink(const void* vp) {
+        return static_cast<const DerivedType*>(static_cast<const Decorable*>(vp));
+    }
+
+    static const void* upcastBackLink(const Decorable* deco) {
+        return deco;
+    }
+
     template <typename T>
     static Decoration<T> declareDecoration() {
         static_assert(std::is_nothrow_destructible_v<T>);
         return decorable_detail::DecorationBuffer<DerivedType>::template declareDecoration<T>();
     }
 
-    Decorable() : _decorations{&_d()} {}
+    Decorable() : _decorations{this} {}
 
-    Decorable(const Decorable& o) : _decorations{&_d(), o._decorations} {}
+    Decorable(const Decorable& o) : _decorations{this, o._decorations} {}
 
     virtual ~Decorable() = default;
 
@@ -436,13 +448,6 @@ public:
     }
 
 private:
-    const DerivedType& _d() const {
-        return *static_cast<const DerivedType*>(this);
-    }
-    DerivedType& _d() {
-        return *static_cast<DerivedType*>(this);
-    }
-
     decorable_detail::DecorationBuffer<DerivedType> _decorations;
 };
 
