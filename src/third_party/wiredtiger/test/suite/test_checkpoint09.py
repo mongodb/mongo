@@ -81,7 +81,7 @@ class test_checkpoint09(wttest.WiredTigerTestCase):
         evict_cursor = s.open_cursor(uri, None, "debug=(release_evict)")
         for i in range(1, nrows + 1):
             evict_cursor.set_key(ds.key(i))
-            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
             evict_cursor.reset()
         s.rollback_transaction()
         evict_cursor.close()

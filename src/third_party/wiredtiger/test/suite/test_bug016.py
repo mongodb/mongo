@@ -41,7 +41,7 @@ class test_bug016(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, 'append')
         cursor.set_value('value')
         cursor.insert()
-        self.assertEquals(cursor.get_key(), 1)
+        self.assertEqual(cursor.get_key(), 1)
 
     # Insert a row into a simple column-store table.
     # WT_CURSOR.get_key should fail.
@@ -76,7 +76,7 @@ class test_bug016(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, 'append')
         cursor.set_value('value')
         cursor.insert()
-        self.assertEquals(cursor.get_key(), 1)
+        self.assertEqual(cursor.get_key(), 1)
 
     # Insert a row into a complex column-store table.
     # WT_CURSOR.get_key should fail.

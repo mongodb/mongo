@@ -37,7 +37,7 @@ class checkpoint_thread(threading.Thread):
 
     def run(self):
         sess = self.conn.open_session()
-        while not self.done.isSet():
+        while not self.done.is_set():
             # Sleep for 10 milliseconds.
             time.sleep(0.001)
             sess.checkpoint()
@@ -52,7 +52,7 @@ class named_checkpoint_thread(threading.Thread):
 
     def run(self):
         sess = self.conn.open_session()
-        while not self.done.isSet():
+        while not self.done.is_set():
             # Sleep for 10 milliseconds.
             time.sleep(0.001)
             sess.checkpoint('name=' + self.ckpt_name)
@@ -67,7 +67,7 @@ class flush_checkpoint_thread(threading.Thread):
 
     def run(self):
         sess = self.conn.open_session()
-        while not self.done.isSet():
+        while not self.done.is_set():
             # Sleep for 10 milliseconds.
             time.sleep(0.001)
             if random.randint(0, 100) < self.flush_probability:
@@ -85,7 +85,7 @@ class backup_thread(threading.Thread):
 
     def run(self):
         sess = self.conn.open_session()
-        while not self.done.isSet():
+        while not self.done.is_set():
             # Sleep for 2 seconds.
             time.sleep(2)
             sess.checkpoint()
@@ -153,7 +153,7 @@ class op_thread(threading.Thread):
             cursors = list()
             for next_uri in self.uris:
                 cursors.append(sess.open_cursor(next_uri, None, None))
-        while not self.done.isSet():
+        while not self.done.is_set():
             try:
                 op, key, value = self.work_queue.get_nowait()
                 if op == 'gi': # Group insert a number of tables.

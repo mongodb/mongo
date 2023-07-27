@@ -59,7 +59,7 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check cursor next inside trailing implicit keys.
         cursor.set_key(60)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(0, 5):
             self.assertEqual(cursor.get_key(), 60 + i)
             self.assertEqual(cursor.get_value(), 0x00)
@@ -67,13 +67,13 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check cursor prev inside trailing implicit keys.
         cursor.set_key(60)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(0, 5):
             self.assertEqual(cursor.get_key(), 60 - i)
             self.assertEqual(cursor.get_value(), 0x00)
             self.assertEqual(cursor.prev(), 0)
 
-        self.assertEquals(cursor.close(), 0)
+        self.assertEqual(cursor.close(), 0)
         self.dropUntilSuccess(self.session, uri)
         cursor = self.create_implicit(uri, 20, 50, 0)
 
@@ -83,7 +83,7 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check cursor next inside leading implicit keys.
         cursor.set_key(10)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(0, 5):
             self.assertEqual(cursor.get_key(), 10 + i)
             self.assertEqual(cursor.get_value(), 0x00)
@@ -91,13 +91,13 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check cursor prev inside leading implicit keys.
         cursor.set_key(10)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(0, 5):
             self.assertEqual(cursor.get_key(), 10 - i)
             self.assertEqual(cursor.get_value(), 0x00)
             self.assertEqual(cursor.prev(), 0)
 
-        self.assertEquals(cursor.close(), 0)
+        self.assertEqual(cursor.close(), 0)
         self.dropUntilSuccess(self.session, uri)
 
     # Test a bug where cursor remove inside implicit records looped infinitely.
@@ -107,45 +107,45 @@ class test_bug001(wttest.WiredTigerTestCase):
 
         # Check cursor next/remove inside trailing implicit keys.
         cursor.set_key(60)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.next(), 0)
             self.assertEqual(cursor.get_key(), 60 + i)
             self.assertEqual(cursor.get_value(), 0x00)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
 
         # Check cursor prev/remove inside trailing implicit keys.
         cursor.set_key(70)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
-            self.assertEquals(cursor.prev(), 0)
+            self.assertEqual(cursor.prev(), 0)
             self.assertEqual(cursor.get_key(), 70 - i)
             self.assertEqual(cursor.get_value(), 0x00)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
 
-        self.assertEquals(cursor.close(), 0)
+        self.assertEqual(cursor.close(), 0)
         self.dropUntilSuccess(self.session, uri)
         cursor = self.create_implicit(uri, 20, 50, 0)
 
         # Check cursor next/remove inside leading implicit keys.
         cursor.set_key(2)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.next(), 0)
             self.assertEqual(cursor.get_key(), 2 + i)
             self.assertEqual(cursor.get_value(), 0x00)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
 
         # Check cursor prev/remove inside leading implicit keys.
         cursor.set_key(18)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
         for i in range(1, 5):
-            self.assertEquals(cursor.prev(), 0)
+            self.assertEqual(cursor.prev(), 0)
             self.assertEqual(cursor.get_key(), 18 - i)
             self.assertEqual(cursor.get_value(), 0x00)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
 
-        self.assertEquals(cursor.close(), 0)
+        self.assertEqual(cursor.close(), 0)
         self.dropUntilSuccess(self.session, uri)
 
 if __name__ == '__main__':

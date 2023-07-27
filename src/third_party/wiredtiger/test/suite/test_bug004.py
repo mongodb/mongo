@@ -104,9 +104,9 @@ class test_bug004(wttest.WiredTigerTestCase):
         c1.search()
         for i in range(2, self.nentries):
             c1.next()
-            self.assertEquals(
+            self.assertEqual(
                 c1.get_key(), self.make_key(c1, i))
-            self.assertEquals(
+            self.assertEqual(
                 c1.get_value(), simple_value(c1, i) + 'abcdef' * 100)
 
 if __name__ == '__main__':
