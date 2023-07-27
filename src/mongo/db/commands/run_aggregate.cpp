@@ -1282,6 +1282,7 @@ Status runAggregate(OperationContext* opCtx,
         }
     });
     for (auto&& exec : execs) {
+        // TODO SERVER-79373: Do not create a cursor if results can fit in a single batch.
         ClientCursorParams cursorParams(
             std::move(exec),
             origNss,
