@@ -4,4 +4,5 @@
 - [TLS](https://github.com/mongodb/mongo/blob/master/src/mongo/util/net/README.md)
 - [FTDC](https://github.com/mongodb/mongo/blob/master/src/mongo/db/ftdc/README.md)
 - [Free Monitoring](https://github.com/mongodb/mongo/blob/master/src/mongo/db/free_mon/README.md)
+- [LibFuzzer](https://github.com/mongodb/mongo/blob/master/docs/libfuzzer.md)
 - [SELinux](https://github.com/mongodb/mongodb-selinux/blob/master/README.md)
