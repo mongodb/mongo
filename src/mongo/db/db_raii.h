@@ -553,4 +553,9 @@ private:
     PrepareConflictBehavior _originalValue;
 };
 
+// Asserts whether the read concern is supported for the given collection with the specified read
+// source.
+void assertReadConcernSupported(const CollectionPtr& coll,
+                                const repl::ReadConcernArgs& readConcernArgs,
+                                const RecoveryUnit::ReadSource& readSource);
 }  // namespace mongo

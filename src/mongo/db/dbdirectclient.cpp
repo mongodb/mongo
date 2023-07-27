@@ -136,6 +136,7 @@ double DBDirectClient::getSoTimeout() const {
 namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
     DirectClientScope directClientScope(opCtx);
+    StashTransactionResourcesForDBDirect stashedTxnResources(opCtx);
 
     CurOp curOp;
     curOp.push(opCtx);

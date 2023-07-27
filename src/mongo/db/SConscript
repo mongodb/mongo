@@ -1074,6 +1074,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'repl/repl_coordinator_interface',
         'repl/repl_settings',
+        'shard_role',
     ],
 )
 

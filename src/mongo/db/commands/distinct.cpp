@@ -276,11 +276,11 @@ public:
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
 
-        // TODO: Make nicer. We need to instantiate the AutoStatsTracker before the acquisition in
-        // case it would throw so we can ensure data is written to the profile collection that some
-        // test may rely on. However, we might not know the namespace at this point so it is wrapped
-        // in a boost::optional. If the request is with a UUID we instantiate it after, but this is
-        // fine as the request should not be for sharded collections.
+        // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
+        // acquisition in case it would throw so we can ensure data is written to the profile
+        // collection that some test may rely on. However, we might not know the namespace at this
+        // point so it is wrapped in a boost::optional. If the request is with a UUID we instantiate
+        // it after, but this is fine as the request should not be for sharded collections.
         boost::optional<AutoStatsTracker> tracker;
         auto const initializeTracker = [&](const NamespaceString& nss) {
             tracker.emplace(opCtx,

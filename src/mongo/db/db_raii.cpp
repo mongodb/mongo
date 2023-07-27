@@ -229,36 +229,6 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     }
 }
 
-void assertReadConcernSupported(const CollectionPtr& coll,
-                                const repl::ReadConcernArgs& readConcernArgs,
-                                const RecoveryUnit::ReadSource& readSource) {
-    const auto readConcernLevel = readConcernArgs.getLevel();
-    // Ban snapshot reads on capped collections.
-    uassert(ErrorCodes::SnapshotUnavailable,
-            "Reading from capped collections with readConcern snapshot is not supported",
-            !coll->isCapped() || readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
-
-    // Disallow snapshot reads and causal consistent majority reads on config.transactions
-    // outside of transactions to avoid running the collection at a point-in-time in the middle
-    // of a secondary batch. Such reads are unsafe because config.transactions updates are
-    // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
-    // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
-    // reads because they must be from internal readers given the snapshot/majority readConcern
-    // (e.g. for session checkout).
-
-    if (coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
-        readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
-        readSource != RecoveryUnit::ReadSource::kLastApplied &&
-        ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
-          !readConcernArgs.allowTransactionTableSnapshot()) ||
-         (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
-          readConcernArgs.getArgsAfterClusterTime()))) {
-        uasserted(5557800,
-                  "Snapshot reads and causal consistent majority reads on config.transactions "
-                  "are not supported");
-    }
-}
-
 void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
                                    const boost::optional<LogicalTime>& afterClusterTime,
                                    const RecoveryUnit::ReadSource& readSource,
@@ -1225,5 +1195,35 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUI
 
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>;
+
+void assertReadConcernSupported(const CollectionPtr& coll,
+                                const repl::ReadConcernArgs& readConcernArgs,
+                                const RecoveryUnit::ReadSource& readSource) {
+    const auto readConcernLevel = readConcernArgs.getLevel();
+    // Ban snapshot reads on capped collections.
+    uassert(ErrorCodes::SnapshotUnavailable,
+            "Reading from capped collections with readConcern snapshot is not supported",
+            !coll->isCapped() || readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // Disallow snapshot reads and causal consistent majority reads on config.transactions
+    // outside of transactions to avoid running the collection at a point-in-time in the middle
+    // of a secondary batch. Such reads are unsafe because config.transactions updates are
+    // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
+    // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
+    // reads because they must be from internal readers given the snapshot/majority readConcern
+    // (e.g. for session checkout).
+
+    if (coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
+        readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+        readSource != RecoveryUnit::ReadSource::kLastApplied &&
+        ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
+          !readConcernArgs.allowTransactionTableSnapshot()) ||
+         (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
+          readConcernArgs.getArgsAfterClusterTime()))) {
+        uasserted(5557800,
+                  "Snapshot reads and causal consistent majority reads on config.transactions "
+                  "are not supported");
+    }
+}
 
 }  // namespace mongo

@@ -591,7 +591,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << nss.toStringForErrorMsg()
                           << "' collection in a transaction.",
-            !nss.isSystemDotProfile());
+            !(nss.isSystemDotProfile() || nss.isSystemDotViews()));
 
     if (allowTransactionsOnConfigDatabase) {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,

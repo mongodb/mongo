@@ -1736,13 +1736,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield,
     size_t plannerOptions) {
 
-    MultipleCollectionAccessor multi{*coll};
+    auto multi = stdx::visit(OverloadedVisitor{[](const CollectionPtr* collPtr) {
+                                                   return MultipleCollectionAccessor{*collPtr};
+                                               },
+                                               [](const CollectionAcquisition& acq) {
+                                                   return MultipleCollectionAccessor{acq};
+                                               }},
+                             coll.get());
+
     return getExecutorFind(opCtx,
                            multi,
                            std::move(canonicalQuery),

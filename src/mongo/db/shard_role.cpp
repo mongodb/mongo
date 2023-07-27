@@ -58,6 +58,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -201,7 +202,10 @@ void verifyDbAndCollection(OperationContext* opCtx,
     // before taking the lock. One exception is a query by UUID of system.views in a
     // transaction. Usual queries of system.views (by name, not UUID) within a transaction are
     // rejected. However, if the query is by UUID we can't determine whether the namespace is
-    // actually system.views until we take the lock here. So we have this one last assertion.
+    // actually system.views until we take the lock here. So we have these last two assertions.
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            "Cannot access system.views collection in a transaction",
+            !(opCtx->inMultiDocumentTransaction() && nss.isSystemDotViews()));
     uassert(6944500,
             "Modifications to system.views must take an exclusive lock",
             operationType == AcquisitionPrerequisites::OperationType::kRead ||
@@ -261,12 +265,14 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
     if (coll) {
         verifyDbAndCollection(opCtx, nss, coll, prerequisites.operationType);
 
-        // Ban snapshot reads on capped collections.
-        const auto readConcernLevel = prerequisites.readConcern.getLevel();
-        uassert(ErrorCodes::SnapshotUnavailable,
-                "Reading from capped collections with readConcern snapshot is not supported",
-                !coll->isCapped() ||
-                    readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+        // TODO SERVER-79401: To mimic the previous behaviour with AutoGetCollectionForRead we only
+        // check for usage of the correct read concern on reads. Otherwise multi-document
+        // transactions cannot perform commits since they perform writes with an "invalid" read
+        // concern for the user (snapshot).
+        if (prerequisites.operationType == AcquisitionPrerequisites::kRead) {
+            assertReadConcernSupported(
+                coll, prerequisites.readConcern, opCtx->recoveryUnit()->getTimestampReadSource());
+        }
 
         return coll;
     } else if (auto view = catalog.lookupView(opCtx, nss)) {
@@ -1478,6 +1484,21 @@ void restoreTransactionResourcesToOperationContext(
     }
 
     scopeGuard.dismiss();
+}
+
+StashTransactionResourcesForDBDirect::StashTransactionResourcesForDBDirect(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    if (TransactionResources::isPresent(opCtx)) {
+        _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
+        TransactionResources::attachToOpCtx(opCtx, std::make_unique<TransactionResources>());
+    }
+}
+
+StashTransactionResourcesForDBDirect::~StashTransactionResourcesForDBDirect() {
+    if (TransactionResources::isPresent(_opCtx)) {
+        TransactionResources::detachFromOpCtx(_opCtx);
+    }
+    TransactionResources::attachToOpCtx(_opCtx, std::move(_originalTransactionResources));
 }
 
 HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(OperationContext* opCtx,

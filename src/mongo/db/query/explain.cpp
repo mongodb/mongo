@@ -460,6 +460,22 @@ void Explain::explainStages(PlanExecutor* exec,
                   out);
 }
 
+void Explain::explainStages(PlanExecutor* exec,
+                            const CollectionAcquisition& collection,
+                            ExplainOptions::Verbosity verbosity,
+                            BSONObj extraInfo,
+                            const SerializationContext& serializationContext,
+                            const BSONObj& command,
+                            BSONObjBuilder* out) {
+    explainStages(exec,
+                  MultipleCollectionAccessor(collection),
+                  verbosity,
+                  extraInfo,
+                  serializationContext,
+                  command,
+                  out);
+}
+
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {
     out->append("version", "1");
 

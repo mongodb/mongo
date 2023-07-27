@@ -198,15 +198,16 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
  */
 std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     OperationContext* opCtx,
-    const AutoGetCollectionForReadCommandMaybeLockFree& ctx,
+    const CollectionOrViewAcquisition& collOrViewAcquisition,
     const NamespaceString& nss,
     BSONObj requestBody,
-    std::unique_ptr<FindCommandRequest> findCommand,
-    const CollectionPtr& collection) {
+    std::unique_ptr<FindCommandRequest> findCommand) {
     // Fill out curop information.
     beginQueryOp(opCtx, nss, requestBody);
     // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
     const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+
+    const auto& collection = collOrViewAcquisition.getCollectionPtr();
 
     auto expCtx =
         makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
@@ -230,13 +231,17 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                 expCtx);
             return std::make_unique<query_stats::FindKeyGenerator>(
-                expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
+                expCtx,
+                *parsedRequest,
+                std::move(queryShape),
+                collOrViewAcquisition.getCollectionType());
         });
     }
 
     return uassertStatusOK(
         CanonicalQuery::canonicalize(std::move(expCtx), std::move(parsedRequest)));
 }
+
 /**
  * A command for running .find() queries.
  */
@@ -368,12 +373,22 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
-            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-            ctx.emplace(opCtx,
-                        CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
-                        AutoGetCollection::Options{}.viewMode(
-                            auto_get_collection::ViewMode::kViewsPermitted));
-            const auto nss = ctx->getNss();
+            // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
+            // acquisition in case it would throw so we can ensure data is written to the profile
+            // collection that some test may rely on.
+            auto const nss = CommandHelpers::parseNsCollectionRequired(_dbName, _request.body);
+            AutoStatsTracker tracker{
+                opCtx,
+                nss,
+                Top::LockType::ReadLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName())};
+
+            const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
+                opCtx, nss, AcquisitionPrerequisites::kRead);
+
+            boost::optional<CollectionOrViewAcquisition> collectionOrView =
+                acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
 
             // Going forward this operation must never ignore interrupt signals while waiting for
             // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock
@@ -398,13 +413,13 @@ public:
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
-            const auto& collection = ctx->getCollection();
-            if (!ctx->getView()) {
-                const bool isClusteredCollection = collection && collection->isClustered();
+            const auto& collectionPtr = collectionOrView->getCollectionPtr();
+            if (!collectionOrView->isView()) {
+                const bool isClusteredCollection = collectionPtr && collectionPtr->isClustered();
                 uassertStatusOK(query_request_helper::validateResumeAfter(
                     findCommand->getResumeAfter(), isClusteredCollection));
             }
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, collectionPtr, verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
@@ -420,9 +435,9 @@ public:
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
-            if (ctx->getView()) {
+            if (collectionOrView->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
-                ctx.reset();
+                collectionOrView.reset();
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
@@ -449,10 +464,11 @@ public:
             cq->setUseCqfIfEligible(true);
 
             // Get the execution plan for the query.
+            const auto& collection = collectionOrView->getCollection();
             bool permitYield = true;
             auto exec =
                 uassertStatusOK(getExecutorFind(opCtx,
-                                                &collection,
+                                                collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
                                                 permitYield));
@@ -571,13 +587,41 @@ public:
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query
             // request into an aggregation command.
-            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-            ctx.emplace(opCtx,
-                        CommandHelpers::parseNsOrUUID(_dbName, _request.body),
-                        AutoGetCollection::Options{}
-                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                            .expectedUUID(findCommand->getCollectionUUID()));
-            const auto& nss = ctx->getNss();
+
+            // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
+            // acquisition in case it would throw so we can ensure data is written to the profile
+            // collection that some test may rely on. However, we might not know the namespace at
+            // this point so it is wrapped in a boost::optional. If the request is with a UUID we
+            // instantiate it after, but this is fine as the request should not be for sharded
+            // collections.
+            boost::optional<AutoStatsTracker> tracker;
+            auto const initializeTracker = [&](const NamespaceString& nss) {
+                tracker.emplace(
+                    opCtx,
+                    nss,
+                    Top::LockType::ReadLocked,
+                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+            };
+            auto const nssOrUUID = CommandHelpers::parseNsOrUUID(_dbName, _request.body);
+            if (nssOrUUID.isNamespaceString()) {
+                initializeTracker(nssOrUUID.nss());
+            }
+            const auto acquisitionRequest = [&] {
+                auto req = CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
+
+                req.expectedUUID = findCommand->getCollectionUUID();
+                return req;
+            }();
+
+            boost::optional<CollectionOrViewAcquisition> collectionOrView =
+                acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+            const NamespaceString nss = collectionOrView->nss();
+
+            if (!tracker) {
+                initializeTracker(nss);
+            }
 
             if (!findCommand->getMirrored()) {
                 if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
@@ -604,28 +648,28 @@ public:
             // ignoring interrupt.
             InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
-            const auto& collection = ctx->getCollection();
+            const auto& collectionPtr = collectionOrView->getCollectionPtr();
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
-                    collection || !isFindByUUID);
+                    collectionOrView->collectionExists() || !isFindByUUID);
 
             bool isClusteredCollection = false;
-            if (collection) {
+            if (collectionOrView->collectionExists()) {
                 if (isFindByUUID) {
                     // Replace the UUID in the find command with the fully qualified namespace of
                     // the looked up Collection.
-                    findCommand->setNss(ctx->getNss());
+                    findCommand->setNss(nss);
                 }
 
                 // Tailing a replicated capped clustered collection requires majority read concern.
                 const bool isTailable = findCommand->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
-                isClusteredCollection = collection->isClustered();
-                const bool isCapped = collection->isCapped();
-                const bool isReplicated = collection->ns().isReplicated();
+                isClusteredCollection = collectionPtr->isClustered();
+                const bool isCapped = collectionPtr->isCapped();
+                const bool isReplicated = collectionPtr->ns().isReplicated();
                 if (isClusteredCollection && isCapped && isReplicated && isTailable) {
                     uassert(ErrorCodes::Error(6049203),
                             "A tailable cursor on a capped clustered collection requires majority "
@@ -637,19 +681,19 @@ public:
             // Views use the aggregation system and the $_resumeAfter parameter is not allowed. A
             // more descriptive error will be raised later, but we want to validate this parameter
             // before beginning the operation.
-            if (!ctx->getView()) {
+            if (!collectionOrView->isView()) {
                 uassertStatusOK(query_request_helper::validateResumeAfter(
                     findCommand->getResumeAfter(), isClusteredCollection));
             }
 
             auto cq = parseQueryAndBeginOperation(
-                opCtx, *ctx, nss, _request.body, std::move(findCommand), collection);
+                opCtx, *collectionOrView, nss, _request.body, std::move(findCommand));
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
-            if (ctx->getView()) {
+            if (collectionOrView->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
-                ctx.reset();
+                collectionOrView.reset();
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
@@ -675,6 +719,8 @@ public:
                 return;
             }
 
+            const auto& collection = collectionOrView->getCollection();
+
             if (!cq->getFindCommandRequest().getAllowDiskUse().value_or(true)) {
                 allowDiskUseFalseCounter.increment();
             }
@@ -695,7 +741,7 @@ public:
             bool permitYield = true;
             auto exec =
                 uassertStatusOK(getExecutorFind(opCtx,
-                                                &collection,
+                                                collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
                                                 permitYield));
@@ -711,12 +757,12 @@ public:
                 CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
             }
 
-            if (!collection) {
+            if (!collection.exists()) {
                 // No collection. Just fill out curop indicating that there were zero results and
                 // there is no ClientCursor id, and then return.
                 const long long numResults = 0;
                 const CursorId cursorId = 0;
-                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
+                endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
                 appendCursorResponseObject(cursorId,
                                            nss,
@@ -789,7 +835,7 @@ public:
 
             // Set up the cursor for getMore.
             CursorId cursorId = 0;
-            if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
+            if (shouldSaveCursor(opCtx, collectionPtr, state, exec.get())) {
                 const bool stashResourcesForGetMore =
                     exec->isSaveRecoveryUnitAcrossCommandsEnabled();
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
@@ -821,7 +867,7 @@ public:
                 }
 
                 // Fill out curop based on the results.
-                endQueryOp(opCtx, collection, *cursorExec, numResults, pinnedCursor, cmdObj);
+                endQueryOp(opCtx, collectionPtr, *cursorExec, numResults, pinnedCursor, cmdObj);
 
                 if (stashResourcesForGetMore) {
                     // Collect storage stats now before we stash the recovery unit. These stats are
@@ -835,11 +881,20 @@ public:
                     CurOp::get(opCtx)->debug().storageStats =
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
+
+                stashTransactionResourcesFromOperationContext(opCtx, pinnedCursor.getCursor());
+                // During destruction of the pinned cursor we may discover that the operation has
+                // been interrupted. This would cause the transaction resources we just stashed to
+                // be released and destroyed. As we hold a reference here to them in the form of the
+                // acquisition which modifies the resources, we must release it now before
+                // destroying the pinned cursor.
+                collectionOrView.reset();
             } else {
-                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
+                endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
                 // We want to destroy executor as soon as possible to release any resources locks it
                 // may hold.
                 exec.reset();
+                collectionOrView.reset();
             }
 
             // Generate the response object to send to the client.

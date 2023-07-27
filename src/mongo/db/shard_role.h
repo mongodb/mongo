@@ -41,6 +41,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -300,6 +301,23 @@ public:
         return std::get<ViewAcquisition>(_collectionOrViewAcquisition);
     }
 
+    query_shape::CollectionType getCollectionType() const {
+        if (isView()) {
+            if (getView().getViewDefinition().timeseries())
+                return query_shape::CollectionType::timeseries;
+            return query_shape::CollectionType::view;
+        }
+        const auto& collection = getCollection();
+        if (!collection.exists()) {
+            return query_shape::CollectionType::nonExistent;
+        }
+        return query_shape::CollectionType::collection;
+    }
+
+    bool collectionExists() const {
+        return isCollection() && getCollection().exists();
+    }
+
 private:
     friend class CollectionAcquisition;
 
@@ -477,6 +495,16 @@ private:
 
     std::unique_ptr<shard_role_details::TransactionResources> _yieldedResources;
     shard_role_details::TransactionResources::State _originalState;
+};
+
+class StashTransactionResourcesForDBDirect {
+public:
+    StashTransactionResourcesForDBDirect(OperationContext* opCtx);
+    ~StashTransactionResourcesForDBDirect();
+
+private:
+    OperationContext* _opCtx;
+    std::unique_ptr<shard_role_details::TransactionResources> _originalTransactionResources;
 };
 
 class ClientCursor;

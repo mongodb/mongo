@@ -89,6 +89,14 @@ public:
                               const BSONObj& command,
                               BSONObjBuilder* out);
 
+    static void explainStages(PlanExecutor* exec,
+                              const CollectionAcquisition& collection,
+                              ExplainOptions::Verbosity verbosity,
+                              BSONObj extraInfo,
+                              const SerializationContext& serializationContext,
+                              const BSONObj& command,
+                              BSONObjBuilder* out);
+
     /**
      * Similar to the above function, but takes in multiple collections instead to support
      * aggregation that involves multiple collections (e.g. $lookup).
