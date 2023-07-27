@@ -63,7 +63,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-class NamespaceStringUtil;
 
 class NamespaceString {
 public:
@@ -862,7 +861,7 @@ public:
     }
 
 private:
-    friend NamespaceStringUtil;
+    friend class NamespaceStringUtil;
     friend class NamespaceStringTest;
 
     /**
