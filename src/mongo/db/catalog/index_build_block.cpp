@@ -260,7 +260,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         [svcCtx,
          indexName = _indexName,
          spec = _spec,
-         entry = indexCatalogEntry,
+         ident = indexCatalogEntry->getIdent(),
          coll = collection,
          buildUUID = _buildUUID](OperationContext*, boost::optional<Timestamp> commitTime) {
             // Note: this runs after the WUOW commits but before we release our X lock on the
@@ -273,7 +273,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "collectionUUID"_attr = coll->uuid(),
                   logAttrs(coll->ns()),
                   "index"_attr = indexName,
-                  "ident"_attr = entry->getIdent(),
+                  "ident"_attr = ident,
                   "collectionIdent"_attr = coll->getSharedIdent()->getIdent(),
                   "commitTimestamp"_attr = commitTime);
 

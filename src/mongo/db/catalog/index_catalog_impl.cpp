@@ -1436,33 +1436,29 @@ namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
     IndexRemoveChange(const NamespaceString& nss,
-                      const UUID& uuid,
-                      std::shared_ptr<IndexCatalogEntry> entry,
+                      const IndexDescriptor* desc,
                       SharedCollectionDecorations* collectionDecorations)
-        : _nss(nss),
-          _uuid(uuid),
-          _entry(std::move(entry)),
+        : _indexName(desc->indexName()),
+          _keyPattern(desc->keyPattern().getOwned()),
+          _indexFeatures(IndexFeatures::make(desc, nss.isOnInternalDb())),
           _collectionDecorations(collectionDecorations) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
-        _entry->setDropped();
-    }
+    // Index entries use copy-on-write, so we can modify the instance in-place as it isn't published
+    // yet. This is done by calling setDropped() on the copied index entry. There is no need to do
+    // this in a commit handler.
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {}
 
     void rollback(OperationContext* opCtx) final {
-        auto indexDescriptor = _entry->descriptor();
-
         // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
         // present as it is shared state across Collection copies.
         CollectionIndexUsageTrackerDecoration::get(_collectionDecorations)
-            .registerIndex(indexDescriptor->indexName(),
-                           indexDescriptor->keyPattern(),
-                           IndexFeatures::make(indexDescriptor, _nss.isOnInternalDb()));
+            .registerIndex(_indexName, _keyPattern, _indexFeatures);
     }
 
 private:
-    const NamespaceString _nss;
-    const UUID _uuid;
-    std::shared_ptr<IndexCatalogEntry> _entry;
+    const std::string _indexName;
+    const BSONObj _keyPattern;
+    const IndexFeatures _indexFeatures;
     SharedCollectionDecorations* _collectionDecorations;
 };
 }  // namespace
@@ -1491,12 +1487,12 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     }();
 
     invariant(released.get() == entry);
-    // TODO SERVER-77131: Remove index catalog entry instance in commit handler.
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<IndexRemoveChange>(collection->ns(),
-                                            collection->uuid(),
-                                            entry->shared_from_this(),
-                                            collection->getSharedDecorations()));
+
+    // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
+    // handler. The index entry is discarded on rollback.
+    entry->setDropped();
+    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
+        collection->ns(), entry->descriptor(), collection->getSharedDecorations()));
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
@@ -1728,12 +1724,11 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
         _readyIndexes.release(writableEntry->descriptor());
     invariant(writableEntry == deletedEntry.get());
 
-    // TODO SERVER-77131: Remove index catalog entry instance in commit handler.
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<IndexRemoveChange>(collection->ns(),
-                                            collection->uuid(),
-                                            writableEntry->shared_from_this(),
-                                            collection->getSharedDecorations()));
+    // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
+    // handler. The index entry is discarded on rollback.
+    writableEntry->setDropped();
+    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
+        collection->ns(), writableEntry->descriptor(), collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
 
