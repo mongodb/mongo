@@ -185,12 +185,17 @@ private:
     bool _encryptionEnabled;
 };
 
-const std::shared_ptr<DBClientBase>& getConnectionRef(JS::CallArgs& args) {
+const std::shared_ptr<DBClientWithAutoEncryption>& getDBClientWithAutoEncryptionRef(
+    JS::CallArgs& args) {
     auto ret = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
         JS::GetPrivate(args.thisv().toObjectOrNull()));
     uassert(
         ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", *ret != nullptr);
-    return (*ret)->getConnection();
+    return *ret;
+}
+
+const std::shared_ptr<DBClientBase>& getConnectionRef(JS::CallArgs& args) {
+    return getDBClientWithAutoEncryptionRef(args)->getConnection();
 }
 
 DBClientBase* getConnection(JS::CallArgs& args) {
@@ -525,8 +530,7 @@ void MongoBase::Functions::setAutoEncryption::call(JSContext* cx, JS::CallArgs a
             JS::GetPrivate(args.thisv().toObjectOrNull())));
     }
 
-    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
-        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto client = getDBClientWithAutoEncryptionRef(args);
 
     if (client->getEncryptedConnection() != nullptr) {
         uasserted(ErrorCodes::BadValue, "Auto encryption is already set on this connection");
@@ -542,8 +546,7 @@ void MongoBase::Functions::setAutoEncryption::call(JSContext* cx, JS::CallArgs a
 }
 
 void MongoBase::Functions::getAutoEncryptionOptions::call(JSContext* cx, JS::CallArgs args) {
-    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
-        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto client = getDBClientWithAutoEncryptionRef(args);
     auto encConn = client->getEncryptedConnection();
     if (encConn) {
         auto ptr = getEncryptionCallbacks(encConn.get());
@@ -555,8 +558,7 @@ void MongoBase::Functions::getAutoEncryptionOptions::call(JSContext* cx, JS::Cal
 }
 
 void MongoBase::Functions::unsetAutoEncryption::call(JSContext* cx, JS::CallArgs args) {
-    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
-        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto client = getDBClientWithAutoEncryptionRef(args);
     client->toggleAutoEncryption(false);
     client->setEncryptedConnection(nullptr);
     args.rval().setBoolean(true);
@@ -569,15 +571,13 @@ void MongoBase::Functions::toggleAutoEncryption::call(JSContext* cx, JS::CallArg
         uasserted(ErrorCodes::BadValue, "first argument to toggleAutoEncryption must be a boolean");
     }
     auto enable = ValueWriter(cx, args.get(0)).toBoolean();
-    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
-        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto client = getDBClientWithAutoEncryptionRef(args);
     client->toggleAutoEncryption(enable);
     args.rval().setBoolean(true);
 }
 
 void MongoBase::Functions::isAutoEncryptionEnabled::call(JSContext* cx, JS::CallArgs args) {
-    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
-        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto client = getDBClientWithAutoEncryptionRef(args);
     args.rval().setBoolean(client->isEncryptionEnabled());
 }
 
