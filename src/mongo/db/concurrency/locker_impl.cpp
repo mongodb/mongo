@@ -715,6 +715,9 @@ bool LockerImpl::isDbLockedForMode(const DatabaseName& dbName, LockMode mode) co
 bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const {
     invariant(nss.coll().size());
 
+    if (!shouldConflictWithSecondaryBatchApplication())
+        return true;
+
     if (auto lockedForMode =
             _globalAndTenantLocksImplyDBOrCollectionLockedForMode(nss.tenantId(), mode);
         lockedForMode) {
