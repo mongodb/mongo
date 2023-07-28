@@ -81,8 +81,18 @@ public:
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _algorithm(algorithm),
               _hmacKey(hmacKey),
-              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
-                                     ActionType::queryStatsRead)}) {}
+              _privileges(
+                  algorithm == TransformAlgorithmEnum::kNone
+                      ? PrivilegeVector{Privilege(ResourcePattern::forClusterResource(tenantId),
+                                                  ActionType::queryStatsReadTransformed),
+                                        Privilege(ResourcePattern::forClusterResource(tenantId),
+                                                  ActionType::queryStatsRead)}
+                      : PrivilegeVector{Privilege(ResourcePattern::forClusterResource(tenantId),
+                                                  ActionType::queryStatsReadTransformed)}) {
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized to run $queryStats without transformation",
+                    getTestCommandsEnabled() || _privileges.size() == 1);
+        }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
