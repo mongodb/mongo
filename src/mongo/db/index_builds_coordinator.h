@@ -609,9 +609,7 @@ protected:
      *
      * See SERVER-44722, SERVER-42621, and SERVER-71191.
      */
-    StatusWith<std::tuple<Lock::DBLock,
-                          CollectionNamespaceOrUUIDLock,
-                          repl::ReplicationStateTransitionLockGuard>>
+    StatusWith<std::tuple<AutoGetCollection, repl::ReplicationStateTransitionLockGuard>>
     _acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
                                        ReplIndexBuildState* replState,
                                        bool retry = true);

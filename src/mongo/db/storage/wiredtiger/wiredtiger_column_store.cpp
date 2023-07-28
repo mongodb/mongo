@@ -154,7 +154,9 @@ void WiredTigerColumnStore::insert(OperationContext* opCtx,
     WriteCursor(opCtx, _uri, _tableId).insert(path, rid, cell);
 }
 void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellView cell) {
-    dassert(_opCtx->lockState()->isWriteLocked());
+    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
+    // (global MODE_IS).
+    dassert(_opCtx->lockState()->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
@@ -176,7 +178,9 @@ void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, RowId
     WriteCursor(opCtx, _uri, _tableId).remove(path, rid);
 }
 void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
-    dassert(_opCtx->lockState()->isWriteLocked());
+    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
+    // (global MODE_IS).
+    dassert(_opCtx->lockState()->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
@@ -197,7 +201,9 @@ void WiredTigerColumnStore::update(OperationContext* opCtx,
     WriteCursor(opCtx, _uri, _tableId).update(path, rid, cell);
 }
 void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellView cell) {
-    dassert(_opCtx->lockState()->isWriteLocked());
+    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
+    // (global MODE_IS).
+    dassert(_opCtx->lockState()->isLocked());
 
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
