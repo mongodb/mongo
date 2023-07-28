@@ -72,7 +72,7 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
     if (propagationPreference == PropagationPreferenceOptions.kConfig) {
         configFromMongos.coll1.find().itcount();
     } else {
-        toDBFromMongos.coll1.find().itcount();
+        toDBFromMongos.toColl.find().itcount();
     }
 
     // Attempt a snapshot read at 'clusterTime' on toRS. Test that it performs a noop write
