@@ -39,6 +39,8 @@
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/exit_code.h"
+#include <string_view>
+#include <type_traits>
 
 namespace mongo {
 namespace logger {
@@ -128,6 +130,10 @@ public:
         stream() << x;
         return *this;
     }
+    LogstreamBuilder& operator<<(const std::string_view& x) {
+        stream() << x;
+        return *this;
+    }
     LogstreamBuilder& operator<<(StringData x) {
         stream() << x;
         return *this;
@@ -207,7 +213,12 @@ public:
 
     template <typename T>
     LogstreamBuilder& operator<<(const T& x) {
-        stream() << x.toString();
+        // support enum class
+        if constexpr (std::is_enum_v<T>) {
+            stream() << static_cast<typename std::underlying_type<T>::type>(x);
+        } else {
+            stream() << x.toString();
+        }
         return *this;
     }
 
