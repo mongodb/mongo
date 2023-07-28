@@ -609,7 +609,7 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 }
 
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
-                                                 SerializationOptions opts) const {
+                                                 const SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db_deprecated() == _from.db_deprecated())
         ? Value(opts.serializeIdentifier(_from.coll()))

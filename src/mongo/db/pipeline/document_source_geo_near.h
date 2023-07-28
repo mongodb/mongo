@@ -101,7 +101,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
 

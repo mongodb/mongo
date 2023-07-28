@@ -99,8 +99,10 @@ public:
         assertBucketAutoType(bucketAutoStage);
 
         vector<Value> explainedStages;
-        bucketAutoStage->serializeToArray(explainedStages,
-                                          ExplainOptions::Verbosity::kQueryPlanner);
+        bucketAutoStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 1UL);
 
         Value expectedExplain = Value(expectedObj);

@@ -83,7 +83,7 @@ REGISTER_DOCUMENT_SOURCE(geoNear,
                          DocumentSourceGeoNear::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
-Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
+Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
     MutableDocument result;
 
     if (keyFieldPath) {

@@ -100,7 +100,7 @@ boost::intrusive_ptr<Expression> ExpressionTestApiVersion::parse(ExpressionConte
     return new ExpressionTestApiVersion(expCtx, unstableField, deprecatedField);
 }
 
-Value ExpressionTestApiVersion::serialize(SerializationOptions options) const {
+Value ExpressionTestApiVersion::serialize(const SerializationOptions& options) const {
     return Value(Document{{"$_testApiVersion",
                            Document{{"unstable", _unstable ? Value(_unstable) : Value()},
                                     {"deprecated", _deprecated ? Value(_deprecated) : Value()}}}});

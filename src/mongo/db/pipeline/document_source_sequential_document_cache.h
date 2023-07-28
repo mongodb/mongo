@@ -125,7 +125,7 @@ private:
     DocumentSourceSequentialDocumentCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           SequentialDocumentCache* cache);
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     SequentialDocumentCache* _cache;
 

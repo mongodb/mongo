@@ -139,7 +139,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     });
 }
 
-Value DocumentSourceQueryStats::serialize(SerializationOptions opt) const {
+Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) const {
     // This document source never contains any user information, so serialization options do not
     // apply.
     return Value{Document{
@@ -149,7 +149,7 @@ Value DocumentSourceQueryStats::serialize(SerializationOptions opt) const {
                          Document{
                              {"algorithm", TransformAlgorithm_serializer(_algorithm)},
                              {"hmacKey",
-                              opt.serializeLiteral(BSONBinData(
+                              opts.serializeLiteral(BSONBinData(
                                   _hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive))}}}}
              : Document{}}}};
 }

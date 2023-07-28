@@ -91,7 +91,8 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
     }
 }
 
-Value DocumentSourceSingleDocumentTransformation::serialize(SerializationOptions opts) const {
+Value DocumentSourceSingleDocumentTransformation::serialize(
+    const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(),
                            _transformationProcessor
                                ? _transformationProcessor->getTransformer().serializeTransformation(

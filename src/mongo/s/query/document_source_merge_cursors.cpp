@@ -123,7 +123,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     return Document::fromBsonWithMetaData(*next.getResult());
 }
 
-Value DocumentSourceMergeCursors::serialize(SerializationOptions opts) const {
+Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
     return Value(Document{{kStageName, _armParams->toBSON(opts)}});

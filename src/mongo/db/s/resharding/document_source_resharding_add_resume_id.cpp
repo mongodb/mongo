@@ -111,7 +111,7 @@ StageConstraints DocumentSourceReshardingAddResumeId::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingAddResumeId::serialize(SerializationOptions opts) const {
+Value DocumentSourceReshardingAddResumeId::serialize(const SerializationOptions& opts) const {
     return Value(Document{{kStageName, Value(Document{})}});
 }
 

@@ -71,7 +71,7 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    Value serialize(SerializationOptions options) const final;
+    Value serialize(const SerializationOptions& options) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);

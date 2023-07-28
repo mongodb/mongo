@@ -83,7 +83,7 @@ struct BoundMakerMin {
             doc.metadata().getTimeseriesBucketMinTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize(SerializationOptions opts) const {
+    Document serialize(const SerializationOptions& opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMin},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
@@ -99,7 +99,7 @@ struct BoundMakerMax {
             doc.metadata().getTimeseriesBucketMaxTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize(SerializationOptions opts) const {
+    Document serialize(const SerializationOptions& opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMax},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
@@ -299,7 +299,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
 }
 
 void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
-                                          SerializationOptions opts) const {
+                                          const SerializationOptions& opts) const {
     auto explain = opts.verbosity;
 
     if (_timeSorter) {

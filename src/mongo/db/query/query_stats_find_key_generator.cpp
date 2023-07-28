@@ -81,10 +81,12 @@ BSONObj FindKeyGenerator::generate(
                                    ExtensionsCallbackNoop(),
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
     expCtx->setUserRoles();
-
-    auto opts = hmacPolicy
-        ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)
-        : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
+    auto opts = hmacPolicy ? SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString,
+                                                  /*transformIdentifiersBool*/ true,
+                                                  *hmacPolicy,
+                                                  /*includePath*/ true,
+                                                  /*verbosity*/ boost::none}
+                           : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
     return generateWithQueryShape(query_shape::extractQueryShape(*parsedRequest, opts, expCtx),
                                   opts);

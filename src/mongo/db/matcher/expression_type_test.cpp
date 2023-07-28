@@ -228,8 +228,7 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
 
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
     TypeMatchExpression type(""_sd, String);
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$type":[2]})",
         type.getSerializedRightHandSide(opts));
@@ -328,8 +327,7 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
 
 TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
     InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataSubType":"?number"})",
         e.getSerializedRightHandSide(opts));

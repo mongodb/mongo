@@ -114,7 +114,7 @@ public:
                                               acr.getNamespace(),
                                               collectionType);
 
-        SerializationOptions opts(literalPolicy);
+        SerializationOptions opts{.literalPolicy = literalPolicy};
         if (applyHmac) {
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;

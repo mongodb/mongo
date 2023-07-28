@@ -101,7 +101,7 @@ public:
         return checked_cast<ExprMatchExpression*>(_matchExpression.get());
     }
 
-    BSONObj serialize(SerializationOptions opts) {
+    BSONObj serialize(const SerializationOptions& opts) {
         return _matchExpression->serialize(opts);
     }
 

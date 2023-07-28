@@ -341,11 +341,13 @@ public:
     /**
      * Helpers to serialize a pipeline.
      */
-    std::vector<Value> serialize(boost::optional<SerializationOptions> opts = boost::none) const;
+    std::vector<Value> serialize(
+        boost::optional<const SerializationOptions&> opts = boost::none) const;
     std::vector<BSONObj> serializeToBson(
-        boost::optional<SerializationOptions> opts = boost::none) const;
+        boost::optional<const SerializationOptions&> opts = boost::none) const;
     static std::vector<Value> serializeContainer(
-        const SourceContainer& container, boost::optional<SerializationOptions> opts = boost::none);
+        const SourceContainer& container,
+        boost::optional<const SerializationOptions&> opts = boost::none);
 
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
@@ -361,7 +363,8 @@ public:
      * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
      * specified by 'verbosity'.
      */
-    std::vector<Value> writeExplainOps(SerializationOptions opts = SerializationOptions()) const;
+    std::vector<Value> writeExplainOps(
+        const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
      * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what

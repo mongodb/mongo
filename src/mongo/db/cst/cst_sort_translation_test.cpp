@@ -76,8 +76,8 @@ void assertSortPatternsEQ(SortPattern correct, SortPattern fromTest) {
         }
         if (correct[i].expression) {
             if (fromTest[i].expression)
-                ASSERT_EQ(correct[i].expression->serialize(false).toString(),
-                          fromTest[i].expression->serialize(false).toString());
+                ASSERT_EQ(correct[i].expression->serialize(SerializationOptions{}).toString(),
+                          fromTest[i].expression->serialize(SerializationOptions{}).toString());
             else {
                 FAIL("Pattern missing expression");
             }

@@ -74,7 +74,7 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 }
 
 void InternalSchemaMatchArrayIndexMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     bob->append(kName,
                 BSON("index" << opts.serializeLiteral(_index) << "namePlaceholder"
                              << opts.serializeFieldPathFromString(

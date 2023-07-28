@@ -545,7 +545,7 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
 }
 
 vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
-                                           boost::optional<SerializationOptions> opts) {
+                                           boost::optional<const SerializationOptions&> opts) {
     vector<Value> serializedSources;
     for (auto&& source : container) {
         source->serializeToArray(serializedSources, opts ? opts.get() : SerializationOptions());
@@ -553,11 +553,11 @@ vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
     return serializedSources;
 }
 
-vector<Value> Pipeline::serialize(boost::optional<SerializationOptions> opts) const {
+vector<Value> Pipeline::serialize(boost::optional<const SerializationOptions&> opts) const {
     return serializeContainer(_sources, opts);
 }
 
-vector<BSONObj> Pipeline::serializeToBson(boost::optional<SerializationOptions> opts) const {
+vector<BSONObj> Pipeline::serializeToBson(boost::optional<const SerializationOptions&> opts) const {
     const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
@@ -599,7 +599,7 @@ boost::optional<Document> Pipeline::getNext() {
                               : boost::optional<Document>{nextResult.releaseDocument()};
 }
 
-vector<Value> Pipeline::writeExplainOps(SerializationOptions opts) const {
+vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
     vector<Value> array;
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();

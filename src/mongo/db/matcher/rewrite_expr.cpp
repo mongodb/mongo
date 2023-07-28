@@ -55,8 +55,10 @@ using CmpOp = ExpressionCompare::CmpOp;
 
 RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expression>& expression,
                                                 const CollatorInterface* collator) {
-    LOGV2_DEBUG(
-        20725, 5, "Expression prior to rewrite", "expression"_attr = expression->serialize(false));
+    LOGV2_DEBUG(20725,
+                5,
+                "Expression prior to rewrite",
+                "expression"_attr = expression->serialize(SerializationOptions{}));
 
     RewriteExpr rewriteExpr(collator);
     std::unique_ptr<MatchExpression> matchExpression;

@@ -118,7 +118,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
     return new DocumentSourceOperationMetrics(pExpCtx, clearMetrics);
 }
 
-Value DocumentSourceOperationMetrics::serialize(SerializationOptions opts) const {
+Value DocumentSourceOperationMetrics::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo

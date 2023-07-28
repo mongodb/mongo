@@ -145,8 +145,9 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
 
-    void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts = SerializationOptions()) const final override;
+    void serializeToArray(
+        std::vector<Value>& array,
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
@@ -156,7 +157,8 @@ private:
 
     GetNextResult doGetNext() final;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
     }
 

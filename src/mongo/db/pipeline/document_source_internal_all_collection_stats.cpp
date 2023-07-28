@@ -150,8 +150,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
     }
 }
 
-void DocumentSourceInternalAllCollectionStats::serializeToArray(std::vector<Value>& array,
-                                                                SerializationOptions opts) const {
+void DocumentSourceInternalAllCollectionStats::serializeToArray(
+    std::vector<Value>& array, const SerializationOptions& opts) const {
     auto explain = opts.verbosity;
     if (explain) {
         BSONObjBuilder bob;
@@ -162,7 +162,11 @@ void DocumentSourceInternalAllCollectionStats::serializeToArray(std::vector<Valu
         auto doc = Document{{getSourceName(), bob.obj()}};
         array.push_back(Value(doc));
     } else {
-        array.push_back(serialize(explain));
+        auto opts = explain ? SerializationOptions{.includePath = false,
+                                                   .verbosity = boost::make_optional(
+                                                       ExplainOptions::Verbosity::kQueryPlanner)}
+                            : SerializationOptions{};
+        array.push_back(serialize(opts));
         if (_absorbedMatch) {
             _absorbedMatch->serializeToArray(array);
         }
@@ -190,7 +194,7 @@ const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-Value DocumentSourceInternalAllCollectionStats::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON(opts)}});
 }
 }  // namespace mongo

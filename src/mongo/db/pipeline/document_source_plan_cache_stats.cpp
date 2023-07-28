@@ -85,7 +85,7 @@ DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     : DocumentSource(kStageName, expCtx), _allHosts(allHosts) {}
 
 void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
-                                                    SerializationOptions opts) const {
+                                                    const SerializationOptions& opts) const {
     if (opts.verbosity) {
         tassert(7513100,
                 "$planCacheStats is not equipped to serialize in explain mode with redaction on",

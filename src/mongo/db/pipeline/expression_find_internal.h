@@ -96,7 +96,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(SerializationOptions options) const final {
+    Value serialize(const SerializationOptions& options) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -166,7 +166,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(SerializationOptions options) const final {
+    Value serialize(const SerializationOptions& options) const final {
         MONGO_UNREACHABLE;
     }
 
@@ -219,7 +219,7 @@ public:
         return visitor->visit(this);
     }
 
-    Value serialize(SerializationOptions options) const final {
+    Value serialize(const SerializationOptions& options) const final {
         MONGO_UNREACHABLE;
     }
 

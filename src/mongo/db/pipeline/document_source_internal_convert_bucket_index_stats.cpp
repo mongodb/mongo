@@ -155,7 +155,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
         expCtx, std::move(timeseriesOptions));
 }
 
-Value DocumentSourceInternalConvertBucketIndexStats::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalConvertBucketIndexStats::serialize(
+    const SerializationOptions& opts) const {
     MutableDocument out;
     out.addField(timeseries::kTimeFieldName,
                  Value{opts.serializeFieldPathFromString(_timeseriesOptions.timeField)});

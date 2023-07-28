@@ -284,7 +284,8 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     return newCmd.freeze().toBson();
 }
 
-Value DocumentSourceChangeStreamHandleTopologyChange::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamHandleTopologyChange::serialize(
+    const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage"

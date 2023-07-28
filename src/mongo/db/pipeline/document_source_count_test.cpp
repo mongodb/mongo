@@ -70,10 +70,15 @@ public:
             dynamic_cast<DocumentSourceSingleDocumentTransformation*>(result.back().get());
         ASSERT(projectStage);
 
-        auto explain = ExplainOptions::Verbosity::kQueryPlanner;
         vector<Value> explainedStages;
-        groupStage->serializeToArray(explainedStages, explain);
-        projectStage->serializeToArray(explainedStages, explain);
+        groupStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
+        projectStage->serializeToArray(
+            explainedStages,
+            SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 
         StringData countName = countSpec.firstElement().valueStringData();

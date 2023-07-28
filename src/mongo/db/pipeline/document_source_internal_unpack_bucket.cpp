@@ -540,7 +540,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& array,
-                                                          SerializationOptions opts) const {
+                                                          const SerializationOptions& opts) const {
     auto explain = opts.verbosity;
 
     MutableDocument out;

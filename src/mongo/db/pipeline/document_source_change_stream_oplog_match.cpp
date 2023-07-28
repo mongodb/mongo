@@ -220,7 +220,7 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamOplogMatch::serialize(const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));

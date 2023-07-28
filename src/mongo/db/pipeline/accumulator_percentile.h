@@ -117,14 +117,14 @@ public:
      */
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       SerializationOptions options) const;
+                       const SerializationOptions& options) const;
 
     /**
      * Helper that allows both the accumulator and expression $percentile to serialize their
      * corresponding instance variables.
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                SerializationOptions options,
+                                const SerializationOptions& options,
                                 std::vector<double> percentiles,
                                 PercentileMethod method,
                                 MutableDocument& md);
@@ -185,14 +185,14 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       SerializationOptions options) const;
+                       const SerializationOptions& options) const;
 
     /**
      * Helper that allows both the accumulator and expression $median to serialize their
      * corresponding instance variables.
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                SerializationOptions options,
+                                const SerializationOptions& options,
                                 std::vector<double> percentiles,
                                 PercentileMethod method,
                                 MutableDocument& md);

@@ -114,7 +114,7 @@ public:
         return false;
     }
 
-    void serialize(BSONObjBuilder* builder, SerializationOptions opts) const final;
+    void serialize(BSONObjBuilder* builder, const SerializationOptions& opts) const final;
 
     std::unique_ptr<MatchExpression> clone() const final;
 

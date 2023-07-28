@@ -55,7 +55,8 @@ using DocumentSourcePlanCacheStatsTest = AggregationContextFixture;
 static const BSONObj kEmptySpecObj = fromjson("{$planCacheStats: {}}");
 static const BSONObj kAllHostsFalseSpecObj = fromjson("{$planCacheStats: {allHosts: false}}");
 static const BSONObj kAllHostsTrueSpecObj = fromjson("{$planCacheStats: {allHosts: true}}");
-
+static const SerializationOptions kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 /**
  * A MongoProcessInterface used for testing which returns artificial plan cache stats.
  */
@@ -128,7 +129,9 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainSuccessful
     auto stage =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    stage->serializeToArray(serialized,
+                            SerializationOptions{.verbosity = boost::make_optional(
+                                                     ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
 }
@@ -148,7 +151,9 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainAllHostsSu
     auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
                                                               getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    stage->serializeToArray(serialized,
+                            SerializationOptions{.verbosity = boost::make_optional(
+                                                     ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(kAllHostsTrueSpecObj, serialized[0].getDocument().toBson());
 }
@@ -179,7 +184,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     pipeline->optimizePipeline();
     ASSERT_EQ(1u, pipeline->getSources().size());
 
-    auto serialized = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+    auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}, allHosts: false}}"),
                       serialized[0].getDocument().toBson());
@@ -214,7 +219,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest,
     pipeline->optimizePipeline();
     ASSERT_EQ(1u, pipeline->getSources().size());
 
-    auto serialized = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+    auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}, allHosts: true}}"),
                       serialized[0].getDocument().toBson());

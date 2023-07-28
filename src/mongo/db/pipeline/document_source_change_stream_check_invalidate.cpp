@@ -192,7 +192,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckInvalidate::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamCheckInvalidate::serialize(const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));

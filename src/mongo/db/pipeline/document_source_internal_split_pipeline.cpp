@@ -95,7 +95,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
     return pSource->getNext();
 }
 
-Value DocumentSourceInternalSplitPipeline::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions& opts) const {
     std::string mergeTypeString;
 
     switch (_mergeType) {

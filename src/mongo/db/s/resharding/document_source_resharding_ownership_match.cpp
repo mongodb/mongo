@@ -103,7 +103,7 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingOwnershipMatch::serialize(SerializationOptions opts) const {
+Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptions& opts) const {
     return Value{Document{{kStageName,
                            DocumentSourceReshardingOwnershipMatchSpec(
                                _recipientShardId, _reshardingKey.getKeyPattern())

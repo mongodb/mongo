@@ -92,7 +92,7 @@ Value ExprMatchExpression::evaluateExpression(const MatchableDocument* doc) cons
     return _expression->evaluate(document, &variables);
 }
 
-void ExprMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
+void ExprMatchExpression::serialize(BSONObjBuilder* out, const SerializationOptions& opts) const {
     *out << "$expr" << _expression->serialize(opts);
 }
 
@@ -109,8 +109,8 @@ bool ExprMatchExpression::equivalent(const MatchExpression* other) const {
     }
 
     // TODO SERVER-30982: Add mechanism to allow for checking Expression equivalency.
-    return ValueComparator().evaluate(_expression->serialize(false) ==
-                                      realOther->_expression->serialize(false));
+    return ValueComparator().evaluate(_expression->serialize(SerializationOptions{}) ==
+                                      realOther->_expression->serialize(SerializationOptions{}));
 }
 
 void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
@@ -129,7 +129,7 @@ void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
 std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
     // TODO SERVER-31003: Replace Expression clone via serialization with Expression::clone().
     BSONObjBuilder bob;
-    bob << "" << _expression->serialize(false);
+    bob << "" << _expression->serialize(SerializationOptions{});
     boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
         _expCtx.get(), bob.obj().firstElement(), _expCtx->variablesParseState);
 

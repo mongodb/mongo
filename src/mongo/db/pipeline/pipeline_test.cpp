@@ -93,6 +93,8 @@ namespace {
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("a.collection");
 const NamespaceString kAdminCollectionlessNss =
     NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
+const auto kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 constexpr size_t getChangeStreamStageSize() {
     return 6;
@@ -117,7 +119,8 @@ class StubExplainInterface : public StubMongoProcessInterface {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
         BSONArrayBuilder bab;
-        auto pipelineVec = pipeline->writeExplainOps(verbosity);
+        auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
+        auto pipelineVec = pipeline->writeExplainOps(opts);
         for (auto&& stage : pipelineVec) {
             bab << stage;
         }
@@ -165,8 +168,10 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
     auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
     outputPipe->optimizePipeline();
 
-    ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
-                    Value(outputPipeExpected["pipeline"]));
+    ASSERT_VALUE_EQ(
+        Value(outputPipe->writeExplainOps(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})),
+        Value(outputPipeExpected["pipeline"]));
     ASSERT_VALUE_EQ(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
 }
 
@@ -3615,8 +3620,10 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string inputPipe1,
     }
     pipeline1->optimizePipeline();
 
-    ASSERT_VALUE_EQ(Value(pipeline1->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
-                    Value(outputBson["pipeline"]));
+    ASSERT_VALUE_EQ(
+        Value(pipeline1->writeExplainOps(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})),
+        Value(outputBson["pipeline"]));
 }
 
 TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelineDoesNotSwapIfNoPreserve) {
@@ -3733,12 +3740,11 @@ public:
         mergePipe->optimizePipeline();
 
         auto splitPipeline = sharded_agg_helpers::splitPipeline(std::move(mergePipe));
-
-        ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(
-                            ExplainOptions::Verbosity::kQueryPlanner)),
+        const auto explain = SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+        ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(explain)),
                         Value(shardPipeExpected["pipeline"]));
-        ASSERT_VALUE_EQ(Value(splitPipeline.mergePipeline->writeExplainOps(
-                            ExplainOptions::Verbosity::kQueryPlanner)),
+        ASSERT_VALUE_EQ(Value(splitPipeline.mergePipeline->writeExplainOps(explain)),
                         Value(mergePipeExpected["pipeline"]));
 
         shardPipe = std::move(splitPipeline.shardsPipeline);

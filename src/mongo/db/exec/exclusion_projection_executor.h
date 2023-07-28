@@ -188,7 +188,7 @@ public:
     }
 
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
-                                     SerializationOptions options = {}) const final {
+                                     const SerializationOptions& options = {}) const final {
         MutableDocument output;
 
         // The ExclusionNode tree in '_root' will always have a top-level _id node if _id is to be

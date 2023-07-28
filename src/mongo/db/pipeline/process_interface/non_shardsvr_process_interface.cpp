@@ -269,6 +269,7 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
     Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
     std::vector<Value> pipelineVec;
     auto firstStage = ownedPipeline->peekFront();
+    auto opts = SerializationOptions{.verbosity = verbosity};
     // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
     // we would for a normal execution and explain that.
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
@@ -276,7 +277,7 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         // extracted the necessary information and won't need it again.
         std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
             ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
-        pipelineVec = managedPipeline->writeExplainOps(verbosity);
+        pipelineVec = managedPipeline->writeExplainOps(opts);
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
@@ -285,7 +286,7 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
             while (pipelineWithCursor->getNext()) {
             }
         }
-        pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
+        pipelineVec = pipelineWithCursor->writeExplainOps(opts);
     }
     BSONArrayBuilder bab;
     for (auto&& stage : pipelineVec) {

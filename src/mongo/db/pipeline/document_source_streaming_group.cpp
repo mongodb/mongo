@@ -169,8 +169,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
     return groupStage;
 }
 
-void DocumentSourceStreamingGroup::serializeAdditionalFields(MutableDocument& out,
-                                                             SerializationOptions opts) const {
+void DocumentSourceStreamingGroup::serializeAdditionalFields(
+    MutableDocument& out, const SerializationOptions& opts) const {
     std::vector<Value> monotonicIdFields;
     const auto& idFieldNames = _groupProcessor.getIdFieldNames();
     if (idFieldNames.empty()) {

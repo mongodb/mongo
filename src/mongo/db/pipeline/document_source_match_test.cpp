@@ -70,7 +70,6 @@ using std::string;
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 using DocumentSourceMatchTest = AggregationContextFixture;
 
-constexpr auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
 
 TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
     auto expCtx = getExpCtx();
@@ -713,7 +712,9 @@ TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimi
     auto expectedMatch = fromjson("{$match: {a:{$eq: 1}}}");
 
     ASSERT_VALUE_EQ(
-        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))->serialize(kExplain)),
+        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))
+                  ->serialize(SerializationOptions{.verbosity = boost::make_optional(
+                                                       ExplainOptions::Verbosity::kQueryPlanner)})),
         Value(expectedMatch));
 }
 

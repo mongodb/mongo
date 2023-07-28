@@ -55,6 +55,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -185,7 +186,8 @@ public:
      * providing the level of detail specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
-        return _pipeline->writeExplainOps(verbosity);
+        auto opts = SerializationOptions{.verbosity = verbosity};
+        return _pipeline->writeExplainOps(opts);
     }
 
     void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}

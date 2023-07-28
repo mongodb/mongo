@@ -168,7 +168,7 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
         window_function::Expression::parse(elem.embeddedObject(), sortBy, expCtx));
 }
 void WindowFunctionStatement::serialize(MutableDocument& outputFields,
-                                        SerializationOptions opts) const {
+                                        const SerializationOptions& opts) const {
     outputFields[opts.serializeFieldPathFromString(fieldName)] = expr->serialize(opts);
 }
 
@@ -319,7 +319,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     return this;
 }
 
-Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOptions& opts) const {
     MutableDocument spec;
     spec[SetWindowFieldsSpec::kPartitionByFieldName] =
         _partitionBy ? (*_partitionBy)->serialize(opts) : Value();

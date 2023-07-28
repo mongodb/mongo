@@ -78,7 +78,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 

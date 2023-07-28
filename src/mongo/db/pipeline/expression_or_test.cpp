@@ -82,7 +82,10 @@ static BSONObj toBson(const Value& value) {
 
 /** Convert Expression to BSON. */
 static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
-    return BSON("" << expression->serialize(false)).firstElement().embeddedObject().getOwned();
+    return BSON("" << expression->serialize(SerializationOptions{}))
+        .firstElement()
+        .embeddedObject()
+        .getOwned();
 }
 
 /** Convert Document to BSON. */

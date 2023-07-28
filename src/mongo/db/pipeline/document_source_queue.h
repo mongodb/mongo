@@ -72,7 +72,7 @@ public:
 
     const char* getSourceName() const override;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,

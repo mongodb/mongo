@@ -125,7 +125,10 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForE
                         Document{{"stage"_sd, DocumentSourceChangeStreamAddPostImage::kStageName},
                                  {"fullDocument"_sd, "updateLookup"_sd}}}});
 
-    ASSERT_VALUE_EQ(stage->serialize({ExplainOptions::Verbosity::kQueryPlanner}), expectedOutput);
+    ASSERT_VALUE_EQ(
+        stage->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
+        expectedOutput);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldSerializeAsExpectedForDispatch) {

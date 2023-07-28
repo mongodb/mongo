@@ -108,7 +108,7 @@ const char* DocumentSourceExchange::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceExchange::serialize(SerializationOptions opts) const {
+Value DocumentSourceExchange::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << _exchange->getSpec().toBSON(opts)));
 }
 

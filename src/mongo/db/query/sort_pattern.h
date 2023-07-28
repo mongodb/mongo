@@ -95,7 +95,7 @@ public:
      * Write out a Document whose contents are the sort key pattern.
      */
     Document serialize(SortKeySerialization serializationMode,
-                       SerializationOptions options = {}) const;
+                       const SerializationOptions& options = {}) const;
 
     /**
      * Serializes the document to BSON, only keeping the paths specified in the sort pattern.

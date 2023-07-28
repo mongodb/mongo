@@ -187,7 +187,7 @@ private:
                         size_t bufferSizeBytes,
                         size_t maxOutputDocBytes);
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;

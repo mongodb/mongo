@@ -132,7 +132,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
     return shiftExpr;
 }
 
-Value ExpressionShift::serialize(SerializationOptions opts) const {
+Value ExpressionShift::serialize(const SerializationOptions& opts) const {
     MutableDocument args;
     args.addField(kByArg, opts.serializeLiteral(_offset));
     args.addField(kOutputArg, _input->serialize(opts));

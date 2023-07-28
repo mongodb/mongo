@@ -331,8 +331,7 @@ TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
         "properties: { name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326' }"
         "}}}}");
     std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1));
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto serialized = ge1->getSerializedRightHandSide(opts);
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({

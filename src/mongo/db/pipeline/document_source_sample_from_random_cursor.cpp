@@ -160,7 +160,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                                "sporadic failure, please try again.");
 }
 
-Value DocumentSourceSampleFromRandomCursor::serialize(SerializationOptions opts) const {
+Value DocumentSourceSampleFromRandomCursor::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteral(_size))));
 }
 

@@ -295,7 +295,7 @@ void ProjectionNode::optimize() {
 }
 
 Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
-                                   SerializationOptions options) const {
+                                   const SerializationOptions& options) const {
     MutableDocument outputDoc;
     serialize(explain, &outputDoc, options);
     return outputDoc.freeze();
@@ -303,7 +303,7 @@ Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> ex
 
 void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
                                MutableDocument* output,
-                               SerializationOptions options) const {
+                               const SerializationOptions& options) const {
     // Determine the boolean value for projected fields in the explain output.
     const bool projVal = !applyLeafProjectionToValue(Value(true)).missing();
 

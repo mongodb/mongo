@@ -148,7 +148,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     return preImageField.getDocument().getOwned();
 }
 
-Value DocumentSourceChangeStreamAddPreImage::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamAddPreImage::serialize(const SerializationOptions& opts) const {
     return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,

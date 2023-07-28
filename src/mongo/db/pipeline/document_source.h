@@ -468,7 +468,7 @@ public:
      * stages (eg, $sort sometimes also outputs a $limit).
      */
     virtual void serializeToArray(std::vector<Value>& array,
-                                  SerializationOptions opts = SerializationOptions()) const;
+                                  const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not
@@ -835,7 +835,7 @@ private:
      * to a pipeline being serialized. Returning a missing() Value results in no entry
      * being added to the array for this stage (DocumentSource).
      */
-    virtual Value serialize(SerializationOptions opts = SerializationOptions()) const = 0;
+    virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
 };
 
 /**

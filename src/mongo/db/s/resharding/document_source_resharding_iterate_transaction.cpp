@@ -128,7 +128,8 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingIterateTransaction::serialize(SerializationOptions opts) const {
+Value DocumentSourceReshardingIterateTransaction::serialize(
+    const SerializationOptions& opts) const {
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

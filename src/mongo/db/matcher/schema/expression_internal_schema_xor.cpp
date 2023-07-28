@@ -70,7 +70,7 @@ void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
 }
 
 void InternalSchemaXorMatchExpression::serialize(BSONObjBuilder* out,
-                                                 SerializationOptions opts) const {
+                                                 const SerializationOptions& opts) const {
     BSONArrayBuilder arrBob(out->subarrayStart(kName));
     _listToBSON(&arrBob, opts);
 }

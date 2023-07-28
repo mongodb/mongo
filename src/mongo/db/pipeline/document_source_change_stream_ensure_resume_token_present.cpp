@@ -163,7 +163,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
 }
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
-    SerializationOptions opts) const {
+    const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));

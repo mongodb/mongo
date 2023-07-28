@@ -228,7 +228,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
     MONGO_UNREACHABLE;
 }
 
-Value DocumentSourceChangeStreamCheckResumability::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamCheckResumability::serialize(
+    const SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));

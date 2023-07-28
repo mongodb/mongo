@@ -146,7 +146,6 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
                          bool bypassIsFieldHashedCheck = false);
 
-
 /**
  * Populates 'shardIds' with the shard ids for a query with given filter and collation. If 'info' is
  * not null, populates it with the ChunkRanges that the query targets and a description about

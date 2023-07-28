@@ -398,7 +398,7 @@ void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
 }
 
-Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
+Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
     insides["groupBy"] = _groupByExpression->serialize(opts);

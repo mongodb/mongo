@@ -124,7 +124,7 @@ public:
         return DocumentSourceListSessions::kStageName.rawData();
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,

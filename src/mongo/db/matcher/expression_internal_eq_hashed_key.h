@@ -100,7 +100,8 @@ public:
         visitor->visit(this);
     }
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final {
         if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
             // We need to make sure the value added to bob is of type NumberLong, so it can be
             // re-parsed successfully.

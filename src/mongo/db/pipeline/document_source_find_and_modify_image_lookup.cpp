@@ -215,7 +215,7 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceFindAndModifyImageLookup::serialize(SerializationOptions opts) const {
+Value DocumentSourceFindAndModifyImageLookup::serialize(const SerializationOptions& opts) const {
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

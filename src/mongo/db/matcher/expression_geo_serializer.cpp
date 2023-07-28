@@ -44,7 +44,9 @@
 
 namespace mongo {
 namespace {
-void appendLegacyGeoLiteral(BSONObjBuilder* bob, const BSONElement& e, SerializationOptions opts) {
+void appendLegacyGeoLiteral(BSONObjBuilder* bob,
+                            const BSONElement& e,
+                            const SerializationOptions& opts) {
     if (opts.literalPolicy != LiteralSerializationPolicy::kToRepresentativeParseableValue) {
         opts.appendLiteral(bob, e);
         return;
@@ -76,7 +78,7 @@ void appendLegacyGeoLiteral(BSONObjBuilder* bob, const BSONElement& e, Serializa
 void appendGeoJSONCoordinatesLiteral(BSONObjBuilder* bob,
                                      const BSONElement& e,
                                      StringData geoJSONType,
-                                     SerializationOptions opts) {
+                                     const SerializationOptions& opts) {
     if (opts.literalPolicy != LiteralSerializationPolicy::kToRepresentativeParseableValue) {
         opts.appendLiteral(bob, e);
         return;
@@ -114,7 +116,9 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder* bob,
     }
 }
 
-void appendCRSObject(BSONObjBuilder* bob, const BSONElement& crsObj, SerializationOptions opts) {
+void appendCRSObject(BSONObjBuilder* bob,
+                     const BSONElement& crsObj,
+                     const SerializationOptions& opts) {
     // 'crs' is always an object.
     tassert(7559700, "Expected 'crs' to be an object", crsObj.type() == BSONType::Object);
     // 'crs' is required to have a 'type' field with the value 'name'.
@@ -155,7 +159,7 @@ void appendCRSObject(BSONObjBuilder* bob, const BSONElement& crsObj, Serializati
 
 void appendGeometrySubObject(BSONObjBuilder* bob,
                              const BSONObj& geometryObj,
-                             SerializationOptions opts) {
+                             const SerializationOptions& opts) {
     auto typeElem = geometryObj["type"];
     if (typeElem) {
         bob->append(typeElem);
@@ -172,7 +176,9 @@ void appendGeometrySubObject(BSONObjBuilder* bob,
 }
 }  // namespace
 
-void geoCustomSerialization(BSONObjBuilder* bob, const BSONObj& obj, SerializationOptions opts) {
+void geoCustomSerialization(BSONObjBuilder* bob,
+                            const BSONObj& obj,
+                            const SerializationOptions& opts) {
     BSONElement outerElem = obj.firstElement();
 
     // Legacy GeoNear query.

@@ -185,7 +185,7 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
+Value DocumentSourceUnwind::serialize(const SerializationOptions& opts) const {
     return Value(
         DOC(getSourceName() << DOC(
                 "path" << opts.serializeFieldPathWithPrefix(_unwindProcessor->getUnwindPath())

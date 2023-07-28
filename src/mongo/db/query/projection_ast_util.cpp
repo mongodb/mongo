@@ -61,9 +61,8 @@ class BSONPreVisitor : public ProjectionASTConstVisitor {
 public:
     using ProjectionASTConstVisitor::visit;
     BSONPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context,
-                   const SerializationOptions& options)
-        : _context(context), _builders(context->data().builders), _options(options) {}
-
+                   SerializationOptions options)
+        : _context(context), _builders(context->data().builders), _options(std::move(options)) {}
 
     void visit(const ProjectionPathASTNode* node) override {
         if (!node->parent()) {
@@ -171,7 +170,7 @@ class SerializationPreVisitor : public BSONPreVisitor {
 public:
     using BSONPreVisitor::visit;
     SerializationPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context,
-                            SerializationOptions options)
+                            const SerializationOptions& options)
         : BSONPreVisitor(context, options) {}
 
     void visit(const ProjectionPositionalASTNode* node) override {
@@ -211,6 +210,7 @@ BSONObj astToDebugBSON(const ASTNode* root) {
     PathTrackingVisitorContext<BSONVisitorContext> context;
     DebugPreVisitor preVisitor{&context};
     DebugPostVisitor postVisitor{&context.data()};
+
     PathTrackingWalker walker{&context, {&preVisitor}, {&postVisitor}};
 
     tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);
@@ -219,12 +219,11 @@ BSONObj astToDebugBSON(const ASTNode* root) {
     return context.data().builders.top().obj();
 }
 
-BSONObj serialize(const ProjectionPathASTNode& root, SerializationOptions options) {
+BSONObj serialize(const ProjectionPathASTNode& root, const SerializationOptions& options) {
     PathTrackingVisitorContext<BSONVisitorContext> context;
     SerializationPreVisitor preVisitor{&context, options};
     SerializationPostVisitor postVisitor{&context.data()};
     PathTrackingWalker walker{&context, {&preVisitor}, {&postVisitor}};
-
     tree_walker::walk<true, projection_ast::ASTNode>(&root, &walker);
 
     invariant(context.data().builders.size() == 1);

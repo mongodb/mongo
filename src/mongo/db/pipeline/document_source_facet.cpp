@@ -193,7 +193,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     return resultDoc.freeze();
 }
 
-Value DocumentSourceFacet::serialize(SerializationOptions opts) const {
+Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
     MutableDocument serialized;
     for (auto&& facet : _facets) {
         serialized[opts.serializeFieldPathFromString(facet.name)] =

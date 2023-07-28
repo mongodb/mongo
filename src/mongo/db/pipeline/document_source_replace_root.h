@@ -78,7 +78,7 @@ public:
     }
 
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
-                                     SerializationOptions options = {}) const final {
+                                     const SerializationOptions& options = {}) const final {
         return Document{{"newRoot", _newRoot->serialize(options)}};
     }
 

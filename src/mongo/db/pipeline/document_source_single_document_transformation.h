@@ -86,7 +86,7 @@ public:
     const char* getSourceName() const final;
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;

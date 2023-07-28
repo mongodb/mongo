@@ -90,7 +90,7 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
     return next;
 }
 
-Value DocumentSourceQueue::serialize(SerializationOptions opts) const {
+Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
     ValueArrayStream vals;
     for (const auto& elem : _queue) {
         vals << elem.getDocument().getOwned();

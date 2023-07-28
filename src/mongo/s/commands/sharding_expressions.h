@@ -137,7 +137,7 @@ public:
 
     boost::intrusive_ptr<Expression> optimize() final;
 
-    Value serialize(SerializationOptions options) const final;
+    Value serialize(const SerializationOptions& options) const final;
 
     Value evaluate(const Document& root, Variables* variables) const final;
 

@@ -138,7 +138,7 @@ public:
                 UnionRequirement::kNotAllowed};
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Creates a new $out stage from the given arguments.

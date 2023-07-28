@@ -81,7 +81,7 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
@@ -188,7 +188,7 @@ protected:
     void doDispose() final;
 
     virtual void serializeAdditionalFields(
-        MutableDocument& out, SerializationOptions opts = SerializationOptions()) const {};
+        MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
 
     GroupProcessor _groupProcessor;
 

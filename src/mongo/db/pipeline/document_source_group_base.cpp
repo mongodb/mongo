@@ -89,7 +89,7 @@ DocumentSourceGroupBase::~DocumentSourceGroupBase() {
         stats.spills, stats.spilledDataStorageSize, stats.spilledRecords);
 }
 
-Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
+Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
     const auto& idFieldNames = _groupProcessor.getIdFieldNames();

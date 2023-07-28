@@ -141,7 +141,10 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
 
 /** Convert Expression to BSON. */
 static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
-    return BSON("" << expression->serialize(false)).firstElement().embeddedObject().getOwned();
+    return BSON("" << expression->serialize(SerializationOptions{}))
+        .firstElement()
+        .embeddedObject()
+        .getOwned();
 }
 
 class ExpressionBaseTest : public unittest::Test {
@@ -274,14 +277,15 @@ TEST_F(ExpressionNaryTest, ValidateObjectExpressionDependency) {
 
 TEST_F(ExpressionNaryTest, SerializationToBsonObj) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
-    ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
-                      BSON("foo" << _notAssociativeNorCommutative->serialize(false)));
+    ASSERT_BSONOBJ_EQ(
+        BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
+        BSON("foo" << _notAssociativeNorCommutative->serialize(SerializationOptions{})));
 }
 
 TEST_F(ExpressionNaryTest, SerializationToBsonArr) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(5)));
     ASSERT_BSONOBJ_EQ(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
-                      BSON_ARRAY(_notAssociativeNorCommutative->serialize(false)));
+                      BSON_ARRAY(_notAssociativeNorCommutative->serialize(SerializationOptions{})));
 }
 
 // Verify that the internal operands are optimized

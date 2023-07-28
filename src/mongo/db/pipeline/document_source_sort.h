@@ -103,8 +103,9 @@ public:
         return kStageName.rawData();
     }
 
-    void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts = SerializationOptions()) const final override;
+    void serializeToArray(
+        std::vector<Value>& array,
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
@@ -247,7 +248,7 @@ private:
                        uint64_t limit,
                        uint64_t maxMemoryUsageBytes);
 
-    Value serialize(SerializationOptions opts) const final override {
+    Value serialize(const SerializationOptions& opts) const final override {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
 

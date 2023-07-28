@@ -77,7 +77,7 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
     return pSource->getNext();
 }
 
-Value DocumentSourceSkip::serialize(SerializationOptions opts) const {
+Value DocumentSourceSkip::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 

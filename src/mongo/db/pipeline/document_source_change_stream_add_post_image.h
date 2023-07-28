@@ -137,7 +137,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     const char* getSourceName() const final {
         return kStageName.rawData();

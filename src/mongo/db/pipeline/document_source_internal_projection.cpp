@@ -82,7 +82,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalProjection::doOptimize
     return itr;
 }
 
-Value DocumentSourceInternalProjection::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalProjection::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _stageSpec.toBSON()}});
 }
 

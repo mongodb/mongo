@@ -94,7 +94,7 @@ DocumentSource::GetNextResult DocumentSourceLimit::doGetNext() {
     return nextInput;
 }
 
-Value DocumentSourceLimit::serialize(SerializationOptions opts) const {
+Value DocumentSourceLimit::serialize(const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), opts.serializeLiteral(_limit)}});
 }
 

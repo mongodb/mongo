@@ -101,7 +101,8 @@ public:
         _debugStringAttachTagInfo(&debug);
     }
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final {
         bob->appendArray(name(), _typeSet.toBSONArray());
     }
 
@@ -263,7 +264,8 @@ public:
         _debugStringAttachTagInfo(&debug);
     }
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final {
         if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
             bob->append(name(), _binDataSubType);
         } else {

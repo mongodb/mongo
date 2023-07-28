@@ -97,7 +97,7 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     return _sortStage->getNext();
 }
 
-Value DocumentSourceSample::serialize(SerializationOptions opts) const {
+Value DocumentSourceSample::serialize(const SerializationOptions& opts) const {
     return Value(DOC(kStageName << DOC("size" << opts.serializeLiteral(_size))));
 }
 

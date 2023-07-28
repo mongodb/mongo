@@ -93,7 +93,7 @@ public:
                 ChangeStreamRequirement::kDenylist};
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;

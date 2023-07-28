@@ -102,7 +102,7 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
     return Document(doc.getObject());
 }
 
-Value DocumentSourceInternalApplyOplogUpdate::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalApplyOplogUpdate::serialize(const SerializationOptions& opts) const {
     return Value(Document{
         {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteral(_oplogUpdate)}}}});
 }

@@ -92,11 +92,11 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);
-        debug << "$expr " << _expression->serialize(false).toString();
+        debug << "$expr " << _expression->serialize(SerializationOptions{}).toString();
         _debugStringAttachTagInfo(&debug);
     }
 
-    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final;
+    void serialize(BSONObjBuilder* out, const SerializationOptions& opts) const final;
 
     bool isTriviallyTrue() const final;
 

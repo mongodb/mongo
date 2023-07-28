@@ -136,7 +136,7 @@ protected:
 
 private:
     GetNextResult doGetNext() final;
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
     Variables::Id _variableID;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to

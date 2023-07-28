@@ -108,7 +108,7 @@ const char* DocumentSourceMatch::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
+Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {
     if (opts.verbosity || opts.transformIdentifiers ||
         opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
         return Value(

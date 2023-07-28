@@ -126,7 +126,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -230,7 +231,8 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -272,7 +274,7 @@ public:
     TwoDPtInAnnulusExpression(const R2Annulus& annulus, boost::optional<StringData> twoDPath)
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
-    void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {
+    void serialize(BSONObjBuilder* out, const SerializationOptions& opts) const final {
         out->append("$TwoDPtInAnnulusExpression", true);
     }
 
@@ -291,7 +293,8 @@ public:
     // These won't be called.
     //
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final {
         MONGO_UNREACHABLE;
     }
 
