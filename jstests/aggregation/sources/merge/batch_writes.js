@@ -1,6 +1,12 @@
-// Tests the behavior of an $merge stage which encounters an error in the middle of processing. We
-// don't guarantee any particular behavior in this scenario, but this test exists to make sure
-// nothing horrendous happens and to characterize the current behavior.
+/**
+ * Tests the behavior of an $merge stage which encounters an error in the middle of processing. We
+ * don't guarantee any particular behavior in this scenario, but this test exists to make sure
+ * nothing horrendous happens and to characterize the current behavior.
+ * @tags: [
+ *   # TODO SERVER-79448: Investigate why the test timeouts on TSAN variant.
+ *   tsan_incompatible,
+ * ]
+ */
 (function() {
 "use strict";
 
