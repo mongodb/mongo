@@ -40,11 +40,6 @@ export var TimeseriesTest = class {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesScalabilityImprovements");
     }
 
-    // TODO SERVER-65082 remove this helper.
-    static timeseriesMetricIndexesEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesMetricIndexes");
-    }
-
     // TODO SERVER-68058 remove this helper.
     static arbitraryUpdatesEnabled(conn) {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesUpdatesSupport");

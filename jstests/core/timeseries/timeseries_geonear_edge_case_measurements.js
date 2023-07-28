@@ -12,11 +12,6 @@
 load("jstests/core/timeseries/libs/geo.js");
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    quit();
-}
 Random.setRandomSeed(7813223789272959000);
 
 // Value is taken from geoconstants.h.

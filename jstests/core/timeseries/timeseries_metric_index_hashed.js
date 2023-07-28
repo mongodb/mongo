@@ -8,12 +8,6 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    quit();
-}
-
 TimeseriesTest.run((insert) => {
     const collName = "timeseries_metric_index_hashed";
 

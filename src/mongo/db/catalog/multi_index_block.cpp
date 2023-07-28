@@ -380,8 +380,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
             if (options &&
-                feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
                 timeseries::doesBucketsIndexIncludeMeasurement(
                     opCtx, collection->ns(), *options, info)) {
                 invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());

@@ -217,34 +217,19 @@ TEST_F(DocumentSourceSortTest, AllowsSortOnMetaGeoNearDistance) {
     BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
                                                        << "geoNearDistance")));
     BSONElement specElement = spec.firstElement();
-    // The {$meta: 'geoNearDistance'} is allowed only when the featureFlagTimeseriesMetricIndexes
-    // flag is enabled.
-    {
-        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
-        auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
+    auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
 
-        vector<Value> arr;
-        sort->serializeToArray(arr);
-        ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(),
-                          BSON("$sort" << BSON("$computed0" << BSON("$meta"
-                                                                    << "geoNearDistance"))));
-    }
-    {
-        RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes",
-                                                        false);
-        ASSERT_THROWS_CODE(DocumentSourceSort::createFromBson(specElement, getExpCtx()),
-                           AssertionException,
-                           5917100);
-    }
+    vector<Value> arr;
+    sort->serializeToArray(arr);
+    ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(),
+                      BSON("$sort" << BSON("$computed0" << BSON("$meta"
+                                                                << "geoNearDistance"))));
 }
 
 TEST_F(DocumentSourceSortTest, DetectsDependencyOnMeta) {
     BSONObj spec = BSON("$sort" << BSON("dist" << BSON("$meta"
                                                        << "geoNearDistance")));
     BSONElement specElement = spec.firstElement();
-    // The {$meta: 'geoNearDistance'} is allowed only when the featureFlagTimeseriesMetricIndexes
-    // flag is enabled.
-    RAIIServerParameterControllerForTest controller("featureFlagTimeseriesMetricIndexes", true);
     auto sort = DocumentSourceSort::createFromBson(specElement, getExpCtx());
 
     DepsTracker dependencies;

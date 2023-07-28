@@ -10,7 +10,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 TimeseriesTest.run(() => {
     const collName = "timeseries_index_spec";
@@ -80,57 +79,53 @@ TimeseriesTest.run(() => {
                                           {name: "time_meta_field_downgradable"}));
     verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "time_meta_field_downgradable");
 
-    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-        assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_1");
+    assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_1");
 
-        assert.commandWorked(
-            coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_partial");
+    assert.commandWorked(
+        coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "x_partial");
 
-        assert.commandWorked(coll.createIndex(
-            {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "time_partial");
+    assert.commandWorked(coll.createIndex(
+        {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "time_partial");
 
-        assert.commandWorked(coll.createIndex(
-            {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_partial");
+    assert.commandWorked(coll.createIndex(
+        {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_partial");
 
-        assert.commandWorked(
-            coll.createIndex({[metaFieldName]: 1, x: 1},
-                             {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_x_partial");
-    }
+    assert.commandWorked(
+        coll.createIndex({[metaFieldName]: 1, x: 1},
+                         {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
+    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ true, "meta_x_partial");
 
     // Creating an index directly on the buckets collection is permitted. However, these types of
     // index creations will not have an "originalSpec" field and rely on the reverse mapping
     // mechanism.
-    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-        assert.commandWorked(
-            bucketsColl.createIndex({"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
+    assert.commandWorked(
+        bucketsColl.createIndex({"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
 
-        let foundIndex = false;
-        let bucketIndexes = bucketsColl.getIndexes();
-        for (const index of bucketIndexes) {
-            if (index.name == "y") {
-                foundIndex = true;
-                assert(!index.hasOwnProperty("originalSpec"));
-                break;
-            }
+    let foundIndex = false;
+    let bucketIndexes = bucketsColl.getIndexes();
+    for (const index of bucketIndexes) {
+        if (index.name == "y") {
+            foundIndex = true;
+            assert(!index.hasOwnProperty("originalSpec"));
+            break;
         }
-        assert(foundIndex);
-
-        // Verify that the bucket index can map to a user index.
-        foundIndex = false;
-        let userIndexes = coll.getIndexes();
-        for (const index of userIndexes) {
-            if (index.name == "y") {
-                foundIndex = true;
-                assert(!index.hasOwnProperty("originalSpec"));
-                assert.eq(index.key, {y: 1});
-                break;
-            }
-        }
-        assert(foundIndex);
     }
+    assert(foundIndex);
+
+    // Verify that the bucket index can map to a user index.
+    foundIndex = false;
+    let userIndexes = coll.getIndexes();
+    for (const index of userIndexes) {
+        if (index.name == "y") {
+            foundIndex = true;
+            assert(!index.hasOwnProperty("originalSpec"));
+            assert.eq(index.key, {y: 1});
+            break;
+        }
+    }
+    assert(foundIndex);
 });

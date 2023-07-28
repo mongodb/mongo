@@ -18,11 +18,6 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    quit();
-}
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_metric_index_2dsphere_db");

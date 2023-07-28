@@ -260,8 +260,7 @@ public:
      * Returns a status indicating whether 'expression' is valid for use in a partial index
      * partialFilterExpression.
      */
-    static Status checkValidFilterExpressions(const MatchExpression* expression,
-                                              bool timeseriesMetricIndexesFeatureFlagEnabled);
+    static Status checkValidFilterExpressions(const MatchExpression* expression);
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }

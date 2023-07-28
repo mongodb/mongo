@@ -9,13 +9,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    quit();
-}
 
 TimeseriesTest.run((insert) => {
     const collName = "timeseries_metric_index_compound";

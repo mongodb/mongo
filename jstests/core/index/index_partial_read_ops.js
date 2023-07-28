@@ -12,7 +12,6 @@
 
 // Include helpers for analyzing explain output.
 import {getRejectedPlans, getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let explain;
 const coll = db.index_partial_read_ops;
@@ -131,12 +130,6 @@ const coll = db.index_partial_read_ops;
     // Queries which fall outside the range of any partial indexes produce a COLLSCAN.
     assert(isCollscan(db, coll.explain().find({a: {$lt: 0}}).finish()));
 })();
-
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    jsTest.log(
-        "Skipping partialFilterExpression testing for $in, $or and non-top level $and as timeseriesMetricIndexesEnabled is false");
-    quit();
-}
 
 (function testFilterWithInExpression() {
     assert(coll.drop());

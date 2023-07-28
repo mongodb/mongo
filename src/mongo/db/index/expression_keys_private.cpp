@@ -461,9 +461,7 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
                                                    const BSONObj& keyPattern) {
     // If we have a timeseries collection, check that indexed metric fields do not have expanded
     // array values
-    if (auto tsOptions = collection->getTimeseriesOptions(); tsOptions &&
-        feature_flags::gTimeseriesMetricIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (auto tsOptions = collection->getTimeseriesOptions()) {
         // Each user metric field will be included twice, as both control.min.<field> and
         // control.max.<field>, so we'll want to keep track that we've checked data.<field> to avoid
         // scanning it twice. The time field can be excluded as it is guaranteed to be a date at
