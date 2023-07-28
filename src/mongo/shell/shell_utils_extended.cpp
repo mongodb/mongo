@@ -533,7 +533,11 @@ BSONObj decompressBSONColumn(const BSONObj& a, void* data) {
 
     size_t index = 0;
     for (const BSONElement& e : column) {
-        res.appendAs(e, std::to_string(index++));
+        if (e.eoo()) {
+            res.append(std::to_string(index++), BSONType::jstNULL);
+        } else {
+            res.appendAs(e, std::to_string(index++));
+        }
     }
     res.done();
 
