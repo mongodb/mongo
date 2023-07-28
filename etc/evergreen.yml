@@ -276,6 +276,8 @@ variables:
     distros:
     - ubuntu2004-package
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel7_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1075,6 +1077,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
@@ -1204,6 +1208,8 @@ buildvariants:
   - name: streams
   - name: streams_auth
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
@@ -1354,6 +1360,8 @@ buildvariants:
   - name: streams
   - name: streams_auth
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
@@ -1475,6 +1483,8 @@ buildvariants:
   # - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 # The CQF feature flag is currently part of the always-disabled feature flags list, so it is not
 # enabled in all-feature-flags variants besides this one. This variant allows us to get some initial
@@ -1805,6 +1815,8 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2093,6 +2105,8 @@ buildvariants:
   - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
@@ -2462,6 +2476,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel80-debug-complete-tsan-template
@@ -3079,6 +3095,8 @@ buildvariants:
   - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough

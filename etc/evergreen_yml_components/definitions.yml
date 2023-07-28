@@ -8316,6 +8316,24 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: vector_search_auth
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: vector_search_ssl
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: cqf
   tags: [cqf]
   commands:

@@ -74,6 +74,8 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel7_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
