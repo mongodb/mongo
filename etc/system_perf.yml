@@ -1638,7 +1638,7 @@ buildvariants:
         --use-diagnostic-latches=off
         --allocator=system
         --enable-free-mon=off
-        --enterprise-features=fle,search
+        --enterprise-features=fle,search,vector_search
         --js-engine=none
         --link-model=dynamic-sdk
         --enable-http-client=off
