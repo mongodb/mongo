@@ -806,10 +806,6 @@ public:
     }
 
     void operator()(const ABT& /*n*/, const RIDIntersectNode& node) {
-        if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
-            // TODO SERVER-78508: Implement this implementer.
-            return;
-        }
 
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
         const std::string& scanDefName = indexingAvailability.getScanDefName();
@@ -975,6 +971,7 @@ public:
                                  intersectedCE,
                                  leftCE,
                                  rightCE,
+                                 _physProps,
                                  leftPhysProps,
                                  rightPhysProps,
                                  node.getLeftChild(),
@@ -1753,36 +1750,37 @@ private:
         }
     }
 
-    void optimizeRIDIntersect(const bool isIndex,
-                              const bool dedupRID,
-                              const bool useMergeJoin,
-                              const ProjectionName& ridProjectionName,
-                              const CollationSplitResult& collationLeftRightSplit,
-                              const CollationSplitResult& collationRightLeftSplit,
-                              const CEType intersectedCE,
-                              const CEType leftCE,
-                              const CEType rightCE,
-                              const PhysProps& leftPhysProps,
-                              const PhysProps& rightPhysProps,
-                              const ABT& leftChild,
-                              const ABT& rightChild) {
+
+    void optimizeRIDIntersectHelper(const bool isIndex,
+                                    const bool dedupRID,
+                                    const bool useMergeJoin,
+                                    const ProjectionName& ridProjectionName,
+                                    const CollationSplitResult& collationLeftRightSplit,
+                                    const CollationSplitResult& collationRightLeftSplit,
+                                    const CEType intersectedCE,
+                                    const CEType leftCE,
+                                    const CEType rightCE,
+                                    const PhysProps& leftPhysProps,
+                                    const PhysProps& rightPhysProps,
+                                    const ABT& leftChild,
+                                    const ABT& rightChild) {
         if (isIndex && collationRightLeftSplit._validSplit &&
             (!collationLeftRightSplit._validSplit || leftCE > rightCE)) {
             // Need to reverse the left and right side as the left collation split is not valid, or
             // to use the larger CE as the other side.
-            optimizeRIDIntersect(true /*isIndex*/,
-                                 dedupRID,
-                                 useMergeJoin,
-                                 ridProjectionName,
-                                 collationRightLeftSplit,
-                                 {},
-                                 intersectedCE,
-                                 rightCE,
-                                 leftCE,
-                                 rightPhysProps,
-                                 leftPhysProps,
-                                 rightChild,
-                                 leftChild);
+            optimizeRIDIntersectHelper(true /*isIndex*/,
+                                       dedupRID,
+                                       useMergeJoin,
+                                       ridProjectionName,
+                                       collationRightLeftSplit,
+                                       {},
+                                       intersectedCE,
+                                       rightCE,
+                                       leftCE,
+                                       rightPhysProps,
+                                       leftPhysProps,
+                                       rightChild,
+                                       leftChild);
             return;
         }
         if (!collationLeftRightSplit._validSplit) {
@@ -1921,6 +1919,81 @@ private:
                 std::move(leftPhysPropsLocal),
                 std::move(rightPhysPropsLocal));
         }
+    }
+
+    /**
+     * Optimize the RIDIntersect node. If RemoveOrphansRequirement is set to 'true,' this function
+     * will try an optimization in which the requirement is set on only one child at a time. If the
+     * requirement is 'false', the function simply optimizes the children as normal.
+     */
+    void optimizeRIDIntersect(const bool isIndex,
+                              const bool dedupRID,
+                              const bool useMergeJoin,
+                              const ProjectionName& ridProjectionName,
+                              const CollationSplitResult& collationLeftRightSplit,
+                              const CollationSplitResult& collationRightLeftSplit,
+                              const CEType intersectedCE,
+                              const CEType leftCE,
+                              const CEType rightCE,
+                              const PhysProps& parentPhysProps,
+                              const PhysProps& leftPhysProps,
+                              const PhysProps& rightPhysProps,
+                              const ABT& leftChild,
+                              const ABT& rightChild) {
+        // If RemoveOrphansRequirement is already 'false', do not try any other variations.
+        tassert(7850801,
+                "RIDIntersect props does not have the RemoveOrphansRequirement property",
+                hasProperty<RemoveOrphansRequirement>(parentPhysProps));
+        if (!getPropertyConst<RemoveOrphansRequirement>(parentPhysProps).mustRemove()) {
+            optimizeRIDIntersectHelper(isIndex,
+                                       dedupRID,
+                                       useMergeJoin,
+                                       ridProjectionName,
+                                       collationLeftRightSplit,
+                                       collationRightLeftSplit,
+                                       intersectedCE,
+                                       leftCE,
+                                       rightCE,
+                                       leftPhysProps,
+                                       rightPhysProps,
+                                       leftChild,
+                                       rightChild);
+            return;
+        }
+        // Perform copies so we can modify the props.
+        PhysProps leftPhysPropsLocal = leftPhysProps;
+        PhysProps rightPhysPropsLocal = rightPhysProps;
+        setPropertyOverwrite<RemoveOrphansRequirement>(leftPhysPropsLocal, {true});
+        setPropertyOverwrite<RemoveOrphansRequirement>(rightPhysPropsLocal, {false});
+        optimizeRIDIntersectHelper(isIndex,
+                                   dedupRID,
+                                   useMergeJoin,
+                                   ridProjectionName,
+                                   collationLeftRightSplit,
+                                   collationRightLeftSplit,
+                                   intersectedCE,
+                                   leftCE,
+                                   rightCE,
+                                   leftPhysPropsLocal,
+                                   rightPhysPropsLocal,
+                                   leftChild,
+                                   rightChild);
+
+        setPropertyOverwrite<RemoveOrphansRequirement>(leftPhysPropsLocal, {false});
+        setPropertyOverwrite<RemoveOrphansRequirement>(rightPhysPropsLocal, {true});
+        optimizeRIDIntersectHelper(isIndex,
+                                   dedupRID,
+                                   useMergeJoin,
+                                   ridProjectionName,
+                                   collationLeftRightSplit,
+                                   collationRightLeftSplit,
+                                   intersectedCE,
+                                   leftCE,
+                                   rightCE,
+                                   leftPhysPropsLocal,
+                                   rightPhysPropsLocal,
+                                   leftChild,
+                                   rightChild);
     }
 
     // We don't own any of those:

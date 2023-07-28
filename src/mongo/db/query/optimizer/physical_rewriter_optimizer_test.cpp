@@ -5850,5 +5850,106 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
         optimized);
 }
 
+// TODO SERVER-78507: Examine the physical alternatives in the memo, rather than the logical nodes,
+// to check that the children of the RIDIntersect have physical alternatives with both combinations
+// of RemoveOrphansRequirement.
+TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+                         make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    {
+        auto prefixId = PrefixId::createForTests();
+        auto phaseManager = makePhaseManager(
+            {OptPhase::MemoSubstitutionPhase,
+             OptPhase::MemoExplorationPhase,
+             OptPhase::MemoImplementationPhase},
+            prefixId,
+            {{{"c1",
+               createScanDef(
+                   {},
+                   {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
+                   MultikeynessTrie{},
+                   ConstEval::constFold,
+                   DistributionAndPaths{DistributionType::RangePartitioning,
+                                        ABTVector{make<PathGet>("a", make<PathIdentity>())}},
+                   true,        /* exists */
+                   boost::none, /*ce*/
+                   ShardingMetadata{.mayContainOrphans = true})}}},
+            boost::none /*costModel*/,
+            {true /*debugMode*/, 3 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
+            {});
+
+        ABT optimized = rootNode;
+        phaseManager.optimize(optimized);
+
+        /*
+            Examine the RIDintersectNode in the memo to make sure that it meets the following
+           conditions:
+            1. The right-delegated group needs to have logial node '0' as a scan, and needs to have
+           physical alternatives with RemoveOrphansRequirement both true and false.
+            2. The left-delegated group needs to have logical node '0' as a Sargable [Index] with
+           a=1 and should also have physical alternatives with RemoveOrphansRequirmeent both true
+           and false.
+        */
+
+        const auto& memo = phaseManager.getMemo();
+
+        const RIDIntersectNode* ridIntersectNode = nullptr;
+        for (int groupId = 0; (size_t)groupId < memo.getGroupCount() && !ridIntersectNode;
+             groupId++) {
+            for (auto& node : memo.getLogicalNodes(groupId)) {
+                if (ridIntersectNode = node.cast<RIDIntersectNode>(); ridIntersectNode) {
+                    break;
+                }
+            }
+        }
+        ASSERT(ridIntersectNode);
+        const auto* left = ridIntersectNode->getLeftChild().cast<MemoLogicalDelegatorNode>();
+        const auto* right = ridIntersectNode->getRightChild().cast<MemoLogicalDelegatorNode>();
+        ASSERT(left);
+        ASSERT(right);
+
+        // Given a groupId, checks that the corresponding group contains at least one physical
+        // alternative alternative with RemoveOrphansRequirement 'true' and one with 'false'.
+        // We don't care whether the optimizer found a plan for any of these physical
+        // alternatives; we only care that it attempted all of them.
+        auto containsMustRemoveTrueAndFalse = [&](GroupIdType groupId) {
+            bool containsRemoveOrphansTrueAlternative = false,
+                 containsRemoveOrphansFalseAlternative = false;
+            for (const auto& node : memo.getPhysicalNodes(groupId)) {
+                const PhysProps& props = node->_physProps;
+                ASSERT(hasProperty<RemoveOrphansRequirement>(props));
+                bool result = getPropertyConst<RemoveOrphansRequirement>(props).mustRemove();
+                containsRemoveOrphansTrueAlternative =
+                    containsRemoveOrphansTrueAlternative || result;
+                containsRemoveOrphansFalseAlternative =
+                    containsRemoveOrphansFalseAlternative || !result;
+                if (containsRemoveOrphansTrueAlternative && containsRemoveOrphansFalseAlternative) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Examine the left delegator.
+        ASSERT(containsMustRemoveTrueAndFalse(left->getGroupId()));
+
+        // Examine the right delegator.
+        ASSERT(containsMustRemoveTrueAndFalse(right->getGroupId()));
+    }
+}
+
 }  // namespace
 }  // namespace mongo::optimizer
