@@ -141,12 +141,6 @@ public:
         opCtx->sleepFor(Milliseconds(millis));
     }
 
-    void _sleepInPBWM(mongo::OperationContext* opCtx, long long millis) {
-        Lock::ResourceLock pbwm(opCtx, resourceIdParallelBatchWriterMode, MODE_X);
-        LOGV2(6001604, "PBWM MODE_X lock acquired by sleep command.");
-        opCtx->sleepFor(Milliseconds(millis));
-    }
-
     void _sleepInRSTL(mongo::OperationContext* opCtx, long long millis) {
         Lock::ResourceLock rstl(opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
         LOGV2(6001600, "RSTL MODE_X lock acquired by sleep command.");
@@ -204,11 +198,6 @@ public:
             StringData lockTarget;
             if (cmdObj["lockTarget"]) {
                 lockTarget = cmdObj["lockTarget"].checkAndGetStringData();
-            }
-
-            if (lockTarget == "ParallelBatchWriterMode") {
-                _sleepInPBWM(opCtx, msRemaining.count());
-                continue;
             }
 
             if (lockTarget == "RSTL") {
