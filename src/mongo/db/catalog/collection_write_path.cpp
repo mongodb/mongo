@@ -206,7 +206,10 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     const auto& nss = collection->ns();
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX) ||
-            (nss.isOplog() && opCtx->lockState()->isWriteLocked()));
+            (nss.isOplog() && opCtx->lockState()->isWriteLocked()) ||
+            (nss.isChangeCollection() && nss.tenantId() &&
+             opCtx->lockState()->isLockHeldForMode({ResourceType::RESOURCE_TENANT, *nss.tenantId()},
+                                                   MODE_IX)));
 
     const size_t count = std::distance(begin, end);
 
