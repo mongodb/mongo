@@ -229,10 +229,8 @@ TimeseriesTest.run((insert) => {
     runTest({[metaFieldName + '.location']: "2d", [metaFieldName + '.tag1']: -1},
             {'meta.location': "2d", 'meta.tag1': -1});
 
-    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-        // Measurement 2dsphere index
-        runTest({'loc': '2dsphere'}, {'data.loc': '2dsphere_bucket'});
-    }
+    // Measurement 2dsphere index
+    runTest({'loc': '2dsphere'}, {'data.loc': '2dsphere_bucket'});
 
     /*
      * Test time-series index creation error handling.
@@ -246,17 +244,9 @@ TimeseriesTest.run((insert) => {
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
-    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-        // Reject index keys that do not include the metadata field.
-        assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}),
-                                     ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.hideIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
-        assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
-    } else {
-        assert.commandWorked(coll.createIndex({not_metadata: 1}));
-        assert.commandWorked(coll.hideIndex({not_metadata: 1}));
-        assert.commandWorked(coll.dropIndex({not_metadata: 1}));
-    }
+    assert.commandWorked(coll.createIndex({not_metadata: 1}));
+    assert.commandWorked(coll.hideIndex({not_metadata: 1}));
+    assert.commandWorked(coll.dropIndex({not_metadata: 1}));
 
     // Index names are not transformed. dropIndexes passes the request along to the buckets
     // collection, which in this case does not possess the index by that name.
@@ -268,14 +258,6 @@ TimeseriesTest.run((insert) => {
         assert.commandFailedWithCode(res,
                                      [ErrorCodes.CannotCreateIndex, ErrorCodes.InvalidOptions]);
     };
-
-    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-        // Partial indexes are not supported on time-series collections if the time-series metric
-        // feature flag is disabled.
-        testCreateIndexFailed({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}});
-        testCreateIndexFailed({[metaFieldName]: 1},
-                              {partialFilterExpression: {[metaFieldName]: {$gt: 5}}});
-    }
 
     // Unique indexes are not supported on clustered collections.
     testCreateIndexFailed({[metaFieldName]: 1}, {unique: true});

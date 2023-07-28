@@ -189,11 +189,6 @@ server_parameters:
 
 
 feature_flags:
-    featureFlagTimeseriesMetricIndexes:
-        description: "When enabled, support secondary indexes on time-series measurements"
-        cpp_varname: feature_flags::gTimeseriesMetricIndexes
-        default: true
-        version: 6.0
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique

@@ -199,36 +199,31 @@ assertStats(db, (stats) => {
 
 lastStats = db.serverStatus().indexStats;
 
-const timeSeriesMetricIndexesEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1}))
-        .featureFlagTimeseriesMetricIndexes.value;
-if (timeSeriesMetricIndexesEnabled) {
-    assert.commandWorked(db.createCollection('ts', {timeseries: {timeField: 't'}}));
-    assert.commandWorked(db.ts.createIndex({loc: '2dsphere'}));
-    assert.commandWorked(db.ts.insert({t: new Date(), loc: [0, 0]}));
-    assert.eq(1,
-              db.ts
-                  .aggregate([{
-                                 $geoNear: {
-                                     near: [1, 1],
-                                     key: 'loc',
-                                     distanceField: 'dist',
-                                 }
-                             }],
-                             {hint: 'loc_2dsphere'})
-                  .itcount());
-    assertStats(db, (stats) => {
-        // Includes _id index built for system.views.
-        assertCountIncrease(lastStats, stats, 2);
-        assertFeatureCountIncrease(lastStats, stats, 'id', 1);
-        assertFeatureCountIncrease(lastStats, stats, 'single', 1);
-        assertFeatureCountIncrease(lastStats, stats, '2dsphere_bucket', 1);
+assert.commandWorked(db.createCollection('ts', {timeseries: {timeField: 't'}}));
+assert.commandWorked(db.ts.createIndex({loc: '2dsphere'}));
+assert.commandWorked(db.ts.insert({t: new Date(), loc: [0, 0]}));
+assert.eq(1,
+          db.ts
+              .aggregate([{
+                             $geoNear: {
+                                 near: [1, 1],
+                                 key: 'loc',
+                                 distanceField: 'dist',
+                             }
+                         }],
+                         {hint: 'loc_2dsphere'})
+              .itcount());
+assertStats(db, (stats) => {
+    // Includes _id index built for system.views.
+    assertCountIncrease(lastStats, stats, 2);
+    assertFeatureCountIncrease(lastStats, stats, 'id', 1);
+    assertFeatureCountIncrease(lastStats, stats, 'single', 1);
+    assertFeatureCountIncrease(lastStats, stats, '2dsphere_bucket', 1);
 
-        assertFeatureAccessIncrease(lastStats, stats, 'id', 0);
-        assertFeatureAccessIncrease(lastStats, stats, 'single', 1);
-        assertFeatureAccessIncrease(lastStats, stats, '2dsphere_bucket', 1);
-    });
-}
+    assertFeatureAccessIncrease(lastStats, stats, 'id', 0);
+    assertFeatureAccessIncrease(lastStats, stats, 'single', 1);
+    assertFeatureAccessIncrease(lastStats, stats, '2dsphere_bucket', 1);
+});
 
 lastStats = db.serverStatus().indexStats;
 

@@ -53,11 +53,6 @@ var TimeseriesTest = class {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardedTimeSeries");
     }
 
-    // TODO SERVER-65082 remove this helper.
-    static timeseriesMetricIndexesEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesMetricIndexes");
-    }
-
     // TODO SERVER-69324 remove this helper.
     static bucketUnpackWithSortEnabled(conn) {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "BucketUnpackWithSort");

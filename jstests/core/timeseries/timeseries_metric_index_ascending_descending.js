@@ -15,12 +15,6 @@ load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fixture_helpers.js");
 
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesMetricIndexes")) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
-}
-
 TimeseriesTest.run((insert) => {
     const collName = "timeseries_metric_index_ascending_descending";
 

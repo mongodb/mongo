@@ -113,18 +113,8 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
 
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                    includeOriginalSpec = true;
-                } else {
-                    uasserted(ErrorCodes::InvalidOptions,
-                              "Partial indexes are not supported on time-series collections");
-                }
+                includeOriginalSpec = true;
 
-                uassert(ErrorCodes::CannotCreateIndex,
-                        "Partial indexes on time-series collections require FCV 5.3",
-                        feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
                 BSONObj pred = elem.Obj();
 
                 // If the createIndexes command specifies a collation for this index, then that
@@ -256,9 +246,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
         }
         builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
 
-        if (feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            includeOriginalSpec) {
+        if (includeOriginalSpec) {
             // Store the original user index definition on the transformed index definition for the
             // time-series buckets collection.
             builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());

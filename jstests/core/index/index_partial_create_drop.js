@@ -13,8 +13,6 @@
 
 // Test partial index creation and drops.
 
-load("jstests/libs/feature_flag_util.js");
-
 (function() {
 "use strict";
 var coll = db.index_partial_create_drop;
@@ -46,25 +44,16 @@ assert.commandFailed(
 assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    // Only top-level $and is permitted in a partial filter expression.
-    assert.commandFailedWithCode(coll.createIndex({x: 1}, {
-        partialFilterExpression:
-            {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
-    }),
-                                 ErrorCodes.CannotCreateIndex);
-} else {
-    // Tree depth cannot exceed `internalPartialFilterExpressionMaxDepth`, which defaults to 4.
-    assert.commandFailedWithCode(
-        coll.createIndex({x: 1},
-                         {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
-        ErrorCodes.CannotCreateIndex);
+// Tree depth cannot exceed `internalPartialFilterExpressionMaxDepth`, which defaults to 4.
+assert.commandFailedWithCode(
+    coll.createIndex({x: 1},
+                     {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
+    ErrorCodes.CannotCreateIndex);
 
-    // A tree depth of `internalPartialFilterExpressionMaxDepth` is allowed.
-    assert.commandWorked(
-        coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
-    assert(coll.drop());
-}
+// A tree depth of `internalPartialFilterExpressionMaxDepth` is allowed.
+assert.commandWorked(
+    coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
+assert(coll.drop());
 
 for (var i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i, a: i}));

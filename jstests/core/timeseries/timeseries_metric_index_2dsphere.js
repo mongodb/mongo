@@ -21,11 +21,6 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
-
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    return;
-}
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB("timeseries_metric_index_2dsphere_db");

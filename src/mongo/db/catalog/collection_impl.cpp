@@ -1468,8 +1468,6 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                             << " is already in current metadata: " << _metadata->toBSON());
 
     if (getTimeseriesOptions() &&
-        feature_flags::gTimeseriesMetricIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         timeseries::doesBucketsIndexIncludeMeasurement(
             opCtx, ns(), *getTimeseriesOptions(), spec->infoObj())) {
         invariant(_metadata->timeseriesBucketsMayHaveMixedSchemaData);

@@ -149,23 +149,6 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
         }
 
-        // Indexes on measurement fields are only supported when the 'gTimeseriesMetricIndexes'
-        // feature flag is enabled.
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            auto reason = str::stream();
-            reason << "Invalid index spec for time-series collection: "
-                   << redact(timeseriesIndexSpecBSON) << ". ";
-            reason << "Indexes are only supported on the '" << timeField << "' ";
-            if (metaField) {
-                reason << "and '" << *metaField << "' fields. ";
-            } else {
-                reason << "field. ";
-            }
-            reason << "Attempted to create an index on the field '" << elem.fieldName() << "'.";
-            return {ErrorCodes::BadValue, reason};
-        }
-
         // 2dsphere indexes on measurements are allowed, but need to be re-written to
         // point to the data field and use the special 2dsphere_bucket index type.
         if (elem.valueStringData() == IndexNames::GEO_2DSPHERE) {
@@ -228,9 +211,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
  * }
  */
 boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
-    const TimeseriesOptions& timeseriesOptions,
-    const BSONObj& bucketsIndexSpecBSON,
-    bool timeseriesMetricIndexesFeatureFlagEnabled) {
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -273,13 +254,6 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
                                                       timeseries::kBucketMetaFieldName.size() + 1));
                 continue;
             }
-        }
-
-        if (!timeseriesMetricIndexesFeatureFlagEnabled) {
-            // 'elem' is an invalid index spec field for this time-series collection. It matches
-            // neither the time field nor the metaField field. Therefore, we will not convert the
-            // index spec.
-            return {};
         }
 
         if (elem.fieldNameStringData().startsWith(timeseries::kBucketDataFieldName + ".") &&
@@ -368,12 +342,8 @@ StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
 
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
-    bool timeseriesMetricIndexesFeatureFlagEnabled =
-        feature_flags::gTimeseriesMetricIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    if (bucketsIndex.hasField(kOriginalSpecFieldName) &&
-        timeseriesMetricIndexesFeatureFlagEnabled) {
+    if (bucketsIndex.hasField(kOriginalSpecFieldName)) {
         // This buckets index has the original user index definition available, return it if the
         // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
         // the reverse mapping mechanism will be used. This is necessary to skip returning any
@@ -382,9 +352,7 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     }
     if (bucketsIndex.hasField(kKeyFieldName)) {
         auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
-            timeseriesOptions,
-            bucketsIndex.getField(kKeyFieldName).Obj(),
-            timeseriesMetricIndexesFeatureFlagEnabled);
+            timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());
         if (timeseriesKeyValue) {
             // This creates a BSONObj copy with the kOriginalSpecFieldName field removed, if it
             // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
@@ -416,10 +384,44 @@ bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
         return false;
     }
 
-    return createTimeseriesIndexSpecFromBucketsIndexSpec(
-               timeseriesOptions,
-               bucketsIndex.getField(kKeyFieldName).Obj(),
-               /*timeseriesMetricIndexesFeatureFlagEnabled=*/false) == boost::none;
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    const std::string controlMinTimeField = str::stream()
+        << timeseries::kControlMinFieldNamePrefix << timeField;
+    const std::string controlMaxTimeField = str::stream()
+        << timeseries::kControlMaxFieldNamePrefix << timeField;
+
+    const auto& bucketsIndexSpecBSON = bucketsIndex.getField(kKeyFieldName).Obj();
+    for (const auto& elem : bucketsIndexSpecBSON) {
+        // 'control.min.time' and 'control.max.time' are both ok.
+        if (elem.fieldNameStringData() == controlMinTimeField) {
+            continue;
+        } else if (elem.fieldNameStringData() == controlMaxTimeField) {
+            continue;
+        }
+
+        // Metadata, and subfields of metadata, are both ok.
+        if (metaField) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
+                continue;
+            }
+
+            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                continue;
+            }
+        }
+
+        // Found a non-time, non-metadata field, which means a 5.0 server would not understand this
+        // index. That means it's fine to also include 'originalSpec', because this index would have
+        // to be dropped before downgrading to 5.0 anyway.
+        return true;
+    }
+
+    // All fields are either time or metadata. That means a 5.0 server will understand this index.
+    // Since 5.0 does not know about the 'originalSpec' field, don't include it: we don't want to
+    // complicate downgrade for this index.
+    return false;
 }
 
 bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,

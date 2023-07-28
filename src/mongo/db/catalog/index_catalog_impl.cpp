@@ -700,14 +700,12 @@ constexpr int kMaxNumIndexesAllowed = 64;
  * Recursive function which confirms whether 'expression' is valid for use in partial indexes.
  * Recursion is restricted to 'internalPartialFilterExpressionMaxDepth' levels.
  */
-Status _checkValidFilterExpressions(const MatchExpression* expression,
-                                    bool timeseriesMetricIndexesFeatureFlagEnabled,
-                                    int level = 0) {
+Status _checkValidFilterExpressions(const MatchExpression* expression, int level) {
     if (!expression)
         return Status::OK();
 
     const auto kMaxDepth = internalPartialFilterExpressionMaxDepth.load();
-    if (timeseriesMetricIndexesFeatureFlagEnabled && (level + 1) > kMaxDepth) {
+    if ((level + 1) > kMaxDepth) {
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream()
                           << "partialFilterExpression depth may not exceed " << kMaxDepth);
@@ -715,28 +713,16 @@ Status _checkValidFilterExpressions(const MatchExpression* expression,
 
     switch (expression->matchType()) {
         case MatchExpression::AND:
-            if (!timeseriesMetricIndexesFeatureFlagEnabled) {
-                if (level > 0)
-                    return Status(ErrorCodes::CannotCreateIndex,
-                                  "$and only supported in partialFilterExpression at top level");
-            }
             for (size_t i = 0; i < expression->numChildren(); i++) {
-                Status status = _checkValidFilterExpressions(
-                    expression->getChild(i), timeseriesMetricIndexesFeatureFlagEnabled, level + 1);
+                Status status = _checkValidFilterExpressions(expression->getChild(i), level + 1);
                 if (!status.isOK())
                     return status;
             }
             return Status::OK();
 
         case MatchExpression::OR:
-            if (!timeseriesMetricIndexesFeatureFlagEnabled) {
-                return Status(ErrorCodes::CannotCreateIndex,
-                              str::stream() << "Expression not supported in partial index: "
-                                            << expression->debugString());
-            }
             for (size_t i = 0; i < expression->numChildren(); i++) {
-                Status status = _checkValidFilterExpressions(
-                    expression->getChild(i), timeseriesMetricIndexesFeatureFlagEnabled, level + 1);
+                Status status = _checkValidFilterExpressions(expression->getChild(i), level + 1);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -750,12 +736,7 @@ Status _checkValidFilterExpressions(const MatchExpression* expression,
         case MatchExpression::INTERNAL_EXPR_GT:
         case MatchExpression::INTERNAL_EXPR_GTE:
         case MatchExpression::MATCH_IN:
-            if (timeseriesMetricIndexesFeatureFlagEnabled) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "Expression not supported in partial index: "
-                                        << expression->debugString());
+            return Status::OK();
         case MatchExpression::EQ:
         case MatchExpression::LT:
         case MatchExpression::LTE:
@@ -849,9 +830,8 @@ Status validateColumnStoreSpec(const CollectionPtr& collection,
 }
 }  // namespace
 
-Status IndexCatalogImpl::checkValidFilterExpressions(
-    const MatchExpression* expression, bool timeseriesMetricIndexesFeatureFlagEnabled) {
-    return _checkValidFilterExpressions(expression, timeseriesMetricIndexesFeatureFlagEnabled);
+Status IndexCatalogImpl::checkValidFilterExpressions(const MatchExpression* expression) {
+    return _checkValidFilterExpressions(expression, 0);
 }
 
 Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
@@ -1013,11 +993,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
         const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        Status status = _checkValidFilterExpressions(
-            filterExpr.get(),
-            !fcvSnapshot.isVersionInitialized() ||
-                feature_flags::gTimeseriesMetricIndexes.isEnabled(fcvSnapshot));
+        Status status = checkValidFilterExpressions(filterExpr.get());
         if (!status.isOK()) {
             return status;
         }

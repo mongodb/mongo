@@ -28,11 +28,6 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/feature_flag_util.js");
 
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
-}
 Random.setRandomSeed();
 
 // Value is taken from geoconstants.h.
