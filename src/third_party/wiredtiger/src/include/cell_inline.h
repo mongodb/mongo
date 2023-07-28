@@ -670,6 +670,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
         WT_TIME_WINDOW tw;
     } copy;
     WT_CELL_UNPACK_COMMON *unpack;
+    WT_PAGE_DELETED page_del;
     WT_TIME_AGGREGATE *ta;
     WT_TIME_WINDOW *tw;
     uint64_t v;
@@ -767,6 +768,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
+        WT_CELL_LEN_CHK(p, 0);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             ta->prepare = 1;
@@ -810,6 +812,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
+        WT_CELL_LEN_CHK(p, 0);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             tw->prepare = 1;
@@ -843,6 +846,21 @@ copy_cell_restart:
 
         WT_RET(__cell_check_value_validity(session, tw, end != NULL));
         break;
+    }
+
+    /*
+     * Unpack any fast-truncate information. Note that there is no way to write fast-truncate
+     * information to disk in versions before 6.1, but this information may still exist in the
+     * database files if we are downgrading from newer versions. If the fast-truncate information is
+     * present, it needs to be unpacked but we will ignore these values. Ignoring these values is
+     * equivalent to writing out truncated content that is not associated with any visibility.
+     */
+    if (unpack->raw == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+        WT_RET(
+          __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), (uint64_t *)&page_del.txnid));
+        WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del.timestamp));
+        WT_RET(
+          __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del.durable_timestamp));
     }
 
     /*
