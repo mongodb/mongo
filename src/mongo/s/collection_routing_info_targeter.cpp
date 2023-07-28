@@ -559,7 +559,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // op-style update which we are broadcasting to multiple shards by exact _id. Record this event
     // in our serverStatus metrics.
     if (!isMulti && isExactId && !isShardedTimeseriesCollection) {
-        updateOneTargetedShardedCount.increment(1);
+        updateOneNonTargetedShardedCount.increment(1);
         updateOneOpStyleBroadcastWithExactIDCount.increment(1);
     }
 

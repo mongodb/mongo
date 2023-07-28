@@ -88,7 +88,8 @@ const testCases = [
         }
     },
     {
-        // This will increase updateOneTargetedShardedCount by 1.
+        // This will increase updateOneNonTargetedShardedCount by 1 because it is a
+        // updateOneOpStyleBroadcastWithExactID.
         logMessage:
             "Running targeted updateOne command on sharded collection without shard key but _id is specified.",
         collName: testColl,
@@ -245,13 +246,13 @@ testCases.forEach(testCase => {
 mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
 
 // Verify all counter metrics were updated correctly after the write commands.
-assert.eq(3, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
+assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
 assert.eq(2, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
-assert.eq(4, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+assert.eq(5, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
 assert.eq(3, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
 
@@ -297,13 +298,13 @@ WCOStestCases.forEach(testCase => {
 mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
 
 // Verify all counter metrics were updated correctly after the wcos write commands.
-assert.eq(3, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
+assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
 assert.eq(4, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
-assert.eq(6, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+assert.eq(7, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
 assert.eq(3, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
 assert.eq(3, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
 
@@ -403,13 +404,13 @@ errorTestCases.forEach(testCase => {
 mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
 
 // Verify all counter metrics were not updated after the error write commands.
-assert.eq(3, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
+assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
 assert.eq(4, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
 assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
-assert.eq(11, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+assert.eq(12, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
 assert.eq(5, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
 assert.eq(4, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
 

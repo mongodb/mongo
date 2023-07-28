@@ -100,7 +100,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 
     // Verifying metrics for updateOnes commands.
-    assert.eq(1, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+    assert.eq(5, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
     assert.eq(2, mongosServerStatus.metrics.query.updateOneUnshardedCount);
 
 } else {
