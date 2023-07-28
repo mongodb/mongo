@@ -164,12 +164,6 @@ structs:
                     the shard key pattern if unique is true. If true then it will verify and if
                     false then it won't.
                 type: optionalBool
-            unsplittable:
-                type: optionalBool
-                description: "Flag that identifies whether the collection is splittable in multiple 
-                            chunks. If unsplittable, the collection is always equivalent to a 1 
-                            chunk collection. The shardKey must be set to {_id:1} in case this 
-                            flag is enabled"
 
     CreateCollectionResponse:
         description: "Response of the create collection command"

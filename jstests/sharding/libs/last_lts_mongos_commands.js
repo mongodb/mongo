@@ -30,7 +30,6 @@ const commandsAddedToMongosSinceLastLTS = [
     "coordinateCommitTransaction",
     "cpuload",
     "createSearchIndexes",
-    "createUnsplittableCollection_FOR_TESTING",
     "dropSearchIndex",
     "fsyncUnlock",
     "getClusterParameter",

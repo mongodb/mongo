@@ -334,7 +334,6 @@ let viewsCommandTests = {
     },
     createSearchIndex: {skip: "present in v6.3 but renamed to createSearchIndexes in v7.0"},
     createSearchIndexes: {skip: isUnrelated},
-    createUnsplittableCollection_FOR_TESTING: {skip: isUnrelated},
     createUser: {
         command: {createUser: "testuser", pwd: "testpass", roles: []},
         setup: function(conn) {

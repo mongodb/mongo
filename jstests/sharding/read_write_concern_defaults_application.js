@@ -392,7 +392,6 @@ let testCases = {
     },
     createSearchIndex: {skip: "present in v6.3 but renamed to createSearchIndexes in v7.0"},
     createSearchIndexes: {skip: "does not accept read or write concern"},
-    createUnsplittableCollection_FOR_TESTING: {skip: "does not accept read or write concern"},
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         checkReadConcern: false,

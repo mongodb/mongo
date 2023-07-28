@@ -86,23 +86,3 @@ structs:
           Controls whether this command verifies that any unique indexes are prefixed by the shard
           key pattern if unique is true. If true then it will verify and if false then it won't.
         type: optionalBool
-
-commands:
-    #Temporary command to run shardCollection with unsplittable=true and track unsharded collection.
-    #This command will stay until SERVER-79158 is committed
-    createUnsplittableCollection_FOR_TESTING:
-        command_name: createUnsplittableCollection_FOR_TESTING 
-        cpp_name: CreateUnsplittableCollection_FOR_TESTING
-        description: "The test only and temporary createUnsplittableCollection command for mongos."
-        strict: false
-        namespace: concatenate_with_db
-        api_version: ""
-        fields:
-              timeseries:
-                description: "The options to create the time-series collection with."
-                type: TimeseriesOptions
-                optional: true
-              collectionUUID:
-                description: "The expected UUID of the collection."
-                type: uuid
-                optional: true

@@ -571,7 +571,6 @@ const allCommands = {
         // feature).
         skip: "requires mongot mock setup",
     },
-    createUnsplittableCollection_FOR_TESTING: {skip: commandIsDisabledOnLastLTS},
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         teardown: function(conn) {
