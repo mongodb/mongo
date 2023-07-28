@@ -136,8 +136,12 @@ namespace {
  */
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
 public:
-    ABTMatchExpressionVisitor(bool& eligible, QueryFrameworkControlEnum frameworkControl)
-        : _eligible(eligible), _frameworkControl(frameworkControl) {}
+    ABTMatchExpressionVisitor(bool& eligible,
+                              QueryFrameworkControlEnum frameworkControl,
+                              bool queryHasNaturalHint)
+        : _eligible(eligible),
+          _frameworkControl(frameworkControl),
+          _queryHasNaturalHint(queryHasNaturalHint) {}
 
     void visit(const LTEMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
@@ -371,15 +375,16 @@ private:
             _eligible = false;
 
         // In M2, match expressions which compare against _id should fall back because they could
-        // use the _id index.
+        // use the _id index unless the query has a $natural hint.
         if (!fieldRef.empty() && fieldRef.getPart(0) == "_id" &&
-            _frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+            _frameworkControl == QueryFrameworkControlEnum::kTryBonsai && !_queryHasNaturalHint) {
             _eligible = false;
         }
     }
 
     bool& _eligible;
     const QueryFrameworkControlEnum _frameworkControl;
+    bool _queryHasNaturalHint;
 };
 
 class ABTUnsupportedAggExpressionVisitor : public ExpressionConstVisitor {
@@ -1072,9 +1077,10 @@ bool isEligibleCommon(const RequestType& request,
     auto hasIndexHint = [&](auto param) {
         if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
             return param && !param->isEmpty() &&
-                param->firstElementFieldNameStringData() != "$natural"_sd;
+                param->firstElementFieldNameStringData() != query_request_helper::kNaturalSortField;
         } else {
-            return !param.isEmpty() && param.firstElementFieldNameStringData() != "$natural"_sd;
+            return !param.isEmpty() &&
+                param.firstElementFieldNameStringData() != query_request_helper::kNaturalSortField;
         }
     };
     if (frameworkControl == QueryFrameworkControlEnum::kTryBonsai &&
@@ -1093,6 +1099,17 @@ bool isEligibleCommon(const RequestType& request,
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
+    auto hint = request.getHint();
+    auto queryHasNaturalHint = [&hint]() {
+        if constexpr (std::is_same_v<decltype(hint), boost::optional<BSONObj>>) {
+            return hint && !hint->isEmpty() &&
+                hint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+        } else {
+            return !hint.isEmpty() &&
+                hint.firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+        }
+    }();
+
     while (indexIterator->more()) {
         const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
         if (descriptor.hidden()) {
@@ -1101,8 +1118,10 @@ bool isEligibleCommon(const RequestType& request,
             continue;
         }
 
-        // In M2, we should fall back on any non-hidden, non-_id index.
-        if (!descriptor.isIdIndex() && frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+        // In M2, we should fall back on any non-hidden, non-_id index on a query with no
+        // $natural hint.
+        if (!descriptor.isIdIndex() && frameworkControl == QueryFrameworkControlEnum::kTryBonsai &&
+            !queryHasNaturalHint) {
             return false;
         }
 
@@ -1154,8 +1173,9 @@ boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum framework
 
 bool isEligibleForBonsai(ServiceContext* serviceCtx,
                          const Pipeline& pipeline,
-                         QueryFrameworkControlEnum frameworkControl) {
-    ABTUnsupportedDocumentSourceVisitorContext visitorCtx{frameworkControl};
+                         QueryFrameworkControlEnum frameworkControl,
+                         bool queryHasNaturalHint) {
+    ABTUnsupportedDocumentSourceVisitorContext visitorCtx{frameworkControl, queryHasNaturalHint};
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
     DocumentSourceWalker walker(reg, &visitorCtx);
     walker.walk(pipeline);
@@ -1164,8 +1184,13 @@ bool isEligibleForBonsai(ServiceContext* serviceCtx,
 
 bool isEligibleForBonsai(const CanonicalQuery& cq, QueryFrameworkControlEnum frameworkControl) {
     auto expression = cq.root();
+
+    auto hint = cq.getFindCommandRequest().getHint();
+    bool hasNaturalHint = !hint.isEmpty() &&
+        hint.firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+
     bool eligible = true;
-    ABTMatchExpressionVisitor visitor(eligible, frameworkControl);
+    ABTMatchExpressionVisitor visitor(eligible, frameworkControl, hasNaturalHint);
     MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
     tree_walker::walk<true, MatchExpression>(expression, &walker);
 
@@ -1214,7 +1239,12 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
         return false;
     }
 
-    return isEligibleForBonsai(opCtx->getServiceContext(), pipeline, frameworkControl);
+    auto hint = request.getHint();
+    bool hasNaturalHint = hint.has_value() && !hint->isEmpty() &&
+        hint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+
+    return isEligibleForBonsai(
+        opCtx->getServiceContext(), pipeline, frameworkControl, hasNaturalHint);
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq,
@@ -1267,7 +1297,8 @@ bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& 
     auto frameworkControl = ServerParameterSet::getNodeParameterSet()
                                 ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
                                 ->_data.get();
-    return isEligibleForBonsai(serviceCtx, pipeline, frameworkControl);
+    return isEligibleForBonsai(
+        serviceCtx, pipeline, frameworkControl, false /* queryHasNaturalHint */);
 }
 
 }  // namespace mongo
@@ -1280,7 +1311,8 @@ void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const T&) {
 }
 
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSourceMatch& source) {
-    ABTMatchExpressionVisitor visitor(ctx->eligible, ctx->frameworkControl);
+    ABTMatchExpressionVisitor visitor(
+        ctx->eligible, ctx->frameworkControl, ctx->queryHasNaturalHint);
     MatchExpressionWalker walker(nullptr, nullptr, &visitor);
     tree_walker::walk<true, MatchExpression>(source.getMatchExpression(), &walker);
 }

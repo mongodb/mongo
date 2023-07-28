@@ -151,7 +151,7 @@ assertSupportedByBonsaiExperimentally({
     hint: {_id: 1}
 });
 
-// $natural hints are fully supported in Bonsai...
+// $natural hints are fully supported in Bonsai.
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: 1}});
 assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: 1}});
@@ -159,15 +159,26 @@ assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural:
 assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}});
 
-// ... Except if the query relies on some experimental feature (e.g., predicate on _id).
-assertSupportedByBonsaiExperimentally(
-    {find: coll.getName(), filter: {_id: 1}, hint: {$natural: 1}});
-assertSupportedByBonsaiExperimentally(
+// $natural hints allow running a predicate on _id.
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {_id: 1}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}, hint: {$natural: 1}});
-assertSupportedByBonsaiExperimentally(
-    {find: coll.getName(), filter: {_id: 1}, hint: {$natural: -1}});
-assertSupportedByBonsaiExperimentally(
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {_id: 1}, hint: {$natural: -1}});
+assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}, hint: {$natural: -1}});
+
+// The presence of a $natural hint does not allow an otherwise unsupported query to go through
+// Bonsai.
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, sort: {a: 1}, hint: {$natural: 1}},
+                           true);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$sort: {a: 1}}], cursor: {}, hint: {$natural: 1}},
+    true);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, sort: {a: 1}, hint: {$natural: -1}},
+                           true);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$sort: {a: 1}}], cursor: {}, hint: {$natural: -1}},
+    true);
 
 // Unsupported projection expression.
 assertNotSupportedByBonsai(
@@ -349,6 +360,17 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {}});
 assertSupportedByBonsaiExperimentally({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// A query against a collection with a secondary index should be eligible in the presence of a
+// $natural hint.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}));
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: -1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}});
 
 // A query against a collection with a hidden index should be eligible for CQF.
 coll.drop();

@@ -56,10 +56,12 @@ namespace optimizer {
  * should set 'eligible' to false.
  */
 struct ABTUnsupportedDocumentSourceVisitorContext : public DocumentSourceVisitorContextBase {
-    ABTUnsupportedDocumentSourceVisitorContext(QueryFrameworkControlEnum controlEnum)
-        : frameworkControl(controlEnum) {}
+    ABTUnsupportedDocumentSourceVisitorContext(QueryFrameworkControlEnum controlEnum,
+                                               bool hasNaturalHint)
+        : frameworkControl(controlEnum), queryHasNaturalHint(hasNaturalHint) {}
     bool eligible{true};
     const QueryFrameworkControlEnum frameworkControl;
+    const bool queryHasNaturalHint;
 };
 }  // namespace optimizer
 
