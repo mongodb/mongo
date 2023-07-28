@@ -28,7 +28,7 @@
 
 from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
 from wtscenario import make_scenarios
-import os, random, wtscenario, wttest
+import os, random, wttest
 from wtdataset import TrackedSimpleDataSet, TrackedComplexDataSet
 
 # test_tiered14.py
@@ -69,7 +69,7 @@ class test_tiered14(wttest.WiredTigerTestCase):
             num_ops = 20,
             ss_name = 's3_store')),
     ]
-    scenarios = wtscenario.make_scenarios(multiplier, keyfmt, dataset, storage_sources)
+    scenarios = make_scenarios(multiplier, keyfmt, dataset, storage_sources)
 
     def conn_config(self):
         if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
@@ -86,7 +86,7 @@ class test_tiered14(wttest.WiredTigerTestCase):
         config = ''
         # S3 store is built as an optional loadable extension, not all test environments build S3.
         if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
+            #config = '=(config=\"(verbose=[api:1,version,tiered:-3])\")'
             extlist.skip_if_missing = True
         #if self.ss_name == 'dir_store':
             #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
