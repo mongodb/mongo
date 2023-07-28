@@ -193,14 +193,29 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Verify that the number of docs are same.
         assert.eq(db[collName].find().itcount(), db[this.nonShardCollName].find().itcount());
 
-        // Pick 'this.threadCount - 1' split points so that we have can create this.threadCount
-        // chunks.
+        // Pick 'this.threadCount - 1' split points so that we have 'this.threadCount' chunks.
         const chunkRange = (currentTimeStamp - this.startTime) / this.threadCount;
         currentTimeStamp = this.startTime;
         for (let i = 0; i < (this.threadCount - 1); ++i) {
             currentTimeStamp += chunkRange;
             assertWhenOwnColl.commandWorked(ChunkHelper.splitChunkAt(
                 db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
+        }
+
+        // Create an extra chunk on each shard to make sure multi:true operations return correct
+        // metrics in write results.
+        const destinationShards = Object.keys(cluster.getSerializedCluster().shards);
+        for (const destinationShard of destinationShards) {
+            currentTimeStamp += chunkRange;
+            assertWhenOwnColl.commandWorked(ChunkHelper.splitChunkAt(
+                db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
+
+            ChunkHelper.moveChunk(
+                db,
+                this.bucketPrefix + collName,
+                [{'control.min.t': new Date(currentTimeStamp)}, {'control.min.t': MaxKey}],
+                destinationShard,
+                /*waitForDelete=*/ false);
         }
 
         // Verify that the number of docs remain the same.
