@@ -1295,7 +1295,7 @@ void syncFixUp(OperationContext* opCtx,
             BSONObj good;
             NamespaceString resNss;
 
-            std::string dbName = nss ? nss->db_deprecated().toString() : "";
+            DatabaseName dbName = nss ? nss->dbName() : DatabaseName();
             std::tie(good, resNss) = rollbackSource.findOneByUUID(dbName, uuid, doc._id.wrap());
 
             // To prevent inconsistencies in the transactions collection, rollback fails if the UUID

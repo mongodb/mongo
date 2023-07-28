@@ -326,8 +326,7 @@ public:
                             logAttrs(coll->ns().dbName()),
                             "uuid"_attr = coll->uuid(),
                             "_id"_attr = doc.getField("_id"));
-                NamespaceStringOrUUID nssOrUUID(coll->ns().db_forSharding().toString(),
-                                                coll->uuid());
+                NamespaceStringOrUUID nssOrUUID(coll->ns().dbName(), coll->uuid());
                 uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                     opCtx, nssOrUUID, doc.getField("_id")));
             }
@@ -390,8 +389,7 @@ public:
                                 logAttrs(coll->ns().dbName()),
                                 "uuid"_attr = coll->uuid(),
                                 "_id"_attr = doc.getField("_id"));
-                    NamespaceStringOrUUID nssOrUUID(coll->ns().db_forSharding().toString(),
-                                                    coll->uuid());
+                    NamespaceStringOrUUID nssOrUUID(coll->ns().dbName(), coll->uuid());
                     uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                         opCtx, nssOrUUID, doc.getField("_id")));
                 }

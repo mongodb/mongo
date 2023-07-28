@@ -365,7 +365,7 @@ TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
         NamespaceString::createNamespaceString_forTest("", "foo");
     checkAcquisitionByNss(nssEmptyDbName);
     checkAcquisitionByNssOrUUID(nssEmptyDbName);
-    checkAcquisitionByNssOrUUID(NamespaceStringOrUUID("", UUID::gen()));
+    checkAcquisitionByNssOrUUID(NamespaceStringOrUUID(DatabaseName(), UUID::gen()));
 }
 
 // ---------------------------------------------------------------------------
@@ -1050,14 +1050,17 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUID) {
 
 TEST_F(ShardRoleTest, AcquireCollectionByUUIDButWrongDbNameThrows) {
     const auto uuid = getCollectionUUID(opCtx(), nssUnshardedCollection1);
-    ASSERT_THROWS_CODE(acquireCollection(opCtx(),
-                                         {NamespaceStringOrUUID("anotherDbName", uuid),
-                                          {},
-                                          repl::ReadConcernArgs(),
-                                          AcquisitionPrerequisites::kWrite},
-                                         MODE_IX),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        acquireCollection(
+            opCtx(),
+            {NamespaceStringOrUUID(
+                 DatabaseName::createDatabaseName_forTest(boost::none, "anotherDbName"), uuid),
+             {},
+             repl::ReadConcernArgs(),
+             AcquisitionPrerequisites::kWrite},
+            MODE_IX),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(ShardRoleTest, AcquireCollectionByWrongUUID) {

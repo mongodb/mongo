@@ -1824,8 +1824,8 @@ public:
         insert(nss(), BSON("a" << 1));
         insert(nss(), BSON("a" << 2));
         insert(nss(), BSON("a" << 3));
-        std::unique_ptr<DBClientCursor> cursor =
-            _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
+        std::unique_ptr<DBClientCursor> cursor = _client.find(
+            FindCommandRequest{NamespaceStringOrUUID{nss().dbName(), *coll_opts.uuid}});
         ASSERT_EQUALS(nss(), cursor->getNamespaceString());
         for (int i = 1; i <= 3; ++i) {
             ASSERT(cursor->more());
@@ -1852,13 +1852,14 @@ public:
         }
         insert(nss(), BSON("a" << 1));
 
-        auto count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
+        auto count =
+            _client.count(NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), BSONObj());
         ASSERT_EQUALS(1U, count);
 
         insert(nss(), BSON("a" << 2));
         insert(nss(), BSON("a" << 3));
 
-        count = _client.count(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj());
+        count = _client.count(NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), BSONObj());
         ASSERT_EQUALS(3U, count);
     }
 };
@@ -1885,17 +1886,13 @@ public:
         const int options = 0;
 
         auto specsWithIdIndexOnly = _client.getIndexSpecs(
-            NamespaceStringOrUUID(nss().db_forTest().toString(), *coll_opts.uuid),
-            includeBuildUUIDs,
-            options);
+            NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), includeBuildUUIDs, options);
         ASSERT_EQUALS(1U, specsWithIdIndexOnly.size());
 
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1), true));
 
         auto specsWithBothIndexes = _client.getIndexSpecs(
-            NamespaceStringOrUUID(nss().db_forTest().toString(), *coll_opts.uuid),
-            includeBuildUUIDs,
-            options);
+            NamespaceStringOrUUID(nss().dbName(), *coll_opts.uuid), includeBuildUUIDs, options);
         ASSERT_EQUALS(2U, specsWithBothIndexes.size());
     }
 };

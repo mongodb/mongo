@@ -90,7 +90,7 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
         .getOwned();
 }
 
-std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std::string& db,
+std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const DatabaseName& db,
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
     FindCommandRequest findRequest{NamespaceStringOrUUID{db, uuid}};

@@ -1190,7 +1190,9 @@ void SBENodeLowering::generateSlots(SlotVarMap& slotMap,
 static NamespaceStringOrUUID parseFromScanDef(const ScanDefinition& def) {
     const auto& dbName = def.getOptionsMap().at("database");
     const auto& uuidStr = def.getOptionsMap().at("uuid");
-    return {dbName, UUID::parse(uuidStr).getValue()};
+    // TODO SERVER-79427 we should no longer deserialize in this method since NamespaceStringOrUUID
+    // should be part of the ScanDefinition.
+    return {DatabaseNameUtil::deserialize(boost::none, dbName), UUID::parse(uuidStr).getValue()};
 }
 
 

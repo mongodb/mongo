@@ -2810,7 +2810,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
                                      << "five");
 
         BSONObjBuilder builder;
-        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceStringOrUUID("db", uuid));
+        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceStringOrUUID(
+            DatabaseName::createDatabaseName_forTest(boost::none, "db"), uuid));
         one_new.setField1(3);
         one_new.setField2("five");
         one_new.serialize(BSONObj(), &builder);
@@ -2821,7 +2822,8 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
 
     // Positive: Test we can serialize from nothing the same document
     {
-        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceStringOrUUID("db", uuid));
+        BasicConcatenateWithDbOrUUIDCommand one_new(NamespaceStringOrUUID(
+            DatabaseName::createDatabaseName_forTest(boost::none, "db"), uuid));
         one_new.setField1(3);
         one_new.setField2("five");
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));

@@ -1032,8 +1032,9 @@ TEST(QueryRequestTest, AsFindCommandRequestWithUuidAllNonOptionFields) {
 TEST(QueryRequestTest, AsFindCommandRequestWithUuidNoAvailableNamespace) {
     BSONObj cmdObj =
         fromjson("{find: { \"$binary\" : \"ASNFZ4mrze/ty6mHZUMhAQ==\", \"$type\" : \"04\" }}");
-    FindCommandRequest findCommand(NamespaceStringOrUUID(
-        "test", UUID::parse("01234567-89ab-cdef-edcb-a98765432101").getValue()));
+    FindCommandRequest findCommand(
+        NamespaceStringOrUUID(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                              UUID::parse("01234567-89ab-cdef-edcb-a98765432101").getValue()));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), findCommand.toBSON(BSONObj()));
 }
 
@@ -1593,7 +1594,8 @@ class QueryRequestTest : public ServiceContextTest {};
 
 TEST_F(QueryRequestTest, ParseFromUUID) {
     const UUID uuid = UUID::gen();
-    NamespaceStringOrUUID nssOrUUID("test", uuid);
+    NamespaceStringOrUUID nssOrUUID(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                    uuid);
     FindCommandRequest findCommand(nssOrUUID);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
     findCommand.setNss(nss);

@@ -306,7 +306,7 @@ public:
     BSONObj getLastOperation() const override;
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-    std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
+    std::pair<BSONObj, NamespaceString> findOneByUUID(const DatabaseName& db,
                                                       UUID uuid,
                                                       const BSONObj& filter) const override;
 

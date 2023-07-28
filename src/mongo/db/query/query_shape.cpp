@@ -395,7 +395,7 @@ NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
                 "Exactly one of 'uuid' and 'coll' can be defined.",
                 !cmdNs.getColl().has_value());
         UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
-        return NamespaceStringOrUUID(cmdNs.getDb().toString(), uuid, tenantId);
+        return NamespaceStringOrUUID(DatabaseNameUtil::deserialize(tenantId, cmdNs.getDb()), uuid);
     }
 }
 

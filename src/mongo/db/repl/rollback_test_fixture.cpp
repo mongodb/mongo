@@ -318,7 +318,7 @@ BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& f
     return BSONObj();
 }
 
-std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const std::string& db,
+std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const DatabaseName& db,
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
     return {BSONObj(), NamespaceString()};

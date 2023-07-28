@@ -1021,12 +1021,6 @@ public:
         : NamespaceStringOrUUID{static_cast<const NamespaceString&>(nss)} {}
     NamespaceStringOrUUID(DatabaseName dbname, UUID uuid)
         : _nssOrUUID(UUIDWithDbName{std::move(dbname), std::move(uuid)}) {}
-    // TODO SERVER-65920 Remove once all call sites have been changed to take tenantId explicitly
-    NamespaceStringOrUUID(std::string db,
-                          UUID uuid,
-                          boost::optional<TenantId> tenantId = boost::none)
-        : _nssOrUUID(
-              UUIDWithDbName{DatabaseName{std::move(tenantId), std::move(db)}, std::move(uuid)}) {}
 
     bool isNamespaceString() const {
         return stdx::holds_alternative<NamespaceString>(_nssOrUUID);

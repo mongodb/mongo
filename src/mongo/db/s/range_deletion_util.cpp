@@ -314,8 +314,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
             int numDeleted;
             const auto nss = [&]() {
                 try {
-                    const auto nssOrUuid =
-                        NamespaceStringOrUUID{DatabaseNameUtil::serialize(dbName), collectionUuid};
+                    const auto nssOrUuid = NamespaceStringOrUUID{dbName, collectionUuid};
                     const auto collection =
                         acquireCollection(opCtx,
                                           {nssOrUuid,

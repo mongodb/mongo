@@ -175,11 +175,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* o
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
         auto [cm, _] = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionOptions(
-            opCtx,
-            NamespaceStringOrUUID{nss.db_forSharding().toString(), uuid},
-            cm.dbPrimary(),
-            cm,
-            afterClusterTime);
+            opCtx, NamespaceStringOrUUID{nss.dbName(), uuid}, cm.dbPrimary(), cm, afterClusterTime);
     });
 }
 
@@ -194,7 +190,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
         auto cri = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionIndexes(
             opCtx,
-            NamespaceStringOrUUID{nss.db_forSharding().toString(), uuid},
+            NamespaceStringOrUUID{nss.dbName(), uuid},
             cri.cm.getMinKeyShardIdWithSimpleCollation(),
             cri,
             afterClusterTime);
