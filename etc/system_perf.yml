@@ -3248,7 +3248,7 @@ buildvariants:
       mongodb_setup_release: 2022-11
       mongodb_setup: shard-lite-audit
       infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: shard-lite
+      infrastructure_provisioning: shard-lite-audit
       workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
