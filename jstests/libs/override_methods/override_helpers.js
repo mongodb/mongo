@@ -63,7 +63,11 @@ var OverrideHelpers = (function() {
             let newCode;
             if (typeof jsCode === "function") {
                 // Load the override file and immediately invoke the supplied function.
-                newCode = `load("${overrideFile}"); (${jsCode})();`;
+                if (jsCode.constructor.name === 'AsyncFunction') {
+                    newCode = `load("${overrideFile}"); await (${jsCode.toString()})();`;
+                } else {
+                    newCode = `load("${overrideFile}"); (${jsCode.toString()})();`;
+                }
             } else {
                 newCode = `load("${overrideFile}"); ${jsCode};`;
             }

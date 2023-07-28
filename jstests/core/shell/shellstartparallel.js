@@ -4,11 +4,6 @@
 //   uses_parallel_shell,
 // ]
 
-function f() {
-    throw Error("intentional_throw_to_test_assert_throws");
-}
-assert.throws(f);
-
 // verify that join works
 db.sps.drop();
 var awaitShell = startParallelShell("sleep(1000); db.sps.insert({x:1});");
@@ -20,5 +15,30 @@ awaitShell = startParallelShell("db.sps.insert({x:1}); throw Error('intentionall
 var exitCode = awaitShell({checkExitSuccess: false});
 assert.neq(0, exitCode, "expected shell to exit abnormally due to an uncaught exception");
 assert.eq(2, db.sps.count(), "join2 problem?");
+
+// test throwing with checking exit success
+function func() {
+    throw Error("intentional_throw_to_test_assert_throws");
+}
+assert.throws(() => {
+    const awaitShell = startParallelShell(func);
+    awaitShell();
+});
+
+async function asyncFunc() {
+    throw Error("intentional_throw_to_test_assert_throws");
+}
+assert.throws(() => {
+    const awaitShell = startParallelShell(asyncFunc);
+    awaitShell();
+});
+
+const asyncLambda = async () => {
+    throw Error("intentional_throw_to_test_assert_throws");
+};
+assert.throws(() => {
+    const awaitShell = startParallelShell(asyncLambda);
+    awaitShell();
+});
 
 print("shellstartparallel.js SUCCESS");

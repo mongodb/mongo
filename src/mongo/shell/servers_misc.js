@@ -138,11 +138,14 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
 
     // Convert function into call-string
     if (typeof (jsCode) == "function") {
-        jsCode = "(" + jsCode.toString() + ")();";
+        if (jsCode.constructor.name === 'AsyncFunction') {
+            jsCode = `await (${jsCode.toString()})();`;
+        } else {
+            jsCode = `(${jsCode.toString()})();`;
+        }
     } else if (typeof (jsCode) == "string") {
-    }
-    // do nothing
-    else {
+        // do nothing
+    } else {
         throw Error("bad first argument to startParallelShell");
     }
 
