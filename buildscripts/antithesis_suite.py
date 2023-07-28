@@ -22,6 +22,8 @@ HOOKS_BLACKLIST = [
 
 _SUITES_PATH = os.path.join("buildscripts", "resmokeconfig", "suites")
 
+MONGOS_PORT = 27017
+
 
 def delete_archival(suite):
     """Remove archival for Antithesis environment."""
@@ -50,8 +52,22 @@ def use_external_fixture(suite):
     if suite.get("executor", {}).get("fixture", None):
         suite["executor"]["fixture"] = {
             "class": f"External{suite['executor']['fixture']['class']}",
-            "shell_conn_string": "mongodb://mongos:27017"
+            "shell_conn_string": get_mongos_connection_url(suite)
         }
+
+
+def get_mongos_connection_url(suite):
+    """
+    Return the mongos connection URL for suite if Antithesis compatible.
+
+    :param suite: Parsed YAML document for the suite we wish to connect to.
+    :return: Connection url for the suite, or a warning if Antithesis incompatible.
+    """
+    if suite.get("executor", {}).get("fixture", {}).get("num_mongos", None):
+        return "mongodb://" + ",".join(
+            [f"mongos{i}:{MONGOS_PORT}" for i in range(suite['executor']['fixture']['num_mongos'])])
+    else:
+        return "ANTITHESIS_INCOMPATIBLE"
 
 
 def update_test_data(suite):

@@ -271,3 +271,6 @@ package-lock.json
 
 # jstestfuzz generated test directory
 jstestfuzz/
+
+# generated configs for antithesis
+antithesis/antithesis_config

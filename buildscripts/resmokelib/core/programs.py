@@ -94,6 +94,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     remove_set_parameter_if_before_version(suite_set_parameters, "queryAnalysisWriterIntervalSecs",
                                            bin_version, "7.0.0")
     _apply_set_parameters(args, suite_set_parameters)
+    final_mongod_options = mongod_options.copy()
     mongod_options.pop("set_parameters")
 
     # Apply the rest of the command line arguments.
@@ -106,7 +107,8 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
         mongod_options.dump_history(f"{logger.name}_config.yml")
     elif config.EXPORT_MONGOD_CONFIG == "detailed":
         mongod_options.dump_history(f"{logger.name}_config.yml", include_location=True)
-    return make_process(logger, args, **process_kwargs), mongod_options["port"]
+
+    return make_process(logger, args, **process_kwargs), final_mongod_options
 
 
 def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):
@@ -123,6 +125,7 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     remove_set_parameter_if_before_version(
         suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
     _apply_set_parameters(args, suite_set_parameters)
+    final_mongos_options = mongos_options.copy()
     mongos_options.pop("set_parameters")
 
     # Apply the rest of the command line arguments.
@@ -131,7 +134,8 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     _set_keyfile_permissions(mongos_options)
 
     process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
-    return make_process(logger, args, **process_kwargs), mongos_options["port"]
+
+    return make_process(logger, args, **process_kwargs), final_mongos_options
 
 
 def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,

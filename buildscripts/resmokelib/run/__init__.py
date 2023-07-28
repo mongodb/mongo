@@ -948,6 +948,10 @@ class RunPlugin(PluginInterface):
 
         parser.add_argument("--maxTestQueueSize", type=int, dest="max_test_queue_size",
                             help=argparse.SUPPRESS)
+        parser.add_argument(
+            "--createDockerCompose", action="store_true", dest="create_docker_compose", help=
+            ("Creates docker-compose.yml, init scripts, and volume mounts for the suites being ran."
+             ))
 
         parser.add_argument("--tagFile", action="append", dest="tag_files", metavar="TAG_FILES",
                             help="One or more YAML files that associate tests and tags.")

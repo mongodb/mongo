@@ -160,6 +160,9 @@ DEFAULTS = {
 
     # Limit the number of tests to execute
     "max_test_queue_size": None,
+
+    # Antithesis helper
+    "create_docker_compose": False,
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -611,3 +614,6 @@ EXPANSIONS_FILE = "../expansions.yml" if 'CI' in os.environ else None
 # Symbolizer secrets
 SYMBOLIZER_CLIENT_SECRET = None
 SYMBOLIZER_CLIENT_ID = None
+
+# Antithesis helper
+CREATE_DOCKER_COMPOSE = False

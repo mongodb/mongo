@@ -75,6 +75,7 @@ class MongoDFixture(interface.Fixture):
         mongod, _ = launcher.launch_mongod_program(self.logger, self.job_num,
                                                    executable=self.mongod_executable,
                                                    mongod_options=self.mongod_options)
+
         try:
             self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
             mongod.start()
@@ -85,6 +86,14 @@ class MongoDFixture(interface.Fixture):
             raise self.fixturelib.ServerFailure(msg)
 
         self.mongod = mongod
+
+    def get_options(self):
+        """Return the mongod options of this fixture."""
+        launcher = MongodLauncher(self.fixturelib)
+        _, mongod_options = launcher.launch_mongod_program(self.logger, self.job_num,
+                                                           executable=self.mongod_executable,
+                                                           mongod_options=self.mongod_options)
+        return mongod_options
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
