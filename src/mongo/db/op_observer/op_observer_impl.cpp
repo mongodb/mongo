@@ -992,22 +992,19 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         if (opAccumulator) {
             opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
             opAccumulator->opTime.wallClockTime = opTime.wallClockTime;
-        }
 
-        if (oplogEntry.getNeedsRetryImage()) {
-            // If the oplog entry has `needsRetryImage`, copy the image into image collection.
-            const BSONObj& dataImage = [&]() {
-                if (oplogEntry.getNeedsRetryImage().value() == repl::RetryImageEnum::kPreImage) {
-                    return args.updateArgs->preImageDoc;
-                } else {
-                    return args.updateArgs->updatedDoc;
-                }
-            }();
-            auto imageToWrite =
-                repl::ReplOperation::ImageBundle{oplogEntry.getNeedsRetryImage().value(),
-                                                 dataImage,
-                                                 opTime.writeOpTime.getTimestamp()};
-            writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), imageToWrite);
+            // If the oplog entry has `needsRetryImage` (retryable findAndModify), gather the
+            // pre/post image information to be stored in the the image collection.
+            if (oplogEntry.getNeedsRetryImage()) {
+                opAccumulator->retryableFindAndModifyImageToWrite =
+                    repl::ReplOperation::ImageBundle{
+                        oplogEntry.getNeedsRetryImage().value(),
+                        /*imageDoc=*/
+                        (oplogEntry.getNeedsRetryImage().value() == repl::RetryImageEnum::kPreImage
+                             ? args.updateArgs->preImageDoc
+                             : args.updateArgs->updatedDoc),
+                        opTime.writeOpTime.getTimestamp()};
+            }
         }
 
         SessionTxnRecord sessionTxnRecord;

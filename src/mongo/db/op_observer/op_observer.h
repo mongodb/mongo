@@ -89,6 +89,10 @@ struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     OpTimeBundle opTime;
     std::vector<repl::OpTime> insertOpTimes;
 
+    // Temporary pre/post image information for a retryable findAndModify operation to be written
+    // to the image collection (config.image_collection).
+    boost::optional<repl::ReplOperation::ImageBundle> retryableFindAndModifyImageToWrite;
+
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
     OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;

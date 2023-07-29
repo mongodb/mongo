@@ -109,6 +109,12 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
+        '$BUILD_DIR/mongo/db/shard_role',
     ],
 )
 
@@ -178,6 +184,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/transaction/transaction_operations',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         'change_stream_pre_images_op_observer',
+        'find_and_modify_images_op_observer',
         'op_observer_impl',
         'op_observer_util',
         'oplog_writer_impl',

@@ -44,6 +44,10 @@ class FindAndModifyImagesOpObserver final : public OpObserverNoop {
 public:
     FindAndModifyImagesOpObserver() = default;
     ~FindAndModifyImagesOpObserver() = default;
+
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
 };
 
 }  // namespace mongo
