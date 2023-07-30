@@ -1693,10 +1693,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (opAccumulator) {
         opAccumulator->opTime.writeOpTime = commitOpTime;
         opAccumulator->opTime.wallClockTime = wallClockTime;
-    }
-
-    if (imageToWrite) {
-        writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
+        opAccumulator->retryableFindAndModifyImageToWrite = imageToWrite;
     }
 }
 

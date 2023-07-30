@@ -2735,13 +2735,15 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
 }
 
 TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
-    // Create a registry that registers the OpObserverImpl and ChangeStreamPreImagesOpObserver.
-    // Both OpObservers work together to ensure that pre-images for change streams are written
-    // to the side collection. It falls into cases where `ReservedTimes` is expected to be
-    // instantiated. Due to strong encapsulation, we use the registry that managers the
-    // `ReservedTimes` on our behalf.
+    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver.
+    // These OpObservers work together to ensure that images for retryable findAndModify and
+    // change streams are written correctly to the respective side collections.
+    // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
+    // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
     opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
@@ -3456,13 +3458,15 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
 }
 
 TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
-    // Create a registry that registers the OpObserverImpl and ChangeStreamPreImagesOpObserver.
-    // Both OpObservers work together to ensure that pre-images for change streams are written
-    // to the side collection. It falls into cases where `ReservedTimes` is expected to be
-    // instantiated. Due to strong encapsulation, we use the registry that managers the
-    // `ReservedTimes` on our behalf.
+    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver.
+    // These OpObservers work together to ensure that images for retryable findAndModify and
+    // change streams are written correctly to the respective side collections.
+    // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
+    // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
     opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {

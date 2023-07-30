@@ -111,4 +111,13 @@ void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
     writeToImageCollection(opCtx, opAccumulator);
 }
 
+void FindAndModifyImagesOpObserver::onUnpreparedTransactionCommit(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    OpStateAccumulator* opAccumulator) {
+    writeToImageCollection(opCtx, opAccumulator);
+}
+
 }  // namespace mongo
