@@ -103,4 +103,12 @@ void FindAndModifyImagesOpObserver::onUpdate(OperationContext* opCtx,
     writeToImageCollection(opCtx, opAccumulator);
 }
 
+void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
+                                             const CollectionPtr& coll,
+                                             StmtId stmtId,
+                                             const OplogDeleteEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
+    writeToImageCollection(opCtx, opAccumulator);
+}
+
 }  // namespace mongo

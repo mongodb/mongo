@@ -1121,13 +1121,16 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (opAccumulator) {
             opAccumulator->opTime.writeOpTime = opTime.writeOpTime;
             opAccumulator->opTime.wallClockTime = opTime.wallClockTime;
-        }
 
-        if (oplogEntry.getNeedsRetryImage()) {
-            auto imageDoc = *(args.deletedDoc);
-            auto imageToWrite = repl::ReplOperation::ImageBundle{
-                repl::RetryImageEnum::kPreImage, imageDoc, opTime.writeOpTime.getTimestamp()};
-            writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), imageToWrite);
+            // If the oplog entry has `needsRetryImage` (retryable findAndModify), gather the
+            // pre/post image information to be stored in the the image collection.
+            if (oplogEntry.getNeedsRetryImage()) {
+                const auto& dataImage = *(args.deletedDoc);
+                opAccumulator->retryableFindAndModifyImageToWrite =
+                    repl::ReplOperation::ImageBundle{repl::RetryImageEnum::kPreImage,
+                                                     dataImage,
+                                                     opTime.writeOpTime.getTimestamp()};
+            }
         }
 
         SessionTxnRecord sessionTxnRecord;
