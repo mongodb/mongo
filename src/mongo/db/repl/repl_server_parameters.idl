@@ -771,13 +771,6 @@ feature_flags:
         default: false
         shouldBeFCVGated: true
 
-    featureFlagShardSplit:
-        description: When enabled, multitenant migration can use the shard split commands.
-        cpp_varname: feature_flags::gShardSplit
-        default: true
-        version: 6.3
-        shouldBeFCVGated: true
-
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
         cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck

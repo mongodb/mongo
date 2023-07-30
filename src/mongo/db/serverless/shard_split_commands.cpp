@@ -80,10 +80,6 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "Feature 'shard split' not supported",
-                    repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            uassert(ErrorCodes::IllegalOperation,
                     "Shard split is not available on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::None) ||
                         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
@@ -162,10 +158,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "Feature 'shard split' not supported",
-                    repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::CommandNotSupported,
                     "Shard split is only supported in serverless mode",
                     getGlobalReplSettings().isServerless());
@@ -241,10 +233,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "Feature 'shard split' not supported",
-                    repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::CommandNotSupported,
                     "Shard split is only supported in serverless mode",
                     getGlobalReplSettings().isServerless());
