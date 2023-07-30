@@ -72,6 +72,7 @@
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
@@ -1008,9 +1009,8 @@ std::unique_ptr<SlotTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
         paths.emplace_back(elem.fieldNameStringData());
     }
 
-    const bool removeConflictingPaths = true;
     return buildPathTree<boost::optional<sbe::value::SlotId>>(
-        paths, slots.begin(), slots.end(), removeConflictingPaths);
+        paths, slots.begin(), slots.end(), BuildPathTreeMode::RemoveConflictingPaths);
 }
 
 /**
@@ -1056,155 +1056,70 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
     return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
 }
 
-/**
- * For covered projections, each of the projection field paths represent respective index key. To
- * rehydrate index keys into the result object, we first need to convert projection AST into
- * 'SlotTreeNode' structure. Context structure and visitors below are used for this
- * purpose.
- */
-struct IndexKeysBuilderContext {
-    IndexKeysBuilderContext() = default;
-    explicit IndexKeysBuilderContext(std::unique_ptr<SlotTreeNode> root) : root(std::move(root)) {}
-
-    // Contains resulting tree of index keys converted from projection AST.
-    std::unique_ptr<SlotTreeNode> root;
-
-    // Full field path of the currently visited projection node.
-    std::vector<StringData> currentFieldPath;
-
-    // Each projection node has a vector of field names. This stack contains indexes of the
-    // currently visited field names for each of the projection nodes.
-    std::vector<size_t> currentFieldIndex;
+namespace {
+struct GetProjectionNodesData {
+    projection_ast::ProjectType projectType = projection_ast::ProjectType::kInclusion;
+    std::vector<std::string> paths;
+    std::vector<ProjectionNode> nodes;
 };
+using GetProjectionNodesContext =
+    projection_ast::PathTrackingVisitorContext<GetProjectionNodesData>;
 
-/**
- * Covered projections are always inclusion-only, so we ban all other operators.
- */
-class IndexKeysBuilder : public projection_ast::ProjectionASTConstVisitor {
+class GetProjectionNodesVisitor final : public projection_ast::ProjectionASTConstVisitor {
 public:
-    using projection_ast::ProjectionASTConstVisitor::visit;
+    explicit GetProjectionNodesVisitor(GetProjectionNodesContext* context) : _context{context} {}
 
-    IndexKeysBuilder(IndexKeysBuilderContext* context) : _context{context} {}
+    void visit(const projection_ast::BooleanConstantASTNode* node) final {
+        bool isInclusion = _context->data().projectType == projection_ast::ProjectType::kInclusion;
+        auto path = getCurrentPath();
 
-    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
-        tasserted(5474501, "Positional projection is not allowed in simple or covered projections");
-    }
-
-    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
-        tasserted(5474502, "$slice is not allowed in simple or covered projections");
-    }
-
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
-        tasserted(5474503, "$elemMatch is not allowed in simple or covered projections");
-    }
-
-    void visit(const projection_ast::ExpressionASTNode* node) final {
-        tasserted(5474504, "Expressions are not allowed in simple or covered projections");
-    }
-
-    void visit(const projection_ast::MatchExpressionASTNode* node) final {
-        tasserted(
-            5474505,
-            "$elemMatch / positional projection are not allowed in simple or covered projections");
-    }
-
-    void visit(const projection_ast::BooleanConstantASTNode* node) override {}
-
-protected:
-    IndexKeysBuilderContext* _context;
-};
-
-class IndexKeysPreBuilder final : public IndexKeysBuilder {
-public:
-    using IndexKeysBuilder::IndexKeysBuilder;
-    using IndexKeysBuilder::visit;
-
-    void visit(const projection_ast::ProjectionPathASTNode* node) final {
-        _context->currentFieldIndex.push_back(0);
-        _context->currentFieldPath.emplace_back(node->fieldNames().front());
-    }
-};
-
-class IndexKeysInBuilder final : public IndexKeysBuilder {
-public:
-    using IndexKeysBuilder::IndexKeysBuilder;
-    using IndexKeysBuilder::visit;
-
-    void visit(const projection_ast::ProjectionPathASTNode* node) final {
-        auto& currentIndex = _context->currentFieldIndex.back();
-        currentIndex++;
-        _context->currentFieldPath.back() = node->fieldNames()[currentIndex];
-    }
-};
-
-class IndexKeysPostBuilder final : public IndexKeysBuilder {
-public:
-    using IndexKeysBuilder::IndexKeysBuilder;
-    using IndexKeysBuilder::visit;
-
-    void visit(const projection_ast::ProjectionPathASTNode* node) final {
-        _context->currentFieldIndex.pop_back();
-        _context->currentFieldPath.pop_back();
-    }
-
-    void visit(const projection_ast::BooleanConstantASTNode* constantNode) final {
-        if (!constantNode->value()) {
-            // Even though only inclusion is allowed in covered projection, there still can be
-            // {_id: 0} component. We do not need to generate any nodes for it.
+        // For inclusion projections, if we encounter "{_id: 0}" we ignore it. Likewise, for
+        // exclusion projections, if we encounter "{_id: 1}" we ignore it. ("_id" is the only
+        // field that gets special treatment by the projection parser, so it's the only field
+        // where this check is necessary.)
+        if (isInclusion != node->value() && path == "_id") {
             return;
         }
 
-        // Insert current field path into the index keys tree if it does not exist yet.
-        auto* node = _context->root.get();
-        for (const auto& part : _context->currentFieldPath) {
-            if (auto child = node->findChild(part)) {
-                node = child;
-            } else {
-                node = node->emplace_back(std::string(part));
-            }
-        }
+        _context->data().paths.emplace_back(std::move(path));
+        _context->data().nodes.emplace_back(node);
     }
-};
-
-std::unique_ptr<SlotTreeNode> buildSlotTreeForProjection(const projection_ast::Projection& proj) {
-    IndexKeysBuilderContext context{std::make_unique<SlotTreeNode>()};
-    IndexKeysPreBuilder preVisitor{&context};
-    IndexKeysInBuilder inVisitor{&context};
-    IndexKeysPostBuilder postVisitor{&context};
-
-    projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
-
-    tree_walker::walk<true, projection_ast::ASTNode>(proj.root(), &walker);
-
-    return std::move(context.root);
-}
-
-namespace {
-class ProjectionExprDepsBuilder final : public projection_ast::ProjectionASTConstVisitor {
-public:
-    explicit ProjectionExprDepsBuilder(DepsTracker* deps) : _deps(deps) {}
-
     void visit(const projection_ast::ExpressionASTNode* node) final {
-        expression::addDependencies(node->expressionRaw(), _deps);
+        _context->data().paths.emplace_back(getCurrentPath());
+        _context->data().nodes.emplace_back(node);
     }
-
+    void visit(const projection_ast::ProjectionSliceASTNode* node) final {
+        _context->data().paths.emplace_back(getCurrentPath());
+        _context->data().nodes.emplace_back(node);
+    }
+    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {
+        tasserted(7580705, "Positional projections are not supported in SBE");
+    }
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        tasserted(7580706, "ElemMatch projections are not supported in SBE");
+    }
     void visit(const projection_ast::ProjectionPathASTNode* node) final {}
-    void visit(const projection_ast::BooleanConstantASTNode* node) final {}
-    void visit(const projection_ast::ProjectionSliceASTNode* node) final {}
-    void visit(const projection_ast::ProjectionPositionalASTNode* node) final {}
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {}
     void visit(const projection_ast::MatchExpressionASTNode* node) final {}
 
 private:
-    DepsTracker* _deps = nullptr;
+    std::string getCurrentPath() {
+        return _context->fullPath().fullPath();
+    }
+
+    GetProjectionNodesContext* _context;
 };
 }  // namespace
 
-void addProjectionExprDependencies(const projection_ast::Projection& projection,
-                                   DepsTracker* deps) {
-    ProjectionExprDepsBuilder visitor{deps};
-    projection_ast::ProjectionASTConstWalker walker{nullptr, nullptr, &visitor};
+std::pair<std::vector<std::string>, std::vector<ProjectionNode>> getProjectionNodes(
+    const projection_ast::Projection& projection) {
+    GetProjectionNodesContext ctx{{projection.type(), {}, {}}};
+    GetProjectionNodesVisitor visitor(&ctx);
+
+    projection_ast::PathTrackingConstWalker<GetProjectionNodesData> walker{&ctx, {}, {&visitor}};
+
     tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
+
+    return {std::move(ctx.data().paths), std::move(ctx.data().nodes)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFieldsToSlots(
@@ -1249,8 +1164,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     // Handle the case where 'fields' contains at least one dotted path. We begin by creating a
     // path tree from 'fields'.
     using Node = PathTreeNode<EvalExpr>;
-    const bool removeConflictingPaths = false;
-    auto treeRoot = buildPathTree<EvalExpr>(fields, removeConflictingPaths);
+    auto treeRoot = buildPathTree<EvalExpr>(fields, BuildPathTreeMode::AllowConflictingPaths);
 
     std::vector<Node*> fieldNodes;
     for (const auto& field : fields) {

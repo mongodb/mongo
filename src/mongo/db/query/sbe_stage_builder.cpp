@@ -1912,7 +1912,13 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     // intentionally ignore any basic inclusions that are part of the projection (ex. {a:1})
     // for the purposes of populating 'fields'.
     DepsTracker deps;
-    addProjectionExprDependencies(projection, &deps);
+    auto [_, nodes] = getProjectionNodes(projection);
+    for (auto&& node : nodes) {
+        if (node.isExpr()) {
+            expression::addDependencies(node.getExpr(), &deps);
+        }
+    }
+
     auto fields =
         !deps.needWholeDocument ? getTopLevelFields(deps.fields) : std::vector<std::string>{};
 
@@ -1954,19 +1960,10 @@ SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* ro
     tassert(
         7055403, "buildProjectionDefaultCovered() expected 'pn' to not be fetched", !pn->fetched());
 
-    auto pathTreeRoot = buildSlotTreeForProjection(pn->proj);
-
-    std::vector<std::string> fields;
-    std::vector<SlotTreeNode*> patternNodesForSlots;
-    visitPathTreeNodes(
-        pathTreeRoot.get(), nullptr /* preVisit */, [&](SlotTreeNode* n, const std::string& path) {
-            if (n->children.empty()) {
-                // Store the path of each leaf node in 'fields'.
-                fields.emplace_back(path);
-                // Store a pointer to each leaf node in 'patternNodesForSlots'.
-                patternNodesForSlots.push_back(n);
-            }
-        });
+    auto [paths, _] = getProjectionNodes(projection);
+    auto fields = std::move(paths);
+    auto pathTreeRoot = buildPathTree<boost::optional<sbe::value::SlotId>>(
+        fields, BuildPathTreeMode::AssertNoConflictingPaths);
 
     auto fieldsSet = StringDataSet{fields.begin(), fields.end()};
     auto additionalFields =
@@ -1984,7 +1981,13 @@ SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* ro
     if (reqs.has(kResult) || !additionalFields.empty()) {
         // Extract slots corresponding to each of the projection field paths.
         for (size_t i = 0; i < fields.size(); i++) {
-            patternNodesForSlots[i]->value =
+            auto matchPath = sbe::MatchPath{fields[i]};
+            auto node = pathTreeRoot->findLeafNode(matchPath);
+            tassert(7580700,
+                    str::stream() << "Expected to find '" << fields[i] << "' in the path tree",
+                    node != nullptr);
+
+            node->value =
                 outputs.get(std::make_pair(PlanStageSlots::kField, StringData(fields[i])));
         }
         // Build the expression to create object with requested projection field paths.

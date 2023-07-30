@@ -785,8 +785,6 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
                                                   const sbe::value::SlotVector& indexKeySlots,
                                                   sbe::value::SlotId resultSlot);
 
-std::unique_ptr<SlotTreeNode> buildSlotTreeForProjection(const projection_ast::Projection& proj);
-
 template <typename T>
 inline const char* getRawStringData(const T& str) {
     if constexpr (std::is_same_v<T, StringData>) {
@@ -796,11 +794,17 @@ inline const char* getRawStringData(const T& str) {
     }
 }
 
+enum class BuildPathTreeMode {
+    AllowConflictingPaths,
+    RemoveConflictingPaths,
+    AssertNoConflictingPaths,
+};
+
 template <typename T, typename IterT, typename StringT>
-inline auto buildPathTreeImpl(const std::vector<StringT>& paths,
-                              boost::optional<IterT> valsBegin,
-                              boost::optional<IterT> valsEnd,
-                              bool removeConflictingPaths) {
+inline std::unique_ptr<PathTreeNode<T>> buildPathTreeImpl(const std::vector<StringT>& paths,
+                                                          boost::optional<IterT> valsBegin,
+                                                          boost::optional<IterT> valsEnd,
+                                                          BuildPathTreeMode mode) {
     auto tree = std::make_unique<PathTreeNode<T>>();
     auto valsIt = std::move(valsBegin);
 
@@ -821,29 +825,43 @@ inline auto buildPathTreeImpl(const std::vector<StringT>& paths,
             node = child;
         }
 
-        // When 'removeConflictingPaths' is true, if we're processing a sub-path of another path
-        // that's already been processed, then we should ignore the sub-path.
-        const bool ignorePath = (removeConflictingPaths && node->isLeaf() && node != tree.get());
-        if (!ignorePath) {
-            if (i < numParts) {
-                node = node->emplace_back(std::string(part));
-                for (++i; i < numParts; ++i) {
-                    node = node->emplace_back(std::string(path.getPart(i)));
+        if (mode == BuildPathTreeMode::AssertNoConflictingPaths) {
+            // If mode == AssertNoConflictingPaths, assert that no conflicting paths exist as
+            // we build the path tree.
+            tassert(7580701,
+                    "Expected 'paths' to not contain any conflicting paths",
+                    (node->isLeaf() && i == 0) || (!node->isLeaf() && i < numParts));
+        } else if (mode == BuildPathTreeMode::RemoveConflictingPaths) {
+            if (node->isLeaf() && i != 0) {
+                // If 'mode == RemoveConflictingPaths' and we're about to process a path P and we've
+                // already processed some other path that is a prefix of P, then ignore P.
+                if (valsIt) {
+                    ++(*valsIt);
                 }
-            } else if (removeConflictingPaths && !node->isLeaf()) {
-                // If 'removeConflictingPaths' is true, delete any children that 'node' has.
+
+                continue;
+            } else if (!node->isLeaf() && i == numParts) {
+                // If 'mode == RemoveConflictingPaths' and we're about to process a path P that is a
+                // prefix of another path that's already been processed, then delete the children of
+                // 'node' to remove the longer conflicting path(s).
                 node->clearChildren();
             }
-            if (valsIt) {
-                tassert(7182003,
-                        "buildPathTreeImpl() did not expect iterator 'valsIt' to reach the end",
-                        !valsEnd || *valsIt != *valsEnd);
+        }
 
-                node->value = **valsIt;
+        if (i < numParts) {
+            node = node->emplace_back(std::string(part));
+            for (++i; i < numParts; ++i) {
+                node = node->emplace_back(std::string(path.getPart(i)));
             }
         }
 
         if (valsIt) {
+            tassert(7182003,
+                    "Did not expect iterator 'valsIt' to reach the end yet",
+                    !valsEnd || *valsIt != *valsEnd);
+
+            node->value = **valsIt;
+
             ++(*valsIt);
         }
     }
@@ -854,66 +872,71 @@ inline auto buildPathTreeImpl(const std::vector<StringT>& paths,
 /**
  * Builds a path tree from a set of paths and returns the root node of the tree.
  *
- * If 'removeConflictingPaths' is false, this function will build a tree that contains all paths
+ * If 'mode == AllowConflictingPaths', this function will build a tree that contains all paths
  * specified in 'paths' (regardless of whether there are any paths that conflict).
  *
- * If 'removeConflictingPaths' is true, when there are two conflicting paths (ex. "a" and "a.b")
+ * If 'mode == RemoveConflictingPaths', when there are two conflicting paths (ex. "a" and "a.b")
  * the conflict is resolved by removing the longer path ("a.b") and keeping the shorter path ("a").
+ *
+ * If 'mode == AssertNoConflictingPaths', this function will tassert() if it encounters any
+ * conflicting paths.
  */
 template <typename T, typename StringT>
-auto buildPathTree(const std::vector<StringT>& paths, bool removeConflictingPaths) {
+std::unique_ptr<PathTreeNode<T>> buildPathTree(const std::vector<StringT>& paths,
+                                               BuildPathTreeMode mode) {
     return buildPathTreeImpl<T, std::move_iterator<typename std::vector<T>::iterator>, StringT>(
-        paths, boost::none, boost::none, removeConflictingPaths);
+        paths, boost::none, boost::none, mode);
 }
 
 /**
  * Builds a path tree from a set of paths, assigns a sequence of values to the sequence of nodes
  * corresponding to each path, and returns the root node of the tree.
  *
- * The 'values' sequence/vector and the 'paths' vector are expected to have the same number of
- * elements. The nth value in the the 'values' sequence will be assigned to the node corresponding
- * to the nth path in 'paths'.
+ * The 'values' sequence and the 'paths' vector are expected to have the same number of elements.
+ * The kth value in the 'values' sequence will be assigned to the node corresponding to the kth path
+ * in 'paths'.
  *
- * If 'removeConflictingPaths' is false, this function will build a tree that contains all paths
+ * If 'mode == AllowConflictingPaths', this function will build a tree that contains all paths
  * specified in 'paths' (regardless of whether there are any paths that conflict).
  *
- * If 'removeConflictingPaths' is true, when there are two conflicting paths (ex. "a" and "a.b")
+ * If 'mode == RemoveConflictingPaths', when there are two conflicting paths (ex. "a" and "a.b")
  * the conflict is resolved by removing the longer path ("a.b") and keeping the shorter path ("a").
- * Note that when a path from 'paths' is removed due to a conflict, the corresponding value in
- * 'values' will be ignored.
+ *
+ * If 'mode == AssertNoConflictingPaths', this function will tassert() if it encounters any
+ * conflicting paths.
  */
 template <typename T, typename IterT, typename StringT>
-auto buildPathTree(const std::vector<StringT>& paths,
-                   IterT valuesBegin,
-                   IterT valuesEnd,
-                   bool removeConflictingPaths) {
+std::unique_ptr<PathTreeNode<T>> buildPathTree(const std::vector<StringT>& paths,
+                                               IterT valuesBegin,
+                                               IterT valuesEnd,
+                                               BuildPathTreeMode mode) {
     return buildPathTreeImpl<T, IterT, StringT>(
-        paths, std::move(valuesBegin), std::move(valuesEnd), removeConflictingPaths);
+        paths, std::move(valuesBegin), std::move(valuesEnd), mode);
 }
 
 template <typename T, typename U>
-auto buildPathTree(const std::vector<std::string>& paths,
-                   const std::vector<U>& values,
-                   bool removeConflictingPaths) {
+std::unique_ptr<PathTreeNode<T>> buildPathTree(const std::vector<std::string>& paths,
+                                               const std::vector<U>& values,
+                                               BuildPathTreeMode mode) {
     tassert(7182004,
-            "buildPathTreeImpl() expects 'paths' and 'values' to be the same size",
+            "buildPathTree() expects 'paths' and 'values' to be the same size",
             paths.size() == values.size());
 
-    return buildPathTree<T>(paths, values.begin(), values.end(), removeConflictingPaths);
+    return buildPathTree<T>(paths, values.begin(), values.end(), mode);
 }
 
 template <typename T, typename U>
-auto buildPathTree(const std::vector<std::string>& paths,
-                   std::vector<U>&& values,
-                   bool removeConflictingPaths) {
+std::unique_ptr<PathTreeNode<T>> buildPathTree(const std::vector<std::string>& paths,
+                                               std::vector<U>&& values,
+                                               BuildPathTreeMode mode) {
     tassert(7182005,
-            "buildPathTreeImpl() expects 'paths' and 'values' to be the same size",
+            "buildPathTree() expects 'paths' and 'values' to be the same size",
             paths.size() == values.size());
 
     return buildPathTree<T>(paths,
                             std::make_move_iterator(values.begin()),
                             std::make_move_iterator(values.end()),
-                            removeConflictingPaths);
+                            mode);
 }
 
 /**
@@ -1022,12 +1045,12 @@ inline bool invokeVisitPathTreeNodesCallback(
  * Likewise, assuming 'postVisit' is not null, the 'postVisit' callback must support one of the
  * signatures listed above. For details, see invokeVisitPathTreeNodesCallback().
  *
- * The 'preVisit' callback can return any type. If preVisit's return type is not bool or if
- * 'preVisit' returns boolean true, then preVisit's return value is ignored. If preVisit's return
- * type is bool _and_ preVisit returns boolean false, then the node that was just pre-visited will
- * be "skipped" and its descendents will not be visited (i.e. instead of the DFS descending, it will
- * backtrack), and likewise the 'postVisit' callback will be "skipped" as well and won't be invoked
- * for the node.
+ * The 'preVisit' callback can return any type. If preVisit's return type is not 'bool', its return
+ * value will be ignored at run time. If preVisit's return type _is_ 'bool', then its return value
+ * at run time will be used to decide whether the current node should be "skipped". If preVisit()
+ * returns false, then the current node will be "skipped", its descendents will not be visited (i.e.
+ * instead of the DFS descending, it will backtrack), and the 'postVisit' will not be called for the
+ * node.
  *
  * The 'postVisit' callback can return any type. postVisit's return value (if any) is ignored.
  *
@@ -1122,14 +1145,70 @@ void visitPathTreeNodes(PathTreeNode<T>* treeRoot,
 }
 
 /**
- * This function extracts the dependencies for expressions that appear inside a projection. Note
- * that this function only looks at ExpressionASTNodes in the projection and ignores all other kinds
- * of projection AST nodes.
- *
- * For example, for the projection {a: 1, b: "$c"}, this function will only extract the dependencies
- * needed by the expression "$c".
+ * Simple tagged pointer to a projection AST node. This class provides some useful methods for
+ * extracting information from the AST node.
  */
-void addProjectionExprDependencies(const projection_ast::Projection& projection, DepsTracker* deps);
+class ProjectionNode {
+public:
+    using ASTNode = projection_ast::ASTNode;
+    using BooleanConstantASTNode = projection_ast::BooleanConstantASTNode;
+    using ExpressionASTNode = projection_ast::ExpressionASTNode;
+    using ProjectionSliceASTNode = projection_ast::ProjectionSliceASTNode;
+
+    using SliceInfo = std::pair<int32_t, boost::optional<int32_t>>;
+
+    enum class Type { kBool, kExpr, kSlice };
+
+    struct Keep {};
+    struct Drop {};
+
+    ProjectionNode() = default;
+    ProjectionNode(const BooleanConstantASTNode* n) : _type(Type::kBool), _boolVal(n->value()) {}
+    ProjectionNode(const ExpressionASTNode* n) : _type(Type::kExpr), _node(n) {}
+    ProjectionNode(const ProjectionSliceASTNode* n) : _type(Type::kSlice), _node(n) {}
+    ProjectionNode(Keep) : _type(Type::kBool), _boolVal(true) {}
+    ProjectionNode(Drop) : _type(Type::kBool), _boolVal(false) {}
+
+    Type type() const {
+        return _type;
+    }
+
+    bool isBool() const {
+        return type() == Type::kBool;
+    }
+    bool isExpr() const {
+        return type() == Type::kExpr;
+    }
+    bool isSlice() const {
+        return type() == Type::kSlice;
+    }
+
+    bool getBool() const {
+        tassert(7580702, "getBool() expected type() to be kBool", isBool());
+        return _boolVal;
+    }
+    Expression* getExpr() const {
+        tassert(7580703, "getExpr() expected type() to be kExpr", isExpr());
+        return static_cast<const ExpressionASTNode*>(_node)->expressionRaw();
+    }
+    SliceInfo getSlice() const {
+        tassert(7580704, "getSlice() expected type() to be kSlice", isSlice());
+        auto sliceNode = static_cast<const ProjectionSliceASTNode*>(_node);
+        return SliceInfo{sliceNode->limit(), sliceNode->skip()};
+    }
+
+private:
+    Type _type{};
+    bool _boolVal{false};
+    const ASTNode* _node{nullptr};
+};
+
+/**
+ * This function converts from projection AST to a pair of vectors: a vector of field paths and a
+ * vector of ProjectionNodes.
+ */
+std::pair<std::vector<std::string>, std::vector<ProjectionNode>> getProjectionNodes(
+    const projection_ast::Projection& projection);
 
 /**
  * This method retrieves the values of the specified field paths ('fields') from 'resultSlot'
