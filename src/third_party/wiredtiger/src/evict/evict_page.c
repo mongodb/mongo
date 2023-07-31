@@ -84,6 +84,89 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     return (ret);
 }
 
+#define WT_EVICT_STATS_CLEAN 0x01
+#define WT_EVICT_STATS_FORCE_HS 0x02
+#define WT_EVICT_STATS_SUCCESS 0x04
+#define WT_EVICT_STATS_URGENT 0x08
+
+/*
+ * __evict_stats_update --
+ *     Update the stats of eviction.
+ *
+ */
+static void
+__evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
+{
+    WT_CONNECTION_IMPL *conn;
+    uint64_t eviction_time, eviction_time_milliseconds;
+
+    conn = S2C(session);
+
+    if (session->evict_timeline.reentry_hs_eviction) {
+        session->evict_timeline.reentry_hs_evict_finish = __wt_clock(session);
+        eviction_time = WT_CLOCKDIFF_US(session->evict_timeline.reentry_hs_evict_finish,
+          session->evict_timeline.reentry_hs_evict_start);
+    } else {
+        session->evict_timeline.evict_finish = __wt_clock(session);
+        eviction_time = WT_CLOCKDIFF_US(
+          session->evict_timeline.evict_finish, session->evict_timeline.evict_start);
+    }
+    if (LF_ISSET(WT_EVICT_STATS_SUCCESS)) {
+        if (LF_ISSET(WT_EVICT_STATS_URGENT)) {
+            if (LF_ISSET(WT_EVICT_STATS_FORCE_HS))
+                WT_STAT_CONN_INCR(session, cache_eviction_force_hs_success);
+            if (LF_ISSET(WT_EVICT_STATS_CLEAN)) {
+                WT_STAT_CONN_INCR(session, cache_eviction_force_clean);
+                WT_STAT_CONN_INCRV(session, cache_eviction_force_clean_time, eviction_time);
+            } else {
+                WT_STAT_CONN_INCR(session, cache_eviction_force_dirty);
+                WT_STAT_CONN_INCRV(session, cache_eviction_force_dirty_time, eviction_time);
+            }
+        }
+
+        if (LF_ISSET(WT_EVICT_STATS_CLEAN))
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_clean);
+        else
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_dirty);
+
+        /* Count page evictions in parallel with checkpoint. */
+        if (conn->txn_global.checkpoint_running)
+            WT_STAT_CONN_INCR(session, cache_eviction_pages_in_parallel_with_checkpoint);
+    } else {
+        if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
+            if (LF_ISSET(WT_EVICT_STATS_FORCE_HS))
+                WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
+            WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
+            WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time, eviction_time);
+        }
+
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_fail);
+    }
+    if (!session->evict_timeline.reentry_hs_eviction) {
+        eviction_time_milliseconds = eviction_time / WT_THOUSAND;
+        if (eviction_time_milliseconds > conn->cache->evict_max_ms)
+            conn->cache->evict_max_ms = eviction_time_milliseconds;
+        if (eviction_time_milliseconds > WT_MINUTE * WT_THOUSAND)
+            __wt_verbose(session, WT_VERB_EVICT,
+              "Warning: Eviction took more than 1 minute (%" PRIu64
+              "). Building disk image took %" PRIu64 "us. History store wrapup took %" PRIu64 "us.",
+              eviction_time,
+              WT_CLOCKDIFF_US(session->reconcile_timeline.image_build_finish,
+                session->reconcile_timeline.image_build_start),
+              WT_CLOCKDIFF_US(session->reconcile_timeline.hs_wrapup_finish,
+                session->reconcile_timeline.hs_wrapup_start));
+    } else {
+        /*
+         * We are in the reentrant history store eviction inside a data store reconciliation. Add to
+         * the total time taken to do the reentrant history store eviction.
+         */
+        session->reconcile_timeline.total_reentry_hs_eviction_time +=
+          WT_CLOCKDIFF_MS(session->evict_timeline.reentry_hs_evict_finish,
+            session->evict_timeline.reentry_hs_evict_start);
+        session->evict_timeline.reentry_hs_eviction = false;
+    }
+}
+
 /*
  * __wt_evict --
  *     Evict a page.
@@ -94,15 +177,15 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
-    uint64_t eviction_time, eviction_time_seconds;
-    bool clean_page, closing, force_evict_hs, inmem_split, local_gen, tree_dead;
+    uint8_t stats_flags;
+    bool clean_page, closing, inmem_split, local_gen, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
-    force_evict_hs = false;
+    stats_flags = 0;
+    clean_page = false;
     local_gen = false;
-    eviction_time = eviction_time_seconds = 0;
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -111,30 +194,38 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     if (tree_dead)
         LF_SET(WT_EVICT_CALL_NO_SPLIT);
 
+    /* As re-entry into eviction is possible, only clear the statistics on the first entry. */
+    if (__wt_session_gen((session), (WT_GEN_EVICT)) == 0) {
+        WT_CLEAR(session->reconcile_timeline);
+        WT_CLEAR(session->evict_timeline);
+        session->evict_timeline.evict_start = __wt_clock(session);
+    } else {
+        session->evict_timeline.reentry_hs_eviction = true;
+        session->evict_timeline.reentry_hs_evict_start = __wt_clock(session);
+    }
+
     /*
-     * Enter the eviction generation. If we re-enter eviction, leave the previous eviction
-     * generation (which must be as low as the current generation), untouched.
+     * Enter the eviction generation. If we re-enter eviction, leave the previous generation (which
+     * must be as low as the current generation), untouched.
      */
     if (__wt_session_gen(session, WT_GEN_EVICT) == 0) {
         local_gen = true;
         __wt_session_gen_enter(session, WT_GEN_EVICT);
     }
 
-    WT_CLEAR(session->reconcile_timeline);
-    WT_CLEAR(session->evict_timeline);
-    session->evict_timeline.evict_start = __wt_clock(session);
     /*
      * Immediately increment the forcible eviction counter, we might do an in-memory split and not
      * an eviction, which skips the other statistics.
      */
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
+        FLD_SET(stats_flags, WT_EVICT_STATS_URGENT);
         WT_STAT_CONN_INCR(session, cache_eviction_force);
 
         /*
          * Track history store pages being force evicted while holding a history store cursor open.
          */
         if (session->hs_cursor_counter > 0 && WT_IS_HS(session->dhandle)) {
-            force_evict_hs = true;
+            FLD_SET(stats_flags, WT_EVICT_STATS_FORCE_HS);
             WT_STAT_CONN_INCR(session, cache_eviction_force_hs);
         }
     }
@@ -186,7 +277,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         conn->cache->evict_max_page_size = page->memory_footprint;
 
     /* Figure out whether reconciliation was done on the page */
-    clean_page = __wt_page_evict_clean(page);
+    if (__wt_page_evict_clean(page)) {
+        clean_page = true;
+        FLD_SET(stats_flags, WT_EVICT_STATS_CLEAN);
+    }
 
     /* Update the reference and discard the page. */
     if (__wt_ref_is_root(ref))
@@ -203,59 +297,18 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
      * We have loaded the new disk image and updated the tree structure. We can no longer fail after
      * this point.
      */
-    session->evict_timeline.evict_finish = __wt_clock(session);
-    eviction_time =
-      WT_CLOCKDIFF_US(session->evict_timeline.evict_finish, session->evict_timeline.evict_start);
-    if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
-        if (force_evict_hs)
-            WT_STAT_CONN_INCR(session, cache_eviction_force_hs_success);
-        if (clean_page) {
-            WT_STAT_CONN_INCR(session, cache_eviction_force_clean);
-            WT_STAT_CONN_INCRV(session, cache_eviction_force_clean_time, eviction_time);
-        } else {
-            WT_STAT_CONN_INCR(session, cache_eviction_force_dirty);
-            WT_STAT_CONN_INCRV(session, cache_eviction_force_dirty_time, eviction_time);
-        }
-    }
-    if (clean_page)
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_clean);
-    else
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_dirty);
-
-    /* Count page evictions in parallel with checkpoint. */
-    if (conn->txn_global.checkpoint_running)
-        WT_STAT_CONN_INCR(session, cache_eviction_pages_in_parallel_with_checkpoint);
 
     if (0) {
 err:
         if (!closing)
             __evict_exclusive_clear(session, ref, previous_state);
-        session->evict_timeline.evict_finish = __wt_clock(session);
-        eviction_time = WT_CLOCKDIFF_US(
-          session->evict_timeline.evict_finish, session->evict_timeline.evict_start);
-        if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
-            if (force_evict_hs)
-                WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
-            WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
-            WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time, eviction_time);
-        }
-
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_fail);
     }
 
 done:
-    eviction_time_seconds = eviction_time / WT_MILLION;
-    if (eviction_time_seconds > conn->cache->evict_max_seconds)
-        conn->cache->evict_max_seconds = eviction_time_seconds;
-    if (eviction_time_seconds > 60)
-        __wt_verbose(session, WT_VERB_EVICT,
-          "Warning: eviction took more than 1 minute (%" PRIu64
-          "). Building disk image took %" PRIu64 "us. History store wrapup took %" PRIu64 "us.",
-          eviction_time,
-          WT_CLOCKDIFF_US(session->reconcile_timeline.image_build_finish,
-            session->reconcile_timeline.image_build_start),
-          WT_CLOCKDIFF_US(session->reconcile_timeline.hs_wrapup_finish,
-            session->reconcile_timeline.hs_wrapup_start));
+    if (ret == 0)
+        FLD_SET(stats_flags, WT_EVICT_STATS_SUCCESS);
+    __evict_stats_update(session, stats_flags);
+
     /* Leave any local eviction generation. */
     if (local_gen)
         __wt_session_gen_leave(session, WT_GEN_EVICT);
