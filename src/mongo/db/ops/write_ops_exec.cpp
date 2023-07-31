@@ -769,25 +769,27 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     return boost::none;
 }
 
-UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      CurOp* curOp,
-                                      OpDebug* opDebug,
-                                      bool inTransaction,
-                                      bool remove,
-                                      bool upsert,
-                                      boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest& updateRequest) {
+UpdateResult performUpdate(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CurOp* curOp,
+                           OpDebug* opDebug,
+                           bool inTransaction,
+                           bool remove,
+                           bool upsert,
+                           const boost::optional<mongo::UUID>& collectionUUID,
+                           boost::optional<BSONObj>& docFound,
+                           const UpdateRequest& updateRequest) {
     auto [isTimeseriesUpdate, nsString] = timeseries::isTimeseries(opCtx, updateRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
             !isTimeseriesUpdate || !opCtx->isRetryableWrite());
 
-    auto collection = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
+    auto collection =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
+                          MODE_IX);
     auto dbName = nsString.dbName();
     Database* db = [&]() {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
@@ -882,23 +884,25 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
     return updateResult;
 }
 
-long long writeConflictRetryRemove(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const DeleteRequest& deleteRequest,
-                                   CurOp* curOp,
-                                   OpDebug* opDebug,
-                                   bool inTransaction,
-                                   boost::optional<BSONObj>& docFound) {
+long long performDelete(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const DeleteRequest& deleteRequest,
+                        CurOp* curOp,
+                        OpDebug* opDebug,
+                        bool inTransaction,
+                        const boost::optional<mongo::UUID>& collectionUUID,
+                        boost::optional<BSONObj>& docFound) {
     auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, deleteRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
             !isTimeseriesDelete || !opCtx->isRetryableWrite());
 
-    const auto collection = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
-        MODE_IX);
+    const auto collection =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
+                          MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
 
     ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);

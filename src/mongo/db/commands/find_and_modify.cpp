@@ -529,8 +529,14 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 deleteRequest.setStmtId(stmtId);
             }
             boost::optional<BSONObj> docFound;
-            write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
+            write_ops_exec::performDelete(opCtx,
+                                          nsString,
+                                          deleteRequest,
+                                          curOp,
+                                          opDebug,
+                                          inTransaction,
+                                          boost::none,
+                                          docFound);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -561,15 +567,16 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 try {
                     boost::optional<BSONObj> docFound;
                     auto updateResult =
-                        write_ops_exec::writeConflictRetryUpsert(opCtx,
-                                                                 nsString,
-                                                                 curOp,
-                                                                 opDebug,
-                                                                 inTransaction,
-                                                                 req.getRemove().value_or(false),
-                                                                 req.getUpsert().value_or(false),
-                                                                 docFound,
-                                                                 updateRequest);
+                        write_ops_exec::performUpdate(opCtx,
+                                                      nsString,
+                                                      curOp,
+                                                      opDebug,
+                                                      inTransaction,
+                                                      req.getRemove().value_or(false),
+                                                      req.getUpsert().value_or(false),
+                                                      boost::none,
+                                                      docFound,
+                                                      updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 

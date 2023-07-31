@@ -1,0 +1,38 @@
+/**
+ * Overrides the runCommand method to convert specified CRUD ops into bulkWrite commands.
+ * Converts the bulkWrite responses into the original CRUD response.
+ * This override takes single CRUD ops and sends a bulkWrite and does not batch multiple CRUD ops.
+ */
+(function() {
+'use strict';
+
+// load util functions
+load("jstests/libs/crud_ops_to_bulk_write_lib.js");
+load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+
+function runCommandSingleOpBulkWriteOverride(
+    conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+    let cmdNameLower = cmdName.toLowerCase();
+    if (BulkWriteUtils.canProcessAsBulkWrite(cmdNameLower)) {
+        BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
+        try {
+            let response = BulkWriteUtils.flushCurrentBulkWriteBatch(
+                conn, originalRunCommand, makeRunCommandArgs);
+            assert.eq(response.length, 1);
+            BulkWriteUtils.resetBulkWriteBatch();
+            return response[0];
+        } catch (error) {
+            // In case of error reset the batch.
+            BulkWriteUtils.resetBulkWriteBatch();
+            throw error;
+        }
+    }
+
+    // Non-CRUD op, run command as normal and return results.
+    return originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
+}
+
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);
+})();

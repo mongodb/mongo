@@ -86,7 +86,7 @@ var OverrideHelpers = (function() {
                                 commandName,
                                 commandObj,
                                 mongoRunCommandOriginal,
-                                (commandObj) => [dbName, commandObj, options]);
+                                (commandObj, db = dbName) => [db, commandObj, options]);
         };
     }
 
