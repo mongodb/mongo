@@ -83,7 +83,7 @@ __compact_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
     /* If rewriting the page, have reconciliation write new blocks. */
     if (!*skipp)
-        F_SET_ATOMIC(ref->page, WT_PAGE_COMPACTION_WRITE);
+        F_SET_ATOMIC_16(ref->page, WT_PAGE_COMPACTION_WRITE);
 
     return (0);
 }
