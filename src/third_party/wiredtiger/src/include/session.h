@@ -133,6 +133,25 @@ struct __wt_session_impl {
     } * scratch_track;
 #endif
 
+    /* Record the important timestamps of each stage in an reconciliation. */
+    struct __wt_reconcile_timeline {
+        uint64_t reconcile_start;
+        uint64_t image_build_start;
+        uint64_t image_build_finish;
+        uint64_t hs_wrapup_start;
+        uint64_t hs_wrapup_finish;
+        uint64_t reconcile_finish;
+    } reconcile_timeline;
+
+    /*
+     * Record the important timestamps of each stage in an eviction. If an eviction takes a long
+     * time and times out, we can trace the time usage of each stage from this information.
+     */
+    struct __wt_evict_timeline {
+        uint64_t evict_start;
+        uint64_t evict_finish;
+    } evict_timeline;
+
     WT_ITEM err; /* Error buffer */
 
     WT_TXN_ISOLATION isolation;
