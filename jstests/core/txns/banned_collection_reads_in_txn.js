@@ -17,7 +17,7 @@ testDB.runCommand({create: "foo", viewOn: "bar", pipeline: []});
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+                             [ErrorCodes.OperationNotSupportedInTransaction, 51071]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -44,6 +44,6 @@ assert.neq(null, systemViewsUUID, "did not find UUID for system.views");
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+                             [ErrorCodes.OperationNotSupportedInTransaction, 51070, 7195700]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 }());
