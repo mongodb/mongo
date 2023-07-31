@@ -133,20 +133,6 @@ structs:
                 type: object
                 optional: true
                 stability: unstable
-            return:
-                description: "When set to 'post', returns the modified document
-                              rather than the original. 'pre' returns the original.
-                              Default is to not return either."
-                type: string
-                optional: true
-                validator:
-                    callback: validateUpdateReturn
-                stability: unstable
-            returnFields:
-                description: "A subset of fields to return."
-                type: object
-                optional: true
-                stability: unstable
 
     BulkWriteDeleteOp:
         description: "A struct representing deletes in the 'bulkWrite' command."
@@ -182,15 +168,6 @@ structs:
             sort:
                 description: "Determines which document the operation modifies if the query selects
                               multiple documents."
-                type: object
-                optional: true
-                stability: unstable
-            return:
-                description: "When true, returns the deleted document rather than nothing."
-                type: optionalBool
-                stability: unstable
-            returnFields:
-                description: "A subset of fields to return."
                 type: object
                 optional: true
                 stability: unstable

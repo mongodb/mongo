@@ -52,7 +52,6 @@ constexpr StringData BulkWriteReplyItem::kNFieldName;
 constexpr StringData BulkWriteReplyItem::kNModifiedFieldName;
 constexpr StringData BulkWriteReplyItem::kOkFieldName;
 constexpr StringData BulkWriteReplyItem::kUpsertedFieldName;
-constexpr StringData BulkWriteReplyItem::kValueFieldName;
 
 
 BulkWriteReplyItem::BulkWriteReplyItem()
@@ -113,9 +112,6 @@ void BulkWriteReplyItem::parseProtected(const BSONObj& bsonObject) {
             IDLParserContext ctxt("bulkWrite");
             const auto localObject = element.Obj();
             _upserted = mongo::write_ops::Upserted::parse(ctxt, localObject);
-        } else if (fieldName == kValueFieldName) {
-            const BSONObj localObject = element.Obj();
-            _value = BSONObj::getOwned(localObject);
         } else if (fieldName == kCodeFieldName) {
             code = element.Int();
         } else if (fieldName == kErrmsgFieldName) {
@@ -165,10 +161,6 @@ BSONObj BulkWriteReplyItem::serialize() const {
     if (_upserted) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(kUpsertedFieldName));
         _upserted.get().serialize(&subObjBuilder);
-    }
-
-    if (_value) {
-        builder.append(kValueFieldName, _value.get());
     }
 
     return builder.obj();
