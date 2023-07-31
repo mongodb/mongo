@@ -1448,7 +1448,7 @@ __rollback_to_stable_btree_apply(
     uint64_t rollback_txnid, write_gen;
     uint32_t btree_id;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
+    bool dhandle_allocated, has_txn_updates_gt_than_ckpt_snap, perform_rts;
     bool prepared_updates;
 
     /* Ignore non-btree objects as well as the metadata and history store files. */
@@ -1463,22 +1463,18 @@ __rollback_to_stable_btree_apply(
 
     /* Find out the max durable timestamp of the object from checkpoint. */
     newest_start_durable_ts = newest_stop_durable_ts = WT_TS_NONE;
-    durable_ts_found = prepared_updates = has_txn_updates_gt_than_ckpt_snap = false;
+    prepared_updates = has_txn_updates_gt_than_ckpt_snap = false;
 
     WT_RET(__wt_config_getones(session, config, "checkpoint", &cval));
     __wt_config_subinit(session, &ckptconf, &cval);
     for (; __wt_config_next(&ckptconf, &key, &cval) == 0;) {
         ret = __wt_config_subgets(session, &cval, "newest_start_durable_ts", &value);
-        if (ret == 0) {
+        if (ret == 0)
             newest_start_durable_ts = WT_MAX(newest_start_durable_ts, (wt_timestamp_t)value.val);
-            durable_ts_found = true;
-        }
         WT_RET_NOTFOUND_OK(ret);
         ret = __wt_config_subgets(session, &cval, "newest_stop_durable_ts", &value);
-        if (ret == 0) {
+        if (ret == 0)
             newest_stop_durable_ts = WT_MAX(newest_stop_durable_ts, (wt_timestamp_t)value.val);
-            durable_ts_found = true;
-        }
         WT_RET_NOTFOUND_OK(ret);
         ret = __wt_config_subgets(session, &cval, "prepare", &value);
         if (ret == 0) {
@@ -1536,8 +1532,7 @@ __rollback_to_stable_btree_apply(
      * 1. The dhandle is present in the cache and tree is modified.
      * 2. The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
      * 3. The checkpoint has prepared updates written to disk.
-     * 4. There is no durable timestamp in any checkpoint.
-     * 5. The checkpoint newest txn is greater than snapshot min txn id.
+     * 4. The checkpoint newest txn is greater than snapshot min txn id.
      */
     WT_WITH_HANDLE_LIST_READ_LOCK(session, (ret = __wt_conn_dhandle_find(session, uri, NULL)));
 
@@ -1546,7 +1541,7 @@ __rollback_to_stable_btree_apply(
     WT_ERR_NOTFOUND_OK(ret, false);
 
     if (perform_rts || max_durable_ts > rollback_timestamp || prepared_updates ||
-      !durable_ts_found || has_txn_updates_gt_than_ckpt_snap) {
+      has_txn_updates_gt_than_ckpt_snap) {
         ret = __wt_session_get_dhandle(session, uri, NULL, NULL, 0);
         if (ret != 0)
             WT_ERR_MSG(session, ret, "%s: unable to open handle%s", uri,
@@ -1555,12 +1550,11 @@ __rollback_to_stable_btree_apply(
 
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           "tree rolled back with durable timestamp: %s, or when tree is modified: %s or "
-          "prepared updates: %s or when durable time is not found: %s or txnid: %" PRIu64
+          "prepared updates: %s or txnid: %" PRIu64
           " is greater than recovery checkpoint snap min: %s",
           __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
           S2BT(session)->modified ? "true" : "false", prepared_updates ? "true" : "false",
-          !durable_ts_found ? "true" : "false", rollback_txnid,
-          has_txn_updates_gt_than_ckpt_snap ? "true" : "false");
+          rollback_txnid, has_txn_updates_gt_than_ckpt_snap ? "true" : "false");
         WT_ERR(__rollback_to_stable_btree(session, rollback_timestamp));
     } else
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
