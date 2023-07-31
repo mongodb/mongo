@@ -313,11 +313,13 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckpt_lsn)
      * If we are storing debugging LSNs to retain additional log files from removal, then rotate the
      * newest LSN into the array.
      */
+    __wt_writelock(session, &conn->debug_log_retention_lock);
     if (conn->debug_ckpt_cnt != 0) {
         for (i = (int)conn->debug_ckpt_cnt - 1; i > 0; --i)
             conn->debug_ckpt[i] = conn->debug_ckpt[i - 1];
         conn->debug_ckpt[0] = *ckpt_lsn;
     }
+    __wt_writeunlock(session, &conn->debug_log_retention_lock);
 }
 
 /*
