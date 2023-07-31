@@ -8,7 +8,7 @@ In file included from ./src/include/wt_internal.h:439:
     p = *pp;
       ^ ~~~
 1 warning generated.
-src/btree/bt_delete.c:411:5: warning: Null pointer passed to 1st parameter expecting 'nonnull'
+src/btree/bt_delete.c:413:5: warning: Null pointer passed to 1st parameter expecting 'nonnull'
     __wt_overwrite_and_free(session, ref->ft_info.del);
     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ./src/include/misc.h:141:13: note: expanded from macro '__wt_overwrite_and_free'
@@ -18,7 +18,7 @@ src/btree/bt_delete.c:411:5: warning: Null pointer passed to 1st parameter expec
 #define __wt_explicit_overwrite(p, size) memset(p, WT_DEBUG_BYTE, size)
                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/btree/bt_io.c:178:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
+src/btree/bt_io.c:187:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
     time_start = time_stop = 0;
                  ^           ~
 1 warning generated.
@@ -26,7 +26,7 @@ src/btree/bt_read.c:99:18: warning: Although the value stored to 'time_stop' is 
     time_start = time_stop = 0;
                  ^           ~
 1 warning generated.
-src/btree/bt_sync.c:445:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
+src/btree/bt_sync.c:449:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
     time_start = time_stop = 0;
                  ^           ~
 1 warning generated.
@@ -49,15 +49,15 @@ src/cursor/cur_index.c:369:10: warning: Although the value stored to 'cp' is use
     if ((cp = cindex->cg_cursors) != NULL)
          ^    ~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/evict/evict_page.c:105:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
-    time_start = time_stop = 0; /* [-Werror=maybe-uninitialized] */
+src/evict/evict_page.c:106:18: warning: Although the value stored to 'eviction_time_seconds' is used in the enclosing expression, the value is never actually read from 'eviction_time_seconds'
+    eviction_time = eviction_time_seconds = 0;
                  ^           ~
 1 warning generated.
 src/evict/evict_stat.c:34:31: warning: Although the value stored to 'size' is used in the enclosing expression, the value is never actually read from 'size'
     pages_leaf = seen_count = size = visited_count = 0;
                               ^      ~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/cursor/cur_stat.c:634:10: warning: Although the value stored to 'ret' is used in the enclosing expression, the value is never actually read from 'ret'
+src/cursor/cur_stat.c:635:10: warning: Although the value stored to 'ret' is used in the enclosing expression, the value is never actually read from 'ret'
     if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
          ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
@@ -65,10 +65,10 @@ src/history/hs_verify.c:180:14: warning: Although the value stored to 'ret' is u
         if ((ret = __wt_metadata_btree_id_to_uri(session, btree_id, &uri_data)) != 0) {
              ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/evict/evict_lru.c:2270:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
+src/evict/evict_lru.c:2286:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
     time_start = time_stop = 0;
                  ^           ~
-src/evict/evict_lru.c:2336:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
+src/evict/evict_lru.c:2352:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
     time_start = time_stop = 0;
                  ^           ~
 2 warnings generated.
@@ -110,7 +110,7 @@ src/tiered/tiered_handle.c:129:13: warning: Although the value stored to 'ret' i
     while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
             ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/txn/txn_ckpt.c:775:19: warning: Although the value stored to 'logging' is used in the enclosing expression, the value is never actually read from 'logging'
+src/txn/txn_ckpt.c:814:19: warning: Although the value stored to 'logging' is used in the enclosing expression, the value is never actually read from 'logging'
     full = idle = logging = tracking = use_timestamp = false;
                   ^         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
