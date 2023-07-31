@@ -109,14 +109,6 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    /**
-     * Performs all required checks before holding the critical sections.
-     */
-    void _checkCommandArguments(OperationContext* opCtx);
-
-    boost::optional<CreateCollectionResponse> _checkIfCollectionAlreadyShardedWithSameOptions(
-        OperationContext* opCtx);
-
     TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
 
     void _acquireCriticalSections(OperationContext* opCtx);
@@ -222,6 +214,9 @@ private:
     mongo::CreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
+
+    // Set on successful completion of the coordinator
+    boost::optional<CreateCollectionResponse> _result;
 };
 
 }  // namespace mongo

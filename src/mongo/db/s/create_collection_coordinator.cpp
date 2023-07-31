@@ -474,6 +474,177 @@ void broadcastDropCollection(OperationContext* opCtx,
         opCtx, nss, participants, executor, osi, true /* fromMigrate */);
 }
 
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSameOptions(
+    OperationContext* opCtx,
+    const CreateCollectionRequest& request,
+    const NamespaceString& originalNss) {
+    // If the request is part of a C2C synchronisation, the check on the received UUID must be
+    // performed first to honor the contract with mongosync (see SERVER-67885 for details).
+    if (request.getCollectionUUID()) {
+        if (AutoGetCollection stdColl{opCtx, originalNss, MODE_IS}; stdColl) {
+            checkCollectionUUIDMismatch(opCtx, originalNss, *stdColl, request.getCollectionUUID());
+        } else {
+            // No standard collection is present on the local catalog, but the request is not yet
+            // translated; a timeseries version of the requested namespace may still match the
+            // requested UUID.
+            auto bucketsNamespace = originalNss.makeTimeseriesBucketsNamespace();
+            AutoGetCollection timeseriesColl{opCtx, bucketsNamespace, MODE_IS};
+            checkCollectionUUIDMismatch(
+                opCtx, originalNss, *timeseriesColl, request.getCollectionUUID());
+        }
+    }
+
+    // Check is there is a standard sharded collection that matches the original request parameters
+    auto cri = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, originalNss));
+    auto& cm = cri.cm;
+    auto& sii = cri.sii;
+    if (cm.isSharded()) {
+        auto requestMatchesExistingCollection = [&] {
+            // No timeseries fields in request
+            if (request.getTimeseries()) {
+                return false;
+            }
+
+            if (request.getUnique().value_or(false) != cm.isUnique()) {
+                return false;
+            }
+
+            if (SimpleBSONObjComparator::kInstance.evaluate(*request.getShardKey() !=
+                                                            cm.getShardKeyPattern().toBSON())) {
+                return false;
+            }
+
+            auto defaultCollator =
+                cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
+            if (SimpleBSONObjComparator::kInstance.evaluate(
+                    defaultCollator !=
+                    resolveCollationForUserQueries(opCtx, originalNss, request.getCollation()))) {
+                return false;
+            }
+
+            return true;
+        }();
+
+        uassert(ErrorCodes::AlreadyInitialized,
+                str::stream() << "sharding already enabled for collection "
+                              << originalNss.toStringForErrorMsg(),
+                requestMatchesExistingCollection);
+
+        CreateCollectionResponse response(cri.getCollectionVersion());
+        response.setCollectionUUID(cm.getUUID());
+        return response;
+    }
+
+    // If the request is still unresolved, check if there is an existing TS buckets namespace that
+    // may be matched by the request.
+    auto bucketsNss = originalNss.makeTimeseriesBucketsNamespace();
+    cri = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, bucketsNss));
+    cm = cri.cm;
+    sii = cri.sii;
+    if (!cm.isSharded()) {
+        return boost::none;
+    }
+
+    auto requestMatchesExistingCollection = [&] {
+        if (cm.isUnique() != request.getUnique().value_or(false)) {
+            return false;
+        }
+
+        // Timeseries options match
+        const auto& timeseriesOptionsOnDisk = (*cm.getTimeseriesFields()).getTimeseriesOptions();
+        if (request.getTimeseries() &&
+            !timeseries::optionsAreEqual(*request.getTimeseries(), timeseriesOptionsOnDisk)) {
+            return false;
+        }
+
+        auto defaultCollator =
+            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
+        if (SimpleBSONObjComparator::kInstance.evaluate(
+                defaultCollator !=
+                resolveCollationForUserQueries(opCtx, bucketsNss, request.getCollation()))) {
+            return false;
+        }
+
+        // Same Key Pattern
+        const auto& timeseriesOptions =
+            request.getTimeseries() ? *request.getTimeseries() : timeseriesOptionsOnDisk;
+        auto requestKeyPattern =
+            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
+                timeseriesOptions, *request.getShardKey()));
+        if (SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() !=
+                                                        requestKeyPattern)) {
+            return false;
+        }
+        return true;
+    }();
+
+    uassert(ErrorCodes::AlreadyInitialized,
+            str::stream() << "sharding already enabled for collection "
+                          << bucketsNss.toStringForErrorMsg(),
+            requestMatchesExistingCollection);
+
+    CreateCollectionResponse response(cri.getCollectionVersion());
+    response.setCollectionUUID(cm.getUUID());
+    return response;
+}
+
+void checkCommandArguments(OperationContext* opCtx,
+                           const CreateCollectionRequest& request,
+                           const NamespaceString& originalNss) {
+    LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", logAttrs(originalNss));
+
+    uassert(ErrorCodes::IllegalOperation,
+            "Special collection '" + originalNss.toStringForErrorMsg() + "' cannot be sharded",
+            !originalNss.isNamespaceAlwaysUntracked());
+
+    // Ensure that hashed and unique are not both set.
+    uassert(ErrorCodes::InvalidOptions,
+            "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
+            "the hashed field by declaring an additional (non-hashed) unique index on the field.",
+            !ShardKeyPattern(*request.getShardKey()).isHashedPattern() ||
+                !request.getUnique().value_or(false));
+
+    if (request.getNumInitialChunks()) {
+        // Ensure numInitialChunks is within valid bounds.
+        // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
+        // 1,000,000 chunks in total to limit the amount of memory this command consumes so
+        // there is less danger of an OOM error.
+
+        const int maxNumInitialChunksForShards =
+            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
+        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
+        int numChunks = request.getNumInitialChunks().value();
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "numInitialChunks cannot be more than either: "
+                              << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
+                              << " * number of shards; or " << maxNumInitialChunksTotal,
+                numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
+                    numChunks <= maxNumInitialChunksTotal);
+    }
+
+    if (originalNss.dbName() == DatabaseName::kConfig) {
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+        auto findReponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                                originalNss,
+                                                BSONObj(),
+                                                BSONObj(),
+                                                1));
+
+        auto numDocs = findReponse.docs.size();
+
+        // If this is a collection on the config db, it must be empty to be sharded.
+        uassert(ErrorCodes::IllegalOperation,
+                "collections in the config db must be empty to be sharded",
+                numDocs == 0);
+    }
+}
+
 }  // namespace
 
 void CreateCollectionCoordinatorLegacy::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
@@ -516,11 +687,11 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                _checkCommandArguments(opCtx);
+                checkCommandArguments(opCtx, _request, originalNss());
                 // Perform a preliminary check on whether the request may resolve into a no-op
                 // before acquiring any critical section.
                 auto createCollectionResponseOpt =
-                    _checkIfCollectionAlreadyShardedWithSameOptions(opCtx);
+                    checkIfCollectionAlreadyShardedWithSameOptions(opCtx, _request, originalNss());
                 if (createCollectionResponseOpt) {
                     _result = createCollectionResponseOpt;
                     // Launch an exception to directly jump to the end of the continuation chain
@@ -664,177 +835,6 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
 
             return status;
         });
-}
-
-boost::optional<CreateCollectionResponse>
-CreateCollectionCoordinatorLegacy::_checkIfCollectionAlreadyShardedWithSameOptions(
-    OperationContext* opCtx) {
-    // If the request is part of a C2C synchronisation, the check on the received UUID must be
-    // performed first to honor the contract with mongosync (see SERVER-67885 for details).
-    if (_request.getCollectionUUID()) {
-        if (AutoGetCollection stdColl{opCtx, originalNss(), MODE_IS}; stdColl) {
-            checkCollectionUUIDMismatch(
-                opCtx, originalNss(), *stdColl, _request.getCollectionUUID());
-        } else {
-            // No standard collection is present on the local catalog, but the request is not yet
-            // translated; a timeseries version of the requested namespace may still match the
-            // requested UUID.
-            auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
-            AutoGetCollection timeseriesColl{opCtx, bucketsNamespace, MODE_IS};
-            checkCollectionUUIDMismatch(
-                opCtx, originalNss(), *timeseriesColl, _request.getCollectionUUID());
-        }
-    }
-
-    // Check is there is a standard sharded collection that matches the original request parameters
-    auto cri =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-            opCtx, originalNss()));
-    auto& cm = cri.cm;
-    auto& sii = cri.sii;
-    if (cm.isSharded()) {
-        auto requestMatchesExistingCollection = [&] {
-            // No timeseries fields in request
-            if (_request.getTimeseries()) {
-                return false;
-            }
-
-            if (_request.getUnique().value_or(false) != cm.isUnique()) {
-                return false;
-            }
-
-            if (SimpleBSONObjComparator::kInstance.evaluate(*_request.getShardKey() !=
-                                                            cm.getShardKeyPattern().toBSON())) {
-                return false;
-            }
-
-            auto defaultCollator =
-                cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
-            if (SimpleBSONObjComparator::kInstance.evaluate(
-                    defaultCollator !=
-                    resolveCollationForUserQueries(
-                        opCtx, originalNss(), _request.getCollation()))) {
-                return false;
-            }
-
-            return true;
-        }();
-
-        uassert(ErrorCodes::AlreadyInitialized,
-                str::stream() << "sharding already enabled for collection "
-                              << originalNss().toStringForErrorMsg(),
-                requestMatchesExistingCollection);
-
-        CreateCollectionResponse response(cri.getCollectionVersion());
-        response.setCollectionUUID(cm.getUUID());
-        return response;
-    }
-
-    // If the request is still unresolved, check if there is an existing TS buckets namespace that
-    // may be matched by the request.
-    auto bucketsNss = originalNss().makeTimeseriesBucketsNamespace();
-    cri = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, bucketsNss));
-    cm = cri.cm;
-    sii = cri.sii;
-    if (!cm.isSharded()) {
-        return boost::none;
-    }
-
-    auto requestMatchesExistingCollection = [&] {
-        if (cm.isUnique() != _request.getUnique().value_or(false)) {
-            return false;
-        }
-
-        // Timeseries options match
-        const auto& timeseriesOptionsOnDisk = (*cm.getTimeseriesFields()).getTimeseriesOptions();
-        if (_request.getTimeseries() &&
-            !timeseries::optionsAreEqual(*_request.getTimeseries(), timeseriesOptionsOnDisk)) {
-            return false;
-        }
-
-        auto defaultCollator =
-            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
-        if (SimpleBSONObjComparator::kInstance.evaluate(
-                defaultCollator !=
-                resolveCollationForUserQueries(opCtx, bucketsNss, _request.getCollation()))) {
-            return false;
-        }
-
-        // Same Key Pattern
-        const auto& timeseriesOptions =
-            _request.getTimeseries() ? *_request.getTimeseries() : timeseriesOptionsOnDisk;
-        auto requestKeyPattern =
-            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                timeseriesOptions, *_request.getShardKey()));
-        if (SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() !=
-                                                        requestKeyPattern)) {
-            return false;
-        }
-        return true;
-    }();
-
-    uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection "
-                          << bucketsNss.toStringForErrorMsg(),
-            requestMatchesExistingCollection);
-
-    CreateCollectionResponse response(cri.getCollectionVersion());
-    response.setCollectionUUID(cm.getUUID());
-    return response;
-}
-
-void CreateCollectionCoordinatorLegacy::_checkCommandArguments(OperationContext* opCtx) {
-    LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", logAttrs(originalNss()));
-
-    uassert(ErrorCodes::IllegalOperation,
-            "Special collection '" + originalNss().toStringForErrorMsg() + "' cannot be sharded",
-            !originalNss().isNamespaceAlwaysUntracked());
-
-    // Ensure that hashed and unique are not both set.
-    uassert(ErrorCodes::InvalidOptions,
-            "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
-            "the hashed field by declaring an additional (non-hashed) unique index on the field.",
-            !ShardKeyPattern(*_request.getShardKey()).isHashedPattern() ||
-                !_request.getUnique().value_or(false));
-
-    if (_request.getNumInitialChunks()) {
-        // Ensure numInitialChunks is within valid bounds.
-        // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
-        // 1,000,000 chunks in total to limit the amount of memory this command consumes so
-        // there is less danger of an OOM error.
-
-        const int maxNumInitialChunksForShards =
-            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
-        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = _request.getNumInitialChunks().value();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "numInitialChunks cannot be more than either: "
-                              << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
-                              << " * number of shards; or " << maxNumInitialChunksTotal,
-                numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
-                    numChunks <= maxNumInitialChunksTotal);
-    }
-
-    if (originalNss().dbName() == DatabaseName::kConfig) {
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-        auto findReponse = uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                repl::ReadConcernLevel::kMajorityReadConcern,
-                                                originalNss(),
-                                                BSONObj(),
-                                                BSONObj(),
-                                                1));
-
-        auto numDocs = findReponse.docs.size();
-
-        // If this is a collection on the config db, it must be empty to be sharded.
-        uassert(ErrorCodes::IllegalOperation,
-                "collections in the config db must be empty to be sharded",
-                numDocs == 0);
-    }
 }
 
 TranslatedRequestParams CreateCollectionCoordinatorLegacy::_translateRequestParameters(
@@ -1312,7 +1312,23 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([] {
+        .then([this, anchor = shared_from_this()] {
+            if (_doc.getPhase() < Phase::kCommit) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                checkCommandArguments(opCtx, _request, originalNss());
+                // Perform a preliminary check on whether the request may resolve into a no-op
+                // before acquiring any critical section.
+                auto createCollectionResponseOpt =
+                    checkIfCollectionAlreadyShardedWithSameOptions(opCtx, _request, originalNss());
+                if (createCollectionResponseOpt) {
+                    _result = createCollectionResponseOpt;
+                    // TODO SERVER-79406 Skip the rest of the chain in case the collection is
+                    // already sharded.
+                }
+            }
             uasserted(ErrorCodes::NotImplemented,
                       "The new shardCollection version is still incomplete.");
         })
