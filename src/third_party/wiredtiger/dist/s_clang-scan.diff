@@ -49,10 +49,6 @@ src/cursor/cur_index.c:369:10: warning: Although the value stored to 'cp' is use
     if ((cp = cindex->cg_cursors) != NULL)
          ^    ~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/evict/evict_page.c:106:18: warning: Although the value stored to 'eviction_time_seconds' is used in the enclosing expression, the value is never actually read from 'eviction_time_seconds'
-    eviction_time = eviction_time_seconds = 0;
-                 ^           ~
-1 warning generated.
 src/evict/evict_stat.c:34:31: warning: Although the value stored to 'size' is used in the enclosing expression, the value is never actually read from 'size'
     pages_leaf = seen_count = size = visited_count = 0;
                               ^      ~~~~~~~~~~~~~~~~~
