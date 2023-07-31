@@ -867,19 +867,22 @@ tasks:
         vars:
           configure_env_vars: CC=gcc-9 CXX=g++-9 ADD_CFLAGS="-ggdb -fPIC"
 
-  - name: compile-clang
-    tags: ["pull_request", "pull_request_compilers"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 ADD_CFLAGS="-ggdb -fPIC"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=clang-7 CXX=clang++-7 ADD_CFLAGS="-ggdb -fPIC"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars: CC=clang-8 CXX=clang++-8 ADD_CFLAGS="-ggdb -fPIC"
+  # FIXME-WT-11239: This is a build issue as this test intentionally does not use the mongodbtoolchain
+  # and recent platform changes have caused issues with the system toolchain. We will be fixing this as 
+  # part of WT-11239.
+  # - name: compile-clang
+  #   tags: ["pull_request", "pull_request_compilers"]
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 ADD_CFLAGS="-ggdb -fPIC"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         configure_env_vars: CC=clang-7 CXX=clang++-7 ADD_CFLAGS="-ggdb -fPIC"
+  #     - func: "compile wiredtiger"
+  #       vars:
+  #         configure_env_vars: CC=clang-8 CXX=clang++-8 ADD_CFLAGS="-ggdb -fPIC"
 
   - name: make-check-test
     depends_on:
