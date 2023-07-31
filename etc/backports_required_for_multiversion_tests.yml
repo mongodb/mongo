@@ -431,6 +431,8 @@ last-continuous:
     ticket: SERVER-79136
   - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
     ticket: SERVER-78650
+  - test_file: jstests/replsets/tenant_migration_shard_merge_journal_compressor.js
+    ticket: SERVER-61475
   suites: null
 
 last-lts:
@@ -955,4 +957,6 @@ last-lts:
     ticket: SERVER-78813
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
+  - test_file: jstests/replsets/tenant_migration_shard_merge_journal_compressor.js
+    ticket: SERVER-61475
   suites: null
