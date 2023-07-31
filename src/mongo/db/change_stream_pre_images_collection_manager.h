@@ -145,6 +145,10 @@ public:
         return _purgingJobStats;
     }
 
+    int64_t getDocsInserted() const {
+        return _docsInserted.loadRelaxed();
+    }
+
 private:
     /**
      * Scans the 'config.system.preimages' collection and deletes the expired pre-images from it.
@@ -216,6 +220,8 @@ private:
                                                boost::optional<TenantId> tenantId);
 
     PurgingJobStats _purgingJobStats;
+
+    AtomicWord<int64_t> _docsInserted;
 
     /**
      * Manages truncate markers and truncation across tenants. Treats a single tenant environment

@@ -34,10 +34,63 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 namespace mongo {
+namespace {
+
+void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* result) {
+    const auto preImagesCollectionNamespace =
+        NamespaceString::makePreImageCollectionNSS(boost::none /** tenantId */);
+    // Hold reference to the catalog for collection lookup without locks to be safe.
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto preImagesColl = catalog->lookupCollectionByNamespace(opCtx, preImagesCollectionNamespace);
+    if (!preImagesColl) {
+        return;
+    }
+    int64_t numRecords = preImagesColl->numRecords(opCtx);
+    int64_t dataSize = preImagesColl->dataSize(opCtx);
+    result->append("numDocs", numRecords);
+    result->append("totalBytes", dataSize);
+
+    if (numRecords) {
+        result->append("avgDocSize", preImagesColl->averageObjectSize(opCtx));
+    }
+
+    result->append("docsInserted",
+                   ChangeStreamPreImagesCollectionManager::get(opCtx).getDocsInserted());
+
+
+    // Obtaining 'storageSize' and 'freeStorageSize' requires obtaining the GlobalLock in MODE_IS.
+    //
+    // Fields are omitted if it cannot be immediately acquired to prevent stalling 'serverStatus'
+    // observability.
+    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
+    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                        AdmissionContext::Priority::kImmediate);
+    Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {
+        Lock::GlobalLockSkipOptions options;
+        options.skipRSTLLock = true;
+        return options;
+    }());
+    if (!lk.isLocked()) {
+        LOGV2_DEBUG(7790900,
+                    2,
+                    "Failed to get global lock for 'changeStreamPreImages' serverStatus "
+                    "'storageSize' and 'freeStorageSize' fields");
+        return;
+    }
+
+    result->append("storageSize", preImagesColl->getRecordStore()->storageSize(opCtx));
+    result->append("freeStorageSize", preImagesColl->getRecordStore()->freeStorageSize(opCtx));
+}
+}  // namespace
+
 /**
  * Adds a section 'changeStreamPreImages' to the serverStatus metrics that provides aggregated
  * statistics for change stream pre-images.
@@ -50,14 +103,26 @@ public:
         return true;
     }
 
-    void appendSection(OperationContext* opCtx,
-                       const BSONElement& configElement,
-                       BSONObjBuilder* result) const override {
-        // Append the section only when pre-images exists.
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder builder;
+
+        // Purging metrics are reported regardless of whether it is a single or multi-tenant
+        // environment. In the case of a multi tenant environment, the metrics are cumulative across
+        // tenants.
         const auto& jobStats =
             ChangeStreamPreImagesCollectionManager::get(opCtx).getPurgingJobStats();
+        builder.append("purgingJob", jobStats.toBSON());
 
-        result->append(getSectionName(), BSON("purgingJob" << jobStats.toBSON()));
+        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+            // Only report pre-images collection specific metrics in single tenant environments.
+            // Multi-tenant environments would have the aggregate result of all the tenants (one
+            // pre-images collection per tenant), making it difficult to pinpoint where the metrics
+            // values come from.
+            appendPreImagesCollectionStats(opCtx, &builder);
+        }
+
+        return builder.obj();
     }
 } changeStreamPreImagesServerStatus;
 
