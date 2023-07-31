@@ -490,9 +490,9 @@ void Balancer::_consumeActionStreamLoop() {
         executor->shutdown();
         executor->join();
         // When shutting down, the task executor may or may not invoke the
-        // applyActionResponseTo()callback for canceled streaming actions: to ensure a consistent
-        // state of the balancer after a step down, _outstandingStreamingOps needs then to be reset
-        // to 0 once all the tasks have been drained.
+        // _applyDefragmentationActionResponseToPolicy() callback for canceled streaming actions: to
+        // ensure a consistent state of the balancer after a step down, _outstandingStreamingOps
+        // needs then to be reset to 0 once all the tasks have been drained.
         _outstandingStreamingOps.store(0);
     });
 
@@ -507,15 +507,6 @@ void Balancer::_consumeActionStreamLoop() {
             return _defragmentationPolicy.get();
         }
         return nullptr;
-    };
-
-    auto applyActionResponseTo = [this](const DefragmentationAction& action,
-                                        const DefragmentationActionResponse& response,
-                                        ActionsStreamPolicy* policy) {
-        invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
-        ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
-        auto opCtx = tc->makeOperationContext();
-        policy->applyActionResult(opCtx.get(), action, response);
     };
 
     auto applyThrottling = [lastActionTime = Date_t::fromMillisSinceEpoch(0)]() mutable {
@@ -580,11 +571,10 @@ void Balancer::_consumeActionStreamLoop() {
                                                  mergeAction.chunkRange,
                                                  mergeAction.collectionVersion)
                             .thenRunOn(*executor)
-                            .onCompletion([this,
-                                           selectedStream,
-                                           &applyActionResponseTo,
-                                           action = std::move(mergeAction)](const Status& status) {
-                                applyActionResponseTo(action, status, selectedStream);
+                            .onCompletion([this, selectedStream, action = std::move(mergeAction)](
+                                              const Status& status) {
+                                _applyDefragmentationActionResponseToPolicy(
+                                    action, status, selectedStream);
                             });
                 },
                 [&, selectedStream](DataSizeInfo&& dataSizeAction) {
@@ -599,13 +589,12 @@ void Balancer::_consumeActionStreamLoop() {
                                               dataSizeAction.estimatedValue,
                                               dataSizeAction.maxSize)
                             .thenRunOn(*executor)
-                            .onCompletion([this,
-                                           selectedStream,
-                                           &applyActionResponseTo,
-                                           action = std::move(dataSizeAction)](
-                                              const StatusWith<DataSizeResponse>& swDataSize) {
-                                applyActionResponseTo(action, swDataSize, selectedStream);
-                            });
+                            .onCompletion(
+                                [this, selectedStream, action = std::move(dataSizeAction)](
+                                    const StatusWith<DataSizeResponse>& swDataSize) {
+                                    _applyDefragmentationActionResponseToPolicy(
+                                        action, swDataSize, selectedStream);
+                                });
                 },
                 [&, selectedStream](AutoSplitVectorInfo&& splitVectorAction) {
                     auto result =
@@ -619,12 +608,10 @@ void Balancer::_consumeActionStreamLoop() {
                                                      splitVectorAction.maxChunkSizeBytes)
                             .thenRunOn(*executor)
                             .onCompletion(
-                                [this,
-                                 selectedStream,
-                                 &applyActionResponseTo,
-                                 action = std::move(splitVectorAction)](
+                                [this, selectedStream, action = std::move(splitVectorAction)](
                                     const StatusWith<AutoSplitVectorResponse>& swSplitPoints) {
-                                    applyActionResponseTo(action, swSplitPoints, selectedStream);
+                                    _applyDefragmentationActionResponseToPolicy(
+                                        action, swSplitPoints, selectedStream);
                                 });
                 },
                 [&, selectedStream](SplitInfoWithKeyPattern&& splitAction) {
@@ -640,11 +627,10 @@ void Balancer::_consumeActionStreamLoop() {
                                                 splitAction.info.maxKey,
                                                 splitAction.info.splitKeys)
                             .thenRunOn(*executor)
-                            .onCompletion([this,
-                                           selectedStream,
-                                           &applyActionResponseTo,
-                                           action = std::move(splitAction)](const Status& status) {
-                                applyActionResponseTo(action, status, selectedStream);
+                            .onCompletion([this, selectedStream, action = std::move(splitAction)](
+                                              const Status& status) {
+                                _applyDefragmentationActionResponseToPolicy(
+                                    action, status, selectedStream);
                             });
                 },
                 [](MigrateInfo&& _) {
@@ -884,6 +870,16 @@ void Balancer::_mainThread() {
 
     LOGV2(21867, "CSRS balancer is now stopped");
 }
+
+void Balancer::_applyDefragmentationActionResponseToPolicy(
+    const DefragmentationAction& action,
+    const DefragmentationActionResponse& response,
+    ActionsStreamPolicy* policy) {
+    invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
+    ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
+    auto opCtx = tc->makeOperationContext();
+    policy->applyActionResult(opCtx.get(), action, response);
+};
 
 bool Balancer::_stopRequested() {
     stdx::lock_guard<Latch> scopedLock(_mutex);

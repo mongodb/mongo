@@ -40,6 +40,7 @@
 
 namespace mongo {
 
+class ActionsStreamPolicy;
 class ChunkType;
 class ClusterStatistics;
 class BalancerCommandsScheduler;
@@ -258,6 +259,15 @@ private:
                     const MigrateInfoVector& chunksToDefragment);
 
     void _onActionsStreamPolicyStateUpdate();
+
+    /**
+     * To be invoked on completion of an action requested to by an ActionStream policy to
+     * update the policy state (which will generate follow-up actions based on the received
+     * outcome).
+     */
+    void _applyDefragmentationActionResponseToPolicy(const DefragmentationAction& action,
+                                                     const DefragmentationActionResponse& response,
+                                                     ActionsStreamPolicy* policy);
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
