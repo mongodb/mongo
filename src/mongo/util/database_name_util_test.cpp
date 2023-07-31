@@ -36,7 +36,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -123,7 +122,7 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequireTen
 }
 
 // Assert tenantID is not initialized when multitenancySupport is disabled.
-DEATH_TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOff, "Tripwire assertion") {
+TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
     ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(tenantId, "foo"), AssertionException, 7005302);
@@ -442,6 +441,13 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
+    {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
+        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
+        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId),
+                           AssertionException,
+                           8423386);
+    }
+
     {  // Has prefix, has tenantId.
         // request -->  { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: true }
         auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
@@ -449,29 +455,5 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 }
-
-DEATH_TEST(DatabaseNameUtilTest,
-           DeserializeExpectPrefixTrue_CommandRequest_Tassert,
-           "Tripwire assertion") {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    TenantId tenantId(OID::gen());
-    const std::string dbnString = "foo";
-    const std::string dbnPrefixString = str::stream() << tenantId.toString() << "_" << dbnString;
-
-    SerializationContext ctxt_noTenantId(SerializationContext::stateCommandRequest());
-    ctxt_noTenantId.setTenantIdSource(false);
-    ctxt_noTenantId.setPrefixState(true);
-    SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
-    ctxt_withTenantId.setTenantIdSource(true);
-    ctxt_withTenantId.setPrefixState(true);
-
-    {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
-        // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
-        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId),
-                           AssertionException,
-                           8423386);
-    }
-}
-
 
 }  // namespace mongo
