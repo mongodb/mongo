@@ -91,6 +91,7 @@ public:
     virtual std::vector<ShardEndpoint> targetUpdate(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
+        bool* useTwoPhaseWriteProtocol = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const = 0;
 
     /**
@@ -102,6 +103,7 @@ public:
     virtual std::vector<ShardEndpoint> targetDelete(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
+        bool* useTwoPhaseWriteProtocol = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const = 0;
 
     /**

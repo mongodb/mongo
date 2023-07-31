@@ -141,14 +141,15 @@ const write_ops::WriteError& WriteOp::getOpError() const {
 
 void WriteOp::targetWrites(OperationContext* opCtx,
                            const NSTargeter& targeter,
-                           std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites) {
+                           std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
+                           bool* useTwoPhaseWriteProtocol) {
     auto endpoints = [&] {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            return targeter.targetUpdate(opCtx, _itemRef);
+            return targeter.targetUpdate(opCtx, _itemRef, useTwoPhaseWriteProtocol);
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            return targeter.targetDelete(opCtx, _itemRef);
+            return targeter.targetDelete(opCtx, _itemRef, useTwoPhaseWriteProtocol);
         }
         MONGO_UNREACHABLE;
     }();

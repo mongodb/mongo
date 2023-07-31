@@ -88,6 +88,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(isShardedTimeSeriesBucketsNamespaceAlwaysTrue);
+
 constexpr auto kIdFieldName = "_id"_sd;
 
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
@@ -396,7 +398,10 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
 }
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
-    OperationContext* opCtx, const BatchItemRef& itemRef, std::set<ChunkRange>* chunkRanges) const {
+    OperationContext* opCtx,
+    const BatchItemRef& itemRef,
+    bool* useTwoPhaseWriteProtocol,
+    std::set<ChunkRange>* chunkRanges) const {
     // If the update is replacement-style:
     // 1. Attempt to target using the query. If this fails, AND the query targets more than one
     //    shard,
@@ -481,15 +486,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                                 StatusWith<BSONObj> swShardKey, std::string msg) {
         const auto& shardKey = uassertStatusOKWithContext(std::move(swShardKey), msg);
         if (shardKey.isEmpty()) {
-            if (isUpsert && !isMulti) {  // Single upsert
-                updateOneNonTargetedShardedCount.increment(1);
-            }
             uasserted(ErrorCodes::ShardKeyNotFound,
                       str::stream() << msg << " :: could not extract exact shard key");
         } else {
-            if (isUpsert && !isMulti) {  // Single upsert
-                updateOneTargetedShardedCount.increment(1);
-            }
             return std::vector{
                 uassertStatusOKWithContext(_targetShardKey(shardKey, collation, chunkRanges), msg)};
         }
@@ -512,16 +511,29 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                                 "Failed to target upsert by query");
     }
 
+    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
+    auto isExactId = _isExactIdQuery(*cq, _cri.cm);
+
     // We first try to target based on the update's query. It is always valid to forward any update
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
     auto endPoints = uassertStatusOK(_targetQuery(*cq, collation, chunkRanges));
     if (endPoints.size() == 1) {
+        // The check is structured in this way to check if the query does not contain a shard key,
+        // but is still targetable to a single shard. We don't explicitly use the result of
+        // targetByShardKey(), and instead only see if we throw in that helper in order to determine
+        // if the two phase write protocol should be used (in the case of a query that does not have
+        // a shard key).
+        try {
+            targetByShardKey(extractShardKeyFromQuery(shardKeyPattern, *cq),
+                             "Query does not contain the shard key.");
+        } catch (const DBException&) {
+            if (useTwoPhaseWriteProtocol && !isExactId) {
+                *useTwoPhaseWriteProtocol = true;
+            }
+        }
         updateOneTargetedShardedCount.increment(1);
         return endPoints;
     }
-
-    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
-    auto isExactId = _isExactIdQuery(*cq, _cri.cm);
 
     // Targeting by replacement document is no longer necessary when an updateOne without shard key
     // is allowed, since we're able to decisively select a document to modify with the two phase
@@ -555,19 +567,32 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-    // If the request is {multi:false} and it's not a write without shard key, then this is a single
-    // op-style update which we are broadcasting to multiple shards by exact _id. Record this event
-    // in our serverStatus metrics.
-    if (!isMulti && isExactId && !isShardedTimeseriesCollection) {
+    if (!isMulti) {
+        // If the request is {multi:false} and it's not a write without shard key, then this is a
+        // single op-style update which we are broadcasting to multiple shards by exact _id. Record
+        // this event in our serverStatus metrics. If the query requests an upsert, then we will use
+        // the two phase write protocol anyway.
         updateOneNonTargetedShardedCount.increment(1);
-        updateOneOpStyleBroadcastWithExactIDCount.increment(1);
+        if (isExactId && !isShardedTimeseriesCollection) {
+            updateOneOpStyleBroadcastWithExactIDCount.increment(1);
+            if (isUpsert && useTwoPhaseWriteProtocol) {
+                *useTwoPhaseWriteProtocol = true;
+            }
+        } else {
+            if (useTwoPhaseWriteProtocol) {
+                *useTwoPhaseWriteProtocol = true;
+            }
+        }
     }
 
     return endPoints;
 }
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
-    OperationContext* opCtx, const BatchItemRef& itemRef, std::set<ChunkRange>* chunkRanges) const {
+    OperationContext* opCtx,
+    const BatchItemRef& itemRef,
+    bool* useTwoPhaseWriteProtocol,
+    std::set<ChunkRange>* chunkRanges) const {
     const auto& deleteOp = itemRef.getDeleteRef();
     const bool isMulti = deleteOp.getMulti();
     const auto collation = write_ops::collationOf(deleteOp);
@@ -657,9 +682,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-
-    if (isExactId && !deleteOp.getMulti()) {
-        deleteOneTargetedShardedCount.increment(1);
+    if (!isMulti) {
+        if (isExactId && !isShardedTimeseriesCollection) {
+            deleteOneTargetedShardedCount.increment(1);
+        } else {
+            deleteOneNonTargetedShardedCount.increment(1);
+            if (useTwoPhaseWriteProtocol) {
+                *useTwoPhaseWriteProtocol = true;
+            }
+        }
     }
 
     return endpoints;
@@ -826,6 +857,10 @@ int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {
 }
 
 bool CollectionRoutingInfoTargeter::isShardedTimeSeriesBucketsNamespace() const {
+    // Used for testing purposes to force that we always have a sharded timeseries bucket namespace.
+    if (MONGO_unlikely(isShardedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
     return _cri.cm.isSharded() && _cri.cm.getTimeseriesFields();
 }
 

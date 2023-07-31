@@ -151,13 +151,11 @@ public:
      *
      * The ShardTargeter determines the ShardEndpoints to send child writes to, but is not
      * modified by this operation.
-     *
-     * Returns !OK if the targeting process itself fails
-     *             (no TargetedWrites will be added, state unchanged)
      */
     void targetWrites(OperationContext* opCtx,
                       const NSTargeter& targeter,
-                      std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites);
+                      std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
+                      bool* useTwoPhaseWriteProtocol = nullptr);
 
     /**
      * Returns the number of child writes that were last targeted.

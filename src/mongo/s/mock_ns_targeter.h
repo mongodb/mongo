@@ -91,6 +91,7 @@ public:
     std::vector<ShardEndpoint> targetUpdate(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
+        bool* useTwoPhaseWriteProtocol = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const override {
         return _targetQuery(itemRef.getUpdateRef().getFilter(), chunkRanges);
     }
@@ -103,6 +104,7 @@ public:
     std::vector<ShardEndpoint> targetDelete(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
+        bool* useTwoPhaseWriteProtocol = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const override {
         return _targetQuery(itemRef.getDeleteRef().getFilter(), chunkRanges);
     }
