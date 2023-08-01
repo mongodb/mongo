@@ -1,6 +1,6 @@
 # ![Logo](docs/leaf.svg) MongoDB README
 
-Welcome to MongoDB!
+Welcome to MongoDB 7.0!
 
 ## Components
 
