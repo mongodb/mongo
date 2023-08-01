@@ -113,6 +113,11 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
                                                 const CommonReshardingMetadata& metadata);
 
 /**
+ * Removes all entries matching the given reshardingUUID from the recipient resume data table.
+ */
+void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUUID);
+
+/**
  * Returns the largest _id value in the collection.
  */
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
@@ -132,6 +137,20 @@ boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
 std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes);
 
 /**
+ * Atomically inserts a batch of documents in a single multi-document transaction, along with also
+ * storing the resume token in the same transaction. Returns the number of bytes inserted.
+ */
+int insertBatchTransactionally(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const boost::optional<ShardingIndexesCatalogCache>& sii,
+                               TxnNumber& txnNumber,
+                               std::vector<InsertStatement>& batch,
+                               const UUID& reshardingUUID,
+                               ShardId donorShard,
+                               HostAndPort donorHost,
+                               const BSONObj& resumeToken);
+
+/**
  * Atomically inserts a batch of documents in a single storage transaction. Returns the number of
  * bytes inserted.
  *
@@ -141,6 +160,14 @@ int insertBatch(OperationContext* opCtx,
                 const NamespaceString& nss,
                 std::vector<InsertStatement>& batch);
 
+/**
+ * Checks out the logical session in the opCtx and runs the supplied lambda function in a
+ * transaction, using the transaction number supplied in the opCtx.
+ */
+void runWithTransactionFromOpCtx(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const boost::optional<ShardingIndexesCatalogCache>& sii,
+                                 unique_function<void(OperationContext*)> func);
 /**
  * Checks out the logical session and acts in one of the following ways depending on the state of
  * this shard's config.transactions table:

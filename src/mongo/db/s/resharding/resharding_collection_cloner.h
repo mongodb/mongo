@@ -72,6 +72,7 @@ class ServiceContext;
 class ReshardingCollectionCloner {
 public:
     ReshardingCollectionCloner(ReshardingMetrics* metrics,
+                               const UUID& reshardingUUID,
                                ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
                                const UUID& sourceUUID,
@@ -102,7 +103,7 @@ public:
      * Returns true if there are more documents to be fetched and inserted, and returns false
      * otherwise.
      */
-    bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline);
+    bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline, TxnNumber& txnNum);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
@@ -112,6 +113,7 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 
     ReshardingMetrics* _metrics;
+    const UUID _reshardingUUID;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const UUID _sourceUUID;

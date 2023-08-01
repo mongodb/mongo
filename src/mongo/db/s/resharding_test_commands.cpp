@@ -110,7 +110,10 @@ public:
                     "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
             executor->startup();
 
+            UUID reshardingUUID =
+                request().getReshardingUUID() ? *request().getReshardingUUID() : UUID::gen();
             ReshardingCollectionCloner cloner(metrics.get(),
+                                              reshardingUUID,
                                               ShardKeyPattern(request().getShardKey()),
                                               ns(),
                                               request().getUuid(),

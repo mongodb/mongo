@@ -129,6 +129,11 @@ NSS_CONSTANT(kRecipientReshardingOperationsNamespace,
              DatabaseName::kConfig,
              "localReshardingOperations.recipient"_sd)
 
+// Namespace for the recipient shard's local resharding operation resume data.
+NSS_CONSTANT(kRecipientReshardingResumeDataNamespace,
+             DatabaseName::kConfig,
+             "localReshardingResumeData.recipient"_sd)
+
 // Namespace for persisting sharding DDL coordinators state documents
 NSS_CONSTANT(kShardingDDLCoordinatorsNamespace,
              DatabaseName::kConfig,

@@ -59,6 +59,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -103,57 +104,9 @@ void runWithTransaction(OperationContext* opCtx,
                         const boost::optional<ShardingIndexesCatalogCache>& sii,
                         unique_function<void(OperationContext*)> func) {
     AlternativeSessionRegion asr(opCtx);
-    auto* const client = asr.opCtx()->getClient();
-    asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-    AuthorizationSession::get(client)->grantInternalAuthorization(client);
     TxnNumber txnNumber = 0;
     asr.opCtx()->setTxnNumber(txnNumber);
-    asr.opCtx()->setInMultiDocumentTransaction();
-
-    // ReshardingOpObserver depends on the collection metadata being known when processing writes to
-    // the temporary resharding collection. We attach placement version IGNORED to the write
-    // operations and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a
-    // StaleConfig error to allow the collection metadata information to be recovered.
-    ScopedSetShardRole scopedSetShardRole(
-        asr.opCtx(),
-        nss,
-        ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                  sii ? boost::make_optional(sii->getCollectionIndexes())
-                                      : boost::none) /* shardVersion */,
-        boost::none /* databaseVersion */);
-
-    auto mongoDSessionCatalog = MongoDSessionCatalog::get(asr.opCtx());
-    auto ocs = mongoDSessionCatalog->checkOutSession(asr.opCtx());
-
-    auto txnParticipant = TransactionParticipant::get(asr.opCtx());
-
-    ScopeGuard guard([opCtx = asr.opCtx(), &txnParticipant] {
-        try {
-            txnParticipant.abortTransaction(opCtx);
-        } catch (DBException& e) {
-            LOGV2_WARNING(4990200,
-                          "Failed to abort transaction in AlternativeSessionRegion",
-                          "error"_attr = redact(e));
-        }
-    });
-
-    txnParticipant.beginOrContinue(
-        asr.opCtx(), {txnNumber}, false /* autocommit */, true /* startTransaction */);
-    txnParticipant.unstashTransactionResources(asr.opCtx(), "reshardingOplogApplication");
-
-    func(asr.opCtx());
-
-    if (!txnParticipant.retrieveCompletedTransactionOperations(asr.opCtx())->isEmpty()) {
-        // Similar to the `isTimestamped` check in `applyOperation`, we only want to commit the
-        // transaction if we're doing replicated writes.
-        txnParticipant.commitUnpreparedTransaction(asr.opCtx());
-    } else {
-        txnParticipant.abortTransaction(asr.opCtx());
-    }
-    txnParticipant.stashTransactionResources(asr.opCtx());
-
-    guard.dismiss();
+    resharding::data_copy::runWithTransactionFromOpCtx(asr.opCtx(), nss, sii, std::move(func));
 }
 
 }  // namespace
