@@ -843,6 +843,13 @@ tasks:
         vars:
           test_control: "BigUpdate10k"
 
+  - name: startup
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "startup"
+
   - name: misc_workloads
     priority: 5
     commands:
@@ -2437,6 +2444,29 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+
+  - name: linux-1-node-replSet-test-commands.2022-11
+    display_name: Linux 1-Node ReplSet With Test Commands 2022-11
+    cron: *linux-1-node-repl-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      # Needed to allow enabling failpoints.
+      config_params_json: &config_params_enableTestCommmands '{"v":0, "enableTestCommands": true}'
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &1node-test-commands-tasks
+      - name: startup
 
   - name: linux-standalone-audit.2022-11
     display_name: Linux Standalone Audit 2022-11
