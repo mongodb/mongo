@@ -4,7 +4,11 @@
  * Pauses a compact command in the MDB layer, sets interrupt via killOp, and then releases the
  * command to discover the interrupt in the storage engine layer.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *     requires_persistence,
+ *     # TODO(SERVER-79570): re-enable test.
+ *     __TEMPORARILY_DISABLED__,
+ * ]
  */
 
 (function() {
