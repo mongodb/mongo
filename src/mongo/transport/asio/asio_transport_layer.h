@@ -90,6 +90,8 @@ class AsioTransportLayer final : public TransportLayer {
     AsioTransportLayer& operator=(const AsioTransportLayer&) = delete;
 
 public:
+    using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
+
     constexpr static auto kSlowOperationThreshold = Seconds(1);
 
     struct Options {
@@ -254,8 +256,6 @@ public:
 #endif
 
 private:
-    using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
-
     void _acceptConnection(GenericAcceptor& acceptor);
 
     template <typename Endpoint>

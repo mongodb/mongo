@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/transport/asio/asio_transport_layer.h"
+
+#include <exception>
 #include <fstream>
 #include <queue>
 #include <system_error>
@@ -41,6 +44,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -48,7 +52,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_session.h"
-#include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_tcp_fast_open.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/test_fixtures.h"
@@ -79,6 +83,29 @@ using SetsockoptPtr = char*;
 #else
 using SetsockoptPtr = void*;
 #endif
+
+std::string testHostName() {
+    return "127.0.0.1";
+}
+
+asio::ip::address testHostAddr() {
+    return asio::ip::make_address(testHostName());
+}
+
+template <typename T>
+struct ScopedValueGuard {
+public:
+    ScopedValueGuard(T& target, T value)
+        : _target{target}, _saved{std::exchange(_target, std::move(value))} {}
+
+    ~ScopedValueGuard() {
+        _target = std::move(_saved);
+    }
+
+private:
+    T& _target;
+    T _saved;
+};
 
 std::string loadFile(std::string filename) try {
     std::ifstream f;
@@ -115,22 +142,33 @@ public:
     }
 
     void wait() {
+        LOGV2(7079402, "connection: wait()");
         _ready.get();
+        if (_exception) {
+            LOGV2(7079403, "connection: wait() rethrowing");
+            std::rethrow_exception(_exception);
+        }
     }
 
 private:
-    void _run() {
-        _s.connect(SockAddr::create("localhost", _port, AF_INET));
+    void _run() try {
+        ASSERT_TRUE(_s.connect(SockAddr::create(testHostName(), _port, AF_INET)));
         LOGV2(6109502, "connected", "port"_attr = _port);
         if (_onConnect)
             _onConnect(*this);
         _ready.set();
+        LOGV2(7079404, "connection: await stop request");
         _stopRequest.get();
         LOGV2(6109503, "connection: Rx stop request");
+    } catch (...) {
+        LOGV2(7079405, "connection: catching exception");
+        _exception = std::current_exception();
+        _ready.set();
     }
 
     int _port;
     std::function<void(ConnectionThread&)> _onConnect;
+    std::exception_ptr _exception;
     Notification<void> _ready;
     Notification<bool> _stopRequest;
     Socket _s;
@@ -141,8 +179,8 @@ class SyncClient {
 public:
     explicit SyncClient(int port) {
         std::error_code ec;
-        _sock.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), port), ec);
-        ASSERT_EQ(ec, std::error_code());
+        _sock.connect(asio::ip::tcp::endpoint(testHostAddr(), port), ec);
+        ASSERT_FALSE(ec) << errorMessage(ec);
         LOGV2(6109504, "sync client connected");
     }
 
@@ -157,30 +195,37 @@ private:
     asio::ip::tcp::socket _sock{_ctx};
 };
 
-void ping(SyncClient& client) {
+template <typename AsioWriter>
+void ping(AsioWriter& client) {
     OpMsgBuilder builder;
     builder.setBody(BSON("ping" << 1));
     Message msg = builder.finish();
     msg.header().setResponseToMsgId(0);
     msg.header().setId(0);
     OpMsg::appendChecksum(&msg);
-    ASSERT_EQ(client.write(msg.buf(), msg.size()), std::error_code{});
+    auto ec = client.write(msg.buf(), msg.size());
+    ASSERT_FALSE(ec) << errorMessage(ec);
+}
+
+transport::AsioTransportLayer::Options defaultTLAOptions() {
+    ServerGlobalParams params;
+    params.noUnixSocket = true;
+    params.bind_ips = {testHostName()};
+    transport::AsioTransportLayer::Options opts(&params);
+    opts.port = 0;
+    return opts;
 }
 
 std::unique_ptr<transport::AsioTransportLayer> makeTLA(
-    ServiceEntryPoint* sep, transport::AsioTransportLayer::Options options = [] {
-        ServerGlobalParams params;
-        params.noUnixSocket = true;
-        transport::AsioTransportLayer::Options opts(&params);
-        // TODO SERVER-30312 should clean this up and assign a port from the supplied port range
-        // provided by resmoke.
-        opts.port = 0;
-        return opts;
-    }()) {
+    ServiceEntryPoint* sep, const transport::AsioTransportLayer::Options& options) {
     auto tla = std::make_unique<transport::AsioTransportLayer>(options, sep);
     ASSERT_OK(tla->setup());
     ASSERT_OK(tla->start());
     return tla;
+}
+
+std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
+    return makeTLA(sep, defaultTLAOptions());
 }
 
 /**
@@ -191,8 +236,8 @@ class TestFixture {
 public:
     TestFixture() : _tla{makeTLA(&_sep)} {}
 
-    explicit TestFixture(transport::AsioTransportLayer::Options options)
-        : _tla(makeTLA(&_sep, std::move(options))) {}
+    explicit TestFixture(const transport::AsioTransportLayer::Options& options)
+        : _tla{makeTLA(&_sep, options)} {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -299,8 +344,10 @@ TEST(AsioTransportLayer, TCPResetAfterConnectionIsSilentlySwallowed) {
  */
 TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     // Set the listenBacklog to a parameter greater than the number of connection threads we intend
-    // to create.
-    serverGlobalParams.listenBacklog = 10;
+    // to create (temporarily).
+    ScopeGuard sg = [v = std::exchange(serverGlobalParams.listenBacklog, 10)] {
+        serverGlobalParams.listenBacklog = v;
+    };
     TestFixture tf;
 
     LOGV2(6400501, "Starting and hanging three connection threads");
@@ -443,7 +490,7 @@ public:
     };
 
     explicit Acceptor(asio::io_context& ioCtx) : _ioCtx(ioCtx) {
-        asio::ip::tcp::endpoint endpoint(asio::ip::address_v4::loopback(), 0);
+        asio::ip::tcp::endpoint endpoint(testHostAddr(), 0);
         _acceptor.open(endpoint.protocol());
         _acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
         _acceptor.bind(endpoint);
@@ -482,6 +529,98 @@ private:
 };
 
 /**
+ * Create a connection and configure it with transport::tfo routines.
+ */
+class TfoClient {
+public:
+    explicit TfoClient(int port) {
+        std::error_code ec;
+        auto ep = asio::ip::tcp::endpoint(testHostAddr(), port);
+
+        _sock.open(ep.protocol(), ec);
+        ASSERT_FALSE(ec) << errorMessage(ec);
+
+        ec = transport::tfo::initOutgoingSocket(_sock);
+        ASSERT_FALSE(ec) << errorMessage(ec);
+
+        _sock.non_blocking(true);
+        _sock.connect(ep, ec);
+        ASSERT_FALSE(ec) << errorMessage(ec);
+        LOGV2(7097407, "TFO client connected");
+        _sock.non_blocking(false);
+    }
+
+    std::error_code write(const char* buf, size_t bufSize) {
+        std::error_code ec;
+        asio::write(_sock, asio::buffer(buf, bufSize), ec);
+        return ec;
+    }
+
+private:
+    asio::io_context _ctx{};
+    transport::AsioSession::GenericSocket _sock{_ctx};
+};
+
+void runTfoScenario(bool serverOn, bool clientOn, bool expectTfo) {
+    if (auto err = transport::tfo::ensureInitialized(true); !err.isOK()) {
+        LOGV2(7097410, "Skipping: No TcpFastOpen", "error"_attr = err);
+        return;
+    }
+    // Simulate a TFO system for which the initialization had produced the
+    // specified configuration:
+    auto passive = false;           // The TFO options were explicitly given
+    auto initError = Status::OK();  // Initialization succeeded
+    auto qSz = 20;                  // Queue depth
+    auto config = transport::tfo::setConfigForTest(passive, clientOn, serverOn, qSz, initError);
+
+    auto extractTfoAccepted = [] {
+        BSONObjBuilder bob;
+        networkCounter.append(bob);
+        return bob.done()["tcpFastOpen"]["accepted"].numberInt();
+    };
+
+    TestFixture tf;
+    transport::BlockingQueue<StatusWith<Message>> received;
+
+    auto connectOnce = [&] {
+        TfoClient conn(tf.tla().listenerPort());
+        ping(conn);
+        ASSERT_OK(received.pop().getStatus());
+    };
+
+    // Minimal test service. Consumes one `Message` from an incoming connection,
+    // pushing it to the `received` queue.
+    tf.sep().setOnStartSession([&](transport::SessionThread& st) {
+        st.schedule([&](auto& session) { received.push(session.sourceMessage()); });
+    });
+
+    // Make one throwaway connection just to allow establishment of a TFO cookie.
+    connectOnce();
+
+    int tfos = extractTfoAccepted();
+    connectOnce();
+    int newTfos = extractTfoAccepted();
+
+    ASSERT_EQ(newTfos, tfos + expectTfo);
+}
+
+TEST(AsioTransportLayer, TcpFastOpenWithServerOffClientOff) {
+    runTfoScenario(false, false, false);
+}
+
+TEST(AsioTransportLayer, TcpFastOpenWithServerOffClientOn) {
+    runTfoScenario(false, true, false);
+}
+
+TEST(AsioTransportLayer, TcpFastOpenWithServerOnClientOn) {
+    runTfoScenario(true, true, true);
+}
+
+TEST(AsioTransportLayer, TcpFastOpenWithServerOnClientOff) {
+    runTfoScenario(true, false, false);
+}
+
+/**
  * Have `AsioTransportLayer` make a egress connection and observe behavior when
  * that connection is immediately reset by the peer. Test that if this happens
  * during the `AsioSession` constructor, that the thrown `asio::system_error`
@@ -491,10 +630,8 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
     // Under TFO, no SYN is sent until the client has data to send.  For this
     // test, we need the server to respond when the client hits the failpoint
     // in the AsioSession ctor. So we have to disable TFO.
-    auto savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
-    ScopeGuard savedTFOClientRestore = [&] {
-        transport::gTCPFastOpenClient = savedTFOClient;
-    };
+    auto tfoConfig = transport::tfo::setConfigForTest(0, 0, 0, 1024, Status::OK());
+
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
     asio::io_context ioContext;
@@ -527,7 +664,7 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
     // Either is okay, but the `AsioSession` ctor caller is expected to handle
     // `asio::system_error` and convert it to `SocketException`.
     ASSERT_THAT(tf.tla()
-                    .connect({"localhost", server.port()},
+                    .connect({testHostName(), server.port()},
                              transport::ConnectSSLMode::kDisableSSL,
                              Seconds{10},
                              {})
@@ -563,7 +700,7 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
     };
     transport::JoinThread client{[&] {
         asio::ip::tcp::socket client{ioContext};
-        client.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), server.port()));
+        client.connect(asio::ip::tcp::endpoint(testHostAddr(), server.port()));
         connected.set(true);
         accepted.get();
         // Just set any option and see what happens.
@@ -715,7 +852,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     params.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
     params.targetedClusterConnectionString = ConnectionString::forLocal();
 
-    auto status = conn.connectSocketOnly({"localhost", port}, std::move(params));
+    auto status = conn.connectSocketOnly({testHostName(), port}, std::move(params));
     ASSERT_EQ(status, ErrorCodes::HostUnreachable);
 }
 #endif  // _WIN32
@@ -729,71 +866,60 @@ public:
     static constexpr auto kExternalPort = 22000;
     static constexpr auto kInternalPort = 22001;
 
-    AsioTransportLayerWithInternalPortTest() {
-        _savedClusterRole =
-            std::exchange(serverGlobalParams.clusterRole, {ClusterRole::RouterServer});
-        _savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
-    }
-
-    ~AsioTransportLayerWithInternalPortTest() {
-        serverGlobalParams.clusterRole = _savedClusterRole;
-        transport::gTCPFastOpenClient = _savedTFOClient;
-    }
-
     void setUp() override {
-        auto options = [] {
-            ServerGlobalParams params;
-            params.noUnixSocket = true;
-            transport::AsioTransportLayer::Options opts(&params);
-            opts.port = kExternalPort;
-            opts.internalPort = kInternalPort;
-            return opts;
-        }();
-        _fixture = std::make_unique<TestFixture>(std::move(options));
+        auto options = defaultTLAOptions();
+        options.port = kExternalPort;
+        options.internalPort = kInternalPort;
+        _fixture = std::make_unique<TestFixture>(options);
     }
 
     void tearDown() override {
         _fixture.reset();
     }
 
-    auto& fixture() {
-        return *_fixture;
+    transport::MockSEP& sep() {
+        return _fixture->sep();
     }
 
-    auto connect(HostAndPort remote) {
-        const Seconds kTimeout{10};
-        return fixture().tla().connect(
-            remote, transport::ConnectSSLMode::kDisableSSL, kTimeout, {});
+    StatusWith<std::shared_ptr<transport::Session>> connect(HostAndPort remote) {
+        return _fixture->tla().connect(
+            remote, transport::ConnectSSLMode::kDisableSSL, Seconds{10}, {});
+    }
+
+    void doDifferentiatesConnectionsCase(bool internal) {
+        auto internalIngress = std::make_shared<Notification<bool>>();
+        sep().setOnStartSession([internalIngress](transport::SessionThread& st) {
+            internalIngress->set(st.session().isFromInternalPort());
+        });
+        HostAndPort target{testHostName(), internal ? kInternalPort : kExternalPort};
+        auto conn = connect(target);
+        ASSERT_OK(conn) << " target={}"_format(target);
+        ASSERT_FALSE(conn.getValue()->isFromInternalPort());
+        ASSERT_EQ(internalIngress->get(), internal);
     }
 
 private:
     RAIIServerParameterControllerForTest _scopedFeature{"featureFlagCohostedRouter", true};
+    ScopedValueGuard<ClusterRole> _changeClusterRole{serverGlobalParams.clusterRole,
+                                                     ClusterRole::RouterServer};
+    std::shared_ptr<void> _disableTfo =
+        transport::tfo::setConfigForTest(0, 0, 0, 1024, Status::OK());
     std::unique_ptr<TestFixture> _fixture;
-    decltype(serverGlobalParams.clusterRole) _savedClusterRole;
-    bool _savedTFOClient;
 };
 
 TEST_F(AsioTransportLayerWithInternalPortTest, ListensOnBothPorts) {
     for (auto port : {kInternalPort, kExternalPort}) {
-        HostAndPort remote("localhost", port);
+        HostAndPort remote(testHostName(), port);
         ASSERT_OK(connect(remote).getStatus()) << "Unable to connect to " << remote;
     }
 }
 
-TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnections) {
-    auto connectTest = [&](int port, bool isInternal) {
-        auto isFromInternalPort = std::make_shared<Notification<bool>>();
-        fixture().sep().setOnStartSession([isFromInternalPort](transport::SessionThread& st) {
-            isFromInternalPort->set(st.session().isFromInternalPort());
-        });
+TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnectionsExternal) {
+    doDifferentiatesConnectionsCase(false);
+}
 
-        auto conn = uassertStatusOK(connect({"localhost", port}));
-        ASSERT_FALSE(conn->isFromInternalPort());
-        ASSERT_EQ(isFromInternalPort->get(), isInternal);
-    };
-
-    connectTest(kInternalPort, true);
-    connectTest(kExternalPort, false);
+TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnectionsInternal) {
+    doDifferentiatesConnectionsCase(true);
 }
 
 #ifdef __linux__
@@ -1207,7 +1333,7 @@ private:
     std::shared_ptr<transport::Session> _makeEgressSession() {
         auto tla = checked_cast<transport::AsioTransportLayer*>(_sc->getTransportLayer());
 
-        HostAndPort localTarget("localhost", tla->listenerPort());
+        HostAndPort localTarget(testHostName(), tla->listenerPort());
 
         return _sc->getTransportLayer()
             ->asyncConnect(localTarget,
