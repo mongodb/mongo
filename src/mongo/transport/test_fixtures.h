@@ -40,7 +40,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-namespace mongo::transport {
+namespace mongo::transport::test {
 
 template <typename T>
 class BlockingQueue {
@@ -178,6 +178,6 @@ private:
     std::function<void(SessionThread&)> _onStartSession;
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
-}  // namespace mongo::transport
+}  // namespace mongo::transport::test
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

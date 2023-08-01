@@ -66,7 +66,7 @@ public:
 
         std::vector<std::unique_ptr<TransportLayer>> layers;
         getServiceContext()->setServiceEntryPoint(
-            std::make_unique<MockSEP>([this](SessionThread& sessionThread) {
+            std::make_unique<test::MockSEP>([this](test::SessionThread& sessionThread) {
                 if (_serverCb) {
                     _serverCb(sessionThread.session());
                 }
