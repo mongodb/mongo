@@ -660,6 +660,10 @@ bool handleInsertOp(OperationContext* opCtx,
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
+    const NamespaceString& nsString = nsInfo[idx].getNs();
+
+    uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+
     // For FLE + RetryableWrite, we let FLE handle stmtIds and retryability, so we skip
     // checkStatementExecutedNoOplogEntryFetch here.
     if (!nsInfo[idx].getEncryptionInformation().has_value() && opCtx->isRetryableWrite() &&
@@ -973,6 +977,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
         updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
         updateRequest.setUpsert(op->getUpsert());
+        updateRequest.setUpsertSuppliedDocument(op->getUpsertSupplied().value_or(false));
         if (op->getReturn()) {
             updateRequest.setReturnDocs((op->getReturn().get() == "pre")
                                             ? UpdateRequest::RETURN_OLD
@@ -1003,15 +1008,16 @@ bool handleUpdateOp(OperationContext* opCtx,
             for (;;) {
                 try {
                     boost::optional<BSONObj> docFound;
-                    auto result = write_ops_exec::writeConflictRetryUpsert(opCtx,
-                                                                           nsString,
-                                                                           curOp,
-                                                                           opDebug,
-                                                                           inTransaction,
-                                                                           false,
-                                                                           updateRequest.isUpsert(),
-                                                                           docFound,
-                                                                           updateRequest);
+                    auto result = write_ops_exec::performUpdate(opCtx,
+                                                                nsString,
+                                                                curOp,
+                                                                opDebug,
+                                                                inTransaction,
+                                                                false,
+                                                                updateRequest.isUpsert(),
+                                                                nsInfo[idx].getCollectionUUID(),
+                                                                docFound,
+                                                                updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
                     return true;
@@ -1127,8 +1133,14 @@ bool handleDeleteOp(OperationContext* opCtx,
         lastOpFixer.startingOp(nsString);
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
-            auto nDeleted = write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
+            auto nDeleted = write_ops_exec::performDelete(opCtx,
+                                                          nsString,
+                                                          deleteRequest,
+                                                          curOp,
+                                                          opDebug,
+                                                          inTransaction,
+                                                          nsInfo[idx].getCollectionUUID(),
+                                                          docFound);
             lastOpFixer.finishedOpSuccessfully();
             responses.addDeleteReply(currentOpIdx, nDeleted, docFound, boost::none);
             return true;

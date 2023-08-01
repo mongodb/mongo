@@ -389,7 +389,7 @@ assert = (function() {
      * throwing an exception or more than 'timeout' milliseconds have elapsed. Throws an exception
      * with message 'msg' after timing out.
      */
-    assert.soonNoExcept = function(func, msg, timeout, interval) {
+    assert.soonNoExcept = function(func, msg, timeout, interval, {runHangAnalyzer = true} = {}) {
         var safeFunc =
             _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
         var getFunc = () => {
@@ -413,7 +413,7 @@ assert = (function() {
             };
         };
 
-        assert.soon(getFunc(), msg, timeout, interval);
+        assert.soon(getFunc(), msg, timeout, interval, {runHangAnalyzer});
     };
 
     /*

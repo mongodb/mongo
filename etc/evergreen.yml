@@ -2024,6 +2024,7 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: buildscripts_test
+  - name: .bulk_write
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding

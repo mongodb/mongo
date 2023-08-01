@@ -115,6 +115,24 @@ rst.awaitReplication();
 assert.eq(stocks.length, getPreImageCount(connTenant1Secondary));
 assert.eq(stocks.length, getPreImageCount(connTenant2Secondary));
 
+// Verify that serverStatus does not report metrics aside from the 'purgingJob' in a multi-tenant
+// environment.
+const getServerStatusChangeStreamPreImagesSection = function(conn) {
+    return conn.getDB("admin").serverStatus().changeStreamPreImages;
+};
+assert.soon(() => {
+    const serverStatusDiagnosticsTid1 = getServerStatusChangeStreamPreImagesSection(connTenant1);
+    const serverStatusDiagnosticsTid2 = getServerStatusChangeStreamPreImagesSection(connTenant2);
+    return serverStatusDiagnosticsTid1 && serverStatusDiagnosticsTid2;
+});
+const serverStatusStatsTid1 = getServerStatusChangeStreamPreImagesSection(connTenant1);
+const serverStatusStatsTid2 = getServerStatusChangeStreamPreImagesSection(connTenant2);
+for (const stats of [serverStatusStatsTid1, serverStatusStatsTid2]) {
+    const keys = Object.keys(stats);
+    assert.eq(keys.length, 1);
+    assert.eq(keys[0], "purgingJob");
+}
+
 // Let pre-images of tenant1 expire soon.
 setExpireAfterSeconds(connTenant1, kVeryShortPreImageExpirationIntervalSecs);
 

@@ -1221,7 +1221,7 @@ Status runAggregate(OperationContext* opCtx,
             auto maybeExec = getSBEExecutorViaCascadesOptimizer(opCtx,
                                                                 expCtx,
                                                                 nss,
-                                                                collections.getMainCollection(),
+                                                                collections,
                                                                 std::move(queryHints),
                                                                 request.getHint(),
                                                                 pipeline.get());

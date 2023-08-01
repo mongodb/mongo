@@ -225,34 +225,37 @@ public:
     using Fieldname = stdx::variant<KeyFieldname, UserFieldname, FieldnamePath>;
     using ArrayChildren = std::vector<CNode>;
     using ObjectChildren = std::vector<std::pair<Fieldname, CNode>>;
-    stdx::variant<ArrayChildren,
-                  ObjectChildren,
-                  CompoundInclusionKey,
-                  CompoundExclusionKey,
-                  CompoundInconsistentKey,
-                  KeyValue,
-                  NonZeroKey,
-                  ValuePath,
-                  UserDouble,
-                  UserString,
-                  UserBinary,
-                  UserUndefined,
-                  UserObjectId,
-                  UserBoolean,
-                  UserDate,
-                  UserNull,
-                  UserRegex,
-                  UserDBPointer,
-                  UserJavascript,
-                  UserSymbol,
-                  UserJavascriptWithScope,
-                  UserInt,
-                  UserTimestamp,
-                  UserLong,
-                  UserDecimal,
-                  UserMinKey,
-                  UserMaxKey>
-        payload;
+    using Payload = stdx::variant<ArrayChildren,
+                                  ObjectChildren,
+                                  CompoundInclusionKey,
+                                  CompoundExclusionKey,
+                                  CompoundInconsistentKey,
+                                  KeyValue,
+                                  NonZeroKey,
+                                  ValuePath,
+                                  UserDouble,
+                                  UserString,
+                                  UserBinary,
+                                  UserUndefined,
+                                  UserObjectId,
+                                  UserBoolean,
+                                  UserDate,
+                                  UserNull,
+                                  UserRegex,
+                                  UserDBPointer,
+                                  UserJavascript,
+                                  UserSymbol,
+                                  UserJavascriptWithScope,
+                                  UserInt,
+                                  UserTimestamp,
+                                  UserLong,
+                                  UserDecimal,
+                                  UserMinKey,
+                                  UserMaxKey>;
+    Payload payload;
+
+    CNode() = default;
+    CNode(Payload p) : payload(std::move(p)){};
 
     /*
      * Returns whether this fieldname is the key fieldname representing the _id syntax.

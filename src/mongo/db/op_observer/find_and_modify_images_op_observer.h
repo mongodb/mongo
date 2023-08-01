@@ -61,6 +61,15 @@ public:
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime,
+        OpStateAccumulator* opAccumulator = nullptr) final;
 };
 
 }  // namespace mongo

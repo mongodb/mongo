@@ -93,15 +93,21 @@ rst.waitForConfigReplication(primary);
 rst.nodes[2].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: "majority"}}));
 
+function stepUpNode(rst, newPrimary, liveSecondaries) {
+    rst.awaitReplication(null, null, liveSecondaries);
+    assert.commandWorked(newPrimary.adminCommand({replSetStepUp: 1}));
+    assert.eq(rst.getPrimary(), newPrimary);
+    // Waiting for the background step-up writes here means they won't interfere with the next
+    // step-up.  We await their replication as part of the awaitReplication before stepping up.
+    rst.waitForStepUpWrites(newPrimary);
+}
+
 // Only two nodes are needed for an election (0 and 1).
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[1]);
+stepUpNode(rst, rst.nodes[1], [rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+stepUpNode(rst, rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Initial syncing nodes do not acknowledge replication.
@@ -150,14 +156,11 @@ rst.nodes[3].disconnect(rst.nodes);
 assert.commandWorked(primaryColl.insert({a: 6}, {writeConcern: {w: "majority"}}));
 
 // Only two nodes are needed for an election (0 and 1).
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[1]);
+stepUpNode(rst, rst.nodes[1], [rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1]]);
 
 // Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+stepUpNode(rst, rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 
 // 'newlyAdded' nodes cannot be one of the two nodes to satisfy w:majority.
@@ -215,14 +218,11 @@ assert.commandWorked(primaryColl.insert({a: 8}, {writeConcern: {w: "majority"}})
 
 // Only three nodes are needed for an election (0, 1, and 3).
 rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[1]]);
-assert.commandWorked(rst.nodes[1].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[1]);
+stepUpNode(rst, rst.nodes[1], [rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[1], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // Reset node 0 to be primary.
-rst.awaitReplication(null, null, [rst.nodes[0], rst.nodes[1]]);
-assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
-assert.eq(rst.getPrimary(), rst.nodes[0]);
+stepUpNode(rst, rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.nodes[3]]);
 
 // 3 nodes are needed for a w:majority write.

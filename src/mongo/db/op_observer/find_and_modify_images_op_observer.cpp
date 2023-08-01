@@ -120,4 +120,15 @@ void FindAndModifyImagesOpObserver::onUnpreparedTransactionCommit(
     writeToImageCollection(opCtx, opAccumulator);
 }
 
+void FindAndModifyImagesOpObserver::onTransactionPrepare(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    size_t numberOfPrePostImagesToWrite,
+    Date_t wallClockTime,
+    OpStateAccumulator* opAccumulator) {
+    writeToImageCollection(opCtx, opAccumulator);
+}
+
 }  // namespace mongo

@@ -246,7 +246,7 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
 
     // Compute normalized areas.
     size_t i = 0;
-    for (const auto [endIdx, area] : result.typeClassBounds) {
+    for (const auto& [endIdx, area] : result.typeClassBounds) {
         // We ensure above that the area for the current type bracket is never 0.
         tassert(7299703, str::stream() << "maximum area for type bracket is zero", area != 0.0);
         // Iterate over all values in the current type bracket.

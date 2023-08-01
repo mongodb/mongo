@@ -133,6 +133,7 @@ def generate_mongod_parameters(rng, mode):
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
         ["throughputProbing", "fixedConcurrentTransactions"], weights=[10, 1])[0]
+    ret["storageEngineConcurrencyAdjustmentIntervalMillis"] = rng.randint(10, 1000)
     ret["throughputProbingStepMultiple"] = rng.uniform(0.1, 0.5)
     ret["throughputProbingInitialConcurrency"] = rng.randint(4, 128)
     ret["throughputProbingMinConcurrency"] = rng.randint(4,

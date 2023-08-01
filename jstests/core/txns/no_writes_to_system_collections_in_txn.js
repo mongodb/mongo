@@ -52,7 +52,7 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(systemDotViews.insert({_id: "new.view", viewOn: "bar", pipeline: []}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+                             [ErrorCodes.OperationNotSupportedInTransaction, 50791]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});

@@ -8,7 +8,7 @@ set -o verbose
 
 setup_mongo_task_generator
 activate_venv
-PATH=$PATH:$HOME:/ ./mongo-task-generator \
+RUST_BACKTRACE=full PATH=$PATH:$HOME:/ ./mongo-task-generator \
   --expansion-file ../expansions.yml \
   --evg-auth-file ./.evergreen.yml \
   --evg-project-file ${evergreen_config_file_path} \

@@ -180,7 +180,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
             continue;
         }
 
-        for (const auto [type, priority] : _activeRewriteSet) {
+        for (const auto& [type, priority] : _activeRewriteSet) {
             auto& groupQueue = _memo.getLogicalRewriteQueue(nodeMemoId._groupId);
             groupQueue.push(std::make_unique<LogicalRewriteEntry>(priority, type, nodeMemoId));
 

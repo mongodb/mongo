@@ -49,7 +49,6 @@
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
@@ -59,8 +58,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/create_indexes_gen.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
@@ -68,10 +65,8 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -286,49 +281,6 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         logOperation(opCtx, oplogEntry, true /*assignWallClockTime*/, oplogWriter);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
-}
-
-/**
- * Writes temporary documents for retryable findAndModify commands to the
- * side collection (config.image_collection).
- *
- * In server version 7.0 and earlier, this behavior used to be configurable
- * through the server parameter storeFindAndModifyImagesInSideCollection.
- * See SERVER-59443.
- */
-void writeToImageCollection(OperationContext* opCtx,
-                            const LogicalSessionId& sessionId,
-                            const repl::ReplOperation::ImageBundle& imageToWrite) {
-    repl::ImageEntry imageEntry;
-    imageEntry.set_id(sessionId);
-    imageEntry.setTxnNumber(opCtx->getTxnNumber().value());
-    imageEntry.setTs(imageToWrite.timestamp);
-    imageEntry.setImageKind(imageToWrite.imageKind);
-    imageEntry.setImage(imageToWrite.imageDoc);
-
-    DisableDocumentValidation documentValidationDisabler(
-        opCtx, DocumentValidationSettings::kDisableInternalValidation);
-
-    // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
-    // stronger lock acquisition is taken on this namespace is during step up to create the
-    // collection.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    auto collection = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::kConfigImagesNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-    auto curOp = CurOp::get(opCtx);
-    const auto existingNs = curOp->getNSS();
-    UpdateResult res = Helpers::upsert(opCtx, collection, imageEntry.toBSON());
-    {
-        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-        curOp->setNS_inlock(existingNs);
-    }
-
-    invariant(res.numDocsModified == 1 || !res.upsertedId.isEmpty());
 }
 
 bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) {
@@ -1927,8 +1879,8 @@ void OpObserverImpl::onTransactionPrepare(
                                                     wallClockTime,
                                                     logApplyOpsForPreparedTransaction,
                                                     &imageToWrite);
-        if (imageToWrite) {
-            writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
+        if (opAccumulator) {
+            opAccumulator->retryableFindAndModifyImageToWrite = imageToWrite;
         }
     } else {
         // Log an empty 'prepare' oplog entry.

@@ -248,17 +248,18 @@ struct __wt_connection_impl {
 
     const char *cfg; /* Connection configuration */
 
-    WT_SPINLOCK api_lock;        /* Connection API spinlock */
-    WT_SPINLOCK checkpoint_lock; /* Checkpoint spinlock */
-    WT_SPINLOCK fh_lock;         /* File handle queue spinlock */
-    WT_SPINLOCK flush_tier_lock; /* Flush tier spinlock */
-    WT_SPINLOCK metadata_lock;   /* Metadata update spinlock */
-    WT_SPINLOCK reconfig_lock;   /* Single thread reconfigure */
-    WT_SPINLOCK schema_lock;     /* Schema operation spinlock */
-    WT_RWLOCK table_lock;        /* Table list lock */
-    WT_SPINLOCK tiered_lock;     /* Tiered work queue spinlock */
-    WT_SPINLOCK turtle_lock;     /* Turtle file spinlock */
-    WT_RWLOCK dhandle_lock;      /* Data handle list lock */
+    WT_SPINLOCK api_lock;               /* Connection API spinlock */
+    WT_SPINLOCK checkpoint_lock;        /* Checkpoint spinlock */
+    WT_RWLOCK debug_log_retention_lock; /* Log retention reconfiguration lock */
+    WT_SPINLOCK fh_lock;                /* File handle queue spinlock */
+    WT_SPINLOCK flush_tier_lock;        /* Flush tier spinlock */
+    WT_SPINLOCK metadata_lock;          /* Metadata update spinlock */
+    WT_SPINLOCK reconfig_lock;          /* Single thread reconfigure */
+    WT_SPINLOCK schema_lock;            /* Schema operation spinlock */
+    WT_RWLOCK table_lock;               /* Table list lock */
+    WT_SPINLOCK tiered_lock;            /* Tiered work queue spinlock */
+    WT_SPINLOCK turtle_lock;            /* Turtle file spinlock */
+    WT_RWLOCK dhandle_lock;             /* Data handle list lock */
 
     /* Connection queue */
     TAILQ_ENTRY(__wt_connection_impl) q;
@@ -573,6 +574,7 @@ struct __wt_connection_impl {
     bool mmap_all; /* use mmap for all I/O on data files */
     int page_size; /* OS page size for mmap alignment */
 
+    /* Access to these fields is protected by the debug_log_retention_lock. */
     WT_LSN *debug_ckpt;      /* Debug mode checkpoint LSNs. */
     size_t debug_ckpt_alloc; /* Checkpoint retention allocated. */
     uint32_t debug_ckpt_cnt; /* Checkpoint retention number. */

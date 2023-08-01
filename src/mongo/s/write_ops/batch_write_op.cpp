@@ -265,6 +265,8 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
 
     for (auto& writeOp : writeOps) {
+        bool useTwoPhaseWriteProtocol = false;
+
         // Only target Ready op.
         if (writeOp.getWriteState() != WriteOpState_Ready)
             continue;
@@ -280,7 +282,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         std::vector<std::unique_ptr<TargetedWrite>> writes;
         auto targetStatus = [&] {
             try {
-                writeOp.targetWrites(opCtx, targeter, &writes);
+                writeOp.targetWrites(opCtx, targeter, &writes, &useTwoPhaseWriteProtocol);
                 return Status::OK();
             } catch (const DBException& ex) {
                 return ex.toStatus();
@@ -373,45 +375,22 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
             writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
 
-            bool isMultiWrite = false;
-            BSONObj query;
-            BSONObj collation;
-            bool isUpsert = false;
+            auto isMultiWrite = [&] {
+                if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+                    auto updateReq = writeItem.getUpdateRef();
+                    return updateReq.getMulti();
+                } else {
+                    auto deleteReq = writeItem.getDeleteRef();
+                    return deleteReq.getMulti();
+                }
+            }();
 
-            if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                auto updateReq = writeItem.getUpdateRef();
-                isMultiWrite = updateReq.getMulti();
-                query = updateReq.getFilter();
-                collation = updateReq.getCollation().value_or(BSONObj());
-                isUpsert = updateReq.getUpsert();
-            } else {
-                auto deleteReq = writeItem.getDeleteRef();
-                isMultiWrite = deleteReq.getMulti();
-                query = deleteReq.getFilter();
-                collation = deleteReq.getCollation().value_or(BSONObj());
-            }
-
-            if (!isMultiWrite &&
-                write_without_shard_key::useTwoPhaseProtocol(
-                    opCtx,
-                    targeter.getNS(),
-                    true /* isUpdateOrDelete */,
-                    isUpsert,
-                    query,
-                    collation,
-                    writeItem.getLet(),
-                    writeItem.getLegacyRuntimeConstants())) {
+            if (!isMultiWrite && useTwoPhaseWriteProtocol) {
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.cancelWrites(nullptr);
                     break;
                 } else {
-                    if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                        updateOneNonTargetedShardedCount.increment(1);
-                    } else {
-                        deleteOneNonTargetedShardedCount.increment(1);
-                    }
-
                     writeType = WriteType::WithoutShardKeyOrId;
                 }
             };

@@ -94,15 +94,31 @@ public:
                                const BSONObj& doc,
                                std::set<ChunkRange>* chunkRange = nullptr) const override;
 
+    /**
+     * Attempts to target an update request by shard key and returns a vector of shards to target.
+     *
+     * The usage of the useTwoPhaseWriteProtocol boolean pointer is to determine whether or not we
+     * have received a query that does not have the full shard key or is not an _id query and should
+     * use the two phase write protocol to execute the write.
+     */
     std::vector<ShardEndpoint> targetUpdate(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
-        std::set<ChunkRange>* chunkRange = nullptr) const override;
+        bool* useTwoPhaseWriteProtocol = nullptr,
+        std::set<ChunkRange>* chunkRanges = nullptr) const override;
 
+    /**
+     * Attempts to target an delete request by shard key and returns a vector of shards to target.
+     *
+     * The usage of the useTwoPhaseWriteProtocol boolean pointer is to determine whether or not we
+     * have received a query that does not have the full shard key or is not an _id query and should
+     * use the two phase write protocol to execute the write.
+     */
     std::vector<ShardEndpoint> targetDelete(
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
-        std::set<ChunkRange>* chunkRange = nullptr) const override;
+        bool* useTwoPhaseWriteProtocol = nullptr,
+        std::set<ChunkRange>* chunkRanges = nullptr) const override;
 
     std::vector<ShardEndpoint> targetAllShards(
         OperationContext* opCtx, std::set<ChunkRange>* chunkRanges = nullptr) const override;

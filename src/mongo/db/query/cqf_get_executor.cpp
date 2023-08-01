@@ -62,6 +62,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -350,7 +351,7 @@ namespace {
  * TODO SERVER-79041: Change how and when the shardFilterer slot is allocated.
  */
 void setupShardFiltering(OperationContext* opCtx,
-                         const CollectionPtr& collection,
+                         const MultipleCollectionAccessor& collections,
                          mongo::sbe::RuntimeEnvironment& runtimeEnv,
                          sbe::value::SlotIdGenerator& slotIdGenerator) {
     // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
@@ -359,10 +360,19 @@ void setupShardFiltering(OperationContext* opCtx,
 
     // TODO SERVER-79007: Merge this method of creating a ShardFilterer with that in
     // sbe_stage_builders.cpp.
-    if (collection.isSharded_DEPRECATED()) {
+    bool isSharded = collections.isAcquisition()
+        ? collections.getMainAcquisition().getShardingDescription().isSharded()
+        : collections.getMainCollection().isSharded_DEPRECATED();
+    if (isSharded) {
         auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
-            ShardFiltererFactoryImpl shardFiltererFactory(collection);
-            return shardFiltererFactory.makeShardFilterer(opCtx);
+            if (collections.isAcquisition()) {
+                return std::make_unique<ShardFiltererImpl>(
+                    *collections.getMainAcquisition().getShardingFilter());
+            } else {
+                const auto& collection = collections.getMainCollection();
+                ShardFiltererFactoryImpl shardFiltererFactory(collection);
+                return shardFiltererFactory.makeShardFilterer(opCtx);
+            }
         }();
         runtimeEnv.resetSlot(shardFiltererSlot,
                              sbe::value::TypeTags::shardFilterer,
@@ -376,7 +386,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
                                  OperationContext* opCtx,
                                  boost::intrusive_ptr<ExpressionContext> expCtx,
                                  const NamespaceString& nss,
-                                 const CollectionPtr& collection,
+                                 const MultipleCollectionAccessor& collections,
                                  const bool requireRID,
                                  const ScanOrder scanOrder,
                                  const bool needsExplain) {
@@ -386,7 +396,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
     // Construct the ShardFilterer and bind it to the correct slot.
-    setupShardFiltering(opCtx, collection, *runtimeEnvironment, ids);
+    setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
     SBENodeLowering g{
         env, *runtimeEnvironment, ids, phaseManager.getMetadata(), planAndProps._map, scanOrder};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
@@ -764,7 +774,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
-    const CollectionPtr& collection,
+    const MultipleCollectionAccessor& collections,
     QueryHints queryHints,
     const boost::optional<BSONObj>& indexHint,
     const Pipeline* pipeline,
@@ -782,6 +792,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     if (pipeline) {
         involvedCollections = pipeline->getInvolvedCollections();
     }
+
+    const auto& collection = collections.getMainCollection();
 
     validateCommandOptions(canonicalQuery, collection, indexHint, involvedCollections);
 
@@ -902,15 +914,16 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           opCtx,
                           expCtx,
                           nss,
-                          collection,
+                          collections,
                           requireRID,
                           scanOrder,
                           needsExplain);
 }
 
-boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(const CollectionPtr& collection,
-                                                               QueryHints queryHints,
-                                                               const CanonicalQuery* query) {
+boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
+    const MultipleCollectionAccessor& collections,
+    QueryHints queryHints,
+    const CanonicalQuery* query) {
     boost::optional<BSONObj> indexHint;
     if (!query->getFindCommandRequest().getHint().isEmpty()) {
         indexHint = query->getFindCommandRequest().getHint();
@@ -923,7 +936,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(const CollectionP
     return getSBEExecutorViaCascadesOptimizer(opCtx,
                                               expCtx,
                                               nss,
-                                              collection,
+                                              collections,
                                               std::move(queryHints),
                                               indexHint,
                                               nullptr /* pipeline */,

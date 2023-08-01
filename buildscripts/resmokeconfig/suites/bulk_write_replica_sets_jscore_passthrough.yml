@@ -1,0 +1,81 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+  # We will handle transactions testing with the transactions override in a different suite.
+  - jstests/core/txns/**/*.js
+  - jstests/fle2/**/*txn*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*txn*.js
+  # TODO (SERVER-72767/SERVER-72804/SERVER-72805): When timeseries is supported on mongod enable these.
+  - jstests/core/timeseries/**/*.js
+  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+  # server parameter.
+  - jstests/core/**/set_param1.js
+  # TODO (SERVER-78258): Enable these when profiling is supported in bulkWrite.
+  - jstests/core/**/top*.js
+  - jstests/core/**/profile*.js
+  - jstests/core/**/*histogram*.js
+  - jstests/core/views/views_stats.js
+  - jstests/core/write/update/update_metrics.js
+  - jstests/core/comment_field.js
+  # TODO (SERVER-78258): CurOp currently does not display the correct metrics for the individual writes done under bulkWrite.
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  # TODO (SERVER-76497): Enable these when explain is supported in bulkWrite.
+  - jstests/core/**/explain*.js
+  # Runs an update with illegal format (no 'updates'). We could work around this in the override
+  # but it is very annoying.
+  - jstests/core/write/insert/batch_write_command_insert.js
+  - jstests/core/write/update/batch_write_command_update.js
+  - jstests/core/write/delete/batch_write_command_delete.js
+  # Tests that involve setting other generic command parameters that the override does not support.
+  - jstests/core/api/**/*.js
+  - jstests/core/command_json_schema_field.js
+  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/write/write_commands_reject_unknown_fields.js
+  # TODO (SERVER-72767): Uses time series inserts.
+  - jstests/core/catalog/list_catalog.js
+  # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
+  - jstests/core/failcommand_failpoint.js
+  # Asserts a location specific error code failure that happens after we fail out in bulkWrite.
+  - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        load("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2

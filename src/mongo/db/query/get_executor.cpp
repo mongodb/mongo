@@ -1621,7 +1621,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
             auto maybeExec = getSBEExecutorViaCascadesOptimizer(
-                mainColl, std::move(queryHints), canonicalQuery.get());
+                collections, std::move(queryHints), canonicalQuery.get());
             if (maybeExec) {
                 auto exec = uassertStatusOK(
                     makeExecFromParams(std::move(canonicalQuery), std::move(*maybeExec)));

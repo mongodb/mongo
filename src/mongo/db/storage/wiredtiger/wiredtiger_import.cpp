@@ -44,6 +44,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
@@ -148,18 +150,23 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
     // stable, and takes a checkpoint. Accept WT's default checkpoint behavior: take a checkpoint
     // only when opening and closing. We rely on checkpoints being disabled to make exporting the WT
     // metadata (byte offset to the root node) consistent with the new file that was written out.
-    // TODO (SERVER-61475): Determine wiredtiger_open config string.
-    const auto wtConfig = "config_base=false,log=(enabled=true,path=journal,compressor=snappy)";
-    uassertWTOK(wiredtiger_open(importPath.c_str(), nullptr, wtConfig, &conn), nullptr);
+    std::stringstream wtConfigBuilder;
+    wtConfigBuilder
+        << "log=(enabled=true,remove=true,path=journal,compressor="
+        << wiredTigerGlobalOptions.journalCompressor
+        << "),builtin_extension_config=(zstd=(compression_level="
+        << wiredTigerGlobalOptions.zstdCompressorLevel << ")),"
+        << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
+    uassertWTOK(wiredtiger_open(importPath.c_str(), nullptr, wtConfigBuilder.str().c_str(), &conn),
+                nullptr);
     // Reopen as read-only, to ensure the WT metadata we retrieve will be valid after closing again.
     // Otherwise WT might change file offsets etc. between the time we get metadata and the time we
     // close conn. In fact WT doesn't do this if we don't write, but relying on explicit readonly
     // mode is better than relying implicitly on WT internals.
     uassertWTOK(conn->close(conn, nullptr), nullptr);
-    uassertWTOK(
-        wiredtiger_open(
-            importPath.c_str(), nullptr, "{},readonly=true"_format(wtConfig).c_str(), &conn),
-        nullptr);
+    wtConfigBuilder << "readonly=true";
+    uassertWTOK(wiredtiger_open(importPath.c_str(), nullptr, wtConfigBuilder.str().c_str(), &conn),
+                nullptr);
 
     ON_BLOCK_EXIT([&] {
         uassertWTOK(conn->close(conn, nullptr), nullptr);

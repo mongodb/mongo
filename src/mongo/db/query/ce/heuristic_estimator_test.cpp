@@ -537,6 +537,37 @@ TEST_F(CEHeuristicTest, CEWithoutOptimizationConjunctionOfBoundsWithDifferentPat
     ASSERT_CE_CARD(ht, rootNode, 1089.0, 10000.0);
 }
 
+TEST_F(CEHeuristicTest, CEWithoutOptimizationConjunctionWithNeq) {
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "array",
+                make<PathTraverse>(PathTraverse::kSingleLevel,
+                                   make<PathComposeM>(
+                                       // This predicate is a conjunction of two comparisons, but
+                                       // can't be represented as a single contiguous interval,
+                                       // because 'Neq' is a non-contiguous union of intervals.
+                                       // Make sure 'heuristicIntervalSel' doesn't crash here.
+                                       make<PathCompare>(Operations::Neq, Constant::int64(0)),
+                                       make<PathCompare>(Operations::Neq, Constant::int64(5))))),
+
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"test"}},
+                                  std::move(filterNode));
+
+    HeuristicCETester ht(collName, kNoOptPhaseSet);
+    ASSERT_CE_CARD(ht, rootNode, 0.0, 0.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.3, 3.0);
+    ASSERT_CE_CARD(ht, rootNode, 0.7, 7.0);
+    ASSERT_CE_CARD(ht, rootNode, 1.0, 10.0);
+    ASSERT_CE_CARD(ht, rootNode, 10.0, 100.0);
+    ASSERT_CE_CARD(ht, rootNode, 1000.0, 10000.0);
+}
+
 TEST_F(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnSamePathWithoutTraverse) {
     ABT scanNode = make<ScanNode>("test", "test");
 

@@ -965,7 +965,8 @@ var ReplSetTest = function ReplSetTest(opts) {
      * primary. Otherwise, ensure that all the nodes in the set agree with the first node on the
      * identity of the primary.
      */
-    ReplSetTest.prototype.awaitNodesAgreeOnPrimary = function(timeout, nodes, expectedPrimaryNode) {
+    ReplSetTest.prototype.awaitNodesAgreeOnPrimary = function(
+        timeout, nodes, expectedPrimaryNode, runHangAnalyzerOnTimeout = true) {
         timeout = timeout || this.kDefaultTimeoutMS;
         nodes = nodes || this.nodes;
         // indexOf will return the index of the expected node. If expectedPrimaryNode is undefined,
@@ -1021,7 +1022,9 @@ var ReplSetTest = function ReplSetTest(opts) {
 
             print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + this.nodes[primary].name);
             return true;
-        }, "Awaiting nodes to agree on primary timed out", timeout);
+        }, "Awaiting nodes to agree on primary timed out", timeout, undefined /*interval*/, {
+            runHangAnalyzer: runHangAnalyzerOnTimeout
+        });
     };
 
     /**
@@ -1828,8 +1831,11 @@ var ReplSetTest = function ReplSetTest(opts) {
             // Since assert.soon() timeout is 10 minutes (default), setting
             // awaitNodesAgreeOnPrimary() timeout as 1 minute to allow retry of replSetStepUp
             // command on failure of the replica set to agree on the primary.
+            // We should not run hangAnalyzer when awaitNodesAgreeOnPrimary() timeout, otherwise the
+            // mongo processes will be killed and we cannot retry.
             const timeout = 60 * 1000;
-            this.awaitNodesAgreeOnPrimary(timeout, this.nodes, node);
+            this.awaitNodesAgreeOnPrimary(
+                timeout, this.nodes, node, false /*runHangAnalyzerOnTimeout*/);
 
             if (!awaitWritablePrimary) {
                 return true;

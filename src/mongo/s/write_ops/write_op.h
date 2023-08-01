@@ -50,7 +50,7 @@
 namespace mongo {
 
 struct TargetedWrite;
-struct ChildWriteOp;
+class WriteOp;
 
 enum WriteOpState {
     // Item is ready to be targeted
@@ -72,6 +72,31 @@ enum WriteOpState {
 
     // Catch-all error state.
     WriteOpState_Unknown
+};
+
+/**
+ * State of a write in-progress (to a single shard) which is one part of a larger write
+ * operation.
+ *
+ * As above, the write op may finish in either a successful (_Completed) or unsuccessful
+ * (_Error) state.
+ */
+struct ChildWriteOp {
+    ChildWriteOp(WriteOp* const parent) : parentOp(parent) {}
+
+    const WriteOp* const parentOp;
+
+    WriteOpState state{WriteOpState_Ready};
+
+    // non-zero when state == _Pending
+    // Not owned here but tracked for reporting
+    TargetedWrite* pendingWrite{nullptr};
+
+    // filled when state > _Pending
+    std::unique_ptr<ShardEndpoint> endpoint;
+
+    // filled when state == _Error or (optionally) when state == _Cancelled
+    boost::optional<write_ops::WriteError> error;
 };
 
 /**
@@ -126,13 +151,11 @@ public:
      *
      * The ShardTargeter determines the ShardEndpoints to send child writes to, but is not
      * modified by this operation.
-     *
-     * Returns !OK if the targeting process itself fails
-     *             (no TargetedWrites will be added, state unchanged)
      */
     void targetWrites(OperationContext* opCtx,
                       const NSTargeter& targeter,
-                      std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites);
+                      std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
+                      bool* useTwoPhaseWriteProtocol = nullptr);
 
     /**
      * Returns the number of child writes that were last targeted.
@@ -195,31 +218,6 @@ private:
     // stores the shards where this write operation succeeded
     absl::flat_hash_set<ShardId> _successfulShardSet;
 };
-/**
- * State of a write in-progress (to a single shard) which is one part of a larger write
- * operation.
- *
- * As above, the write op may finish in either a successful (_Completed) or unsuccessful
- * (_Error) state.
- */
-struct ChildWriteOp {
-    ChildWriteOp(WriteOp* const parent) : parentOp(parent) {}
-
-    const WriteOp* const parentOp;
-
-    WriteOpState state{WriteOpState_Ready};
-
-    // non-zero when state == _Pending
-    // Not owned here but tracked for reporting
-    TargetedWrite* pendingWrite{nullptr};
-
-    // filled when state > _Pending
-    std::unique_ptr<ShardEndpoint> endpoint;
-
-    // filled when state == _Error or (optionally) when state == _Cancelled
-    boost::optional<write_ops::WriteError> error;
-};
-
 // First value is write item index in the batch, second value is child write op index
 typedef std::pair<int, int> WriteOpRef;
 

@@ -122,30 +122,32 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          bool isRemove);
 
 /**
- * Executes a findAndModify with remove:false, the returned document is placed into docFound (if
- * applicable). Should be called in a writeConflictRetry loop.
+ * Executes an update, supports returning a pre/post image. The returned document is placed into
+ * docFound (if applicable). Should be called in a writeConflictRetry loop.
  */
-UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      CurOp* curOp,
-                                      OpDebug* opDebug,
-                                      bool inTransaction,
-                                      bool remove,
-                                      bool upsert,
-                                      boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest& updateRequest);
+UpdateResult performUpdate(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           CurOp* curOp,
+                           OpDebug* opDebug,
+                           bool inTransaction,
+                           bool remove,
+                           bool upsert,
+                           const boost::optional<mongo::UUID>& collectionUUID,
+                           boost::optional<BSONObj>& docFound,
+                           const UpdateRequest& updateRequest);
 
 /**
- * Executes a findAndModify with remove:true, the returned document is placed into docFound (if
- * applicable). Should be called in a writeConflictRetry loop.
+ * Executes a delete, supports returning the deleted document. the returned document is placed into
+ * docFound (if applicable). Should be called in a writeConflictRetry loop.
  */
-long long writeConflictRetryRemove(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   const DeleteRequest& deleteRequest,
-                                   CurOp* curOp,
-                                   OpDebug* opDebug,
-                                   bool inTransaction,
-                                   boost::optional<BSONObj>& docFound);
+long long performDelete(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const DeleteRequest& deleteRequest,
+                        CurOp* curOp,
+                        OpDebug* opDebug,
+                        bool inTransaction,
+                        const boost::optional<mongo::UUID>& collectionUUID,
+                        boost::optional<BSONObj>& docFound);
 
 /**
  * Generates a WriteError for a given Status.
