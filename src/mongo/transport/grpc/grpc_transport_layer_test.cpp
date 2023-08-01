@@ -87,19 +87,25 @@ public:
     }
 
     std::unique_ptr<GRPCTransportLayer> makeTL(
+        CommandService::RPCHandler serverCb = makeNoopRPCHandler(),
         GRPCTransportLayer::Options options = makeTLOptions()) {
         auto tl = std::make_unique<GRPCTransportLayer>(
             getServiceContext(), WireSpec::instance(), std::move(options));
         uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
-            tl.get(),
-            [](auto session) { session->end(); },
-            std::make_unique<WireVersionProvider>())));
+            tl.get(), std::move(serverCb), std::make_unique<WireVersionProvider>())));
         return tl;
     }
 
-    void runWithTL(std::function<void(GRPCTransportLayer&)> cb,
+    static CommandService::RPCHandler makeNoopRPCHandler() {
+        return [](auto session) {
+            session->end();
+        };
+    }
+
+    void runWithTL(CommandService::RPCHandler serverCb,
+                   std::function<void(GRPCTransportLayer&)> cb,
                    GRPCTransportLayer::Options options) {
-        auto tl = makeTL(std::move(options));
+        auto tl = makeTL(std::move(serverCb), std::move(options));
         uassertStatusOK(tl->setup());
         uassertStatusOK(tl->start());
         ON_BLOCK_EXIT([&] { tl->shutdown(); });
@@ -107,9 +113,8 @@ public:
     }
 
     void assertConnectSucceeds(GRPCTransportLayer& tl, const HostAndPort& addr) {
-        auto swSession = tl.connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(1000));
-        auto session = uassertStatusOK(swSession);
-        ASSERT_OK(static_cast<EgressSession&>(*session).finish());
+        auto session = makeEgressSession(tl, addr);
+        ASSERT_OK(session->finish());
     }
 };
 
@@ -246,6 +251,7 @@ TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
         }
 
         runWithTL(
+            makeNoopRPCHandler(),
             [&](auto& tl) {
                 std::vector<stdx::thread> threads;
                 for (size_t i = 0; i < addrs.size() * 5; i++) {
@@ -268,6 +274,7 @@ TEST_F(GRPCTransportLayerTest, UnixDomainSocketPermissions) {
     options.unixDomainSocketPermissions = permissions;
 
     runWithTL(
+        makeNoopRPCHandler(),
         [&](auto& tl) {
             struct stat st;
             ASSERT_EQ(::stat(makeUnixSockPath(options.bindPort).c_str(), &st), 0)
@@ -291,6 +298,7 @@ TEST_F(GRPCTransportLayerTest, DefaultIPList) {
     addrs.push_back(HostAndPort(makeUnixSockPath(noIPListOptions.bindPort)));
 
     runWithTL(
+        makeNoopRPCHandler(),
         [&](auto& tl) {
             for (auto& addr : addrs) {
                 assertConnectSucceeds(tl, addr);
@@ -301,6 +309,7 @@ TEST_F(GRPCTransportLayerTest, DefaultIPList) {
 
 TEST_F(GRPCTransportLayerTest, ConnectionError) {
     runWithTL(
+        makeNoopRPCHandler(),
         [&](auto& tl) {
             auto tryConnect = [&] {
                 auto status = tl.connect(HostAndPort("localhost", 1235),
@@ -335,13 +344,141 @@ TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
         session.reset();
     }
 
-    ASSERT_NOT_OK(tl->connect(CommandServiceTestFixtures::defaultServerAddress(),
-                              ConnectSSLMode::kGlobalSSLMode,
-                              Milliseconds(50)));
     ASSERT_THROWS_CODE(
         client->connect(CommandServiceTestFixtures::defaultServerAddress(), Milliseconds(50), {}),
         DBException,
         ErrorCodes::NetworkTimeout);
+    ASSERT_NOT_OK(tl->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                              ConnectSSLMode::kGlobalSSLMode,
+                              Milliseconds(50)));
+}
+
+TEST_F(GRPCTransportLayerTest, Unary) {
+    runWithTL(
+        CommandServiceTestFixtures::makeEchoHandler(),
+        [&](auto& tl) {
+            auto session = makeEgressSession(tl);
+            assertEchoSucceeds(*session);
+            ASSERT_OK(session->finish());
+        },
+        makeTLOptions());
+}
+
+TEST_F(GRPCTransportLayerTest, Exhaust) {
+    constexpr auto kMessageCount = 5;
+
+    auto streamingHandler = [](std::shared_ptr<IngressSession> session) {
+        auto swMsg = session->sourceMessage();
+        ASSERT_OK(swMsg);
+
+        for (auto i = 0; i < kMessageCount; i++) {
+            OpMsg response;
+            response.body = BSON("i" << i);
+
+            auto serialized = response.serialize();
+            if (i < kMessageCount - 1) {
+                OpMsg::setFlag(&serialized, OpMsg::kMoreToCome);
+            }
+            ASSERT_OK(session->sinkMessage(serialized));
+        }
+        session->end();
+    };
+
+    runWithTL(
+        streamingHandler,
+        [&](auto& tl) {
+            auto session = makeEgressSession(tl);
+            ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
+            for (auto i = 0;; i++) {
+                auto swMsg = session->sourceMessage();
+                ASSERT_OK(swMsg);
+
+                auto responseMsg = OpMsg::parse(swMsg.getValue());
+                int iReceived = responseMsg.body.getIntField("i");
+                ASSERT_EQ(iReceived, i);
+
+                if (!OpMsg::isFlagSet(swMsg.getValue(), OpMsg::kMoreToCome)) {
+                    break;
+                }
+            }
+            ASSERT_OK(session->finish());
+        },
+        makeTLOptions());
+}
+
+TEST_F(GRPCTransportLayerTest, Awaitable) {
+    auto streamingHandler = [](std::shared_ptr<IngressSession> session) {
+        auto swMsg = session->sourceMessage();
+        ASSERT_OK(swMsg);
+
+        for (auto i = 0;; i++) {
+            OpMsg response;
+            response.body = BSON("i" << i);
+            auto serialized = response.serialize();
+            OpMsg::setFlag(&serialized, OpMsg::kMoreToCome);
+
+            try {
+                uassertStatusOK(session->sinkMessage(serialized));
+            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+                session->end();
+                return;
+            }
+
+            sleepFor(Microseconds(500));
+        }
+    };
+
+    constexpr auto kMessageCount = 5;
+    runWithTL(
+        streamingHandler,
+        [&](auto& tl) {
+            auto session = makeEgressSession(tl);
+            ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
+            for (auto i = 0; i < kMessageCount; i++) {
+                auto swMsg = session->sourceMessage();
+                ASSERT_OK(swMsg);
+
+                auto responseMsg = OpMsg::parse(swMsg.getValue());
+                int iReceived = responseMsg.body.getIntField("i");
+                ASSERT_EQ(iReceived, i);
+            }
+            session->end();
+        },
+        makeTLOptions());
+}
+
+TEST_F(GRPCTransportLayerTest, Unacknowledged) {
+    auto serverHandler = [](std::shared_ptr<IngressSession> session) {
+        while (true) {
+            try {
+                auto swMsg = session->sourceMessage();
+                uassertStatusOK(swMsg);
+                if (OpMsg::isFlagSet(swMsg.getValue(), OpMsg::kMoreToCome)) {
+                    continue;
+                }
+                ASSERT_OK(session->sinkMessage(swMsg.getValue()));
+            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+                session->end();
+                return;
+            }
+        }
+    };
+
+    runWithTL(
+        serverHandler,
+        [&](auto& tl) {
+            auto session = makeEgressSession(tl);
+            assertEchoSucceeds(*session);
+
+            auto unacknowledgedMsg = makeUniqueMessage();
+            OpMsg::setFlag(&unacknowledgedMsg, OpMsg::kMoreToCome);
+            ASSERT_OK(session->sinkMessage(unacknowledgedMsg));
+
+            assertEchoSucceeds(*session);
+
+            ASSERT_OK(session->finish());
+        },
+        makeTLOptions());
 }
 
 }  // namespace

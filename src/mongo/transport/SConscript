@@ -68,6 +68,9 @@ env.Library(
 tlEnv = env.Clone()
 tlEnv.InjectThirdParty(libraries=['asio'])
 
+if shouldBuildGRPC(tlEnv):
+    tlEnv.InjectThirdParty(libraries=['grpc'])
+
 tlEnv.Library(
     target='transport_layer_manager',
     source=[
@@ -228,6 +231,7 @@ tlEnv.CppUnitTest(
         'max_conns_override_test.cpp',
         'session_workflow_test.cpp',
         'transport_layer_manager_test.cpp',
+        'transport_layer_manager_grpc_test.cpp' if shouldBuildGRPC(tlEnv) else [],
         'proxy_protocol_header_parser_test.cpp',
     ],
     LIBDEPS=[
@@ -242,7 +246,9 @@ tlEnv.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory' if shouldBuildGRPC(tlEnv) else [],
         '$BUILD_DIR/third_party/shim_asio',
+        '$BUILD_DIR/third_party/shim_grpc' if shouldBuildGRPC(tlEnv) else [],
         'message_compressor',
         'message_compressor_options_server',
         'service_entry_point',

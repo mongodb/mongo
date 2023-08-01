@@ -56,6 +56,7 @@ public:
     }
 
     ::grpc::Status finish() override {
+        _stream->WritesDone();
         return _stream->Finish();
     }
 
