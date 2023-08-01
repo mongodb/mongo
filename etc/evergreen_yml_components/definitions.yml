@@ -3688,19 +3688,32 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *benchmark_template
-  name: benchmarks_orphaned
+  name: benchmarks_orphaned_first_half
   tags: ["benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
     vars:
-      suite: benchmarks
+      suite: benchmarks_first_half
       exec_timeout_secs: 21600 # 6 hour timeout.
       resmoke_jobs_max: 1
   - func: "send benchmark results"
-#  - func: "analyze benchmark results"
     vars:
-      suite: benchmarks
+      suite: benchmarks_first_half
+
+- <<: *benchmark_template
+  name: benchmarks_orphaned_second_half
+  tags: ["benchmarks"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_second_half
+      exec_timeout_secs: 21600 # 6 hour timeout.
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+    vars:
+      suite: benchmarks_second_half
 
 - <<: *benchmark_template
   name: benchmarks_sharding

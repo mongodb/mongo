@@ -3210,7 +3210,7 @@ buildvariants:
   - name: compile_upload_benchmarks_TG
     distros:
     - windows-vsCurrent-large
-  - name: .benchmarks !benchmarks_orphaned
+  - name: .benchmarks !benchmarks_orphaned_first_half !benchmarks_orphaned_second_half
 
 - <<: *enterprise-windows-nopush-template
   name: &enterprise-windows-wtdevelop enterprise-windows-wtdevelop
