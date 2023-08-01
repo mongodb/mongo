@@ -88,11 +88,7 @@ public:
                                         Privilege(ResourcePattern::forClusterResource(tenantId),
                                                   ActionType::queryStatsRead)}
                       : PrivilegeVector{Privilege(ResourcePattern::forClusterResource(tenantId),
-                                                  ActionType::queryStatsReadTransformed)}) {
-            uassert(ErrorCodes::Unauthorized,
-                    "unauthorized to run $queryStats without transformation",
-                    getTestCommandsEnabled() || _privileges.size() == 1);
-        }
+                                                  ActionType::queryStatsReadTransformed)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
