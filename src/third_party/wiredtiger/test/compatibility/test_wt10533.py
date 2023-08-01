@@ -33,6 +33,7 @@ class test_wt10533(compatibility_test.CompatibilityTestCase):
     Test handling checkpoints during database downgrade.
     '''
 
+    cmake_args = '-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DWT_STANDALONE_BUILD=0 -DENABLE_PYTHON=1'
     conn_config = 'compatibility=(release="3.3"),' + \
         'statistics=(fast),statistics_log=(json,on_close,wait=5)'
     create_config = 'key_format=i,value_format=S'
@@ -54,8 +55,8 @@ class test_wt10533(compatibility_test.CompatibilityTestCase):
 
         # Checkout the relevant branches
         branch = 'mongodb-6.0'
-        self.prepare_wt_branch(branch)
-        self.prepare_wt_branch('develop')
+        self.prepare_wt_branch(branch, self.cmake_args)
+        self.prepare_wt_branch('develop', self.cmake_args)
 
         # Now run the first part of the test on the develop branch.
         self.run_method_on_branch('develop', 'on_develop_test_checkpoint_downgrade')
