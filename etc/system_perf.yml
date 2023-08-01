@@ -52,11 +52,11 @@ variables:
       - name: schedule_global_auto_tasks
         variant: task_generation
   _skip_expansions: &_expansion_updates
-      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
+      # This is the normal (amazon2) "compile" artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_patch_cbba2a682920b2b5f587c7ededf460a5cc4ab230_64c79b8b3066157239cc356b_23_07_31_11_32_24/logs?execution=0
       - key: mdb_binary_for_client
-        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/64c79b8b3066157239cc356b/cbba2a682920b2b5f587c7ededf460a5cc4ab230/linux/mongodb-arm64-64c79b8b3066157239cc356b.tar.gz
       - key: mdb_binary_for_server
-        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/64c79b8b3066157239cc356b/cbba2a682920b2b5f587c7ededf460a5cc4ab230/linux/mongodb-arm64-64c79b8b3066157239cc356b.tar.gz
 ###
 
   _src_dir: &src_dir src/mongo
