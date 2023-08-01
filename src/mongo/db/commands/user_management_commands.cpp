@@ -261,7 +261,7 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
     for (PrivilegeVector::const_iterator it = privileges.begin(); it != privileges.end(); ++it) {
         const ResourcePattern& resource = (*it).getResourcePattern();
         if ((resource.isDatabasePattern() || resource.isExactNamespacePattern()) &&
-            (resource.databaseToMatch() == role.getDB())) {
+            (resource.dbNameToMatch() == role.getDatabaseName())) {
             continue;
         }
 

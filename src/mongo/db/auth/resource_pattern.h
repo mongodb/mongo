@@ -61,9 +61,6 @@ class ResourcePattern {
     friend class AuthorizationContract;
 
 public:
-    // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-    // databaseToMatch() - Remove in favor of dbNameToMatch.
-
     /**
      * Returns a pattern that matches absolutely any resource.
      */
@@ -253,10 +250,6 @@ public:
         return _ns.dbName();
     }
 
-    StringData databaseToMatch() const {
-        return _ns.db_deprecated();
-    }
-
     /**
      * Returns the collection that this pattern matches.
      *
@@ -278,16 +271,6 @@ public:
             return true;
         }
         return (_matchType == other._matchType) && (_ns < other._ns);
-    }
-
-    /**
-     * Perform an equality comparison ignoring the TenantID component of NamespaceString.
-     * This is necessary during migration of ResourcePattern to be tenant aware.
-     * TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-     */
-    bool matchesIgnoringTenant(const ResourcePattern& other) const {
-        return (_matchType == other._matchType) &&
-            (_ns.db_deprecated() == other._ns.db_deprecated()) && (_ns.coll() == other._ns.coll());
     }
 
     template <typename H>

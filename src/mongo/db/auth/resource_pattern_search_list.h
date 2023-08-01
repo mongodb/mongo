@@ -46,39 +46,49 @@ namespace mongo::auth {
  * of ResourcePattern objects representing the breakdown of the target ResourcePattern
  * into the subpatterns which may potentially match it.
  *
- * The seach lists are as follows, depending on the type of "target":
+ * The search lists are as follows, depending on the type of "target":
  *
- * target is ResourcePattern::forAnyResource():
- *   searchList = { ResourcePattern::forAnyResource() }
- * target is the ResourcePattern::forClusterResource():
- *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forClusterResource() }
- * target is a database, db:
- *   searchList = { ResourcePattern::forAnyResource(),
- *                  ResourcePattern::forAnyNormalResource(),
- *                  db }
- * target is a non-system collection, db.coll:
- *   searchList = { ResourcePattern::forAnyResource(),
- *                  ResourcePattern::forAnyNormalResource(),
- *                  db,
- *                  coll,
- *                  db.coll }
- * target is a system buckets collection, db.system.buckets.coll:
- *   searchList = { ResourcePattern::forAnyResource(),
- *                  ResourcePattern::forAnySystemBuckets(),
- *                  ResourcePattern::forAnySystemBucketsInDatabase("db"),
- *                  ResourcePattern::forAnySystemBucketsInAnyDatabase("coll"),
- *                  ResourcePattern::forExactSystemBucketsCollection("db", "coll"),
- *                  system.buckets.coll,
- *                  db.system.buckets.coll }
- * target is a system collection, db.system.coll:
- *   searchList = { ResourcePattern::forAnyResource(),
- *                  system.coll,
- *                  db.system.coll }
+ * target is ResourcePattern::forAnyResource(tenantId):
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none) }
+ * target is ResourcePattern::forClusterResource(tenantId):
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forClusterResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none),
+ *                  ResourcePattern::forClusterResource(boost::none) }
+ * target is a database, tenantId_db:
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forAnyNormalResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none),
+ *                  ResourcePattern::forAnyNormalResource(boost::none),
+ *                  tenantId_db }
+ * target is a non-system collection, tenantId_db.coll:
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forAnyNormalResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none),
+ *                  ResourcePattern::forAnyNormalResource(boost::none),
+ *                  tenantId_db,
+ *                  tenantId_*.coll,
+ *                  tenantId_db.coll }
+ * target is a system buckets collection, tenantId_db.system.buckets.coll:
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none),
+ *                  ResourcePattern::forAnySystemBuckets(tenantId),
+ *                  ResourcePattern::forAnySystemBucketsInDatabase(tenantId, "db"),
+ *                  ResourcePattern::forAnySystemBucketsInAnyDatabase(tenantId, "coll"),
+ *                  ResourcePattern::forExactSystemBucketsCollection(tenantId, "db", "coll"),
+ *                  tenantId_*.system.buckets.coll,
+ *                  tenantId_db.system.buckets.coll }
+ * target is a system collection, tenantId_db.system.coll:
+ *   searchList = { ResourcePattern::forAnyResource(tenantId),
+ *                  ResourcePattern::forAnyResource(boost::none),
+ *                  tenantId_*.system.coll,
+ *                  tenantId_db.system.coll }
  */
 class ResourcePatternSearchList {
 private:
     static constexpr StringData kSystemBucketsPrefix = "system.buckets."_sd;
-    static constexpr std::size_t kMaxResourcePatternLookups = 7;
+    static constexpr std::size_t kMaxResourcePatternLookups = 10;
     using ListType = std::array<ResourcePattern, kMaxResourcePatternLookups>;
 
 public:
@@ -121,6 +131,24 @@ public:
 
         if (!target.isAnyResourcePattern()) {
             _list[_size++] = target;
+        }
+
+        if (target.tenantId()) {
+            // Add base tenant versions of top-level matching types.
+            // This is so that a system user (with no tenant ID) with privileges on these general
+            // match types will be able to take actions on tenant data.
+            // Note that we'll only get this far if that user is authorized for the useTenant action
+            // on the cluster resource.
+            const auto oldSize = _size;
+            for (size_type i = 0; i < oldSize; ++i) {
+                if (_list[i].isAnyResourcePattern()) {
+                    _list[_size++] = ResourcePattern::forAnyResource(boost::none);
+                } else if (_list[i].isAnyNormalResourcePattern()) {
+                    _list[_size++] = ResourcePattern::forAnyNormalResource(boost::none);
+                } else if (_list[i].isClusterResourcePattern()) {
+                    _list[_size++] = ResourcePattern::forClusterResource(boost::none);
+                }
+            }
         }
         dassert(_size <= _list.size());
     }

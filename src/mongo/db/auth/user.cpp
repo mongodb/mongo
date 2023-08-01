@@ -114,20 +114,6 @@ const User::CredentialData& User::getCredentials() const {
 }
 
 ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
-    if (gMultitenancySupport) {
-        // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-        // During migration of resource patterns, we may have a mismatch between privileges and
-        // privilege checks where one may have a tenantId attached and the other doesn't.
-        // Once all checks have been updated, we can remove this branch and use the find below.
-        ActionSet actions;
-        for (const auto& priv : _privileges) {
-            if (priv.second.getResourcePattern().matchesIgnoringTenant(resource)) {
-                actions.addAllActionsFromSet(priv.second.getActions());
-            }
-        }
-        return actions;
-    }
-
     if (auto it = _privileges.find(resource); it != _privileges.end()) {
         return it->second.getActions();
     }

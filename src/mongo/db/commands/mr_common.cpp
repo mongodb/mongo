@@ -377,7 +377,8 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
     const auto emptyNss =
         mapReduceField.type() == mongo::String && mapReduceField.valueStringData().empty();
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid input namespace " << inputResource.databaseToMatch() << "."
+            str::stream() << "Invalid input namespace "
+                          << inputResource.dbNameToMatch().toStringForErrorMsg() << "."
                           << (emptyNss ? "" : cmdObj["mapReduce"].String()),
             !emptyNss && inputResource.isExactNamespacePattern());
 
