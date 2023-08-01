@@ -2124,7 +2124,14 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: *classic_engine_tasks
+    tasks: &bonsai_standalone_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: bestbuy_agg
+      - name: bestbuy_query
 
   - name: linux-intel-standalone-sampling-bonsai
     display_name: Linux Intel Standalone (Bonsai with Sampling CE)
@@ -2143,7 +2150,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks: *classic_engine_tasks
+    tasks: *bonsai_standalone_tasks
 
   - name: linux-standalone-heuristic-bonsai.2022-11
     display_name: Linux Standalone (Bonsai with Heuristic CE) 2022-11
@@ -2163,7 +2170,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: *classic_engine_tasks
+    tasks: *bonsai_standalone_tasks
 
   - name: linux-intel-standalone-heuristic-bonsai
     display_name: Linux Intel Standalone (Bonsai with Heuristic CE)
@@ -2182,7 +2189,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks: *classic_engine_tasks
+    tasks: *bonsai_standalone_tasks
 
   - name: linux-intel-1-node-replSet-sampling-bonsai
     display_name: Linux Intel 1-Node ReplSet (Bonsai with Sampling CE)
@@ -2201,7 +2208,11 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks: *classic_engine_1nodereplset_tasks
+    tasks: &bonsai_1nodereplset_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: linkbench2
+      - name: snapshot_reads
 
   - name: linux-1-node-replSet-sampling-bonsai.2022-11
     display_name: Linux 1-Node ReplSet (Bonsai with Sampling CE) 2022-11
@@ -2221,7 +2232,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: *classic_engine_1nodereplset_tasks
+    tasks: *bonsai_1nodereplset_tasks
 
   - name: linux-intel-1-node-replSet-heuristic-bonsai
     display_name: Linux Intel 1-Node ReplSet (Bonsai with Heuristic CE)
@@ -2240,7 +2251,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks: *classic_engine_1nodereplset_tasks
+    tasks: *bonsai_1nodereplset_tasks
 
   - name: linux-1-node-replSet-heuristic-bonsai.2022-11
     display_name: Linux 1-Node ReplSet (Bonsai with Heuristic CE) 2022-11
@@ -2260,7 +2271,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: *classic_engine_1nodereplset_tasks
+    tasks: *bonsai_1nodereplset_tasks
 
   - name: linux-1-node-replSet-classic-query-engine.2022-11
     display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
@@ -2780,7 +2791,11 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: *linux_3_shard_tasks
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: industry_benchmarks_w1
 
   - name: linux-shard-lite-audit.2022-11
     display_name: Linux Shard Lite Cluster Audit 2022-11
@@ -3712,6 +3727,7 @@ buildvariants:
     tasks: &microbenchmarks-bonsai-tasks
       - name: agg-query-comparison_read_commands
       - name: aggregation_read_commands
+      - name: big_collection
       - name: query_read_commands
       - name: query_read_commands_large_dataset
 
