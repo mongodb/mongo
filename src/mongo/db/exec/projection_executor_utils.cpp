@@ -199,7 +199,14 @@ Document applyFindPositionalProjection(const Document& preImage,
     // invariant to make sure this is the case indeed.
     MatchDetails details;
     details.requestElemMatchKey();
-    invariant(matchExpr.matchesBSON(preImage.toBson(), &details));
+
+    // Ideally we should not assert for this case, but this is a temporary workaround. SERVER-72416
+    // should address this problem more cleanly.
+    uassert(7959200,
+            "None of the array elements matched the filter while applying positional projection. "
+            "If the collection was created with collation, this issue can be worked-around by "
+            "providing the collation as part of the query",
+            matchExpr.matchesBSON(preImage.toBson(), &details));
 
     // At this stage we know that the 'input' document matches against the specified condition,
     // but the matching array element may not be found. This can happen if the field, specified
