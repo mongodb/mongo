@@ -60,6 +60,7 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
     :param expansions: Evergreen expansions file contents.
     :param evg_api: Evergreen API client.
     """
+    tasks_not_activated = []
     if expansions.task == BURN_IN_TAGS:
         version = evg_api.version_by_id(expansions.version_id)
         burn_in_build_variants = [
@@ -74,14 +75,31 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                 if task.display_name == BURN_IN_TESTS:
                     LOGGER.info("Activating task", task_id=task.task_id,
                                 task_name=task.display_name)
-                    evg_api.configure_task(task.task_id, activated=True)
+                    try:
+                        evg_api.configure_task(task.task_id, activated=True)
+                    except Exception:
+                        LOGGER.warning("Could not activate task", task_id=task.task_id,
+                                       task_name=task.display_name)
+                        tasks_not_activated.append(task.task_id)
 
     else:
         task_list = evg_api.tasks_by_build(expansions.build_id)
         for task in task_list:
             if task.display_name == expansions.task:
                 LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
-                evg_api.configure_task(task.task_id, activated=True)
+                try:
+                    evg_api.configure_task(task.task_id, activated=True)
+                except Exception:
+                    LOGGER.warning("Could not activate task", task_id=task.task_id,
+                                   task_name=task.display_name)
+                    tasks_not_activated.append(task.task_id)
+    if len(tasks_not_activated) > 0:
+        LOGGER.error("Some tasks were unable to be activated",
+                     unactivated_tasks=len(tasks_not_activated))
+        raise ValueError(
+            "Some tasks were unable to be activated, failing the task to let the author know. "
+            "This should not be a blocking issue but may mean that some tasks are missing from your patch."
+        )
 
 
 @click.command()
