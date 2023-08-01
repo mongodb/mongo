@@ -167,15 +167,10 @@ namespace {
  * this returns a pointer to a constructed object of the latter type, else it returns nullptr.
  */
 boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTransformation(
-    const DocumentSource& stage) {
-    const DocumentSourceSingleDocumentTransformation* transformStage =
-        dynamic_cast<const DocumentSourceSingleDocumentTransformation*>(&stage);
-    if (!transformStage) {
-        return nullptr;
-    }
-
+    const DocumentSourceSingleDocumentTransformation& transformStage,
+    SbeCompatibility minRequiredCompatibility) {
     InternalProjectionPolicyEnum policies;
-    switch (transformStage->getType()) {
+    switch (transformStage.getType()) {
         case TransformerInterface::TransformerType::kExclusionProjection:
         case TransformerInterface::TransformerType::kInclusionProjection:
             policies = InternalProjectionPolicyEnum::kAggregate;
@@ -187,7 +182,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
             return nullptr;
     }
 
-    const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage->getContext();
+    const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage.getContext();
     ON_BLOCK_EXIT([&,
                    originalSbeCompatibility{std::exchange(expCtx->sbeCompatibility,
                                                           SbeCompatibility::fullyCompatible)}]() {
@@ -197,12 +192,95 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
     boost::intrusive_ptr<DocumentSource> projectionStage =
         make_intrusive<DocumentSourceInternalProjection>(
             expCtx,
-            transformStage->getTransformer().serializeTransformation(boost::none).toBson(),
+            transformStage.getTransformer().serializeTransformation(boost::none).toBson(),
             policies);
 
-    return (expCtx->sbeCompatibility != SbeCompatibility::notCompatible) ? projectionStage
-                                                                         : nullptr;
+    if (expCtx->sbeCompatibility < minRequiredCompatibility) {
+        return nullptr;
+    }
+
+    return projectionStage;
 }
+
+// A bit field with a bool flag for each aggregation pipeline stage that can be translated to SBE.
+// The flags can be used to indicate which translations are enabled and/or supported in a particular
+// context.
+struct CompatiblePipelineStages {
+    bool group : 1;
+    bool lookup : 1;
+
+    // The $project and $addField stages are considered the same for the purposes of SBE
+    // translation.
+    bool transform : 1;
+
+    bool search : 1;
+};
+
+// Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list as
+// a 'InnerPipelineStageInterface' and return true. Return false if 'stage' is ineligible, either
+// because it is disallowed by 'allowedStages' or because it requires functionality that cannot be
+// translated to SBE.
+bool pushDownPipelineStageIfCompatible(
+    const OperationContext* opCtx,
+    const boost::intrusive_ptr<DocumentSource>& stage,
+    SbeCompatibility minRequiredCompatibility,
+    const CompatiblePipelineStages& allowedStages,
+    bool isLastSource,
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
+    if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage.get())) {
+        if (!allowedStages.group || groupStage->doingMerge() ||
+            groupStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
+        return true;
+    } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage.get())) {
+        if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
+        return true;
+    } else if (auto transformStage =
+                   dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get())) {
+        if (!allowedStages.transform) {
+            return false;
+        }
+
+        auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
+            *transformStage, minRequiredCompatibility);
+        if (!projectionStage) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
+        return true;
+    } else if (const auto& searchHelpers = getSearchHelpers(opCtx->getServiceContext());
+               searchHelpers->isSearchStage(stage.get()) ||
+               searchHelpers->isSearchMetaStage(stage.get())) {
+        if (!allowedStages.search) {
+            return false;
+        }
+
+        stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
+        return true;
+    }
+
+    return false;
+}
+
+// Limit the number of aggregation pipeline stages that can be "pushed down" to the SBE stage
+// builders. Compiling too many pipeline stages during stage building would overflow the call stack.
+// The limit is higher for optimized builds, because optimization reduces the size of stack frames.
+#ifdef MONGO_CONFIG_OPTIMIZED_BUILD
+constexpr size_t kSbeMaxPipelineStages = 400;
+#else
+constexpr size_t kSbeMaxPipelineStages = 100;
+#endif
 
 /**
  * Finds a prefix of stages from the given pipeline to prepare for pushdown into the inner query
@@ -253,84 +331,58 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
     }
 
-    // If lookup pushdown isn't enabled or the main collection is sharded or any of the secondary
-    // namespaces are sharded or are a view, then no $lookup stage will be eligible for pushdown.
-    //
-    // When acquiring locks for multiple collections, it is the case that we can only determine
-    // whether any secondary collection is a view or is sharded, not which ones are a view or are
-    // sharded and which ones aren't. As such, if any secondary collection is a view or is sharded,
-    // no $lookup will be eligible for pushdown.
-    const bool disallowLookupPushdown =
-        internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
-        collections.isAnySecondaryNamespaceAViewOrSharded();
+    // SERVER-78998: Refactor these checks so that they do not load their values multiple times
+    // during the same query.
+    // (Ignore FCV check): featureFlagSbeFull does not change the semantics of queries, so it can
+    // safely be enabled on some nodes and disabled on other nodes during upgrade/downgrade.
+    SbeCompatibility minRequiredCompatibility =
+        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()
+        ? SbeCompatibility::flagGuarded
+        : SbeCompatibility::fullyCompatible;
 
-    // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
-    // node.
-    const bool disallowSearchPushdown =
-        !feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe();
+    CompatiblePipelineStages allowedStages = {
+        .group = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility) &&
+            !internalQuerySlotBasedExecutionDisableGroupPushdown.load(),
+
+        // If lookup pushdown isn't enabled or the main collection is sharded or any of the
+        // secondary namespaces are sharded or are a view, then no $lookup stage will be eligible
+        // for pushdown.
+        //
+        // When acquiring locks for multiple collections, it is the case that we can only determine
+        // whether any secondary collection is a view or is sharded, not which ones are a view or
+        // are sharded and which ones aren't. As such, if any secondary collection is a view or is
+        // sharded, no $lookup will be eligible for pushdown.
+        .lookup = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility) &&
+            !internalQuerySlotBasedExecutionDisableLookupPushdown.load() &&
+            !isMainCollectionSharded && !collections.isAnySecondaryNamespaceAViewOrSharded(),
+
+        // TODO (SERVER-72549): SBE execution of these stages requires `featureFlagSbeFull` to be
+        // enabled.
+        .transform = !(SbeCompatibility::flagGuarded < minRequiredCompatibility),
+
+        // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
+        // enabled.
+        // (Ignore FCV check): As with 'featureFlagSbeFull' (above), the effects of
+        // 'featureFlagSearchInSbe' are local to this node, making it safe to ignore the FCV.
+        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
+    };
 
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
-        DocumentSource* stage = itr->get();
-        const bool isLastSource = stage == sources.back().get();
-
-        // $group pushdown logic.
-        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage)) {
-            if (internalQuerySlotBasedExecutionDisableGroupPushdown.load()) {
-                break;
-            }
-
-            if (groupStage->sbeCompatibility() != SbeCompatibility::notCompatible &&
-                !groupStage->doingMerge()) {
-                stagesForPushdown.push_back(
-                    std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
-                continue;
-            }
+        // Push down at most kMaxPipelineStages stages for execution in SBE.
+        if (stagesForPushdown.size() >= kSbeMaxPipelineStages) {
             break;
         }
 
-        // $lookup pushdown logic.
-        if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage)) {
-            if (disallowLookupPushdown) {
-                break;
-            }
-
-            // Note that 'lookupStage->sbeCompatible()' encodes whether the foreign collection is a
-            // view.
-            if (lookupStage->sbeCompatibility() != SbeCompatibility::notCompatible) {
-                stagesForPushdown.push_back(
-                    std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
-                continue;
-            }
+        const bool isLastSource = itr->get() == sources.back().get();
+        if (!pushDownPipelineStageIfCompatible(pipeline->getContext()->opCtx,
+                                               *itr,
+                                               minRequiredCompatibility,
+                                               allowedStages,
+                                               isLastSource,
+                                               stagesForPushdown)) {
+            // Stop pushing stages down once we hit an incompatible stage.
             break;
         }
-
-        // TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-        // (Ignore FCV check): This is intentional because we always want to use this feature when
-        // the feature flag is enabled.
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()) {
-            if (boost::intrusive_ptr<DocumentSource> projectionStage =
-                    sbeCompatibleProjectionFromSingleDocumentTransformation(**itr)) {
-                stagesForPushdown.push_back(
-                    std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
-                continue;
-            }
-        }
-
-        // $search pushdown logic.
-        if (getSearchHelpers(pipeline->getContext()->opCtx->getServiceContext())
-                ->isSearchStage(stage) ||
-            getSearchHelpers(pipeline->getContext()->opCtx->getServiceContext())
-                ->isSearchMetaStage(stage)) {
-            if (disallowSearchPushdown) {
-                break;
-            }
-            stagesForPushdown.push_back(
-                std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
-            continue;
-        }
-
-        // Current stage cannot be pushed down.
-        break;
     }
     return stagesForPushdown;
 }
