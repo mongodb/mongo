@@ -226,6 +226,7 @@ env.Library(
         'cluster_configure_collection_balancing.cpp',
         'cluster_configure_query_analyzer_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
+        'cluster_create_unsplittable_collections_command.cpp',
         'cluster_list_shards_cmd.cpp',
         'cluster_merge_all_chunks_on_shard_cmd.cpp',
         'cluster_merge_chunks_cmd.cpp',

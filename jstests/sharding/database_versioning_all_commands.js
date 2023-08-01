@@ -405,6 +405,8 @@ let testCases = {
     },
     createSearchIndexes: {skip: "executes locally on mongos"},
     createRole: {skip: "always targets the config server"},
+    createUnsplittableCollection:
+        {skip: "Test command that which functionality will be integrated into createCollection"},
     createUser: {skip: "always targets the config server"},
     currentOp: {skip: "not on a user database"},
     dataSize: {

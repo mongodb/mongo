@@ -560,6 +560,7 @@ const allCommands = {
         // feature).
         skip: "requires mongot mock setup",
     },
+    createUnsplittableCollection: {skip: isAnInternalCommand},
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
         teardown: function(conn) {

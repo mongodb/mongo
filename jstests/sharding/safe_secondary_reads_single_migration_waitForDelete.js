@@ -193,6 +193,7 @@ let testCases = {
     createIndexes: {skip: "primary only"},
     createRole: {skip: "primary only"},
     createSearchIndexes: {skip: "does not return user data"},
+    createUnsplittableCollection: {skip: "primary only"},
     createUser: {skip: "primary only"},
     currentOp: {skip: "does not return user data"},
     dataSize: {skip: "does not return user data"},
