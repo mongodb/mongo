@@ -380,10 +380,12 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
 
     block->compact_pages_rewritten_expected = block->compact_pages_rewritten + total_pages_to_move;
     __wt_verbose_debug1(session, WT_VERB_COMPACT,
-      "%s: expecting to move approx. %" PRIu64 " more pages (%" PRIu64 "MB), %" PRIu64 " total",
+      "%s: expecting to move approx. %" PRIu64 " more pages (%" PRIu64 "MB), %" PRIu64
+      " total, target %" PRIu64 "MB (%" PRIu64 "B)",
       block->name, total_pages_to_move,
       total_pages_to_move * (uint64_t)avg_block_size / WT_MEGABYTE,
-      block->compact_pages_rewritten_expected);
+      block->compact_pages_rewritten_expected, session->compact->free_space_target / WT_MEGABYTE,
+      session->compact->free_space_target);
 }
 
 /*
@@ -460,8 +462,20 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_2))
         __block_dump_file_stat(session, block, true);
 
-    __block_compact_skip_internal(
-      session, block, false, block->size, 0, 0, skipp, &block->compact_pct_tenths);
+    /*
+     * Check if the number of available bytes matches the expected configured threshold. Only
+     * perform that check during the first iteration.
+     */
+    if (block->compact_pages_reviewed == 0 &&
+      block->live.avail.bytes < session->compact->free_space_target)
+        __wt_verbose_debug1(session, WT_VERB_COMPACT,
+          "%s: skipping because the number of available bytes %" PRIu64
+          "B is less than the configured threshold %" PRIu64 "B.",
+          block->name, block->live.avail.bytes, session->compact->free_space_target);
+    else
+        __block_compact_skip_internal(
+          session, block, false, block->size, 0, 0, skipp, &block->compact_pct_tenths);
+
     __wt_spin_unlock(session, &block->live_lock);
 
     return (0);
@@ -673,8 +687,8 @@ __block_dump_file_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
     }
 
     __wt_verbose_debug1(session, WT_VERB_COMPACT,
-      "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX "%% space available %" PRIuMAX
-      "MB (%" PRIuMAX ")",
+      "file size %" PRIuMAX "MB (%" PRIuMAX "B) with %" PRIuMAX "%% space available %" PRIuMAX
+      "MB (%" PRIuMAX "B)",
       (uintmax_t)size / WT_MEGABYTE, (uintmax_t)size,
       ((uintmax_t)el->bytes * 100) / (uintmax_t)size, (uintmax_t)el->bytes / WT_MEGABYTE,
       (uintmax_t)el->bytes);

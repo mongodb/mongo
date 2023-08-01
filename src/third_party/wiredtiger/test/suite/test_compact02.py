@@ -161,10 +161,11 @@ class test_compact02(wttest.WiredTigerTestCase):
         # 5. Call compact.
         # Compact can collide with eviction, if that happens we retry. Wait for
         # a long time, the check for EBUSY means we're not retrying on any real
-        # errors.
+        # errors. Set the minimum threshold to make sure compaction can be executed.
+        compact_cfg = "free_space_target=1MB"
         for i in range(1, 100):
             if not self.raisesBusy(
-              lambda: self.session.compact(self.uri, None)):
+              lambda: self.session.compact(self.uri, compact_cfg)):
                 break
             time.sleep(6)
 

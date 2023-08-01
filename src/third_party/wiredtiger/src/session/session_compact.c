@@ -380,6 +380,10 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
     memset(&compact, 0, sizeof(WT_COMPACT_STATE));
     session->compact = &compact;
 
+    /* Configure the minimum amount of space recoverable. */
+    WT_ERR(__wt_config_gets(session, cfg, "free_space_target", &cval));
+    session->compact->free_space_target = (uint64_t)cval.val;
+
     /* Compaction can be time-limited. */
     WT_ERR(__wt_config_gets(session, cfg, "timeout", &cval));
     session->compact->max_time = (uint64_t)cval.val;

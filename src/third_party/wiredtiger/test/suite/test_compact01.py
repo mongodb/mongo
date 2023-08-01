@@ -97,18 +97,20 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         c1.close()
         c2.close()
 
-        # Compact it, using either the session method or the utility.
+        # Compact it, using either the session method or the utility. Generated files are ~2MB, set
+        # the minimum threshold to a low value to make sure compaction can be executed.
+        compact_cfg = "free_space_target=1MB"
         if self.utility == 1:
             self.session.checkpoint(None)
             self.close_conn()
-            self.runWt(["compact", uri])
+            self.runWt(["compact", "-c", compact_cfg, uri])
         else:
             # Optionally reopen the connection so we do more on-disk tests.
             if self.reopen == 1:
                 self.session.checkpoint(None)
                 self.reopen_conn()
 
-            self.session.compact(uri, None)
+            self.session.compact(uri, compact_cfg)
 
         # Verify compact progress stats. We can't do this with utility method as reopening the
         # connection would reset the stats.
