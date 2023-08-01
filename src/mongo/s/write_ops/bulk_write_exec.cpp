@@ -352,9 +352,6 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
                 (_txnNum ? write_ops::kStmtIdSize +
                          write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
                          : 0);
-
-            // TODO SERVER-78084: Determine if we we need to consider the potential size of errors
-            // received in response to the command here.
             return writeSizeBytes;
         },
         getBaseBatchCommandSizeEstimate(),
