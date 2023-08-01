@@ -179,7 +179,7 @@ class CapturedFd(object):
                              gotstr + '"')
         self.expectpos = os.path.getsize(self.filename)
 
-    def checkAdditionalPattern(self, testcase, pat, re_flags = 0):
+    def checkAdditionalPattern(self, testcase, pat, re_flags = 0, maxchars=1500):
         """
         Check to see that an additional string has been added to the
         output file.  If it has not, raise it as a test failure.
@@ -187,7 +187,7 @@ class CapturedFd(object):
         """
         if self.file != None:
             self.file.flush()
-        gotstr = self.readFileFrom(self.filename, self.expectpos, 1500)
+        gotstr = self.readFileFrom(self.filename, self.expectpos, maxchars)
         if re.search(pat, gotstr, re_flags) == None:
             testcase.fail('in ' + self.desc +
                           ', expected pattern "' + pat + '", but got "' +
@@ -903,16 +903,16 @@ class WiredTigerTestCase(unittest.TestCase):
         self.captureerr.checkAdditional(self, expect)
 
     @contextmanager
-    def expectedStdoutPattern(self, pat, re_flags=0):
+    def expectedStdoutPattern(self, pat, re_flags=0, maxchars=1500):
         self.captureout.check(self)
         yield
-        self.captureout.checkAdditionalPattern(self, pat, re_flags)
+        self.captureout.checkAdditionalPattern(self, pat, re_flags, maxchars)
 
     @contextmanager
-    def expectedStderrPattern(self, pat, re_flags=0):
+    def expectedStderrPattern(self, pat, re_flags=0, maxchars=1500):
         self.captureerr.check(self)
         yield
-        self.captureerr.checkAdditionalPattern(self, pat, re_flags)
+        self.captureerr.checkAdditionalPattern(self, pat, re_flags, maxchars)
 
     @contextmanager
     def customStdoutPattern(self, f):
