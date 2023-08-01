@@ -71,36 +71,6 @@ public:
             "aggRemovableSumFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledRemovableSumFinalize = compileExpression(*aggRemovableSumFinalize);
 
-        //  state
-        auto [stateTag, stateVal] = value::makeNewArray();
-        auto state = value::getArrayView(stateVal);
-
-        // sum acc state
-        auto [accTag, accValue] = value::makeNewArray();
-        auto arr = value::getArrayView(accValue);
-        arr->reserve(AggSumValueElems::kMaxSizeOfArray);
-        arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        state->push_back(accTag, accValue);
-
-        // nanCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
-
-        // positiveInfinityCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
-
-        // negInfinityCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
-
-        // doubleCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
-
-        // decimalCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
-
-        aggAccessor.reset(stateTag, stateVal);
-
         // call RemovableSumOp (Add/Remove) on the inputs and call finalize() method after each op
         size_t addIdx = 0, removeIdx = 0;
         for (size_t i = 0; i < operations.size(); ++i) {
