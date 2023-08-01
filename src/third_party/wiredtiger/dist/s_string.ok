@@ -579,7 +579,6 @@ config
 configs
 conn
 connectionp
-const
 constantp
 consts
 cookiep
