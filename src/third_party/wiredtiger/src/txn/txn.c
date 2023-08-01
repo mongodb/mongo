@@ -555,10 +555,9 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
     if (cval.len != 0)
-        txn->isolation = WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-          WT_ISO_SNAPSHOT :
-          WT_STRING_MATCH("read-committed", cval.str, cval.len) ? WT_ISO_READ_COMMITTED :
-                                                                  WT_ISO_READ_UNCOMMITTED;
+        txn->isolation = WT_STRING_MATCH("snapshot", cval.str, cval.len) ? WT_ISO_SNAPSHOT :
+          WT_STRING_MATCH("read-committed", cval.str, cval.len)          ? WT_ISO_READ_COMMITTED :
+                                                                           WT_ISO_READ_UNCOMMITTED;
 
     WT_ERR(__txn_config_operation_timeout(session, cfg, false));
 
@@ -640,7 +639,7 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, const char *config)
     ret = __wt_config_getones(session, config, "isolation", &cval);
     if (ret == 0 && cval.len != 0) {
         session->isolation = txn->isolation = WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-          WT_ISO_SNAPSHOT :
+                                                                    WT_ISO_SNAPSHOT :
           WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ? WT_ISO_READ_UNCOMMITTED :
                                                                     WT_ISO_READ_COMMITTED;
     }

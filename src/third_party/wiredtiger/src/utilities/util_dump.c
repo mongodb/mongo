@@ -711,7 +711,10 @@ dump_prefix(WT_SESSION *session, bool pretty, bool hex, bool json)
 
     if (!json &&
       (fprintf(fp, "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n", vmajor, vminor, vpatch) < 0 ||
-        fprintf(fp, "Format=%s\n", (pretty && hex) ? "print hex" : hex ? "hex" : "print") < 0 ||
+        fprintf(fp, "Format=%s\n",
+          (pretty && hex) ? "print hex" :
+            hex           ? "hex" :
+                            "print") < 0 ||
         fprintf(fp, "Header\n") < 0))
         return (util_err(session, EIO, NULL));
 

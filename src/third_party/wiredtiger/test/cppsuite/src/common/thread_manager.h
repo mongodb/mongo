@@ -43,7 +43,7 @@ public:
      */
     template <typename Callable, typename... Args>
     void
-    add_thread(Callable &&fct, Args &&... args)
+    add_thread(Callable &&fct, Args &&...args)
     {
         std::thread *t = new std::thread(fct, std::forward<Args>(args)...);
         _workers.push_back(t);
