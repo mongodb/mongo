@@ -6650,7 +6650,7 @@ export const authCommandsLib = {
           command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
           skipSharded: false,
           skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagQueryStats;
+              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
           },
           testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
         },
@@ -6660,7 +6660,7 @@ export const authCommandsLib = {
           command: {aggregate: 1, pipeline: [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256"}}}], cursor: {}},
           skipSharded: false,
           skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagQueryStats;
+              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
           },
           testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
         },

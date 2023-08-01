@@ -56,8 +56,14 @@ feature_flags:
       shouldBeFCVGated: true
 
     featureFlagQueryStats:
-      description: "Feature flag for enabling the queryStats store."
+      description: "Feature flag for enabling full queryStats collection."
       cpp_varname: gFeatureFlagQueryStats
+      default: false
+      shouldBeFCVGated: true
+
+    featureFlagQueryStatsFindCommand:
+      description: "Feature flag for enabling queryStats collection for the find command."
+      cpp_varname: gFeatureFlagQueryStatsFindCommand
       default: false
       shouldBeFCVGated: true
 

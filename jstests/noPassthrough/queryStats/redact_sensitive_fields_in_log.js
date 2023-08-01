@@ -1,9 +1,6 @@
 /**
  * Test that the queryStats HMAC key is not logged.
- * @tags: [
- *   featureFlagQueryStats,
- *   requires_sharding,
- * ]
+ * @tags: [featureFlagQueryStatsFindCommand]
  */
 
 (function() {

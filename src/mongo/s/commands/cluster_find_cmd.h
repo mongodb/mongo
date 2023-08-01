@@ -225,10 +225,14 @@ public:
                     *parsedFind,
                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                     expCtx);
-                query_stats::registerRequest(opCtx, expCtx->ns, [&]() {
-                    return std::make_unique<query_stats::FindKeyGenerator>(
-                        expCtx, *parsedFind, std::move(queryShape));
-                });
+                query_stats::registerRequest(
+                    opCtx,
+                    expCtx->ns,
+                    [&]() {
+                        return std::make_unique<query_stats::FindKeyGenerator>(
+                            expCtx, *parsedFind, std::move(queryShape));
+                    },
+                    /*requiresFullQueryStatsFeatureFlag*/ false);
             }
             auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));
 

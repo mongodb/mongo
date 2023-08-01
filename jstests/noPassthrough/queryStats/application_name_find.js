@@ -1,14 +1,12 @@
 /**
  * Test that applicationName and namespace appear in queryStats for the find command.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagQueryStatsFindCommand]
  */
 load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 
 const kApplicationName = "MongoDB Shell";
-const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";
-const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 // Turn on the collecting of queryStats metrics.
 let options = {

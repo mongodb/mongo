@@ -177,7 +177,9 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // It is possible that this is called before FCV is properly set up. Setting up the store if
         // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
         // changed to a supported version later.
-        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+            !feature_flags::gFeatureFlagQueryStatsFindCommand
+                 .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a queryStats store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.
@@ -219,14 +221,14 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 /**
  * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
  * no further.
+ * TODO SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
-    // During initialization FCV may not yet be setup but queries could be run. We can't
+bool isQueryStatsEnabled(const ServiceContext* serviceCtx, bool requiresFullQueryStatsFeatureFlag) {
+    // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
     // TODO SERVER-75935 Remove FCV Check.
-    return feature_flags::gFeatureFlagQueryStats.isEnabled(
-               serverGlobalParams.featureCompatibility) &&
+    return isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag) &&
         queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
@@ -235,10 +237,6 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
 bool shouldCollect(const ServiceContext* serviceCtx) {
-    // Quick escape if queryStats is turned off.
-    if (!isQueryStatsEnabled(serviceCtx)) {
-        return false;
-    }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
     auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
@@ -266,6 +264,22 @@ std::size_t hash(const BSONObj& obj) {
 
 }  // namespace
 
+/**
+ * Indicates whether or not query stats is enabled via the feature flags. If
+ * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
+ * enabled. Otherwise, it will return true if either featureFlagQueryStats or
+ * featureFlagQueryStatsFindCommand is enabled.
+ *
+ * TODO SERVER-79494 Remove this function and collapse feature flag check into isQueryStatsEnabled.
+ */
+bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
+    return feature_flags::gFeatureFlagQueryStats.isEnabled(
+               serverGlobalParams.featureCompatibility) ||
+        (!requiresFullQueryStatsFeatureFlag &&
+         feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(
+             serverGlobalParams.featureCompatibility));
+}
+
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
                                               TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
@@ -279,8 +293,9 @@ BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator,
+                     bool requiresFullQueryStatsFeatureFlag) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
         return;
     }
 
@@ -310,9 +325,10 @@ void registerRequest(OperationContext* opCtx,
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
-            "Telemetry is not enabled without the feature flag on and a cache size greater than 0 "
-            "bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext()));
+            "Query stats is not enabled without the feature flag on and a cache size greater than "
+            "0 bytes",
+            isQueryStatsEnabled(opCtx->getServiceContext(),
+                                /*requiresFullQueryStatsFeatureFlag*/ false));
     return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
