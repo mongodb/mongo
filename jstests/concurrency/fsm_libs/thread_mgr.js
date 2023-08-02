@@ -1,13 +1,13 @@
-'use strict';
-
-load('jstests/libs/parallelTester.js');                 // for Thread and CountDownLatch
-load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread
+load('jstests/libs/parallelTester.js');  // for Thread and CountDownLatch
+import {workerThread} from "jstests/concurrency/fsm_libs/worker_thread.js";
 
 /**
  * Helper for spawning and joining worker threads.
  */
 
-var ThreadManager = function(clusterOptions, executionMode = {composed: false}) {
+export const ThreadManager = function(clusterOptions, executionMode = {
+    composed: false
+}) {
     if (!(this instanceof ThreadManager)) {
         return new ThreadManager(clusterOptions, executionMode);
     }
@@ -196,9 +196,9 @@ var ThreadManager = function(clusterOptions, executionMode = {composed: false}) 
  * workload and a composition of them, respectively.
  */
 
-workerThread.fsm = function(workloads, args, options) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
-    load('jstests/concurrency/fsm_libs/fsm.js');            // for fsm.run
+workerThread.fsm = async function(workloads, args, options) {
+    const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
+    load('jstests/concurrency/fsm_libs/fsm.js');  // for fsm.run
 
     return workerThread.main(workloads, args, function(configs) {
         var workloads = Object.keys(configs);
@@ -207,9 +207,9 @@ workerThread.fsm = function(workloads, args, options) {
     });
 };
 
-workerThread.composed = function(workloads, args, options) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js');  // for workerThread.main
-    load('jstests/concurrency/fsm_libs/composer.js');       // for composer.run
+workerThread.composed = async function(workloads, args, options) {
+    const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
+    load('jstests/concurrency/fsm_libs/composer.js');  // for composer.run
 
     return workerThread.main(workloads, args, function(configs) {
         composer.run(workloads, configs, options);

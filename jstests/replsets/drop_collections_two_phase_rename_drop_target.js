@@ -3,10 +3,7 @@
  * renameCollection command when dropTarget is set to true.
  */
 
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Return a list of all indexes for a given collection. Use 'args' as the
 // 'listIndexes' command arguments.
@@ -33,7 +30,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 // Create the collections that will be renamed and dropped.
@@ -114,4 +111,3 @@ try {
 
     twoPhaseDropTest.stop();
 }
-}());

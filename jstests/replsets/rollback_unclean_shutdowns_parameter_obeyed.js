@@ -5,10 +5,7 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 TestData.rollbackShutdowns = true;
 // Only clean shutdowns should be allowed.
@@ -36,4 +33,3 @@ rollbackTest.transitionToSteadyStateOperations();
 assert.eq(rawMongoProgramOutput().search(/Detected unclean shutdown/), -1);
 
 rollbackTest.stop();
-}());

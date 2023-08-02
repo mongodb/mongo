@@ -14,10 +14,7 @@
  * unless explicitly requested by the user with a write concern.
  */
 
-(function() {
-"use strict";
-
-load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 load("jstests/replsets/rslib.js");
 load("jstests/libs/write_concern_util.js");
 
@@ -163,4 +160,3 @@ assert.eq(0, exitCode, 'dropDatabase command on ' + primary.host + ' failed.');
 jsTestLog('Completed dropDatabase command on ' + primary.host);
 
 replTest.stopSet();
-}());

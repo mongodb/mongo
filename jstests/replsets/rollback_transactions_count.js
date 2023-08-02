@@ -4,10 +4,7 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_transactions_count";
 const dbName = testName;
@@ -63,4 +60,3 @@ assert.eq(sessionColl1.find().itcount(), 3);
 assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 
 rollbackTest.stop();
-})();

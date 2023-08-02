@@ -3,17 +3,14 @@
  * collections and indexes before shutting down a mongod while running JS tests.
  */
 
-(function() {
-"use strict";
+import {validateCollections} from "jstests/hooks/validate_collections.js";
+import {CommandSequenceWithRetries} from "jstests/libs/command_sequence_with_retries.js";
 
-load("jstests/libs/command_sequence_with_retries.js");  // for CommandSequenceWithRetries
-
-MongoRunner.validateCollectionsCallback = function(port) {
-    // This function may be executed in a new Thread context, so ensure the proper definitions
-    // are loaded.
-    if (typeof CommandSequenceWithRetries === "undefined") {
-        load("jstests/libs/command_sequence_with_retries.js");
-    }
+MongoRunner.validateCollectionsCallback = function(port, options) {
+    options = options || {};
+    const CommandSequenceWithRetriesImpl =
+        options.CommandSequenceWithRetries || CommandSequenceWithRetries;
+    const validateCollectionsImpl = options.validateCollections || validateCollections;
 
     if (jsTest.options().skipCollectionAndIndexValidation) {
         print("Skipping collection validation during mongod shutdown");
@@ -34,7 +31,7 @@ MongoRunner.validateCollectionsCallback = function(port) {
 
     let dbNames;
     let result =
-        new CommandSequenceWithRetries(conn)
+        new CommandSequenceWithRetriesImpl(conn)
             .then("running the isMaster command",
                   function(conn) {
                       const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
@@ -119,9 +116,7 @@ MongoRunner.validateCollectionsCallback = function(port) {
         return;
     }
 
-    load('jstests/hooks/validate_collections.js');  // for validateCollections
-
-    const cmds = new CommandSequenceWithRetries(conn);
+    const cmds = new CommandSequenceWithRetriesImpl(conn);
     for (let i = 0; i < dbNames.length; ++i) {
         const dbName = dbNames[i];
         cmds.then("validating " + dbName, function(conn) {
@@ -132,7 +127,7 @@ MongoRunner.validateCollectionsCallback = function(port) {
                 validateOptions.enforceFastCount = false;
             }
 
-            const validate_res = validateCollections(conn.getDB(dbName), validateOptions);
+            const validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
             if (!validate_res.ok) {
                 return {
                     shouldStop: true,
@@ -144,4 +139,3 @@ MongoRunner.validateCollectionsCallback = function(port) {
 
     assert.commandWorked(cmds.execute());
 };
-})();

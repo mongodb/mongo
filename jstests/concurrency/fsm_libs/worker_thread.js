@@ -1,11 +1,9 @@
-'use strict';
-
 load('jstests/concurrency/fsm_libs/assert.js');
-load('jstests/concurrency/fsm_libs/cluster.js');       // for Cluster.isStandalone
+import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
 load('jstests/libs/specific_secondary_reader_mongo.js');
 
-var workerThread = (function() {
+export const workerThread = (function() {
     // workloads = list of workload filenames
     // args.tid = the thread identifier
     // args.data = map of workload -> 'this' parameter passed to the FSM state functions

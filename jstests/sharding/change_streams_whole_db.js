@@ -3,10 +3,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
-load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
 load('jstests/libs/change_stream_util.js');        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
@@ -184,4 +180,3 @@ cst.assertNextChangesEqual({
 cst.cleanUp();
 
 st.stop();
-})();

@@ -1,8 +1,5 @@
 // Runner that runs full validation on all collections of the initial sync node and checks the
 // dbhashes of all of the nodes including the initial sync node.
-'use strict';
-
-(function() {
 var startTime = Date.now();
 
 var primaryInfo = db.isMaster();
@@ -42,8 +39,7 @@ assert.eq(res.myState, ReplSetTest.State.SECONDARY, tojson(res));
 const excludedDBs = jsTest.options().excludedDBsFromDBHash;
 rst.checkReplicatedDataHashes(undefined, excludedDBs);
 
-load('jstests/hooks/run_validate_collections.js');
+await import("jstests/hooks/run_validate_collections.js");
 
 var totalTime = Date.now() - startTime;
 print('Finished consistency checks of initial sync node in ' + totalTime + ' ms.');
-})();

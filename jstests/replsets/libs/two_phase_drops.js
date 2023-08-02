@@ -14,13 +14,12 @@
  * of the replica set.
  *
  */
-"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
 load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
 
-class TwoPhaseDropCollectionTest {
+export class TwoPhaseDropCollectionTest {
     constructor(testName, dbName) {
         this.testName = testName;
         this.dbName = dbName;

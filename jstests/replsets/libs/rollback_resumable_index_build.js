@@ -1,5 +1,4 @@
 load("jstests/noPassthrough/libs/index_build.js");
-load('jstests/replsets/libs/rollback_test.js');
 
 const RollbackResumableIndexBuildTest = class {
     static checkCompletedAndDrop(

@@ -1,10 +1,7 @@
 /**
  * Tests that capped collections get the correct fastcounts after rollback.
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = 'rollback_capped_deletions';
 const dbName = testName;
@@ -45,4 +42,3 @@ try {
 }
 
 rollbackTest.stop();
-})();

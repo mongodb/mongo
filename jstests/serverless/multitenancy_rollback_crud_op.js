@@ -2,10 +2,7 @@
  * Test of a successfull replica set rollback for basic CRUD operations in multitenancy environment
  * with featureFlagRequireTenantId. This test is modeled from rollback_crud_ops_sequence.js.
  */
-load('jstests/replsets/libs/rollback_test.js');
-
-(function() {
-"use strict";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const kColl = "bar";
 const tenantA = ObjectId();
@@ -166,4 +163,3 @@ checkFinalResults(rollbackNodeDB);
 checkFinalResults(syncSourceDB);
 
 rollbackTest.stop();
-}());

@@ -2,12 +2,9 @@
  * Test that CollectionCloner completes without error when a collection is renamed during cloning.
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load('jstests/replsets/libs/two_phase_drops.js');
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_rename_collection";
@@ -211,4 +208,3 @@ runRenameTest({
 });
 
 replTest.stopSet();
-})();

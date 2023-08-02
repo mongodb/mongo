@@ -4289,6 +4289,7 @@ tasks:
       num_files: 3
       num_tasks: 5
       npm_command: rollback-fuzzer
+      jstestfuzz_vars: --useEsModules
       suite: rollback_fuzzer
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
       # index build commit quorum.
@@ -4306,6 +4307,7 @@ tasks:
       num_files: 3
       num_tasks: 5
       npm_command: rollback-fuzzer
+      jstestfuzz_vars: --useEsModules
       suite: rollback_fuzzer
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
       # index build commit quorum.
@@ -4321,7 +4323,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 1
       num_tasks: 4
-      jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
+      jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50 --useEsModules
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_clean_shutdowns
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
@@ -4338,7 +4340,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       num_files: 1
       num_tasks: 4
-      jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50
+      jstestfuzz_vars: --numLinesPerFile 300 --maxLinesBetweenEvents 50 --useEsModules
       npm_command: rollback-fuzzer
       suite: rollback_fuzzer_unclean_shutdowns
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling

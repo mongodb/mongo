@@ -27,7 +27,7 @@ import {
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load('jstests/replsets/libs/two_phase_drops.js');
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 function runDropTest({failPointName, failPointData, expectedLog, createNew}) {

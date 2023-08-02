@@ -3,11 +3,8 @@
  * collections, with optimes preceding or equal to the operation's optime, to be reaped.
  */
 
-(function() {
-'use strict';
-
 load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Alias to logging function in two_phase_drops.js
 const testLog = TwoPhaseDropCollectionTest._testLog;
@@ -34,7 +31,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 // Create the collection that will be dropped.
@@ -85,4 +82,3 @@ assert.eq(4, collForInserts.find().itcount());
 twoPhaseDropTest.commitDropCollection(collName);
 
 twoPhaseDropTest.stop();
-}());

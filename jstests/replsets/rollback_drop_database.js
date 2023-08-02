@@ -19,9 +19,7 @@
  * ]
  */
 
-(function() {
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_drop_database";
 
@@ -104,4 +102,3 @@ assert.commandWorked(rollbackNode.getDB(conflictingDbName)["afterRollback"].inse
     {"num": 2}, {writeConcern: {w: 2}}));
 
 rollbackTest.stop();
-})();

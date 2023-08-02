@@ -12,11 +12,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "commit_transaction_rollback_recovery_data_already_applied";
@@ -102,4 +99,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 assert.eq(testDB[collName].findOne({_id: 1}), {_id: 1, a: 1});
 
 rollbackTest.stop();
-}());

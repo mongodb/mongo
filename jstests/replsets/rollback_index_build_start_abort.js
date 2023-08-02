@@ -1,11 +1,7 @@
 /**
  * Tests different permutations of rolling-back index build start and abort oplog entries.
  */
-(function() {
-"use strict";
-
-// for RollbackIndexBuildTest
-load('jstests/replsets/libs/rollback_index_builds_test.js');
+import {RollbackIndexBuildsTest} from "jstests/replsets/libs/rollback_index_builds_test.js";
 
 const rollbackIndexTest = new RollbackIndexBuildsTest([ErrorCodes.Interrupted]);
 
@@ -17,4 +13,3 @@ const indexBuildOps = ["start", "abort"];
 const schedules = RollbackIndexBuildsTest.makeSchedules(rollbackOps, indexBuildOps);
 rollbackIndexTest.runSchedules(schedules);
 rollbackIndexTest.stop();
-})();

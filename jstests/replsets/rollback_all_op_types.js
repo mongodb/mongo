@@ -11,10 +11,7 @@
  * @tags: [requires_fcv_53]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test_deluxe.js");
+import {RollbackTestDeluxe} from "jstests/replsets/libs/rollback_test_deluxe.js";
 
 let noOp = () => {};
 
@@ -380,4 +377,3 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Check the replica set.
 rollbackTest.stop();
-})();

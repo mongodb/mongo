@@ -5,10 +5,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up a two phase drop test.
 let testName = "drop_collection_two_phase";
@@ -23,7 +20,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 const primary = replTest.getPrimary();
@@ -47,4 +44,3 @@ try {
 }
 
 twoPhaseDropTest.stop();
-}());

@@ -6,10 +6,7 @@
 //
 // @tags: [requires_persistence]
 //
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 TestData.rollbackShutdowns = true;
 let dbName = "test";
@@ -52,4 +49,3 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Check the replica set.
 rollbackTest.stop();
-}());

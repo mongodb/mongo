@@ -4,10 +4,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load('jstests/replsets/libs/rollback_files.js');
 load("jstests/libs/uuid_util.js");
 
@@ -67,4 +64,3 @@ const uuid = getUUIDFromListCollections(rollbackTest.getPrimary().getDB(dbName),
 checkRollbackFiles(replTest.getDbPath(rollbackNode), collName, uuid, rollbackDocs);
 
 rollbackTest.stop();
-})();

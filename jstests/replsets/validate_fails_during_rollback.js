@@ -1,10 +1,7 @@
 /*
  * This test makes sure the 'validate' command fails correctly during rollback.
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -38,4 +35,3 @@ rollbackTest.transitionToSteadyStateOperations();
 
 // Check the replica set.
 rollbackTest.stop();
-}());

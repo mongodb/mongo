@@ -1,10 +1,8 @@
 // Runner for validateCollections that runs full validation on all collections when loaded into
 // the mongo shell.
-'use strict';
 
-(function() {
-load('jstests/libs/discover_topology.js');      // For Topology and DiscoverTopology.
-load('jstests/hooks/validate_collections.js');  // For CollectionValidator.
+import {CollectionValidator} from "jstests/hooks/validate_collections.js";
+load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 
 assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
@@ -93,4 +91,3 @@ if (originalTransactionLifetimeLimitSeconds) {
             conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
     }
 }
-})();

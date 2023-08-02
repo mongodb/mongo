@@ -5,13 +5,10 @@
 //   do_not_wrap_aggregations_in_facets,
 //   uses_multiple_connections,
 // ]
-(function() {
-"use strict";
-
 load("jstests/libs/change_stream_util.js");
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/replsets/libs/two_phase_drops.js");  // For 'TwoPhaseDropCollectionTest'.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_post_image");
 const cst = new ChangeStreamTest(db);
@@ -247,4 +244,3 @@ if (!isChangeStreamPassthrough()) {
     latestChange = cst.getOneChange(cursor, true);
     assert.eq(latestChange.operationType, "invalidate");
 }
-}());

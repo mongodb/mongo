@@ -4,13 +4,10 @@
  * @tags: [requires_fcv_52, serverless]
  */
 
+import {Thread} from "jstests/libs/parallelTester_module.js";
 import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
 
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 function donorStartMigrationCmd(tenantID, realConnUrl) {
     return {
@@ -176,4 +173,3 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
 })();
 
 st.stop();
-})();

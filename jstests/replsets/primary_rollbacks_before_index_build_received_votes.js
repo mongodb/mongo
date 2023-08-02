@@ -2,11 +2,7 @@
  * Test that primary rollbacks before receiving any votes from the replica set should not
  * make createIndexes command's commit quorum value to be lost.
  */
-(function() {
-
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load('jstests/noPassthrough/libs/index_build.js');
 
 const dbName = jsTest.name();
@@ -60,4 +56,3 @@ awaitBuild();
 IndexBuildTest.assertIndexes(newPrimaryDB[collName], 2, ['_id_', 'i_1']);
 
 rollbackTest.stop();
-})();

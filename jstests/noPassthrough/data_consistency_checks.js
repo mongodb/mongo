@@ -8,12 +8,6 @@
  * ]
  */
 
-// The global 'db' variable is used by the data consistency hooks.
-var db;
-
-(function() {
-"use strict";
-
 // We skip doing the data consistency checks while terminating the cluster because they conflict
 // with the counts of the number of times the "dbhash" and "validate" commands are run.
 TestData.skipCollectionAndIndexValidation = true;
@@ -42,24 +36,27 @@ function countMatches(pattern, output) {
     return numMatches;
 }
 
-function runDataConsistencyChecks(testCase) {
-    db = testCase.conn.getDB("test");
-    try {
-        clearRawMongoProgramOutput();
+async function runDataConsistencyChecks(testCase) {
+    clearRawMongoProgramOutput();
 
+    // NOTE: once modules are imported they are cached, so we need to run this in a parallel shell.
+    const awaitShell = startParallelShell(async function() {
+        globalThis.db = db.getSiblingDB("test");
         load("jstests/hooks/run_check_repl_dbhash.js");
-        load("jstests/hooks/run_validate_collections.js");
+        await import("jstests/hooks/run_validate_collections.js");
+    }, testCase.conn.port);
 
-        // We terminate the processes to ensure that the next call to rawMongoProgramOutput()
-        // will return all of their output.
-        testCase.teardown();
-        return rawMongoProgramOutput();
-    } finally {
-        db = undefined;
-    }
+    awaitShell();
+    const output = rawMongoProgramOutput();
+
+    // We terminate the processes to ensure that the next call to rawMongoProgramOutput()
+    // will return all of their output.
+    testCase.teardown();
+
+    return output;
 }
 
-(function testReplicaSetWithVotingSecondaries() {
+await (async function testReplicaSetWithVotingSecondaries() {
     const numNodes = 2;
     const rst = new ReplSetTest({
         nodes: numNodes,
@@ -72,7 +69,8 @@ function runDataConsistencyChecks(testCase) {
 
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do.
     assert.commandWorked(rst.nodes[0].getDB("test").mycoll.insert({}));
-    const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
+    const output =
+        await runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
     assert.eq(numNodes,
@@ -85,7 +83,7 @@ function runDataConsistencyChecks(testCase) {
               "expected to find " + tojson(pattern) + " from each node in the log output");
 })();
 
-(function testReplicaSetWithNonVotingSecondaries() {
+await (async function testReplicaSetWithNonVotingSecondaries() {
     const numNodes = 2;
     const rst = new ReplSetTest({
         nodes: numNodes,
@@ -104,7 +102,8 @@ function runDataConsistencyChecks(testCase) {
 
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do.
     assert.commandWorked(rst.nodes[0].getDB("test").mycoll.insert({}));
-    const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
+    const output =
+        await runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
     assert.eq(numNodes,
@@ -117,7 +116,7 @@ function runDataConsistencyChecks(testCase) {
               "expected to find " + tojson(pattern) + " from each node in the log output");
 })();
 
-(function testShardedClusterWithOneNodeCSRS() {
+await (async function testShardedClusterWithOneNodeCSRS() {
     const st = new ShardingTest({
         mongos: 1,
         config: 1,
@@ -131,7 +130,7 @@ function runDataConsistencyChecks(testCase) {
     // database exists for when we go to run the data consistency checks against the CSRS.
     st.shardColl(st.s.getDB("test").mycoll, {_id: 1}, false);
 
-    const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
+    const output = await runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
     let pattern = makePatternForDBHash("config");
     assert.eq(0,
@@ -147,7 +146,7 @@ function runDataConsistencyChecks(testCase) {
               "expected to find " + tojson(pattern) + " in the log output for 1-node CSRS");
 })();
 
-(function testShardedCluster() {
+await (async function testShardedCluster() {
     const st = new ShardingTest({
         mongos: 1,
         config: 3,
@@ -168,7 +167,7 @@ function runDataConsistencyChecks(testCase) {
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do on
     // the replica set shard.
     assert.commandWorked(st.s.getDB("test").mycoll.insert({_id: 0}));
-    const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
+    const output = await runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
     // The "config" database exists on both the CSRS and the replica set shards due to the
     // "config.transactions" collection.
@@ -197,5 +196,4 @@ function runDataConsistencyChecks(testCase) {
               countMatches(pattern, output),
               "expected to find " + tojson(pattern) +
                   " from each replica set shard node in the log output");
-})();
 })();

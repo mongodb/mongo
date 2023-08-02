@@ -4,10 +4,7 @@
  * corruption on the rollback node.
  */
 
-(function() {
-'use strict';
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 let dbName = "rollback_rename_collection_on_sync_source";
 let otherDbName = "rollback_rename_collection_on_sync_source_other";
@@ -74,4 +71,3 @@ rollbackTestAcrossDBs.transitionToSteadyStateOperations();
 
 // Check the replica set.
 rollbackTestAcrossDBs.stop();
-}());

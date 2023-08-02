@@ -8,10 +8,8 @@
  * ]
  */
 
-(function() {
-"use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "rollback_reconstructs_transactions_prepared_before_stable";
@@ -134,4 +132,3 @@ assert.sameMembers(testColl.find().toArray(), [{_id: 0, a: 1}, {_id: 1}, {_id: 2
 assert.eq(testColl.count(), 3);
 
 rollbackTest.stop();
-}());

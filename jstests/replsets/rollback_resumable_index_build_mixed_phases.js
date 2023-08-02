@@ -10,10 +10,8 @@
  *   incompatible_with_gcov,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/replsets/libs/rollback_resumable_index_build.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const rollbackTest = new RollbackTest(jsTestName());
@@ -137,4 +135,3 @@ runRollbackTo(
     [{skippedPhaseLogID: 20391}, {skippedPhaseLogID: 20392}]);
 
 rollbackTest.stop();
-})();

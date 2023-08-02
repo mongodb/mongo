@@ -2,11 +2,7 @@
 // @tags: [
 //   requires_majority_read_concern,
 // ]
-(function() {
-"use strict";
-
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
 const st = new ShardingTest({
     shards: 2,
@@ -180,4 +176,3 @@ assert.soon(() => {
 assert.eq(resumeStream1.getResumeToken(), dbDropInvalidateToken);
 
 st.stop();
-})();

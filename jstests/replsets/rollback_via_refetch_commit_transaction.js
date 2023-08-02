@@ -12,10 +12,8 @@
 
 TestData.skipCheckDBHashes = true;
 
-(function() {
-"use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "rollback_via_refetch_commit_transaction";
@@ -82,4 +80,3 @@ assert.soon(function() {
 
 // Transaction is still in prepared state and validation will be blocked, so skip it.
 rst.stopSet(undefined, undefined, {skipValidation: true});
-}());

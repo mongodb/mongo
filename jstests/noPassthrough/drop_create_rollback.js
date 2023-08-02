@@ -5,14 +5,11 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 TestData.rollbackShutdowns = true;
 TestData.logComponentVerbosity = {
     storage: {recovery: 2}
 };
-load('jstests/replsets/libs/rollback_test.js');
+const {RollbackTest} = await import("jstests/replsets/libs/rollback_test.js");
 
 const rollbackTest = new RollbackTest();
 let primary = rollbackTest.getPrimary();
@@ -51,4 +48,3 @@ rollbackTest.transitionToSteadyStateOperations();
 assert.contains("timestamped", rollbackNode.getDB("foo").getCollectionNames());
 assert.contains("untimestamped", rollbackNode.getDB("local").getCollectionNames());
 rollbackTest.stop();
-})();

@@ -7,40 +7,41 @@
  *
  * @param {Mongo} conn - a connection to the server
  */
-function CommandSequenceWithRetries(conn) {
-    "use strict";
 
-    if (!(this instanceof CommandSequenceWithRetries)) {
-        return new CommandSequenceWithRetries(conn);
+function attemptReconnect(conn) {
+    try {
+        conn.adminCommand({ping: 1});
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
+
+export class CommandSequenceWithRetries {
+    constructor(conn) {
+        this.conn = conn;
+        this.steps = [];
     }
 
-    const steps = [];
-
-    function attemptReconnect(conn) {
-        try {
-            conn.adminCommand({ping: 1});
-        } catch (e) {
-            return false;
-        }
-        return true;
-    }
-
-    this.then = function then(phase, action) {
-        steps.push({phase: phase, action: action});
+    then(phase, action) {
+        this.steps.push({phase, action});
         return this;
-    };
+    }
 
-    this.execute = function execute() {
+    execute() {
         let i = 0;
         let stepHadNetworkErrorAlready = false;
 
-        while (i < steps.length) {
+        while (i < this.steps.length) {
             try {
                 // Treat no explicit return statement inside the action function as returning
                 // {shouldStop: false} for syntactic convenience.
-                const result = steps[i].action(conn);
+                const result = this.steps[i].action(this.conn);
                 if (result !== undefined && result.shouldStop) {
-                    return {ok: 0, msg: "giving up after " + steps[i].phase + ": " + result.reason};
+                    return {
+                        ok: 0,
+                        msg: "giving up after " + this.steps[i].phase + ": " + result.reason
+                    };
                 }
             } catch (e) {
                 if (!isNetworkError(e)) {
@@ -54,15 +55,15 @@ function CommandSequenceWithRetries(conn) {
                 if (stepHadNetworkErrorAlready) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + steps[i].phase +
+                        msg: "giving up after " + this.steps[i].phase +
                             " because we encountered multiple network errors"
                     };
                 }
 
-                if (!attemptReconnect(conn)) {
+                if (!attemptReconnect(this.conn)) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + steps[i].phase +
+                        msg: "giving up after " + this.steps[i].phase +
                             " because attempting to reconnect failed"
                     };
                 }
@@ -76,5 +77,5 @@ function CommandSequenceWithRetries(conn) {
         }
 
         return {ok: 1};
-    };
+    }
 }

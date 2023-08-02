@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const getExtendedRangeCount = (db) => {
     return assert.commandWorked(db.adminCommand({serverStatus: 1}))
@@ -68,4 +65,3 @@ rollbackTest.transitionToSteadyStateOperations();
 assert.eq(1, getExtendedRangeCount(rollbackNode));
 
 rollbackTest.stop();
-})();

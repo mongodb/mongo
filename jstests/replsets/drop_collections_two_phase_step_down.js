@@ -12,10 +12,7 @@
  * 6. Resume oplog application on secondary and make sure collection drop is eventually committed.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up a two phase drop test.
 let testName = "drop_collection_two_phase_step_down";
@@ -30,7 +27,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 // Create the collection that will be dropped.
@@ -67,4 +64,3 @@ try {
 } finally {
     twoPhaseDropTest.stop();
 }
-}());

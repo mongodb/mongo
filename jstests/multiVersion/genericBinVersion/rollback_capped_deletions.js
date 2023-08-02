@@ -1,10 +1,8 @@
 /**
  * Tests that capped collections get the correct fast counts after rollback in FCV 4.4.
  */
-(function() {
-'use strict';
-
-load("jstests/multiVersion/libs/multiversion_rollback.js");
+import {setupReplicaSet} from "jstests/multiVersion/libs/multiversion_rollback.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = 'rollback_capped_deletions';
 const dbName = testName;
@@ -47,4 +45,3 @@ try {
 
 // The fast count checks occur when tearing down the fixture as part of the consistency checks.
 rollbackTest.stop();
-})();

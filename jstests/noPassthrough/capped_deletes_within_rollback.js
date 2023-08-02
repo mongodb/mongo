@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const rollbackTest = new RollbackTest(jsTestName());
 
@@ -36,4 +33,3 @@ rollbackTest.transitionToSteadyStateOperations();
 // validation to fail if rollback did not perform capped deletes on documents that were inserted
 // earlier in rollback.
 rollbackTest.stop();
-})();

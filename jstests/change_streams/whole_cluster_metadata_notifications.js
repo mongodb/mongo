@@ -3,11 +3,8 @@
 // collections will live on different shards. Majority read concern cannot be off with multi-shard
 // transactions, which is why this test needs the tag below.
 // @tags: [requires_majority_read_concern]
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
+load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
@@ -243,4 +240,3 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
 }
 
 cst.cleanUp();
-}());

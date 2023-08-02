@@ -1,11 +1,8 @@
 /*
  * Basic test of a succesful replica set rollback for CRUD operations.
  */
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load("jstests/replsets/rslib.js");
-
-(function() {
-"use strict";
 
 // Helper function for verifying contents at the end of the test.
 const checkFinalResults = function(db) {
@@ -77,4 +74,3 @@ checkFinalResults(rollbackNodeDB);
 checkFinalResults(syncSourceDB);
 
 rollbackTest.stop();
-}());

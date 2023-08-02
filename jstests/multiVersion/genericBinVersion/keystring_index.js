@@ -22,9 +22,7 @@
  * For each index type, a v1 unique, v2 unique, v1 non-unique and v2 non-unique index
  * is considered except for hashed and wildcard, which only consider the v2 non-unique case.
  */
-(function() {
-'use strict';
-load('jstests/hooks/validate_collections.js');
+import {validateCollections} from "jstests/hooks/validate_collections.js";
 
 const kNumDocs = 100;
 
@@ -273,4 +271,3 @@ function insertDocumentsUnique(collection, numDocs, getDoc) {
     }
     assert.commandWorked(bulk.execute());
 }
-})();

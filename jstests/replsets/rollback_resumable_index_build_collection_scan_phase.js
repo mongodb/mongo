@@ -10,10 +10,8 @@
  *   incompatible_with_gcov,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/replsets/libs/rollback_resumable_index_build.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 
@@ -68,4 +66,3 @@ runRollbackTo("hangAfterSettingUpIndexBuild", 20387);
 runRollbackTo("hangIndexBuildDuringCollectionScanPhaseAfterInsertion", 20386);
 
 rollbackTest.stop();
-})();

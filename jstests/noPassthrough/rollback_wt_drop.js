@@ -5,10 +5,8 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Returns list of collections in database, including pending drops.
 // Assumes all collections fit in first batch of results.
@@ -148,4 +146,3 @@ assert.eq(2, noOpsToRollbackColl.find().itcount());
 assert.eq(2, noOpsToRollbackColl.count());
 
 rollbackTest.stop();
-})();

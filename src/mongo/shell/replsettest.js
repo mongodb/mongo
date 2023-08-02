@@ -3320,7 +3320,14 @@ var ReplSetTest = function ReplSetTest(opts) {
         // Perform collection validation on each node in parallel.
         let validators = [];
         for (let i = 0; i < ports.length; i++) {
-            let validator = new Thread(MongoRunner.validateCollectionsCallback, this.ports[i]);
+            let validator = new Thread(async function(port) {
+                const {CommandSequenceWithRetries} =
+                    await import("jstests/libs/command_sequence_with_retries.js");
+                const {validateCollections} = await import("jstests/hooks/validate_collections.js");
+                await import("jstests/libs/override_methods/validate_collections_on_shutdown.js");
+                MongoRunner.validateCollectionsCallback(
+                    port, {CommandSequenceWithRetries, validateCollections});
+            }, ports[i]);
             validators.push(validator);
             validators[i].start();
         }

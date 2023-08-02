@@ -2,12 +2,9 @@
  * Test to ensure that index creation fails on a drop-pending collection.
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");            // For kDefaultWaitForFailPointTimeout.
 load("jstests/noPassthrough/libs/index_build.js");  // For IndexBuildTest.
-load("jstests/replsets/libs/two_phase_drops.js");   // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up a two phase drop test.
 let testName = "drop_collection_two_phase";
@@ -22,7 +19,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 const primary = replTest.getPrimary();
@@ -67,4 +64,3 @@ try {
 }
 
 twoPhaseDropTest.stop();
-}());

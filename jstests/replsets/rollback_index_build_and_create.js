@@ -1,11 +1,7 @@
 /**
  * Test that rolling back an index build and collection creation behaves correctly.
  */
-(function() {
-"use strict";
-
-// For RollbackIndexBuildsTest
-load('jstests/replsets/libs/rollback_index_builds_test.js');
+import {RollbackIndexBuildsTest} from "jstests/replsets/libs/rollback_index_builds_test.js";
 
 const rollbackIndexTest = new RollbackIndexBuildsTest([ErrorCodes.InterruptedDueToReplStateChange]);
 
@@ -25,4 +21,3 @@ const schedule = [
 
 rollbackIndexTest.runSchedules([schedule]);
 rollbackIndexTest.stop();
-})();

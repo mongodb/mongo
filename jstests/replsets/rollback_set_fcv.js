@@ -9,7 +9,7 @@
  *  @tags: [multiversion_incompatible]
  */
 
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");

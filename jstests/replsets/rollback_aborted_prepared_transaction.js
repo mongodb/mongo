@@ -7,11 +7,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 const collName = "rollback_aborted_prepared_transaction";
@@ -105,4 +102,3 @@ assert.eq(testColl.find().itcount(), 2);
 assert.eq(testColl.count(), 2);
 
 rollbackTest.stop();
-}());

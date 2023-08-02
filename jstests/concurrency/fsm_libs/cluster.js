@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * Represents a MongoDB cluster.
  */
-load('jstests/hooks/validate_collections.js');          // For validateCollections.
+import {validateCollections} from "jstests/hooks/validate_collections.js";
 load('jstests/concurrency/fsm_libs/shard_fixture.js');  // For FSMShardingTest.
 
-var Cluster = function(options) {
+export const Cluster = function(options) {
     if (!(this instanceof Cluster)) {
         return new Cluster(options);
     }

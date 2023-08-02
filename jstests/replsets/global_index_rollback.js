@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 load('jstests/replsets/libs/rollback_files.js');
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load('jstests/libs/uuid_util.js');
 
 function uuidToCollName(uuid) {
@@ -534,4 +531,3 @@ for (let bulk of [false, true]) {
 }
 
 rollbackTest.stop();
-})();

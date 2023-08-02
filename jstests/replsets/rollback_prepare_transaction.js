@@ -6,11 +6,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load("jstests/replsets/libs/rollback_files.js");
 load("jstests/libs/uuid_util.js");
 
@@ -102,4 +99,3 @@ assert.commandWorked(adminDB.adminCommand({
 }));
 
 rollbackTest.stop();
-})();

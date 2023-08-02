@@ -1,10 +1,7 @@
 /**
  * Tests that rollback corrects fastcounts even when collections are renamed.
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_rename_count";
 const dbName = testName;
@@ -56,4 +53,3 @@ assert.eq(coll1.find().itcount(), 2);
 assert.eq(coll2.find().itcount(), 2);
 
 rollbackTest.stop();
-})();

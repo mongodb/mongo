@@ -2,12 +2,10 @@
  * Fixture to test rollback permutations with index builds.
  */
 
-"use strict";
-
 load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
-load('jstests/replsets/libs/rollback_test.js');     // for RollbackTest
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
-class RollbackIndexBuildsTest {
+export class RollbackIndexBuildsTest {
     constructor(expectedErrors) {
         jsTestLog("Set up a Rollback Test.");
         const replTest = new ReplSetTest({

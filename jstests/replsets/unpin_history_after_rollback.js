@@ -14,10 +14,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 let rst = new ReplSetTest({
     name: "history_rollback_test",
@@ -61,4 +58,3 @@ pinnedTs = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned ti
 assert.eq(maxTimestampValue, pinnedTs);
 
 rst.stopSet();
-})();

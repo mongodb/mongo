@@ -5,19 +5,17 @@
  * exercise rollback via refetch in the case that refetch is necessary.
  */
 
-'use strict';
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load("jstests/libs/collection_drop_recreate.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
 
-function printFCVDoc(nodeAdminDB, logMessage) {
+export function printFCVDoc(nodeAdminDB, logMessage) {
     const fcvDoc = nodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(logMessage + ` ${tojson(fcvDoc)}`);
 }
 
-function CommonOps(dbName, node) {
+export function CommonOps(dbName, node) {
     // Insert four documents on both nodes.
     assert.commandWorked(node.getDB(dbName)["bothNodesKeep"].insert({a: 1}));
     assert.commandWorked(node.getDB(dbName)["rollbackNodeDeletes"].insert({b: 1}));
@@ -25,7 +23,7 @@ function CommonOps(dbName, node) {
     assert.commandWorked(node.getDB(dbName)["bothNodesUpdate"].insert({d: 1}));
 }
 
-function RollbackOps(dbName, node) {
+export function RollbackOps(dbName, node) {
     // Perform operations only on the rollback node:
     //   1. Delete a document.
     //   2. Update a document only on this node.
@@ -36,7 +34,7 @@ function RollbackOps(dbName, node) {
     assert.commandWorked(node.getDB(dbName)["bothNodesUpdate"].update({d: 1}, {d: 0}));
 }
 
-function SyncSourceOps(dbName, node) {
+export function SyncSourceOps(dbName, node) {
     // Perform operations only on the sync source:
     //   1. Make a conflicting write on one of the documents the rollback node updates.
     //   2. Insert a new document.
@@ -52,7 +50,7 @@ function SyncSourceOps(dbName, node) {
  * @param {string} syncSourceVersion the desired version for the sync source
  *
  */
-function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersion) {
+export function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersion) {
     jsTestLog("Started multiversion rollback test for versions: {rollbackNode: " +
               rollbackNodeVersion + ", syncSource: " + syncSourceVersion + "}.");
 
@@ -82,7 +80,7 @@ function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersi
 }
 
 // Test rollback between latest rollback node and downgrading sync node.
-function testMultiversionRollbackLatestFromDowngrading(testName, upgradeImmediately) {
+export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeImmediately) {
     const dbName = testName;
     const replSet = new ReplSetTest(
         {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
@@ -186,7 +184,7 @@ function testMultiversionRollbackLatestFromDowngrading(testName, upgradeImmediat
 }
 
 // Test rollback between downgrading rollback node and lastLTS sync node.
-function testMultiversionRollbackDowngradingFromLastLTS(testName) {
+export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
     const dbName = testName;
     const replSet = new ReplSetTest(
         {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
@@ -290,7 +288,7 @@ function testMultiversionRollbackDowngradingFromLastLTS(testName) {
  * @param {string} rollbackNodeVersion the desired version for the rollback node
  * @param {string} syncSourceVersion the desired version for the sync source
  */
-function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
+export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     jsTestLog(
         `[${testName}] Beginning cluster setup with versions: {rollbackNode: ${rollbackNodeVersion},
             syncSource: ${syncSourceVersion}}.`);

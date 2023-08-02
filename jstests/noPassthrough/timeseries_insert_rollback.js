@@ -6,10 +6,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/rollback_test.js');
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const rollbackTest = new RollbackTest(jsTestName());
 
@@ -58,4 +55,3 @@ const buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 2, 'Expected two bucket but found: ' + tojson(buckets));
 
 rollbackTest.stop();
-})();

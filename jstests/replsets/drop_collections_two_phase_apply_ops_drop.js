@@ -3,10 +3,7 @@
  * By definition, a drop-pending collection will be removed by the server eventually.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up a two phase drop test.
 let testName = "drop_collection_two_phase_apply_ops_noop";
@@ -21,7 +18,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 // Create the collection that will be dropped.
@@ -62,4 +59,3 @@ assert(
 twoPhaseDropTest.commitDropCollection(collName);
 
 twoPhaseDropTest.stop();
-}());

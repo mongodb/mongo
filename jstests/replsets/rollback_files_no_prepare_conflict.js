@@ -7,10 +7,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const name = "rollback_files_no_prepare_conflicts";
 const dbName = "test";
@@ -53,4 +51,3 @@ testColl = testDB.getCollection(collName);
 assert.docEq({_id: 42, a: "one"}, testColl.findOne({_id: 42}));
 
 rollbackTest.stop();
-})();

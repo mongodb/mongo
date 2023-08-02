@@ -5,8 +5,8 @@
  *   requires_replication,
  * ]
  */
-load('jstests/replsets/libs/rollback_test.js');
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Operations that will be present on both nodes, before the common point.
 const dbName = 'test';

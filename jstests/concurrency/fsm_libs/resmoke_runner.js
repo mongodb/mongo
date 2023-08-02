@@ -1,7 +1,7 @@
-'use strict';
-
-load('jstests/concurrency/fsm_libs/runner.js');  // for runner.internals
-load('jstests/libs/discover_topology.js');       // For Topology and DiscoverTopology.
+import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
+import {runner} from "jstests/concurrency/fsm_libs/runner.js";
+import {ThreadManager} from "jstests/concurrency/fsm_libs/thread_mgr.js";
+load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 
 const validateExecutionOptions = runner.internals.validateExecutionOptions;
 const prepareCollections = runner.internals.prepareCollections;

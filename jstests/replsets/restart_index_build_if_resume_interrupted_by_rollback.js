@@ -7,10 +7,8 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/replsets/libs/rollback_resumable_index_build.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
 
@@ -20,4 +18,3 @@ RollbackResumableIndexBuildTest.runResumeInterruptedByRollback(
     rollbackTest, dbName, [{a: 1}, {a: 2}], {a: 1}, [{a: 3}], [{a: 4}]);
 
 rollbackTest.stop();
-})();

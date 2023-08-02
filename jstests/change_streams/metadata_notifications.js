@@ -5,11 +5,7 @@
 //   do_not_run_in_whole_cluster_passthrough,
 //   requires_fcv_63,
 // ]
-(function() {
-"use strict";
-
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For isSharded.
 
@@ -280,4 +276,3 @@ cst.assertNextChangesEqual(
     {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: true});
 
 cst.cleanUp();
-}());

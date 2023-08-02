@@ -5,10 +5,7 @@
  * then renaming that collection and rolling back a drop on that index.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_drop_index_after_rename";
 const dbName = testName;
@@ -55,4 +52,3 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 rollbackTest.stop();
-})();

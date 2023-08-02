@@ -3,10 +3,7 @@
  * phase collection drop.
  */
 
-(function() {
-'use strict';
-
-load("jstests/replsets/libs/two_phase_drops.js");  // For TwoPhaseDropCollectionTest.
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Compute db hash for all collections on given database.
 function getDbHash(database) {
@@ -27,7 +24,7 @@ let replTest = twoPhaseDropTest.initReplSet();
 if (!twoPhaseDropTest.supportsDropPendingNamespaces()) {
     jsTestLog('Drop pending namespaces not supported by storage engine. Skipping test.');
     twoPhaseDropTest.stop();
-    return;
+    quit();
 }
 
 let primaryDB = replTest.getPrimary().getDB(dbName);
@@ -49,4 +46,3 @@ let failMsg = "dbHash during drop pending phase did not match dbHash after drop 
 assert.eq(dropPendingDbHash, dropCommittedDbHash, failMsg);
 
 replTest.stopSet();
-})();

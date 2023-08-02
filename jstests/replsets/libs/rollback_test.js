@@ -38,11 +38,9 @@
  * of each stage.
  */
 
-"use strict";
-
+import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 load("jstests/replsets/rslib.js");
-load("jstests/replsets/libs/two_phase_drops.js");
-load("jstests/hooks/validate_collections.js");
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 load('jstests/libs/fail_point_util.js');
 
 /**
@@ -70,7 +68,7 @@ load('jstests/libs/fail_point_util.js');
  * @param {Object} [optional] nodeOptions command-line options to apply to all nodes in the replica
  *     set. Ignored if 'replSet' is provided.
  */
-function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
+export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",

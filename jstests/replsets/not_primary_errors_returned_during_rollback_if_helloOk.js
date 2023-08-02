@@ -8,10 +8,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/rollback_test.js");
+import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 load("jstests/replsets/rslib.js");
 
 const dbName = "test";
@@ -82,4 +79,3 @@ failPointAfterTransition.off();
 
 rollbackTest.transitionToSteadyStateOperations();
 rollbackTest.stop();
-}());

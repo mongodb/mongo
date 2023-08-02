@@ -1,7 +1,5 @@
 // This is the template file used in Powercycle testing for launching FSM Serial clients.
-'use strict';
-
-load('jstests/concurrency/fsm_libs/runner.js');
+import {runWorkloadsSerially} from "jstests/concurrency/fsm_libs/runner.js";
 
 var workloadDir = 'jstests/concurrency/fsm_workloads';
 
