@@ -843,6 +843,11 @@ StringData PrimaryOnlyService::_getStateString(WithLock) const {
     }
 }
 
+void PrimaryOnlyService::waitForStateNotRebuilding_forTest(OperationContext* opCtx) {
+    stdx::unique_lock lk(_mutex);
+    _waitForStateNotRebuilding(opCtx, lk);
+}
+
 void PrimaryOnlyService::_waitForStateNotRebuilding(OperationContext* opCtx,
                                                     BasicLockableAdapter m) {
 

@@ -1182,6 +1182,7 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
 }
 
 TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
+    primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::alwaysOn);
     // We change slow stepUp threshold to a extremely large value to avoid test failure in some slow
     // test environments.
     const auto oldSlowServiceOnStepUpCompleteThresholdMS =

@@ -284,6 +284,8 @@ public:
      */
     void unregisterOpCtx(OperationContext* opCtx);
 
+    void waitForStateNotRebuilding_forTest(OperationContext* opCtx);
+
 protected:
     /**
      * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the
