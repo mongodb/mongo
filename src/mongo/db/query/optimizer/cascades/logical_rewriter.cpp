@@ -608,8 +608,12 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
     ProjectionRenames projectionRenames;
-    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
-        scanProjName, multikeynessTrie, mergedReqs, projectionRenames, ctx.getConstFold());
+    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
+                                                                multikeynessTrie,
+                                                                mergedReqs,
+                                                                projectionRenames,
+                                                                ctx.getConstFold(),
+                                                                ctx.getPathToInterval());
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -717,7 +721,8 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                                                                 scanDef.getMultikeynessTrie(),
                                                                 conversion->_reqMap,
                                                                 projectionRenames_unused,
-                                                                ctx.getConstFold());
+                                                                ctx.getConstFold(),
+                                                                ctx.getPathToInterval());
     tassert(6624156,
             "We should not be seeing renames from a converted Filter",
             projectionRenames_unused.empty());
@@ -1227,7 +1232,8 @@ struct SubstituteConvert<EvaluationNode> {
                                                                     scanDef.getMultikeynessTrie(),
                                                                     conversion->_reqMap,
                                                                     projectionRenames_unused,
-                                                                    ctx.getConstFold());
+                                                                    ctx.getConstFold(),
+                                                                    ctx.getPathToInterval());
         if (hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
             return;
@@ -1846,7 +1852,8 @@ struct ExploreConvert<SargableNode> {
                                                   scanDef.getMultikeynessTrie(),
                                                   *leftReqs,
                                                   renames,
-                                                  ctx.getConstFold());
+                                                  ctx.getConstFold(),
+                                                  ctx.getPathToInterval());
                 tassert(6902605,
                         "Did not expect projection renames from CNF -> DNF conversion",
                         renames.empty());
@@ -1865,7 +1872,8 @@ struct ExploreConvert<SargableNode> {
                                                   scanDef.getMultikeynessTrie(),
                                                   *rightReqs,
                                                   renames,
-                                                  ctx.getConstFold());
+                                                  ctx.getConstFold(),
+                                                  ctx.getPathToInterval());
                 tassert(6902604,
                         "Did not expect projection renames from CNF -> DNF conversion",
                         renames.empty());

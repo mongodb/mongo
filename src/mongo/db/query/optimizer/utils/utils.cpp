@@ -291,7 +291,8 @@ public:
                                               {} /*multikeynessTrie*/,
                                               leftReqMap,
                                               renames_unused,
-                                              {} /*constFold*/);
+                                              {} /*constFold*/,
+                                              {} /*pathToInterval*/);
             tassert(6624168,
                     "Cannot detect empty intervals without providing a constant folder",
                     !hasEmptyInterval);
@@ -772,7 +773,8 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
                                    const MultikeynessTrie& multikeynessTrie,
                                    PartialSchemaRequirements& reqMap,
                                    ProjectionRenames& projectionRenames,
-                                   const ConstFoldFn& constFold) {
+                                   const ConstFoldFn& constFold,
+                                   const PathToIntervalFn& pathToInterval) {
     const auto simplifyFn = [&constFold](IntervalReqExpr::Node& intervals) -> bool {
         normalizeIntervals(intervals);
         auto simplified = simplifyDNFIntervals(intervals, constFold);
@@ -896,7 +898,7 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
 
     if (constFold) {
         // Intersect and normalize intervals.
-        const bool representable = newReqs.simplify([&](const PartialSchemaKey&,
+        const bool representable = newReqs.simplify([&](const PartialSchemaKey& key,
                                                         PartialSchemaRequirement& req) -> bool {
             auto resultIntervals = req.getIntervals();
             if (!simplifyFn(resultIntervals)) {
@@ -904,6 +906,12 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
             }
 
             normalizeIntervals(resultIntervals);
+
+            if (pathToInterval &&
+                requiresArrayOnNonMultikeyPath(
+                    key._path, resultIntervals, multikeynessTrie, pathToInterval)) {
+                return false;
+            }
 
             req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
             return true;
@@ -1002,7 +1010,8 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
                                                                 {} /*multikeynessTrie*/,
                                                                 intersection,
                                                                 renames_unused,
-                                                                {} /*constFold*/);
+                                                                {} /*constFold*/,
+                                                                {} /*pathToInterval*/);
     tassert(6624169,
             "Cannot detect empty intervals without providing a constant folder",
             !hasEmptyInterval);

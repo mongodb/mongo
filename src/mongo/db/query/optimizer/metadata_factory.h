@@ -35,6 +35,7 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/utils/const_fold_interface.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 
 namespace mongo::optimizer {
@@ -48,7 +49,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              bool exists = true,
-                             boost::optional<CEType> ce = boost::none);
+                             boost::optional<CEType> ce = boost::none,
+                             const PathToIntervalFn& pathToInterval = {});
 
 ScanDefinition createScanDef(ScanDefOptions options,
                              IndexDefinitions indexDefs,
@@ -57,6 +59,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              DistributionAndPaths distributionAndPaths,
                              bool exists = true,
                              boost::optional<CEType> ce = boost::none,
-                             ShardingMetadata shardingMetadata = {});
+                             ShardingMetadata shardingMetadata = {},
+                             const PathToIntervalFn& pathToInterval = {});
 
 }  // namespace mongo::optimizer

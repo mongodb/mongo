@@ -296,7 +296,8 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     const MultikeynessTrie& multikeynessTrie,
     PartialSchemaRequirements& reqMap,
     ProjectionRenames& projectionRenames,
-    const ConstFoldFn& constFold);
+    const ConstFoldFn& constFold,
+    const PathToIntervalFn& pathToInterval);
 
 /**
  * Try to check whether the predicate 'lhs' is a subset of 'rhs'.

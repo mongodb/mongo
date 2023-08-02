@@ -83,7 +83,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
-                             boost::optional<CEType> ce) {
+                             boost::optional<CEType> ce,
+                             const PathToIntervalFn& pathToInterval) {
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
 
@@ -93,7 +94,9 @@ ScanDefinition createScanDef(ScanDefOptions options,
                          constFold,
                          std::move(distributionAndPaths),
                          exists,
-                         std::move(ce));
+                         std::move(ce),
+                         {} /*shardingMetadata*/,
+                         pathToInterval);
 }
 
 ScanDefinition createScanDef(ScanDefOptions options,
@@ -103,7 +106,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
                              boost::optional<CEType> ce,
-                             ShardingMetadata shardingMetadata) {
+                             ShardingMetadata shardingMetadata,
+                             const PathToIntervalFn& pathToInterval) {
 
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
@@ -113,7 +117,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
                                           multikeynessTrie,
                                           indexDef.getPartialReqMap(),
                                           projRenames_unused,
-                                          constFold);
+                                          constFold,
+                                          pathToInterval);
         tassert(6624157,
                 "We should not be seeing renames from partial index filters",
                 projRenames_unused.empty());
