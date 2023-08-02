@@ -29,6 +29,7 @@
 
 #include "mongo/db/ops/write_ops_exec.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -2343,6 +2344,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             boost::optional<repl::OpTime>* opTime,
                             boost::optional<OID>* electionId,
                             std::vector<size_t>* docsToRetry,
+                            absl::flat_hash_map<int, int>& retryAttemptsForDup,
                             const write_ops::InsertCommandRequest& request) try {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
@@ -2363,9 +2365,17 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
             performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds), request);
         if (auto error = write_ops_exec::generateError(
                 opCtx, output.result.getStatus(), start + index, errors->size())) {
-            errors->emplace_back(std::move(*error));
+            bool canContinue = output.canContinue;
+            // Automatically attempts to retry on DuplicateKey error.
+            if (error->getStatus().code() == ErrorCodes::DuplicateKey &&
+                retryAttemptsForDup[index]++ < gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                docsToRetry->push_back(index);
+                canContinue = true;
+            } else {
+                errors->emplace_back(std::move(*error));
+            }
             abort(bucketCatalog, batch, output.result.getStatus());
-            return output.canContinue;
+            return canContinue;
         }
 
         invariant(output.result.getValue().getN() == 1,
@@ -2490,6 +2500,9 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         auto result = write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
         if (!result.isOK()) {
+            if (result.code() == ErrorCodes::DuplicateKey) {
+                timeseries::bucket_catalog::resetBucketOIDCounter();
+            }
             abortStatus = result;
             return false;
         }
@@ -2891,25 +2904,18 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                 ? std::move(bucketStmtIds[batch->bucketHandle.bucketId.oid])
                 : std::vector<StmtId>{};
-            try {
-                canContinue = commitTimeseriesBucket(opCtx,
-                                                     batch,
-                                                     start,
-                                                     index,
-                                                     std::move(stmtIds),
-                                                     errors,
-                                                     opTime,
-                                                     electionId,
-                                                     &docsToRetry,
-                                                     request);
-            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-                // Automatically attempts to retry on DuplicateKey error.
-                if (retryAttemptsForDup[index]++ < gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
-                    docsToRetry.push_back(index);
-                } else {
-                    throw;
-                }
-            }
+            canContinue = commitTimeseriesBucket(opCtx,
+                                                 batch,
+                                                 start,
+                                                 index,
+                                                 std::move(stmtIds),
+                                                 errors,
+                                                 opTime,
+                                                 electionId,
+                                                 &docsToRetry,
+                                                 retryAttemptsForDup,
+                                                 request);
+
             batch.reset();
             if (!canContinue) {
                 break;
