@@ -181,22 +181,18 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                      _freezeMigrations(executor);
                                  }))
 
-        .then([this, token, executor = executor, anchor = shared_from_this()] {
-            _buildPhaseHandler(Phase::kEnterCriticalSection,
-                               [this, token, executor = executor, anchor = shared_from_this()] {
-                                   _enterCriticalSection(executor, token);
-                               })();
-        })
+        .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
+                                 [this, token, executor = executor, anchor = shared_from_this()] {
+                                     _enterCriticalSection(executor, token);
+                                 }))
         .then(_buildPhaseHandler(Phase::kDropCollection,
                                  [this, executor = executor, anchor = shared_from_this()] {
                                      _commitDropCollection(executor);
                                  }))
-        .then([this, token, executor = executor, anchor = shared_from_this()] {
-            _buildPhaseHandler(Phase::kReleaseCriticalSection,
-                               [this, token, executor = executor, anchor = shared_from_this()] {
-                                   _exitCriticalSection(executor, token);
-                               })();
-        });
+        .then(_buildPhaseHandler(Phase::kReleaseCriticalSection,
+                                 [this, token, executor = executor, anchor = shared_from_this()] {
+                                     _exitCriticalSection(executor, token);
+                                 }));
 }
 
 void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
