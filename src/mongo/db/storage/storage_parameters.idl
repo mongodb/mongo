@@ -170,6 +170,15 @@ server_parameters:
         cpp_vartype: bool
         default: true
 
+    skipDroppingHashedShardKeyIndex:
+        description: >-
+            Skips dropping hashed shard key supporting indexes when calling dropIndexes with the '*' parameter. Used for testing purposes.
+        set_at: [ startup, runtime ]
+        cpp_vartype: bool
+        cpp_varname: skipDroppingHashedShardKeyIndex
+        default: false
+
+
 feature_flags:
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
