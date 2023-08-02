@@ -1,3 +1,11 @@
+// Various tests of the ability to establish a cursor on each mongod in a sharded cluster.
+
+(function() {
+"use strict";
+function listMongodStats(db) {
+    return db.getSiblingDB("admin").aggregate([{$_internalShardServerInfo: {}}]).toArray();
+}
+
 /**
  * Test that mongos can establish cursors on all nodes within a sharded cluster.
  */
@@ -12,13 +20,9 @@ function runTest({shards, nodes}) {
         rs: {nodes},
     });
     const db = st.s.getDB(jsTestName());
-    const results = db.getSiblingDB("admin")
-                        .aggregate([
-                            {$_internalShardServerInfo: {}},
-                        ])
-                        .toArray();
+    const results = listMongodStats(db);
 
-    // Assert there are $currentOp results from all hosts.
+    // Assert there are results from all hosts.
     const totalHosts = shards * nodes;
     assert.eq(totalHosts, results.length);
     st.stop();
@@ -87,4 +91,53 @@ assert.soon(() => {
 });
 
 st.stop();
+}());
+
+/**
+ * Test that we can gracefully handle an imbalanced topology where some shards have fewer replica
+ * set members than others (SERVER-79372).
+ */
+(function() {
+"use strict";
+const st = new ShardingTest({
+    mongos: 1,
+    // different numbers of mongods between shards.
+    shards: {rs0: {nodes: 1}, rs1: {nodes: 2}},
+    config: 1,  // not relevant for this test.
+});
+
+// This once tripped an invariant failure: SERVER-79372.
+const results = listMongodStats(st.s.getDB(jsTestName()));
+
+// Assert there are results from all hosts.
+const totalHosts = 3;
+assert.eq(totalHosts, results.length, results);
+
+st.stop();
+}());
+
+/**
+ * Same sort of test (SERVER-79372) but now where the config server has a different number of
+ * shards, and it gets migrated from a dedicated config server to be one of the shards. This is how
+ * the bug was originally discovered.
+ */
+(function() {
+"use strict";
+const st = new ShardingTest({
+    mongos: 1,
+    shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
+    config: {rs: {nodes: 1}},
+});
+// This one has always worked fine.
+let results = listMongodStats(st.s.getDB(jsTestName()));
+assert.eq(4, results.length, results);
+assert.commandWorked(st.s.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}));
+// After the above command, this once tripped an invariant failure: SERVER-79372.
+results = listMongodStats(st.s.getDB(jsTestName()));
+
+// Assert there are results from all hosts.
+assert.eq(5, results.length, results);
+
+st.stop();
+}());
 }());
