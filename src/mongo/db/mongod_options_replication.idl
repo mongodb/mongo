@@ -66,12 +66,11 @@ configs:
         description: 'arg is <setname>[/<optionalseedhostlist>]'
         short_name: replSet
         arg_vartype: String
-        source: [ cli, ini ]
     'replication.replSetName':
         section: 'Replica set options'
         description: 'arg is <setname>'
+        short_name: replSetName
         arg_vartype: String
-        source: yaml
         validator:
             callback: validateReplicaSetNameSetting
     'replication.serverless':
