@@ -261,6 +261,8 @@ protected:
 
     LogicalSessionId _lsid{makeLogicalSessionIdForTest()};
     TxnNumberAndRetryCounter _txnNumberAndRetryCounter{1, 1};
+    CancellationSource cancelSource;
+    CancellationToken _cancelToken{cancelSource.token()};
 };
 
 class TransactionCoordinatorDriverTest : public TransactionCoordinatorTestBase {
@@ -1243,7 +1245,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesCommitDecisionOnTwoCommitRes
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1265,7 +1268,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1290,7 +1294,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1315,7 +1320,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1339,7 +1345,8 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnSingleAbortRe
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1362,7 +1369,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1392,7 +1400,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1419,7 +1428,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1451,7 +1461,8 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -1687,7 +1698,8 @@ protected:
             _lsid,
             _txnNumberAndRetryCounter,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-            Date_t::max());
+            Date_t::max(),
+            _cancelToken);
 
         coordinator.runCommit(operationContext(), kTwoShardIdList);
 
@@ -1987,7 +1999,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2162,7 +2175,8 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorIsCanceledWhileInactive) {
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2204,8 +2218,12 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
     auto awsPtr = aws.get();
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2247,8 +2265,12 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalCreated++;
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2309,8 +2331,12 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
     auto awsPtr = aws.get();
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2373,8 +2399,12 @@ TEST_F(TransactionCoordinatorMetricsTest,
     expectedMetrics.totalCreated++;
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2441,8 +2471,12 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
     auto awsPtr = aws.get();
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2512,8 +2546,12 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 
     auto aws = std::make_unique<txn::AsyncWorkScheduler>(getServiceContext());
     auto awsPtr = aws.get();
-    TransactionCoordinator coordinator(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, std::move(aws), Date_t::max());
+    TransactionCoordinator coordinator(operationContext(),
+                                       _lsid,
+                                       _txnNumberAndRetryCounter,
+                                       std::move(aws),
+                                       Date_t::max(),
+                                       _cancelToken);
     const auto& stats =
         coordinator.getMetricsObserverForTest().getSingleTransactionCoordinatorStats();
 
@@ -2601,7 +2639,8 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
 
@@ -2633,7 +2672,8 @@ TEST_F(
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     tickSource()->advance(Milliseconds(101));
 
@@ -2663,7 +2703,8 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
 
@@ -2710,7 +2751,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesTerminationCauseFor
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
 
@@ -2761,7 +2803,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     {
         FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern",
@@ -2883,7 +2926,8 @@ TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportSt
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     const auto assertRecoveryFlag = [&coordinator](bool expectedFlagValue) {
         BSONObjBuilder builder;
@@ -2919,7 +2963,8 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
         _lsid,
         _txnNumberAndRetryCounter,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        Date_t::max());
+        Date_t::max(),
+        _cancelToken);
 
     {
         BSONObjBuilder builder;

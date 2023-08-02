@@ -5,6 +5,11 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
+import {
+    checkDecisionIs,
+    checkDocumentDeleted
+} from 'jstests/sharding/libs/txn_two_phase_commit_util.js';
+
 (function() {
 'use strict';
 
@@ -34,26 +39,6 @@ const checkParticipantListMatches = function(
                        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     assert.neq(null, coordDoc);
     assert.sameMembers(coordDoc.participants, expectedParticipantList);
-};
-
-const checkDecisionIs = function(coordinatorConn, lsid, txnNumber, expectedDecision) {
-    let coordDoc = coordinatorConn.getDB("config")
-                       .getCollection("transaction_coordinators")
-                       .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
-    assert.neq(null, coordDoc);
-    assert.eq(expectedDecision, coordDoc.decision.decision);
-    if (expectedDecision === "commit") {
-        assert.neq(null, coordDoc.decision.commitTimestamp);
-    } else {
-        assert.eq(null, coordDoc.decision.commitTimestamp);
-    }
-};
-
-const checkDocumentDeleted = function(coordinatorConn, lsid, txnNumber) {
-    let coordDoc = coordinatorConn.getDB("config")
-                       .getCollection("transaction_coordinators")
-                       .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
-    return null === coordDoc;
 };
 
 const runCommitThroughMongosInParallelShellExpectSuccess = function() {

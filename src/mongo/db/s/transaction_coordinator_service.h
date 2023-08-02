@@ -180,6 +180,9 @@ private:
 
     // Sets to false once shutdown was called at least once.
     bool _isShuttingDown{false};
+
+    // Used to cancel WaitForMajority for TransactionCoordinator when this service steps down.
+    CancellationSource _cancelSource;
 };
 
 }  // namespace mongo

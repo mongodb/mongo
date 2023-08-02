@@ -103,9 +103,12 @@ void TransactionCoordinatorService::createCoordinator(
         latestCoordinator->cancelIfCommitNotYetStarted();
     }
 
-    auto coordinator = std::make_shared<TransactionCoordinator>(
-        opCtx, lsid, txnNumberAndRetryCounter, scheduler.makeChildScheduler(), commitDeadline);
-
+    auto coordinator = std::make_shared<TransactionCoordinator>(opCtx,
+                                                                lsid,
+                                                                txnNumberAndRetryCounter,
+                                                                scheduler.makeChildScheduler(),
+                                                                commitDeadline,
+                                                                _cancelSource.token());
     try {
         catalog.insert(opCtx, lsid, txnNumberAndRetryCounter, coordinator);
     } catch (const DBException&) {
@@ -210,12 +213,14 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
     invariant(!_catalogAndScheduler);
     _catalogAndScheduler = std::make_shared<CatalogAndScheduler>(opCtx->getServiceContext());
+    _cancelSource = CancellationSource();
 
     auto future =
         _catalogAndScheduler->scheduler
             .scheduleWorkIn(
                 recoveryDelayForTesting,
-                [catalogAndScheduler = _catalogAndScheduler](OperationContext* opCtx) {
+                [catalogAndScheduler = _catalogAndScheduler,
+                 cancelSource = _cancelSource](OperationContext* opCtx) {
                     auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
                     replClientInfo.setLastOpToSystemLastOpTime(opCtx);
 
@@ -272,7 +277,8 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                             lsid,
                             TxnNumberAndRetryCounter{txnNumber, txnRetryCounter},
                             scheduler.makeChildScheduler(),
-                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
+                            clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()),
+                            cancelSource.token());
 
                         catalog.insert(opCtx,
                                        lsid,
@@ -299,6 +305,7 @@ void TransactionCoordinatorService::onStepDown() {
         _catalogAndSchedulerToCleanup = std::move(_catalogAndScheduler);
     }
 
+    _cancelSource.cancel();
     _catalogAndSchedulerToCleanup->onStepDown();
 }
 
@@ -307,7 +314,6 @@ void TransactionCoordinatorService::shutdown() {
         stdx::lock_guard<Latch> lg(_mutex);
         _isShuttingDown = true;
     }
-
     onStepDown();
     joinPreviousRound();
 }

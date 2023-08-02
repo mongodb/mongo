@@ -96,7 +96,8 @@ public:
                            const LogicalSessionId& lsid,
                            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                            std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
-                           Date_t deadline);
+                           Date_t deadline,
+                           const CancellationToken& cancelToken);
 
     ~TransactionCoordinator();
 
@@ -230,6 +231,9 @@ private:
 
     // The deadline for the TransactionCoordinator to reach a decision
     Date_t _deadline;
+
+    // The cancellation token for WaitForMajority.
+    const CancellationToken _cancelToken;
 };
 
 }  // namespace mongo

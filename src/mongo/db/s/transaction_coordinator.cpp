@@ -98,11 +98,12 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
     const std::string& failPointName,
     repl::OpTime opTime,
     const LogicalSessionId& lsid,
-    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    const CancellationToken& cancelToken) {
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
-    auto waitForWC = [service, executor](repl::OpTime opTime) {
+    auto waitForWC = [service, executor, cancelToken](repl::OpTime opTime) {
         return WaitForMajorityService::get(service)
-            .waitUntilMajority(opTime, CancellationToken::uncancelable())
+            .waitUntilMajority(opTime, cancelToken)
             .thenRunOn(executor);
     };
 
@@ -146,7 +147,8 @@ TransactionCoordinator::TransactionCoordinator(
     const LogicalSessionId& lsid,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
     std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
-    Date_t deadline)
+    Date_t deadline,
+    const CancellationToken& cancelToken)
     : _serviceContext(operationContext->getServiceContext()),
       _lsid(lsid),
       _txnNumberAndRetryCounter(txnNumberAndRetryCounter),
@@ -154,7 +156,8 @@ TransactionCoordinator::TransactionCoordinator(
       _sendPrepareScheduler(_scheduler->makeChildScheduler()),
       _transactionCoordinatorMetricsObserver(
           std::make_unique<TransactionCoordinatorMetricsObserver>()),
-      _deadline(deadline) {
+      _deadline(deadline),
+      _cancelToken(cancelToken) {
     invariant(_txnNumberAndRetryCounter.getTxnRetryCounter());
 
     auto apiParams = APIParameters::get(operationContext);
@@ -232,7 +235,8 @@ TransactionCoordinator::TransactionCoordinator(
                 "hangBeforeWaitingForParticipantListWriteConcern",
                 std::move(opTime),
                 _lsid,
-                _txnNumberAndRetryCounter);
+                _txnNumberAndRetryCounter,
+                _cancelToken);
         })
         .thenRunOn(_scheduler->getExecutor())
         .then([this, apiParams] {
@@ -356,7 +360,8 @@ TransactionCoordinator::TransactionCoordinator(
                                                     "hangBeforeWaitingForDecisionWriteConcern",
                                                     std::move(opTime),
                                                     _lsid,
-                                                    _txnNumberAndRetryCounter);
+                                                    _txnNumberAndRetryCounter,
+                                                    _cancelToken);
         })
         .then([this, apiParams] {
             {
@@ -414,7 +419,6 @@ TransactionCoordinator::TransactionCoordinator(
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
             }
-
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumberAndRetryCounter);
         })
         .getAsync([this, deadlineFuture = std::move(deadlineFuture)](Status s) mutable {
