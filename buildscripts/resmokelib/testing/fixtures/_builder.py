@@ -5,10 +5,13 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from buildscripts.resmokelib import config
+from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
+from buildscripts.resmokelib.suitesconfig import _get_suite_config
+from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.testing.fixtures.replicaset import \
     ReplicaSetFixture
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import \
@@ -43,6 +46,26 @@ def make_fixture(class_name, logger, job_num, *args, enable_feature_flags=True, 
                                      add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS), **kwargs)
 
     return _FIXTURES[class_name](logger, job_num, fixturelib, *args, **kwargs)
+
+
+def make_dummy_fixture(suite_name):
+    """Create a dummy fixture for the given suite.
+
+    This fixture is not meant to be used for testing.
+
+    This fixture should only be used to inspect the test topology for a given suite.
+    """
+
+    # Get info to create the target fixture
+    suite = _suite.Suite(suite_name, _get_suite_config(suite_name))
+    fixture_config = suite.get_executor_config()["fixture"]
+    fixture_class = fixture_config.pop("class")
+
+    # This is a noop. A job logger is expected to have been created in order to create a fixture.
+    _ = logging.loggers.new_job_logger(suite.test_kind, job_num=0)
+
+    fixture_logger = logging.loggers.new_fixture_logger(fixture_class, job_num=0)
+    return make_fixture(fixture_class, fixture_logger, job_num=0, **fixture_config)
 
 
 class FixtureBuilder(ABC, metaclass=registry.make_registry_metaclass(_BUILDERS, type(ABC))):  # pylint: disable=invalid-metaclass
