@@ -4,6 +4,8 @@
 //   uses_parallel_shell,
 // ]
 
+load("jstests/libs/parallel_shell_helpers.js");
+
 // verify that join works
 db.sps.drop();
 var awaitShell = startParallelShell("sleep(1000); db.sps.insert({x:1});");
@@ -24,6 +26,10 @@ assert.throws(() => {
     const awaitShell = startParallelShell(func);
     awaitShell();
 });
+assert.throws(() => {
+    const awaitShell = startParallelShell(funWithArgs(func, true));
+    awaitShell();
+});
 
 async function asyncFunc() {
     throw Error("intentional_throw_to_test_assert_throws");
@@ -32,12 +38,20 @@ assert.throws(() => {
     const awaitShell = startParallelShell(asyncFunc);
     awaitShell();
 });
+assert.throws(() => {
+    const awaitShell = startParallelShell(funWithArgs(asyncFunc, true));
+    awaitShell();
+});
 
 const asyncLambda = async () => {
     throw Error("intentional_throw_to_test_assert_throws");
 };
 assert.throws(() => {
     const awaitShell = startParallelShell(asyncLambda);
+    awaitShell();
+});
+assert.throws(() => {
+    const awaitShell = startParallelShell(funWithArgs(asyncLambda, true));
     awaitShell();
 });
 

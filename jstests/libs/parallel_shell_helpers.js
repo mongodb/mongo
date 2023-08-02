@@ -1,8 +1,14 @@
 /**
  * Allows passing arguments to the function executed by startParallelShell.
  */
-const funWithArgs = (fn, ...args) =>
-    "(" + fn.toString() + ")(" + args.map(x => tojson(x)).reduce((x, y) => x + ", " + y) + ")";
+const funWithArgs = (fn, ...args) => {
+    const result = `(${fn.toString()})(${args.map(x => tojson(x)).reduce((x, y) => `${x}, ${y}`)})`;
+    if (fn.constructor.name === 'AsyncFunction') {
+        return `await ${result}`;
+    }
+
+    return result;
+};
 
 /**
  * Internal function used by _doAssertCommandInParallelShell().
