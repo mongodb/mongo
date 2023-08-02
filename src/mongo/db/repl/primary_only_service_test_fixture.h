@@ -54,6 +54,8 @@ namespace repl {
 class PrimaryOnlyService;
 class PrimaryOnlyServiceRegistry;
 
+extern FailPoint primaryOnlyServiceTestStepUpWaitForRebuildComplete;
+
 class PrimaryOnlyServiceMongoDTest : public ServiceContextMongoDTest {
 public:
     void setUp() override;

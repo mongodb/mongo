@@ -48,6 +48,8 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(primaryOnlyServiceTestStepUpWaitForRebuildComplete);
+
 void PrimaryOnlyServiceMongoDTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
@@ -82,6 +84,7 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
         _registry->registerService(std::move(service));
         _service = _registry->lookupServiceByName(serviceName);
 
+        primaryOnlyServiceTestStepUpWaitForRebuildComplete.setMode(FailPoint::nTimes, 1);
         startup(opCtx.get());
         stepUp(opCtx.get());
     }
@@ -108,6 +111,9 @@ void PrimaryOnlyServiceMongoDTest::shutdown() {
 
 void PrimaryOnlyServiceMongoDTest::stepUp(OperationContext* opCtx) {
     repl::stepUp(opCtx, getServiceContext(), _registry, _term);
+    if (primaryOnlyServiceTestStepUpWaitForRebuildComplete.shouldFail()) {
+        _service->waitForStateNotRebuilding_forTest(opCtx);
+    }
 }
 
 void PrimaryOnlyServiceMongoDTest::stepDown() {
