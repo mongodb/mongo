@@ -813,6 +813,9 @@ enum class Builtin : uint8_t {
     aggRemovableSumAdd,
     aggRemovableSumRemove,
     aggRemovableSumFinalize,
+    aggIntegralAdd,
+    aggIntegralRemove,
+    aggIntegralFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -974,6 +977,34 @@ enum class AggRemovableSumElems {
     kDecimalCount,
     kSizeOfArray
 };
+
+/**
+ * This enum defines indices into an 'Array' that stores the state for $integral accumulator
+ * Element at `kInputQueue` stores the queue of input values
+ * Element at `kSortByQueue` stores the queue of sortBy values
+ * Element at `kIntegral` stores the integral over the current window
+ * Element at `kNanCount` stores the count of NaN values encountered
+ * Element at `kunitMillis` stores the date unit (Null if not valid)
+ */
+enum class AggIntegralElems {
+    kInputQueue,
+    kSortByQueue,
+    kIntegral,
+    kNanCount,
+    kUnitMillis,
+    kMaxSizeOfArray
+};
+
+/**
+ * This enum defines indices into an 'Array' that stores the state for a queue backed by a
+ * circular array
+ * Element at `kArray` stores the underlying array thats holds the elements. This should be
+ * initialized to a non-zero size initially.
+ * Element at `kStartIdx` stores the start position of the queue
+ * Element at `kQueueSize` stores the size of the queue
+ * The empty values in the array are filled with Null
+ */
+enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1797,6 +1828,15 @@ private:
     void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
                                              value::TypeTags rhsTag,
                                              value::Value rhsVal);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> integralOfTwoPointsByTrapezoidalRule(
+        std::pair<value::TypeTags, value::Value> prevInput,
+        std::pair<value::TypeTags, value::Value> prevSortByVal,
+        std::pair<value::TypeTags, value::Value> newInput,
+        std::pair<value::TypeTags, value::Value> newSortByVal);
+
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
