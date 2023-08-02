@@ -71,6 +71,22 @@ function checkStandardFieldsOK(res) {
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0, res);
 }
 
+function checkStatFieldsOK(res) {
+    const currOp = res.inprog[0];
+    assert(currOp.hasOwnProperty("approxTotalDataSize") &&
+               currOp.approxTotalDataSize instanceof NumberLong,
+           res);
+    assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
+               currOp.approxTotalBytesCopied instanceof NumberLong,
+           res);
+    assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
+               currOp.totalReceiveElapsedMillis instanceof NumberLong,
+           res);
+    assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
+               currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
+           res);
+}
+
 // Check currentOp fields' expected value once the recipient is in state "consistent" or later.
 function checkPostConsistentFieldsOK(res) {
     const currOp = res.inprog[0];
@@ -121,6 +137,7 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
 
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
     checkStandardFieldsOK(res);
+    checkStatFieldsOK(res);
     let currOp = res.inprog[0];
     assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kStarted, res);
     assert.eq(currOp.garbageCollectable, false, res);
@@ -142,6 +159,7 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
 
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
     checkStandardFieldsOK(res);
+    checkStatFieldsOK(res);
     let currOp = res.inprog[0];
     assert.gt(new Date(), currOp.receiveStart, tojson(res));
     assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kLearnedFilenames, res);
@@ -168,6 +186,7 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
 
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
     checkStandardFieldsOK(res);
+    checkStatFieldsOK(res);
     checkPostConsistentFieldsOK(res);
     let currOp = res.inprog[0];
     // State should have changed.
@@ -182,6 +201,7 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
 
     res = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
     checkStandardFieldsOK(res);
+    checkStatFieldsOK(res);
     checkPostConsistentFieldsOK(res);
     currOp = res.inprog[0];
     // State should have changed.
@@ -211,6 +231,7 @@ forgetMigrationThread.start();
 
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
     checkStandardFieldsOK(res);
+    checkStatFieldsOK(res);
     checkPostConsistentFieldsOK(res);
     let currOp = res.inprog[0];
     assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kConsistent, res);

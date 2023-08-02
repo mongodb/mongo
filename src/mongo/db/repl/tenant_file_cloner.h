@@ -66,8 +66,12 @@ namespace mongo::repl {
 class TenantFileCloner final : public TenantBaseCloner {
 public:
     struct Stats {
-        std::string filePath;
-        size_t fileSize;
+
+        explicit Stats(const std::string& filePath, size_t fileSize)
+            : filePath(filePath), fileSize(fileSize) {}
+
+        const std::string filePath;
+        const size_t fileSize;
         Date_t start;
         Date_t end;
         size_t receivedBatches{0};
@@ -212,8 +216,8 @@ private:
     const UUID _backupId;                    // (R)
     const UUID _migrationId;                 // (R)
     const std::string _remoteFileName;       // (R)
-    size_t _remoteFileSize;                  // (R)
     const std::string _relativePathString;   // (R)
+    Stats _stats;                            // (M)
     boost::filesystem::path _localFilePath;  // (X)
 
     TenantFileClonerQueryStage _queryStage;  // (R)
@@ -232,7 +236,6 @@ private:
     ScheduleFsWorkFn _scheduleFsWorkFn;  // (R)
 
     ProgressMeter _progressMeter;  // (X) progress meter for this instance.
-    Stats _stats;                  // (M)
 
     static constexpr int kProgressMeterSecondsBetween = 60;
     static constexpr int kProgressMeterCheckInterval = 128;

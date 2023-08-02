@@ -111,6 +111,7 @@
 #include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/tenant_file_importer_service.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
@@ -566,6 +567,8 @@ boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentO
     bob.appendBool("migrationStarted", !_stateDoc.getStartGarbageCollect());
     bob.append("migrationCompleted", _migrationCompletionPromise.getFuture().isReady());
     bob.append("garbageCollectable", _forgetMigrationDurablePromise.getFuture().isReady());
+
+    repl::TenantFileImporterService::get(getGlobalServiceContext())->getStats(bob, _migrationUuid);
 
     if (_stateDoc.getStartFetchingDonorOpTime())
         _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");

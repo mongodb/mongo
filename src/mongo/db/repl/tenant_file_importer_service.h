@@ -42,6 +42,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -55,14 +56,55 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo::repl {
-// Runs on tenant migration recipient primary and secondaries. Copies and imports donor files and
-// then informs the primary that it has finished by running recipientVoteImportedFiles.
+/**
+ * Replica set aware service that runs both on the primary and secondaries. It orchestrates the
+ * copying of data files from donor, import those files, and notifies the primary when the import is
+ * successful.
+ */
 class TenantFileImporterService : public ReplicaSetAwareService<TenantFileImporterService> {
 public:
     static constexpr StringData kTenantFileImporterServiceName = "TenantFileImporterService"_sd;
     static TenantFileImporterService* get(ServiceContext* serviceContext);
     static TenantFileImporterService* get(OperationContext* opCtx);
     TenantFileImporterService();
+
+    using CreateConnectionFn = std::function<std::unique_ptr<DBClientConnection>()>;
+
+    struct Stats {
+        Date_t fileCopyStart;
+        Date_t fileCopyEnd;
+        uint64_t totalDataSize{0};
+        uint64_t totalBytesCopied{0};
+    };
+
+    // Explicit State enum ordering defined here because we rely on comparison
+    // operators for state checking in various TenantFileImporterService methods.
+    enum class State {
+        kUninitialized = 0,
+        kStarted = 1,
+        kLearnedFilename = 2,
+        kLearnedAllFilenames = 3,
+        kInterrupted = 4,
+        kStopped = 5
+    };
+
+    static StringData stateToString(State state) {
+        switch (state) {
+            case State::kUninitialized:
+                return "uninitialized";
+            case State::kStarted:
+                return "started";
+            case State::kLearnedFilename:
+                return "learned filename";
+            case State::kLearnedAllFilenames:
+                return "learned all filenames";
+            case State::kInterrupted:
+                return "interrupted";
+            case State::kStopped:
+                return "stopped";
+        }
+        MONGO_UNREACHABLE;
+    }
 
     /**
      * Begins the process of copying and importing files for a given migration.
@@ -82,7 +124,15 @@ public:
     /**
      * Interrupts an in-progress migration with the provided migration id.
      */
-    void interrupt(const UUID& migrationId);
+    void interruptMigration(const UUID& migrationId);
+
+    /**
+     * Resets the interrupted migration for the given migrationId by calling
+     * _resetMigrationHandle(). See _resetMigrationHandle() for detailed comments.
+     *
+     * Throws an exception if called before the migration is interrupted.
+     */
+    void resetMigration(const UUID& migrationId);
 
     /**
      * Causes any in-progress migration be interrupted.
@@ -90,60 +140,76 @@ public:
     void interruptAll();
 
     /**
-     * Set the function used to create a donor client connection. Used for testing.
+     * Returns the migration stats for the given migrationId.
+     * If no migrationId is provided, it returns the stats of an ongoing migration, if any.
      */
-    void setCreateConnectionForTest(std::function<std::shared_ptr<DBClientConnection>()> fn) {
-        _createConnection = fn;
-    };
+    BSONObj getStats(boost::optional<const UUID&> migrationId = boost::none);
+    void getStats(BSONObjBuilder& bob, boost::optional<const UUID&> migrationId = boost::none);
 
-    /**
-     * Set the function used for importing file data. Used for testing.
-     */
-    void setImportFilesForTest(
-        std::function<void(OperationContext* opCtx, const UUID& migrationId)> fn) {
-        _importFiles = fn;
-    };
+    void onInitialDataAvailable(OperationContext*, bool) override final {}
 
-    BSONObj getState() {
-        stdx::lock_guard lk(_mutex);
-        auto migrationId = _migrationId ? _migrationId->toString() : "(empty)";
-        auto state = stateToString(_state);
-        return BSON("migrationId" << migrationId << "state" << state);
-    }
-
-private:
-    void onInitialDataAvailable(OperationContext*, bool) final {}
-
-    void onShutdown() final {
+    void onShutdown() override final {
         {
             stdx::lock_guard lk(_mutex);
             // Prevents a new migration from starting up during or after shutdown.
             _isShuttingDown = true;
         }
         interruptAll();
-        _reset();
+        _resetMigrationHandle();
     }
 
-    void onStartup(OperationContext*) final {}
+    void onStartup(OperationContext*) override final {}
 
-    void onSetCurrentConfig(OperationContext* opCtx) final {}
+    void onSetCurrentConfig(OperationContext* opCtx) override final {}
 
-    void onStepUpBegin(OperationContext*, long long) final {}
+    void onStepUpBegin(OperationContext*, long long) override final {}
 
-    void onStepUpComplete(OperationContext*, long long) final {}
+    void onStepUpComplete(OperationContext*, long long) override final {}
 
-    void onStepDown() final {}
+    void onStepDown() override final {}
 
-    void onBecomeArbiter() final {}
+    void onBecomeArbiter() override final {}
 
     inline std::string getServiceName() const override final {
         return "TenantFileImporterService";
     }
 
     /**
+     * Set the function used to create a donor client connection. Used for testing.
+     */
+    void setCreateConnectionFn_forTest(const CreateConnectionFn& fn) {
+        _createConnectionFn = fn;
+    };
+
+    /**
+     * Returns the migrationId.
+     */
+    boost::optional<UUID> getMigrationId_forTest() {
+        return _mh ? boost::make_optional(_mh->migrationId) : boost::none;
+    }
+
+    /**
+     * Returns the migration state.
+     */
+    boost::optional<TenantFileImporterService::State> getState_forTest() {
+        return _mh ? boost::make_optional(_mh->state) : boost::none;
+    }
+
+private:
+    /**
      * A worker function that waits for ImporterEvents and handles cloning and importing files.
      */
     void _handleEvents(const UUID& migrationId);
+
+    /**
+     * Performs file copying from the donor for the specified filename in the given metadataDoc.
+     */
+    void _cloneFile(OperationContext* opCtx,
+                    const UUID& migrationId,
+                    DBClientConnection* clientConnection,
+                    ThreadPool* writerPool,
+                    TenantMigrationSharedData* sharedData,
+                    const BSONObj& metadataDoc);
 
     /**
      * Called to inform the primary that we have finished copying and importing all files.
@@ -151,41 +217,33 @@ private:
     void _voteImportedFiles(OperationContext* opCtx, const UUID& migrationId);
 
     /**
-     * Called internally by interrupt and interruptAll to interrupt a running file import operation.
+     * Called internally by interrupt and interruptAll to interrupt a running file cloning and
+     * import operations.
      */
-    void _interrupt(WithLock);
+    void _interrupt(WithLock lk, const UUID& migrationId);
 
     /**
-     * Waits for all async work to be finished and then resets internal state.
+     * This blocking call waits for the worker threads to finish the execution, and then releases
+     * the resources held by MigrationHandle for the given migrationId (if provided) or for the
+     * current ongoing migration.
+     *
+     * Throws an exception if called before the migration is interrupted.
      */
-    void _reset();
+    void _resetMigrationHandle(boost::optional<const UUID&> migrationId = boost::none);
 
-    // Explicit State enum ordering defined here because we rely on comparison
-    // operators for state checking in various TenantFileImporterService methods.
-    enum class State {
-        kUninitialized = 0,
-        kStarted = 1,
-        kLearnedFilename = 2,
-        kLearnedAllFilenames = 3,
-        kInterrupted = 4
-    };
+    /*
+     * Transitions the migration associated with the given migrationId to the specified target
+     * state. If dryRun is set to 'true', the function performs a dry run of the state transition
+     * without actually changing the state. Throws an exception for an invalid state transition.
+     *
+     * Returns the current migration state before the state transition.
+     */
+    TenantFileImporterService::State _transitionToState(WithLock,
+                                                        const UUID& migrationId,
+                                                        State targetState,
+                                                        bool dryRun = false);
 
-    static StringData stateToString(State state) {
-        switch (state) {
-            case State::kUninitialized:
-                return "uninitialized";
-            case State::kStarted:
-                return "started";
-            case State::kLearnedFilename:
-                return "learned filename";
-            case State::kLearnedAllFilenames:
-                return "learned all filenames";
-            case State::kInterrupted:
-                return "interrupted";
-        }
-        MONGO_UNREACHABLE;
-        return StringData();
-    }
+    void _makeMigrationHandleIfNotPresent(WithLock, const UUID& migrationId);
 
     struct ImporterEvent {
         enum class Type { kNone, kLearnedFileName, kLearnedAllFilenames };
@@ -200,6 +258,48 @@ private:
     using Queue =
         MultiProducerSingleConsumerQueue<ImporterEvent,
                                          producer_consumer_queue_detail::DefaultCostFunction>;
+
+    // Represents a handle for managing the migration process. It holds various resources and
+    // information required for cloning files and importing them.
+    struct MigrationHandle {
+        explicit MigrationHandle(const UUID& migrationId);
+
+        // Shard merge migration Id.
+        const UUID migrationId;
+
+        // Queue to process ImporterEvents.
+        const std::unique_ptr<Queue> eventQueue;
+
+        // ThreadPool used by TenantFileCloner to do storage write operations.
+        const std::unique_ptr<ThreadPool> writerPool;
+
+        // Shared between the importer service and TenantFileCloners
+        const std::unique_ptr<TenantMigrationSharedData> sharedData;
+
+        // Worker thread to orchestrate the cloning, importing and notifying the primary steps.
+        std::unique_ptr<stdx::thread> workerThread;
+
+        // State of the associated migration.
+        State state = State::kUninitialized;
+
+        // Tracks the Statistics of the associated migration.
+        Stats stats;
+
+        // Pointers below are not owned by this struct. The method that sets these
+        // pointers must manage their lifecycle and ensure proper pointer reset to prevent
+        // invalid memory access by other methods when reading the pointer value.
+
+        // Donor DBClientConnection for file cloning.
+        DBClientConnection* donorConnection = nullptr;
+
+        // OperationContext associated with the migration.
+        OperationContext* opCtx = nullptr;
+
+        // Pointer to the current TenantFileCloner of the associated migration; used for statistics
+        // purpose.
+        TenantFileCloner* currentTenantFileCloner = nullptr;
+    };
+
     Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
 
     // All member variables are labeled with one of the following codes indicating the
@@ -214,35 +314,14 @@ private:
     // Set to true when the shutdown procedure is initiated.
     bool _isShuttingDown = false;  // (M)
 
-    OperationContext* _opCtx;  // (M)
-
-    // The worker thread that processes ImporterEvents.
-    std::unique_ptr<stdx::thread> _workerThread;  // (M)
-
-    // The UUID of the current running migration.
-    boost::optional<UUID> _migrationId;  // (M)
-
-    // The state of the current running migration.
-    State _state;  // (M)
-
-    // The DBClientConnection to the donor used for cloning files.
-    std::shared_ptr<DBClientConnection>
-        _donorConnection;  // (I) pointer set under mutex, copied by callers.
-
-    // The ThreadPool used for cloning files.
-    std::shared_ptr<ThreadPool> _writerPool;  // (I) pointer set under mutex, copied by callers.
-
-    // The TenantMigrationSharedData used for cloning files.
-    std::shared_ptr<TenantMigrationSharedData>
-        _sharedData;  // (I) pointer set under mutex, copied by callers.
-
-    // The Queue used for processing ImporterEvents.
-    std::shared_ptr<Queue> _eventQueue;  // (I) pointer set under mutex, copied by callers.
-
-    // Called after all filenames have been learned to import file data.
-    std::function<void(OperationContext* opCtx, const UUID& migrationId)> _importFiles = {};  // (W)
+    std::unique_ptr<MigrationHandle> _mh;  // (M)
 
     // Used to create a new DBClientConnection to the donor.
-    std::function<std::shared_ptr<DBClientConnection>()> _createConnection = {};  // (W)
+    CreateConnectionFn _createConnectionFn = {};  // (W)
+
+    // Condition variable to block concurrent reset operations.
+    stdx::condition_variable _resetCV;  // (M)
+    // Flag indicating whether a reset is currently in progress.
+    bool _resetInProgress = false;  // (M)
 };
 }  // namespace mongo::repl

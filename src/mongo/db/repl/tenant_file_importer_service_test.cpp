@@ -39,6 +39,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/member_state.h"
@@ -58,6 +59,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/fail_point.h"
@@ -71,8 +73,39 @@ using executor::TaskExecutor;
 using executor::ThreadPoolExecutorTest;
 
 namespace repl {
+
+using namespace repl::shard_merge_utils;
+
+namespace {
+constexpr auto kDonorHostName = "localhost:12345"_sd;
+constexpr auto kDonorDBPath = "/path/to/remoteDB/"_sd;
+static const UUID kBackupId = UUID::gen();
+
+}  // namespace
 class TenantFileImporterServiceTest : public ServiceContextMongoDTest {
 public:
+    /**
+     * Create TenantFileImporterService::ImporterEvent::kLearnedFileName event.
+     */
+    static BSONObj makefileMetaDoc(const UUID& migrationId,
+                                   const std::string& fileName,
+                                   uint64_t fileSize) {
+        return BSON("filename" << kDonorDBPath + "/" + fileName << "fileSize"
+                               << static_cast<int64_t>(fileSize) << kDonorHostNameFieldName
+                               << kDonorHostName << kMigrationIdFieldName << migrationId
+                               << kBackupIdFieldName << kBackupId << kDonorDbPathFieldName
+                               << kDonorDBPath);
+    }
+
+
+    /**
+     * Returns true if collection exists.
+     */
+    static bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+        return static_cast<bool>(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    }
+
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
@@ -92,10 +125,20 @@ public:
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
         ReplicationCoordinator::set(serviceContext, std::move(replCoord));
         StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+
+        _importerService = repl::TenantFileImporterService::get(serviceContext);
+
+        _mockDonorServer = std::make_unique<MockRemoteDBServer>(kDonorHostName.toString());
+        _importerService->setCreateConnectionFn_forTest([&]() {
+            return std::make_unique<MockDBClientConnection>(_mockDonorServer.get(),
+                                                            true /* autoReconnect */);
+        });
+
+        globalFailPointRegistry().find("skipImportFiles")->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
-        ReplicaSetAwareServiceRegistry::get(getServiceContext()).onShutdown();
+        _importerService->onShutdown();
         StorageInterface::set(getServiceContext(), {});
         ReplicationCoordinator::set(getServiceContext(), {});
         ServiceContextMongoDTest::tearDown();
@@ -113,112 +156,305 @@ private:
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};
     unittest::MinimumLoggedSeverityGuard _tenantMigrationSeverityGuard{
         logv2::LogComponent::kTenantMigration, logv2::LogSeverity::Debug(1)};
+
+protected:
+    std::unique_ptr<MockRemoteDBServer> _mockDonorServer;
+    TenantFileImporterService* _importerService;
 };
 
-TEST_F(TenantFileImporterServiceTest, WillNotStartConcurrentMigrationsForDifferentMigrationIds) {
-    auto tenantFileImporterService = repl::TenantFileImporterService::get(getServiceContext());
-
+TEST_F(TenantFileImporterServiceTest, ConcurrentMigrationWithDifferentMigrationID) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
-    tenantFileImporterService->startMigration(migrationId);
+    auto anotherMigrationId = UUID::gen();
 
-    // startMigration calls for other migrationIds are ignored.
-    tenantFileImporterService->startMigration(UUID::gen());
+    auto verifyAllStateTransitionFailsForAnotherMigrationId = [&] {
+        ASSERT_THROWS_CODE(
+            _importerService->startMigration(anotherMigrationId), DBException, 7800210);
+        ASSERT_THROWS_CODE(_importerService->learnedFilename(
+                               anotherMigrationId, makefileMetaDoc(migrationId, "some-file.wt", 1)),
+                           DBException,
+                           7800210);
+        ASSERT_THROWS_CODE(
+            _importerService->learnedAllFilenames(anotherMigrationId), DBException, 7800210);
+        ASSERT_THROWS_CODE(
+            _importerService->interruptMigration(anotherMigrationId), DBException, 7800210);
+        ASSERT_THROWS_CODE(
+            _importerService->resetMigration(anotherMigrationId), DBException, 7800210);
+    };
 
-    auto state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "started");
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
+
+    verifyAllStateTransitionFailsForAnotherMigrationId();
+
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedFilename);
+
+    verifyAllStateTransitionFailsForAnotherMigrationId();
+
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
+
+    verifyAllStateTransitionFailsForAnotherMigrationId();
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+
+    verifyAllStateTransitionFailsForAnotherMigrationId();
+
+    _importerService->resetMigration(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    {
+        // Starting a new migration with anotherMigrationId is now possible.
+        _importerService->startMigration(anotherMigrationId);
+        ASSERT_EQ(_importerService->getMigrationId_forTest(), anotherMigrationId);
+        ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
+    }
 }
 
-TEST_F(TenantFileImporterServiceTest, WillNotStartConcurrentMigrationsForTheSameMigrationId) {
-    auto tenantFileImporterService = repl::TenantFileImporterService::get(getServiceContext());
-
+TEST_F(TenantFileImporterServiceTest, StartConcurrentMigrationWithSameMigrationID) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
-    tenantFileImporterService->startMigration(migrationId);
 
-    // startMigration calls with the same migrationId are ignored.
-    tenantFileImporterService->startMigration(migrationId);
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
-    auto state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "started");
+    // startMigration calls with the same migrationId will be ignored.
+    _importerService->startMigration(migrationId);
+
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedFilename);
+
+    ASSERT_THROWS_CODE(_importerService->startMigration(migrationId), DBException, 7800210);
+
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
+
+    ASSERT_THROWS_CODE(_importerService->startMigration(migrationId), DBException, 7800210);
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+
+    _importerService->resetMigration(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    // Starting a new migration with same migrationId is now possible.
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 }
 
-TEST_F(TenantFileImporterServiceTest, CanBeSafelyInterruptedBeforeMigrationStart) {
-    auto tenantFileImporterService = repl::TenantFileImporterService::get(getServiceContext());
-    tenantFileImporterService->interruptAll();
-    auto state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["state"].str(), "uninitialized");
+TEST_F(TenantFileImporterServiceTest, ShouldHaveLearntAtLeastOneFileName) {
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    ASSERT_THROWS_CODE(_importerService->learnedAllFilenames(migrationId), DBException, 7800210);
 }
 
-TEST_F(TenantFileImporterServiceTest, CanBeSafelyInterruptedAfterMigrationStart) {
-    auto tenantFileImporterService = repl::TenantFileImporterService::get(getServiceContext());
-
+TEST_F(TenantFileImporterServiceTest, learnedAllFilenamesFollowedByLearnedFileNameOutOfOrderEvent) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
-    tenantFileImporterService->startMigration(migrationId);
-    auto state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "started");
 
-    tenantFileImporterService->interruptAll();
-    state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "interrupted");
+    _importerService->startMigration(migrationId);
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
+
+    ASSERT_THROWS_CODE(
+        _importerService->learnedFilename(migrationId,
+                                          BSON("filename"
+                                               << "some-file.wt" << kDonorHostNameFieldName
+                                               << kDonorHostName << "fileSize" << 1)),
+        DBException,
+        7800210);
+
+    // Interrupt the migration to prevent running file cloning after exiting this block.
+    _importerService->interruptMigration(migrationId);
+}
+
+TEST_F(TenantFileImporterServiceTest, MigrationNotStartedYetShouldIgnoreAnyStateTransition) {
+    auto migrationId = UUID::gen();
+
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    _importerService->resetMigration(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+}
+
+TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationAfterMigrationStart) {
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+}
+
+TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationWhenLearnedFileName) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedFilename);
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+}
+
+TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationWhenLearnedAllFileNames) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+}
+
+TEST_F(TenantFileImporterServiceTest, CanInterruptAMigrationMoreThanOnce) {
+    auto migrationId = UUID::gen();
+    _importerService->startMigration(migrationId);
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+
+    _importerService->interruptMigration(migrationId);
+}
+
+TEST_F(TenantFileImporterServiceTest, InterruptedMigrationCannotLearnNewFiles) {
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+
+    ASSERT_THROWS_CODE(_importerService->learnedFilename(migrationId,
+                                                         BSON("filename"
+                                                              << "some-file.wt"
+                                                              << "fileSize" << 1)),
+                       DBException,
+                       7800210);
+    ASSERT_THROWS_CODE(_importerService->learnedAllFilenames(migrationId), DBException, 7800210);
+}
+
+TEST_F(TenantFileImporterServiceTest, resetMigration) {
+    FailPointEnableBlock failPoint("skipCloneFiles");
+    auto migrationId = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
+
+    ASSERT_THROWS_CODE(_importerService->resetMigration(migrationId), DBException, 7800210);
+
+    _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedFilename);
+
+    ASSERT_THROWS_CODE(_importerService->resetMigration(migrationId), DBException, 7800210);
+
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
+
+    ASSERT_THROWS_CODE(_importerService->resetMigration(migrationId), DBException, 7800210);
+
+    _importerService->interruptMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
+
+    _importerService->resetMigration(migrationId);
+    ASSERT(!_importerService->getMigrationId_forTest());
+
+    // Resetting migration again shouldn't throw.
+    _importerService->resetMigration(migrationId);
 }
 
 TEST_F(TenantFileImporterServiceTest, ImportsFilesWhenAllFilenamesLearned) {
-    auto migrationId = UUID::gen();
-    auto tenantFileImporterService = repl::TenantFileImporterService::get(getServiceContext());
+    FailPointEnableBlock hangBeforeFileImporterThreadExit("hangBeforeFileImporterThreadExit");
 
+    auto fpSkipImportFiles = globalFailPointRegistry().find("skipImportFiles");
+    const auto fpSkipImportFilesInitialTimesEntered =
+        fpSkipImportFiles->toBSON()["timesEntered"].safeNumberLong();
+    auto migrationId = UUID::gen();
+
+    const std::string fileName = "some-file.wt";
     std::string fileData = "Here is the file data";
-    auto bindata = BSONBinData(fileData.data(), fileData.size(), BinDataGeneral);
-    CursorResponse aggResponse(
+    CursorResponse fileAggResponse(
         NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
         0 /* cursorId */,
-        {BSON("byteOffset" << 0 << "endOfFile" << true << "data" << bindata)});
+        {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
+                           << BSONBinData(fileData.data(), fileData.size(), BinDataGeneral))});
 
-    MockRemoteDBServer server("test");
-    auto conn = std::make_shared<MockDBClientConnection>(&server);
-    tenantFileImporterService->setCreateConnectionForTest([&]() { return conn; });
+    _mockDonorServer->setCommandReply("aggregate", fileAggResponse.toBSONAsInitialResponse());
 
-    int importFilesCallCount = 0;
-    tenantFileImporterService->setImportFilesForTest(
-        [&](OperationContext* opCtx, const UUID& migrationId) { importFilesCallCount++; });
+    // Verify that the temp WT db path is empty before migration start.
+    auto tempWTDirectory = fileClonerTempDir(migrationId);
+    ASSERT(!boost::filesystem::exists(tempWTDirectory / fileName));
 
-    server.setCommandReply("aggregate", aggResponse.toBSONAsInitialResponse());
+    _importerService->startMigration(migrationId);
+    _importerService->learnedFilename(migrationId,
+                                      makefileMetaDoc(migrationId, fileName, fileData.size()));
+    _importerService->learnedAllFilenames(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(),
+              TenantFileImporterService::State::kLearnedAllFilenames);
 
-    auto filePath = shard_merge_utils::fileClonerTempDir(migrationId);
-    auto metadataDoc =
-        BSON("filename" << filePath.string() + "/some-file.wt" << shard_merge_utils::kDonorFieldName
-                        << server.getServerHostAndPort().toString()
-                        << shard_merge_utils::kMigrationIdFieldName << migrationId
-                        << shard_merge_utils::kBackupIdFieldName << UUID::gen() << "remoteDbPath"
-                        << filePath.string() << "fileSize" << std::to_string(fileData.size())
-                        << shard_merge_utils::kDonorDbPathFieldName << filePath.string());
+    hangBeforeFileImporterThreadExit->waitForTimesEntered(
+        hangBeforeFileImporterThreadExit.initialTimesEntered() + 1);
 
-    auto hangBeforeFileImporterThreadExit =
-        globalFailPointRegistry().find("hangBeforeFileImporterThreadExit");
-    hangBeforeFileImporterThreadExit->setMode(FailPoint::alwaysOn);
+    // Verify that the files have been cloned successfully.
+    ASSERT(boost::filesystem::exists(tempWTDirectory / fileName));
+    ASSERT_EQ(fileData.size(), boost::filesystem::file_size(tempWTDirectory / fileName));
 
-    tenantFileImporterService->startMigration(migrationId);
+    // Verify if the import files operation has been called.
+    fpSkipImportFiles->waitForTimesEntered(fpSkipImportFilesInitialTimesEntered + 1);
 
-    tenantFileImporterService->learnedFilename(migrationId, metadataDoc);
-    auto state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "learned filename");
+    // Check if the import done marker collection exists.
+    ASSERT(collectionExists(makeOperationContext().get(), getImportDoneMarkerNs(migrationId)));
 
-    tenantFileImporterService->learnedAllFilenames(migrationId);
-
-    state = tenantFileImporterService->getState();
-    ASSERT_EQ(state["migrationId"].str(), migrationId.toString());
-    ASSERT_EQ(state["state"].str(), "learned all filenames");
-
-    hangBeforeFileImporterThreadExit->waitForTimesEntered(1);
-
-    ASSERT(boost::filesystem::exists(filePath.string() + "/some-file.wt"));
-    ASSERT_EQ(fileData.size(), boost::filesystem::file_size(filePath.string() + "/some-file.wt"));
-    ASSERT_EQ(importFilesCallCount, 1);
+    // Verify whether the node has notified the primary about the import success.
     ASSERT_EQ(runCmdOnPrimaryAndAwaitResponseFnCalls.size(), 1);
-
     auto recipientVoteImportedFilesCmdCall = runCmdOnPrimaryAndAwaitResponseFnCalls.front();
     ASSERT_EQ(recipientVoteImportedFilesCmdCall.dbName, DatabaseName::kAdmin.db().toString());
     ASSERT_BSONOBJ_EQ(recipientVoteImportedFilesCmdCall.cmdObj,
@@ -226,8 +462,104 @@ TEST_F(TenantFileImporterServiceTest, ImportsFilesWhenAllFilenamesLearned) {
                                                         << "from"
                                                         << ":27017"
                                                         << "success" << true));
-
-    hangBeforeFileImporterThreadExit->setMode(FailPoint::off);
 }
+
+TEST_F(TenantFileImporterServiceTest, statsForInvalidMigrationID) {
+    auto migrationId = UUID::gen();
+    auto invalidMigrationID = UUID::gen();
+
+    _importerService->startMigration(migrationId);
+    ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
+    ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
+
+    auto stats = _importerService->getStats(invalidMigrationID);
+    ASSERT_TRUE(stats.isEmpty());
+}
+
+TEST_F(TenantFileImporterServiceTest, statsForValidMigrationID) {
+    auto migrationId = UUID::gen();
+
+    const std::string file1Name = "some-file1.wt";
+    std::string file1Data = "Here is the file1 data";
+    CursorResponse file1AggResponse(
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
+        0 /* cursorId */,
+        {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
+                           << BSONBinData(file1Data.data(), file1Data.size(), BinDataGeneral))});
+
+    const std::string file2Name = "some-file2.wt";
+    std::string file2Data = "Here is the file2 data";
+    CursorResponse file2AggResponse(
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
+        0 /* cursorId */,
+        {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
+                           << BSONBinData(file2Data.data(), file2Data.size(), BinDataGeneral))});
+
+    _mockDonorServer->setCommandReply(
+        "aggregate",
+        {file1AggResponse.toBSONAsInitialResponse(), file2AggResponse.toBSONAsInitialResponse()});
+
+    const auto totalDataSize = file1Data.size() + file2Data.size();
+    FailPointEnableBlock hangBeforeFileImporterThreadExit("hangBeforeFileImporterThreadExit");
+
+    // Verify that the stat is empty before migration start.
+    auto stats = _importerService->getStats(migrationId);
+    ASSERT(stats.isEmpty());
+
+    _importerService->startMigration(migrationId);
+    // Sleep to prevent the race with "totalReceiveElapsedMillis" field.
+    mongo::sleepmillis(1);
+
+    stats = _importerService->getStats(migrationId);
+    ASSERT(!stats.isEmpty());
+    ASSERT(stats.hasField("approxTotalDataSize"));
+    ASSERT(stats.hasField("approxTotalBytesCopied"));
+    ASSERT(stats.hasField("totalReceiveElapsedMillis"));
+    ASSERT(stats.hasField("remainingReceiveEstimatedMillis"));
+    ASSERT_EQ(stats["approxTotalDataSize"].safeNumberLong(), 0ll);
+    ASSERT_EQ(stats["approxTotalBytesCopied"].safeNumberLong(), 0ll);
+    ASSERT_GT(stats["totalReceiveElapsedMillis"].safeNumberLong(), 0ll);
+    ASSERT_EQ(stats["remainingReceiveEstimatedMillis"].safeNumberLong(), 0ll);
+
+    {
+        FailPointEnableBlock fpTenantFileClonerHangAfterHandlingBatchResponse(
+            "TenantFileClonerHangAfterHandlingBatchResponse");
+
+        _importerService->learnedFilename(
+            migrationId, makefileMetaDoc(migrationId, file1Name, file1Data.size()));
+        _importerService->learnedFilename(
+            migrationId, makefileMetaDoc(migrationId, file2Name, file2Data.size()));
+
+        fpTenantFileClonerHangAfterHandlingBatchResponse->waitForTimesEntered(
+            fpTenantFileClonerHangAfterHandlingBatchResponse.initialTimesEntered() + 1);
+        stats = _importerService->getStats(migrationId);
+        ASSERT(!stats.isEmpty());
+        ASSERT(stats.hasField("approxTotalDataSize"));
+        ASSERT(stats.hasField("approxTotalBytesCopied"));
+        ASSERT(stats.hasField("totalReceiveElapsedMillis"));
+        ASSERT(stats.hasField("remainingReceiveEstimatedMillis"));
+        ASSERT_EQ(stats["approxTotalDataSize"].safeNumberLong(), totalDataSize);
+        ASSERT_EQ(stats["approxTotalBytesCopied"].safeNumberLong(), file1Data.size());
+        ASSERT_GT(stats["totalReceiveElapsedMillis"].safeNumberLong(), 0ll);
+        ASSERT_GT(stats["remainingReceiveEstimatedMillis"].safeNumberLong(), 0ll);
+    }
+
+
+    _importerService->learnedAllFilenames(migrationId);
+
+    hangBeforeFileImporterThreadExit->waitForTimesEntered(
+        hangBeforeFileImporterThreadExit.initialTimesEntered() + 1);
+    stats = _importerService->getStats(migrationId);
+    ASSERT(!stats.isEmpty());
+    ASSERT(stats.hasField("approxTotalDataSize"));
+    ASSERT(stats.hasField("approxTotalBytesCopied"));
+    ASSERT(stats.hasField("totalReceiveElapsedMillis"));
+    ASSERT(stats.hasField("remainingReceiveEstimatedMillis"));
+    ASSERT_EQ(stats["approxTotalDataSize"].safeNumberLong(), totalDataSize);
+    ASSERT_EQ(stats["approxTotalBytesCopied"].safeNumberLong(), totalDataSize);
+    ASSERT_GT(stats["totalReceiveElapsedMillis"].safeNumberLong(), 0ll);
+    ASSERT_EQ(stats["remainingReceiveEstimatedMillis"].safeNumberLong(), 0ll);
+}
+
 }  // namespace repl
 }  // namespace mongo

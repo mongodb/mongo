@@ -291,7 +291,7 @@ void onTransitioningToCommitted(OperationContext* opCtx,
     auto migrationId = recipientStateDoc.getId();
     // It's safe to do interrupt outside of onCommit hook as the decision to forget a migration or
     // the migration decision is not reversible.
-    repl::TenantFileImporterService::get(opCtx)->interrupt(migrationId);
+    repl::TenantFileImporterService::get(opCtx)->interruptMigration(migrationId);
 
     auto markedGCAfterMigrationStart = [&] {
         return !recipientStateDoc.getStartGarbageCollect() && recipientStateDoc.getExpireAt();
@@ -314,6 +314,7 @@ void onTransitioningToCommitted(OperationContext* opCtx,
                              migrationId);
         });
 
+        repl::TenantFileImporterService::get(opCtx)->resetMigration(migrationId);
         shard_merge_utils::dropImportDoneMarkerLocalCollection(opCtx, migrationId);
     }
 }
@@ -323,7 +324,7 @@ void onTransitioningToAborted(OperationContext* opCtx,
     auto migrationId = recipientStateDoc.getId();
     // It's safe to do interrupt outside of onCommit hook as the decision to forget a migration or
     // the migration decision is not reversible.
-    repl::TenantFileImporterService::get(opCtx)->interrupt(migrationId);
+    repl::TenantFileImporterService::get(opCtx)->interruptMigration(migrationId);
     tenantMigrationInfo(opCtx) = boost::make_optional<TenantMigrationInfo>(migrationId);
     deleteTenantDataWhenMergeAborts(opCtx, recipientStateDoc);
 
@@ -345,6 +346,7 @@ void onTransitioningToAborted(OperationContext* opCtx,
                              migrationId);
         });
 
+        repl::TenantFileImporterService::get(opCtx)->resetMigration(migrationId);
         shard_merge_utils::dropImportDoneMarkerLocalCollection(opCtx, migrationId);
     }
 }

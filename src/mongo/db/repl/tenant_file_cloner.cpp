@@ -90,8 +90,8 @@ TenantFileCloner::TenantFileCloner(const UUID& backupId,
       _backupId(backupId),
       _migrationId(migrationId),
       _remoteFileName(remoteFileName),
-      _remoteFileSize(remoteFileSize),
       _relativePathString(relativePath),
+      _stats(relativePath, remoteFileSize),
       _queryStage("query", this, &TenantFileCloner::queryStage),
       _fsWorkTaskRunner(dbPool),
       _scheduleFsWorkFn([this](executor::TaskExecutor::CallbackFn work) {
@@ -112,10 +112,7 @@ TenantFileCloner::TenantFileCloner(const UUID& backupId,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "bytes copied",
-                     str::stream() << _remoteFileName << " Tenant migration file clone progress") {
-    _stats.filePath = _relativePathString;
-    _stats.fileSize = _remoteFileSize;
-}
+                     str::stream() << _remoteFileName << "Tenant file clone progress") {}
 
 BaseCloner::ClonerStages TenantFileCloner::getStages() {
     return {&_queryStage};
@@ -372,19 +369,19 @@ BSONObj TenantFileCloner::Stats::toBSON() const {
 
 void TenantFileCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->append("filePath", filePath);
-    builder->appendNumber("fileSize", static_cast<long long>(fileSize));
-    builder->appendNumber("bytesCopied", static_cast<long long>(bytesCopied));
+    builder->append("fileSize", static_cast<long long>(fileSize));
+    builder->append("bytesCopied", static_cast<long long>(bytesCopied));
     if (start != Date_t()) {
         builder->appendDate("start", start);
         if (end != Date_t()) {
             builder->appendDate("end", end);
             auto elapsed = end - start;
             long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
-            builder->appendNumber("elapsedMillis", elapsedMillis);
+            builder->append("elapsedMillis", elapsedMillis);
         }
     }
-    builder->appendNumber("receivedBatches", static_cast<long long>(receivedBatches));
-    builder->appendNumber("writtenBatches", static_cast<long long>(writtenBatches));
+    builder->append("receivedBatches", static_cast<long long>(receivedBatches));
+    builder->append("writtenBatches", static_cast<long long>(writtenBatches));
 }
 
 }  // namespace mongo::repl
