@@ -487,14 +487,16 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
  * Example usage to send a request until a successful status is returned:
  *    ExecutorFuture<Response> response =
  *           AsyncTry([] { return sendRequest(); })
- *          .until([](StatusWith<Response> swResponse) { return swResponse.isOK(); })
+ *          .until([](const StatusWith<Response>& swResponse) { return swResponse.isOK(); })
  *          .withDelayBetweenIterations(Milliseconds(100)) // This call is optional.
  *          .on(executor);
  *
- * Note that the AsyncTry() call passes on the return value of its input lambda (the *body*) to the
- * condition lambda of Until, even if the body returns an error or throws - in which case the
- * StatusWith<T> will contain an error status. The delay inserted by WithDelayBetweenIterations
- * takes place after evaluating the condition and before executing the loop body an extra time.
+ * The constructor for `AsyncTry` accepts a callable that is invoked as part of running every loop
+ * iteration. The `until` predicate peeks at the result of running this callable to decide if the
+ * loop can be terminated. The predicate must accept a `StatusWith<T>`, where `T` is the return
+ * type for the callable, and should accept this argument as a const reference. This allows
+ * avoiding unnecessary copies and supporting move-only types. Optionally, a delay can be added
+ * after each iteration of the loop through invoking `withDelayBetweenIterations`.
  */
 template <typename Callable>
 class [[nodiscard]] AsyncTry {

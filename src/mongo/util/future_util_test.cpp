@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/cancellation.h"
 #include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
@@ -606,6 +607,20 @@ TEST_F(AsyncTryUntilTest, UntilWithDelayBodyPropagatesErrorToCaller) {
                          .withDelayBetweenIterations(Seconds(10))
                          .on(executor(), CancellationToken::uncancelable());
     ASSERT_EQ(resultFut.getNoThrow(), error);
+}
+
+TEST_F(AsyncTryUntilTest, MoveOnlyType) {
+    using MoveOnly = std::unique_ptr<int>;
+
+    AsyncTry([this] { return ExecutorFuture(executor(), MoveOnly{}); })
+        .until([](const StatusWith<MoveOnly>& swResult) {
+            // Access the move-only result via a const reference.
+            return swResult.isOK();
+        })
+        .on(executor(), CancellationToken::uncancelable())
+        .getAsync([](StatusWith<MoveOnly>) {
+            // Consume the (move-only) result.
+        });
 }
 
 template <typename T>
