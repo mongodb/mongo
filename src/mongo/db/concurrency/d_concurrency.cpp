@@ -319,8 +319,4 @@ Lock::CollectionLock::~CollectionLock() {
         _opCtx->lockState()->unlock(_id);
 }
 
-Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(OperationContext* opCtx)
-    : _pbwm(opCtx, resourceIdParallelBatchWriterMode, MODE_X),
-      _shouldNotConflictBlock(opCtx->lockState()) {}
-
 }  // namespace mongo

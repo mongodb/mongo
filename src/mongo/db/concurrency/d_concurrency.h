@@ -395,24 +395,6 @@ public:
         ResourceId _id;
         OperationContext* _opCtx;
     };
-
-    /**
-     * Turn on "parallel batch writer mode" by locking the global ParallelBatchWriterMode
-     * resource in exclusive mode. This mode is off by default.
-     * Note that only one thread creates a ParallelBatchWriterMode object; the other batch
-     * writers just call setShouldConflictWithSecondaryBatchApplication(false).
-     */
-    class ParallelBatchWriterMode {
-        ParallelBatchWriterMode(const ParallelBatchWriterMode&) = delete;
-        ParallelBatchWriterMode& operator=(const ParallelBatchWriterMode&) = delete;
-
-    public:
-        explicit ParallelBatchWriterMode(OperationContext* opCtx);
-
-    private:
-        ResourceLock _pbwm;
-        ShouldNotConflictWithSecondaryBatchApplicationBlock _shouldNotConflictBlock;
-    };
 };
 
 }  // namespace mongo

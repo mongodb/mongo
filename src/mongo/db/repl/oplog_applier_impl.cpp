@@ -751,10 +751,6 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                 "Replication batch size",
                 "size"_attr = ops.size());
 
-    // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
-    // entries from the oplog until we finish writing.
-    Lock::ParallelBatchWriterMode pbwm(opCtx);
-
     invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
         LOGV2_FATAL_CONTINUE(21234, "Attempting to replicate ops while primary");

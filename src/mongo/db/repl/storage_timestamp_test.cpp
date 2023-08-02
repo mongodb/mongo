@@ -2658,11 +2658,7 @@ Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPer
     std::vector<repl::ApplierOperation>* operationsToApply,
     WorkerMultikeyPathInfo* pathInfo,
     const bool isDataConsistent) {
-    if (!_testOpCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_X)) {
-        return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
-    }
-
-    // Insert the document. A reader without a PBWM lock should not see it yet.
+    // Insert the document. A secondary reader should not see it yet.
     const bool dataIsConsistent = true;
     auto status = OplogApplierImpl::applyOplogBatchPerWorker(
         opCtx, operationsToApply, pathInfo, dataIsConsistent);
@@ -2673,9 +2669,9 @@ Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPer
     // Signals the reader to acquire a collection read lock.
     _promise->emplaceValue(true);
 
-    // Block while holding the PBWM lock until the reader is done.
+    // Block until the reader is done.
     if (!_taskFuture->get()) {
-        return {ErrorCodes::BadValue, "Client was holding PBWM lock in MODE_IS"};
+        return {ErrorCodes::BadValue, "Batch failed"};
     }
     return Status::OK();
 }
@@ -2853,8 +2849,7 @@ TEST_F(StorageTimestampTest, SecondaryReadsDuringBatchApplicationAreAllowed) {
         ASSERT_EQ(itCount(autoColl.getCollection()), 0);
     }
 
-    // Returns true when the batch has started, meaning the applier is holding the PBWM lock.
-    // Will return false if the lock was not held.
+    // Returns true when the batch has started, or false if the applier failed.
     auto batchInProgress = makePromiseFuture<bool>();
     // Attempt to read when in the middle of a batch.
     stdx::packaged_task<bool()> task([&] {
@@ -2866,7 +2861,7 @@ TEST_F(StorageTimestampTest, SecondaryReadsDuringBatchApplicationAreAllowed) {
             return false;
         }
         AutoGetCollectionForRead autoColl(readOp.get(), ns);
-        return !readOp->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_IS);
+        return true;
     });
     auto taskFuture = task.get_future();
     stdx::thread taskThread{std::move(task)};
