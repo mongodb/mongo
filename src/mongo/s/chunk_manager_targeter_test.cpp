@@ -303,22 +303,29 @@ TEST_F(ChunkManagerTargeterTest, TargetDeleteWithRangePrefixHashedShardKey) {
                                          << "hashed"),
                               splitPoints);
 
-    // Cannot delete without full shardkey in the query.
-    auto requestPartialKey = buildDelete(kNss, fromjson("{'a.b': {$gt : 2}}"));
-    ASSERT_THROWS_CODE(
-        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey, 0)),
-        DBException,
-        ErrorCodes::ShardKeyNotFound);
+    // Can delete with partial shard key in the query if the query only targets one shard.
+    auto requestPartialKey = buildDelete(kNss, fromjson("{'a.b': {$gt : 101}}"));
+    auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey, 0));
+    ASSERT_EQUALS(res.size(), 1);
+    ASSERT_EQUALS(res[0].shardName, "4");
 
-    auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': -101}"));
+    // Cannot delete with partial shard key in the query if the query targets multiple shards.
+    auto requestPartialKey2 = buildDelete(kNss, fromjson("{'a.b': {$gt: 0}}"));
     ASSERT_THROWS_CODE(
         cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestPartialKey2, 0)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
 
+    // Cannot delete without at least a partial shard key.
+    auto requestNoShardKey = buildDelete(kNss, fromjson("{'k': 0}"));
+    ASSERT_THROWS_CODE(
+        cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestNoShardKey, 0)),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
+
     // Delete targeted correctly with full shard key in query.
     auto requestFullKey = buildDelete(kNss, fromjson("{'a.b': -101, 'c.d': 5}"));
-    auto res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestFullKey, 0));
+    res = cmTargeter.targetDelete(operationContext(), BatchItemRef(&requestFullKey, 0));
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
 
