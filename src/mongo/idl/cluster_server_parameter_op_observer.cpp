@@ -187,8 +187,10 @@ void ClusterServerParameterOpObserver::onReplicationRollback(OperationContext* o
         if (isConfigNamespace(nss)) {
             // We can call resynchronize directly because onReplicationRollback is guaranteed to be
             // called from a state with no active WUOW and no database locks.
-            cluster_parameters::resynchronizeAllTenantParametersFromDisk(opCtx,
-                                                                         nss.dbName().tenantId());
+            AutoGetCollectionForRead coll{
+                opCtx, NamespaceString::makeClusterParametersNSS(nss.tenantId())};
+            cluster_parameters::resynchronizeAllTenantParametersFromCollection(
+                opCtx, coll.getCollection().get());
         }
     }
 }

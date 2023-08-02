@@ -89,10 +89,15 @@ void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(Operati
         }
 
         for (const auto& tenantId : tenantIds) {
-            cluster_parameters::initializeAllTenantParametersFromDisk(opCtx, tenantId);
+            AutoGetCollectionForRead coll{opCtx,
+                                          NamespaceString::makeClusterParametersNSS(tenantId)};
+            cluster_parameters::initializeAllTenantParametersFromCollection(
+                opCtx, coll.getCollection().get());
         }
     }
-    cluster_parameters::initializeAllTenantParametersFromDisk(opCtx, boost::none);
+    AutoGetCollectionForRead coll{opCtx, NamespaceString::makeClusterParametersNSS(boost::none)};
+    cluster_parameters::initializeAllTenantParametersFromCollection(opCtx,
+                                                                    coll.getCollection().get());
 }
 
 }  // namespace mongo

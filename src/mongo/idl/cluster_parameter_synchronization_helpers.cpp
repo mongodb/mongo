@@ -159,52 +159,43 @@ void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<Ten
     }
 }
 
-void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                           const boost::optional<TenantId>& tenantId) {
-    doLoadAllTenantParametersFromDisk(
-        opCtx,
-        "initializing"_sd,
-        [&](OperationContext* opCtx,
-            const BSONObj& doc,
-            StringData mode,
-            const boost::optional<TenantId>& tenantId) {
-            updateParameter(opCtx, doc, mode, tenantId);
-        },
-        tenantId);
+void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection* coll) {
+    doLoadAllTenantParametersFromCollection(opCtx,
+                                            coll,
+                                            "initializing"_sd,
+                                            [&](OperationContext* opCtx,
+                                                const BSONObj& doc,
+                                                StringData mode,
+                                                const boost::optional<TenantId>& tenantId) {
+                                                updateParameter(opCtx, doc, mode, tenantId);
+                                            });
 }
 
-void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                              const boost::optional<TenantId>& tenantId) {
+void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
+                                                    const Collection* coll) {
+    invariant(coll);
+
     const auto& allParams = ServerParameterSet::getClusterParameterSet()->getMap();
     std::set<std::string> unsetSettings;
     for (const auto& it : allParams) {
         unsetSettings.insert(it.second->name());
     }
 
-    doLoadAllTenantParametersFromDisk(
-        opCtx,
-        "resynchronizing"_sd,
-        [&](OperationContext* opCtx,
-            const BSONObj& doc,
-            StringData mode,
-            const boost::optional<TenantId>& tenantId) {
-            unsetSettings.erase(doc[kIdField].str());
-            updateParameter(opCtx, doc, mode, tenantId);
-        },
-        tenantId);
+    doLoadAllTenantParametersFromCollection(opCtx,
+                                            coll,
+                                            "resynchronizing"_sd,
+                                            [&](OperationContext* opCtx,
+                                                const BSONObj& doc,
+                                                StringData mode,
+                                                const boost::optional<TenantId>& tenantId) {
+                                                unsetSettings.erase(doc[kIdField].str());
+                                                updateParameter(opCtx, doc, mode, tenantId);
+                                            });
 
     // For all known settings which were not present in this resync,
     // explicitly clear any value which may be present in-memory.
     for (const auto& setting : unsetSettings) {
-        clearParameter(opCtx, setting, tenantId);
-    }
-}
-
-void maybeUpdateClusterParametersPostImportCollectionCommit(OperationContext* opCtx,
-                                                            const NamespaceString& nss) {
-    if (nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId())) {
-        // Something was imported, do a full collection scan to sync up.
-        cluster_parameters::initializeAllTenantParametersFromDisk(opCtx, nss.dbName().tenantId());
+        clearParameter(opCtx, setting, coll->ns().tenantId());
     }
 }
 

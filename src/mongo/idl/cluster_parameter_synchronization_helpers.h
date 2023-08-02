@@ -79,20 +79,19 @@ void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<Ten
  * Used to initialize in-memory cluster parameter state based on the on-disk contents after startup
  * recovery or initial sync is complete.
  */
-void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                           const boost::optional<TenantId>& tenantId);
+void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection* coll);
 
 /**
  * Used on rollback. Updates settings which are present and clears settings which are not.
  */
-void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                              const boost::optional<TenantId>& tenantId);
+void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
+                                                    const Collection* coll);
 
 template <typename OnEntry>
-void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
-                                       StringData mode,
-                                       OnEntry onEntry,
-                                       const boost::optional<TenantId>& tenantId) try {
+void doLoadAllTenantParametersFromCollection(OperationContext* opCtx,
+                                             const Collection* coll,
+                                             StringData mode,
+                                             OnEntry onEntry) try {
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
     // abandon the snapshot when exiting the function.
@@ -101,10 +100,10 @@ void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
         scopeGuard.dismiss();
     }
 
-    AutoGetCollectionForRead coll(opCtx, NamespaceString::makeClusterParametersNSS(tenantId));
     if (!coll) {
         return;
     }
+    invariant(coll->ns() == NamespaceString::makeClusterParametersNSS(coll->ns().tenantId()));
 
     std::vector<Status> failures;
 
@@ -112,8 +111,8 @@ void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         try {
             auto data = doc.get().data.toBson();
-            validateParameter(opCtx, data, tenantId);
-            onEntry(opCtx, data, mode, tenantId);
+            validateParameter(opCtx, data, coll->ns().tenantId());
+            onEntry(opCtx, data, mode, coll->ns().tenantId());
         } catch (const DBException& ex) {
             failures.push_back(ex.toStatus());
         }
@@ -131,13 +130,6 @@ void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
     uassertStatusOK(ex.toStatus().withContext(
         str::stream() << "Failed " << mode << " cluster server parameters from disk"));
 }
-
-/**
- * Used after an importCollection commits. Will update the in-memory cluster parameter state if the
- * given namespace is a cluster parameters namespace.
- */
-void maybeUpdateClusterParametersPostImportCollectionCommit(OperationContext* opCtx,
-                                                            const NamespaceString& nss);
 
 }  // namespace cluster_parameters
 

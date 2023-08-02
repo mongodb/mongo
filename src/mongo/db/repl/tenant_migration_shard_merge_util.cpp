@@ -238,7 +238,7 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
         opCtx->recoveryUnit()->registerChange(
             makeCountsChange(ownedCollection->getRecordStore(), metadata));
 
-        CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
+        CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, ownedCollection);
 
         auto importedCatalogEntry =
             storageEngine->getCatalog()->getCatalogEntry(opCtx, importResult.catalogId);
@@ -253,8 +253,10 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
 
         wunit.commit();
 
-        if (metadata.numRecords > 0) {
-            cluster_parameters::maybeUpdateClusterParametersPostImportCollectionCommit(opCtx, nss);
+        if (metadata.numRecords > 0 &&
+            nss == NamespaceString::makeClusterParametersNSS(nss.tenantId())) {
+            cluster_parameters::initializeAllTenantParametersFromCollection(opCtx,
+                                                                            &*ownedCollection);
         }
 
         LOGV2(6114300,

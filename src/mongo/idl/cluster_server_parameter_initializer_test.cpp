@@ -89,8 +89,14 @@ public:
         remove(boost::none);
         remove(kTenantId);
         auto opCtx = cc().makeOperationContext();
-        cluster_parameters::resynchronizeAllTenantParametersFromDisk(opCtx.get(), boost::none);
-        cluster_parameters::resynchronizeAllTenantParametersFromDisk(opCtx.get(), kTenantId);
+        auto resynchronize = [opCtx = opCtx.get()](const boost::optional<TenantId>& tenantId) {
+            AutoGetCollectionForRead coll{opCtx,
+                                          NamespaceString::makeClusterParametersNSS(tenantId)};
+            cluster_parameters::resynchronizeAllTenantParametersFromCollection(
+                opCtx, coll.getCollection().get());
+        };
+        resynchronize(boost::none);
+        resynchronize(kTenantId);
     }
     /**
      * Simulates the call to the ClusterServerParameterInitializer at the end of initial sync, when
