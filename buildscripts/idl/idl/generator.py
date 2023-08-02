@@ -1723,9 +1723,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # local _serializationContext obj used to init other structs, so it needs to be
                 # initialized first; don't move in the event a boost::none is supplied
                 initializer_vars.insert(0, '_%s(%s)' % (arg.name, initializer_var))
-            elif arg.name in ["nss", "nssOrUUID"]:
-                # TODO (SERVER-74238): Remove this denylist, prevent use-after-move by defining fields in the correct order.
-                initializer_vars.append('_%s(%s)' % (arg.name, arg.name))
             else:
                 initializer_vars.append('_%s(std::move(%s))' % (arg.name, arg.name))
 
@@ -1757,15 +1754,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                         % (_get_field_member_name(field),
                                            _get_field_member_name(field), serialization_ctx_arg))
 
-        # Serialize the _dbName field second
+        # Serialize the _dbName field second.
+        # Use the class member to perform the initialization instead of the constructor
+        # argument, since we're guaranteed to have already written the initializer for the member earlier
+        # in the list via _gen_initializer_vars above.
         initializes_db_name = False
         if [arg for arg in constructor.args if arg.name == 'nss']:
             if [field for field in struct.fields if field.serialize_op_msg_request_only]:
-                initializers.append('_dbName(nss.dbName())')
+                initializers.append('_dbName(_nss.dbName())')
                 initializes_db_name = True
         elif [arg for arg in constructor.args if arg.name == 'nssOrUUID']:
             if [field for field in struct.fields if field.serialize_op_msg_request_only]:
-                initializers.append('_dbName(nssOrUUID.dbName())')
+                initializers.append('_dbName(_nssOrUUID.dbName())')
                 initializes_db_name = True
 
         # Serialize has fields third
