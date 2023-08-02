@@ -234,7 +234,8 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
                                    const RecoveryUnit::ReadSource& readSource,
                                    const boost::optional<Timestamp>& readTimestamp,
                                    bool callerWasConflicting,
-                                   bool shouldReadAtLastApplied) {
+                                   bool shouldReadAtLastApplied,
+                                   bool isEnforcingConstraints) {
     if (readTimestamp && afterClusterTime) {
         // Readers that use afterClusterTime have already waited at a higher level for the
         // all_durable time to advance to a specified optime, and they assume the read timestamp
@@ -262,11 +263,15 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
     // If the caller entered this function expecting to conflict with batch application
     // (i.e. no ShouldNotConflict block in scope), but they are reading without a timestamp and
     // not holding the PBWM lock, then there is a possibility that this reader may
-    // unintentionally see inconsistent data during a batch. Certain namespaces are applied
-    // serially in oplog application, and therefore can be safely read without taking the PBWM
-    // lock or reading at a timestamp.
-    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting && nss &&
-        !nss->mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
+    // unintentionally see inconsistent data during a batch. However there are a couple exceptions
+    // to this:
+    // * If we are not enforcing contraints, then we are ourselves within batch application or some
+    //   similar state where this is expected
+    // * Certain namespaces are applied serially in oplog application, and therefore can be safely
+    //   read without taking the PBWM or reading at a timestamp
+    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
+        isEnforcingConstraints && nss && !nss->mustBeAppliedInOwnOplogBatch() &&
+        shouldReadAtLastApplied) {
         LOGV2_FATAL(4728700,
                     "Reading from replicated collection on a secondary without read timestamp "
                     "or PBWM lock",
@@ -445,7 +450,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                       readSource,
                                       readTimestamp,
                                       _callerWasConflicting,
-                                      shouldReadAtLastApplied);
+                                      shouldReadAtLastApplied,
+                                      opCtx->isEnforcingConstraints());
 
         checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);
 
@@ -640,7 +646,8 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
                                       readSource,
                                       readTimestamp,
                                       callerExpectedToConflictWithSecondaryBatchApplication,
-                                      shouldReadAtLastApplied);
+                                      shouldReadAtLastApplied,
+                                      opCtx->isEnforcingConstraints());
 
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
 
