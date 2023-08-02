@@ -29,45 +29,48 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::value {
 /**
- * Interface for accessing a collection of SBE Values independent of their backing storage.
+ * Deblocked tags and values for a ValueBlock.
  *
- * Currently we only support forward iteration over all of the values via 'Cursor' but PM-3168
- * will extend the interface to allow for other operations to be applied which may run directly on
- * the underlying format or take advantage of precomputed summaries.
+ * Note: Deblocked values are read-only and must not be modified.
+ */
+struct DeblockedTagVals {
+    // 'tags' and 'vals' point to an array of 'count' elements.
+    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
+        : count(count), tags(tags), vals(vals) {
+        tassert(7888701,
+                "Values must exist if _count > 0",
+                count == 0 || (tags != nullptr && vals != nullptr));
+    }
+
+    size_t count;
+    const TypeTags* tags;
+    const Value* vals;
+};
+
+/**
+ * Interface for accessing a sequence of SBE Values independent of their backing storage.
+ *
+ * Currently we only support getting all of the deblocked values via 'extract()' but PM-3168 will
+ * extend the interface to allow for other operations to be applied which may run directly on the
+ * underlying format or take advantage of precomputed summaries.
  */
 struct ValueBlock {
-    /**
-     * Used for iterating over the whole block.
-     */
-    struct Cursor {
-        virtual ~Cursor() = default;
-
-        /**
-         * Returns unowned value and might invalidate the previously returned value(s). If the
-         * client needs to maintain a value across multiple calls to 'next()' they should copy it
-         * and assume ownership of the copy. Returning 'boost::none' represents the end of data in
-         * this block. It is allowed to call 'next()' in this state and it would continue returning
-         * 'boost::none'.
-         */
-        virtual boost::optional<std::pair<TypeTags, Value>> next() = 0;
-    };
-
     virtual ~ValueBlock() = default;
 
     /**
-     * Creates a cursor to iterate over the block.
-     *
-     * The cursor is guaranteed to be valid during the lifetime of the block. Multiple cursors
-     * over the same block are allowed.
+     * Returns the unowned deblocked values. The return value is only valid as long as the block
+     * remains alive.
      */
-    virtual std::unique_ptr<Cursor> cursor() const = 0;
+    virtual DeblockedTagVals extract() = 0;
 
     /**
      * Returns a copy of this block.
@@ -78,19 +81,20 @@ struct ValueBlock {
 /**
  * A block that contains no values.
  */
-struct EmptyBlock final : public ValueBlock {
-    struct Cursor : public ValueBlock::Cursor {
-        boost::optional<std::pair<value::TypeTags, value::Value>> next() override {
-            return boost::none;
-        }
-    };
-
-    std::unique_ptr<ValueBlock::Cursor> cursor() const override {
-        return std::make_unique<Cursor>();
-    }
+class EmptyBlock final : public ValueBlock {
+public:
+    EmptyBlock() : _deblockedTags(1, TypeTags::Nothing), _deblockedVals(1, Value(0)) {}
 
     std::unique_ptr<ValueBlock> clone() const override {
         return std::make_unique<EmptyBlock>();
     }
+
+    DeblockedTagVals extract() override {
+        return {1, &_deblockedTags[0], &_deblockedVals[0]};
+    }
+
+private:
+    const std::vector<TypeTags> _deblockedTags;
+    const std::vector<Value> _deblockedVals;
 };
 }  // namespace mongo::sbe::value

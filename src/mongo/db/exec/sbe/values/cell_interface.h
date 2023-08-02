@@ -51,10 +51,5 @@ struct CellBlock {
      * corresponds to the path of this cell block.
      */
     virtual const ValueBlock& getValueBlock() const = 0;
-
-    /**
-     * Returns a copy of this block.
-     */
-    virtual std::unique_ptr<CellBlock> clone() const = 0;
 };
 }  // namespace mongo::sbe::value

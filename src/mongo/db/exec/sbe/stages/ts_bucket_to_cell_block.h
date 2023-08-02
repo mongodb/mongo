@@ -67,8 +67,13 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doRestoreState(bool) final;
+
 private:
     PlanState advanceChild();
+
+    void initCellBlocks();
 
     const value::SlotId _bucketSlotId;
     const std::vector<std::string> _topLevelPaths;
@@ -81,6 +86,6 @@ private:
     std::vector<value::OwnedValueAccessor> _blocksOutAccessor;
     value::OwnedValueAccessor _metaOutAccessor;
 
-    std::vector<boost::optional<value::TsCellBlock>> _tsCellBlocks;
+    std::vector<std::unique_ptr<value::TsCellBlock>> _tsCellBlocks;
 };
 }  // namespace mongo::sbe

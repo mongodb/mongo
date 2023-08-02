@@ -41,8 +41,9 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  value::SlotVector blocks,
                                  value::SlotVector valsOut,
                                  PlanNodeId nodeId,
+                                 PlanYieldPolicy* yieldPolicy,
                                  bool participateInTrialRunTracking)
-    : PlanStage("block_to_row"_sd, nodeId, participateInTrialRunTracking),
+    : PlanStage("block_to_row"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _blockSlotIds(std::move(blocks)),
       _valsOutSlotIds(std::move(valsOut)) {
     _children.emplace_back(std::move(input));
@@ -54,6 +55,7 @@ std::unique_ptr<PlanStage> BlockToRowStage::clone() const {
                                              _blockSlotIds,
                                              _valsOutSlotIds,
                                              _commonStats.nodeId,
+                                             _yieldPolicy,
                                              _participateInTrialRunTracking);
 }
 
@@ -84,19 +86,19 @@ void BlockToRowStage::open(bool reOpen) {
     _children[0]->open(reOpen);
 }
 
-PlanState BlockToRowStage::getNextFromCurrentBlocks() {
+PlanState BlockToRowStage::getNextFromDeblockedValues() {
     bool allDone = true;
-    for (size_t i = 0; i < _blockCursors.size(); ++i) {
-        auto optTagVal = _blockCursors[i]->next();
-        if (!optTagVal) {
+    for (size_t i = 0; i < _blocks.size(); ++i) {
+        if (_curIdx >= _deblockedValueRuns[i].count) {
             _valsOutAccessors[i].reset();
             continue;
         }
 
         allDone = false;
-        auto [tag, val] = *optTagVal;
-        _valsOutAccessors[i].reset(tag, val);
+        _valsOutAccessors[i].reset(_deblockedValueRuns[i].tags[_curIdx],
+                                   _deblockedValueRuns[i].vals[_curIdx]);
     }
+    ++_curIdx;
 
     if (allDone) {
         return PlanState::IS_EOF;
@@ -104,35 +106,50 @@ PlanState BlockToRowStage::getNextFromCurrentBlocks() {
     return PlanState::ADVANCED;
 }
 
+// The underlying buffer for blocks has been updated after getNext() on the child, so we need to
+// prepare deblocking the new blocks.
+void BlockToRowStage::prepareDeblock() {
+    _blocks.clear();
+    _deblockedValueRuns.clear();
+    for (auto acc : _blockAccessors) {
+        auto [tag, val] = acc->getViewOfValue();
+        invariant(tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
+
+        const auto* valueBlock = tag == value::TypeTags::valueBlock
+            ? value::getValueBlock(val)
+            : &value::getCellBlock(val)->getValueBlock();
+
+        // We need to clone the block because the underlying buffer may be invalidated after
+        // yielding.
+        // TODO SERVER-79629: Avoid cloning the block.
+        _blocks.emplace_back(valueBlock->clone());
+        _deblockedValueRuns.emplace_back(_blocks.back()->extract());
+    }
+}
+
 PlanState BlockToRowStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    // We may produce multiple (potentially x1000) results for a block, so we need to check for
+    // interrupts so that we don't hold the lock on the underlying collection for too long.
+    checkForInterrupt(_opCtx);
 
-    if (!_blockCursors.empty() && getNextFromCurrentBlocks() == PlanState::ADVANCED) {
+    if (!_blocks.empty() && getNextFromDeblockedValues() == PlanState::ADVANCED) {
         return trackPlanState(PlanState::ADVANCED);
     }
 
-    // Returns once we find a non empty block with a value to return.
+    // Returns once we find a non empty block with a value to return. Otherwise we need to get new
+    // blocks from our child.
     while (true) {
-        // Otherwise we need to get new blocks from our child.
-        _blockCursors.clear();
-
         auto state = _children[0]->getNext();
         if (state == PlanState::IS_EOF) {
             return trackPlanState(state);
         }
 
-        // Initializes the block cursors.
-        for (auto acc : _blockAccessors) {
-            auto [tag, val] = acc->getViewOfValue();
-            invariant(tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
+        // Got new blocks from our child, so we need to start from the beginning of the blocks.
+        _curIdx = 0;
+        prepareDeblock();
 
-            const auto& valueBlock = tag == value::TypeTags::valueBlock
-                ? *value::getValueBlock(val)
-                : value::getCellBlock(val)->getValueBlock();
-            _blockCursors.push_back(valueBlock.cursor());
-        }
-
-        auto blockState = getNextFromCurrentBlocks();
+        auto blockState = getNextFromDeblockedValues();
         if (blockState == PlanState::ADVANCED) {
             return trackPlanState(PlanState::ADVANCED);
         }

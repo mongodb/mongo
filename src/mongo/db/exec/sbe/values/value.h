@@ -1590,9 +1590,9 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::timeZone:
             return makeCopyTimeZone(*getTimeZoneView(val));
         case TypeTags::valueBlock:
-            return makeCopyValueBlock(*getValueBlock(val));
+            [[fallthrough]];
         case TypeTags::cellBlock:
-            return makeCopyCellBlock(*getCellBlock(val));
+            tasserted(7888700, "Cannot copy a ValueBlock or CellBlock");
         default:
             break;
     }

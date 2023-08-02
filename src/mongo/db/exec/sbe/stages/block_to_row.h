@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <vector>
+
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -39,11 +42,18 @@ namespace mongo::sbe {
  * populates the corresponding output slots with the individual values from each block. If the
  * blocks are of unequal size, missing values of blocks that have the less number of elements than
  * the block that maximum number of elements will be filled with Nothing. The number of valsOut must
- * be the same as the number of input blocks.
+ * be the same as the number of input blocks. This stage checks for interrupts.
  *
  * Debug string representation:
  *
  *  block_to_row blocks[blocks[0], ..., blocks[N]] vals[valsOut[0], ..., valsOut[N]]
+ *
+ * Note: Due to the way how the TsBlock's deblocking works, we won't be able to identify the
+ * trailing gaps at the tail of selected columns compared to the time field which is guaranteed to
+ * exist. Depending on which column is selected, we may need to always add the time field to figure
+ * out how many rows really exist in a bucket.
+ *
+ * TODO SERVER-79621: Add a way to figure out the number of measurements in a bucket.
  */
 class BlockToRowStage final : public PlanStage {
 public:
@@ -51,6 +61,7 @@ public:
                     value::SlotVector blocks,
                     value::SlotVector valsOut,
                     PlanNodeId nodeId,
+                    PlanYieldPolicy* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -67,15 +78,21 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 private:
-    PlanState getNextFromCurrentBlocks();
+    PlanState getNextFromDeblockedValues();
 
     PlanState advanceChild();
+
+    void prepareDeblock();
 
     const value::SlotVector _blockSlotIds;
     const value::SlotVector _valsOutSlotIds;
 
-    std::vector<std::unique_ptr<value::ValueBlock::Cursor>> _blockCursors;
+    std::vector<std::unique_ptr<value::ValueBlock>> _blocks;
+    std::vector<value::DeblockedTagVals> _deblockedValueRuns;
     std::vector<value::SlotAccessor*> _blockAccessors;
     std::vector<value::ViewOfValueAccessor> _valsOutAccessors;
+
+    // Keeps track of the current reading index of the blocks.
+    size_t _curIdx = 0;
 };
 }  // namespace mongo::sbe

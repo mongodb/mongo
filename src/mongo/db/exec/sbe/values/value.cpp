@@ -173,16 +173,6 @@ std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
     return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& block) {
-    auto blockCopy = block.clone();
-    return {TypeTags::valueBlock, bitcastFrom<ValueBlock*>(blockCopy.release())};
-}
-
-std::pair<TypeTags, Value> makeCopyCellBlock(const CellBlock& block) {
-    auto blockCopy = block.clone();
-    return {TypeTags::cellBlock, bitcastFrom<CellBlock*>(blockCopy.release())};
-}
-
 key_string::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {
     _sortKeyGen.setCollator(collator);
     return _sortKeyGen.computeSortKeyString(obj);

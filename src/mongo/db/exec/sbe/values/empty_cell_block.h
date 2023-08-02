@@ -46,10 +46,6 @@ public:
         return _block;
     }
 
-    std::unique_ptr<CellBlock> clone() const override {
-        return std::make_unique<EmptyCellBlock>();
-    }
-
 private:
     mutable EmptyBlock _block;
 };
