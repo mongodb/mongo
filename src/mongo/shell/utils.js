@@ -42,6 +42,33 @@ function _getErrorWithCode(codeOrObj, message) {
 }
 
 /**
+ * Executes the specified function and retries it if it fails due to retryable error.
+ * If it exhausts the number of allowed retries, it simply throws the last exception.
+ *
+ * Returns the return value of the input call.
+ */
+
+function retryOnRetryableError(func, numRetries, sleepMs) {
+    numRetries = numRetries || 1;
+    sleepMs = sleepMs || 1000;
+
+    while (true) {
+        try {
+            return func();
+        } catch (e) {
+            if (isRetryableError(e) && numRetries > 0) {
+                print("An error occurred and the call will be retried: " +
+                      tojson({error: e.toString(), stack: e.stack}));
+                numRetries--;
+                sleep(sleepMs);
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
+/**
  * Executes the specified function and retries it if it fails due to exception related to network
  * error. If it exhausts the number of allowed retries, it simply throws the last exception.
  *
@@ -117,7 +144,8 @@ const retryableErrs = [
     "WriteConcernFailed",
     "WriteConcernLegacyOK",
     "UnknownReplWriteConcern",
-    "UnsatisfiableWriteConcern"
+    "UnsatisfiableWriteConcern",
+    "The server is in quiesce mode and will shut down"
 ];
 const retryableErrsPlusShellGeneratedNetworkErrs = [...retryableErrs, ...shellGeneratedNetworkErrs];
 /**

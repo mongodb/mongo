@@ -3650,7 +3650,7 @@ var ReplSetTest = function ReplSetTest(opts) {
     // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.
     // if it is an object, though, pass in a deep copy.
     if (typeof opts === 'string' || opts instanceof String) {
-        retryOnNetworkError(() => {
+        retryOnRetryableError(() => {
             // The primary may unexpectedly step down during startup if under heavy load
             // and too slowly processing heartbeats. When it steps down, it closes all of
             // its connections.
