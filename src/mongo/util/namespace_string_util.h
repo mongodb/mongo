@@ -158,6 +158,12 @@ public:
 
     static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
 
+    /**
+     * To be used only for deserializing a NamespaceString object from a ns string in error
+     * messages.
+     */
+    static NamespaceString deserializeForErrorMsg(StringData nsInErrMsg);
+
 private:
     static std::string serializeForStorage(
         const NamespaceString& ns, const SerializationContext& context = SerializationContext());

@@ -41,12 +41,13 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CannotImplicitlyCreateCollectionInfo);
 }  // namespace
 
 void CannotImplicitlyCreateCollectionInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", NamespaceStringUtil::serialize(_nss));
+    bob->append("ns", _nss.toStringForErrorMsg());
 }
 
 std::shared_ptr<const ErrorExtraInfo> CannotImplicitlyCreateCollectionInfo::parse(
     const BSONObj& obj) {
-    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(NamespaceString(obj["ns"].str()));
+    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(
+        NamespaceStringUtil::deserializeForErrorMsg(obj["ns"].str()));
 }
 
 }  // namespace mongo

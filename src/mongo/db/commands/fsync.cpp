@@ -400,11 +400,9 @@ void FSyncLockThread::run() {
         bool successfulFsyncLock = false;
         auto backupCursorHooks = BackupCursorHooks::get(_serviceContext);
         try {
-            // TODO SERVER-65920: Create a NamespaceString for logging with the "global" ns in
-            // writeConflictRetry.
             writeConflictRetry(&opCtx,
                                "beginBackup",
-                               NamespaceString("global"),
+                               NamespaceString(DatabaseName::kGlobal),
                                [&opCtx, backupCursorHooks, &successfulFsyncLock, storageEngine] {
                                    if (backupCursorHooks->enabled()) {
                                        backupCursorHooks->fsyncLock(&opCtx);

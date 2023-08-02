@@ -1463,11 +1463,12 @@ void restoreTransactionResourcesToOperationContext(
                 throw;
             } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
                 const auto extraInfo = ex.extraInfo<CollectionUUIDMismatchInfo>();
+                const auto dbName = extraInfo->dbName();
                 if (extraInfo->actualCollection()) {
-                    NamespaceString oldNss{extraInfo->dbName().toStringForErrorMsg(),
-                                           extraInfo->expectedCollection()};
-                    NamespaceString newNss{extraInfo->dbName().toStringForErrorMsg(),
-                                           *extraInfo->actualCollection()};
+                    NamespaceString oldNss =
+                        NamespaceStringUtil::deserialize(dbName, extraInfo->expectedCollection());
+                    NamespaceString newNss =
+                        NamespaceStringUtil::deserialize(dbName, *extraInfo->actualCollection());
                     PlanYieldPolicy::throwCollectionRenamedError(
                         oldNss, newNss, extraInfo->collectionUUID());
                 } else {

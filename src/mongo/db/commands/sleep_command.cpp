@@ -109,7 +109,8 @@ public:
             opCtx->sleepFor(Milliseconds(millis));
             return;
         }
-        auto nss = NamespaceString(ns);
+        // This is not ran in multitenancy since sleep is an internal testing command.
+        auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
         uassert(50961,
                 "lockTarget is not a valid namespace",
                 NamespaceString::validDBName(nss.dbName()));

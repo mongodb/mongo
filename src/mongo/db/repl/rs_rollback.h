@@ -366,7 +366,10 @@ struct FixUpInfo {
      * the collection which was dropped into collectionsToRemoveFromDropPendingCollections
      * and collectionsToRename by calling recordRollingBackDrop().
      */
-    Status recordDropTargetInfo(const BSONElement& dropTarget, const BSONObj& obj, OpTime opTime);
+    Status recordDropTargetInfo(const BSONElement& dropTarget,
+                                const BSONObj& obj,
+                                OpTime opTime,
+                                const boost::optional<TenantId>& tenantId);
 };
 
 // Indicates that rollback cannot complete and the server must abort.

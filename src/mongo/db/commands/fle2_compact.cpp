@@ -283,7 +283,7 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     }
 
     auto& cfg = *(edc.getCollectionOptions().encryptedFieldConfig);
-    auto db = edc.ns().db_deprecated();
+    auto dbName = edc.ns().dbName();
     StringData missingColl;
     EncryptedStateCollectionsNamespaces namespaces;
 
@@ -293,11 +293,11 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     };
 
     namespaces.edcNss = edc.ns();
-    namespaces.escNss =
-        NamespaceString(db, cfg.getEscCollection().value_or_eval([&f]() { return f("state"_sd); }));
+    namespaces.escNss = NamespaceStringUtil::deserialize(
+        dbName, cfg.getEscCollection().value_or_eval([&f]() { return f("state"_sd); }));
 
-    namespaces.ecocNss = NamespaceString(
-        db, cfg.getEcocCollection().value_or_eval([&f]() { return f("compaction"_sd); }));
+    namespaces.ecocNss = NamespaceStringUtil::deserialize(
+        dbName, cfg.getEcocCollection().value_or_eval([&f]() { return f("compaction"_sd); }));
 
     if (!missingColl.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -306,10 +306,10 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
                           << " is missing the name of its " << missingColl << " collection");
     }
 
-    namespaces.ecocRenameNss =
-        NamespaceString(db, namespaces.ecocNss.coll().toString().append(".compact"));
-    namespaces.ecocLockNss =
-        NamespaceString(db, namespaces.ecocNss.coll().toString().append(".lock"));
+    namespaces.ecocRenameNss = NamespaceStringUtil::deserialize(
+        dbName, namespaces.ecocNss.coll().toString().append(".compact"));
+    namespaces.ecocLockNss = NamespaceStringUtil::deserialize(
+        dbName, namespaces.ecocNss.coll().toString().append(".lock"));
     return namespaces;
 }
 

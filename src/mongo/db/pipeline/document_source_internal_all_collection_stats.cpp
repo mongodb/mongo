@@ -76,7 +76,8 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
 
     while (!_catalogDocs->empty()) {
         BSONObj obj(std::move(_catalogDocs->front()));
-        NamespaceString nss(obj["ns"].String());
+        const auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
 
         _catalogDocs->pop_front();
 

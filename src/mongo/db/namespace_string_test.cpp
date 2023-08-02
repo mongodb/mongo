@@ -386,6 +386,7 @@ TEST_F(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
     ASSERT_EQUALS("DB", ns.db_forTest());
     ASSERT_EQUALS("$cmd.listCollections", ns.coll());
     ASSERT(ns.isValid());
+    ASSERT(NamespaceString::isValid(ns.ns_forTest()));
     ASSERT(ns.isListCollectionsCursorNS());
 }
 

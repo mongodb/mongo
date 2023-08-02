@@ -2397,7 +2397,8 @@ void _processUsers(OperationContext* opCtx,
                    AuthorizationManager* authzManager,
                    StringData usersCollName,
                    StringData db,
-                   const bool drop) {
+                   const bool drop,
+                   const boost::optional<TenantId>& tenantId) {
     // When the "drop" argument has been provided, we use this set to store the users
     // that are currently in the system, and remove from it as we encounter
     // same-named users in the collection we are restoring from.  Once we've fully
@@ -2428,7 +2429,7 @@ void _processUsers(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceString(usersCollName),
+        NamespaceStringUtil::deserialize(tenantId, usersCollName),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& userObj) {
@@ -2526,7 +2527,8 @@ void _processRoles(OperationContext* opCtx,
                    AuthorizationManager* authzManager,
                    StringData rolesCollName,
                    StringData db,
-                   const bool drop) {
+                   const bool drop,
+                   const boost::optional<TenantId>& tenantId) {
     // When the "drop" argument has been provided, we use this set to store the roles
     // that are currently in the system, and remove from it as we encounter
     // same-named roles in the collection we are restoring from.  Once we've fully
@@ -2556,7 +2558,7 @@ void _processRoles(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceString(rolesCollName),
+        NamespaceStringUtil::deserialize(tenantId, rolesCollName),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& roleObj) {
@@ -2590,13 +2592,14 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
     ScopeGuard invalidateGuard([&] { authzManager->invalidateUserCache(opCtx); });
     const auto db = cmd.getDb();
     const bool drop = cmd.getDrop();
+    const auto tenantId = cmd.getDollarTenant();
 
     if (!tempUsersColl.empty()) {
-        _processUsers(opCtx, authzManager, tempUsersColl, db, drop);
+        _processUsers(opCtx, authzManager, tempUsersColl, db, drop, tenantId);
     }
 
     if (!tempRolesColl.empty()) {
-        _processRoles(opCtx, authzManager, tempRolesColl, db, drop);
+        _processRoles(opCtx, authzManager, tempRolesColl, db, drop, tenantId);
     }
 }
 

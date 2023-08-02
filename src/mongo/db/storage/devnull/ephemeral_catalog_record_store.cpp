@@ -308,7 +308,7 @@ const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecor
         LOGV2_ERROR(
             23720,
             "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(NamespaceString(_data->ns)),
+            logAttrs(_data->ns),
             "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
@@ -322,7 +322,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
         LOGV2_ERROR(
             23721,
             "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(NamespaceString(_data->ns)),
+            logAttrs(_data->ns),
             "loc"_attr = loc);
     }
     invariant(it != _data->records.end());

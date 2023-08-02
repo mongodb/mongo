@@ -153,7 +153,7 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS(const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(DatabaseName::kAdmin.db(), bulkWriteCursorCol, tenantId);
+    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), bulkWriteCursorCol);
 }
 
 NamespaceString NamespaceString::makeClusterParametersNSS(
@@ -261,7 +261,7 @@ NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& op
     ss << db_deprecated() << "." << dropPendingNSPrefix;
     ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
     ss << "." << coll();
-    return NamespaceString(ss.stringData());
+    return NamespaceString(tenantId(), ss.stringData());
 }
 
 StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const {
@@ -372,6 +372,12 @@ bool NamespaceString::isFLE2StateCollection() const {
     return coll().startsWith(fle2Prefix) &&
         (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EccSuffix) ||
          coll().endsWith(fle2EcocSuffix));
+}
+
+bool NamespaceString::isFLE2StateCollection(StringData coll) {
+    return coll.startsWith(fle2Prefix) &&
+        (coll.endsWith(fle2EscSuffix) || coll.endsWith(fle2EccSuffix) ||
+         coll.endsWith(fle2EcocSuffix));
 }
 
 bool NamespaceString::isOplogOrChangeCollection() const {

@@ -256,7 +256,7 @@ struct HandleRequest {
             auto& dbmsg = getDbMessage();
             if (!dbmsg.messageShouldHaveNs())
                 return {};
-            return NamespaceString(dbmsg.getns());
+            return NamespaceStringUtil::deserialize(boost::none, dbmsg.getns());
         }
 
         void assertValidNsString() {

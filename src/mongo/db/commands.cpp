@@ -229,7 +229,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                 _nss = _invocation->ns();
                 _name = _invocation->definition()->getName();
             } else {
-                _nss = NamespaceString(request.getDatabase());
+                _nss = NamespaceString(request.getDbName());
                 _name = request.getCommandName().toString();
             }
         }
@@ -290,10 +290,9 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     const auto ns = first.valueStringData();
-    const NamespaceString nss(ns);
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",
-            nss.isValid());
+            str::stream() << "Invalid namespace specified '" << ns << "'",
+            NamespaceString::isValid(ns));
     return ns.toString();
 }
 

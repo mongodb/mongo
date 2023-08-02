@@ -94,10 +94,11 @@ using namespace std::string_literals;
 Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest& parsedMr) {
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
-    auto outNss =
-        NamespaceString{outOptions.getDatabaseName() ? *outOptions.getDatabaseName()
-                                                     : parsedMr.getNamespace().db_deprecated(),
-                        outOptions.getCollectionName()};
+    const auto outNss = outOptions.getDatabaseName()
+        ? NamespaceStringUtil::parseNamespaceFromRequest(
+              parsedMr.getDollarTenant(), *outOptions.getDatabaseName(), ""_sd)
+        : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
+                                           outOptions.getCollectionName());
     std::string error;
     switch (static_cast<int>(ex->code())) {
         case ErrorCodes::InvalidNamespace:
@@ -336,7 +337,8 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
             outputOptions.outDB = o["db"].String();
             uassert(ErrorCodes::CommandNotSupported,
                     "cannot target internal database as output",
-                    !(NamespaceString(outputOptions.outDB, outputOptions.collectionName)
+                    !(NamespaceStringUtil::parseNamespaceFromRequest(
+                          boost::none, outputOptions.outDB, outputOptions.collectionName)
                           .isOnInternalDb()));
         }
         if (o.hasElement("nonAtomic")) {
@@ -353,7 +355,8 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
 
     if (outputOptions.outType != OutputType::InMemory) {
         const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
-        const NamespaceString nss(outDb, outputOptions.collectionName);
+        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
+            boost::none, outDb, outputOptions.collectionName);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid 'out' namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
@@ -428,10 +431,11 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
-    auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
-                                      ? *parsedMr.getOutOptions().getDatabaseName()
-                                      : parsedMr.getNamespace().db_deprecated(),
-                                  parsedMr.getOutOptions().getCollectionName()};
+    const auto outNss = NamespaceStringUtil::parseNamespaceFromRequest(
+        parsedMr.getDollarTenant(),
+        (parsedMr.getOutOptions().getDatabaseName() ? *parsedMr.getOutOptions().getDatabaseName()
+                                                    : parsedMr.getNamespace().db_deprecated()),
+        parsedMr.getOutOptions().getCollectionName());
 
     std::set<FieldPath> shardKey;
     boost::optional<ChunkVersion> targetCollectionPlacementVersion;

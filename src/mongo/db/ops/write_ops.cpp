@@ -830,7 +830,8 @@ InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
 InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    InsertCommandRequest op(NamespaceString(msg.getns()));
+    // Passing boost::none since this is legacy code and should not be running in serverless.
+    InsertCommandRequest op(NamespaceStringUtil::deserialize(boost::none, msg.getns()));
 
     {
         WriteCommandRequestBase writeCommandBase;

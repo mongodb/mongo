@@ -363,14 +363,15 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
         if (cmd != "getMore"_sd)
             return false;
         StringData db = inRequest.getDatabase();
-        sep->handleRequest(
-               client->makeOperationContext().get(),
-               OpMsgRequest::fromDBAndBody(
-                   db,
-                   KillCursorsCommandRequest(NamespaceString(db, body["collection"].String()),
-                                             {CursorId{firstElement.Long()}})
-                       .toBSON(BSONObj{}))
-                   .serialize())
+        sep->handleRequest(client->makeOperationContext().get(),
+                           OpMsgRequest::fromDBAndBody(
+                               db,
+                               KillCursorsCommandRequest(
+                                   NamespaceStringUtil::deserialize(inRequest.getDbName(),
+                                                                    body["collection"].String()),
+                                   {CursorId{firstElement.Long()}})
+                                   .toBSON(BSONObj{}))
+                               .serialize())
             .get();
         return true;
     } catch (const DBException& e) {

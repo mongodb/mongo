@@ -262,7 +262,8 @@ void FixUpInfo::recordRollingBackDrop(const NamespaceString& nss, OpTime opTime,
 
 Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
                                        const BSONObj& obj,
-                                       OpTime opTime) {
+                                       OpTime opTime,
+                                       const boost::optional<TenantId>& tenantId) {
     StatusWith<UUID> dropTargetUUIDStatus = UUID::parse(dropTarget);
     if (!dropTargetUUIDStatus.isOK()) {
         LOGV2_ERROR(21729,
@@ -275,7 +276,8 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
 
     // The namespace of the collection that was dropped is the same namespace
     // that we are trying to rename the collection to.
-    NamespaceString droppedNs(obj.getStringField("to"));
+    NamespaceString droppedNs =
+        NamespaceStringUtil::deserialize(tenantId, obj.getStringField("to"));
 
     // Records the information necessary for undoing the dropTarget.
     recordRollingBackDrop(droppedNs, opTime, dropTargetUUID);
@@ -414,7 +416,8 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //        }
                 //     ...
                 // }
-                NamespaceString collectionNamespace(nss.getSisterNS(first.valueStringDataSafe()));
+                const auto collectionNamespace = NamespaceStringUtil::deserialize(
+                    nss.tenantId(), nss.getSisterNS(first.valueStringDataSafe()));
 
                 // Registers the collection to be removed from the drop pending collection
                 // reaper and to be renamed from its drop pending namespace to original namespace.
@@ -666,16 +669,17 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 // make sure to un-drop the collection that was dropped in the process
                 // of renaming.
                 if (auto dropTarget = obj.getField("dropTarget")) {
-                    auto status =
-                        fixUpInfo.recordDropTargetInfo(dropTarget, obj, oplogEntry.getOpTime());
+                    auto status = fixUpInfo.recordDropTargetInfo(
+                        dropTarget, obj, oplogEntry.getOpTime(), oplogEntry.getTid());
                     if (!status.isOK()) {
                         return status;
                     }
                 }
 
                 RenameCollectionInfo info;
-                info.renameTo = NamespaceString(ns);
-                info.renameFrom = NamespaceString(obj.getStringField("to"));
+                info.renameTo = NamespaceStringUtil::deserialize(oplogEntry.getTid(), ns);
+                info.renameFrom =
+                    NamespaceStringUtil::deserialize(oplogEntry.getTid(), obj.getStringField("to"));
 
                 // Checks if this collection has been renamed before within the same database.
                 // If it has been, update the renameFrom field of the RenameCollectionInfo
@@ -1663,7 +1667,8 @@ void syncFixUp(OperationContext* opCtx,
             try {
 
                 // TODO: Lots of overhead in context. This can be faster.
-                const NamespaceString docNss(doc.ns);
+                const NamespaceString docNss =
+                    NamespaceStringUtil::deserialize((*nss).tenantId(), doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
                 OldClientContext ctx(opCtx, docNss);
                 auto collection = acquireCollection(opCtx,

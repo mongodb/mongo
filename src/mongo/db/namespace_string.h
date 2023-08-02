@@ -214,18 +214,6 @@ public:
      */
     explicit NamespaceString(DatabaseName dbName) : _data(std::move(dbName._data)) {}
 
-    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
-    // to pass tenantId explicitly
-    explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(std::move(tenantId), ns) {}
-
-    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
-    // to pass tenantId explicitly
-    NamespaceString(StringData db,
-                    StringData collectionName,
-                    boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(std::move(tenantId), db, collectionName) {}
-
     /**
      * Constructs a NamespaceString in the global config db, "config.<collName>".
      */
@@ -644,6 +632,8 @@ public:
      */
     bool isFLE2StateCollection() const;
 
+    static bool isFLE2StateCollection(StringData coll);
+
     /**
      * Returns true if the namespace is an oplog or a change collection, false otherwise.
      */
@@ -743,6 +733,12 @@ public:
      */
     bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
         return validDBName(dbName(), behavior) && !coll().empty();
+    }
+
+    static bool isValid(StringData ns,
+                        DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) {
+        const auto nss = NamespaceString(boost::none, ns);
+        return nss.isValid(behavior);
     }
 
     /**

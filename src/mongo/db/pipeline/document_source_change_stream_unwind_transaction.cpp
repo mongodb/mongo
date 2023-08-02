@@ -508,7 +508,10 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addAff
 
     static const std::vector<std::string> kCollectionField = {"create", "createIndexes"};
 
-    NamespaceString dbCmdNs{doc["ns"].getStringData()};
+    const boost::optional<TenantId> tid = !doc["tid"].missing()
+        ? boost::make_optional<TenantId>(TenantId(doc["tid"].getOid()))
+        : boost::none;
+    const auto dbCmdNs = NamespaceStringUtil::deserialize(tid, doc["ns"].getString());
     const Document& object = doc["o"].getDocument();
     for (const auto& fieldName : kCollectionField) {
         if (object[fieldName].getType() == BSONType::String) {

@@ -334,6 +334,9 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/command_status',
         'remote_command_retry_scheduler',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
 )
 
 env.Library(

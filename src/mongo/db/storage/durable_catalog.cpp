@@ -520,8 +520,8 @@ StatusWith<std::string> DurableCatalog::newOrphanedIdent(OperationContext* opCtx
     // The collection will be named local.orphan.xxxxx.
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
-    NamespaceString nss{DatabaseName::kLocal.db(),
-                        NamespaceString::kOrphanCollectionPrefix + identNs};
+    const auto nss = NamespaceStringUtil::deserialize(
+        DatabaseName::kLocal, NamespaceString::kOrphanCollectionPrefix + identNs);
 
     BSONObj obj;
     {

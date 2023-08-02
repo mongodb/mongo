@@ -49,22 +49,6 @@ namespace mongo {
 namespace auth {
 namespace {
 
-/**
- * Extracts the namespace being indexed from a raw BSON write command.
- * TODO: Remove when we have parsing hooked before authorization.
- */
-NamespaceString _getIndexedNss(const std::vector<BSONObj>& documents) {
-    uassert(ErrorCodes::FailedToParse, "index write batch is empty", !documents.empty());
-    std::string ns = documents.front()["ns"].str();
-    uassert(ErrorCodes::FailedToParse,
-            "index write batch contains an invalid index descriptor",
-            !ns.empty());
-    uassert(ErrorCodes::FailedToParse,
-            "index write batches may only contain a single index descriptor",
-            documents.size() == 1);
-    return NamespaceString(std::move(ns));
-}
-
 void fillPrivileges(const write_ops::InsertCommandRequest& op,
                     std::vector<Privilege>* privileges,
                     ActionSet* actions) {

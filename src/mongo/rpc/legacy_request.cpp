@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -42,7 +43,7 @@ namespace rpc {
 OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
     DbMessage dbm(message);
     QueryMessage qm(dbm);
-    NamespaceString ns(qm.ns);
+    const auto ns = NamespaceStringUtil::deserialize(boost::none, qm.ns);
 
     if (qm.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,
