@@ -250,6 +250,87 @@ __chunkcache_eviction_thread(void *arg)
 }
 
 /*
+ * __chunkcache_str_cmp --
+ *     Qsort function: sort string array.
+ */
+static int WT_CDECL
+__chunkcache_str_cmp(const void *a, const void *b)
+{
+    return (strcmp(*(const char **)a, *(const char **)b));
+}
+
+/*
+ * __chunkcache_arr_free --
+ *     Free the array of strings.
+ */
+static void
+__chunkcache_arr_free(WT_SESSION_IMPL *session, char ***arr)
+{
+    char **p;
+
+    if ((p = (*arr)) != NULL) {
+        for (; *p != NULL; ++p)
+            __wt_free(session, *p);
+        __wt_free(session, *arr);
+    }
+}
+
+/*
+ * __config_get_sorted_pinned_objects --
+ *     Get sorted array of pinned objects from the config.
+ */
+static int
+__config_get_sorted_pinned_objects(WT_SESSION_IMPL *session, const char *cfg[],
+  char ***pinned_objects_list, unsigned int *pinned_entries)
+{
+    WT_CONFIG targetconf;
+    WT_CONFIG_ITEM cval, k, v;
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+    char **pinned_objects;
+    unsigned int cnt;
+
+    pinned_objects = NULL;
+
+    WT_RET(__wt_config_gets(session, cfg, "chunk_cache.pinned", &cval));
+    __wt_config_subinit(session, &targetconf, &cval);
+    for (cnt = 0; (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++cnt)
+        ;
+    *pinned_entries = cnt;
+    WT_RET_NOTFOUND_OK(ret);
+
+    if (cnt != 0) {
+        WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+        WT_ERR(__wt_calloc_def(session, cnt + 1, &pinned_objects));
+        __wt_config_subinit(session, &targetconf, &cval);
+        for (cnt = 0; (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++cnt) {
+            if (!WT_PREFIX_MATCH(k.str, "table:"))
+                WT_ERR_MSG(session, EINVAL,
+                  "chunk cache pinned configuration only supports objects of type \"table\"");
+
+            if (v.len != 0)
+                WT_ERR_MSG(session, EINVAL,
+                  "invalid chunk cache pinned config %.*s: URIs may require quoting", (int)cval.len,
+                  (char *)cval.str);
+
+            WT_PREFIX_SKIP_REQUIRED(session, k.str, "table:");
+            WT_ERR(__wt_buf_fmt(session, tmp, "%.*s.wt", (int)(k.len - strlen("table:")), k.str));
+            WT_ERR(__wt_strndup(session, tmp->data, tmp->size, &pinned_objects[cnt]));
+        }
+        WT_ERR_NOTFOUND_OK(ret, false);
+        __wt_qsort(pinned_objects, cnt, sizeof(char *), __chunkcache_str_cmp);
+        *pinned_objects_list = pinned_objects;
+    }
+
+err:
+    __wt_scr_free(session, &tmp);
+    if (ret != 0)
+        __chunkcache_arr_free(session, &pinned_objects);
+
+    return (ret);
+}
+
+/*
  * __wt_chunkcache_get --
  *     Return the data to the caller if we have it. Otherwise read it from storage and cache it.
  *
@@ -276,7 +357,7 @@ __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid
     WT_DECL_RET;
     size_t already_read, remains_to_read, readable_in_chunk, size_copied;
     uint64_t bucket_id, retries, sleep_usec;
-    bool chunk_cached;
+    bool chunk_cached, found;
 
     chunkcache = &S2C(session)->chunkcache;
     already_read = 0;
@@ -368,6 +449,12 @@ retry:
                 return (ret);
             }
 
+            /* Mark chunk as pinned if the chunk belongs to the object in pinned object array. */
+            WT_BINARY_SEARCH_STRING(chunk->hash_id.objectname, chunkcache->pinned_objects,
+              chunkcache->pinned_entries, found);
+            if (found)
+                F_SET(chunk, WT_CHUNK_PINNED);
+
             /*
              * Mark chunk as valid. The only thread that could be executing this code is the thread
              * that won the race and inserted this (invalid) chunk into the hash table. This thread
@@ -383,6 +470,7 @@ retry:
             goto retry;
         }
     }
+
     *cache_hit = true;
     return (0);
 }
@@ -464,15 +552,14 @@ int
 __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CHUNKCACHE *chunkcache;
-    WT_CONFIG targetconf;
-    WT_CONFIG_ITEM cval, k, v;
-    WT_DECL_RET;
+    WT_CONFIG_ITEM cval;
     unsigned int cnt, i;
     wt_thread_t evict_thread_tid;
     char **pinned_objects;
 
     chunkcache = &S2C(session)->chunkcache;
     pinned_objects = NULL;
+    cnt = 0;
 
     if (chunkcache->type != WT_CHUNKCACHE_UNCONFIGURED && !reconfig)
         WT_RET_MSG(session, EINVAL, "chunk cache setup requested, but cache is already configured");
@@ -521,30 +608,9 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig
 #endif
     }
 
-    WT_RET(__wt_config_gets(session, cfg, "chunk_cache.pinned", &cval));
-    __wt_config_subinit(session, &targetconf, &cval);
-    for (cnt = 0; (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++cnt)
-        ;
-    WT_RET_NOTFOUND_OK(ret);
-
-    if (cnt != 0) {
-        WT_RET(__wt_calloc_def(session, cnt + 1, &pinned_objects));
-        chunkcache->pinned_objects = pinned_objects;
-        __wt_config_subinit(session, &targetconf, &cval);
-        for (cnt = 0; (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++cnt) {
-            if (!WT_PREFIX_MATCH(k.str, "table:"))
-                WT_RET_MSG(session, EINVAL,
-                  "chunk cache pinned configuration only supports objects of type \"table\"");
-
-            if (v.len != 0)
-                WT_RET_MSG(session, EINVAL,
-                  "invalid chunk cache pinned config %.*s: URIs may require quoting", (int)cval.len,
-                  (char *)cval.str);
-
-            WT_RET(__wt_strndup(session, k.str, k.len, &pinned_objects[cnt]));
-        }
-    }
-    WT_RET_NOTFOUND_OK(ret);
+    WT_RET(__config_get_sorted_pinned_objects(session, cfg, &pinned_objects, &cnt));
+    chunkcache->pinned_objects = pinned_objects;
+    chunkcache->pinned_entries = cnt;
 
     WT_RET(__wt_calloc_def(session, chunkcache->hashtable_size, &chunkcache->hashtable));
 
