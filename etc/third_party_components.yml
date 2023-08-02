@@ -39,13 +39,12 @@
 
 components:
 
-  abseil:
+  Abseil:
     homepage_url: https://abseil.io
-    open_hub_url: N/A
+    open_hub_url: https://openhub.net/p/abseil
     release_monitoring_id: 115295
     local_directory_path: src/third_party/abseil-cpp
     team_owner: "Service Architecture"
-    # Note: abseil exists in Black Duck, but not OpenHub
     upgrade_suppression: TODO SERVER-58675
 
   Aladdin MD5:
@@ -102,6 +101,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/SafeInt
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-79444
 
   derickr/timelib:
     homepage_url: https://github.com/derickr/timelib
@@ -209,12 +209,13 @@ components:
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
     upgrade_suppression: TODO SERVER-61193
 
-  librdkafka:
+  "librdkafka - the Apache Kafka C/C++ client library":
     homepage_url: https://github.com/confluentinc/librdkafka/
-    open_hub_url: N/A
-    release_monitoring_id: -1
+    open_hub_url: https://openhub.net/p/librdkafka
+    release_monitoring_id: 12573
     local_directory_path: src/third_party/librdkafka
     team_owner: "Streams"
+    upgrade_suppression: TODO SERVER-79507
 
   linenoise:
     homepage_url: https://github.com/antirez/linenoise
@@ -287,6 +288,7 @@ components:
     release_monitoring_id: 5832
     local_directory_path: src/third_party/pcre2
     team_owner: "Query"
+    upgrade_suppression: TODO SERVER-79445
 
   Protobuf:
     homepage_url: https://developers.google.com/protocol-buffers/
