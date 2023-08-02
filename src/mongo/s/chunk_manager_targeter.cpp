@@ -512,7 +512,6 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
     }
 
     BSONObj deleteQuery = deleteOp.getQ();
-    BSONObj shardKey;
     if (_cm.isSharded()) {
         if (_isRequestOnTimeseriesViewNamespace) {
             uassert(ErrorCodes::NotImplemented,
@@ -538,20 +537,13 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                 deleteQuery = BSONObj();
             }
         }
-
-        // Sharded collections have the following further requirements for targeting:
-        //
-        // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
-        shardKey =
-            uassertStatusOK(_cm.getShardKeyPattern().extractShardKeyFromQuery(expCtx, deleteQuery));
     }
 
-    // Target the shard key or delete query
-    if (!shardKey.isEmpty()) {
-        auto swEndpoint = _targetShardKey(shardKey, collation);
-        if (swEndpoint.isOK()) {
-            return std::vector{std::move(swEndpoint.getValue())};
-        }
+    // We first try to target based on the delete's query. It is always valid to forward any delete
+    // to a single shard, so return immediately if we are able to target a single shard.
+    auto endpoints = uassertStatusOK(_targetQuery(expCtx, deleteQuery, collation));
+    if (endpoints.size() == 1) {
+        return endpoints;
     }
 
     // We failed to target a single shard.
@@ -580,7 +572,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                           << ", shard key pattern: " << _cm.getShardKeyPattern().toString(),
             !_cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cm));
 
-    return uassertStatusOK(_targetQuery(expCtx, deleteQuery, collation));
+    return endpoints;
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(

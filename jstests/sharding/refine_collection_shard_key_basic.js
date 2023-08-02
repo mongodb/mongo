@@ -14,6 +14,7 @@ load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/shard_versioning_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/sharding/libs/bin_version_util.js");
 
 const st = new ShardingTest({
     mongos: 2,
@@ -130,11 +131,18 @@ function validateCRUDAfterRefine() {
     assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
     mongos.setReadPref(null);
 
-    // The full shard key is required when removing documents.
-    assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true),
-                              ErrorCodes.ShardKeyNotFound);
-    assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true),
-                              ErrorCodes.ShardKeyNotFound);
+    if (isLatestBinVersion(mongos, "5.0")) {
+        assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true));
+        assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true));
+    } else {
+        // The full shard key is required when removing documents if the mongos is not on the latest
+        // bin version.
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true),
+                                  ErrorCodes.ShardKeyNotFound);
+        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true),
+                                  ErrorCodes.ShardKeyNotFound);
+    }
+
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
     assert.commandWorked(
         sessionDB.getCollection(kCollName).remove({a: -1, b: 4, c: -1, d: -1}, true));

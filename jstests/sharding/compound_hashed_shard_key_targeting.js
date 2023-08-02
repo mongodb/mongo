@@ -14,6 +14,7 @@ load("jstests/aggregation/extras/utils.js");  // For arrayEq().
 load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
 load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/sharding/libs/bin_version_util.js");
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -280,10 +281,13 @@ profileFilter = {
 };
 verifyProfilerEntryOnCorrectShard(1, profileFilter);
 
-// Test to verify that delete with limit:1, without full shard key in query fails.
-assert.commandFailedWithCode(
-    coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}),
-    ErrorCodes.ShardKeyNotFound);
+if (!isLatestBinVersion(st.s, "5.0")) {
+    // Test to verify that delete with limit:1, without full shard key in query fails if the mongos
+    // is not on the latest bin version.
+    assert.commandFailedWithCode(
+        coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}),
+        ErrorCodes.ShardKeyNotFound);
+}
 
 st.stop();
 })();

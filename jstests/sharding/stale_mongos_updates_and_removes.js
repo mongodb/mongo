@@ -19,6 +19,7 @@
 
 (function() {
 'use strict';
+load("jstests/sharding/libs/bin_version_util.js");
 
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
 // (used for testing *multi* removes to a *specific* shard key).
@@ -132,20 +133,34 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
         assert.writeError(res);
     }
 
-    // Not possible because single remove requires equality match on shard key.
-    checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
+    if (isLatestBinVersion(staleMongos, "5.0")) {
+        doRemove(emptyQuery, single, makeMongosStaleFunc);
+    } else {
+        // Not possible because single remove requires equality match on shard key if the mongos is
+        // not on the latest bin version.
+        checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
+    }
     doRemove(emptyQuery, multi, makeMongosStaleFunc);
 
     doRemove(pointQuery, single, makeMongosStaleFunc);
     doRemove(pointQuery, multi, makeMongosStaleFunc);
 
-    // Not possible because can't do range query on a single remove.
-    checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
+    if (isLatestBinVersion(staleMongos, "5.0")) {
+        doRemove(rangeQuery, single, makeMongosStaleFunc);
+    } else {
+        // Not possible because can't do range query on a single remove if the mongos is not on the
+        // latest bin version.
+        checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
+    }
     doRemove(rangeQuery, multi, makeMongosStaleFunc);
 
-    // Not possible because single remove must contain _id or shard key at top level
-    // (not within $or).
-    checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
+    if (isLatestBinVersion(staleMongos, "5.0")) {
+        doRemove(multiPointQuery, single, makeMongosStaleFunc);
+    } else {
+        // Not possible because single remove must contain _id or shard key at top level
+        // (not within $or) if the mongos is not on the latest bin version.
+        checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
+    }
     doRemove(multiPointQuery, multi, makeMongosStaleFunc);
 }
 

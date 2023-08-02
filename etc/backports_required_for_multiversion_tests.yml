@@ -20,6 +20,10 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
+    ticket: SERVER-44422
+  - test_file: jstests/sharding/query/delete_with_partial_shard_key.js
+    ticket: SERVER-44422
   - test_file: jstests/core/timeseries/timeseries_field_parsed_as_bson.js
     ticket: SERVER-77654
   - test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
@@ -150,6 +154,10 @@ last-lts:
     ticket: SERVER-21929
   - test_file: jstests/sharding/scaled_collection_stats.js
     ticket: SERVER-43902
+  - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
+    ticket: SERVER-44422
+  - test_file: jstests/sharding/query/delete_with_partial_shard_key.js
+    ticket: SERVER-44422
   - test_file: jstests/core/apply_ops_system_dot_views.js
     ticket: SERVER-47469
   - test_file: jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js

@@ -415,7 +415,8 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
 void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
-                                       std::set<ShardId>* shardIds) const {
+                                       std::set<ShardId>* shardIds,
+                                       bool bypassIsFieldHashedCheck) const {
     auto findCommand = std::make_unique<FindCommandRequest>(_rt->optRt->nss());
     findCommand->setFilter(query.getOwned());
 
@@ -442,7 +443,7 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
     auto shardKeyToFind = _rt->optRt->getShardKeyPattern().extractShardKeyFromQuery(*cq);
     if (!shardKeyToFind.isEmpty()) {
         try {
-            auto chunk = findIntersectingChunk(shardKeyToFind, collation);
+            auto chunk = findIntersectingChunk(shardKeyToFind, collation, bypassIsFieldHashedCheck);
             shardIds->insert(chunk.getShardId());
             return;
         } catch (const DBException&) {

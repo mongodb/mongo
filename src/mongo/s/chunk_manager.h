@@ -622,12 +622,15 @@ public:
 
     /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
-     * collection default collation for targeting.
+     * collection default collation for targeting. If 'bypassIsFieldHashedCheck' is true, it skips
+     * checking if the shard key was hashed and assumes that any non-collatable shard key was not
+     * hashed from a collatable type.
      */
     void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
-                             std::set<ShardId>* shardIds) const;
+                             std::set<ShardId>* shardIds,
+                             bool bypassIsFieldHashedCheck = false) const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
