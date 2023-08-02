@@ -28,6 +28,7 @@
  */
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -675,7 +676,8 @@ public:
                                      std::vector<BSONObj>* errors,
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
-                                     std::vector<size_t>* docsToRetry) const {
+                                     std::vector<size_t>* docsToRetry,
+                                     absl::flat_hash_map<int, int>& retryAttemptsForDup) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             auto metadata = bucketCatalog.getMetadata(batch->bucketId());
@@ -697,10 +699,19 @@ public:
                     _performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds));
                 if (auto error =
                         generateError(opCtx, output.result, start + index, errors->size())) {
-                    errors->push_back(*error);
-                    bucketCatalog.abort(batch, output.result.getStatus());
-                    batchGuard.dismiss();
-                    return output.canContinue;
+                    bool canContinue = output.canContinue;
+                    // Automatically attempts to retry on DuplicateKey error.
+                    if ((*error)["code"].safeNumberInt() ==
+                            static_cast<int>(ErrorCodes::DuplicateKey) &&
+                        retryAttemptsForDup[index]++ <
+                            gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                        docsToRetry->push_back(index);
+                        canContinue = true;
+                    } else {
+                        errors->emplace_back(std::move(*error));
+                    }
+                    BucketCatalog::get(opCtx).abort(batch, output.result.getStatus());
+                    return canContinue;
                 }
 
                 invariant(output.result.getValue().getN() == 1,
@@ -789,6 +800,9 @@ public:
             auto result =
                 write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
             if (!result.isOK()) {
+                if (result.code() == ErrorCodes::DuplicateKey) {
+                    BucketCatalog::get(opCtx).resetBucketOIDCounter();
+                }
                 abortStatus = result;
                 return false;
             }
@@ -1033,25 +1047,16 @@ public:
                     auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                         ? std::move(bucketStmtIds[batch->bucketId()])
                         : std::vector<StmtId>{};
-                    try {
-                        canContinue = _commitTimeseriesBucket(opCtx,
-                                                              batch,
-                                                              start,
-                                                              index,
-                                                              std::move(stmtIds),
-                                                              errors,
-                                                              opTime,
-                                                              electionId,
-                                                              &docsToRetry);
-                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-                        // Automatically attempts to retry on DuplicateKey error.
-                        if (retryAttemptsForDup[index]++ <
-                            gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
-                            docsToRetry.push_back(index);
-                        } else {
-                            throw;
-                        }
-                    }
+                    canContinue = _commitTimeseriesBucket(opCtx,
+                                                          batch,
+                                                          start,
+                                                          index,
+                                                          std::move(stmtIds),
+                                                          errors,
+                                                          opTime,
+                                                          electionId,
+                                                          &docsToRetry,
+                                                          retryAttemptsForDup);
                     batch.reset();
                     if (!canContinue) {
                         break;
