@@ -2458,6 +2458,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSqrt(ArityType a
     return genericSqrt(tagOperand, valOperand);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinPow(ArityType arity) {
+    invariant(arity == 2);
+    auto [baseOwned, baseTag, baseValue] = getFromStack(0);
+    auto [exponentOwned, exponentTag, exponentValue] = getFromStack(1);
+
+    return genericPow(baseTag, baseValue, exponentTag, exponentValue);
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto [tagField, valField] = moveOwnedFromStack(1);
@@ -7135,6 +7143,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinLog10(arity);
         case Builtin::sqrt:
             return builtinSqrt(arity);
+        case Builtin::pow:
+            return builtinPow(arity);
         case Builtin::addToArray:
             return builtinAddToArray(arity);
         case Builtin::addToArrayCapped:
@@ -7472,6 +7482,8 @@ std::string builtinToString(Builtin b) {
             return "log10";
         case Builtin::sqrt:
             return "sqrt";
+        case Builtin::pow:
+            return "pow";
         case Builtin::addToArray:
             return "addToArray";
         case Builtin::addToArrayCapped:
