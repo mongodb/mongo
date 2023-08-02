@@ -1307,17 +1307,15 @@ struct SplitRequirementsFetchTransport {
                        const PSRExpr::Node& expr,
                        const Keep keep,
                        const boost::optional<FieldNameSet>& indexFieldPrefixMap,
-                       PSRExprBuilder& leftReqs,
-                       PSRExprBuilder& rightReqs,
-                       bool& hasFieldCoverage) {
-        auto& builder = left ? leftReqs : rightReqs;
+                       SplitRequirementsResult& result) {
+        auto& builder = left ? result._leftReqsBuilder : result._rightReqsBuilder;
 
         SplitRequirementsFetchTransport impl{
             left,
             keep,
             indexFieldPrefixMap,
             builder,
-            hasFieldCoverage,
+            result._hasFieldCoverage,
         };
         algebra::transport<false>(expr, impl);
     }
@@ -1396,13 +1394,11 @@ static SplitRequirementsResult splitRequirementsFetch(
     const QueryHints& hints,
     const std::vector<RequirementProps>& reqProps,
     const boost::optional<FieldNameSet>& indexFieldPrefixMap,
-    const PSRExpr::NodeVector& conjuncts) {
+    const PSRExpr::Node& reqs) {
 
-    bool hasFieldCoverage = true;
-    PSRExprBuilder leftReqs;
-    PSRExprBuilder rightReqs;
-    leftReqs.pushConj();
-    rightReqs.pushConj();
+    SplitRequirementsResult result;
+    result._leftReqsBuilder.pushConj();
+    result._rightReqsBuilder.pushConj();
 
     // Adds a PSRExpr 'expr' to the left or right, as specified by 'left'.
     // When adding to the right, replaces any 'perfOnly' atoms with trivially-true.
@@ -1416,71 +1412,65 @@ static SplitRequirementsResult splitRequirementsFetch(
     using Keep = SplitRequirementsFetchTransport::Keep;
     const auto addReq =
         [&](const bool left, const PSRExpr::Node& expr, const Keep keep = Keep::kBoth) {
-            SplitRequirementsFetchTransport::addReq(
-                left, expr, keep, indexFieldPrefixMap, leftReqs, rightReqs, hasFieldCoverage);
+            SplitRequirementsFetchTransport::addReq(left, expr, keep, indexFieldPrefixMap, result);
         };
 
-    size_t index = 0;
+    PSRExpr::visitConjuncts(
+        reqs, [&](const PSRExpr::Node& conjunct, const PSRExpr::VisitorContext& ctx) {
+            const auto& reqProp = reqProps.at(ctx.getChildIndex());
+            const bool left = ((1ull << ctx.getChildIndex()) & mask);
 
-    for (const auto& conjunct : conjuncts) {
-        const auto& reqProp = reqProps.at(index);
-        const bool left = ((1ull << index) & mask);
-
-        if (!left) {
-            // Predicate should go on the right side.
-            addReq(false /*left*/, conjunct);
-            index++;
-            continue;
-        }
-
-        // Predicate should go on the left side. However:
-        // - Correct null handling requires moving the projection to the fetch side.
-        // - Yield-safe plans require duplicating the predicate to both sides.
-        //     - Except that 'perfOnly' predicates become true on the fetch side.
-
-        if (hints._fastIndexNullHandling || !reqProp._mayReturnNull) {
-            // We can never return Null values from the requirement.
-            if (hints._disableYieldingTolerantPlans) {
-                // Insert into left side unchanged.
-                addReq(true /*left*/, conjunct);
-
-            } else {
-                // Insert a requirement on the right side too, left side is non-binding.
-                addReq(true /*left*/, conjunct, Keep::kPredicateOnly);
+            if (!left) {
+                // Predicate should go on the right side.
                 addReq(false /*left*/, conjunct);
+                return;
             }
-        } else {
-            // At this point we should not be seeing perf-only predicates.
 
-            // We cannot return index values, since the interval can possibly contain Null. Instead,
-            // we remove the output binding for the left side, and return the value from the
-            // right (seek) side.
-            addReq(true /*left*/, conjunct, Keep::kPredicateOnly);
-            addReq(false /*left*/,
-                   conjunct,
-                   // Yield-safe plans keep both the predicate and projection on the fetch side.
-                   // Yield-unsafe plans only need the projection.
-                   hints._disableYieldingTolerantPlans ? Keep::kProjectionOnly : Keep::kBoth);
-        }
+            // Predicate should go on the left side. However:
+            // - Correct null handling requires moving the projection to the fetch side.
+            // - Yield-safe plans require duplicating the predicate to both sides.
+            //     - Except that 'perfOnly' predicates become true on the fetch side.
 
-        if (!hasFieldCoverage) {
-            break;
-        }
-        index++;
-    }
+            if (hints._fastIndexNullHandling || !reqProp._mayReturnNull) {
+                // We can never return Null values from the requirement.
+                if (hints._disableYieldingTolerantPlans) {
+                    // Insert into left side unchanged.
+                    addReq(true /*left*/, conjunct);
+                } else {
+                    // Insert a requirement on the right side too, left side is non-binding.
+                    addReq(true /*left*/, conjunct, Keep::kPredicateOnly);
+                    addReq(false /*left*/, conjunct);
+                }
+            } else {
+                // At this point we should not be seeing perf-only predicates.
 
-    return {
-        std::move(leftReqs),
-        std::move(rightReqs),
-        hasFieldCoverage,
-    };
+                // We cannot return index values, since the interval can possibly contain Null.
+                // Instead, we remove the output binding for the left side, and return the value
+                // from the right (seek) side.
+                addReq(true /*left*/, conjunct, Keep::kPredicateOnly);
+                addReq(false /*left*/,
+                       conjunct,
+                       // Yield-safe plans keep both the predicate and projection on the fetch side.
+                       // Yield-unsafe plans only need the projection.
+                       hints._disableYieldingTolerantPlans ? Keep::kProjectionOnly : Keep::kBoth);
+            }
+
+            if (!result._hasFieldCoverage) {
+                ctx.returnEarly();
+                return;
+            }
+        });
+
+    return result;
 }
 
 static SplitRequirementsResult splitRequirementsIndex(const size_t mask,
-                                                      const PSRExpr::NodeVector& reqs,
+                                                      const PSRExpr::Node& reqs,
                                                       const bool disjunctive) {
-    PSRExprBuilder leftReqs;
-    PSRExprBuilder rightReqs;
+    SplitRequirementsResult result;
+    PSRExprBuilder& leftReqs = result._leftReqsBuilder;
+    PSRExprBuilder& rightReqs = result._rightReqsBuilder;
+
     if (disjunctive) {
         leftReqs.pushDisj();
         rightReqs.pushDisj();
@@ -1489,24 +1479,23 @@ static SplitRequirementsResult splitRequirementsIndex(const size_t mask,
         rightReqs.pushConj();
     }
 
-    size_t index = 0;
-    for (const auto& req : reqs) {
-        if ((1ull << index) & mask) {
-            leftReqs.subtree(req);
-        } else {
-            rightReqs.subtree(req);
-        }
+    PSRExpr::visitConjDisj(
+        !disjunctive, reqs, [&](const PSRExpr::Node& req, const PSRExpr::VisitorContext& ctx) {
+            if ((1ull << ctx.getChildIndex()) & mask) {
+                leftReqs.subtree(req);
+            } else {
+                rightReqs.subtree(req);
+            }
+        });
 
-        index++;
-    }
-
-    return {std::move(leftReqs), std::move(rightReqs)};
+    return result;
 }
 
 /**
  * Finds and splits one requirement with bound projection that may return null. Checks if a
  * SargableNode can be split into two SargableNodes where one of them does not contain any null,
- * which allows us to optimize that with an IndexScan without Seek.
+ * which allows us to optimize that with an IndexScan without Seek. The underlying PSR is expected
+ * to be a singleton disjunction.
  *
  * If eligible, returns the struct containing the position in 'reqs' where the requirement needs to
  * be split along with the split requirements. Returns boost::none if the node is ineligible for the
@@ -1519,39 +1508,40 @@ struct IntervalReqSplitResult {
     ProjectionName boundProjectionName;
 };
 static boost::optional<IntervalReqSplitResult> findOneRequirementMayReturnNull(
-    const PSRExpr::NodeVector& reqs,
+    const PSRExpr::Node& reqs,
     const std::vector<RequirementProps>& reqProps,
-    const RewriteContext& ctx) {
+    const RewriteContext& rewriteCtx) {
     boost::optional<IntervalReqSplitResult> result;
-    for (size_t pos = 0; pos < reqs.size(); ++pos) {
-        const auto& req = reqs[pos];
-        const auto& reqProp = reqProps[pos];
-        if (!reqProp._mayReturnNull) {
-            continue;
-        }
-        if (!PSRExpr::isSingletonDisjunction(req)) {
-            return boost::none;
-        }
-        auto atom = req.cast<PSRExpr::Disjunction>()->nodes().front().cast<PSRExpr::Atom>();
-        if (!atom) {
-            return boost::none;
-        }
-        const auto& requirement = atom->getExpr().second;
-        if (requirement.getBoundProjectionName()) {
-            if (result) {
-                // We don't support more than one requirement to be split.
-                return boost::none;
+    PSRExpr::visitConjuncts(
+        reqs, [&](const PSRExpr::Node& req, const PSRExpr::VisitorContext& ctx) {
+            const auto& reqProp = reqProps[ctx.getChildIndex()];
+            if (!reqProp._mayReturnNull) {
+                return;
             }
-            auto splitResult = splitNull(requirement.getIntervals(), ctx.getConstFold());
-            if (!splitResult) {
-                return boost::none;
+
+            if (PSRExpr::isSingletonDisjunction(req)) {
+                auto* atom =
+                    req.cast<PSRExpr::Disjunction>()->nodes().front().cast<PSRExpr::Atom>();
+                const auto& requirement = atom->getExpr().second;
+                if (const auto& output = requirement.getBoundProjectionName()) {
+                    if (!result) {
+                        // We only support one requirement to be split.
+                        if (auto splitResult =
+                                splitNull(requirement.getIntervals(), rewriteCtx.getConstFold())) {
+                            result = IntervalReqSplitResult{ctx.getChildIndex(),
+                                                            splitResult->first,
+                                                            splitResult->second,
+                                                            *output};
+                            return;
+                        }
+                    }
+                }
             }
-            result = IntervalReqSplitResult{pos,
-                                            splitResult->first,
-                                            splitResult->second,
-                                            *requirement.getBoundProjectionName()};
-        }
-    }
+
+            // Cannot rewrite.
+            result = boost::none;
+            ctx.returnEarly();
+        });
 
     return result;
 }
@@ -1585,7 +1575,7 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
                                               const ProjectionName& scanProjectionName,
                                               const ScanDefinition& scanDef,
                                               const GroupIdType scanGroupId,
-                                              const PSRExpr::NodeVector& reqs,
+                                              const PSRExpr::Node& reqs,
                                               RewriteContext& ctx
 
 ) {
@@ -1594,33 +1584,33 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
     leftReqsBuilder.pushConj();
     rightReqsBuilder.pushConj();
 
-    for (size_t pos = 0; pos < reqs.size(); ++pos) {
-        const auto& req = reqs[pos];
-        if (pos == splitResult.reqMayReturnNullPos) {
-            const auto& atom =
-                req.cast<PSRExpr::Disjunction>()->nodes().begin()->cast<PSRExpr::Atom>();
-            const auto& requirementToSplit = atom->getExpr().second;
-            // Create the requirement for non-null IndexScan.
-            PartialSchemaRequirement nullExcludedRequirement{splitResult.boundProjectionName,
-                                                             std::move(splitResult.nullExcluded),
-                                                             requirementToSplit.getIsPerfOnly()};
-            leftReqsBuilder.pushDisj()
-                .atom({atom->getExpr().first, std::move(nullExcludedRequirement)})
-                .pop();
-            // Create the requirement with interval including nulls.
-            PartialSchemaRequirement nullIncludedRequirement{
-                splitResult.boundProjectionName,
-                std::move(splitResult.nullIncluded),
-                requirementToSplit.getIsPerfOnly(),
-            };
-            rightReqsBuilder.pushDisj()
-                .atom({atom->getExpr().first, std::move(nullIncludedRequirement)})
-                .pop();
-        } else {
-            leftReqsBuilder.subtree(req);
-            rightReqsBuilder.subtree(req);
-        }
-    }
+    PSRExpr::visitConjuncts(
+        reqs, [&](const PSRExpr::Node& req, const PSRExpr::VisitorContext& ctx) {
+            if (ctx.getChildIndex() == splitResult.reqMayReturnNullPos) {
+                const auto& atom =
+                    req.cast<PSRExpr::Disjunction>()->nodes().begin()->cast<PSRExpr::Atom>();
+                const auto& [key, requirementToSplit] = atom->getExpr();
+
+                // Create the requirement for non-null IndexScan.
+                PartialSchemaRequirement nullExcludedRequirement{
+                    splitResult.boundProjectionName,
+                    std::move(splitResult.nullExcluded),
+                    requirementToSplit.getIsPerfOnly()};
+                leftReqsBuilder.pushDisj().atom(key, std::move(nullExcludedRequirement)).pop();
+
+                // Create the requirement with interval including nulls.
+                PartialSchemaRequirement nullIncludedRequirement{
+                    splitResult.boundProjectionName,
+                    std::move(splitResult.nullIncluded),
+                    requirementToSplit.getIsPerfOnly(),
+                };
+                rightReqsBuilder.pushDisj().atom(key, std::move(nullIncludedRequirement)).pop();
+            } else {
+                leftReqsBuilder.subtree(req);
+                rightReqsBuilder.subtree(req);
+            }
+        });
+
     auto leftReqExpr = leftReqsBuilder.finish();
     auto rightReqExpr = rightReqsBuilder.finish();
     // Convert everything back to DNF.
@@ -1747,10 +1737,11 @@ struct ExploreConvert<SargableNode> {
             // Conversion between DNF/CNF can fail if the result would be too big.
             return;
         }
-        const bool disjunctive = splittable->is<PSRExpr::Disjunction>();
-        const PSRExpr::NodeVector& reqs = disjunctive
-            ? splittable->cast<PSRExpr::Disjunction>()->nodes()
-            : splittable->cast<PSRExpr::Conjunction>()->nodes();
+
+        const auto& reqs = *splittable;
+        const bool disjunctive = PSRExpr::isDNF(reqs);
+        const size_t reqSize = disjunctive ? reqs.cast<PSRExpr::Disjunction>()->nodes().size()
+                                           : reqs.cast<PSRExpr::Conjunction>()->nodes().size();
 
         const auto& indexFieldPrefixMap = ctx.getIndexFieldPrefixMap();
         boost::optional<FieldNameSet> indexFieldPrefixMapForScanDef;
@@ -1765,29 +1756,29 @@ struct ExploreConvert<SargableNode> {
         // We only need these for the index/fetch split.
         std::vector<RequirementProps> reqProps;
         if (!isIndex) {
-            reqProps.reserve(reqs.size());
-            for (const auto& conjunct : reqs) {
-                // Pre-compute if a requirement's interval is fully open.
+            reqProps.reserve(reqSize);
+            PSRExpr::visitConjuncts(
+                reqs, [&](const PSRExpr::Node& conjunct, const PSRExpr::VisitorContext& /*ctx*/) {
+                    // Pre-compute if a requirement's interval is fully open.
 
-                // Pre-compute if a requirement's interval may contain nulls, and also has an output
-                // binding. Do use constant folding if we do not have to.
-                const bool mayReturnNull = !hints._fastIndexNullHandling &&
-                    PSRExpr::any(conjunct, [&](const PartialSchemaEntry& entry) {
-                        return entry.second.mayReturnNull(ctx.getConstFold());
+                    // Pre-compute if a requirement's interval may contain nulls, and also has an
+                    // output binding. Do use constant folding if we do not have to.
+                    const bool mayReturnNull = !hints._fastIndexNullHandling &&
+                        PSRExpr::any(conjunct, [&](const PartialSchemaEntry& entry) {
+                            return entry.second.mayReturnNull(ctx.getConstFold());
+                        });
+
+                    reqProps.push_back({
+                        mayReturnNull,
                     });
-
-                reqProps.push_back({
-                    mayReturnNull,
                 });
-            }
         }
 
         // Explores the optimization by splitting a sargable node in order to reduce fetching on
         // non-null fields. For this optimization, the SargableNode to split has to target
         // 'IndexReqTarget::Complete'.
-        if (!isIndex && splitCount == 0 && !hints._fastIndexNullHandling) {
-            if (auto splitResult = findOneRequirementMayReturnNull(reqs, reqProps, ctx);
-                splitResult) {
+        if (!isIndex && splitCount == 0 && !disjunctive && !hints._fastIndexNullHandling) {
+            if (auto splitResult = findOneRequirementMayReturnNull(reqs, reqProps, ctx)) {
                 splitSargableNodeToReduceFetching(
                     *splitResult, scanProjectionName, scanDef, scanGroupId, reqs, ctx);
             }
@@ -1798,7 +1789,7 @@ struct ExploreConvert<SargableNode> {
         // try having at least one predicate on the left (mask = 1), and we try all possible
         // subsets. For index intersection however (isIndex = true), we try symmetric partitioning
         // (thus the high bound is 2^(N-1)).
-        const size_t highMask = isIndex ? (1ull << (reqs.size() - 1)) : (1ull << reqs.size());
+        const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
             auto splitResult = isIndex
                 ? splitRequirementsIndex(mask, reqs, disjunctive)

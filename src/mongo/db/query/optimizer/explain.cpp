@@ -3090,6 +3090,11 @@ std::string ExplainGenerator::explainPartialSchemaReqMap(const PartialSchemaRequ
     return result.str();
 }
 
+std::string ExplainGenerator::explainPartialSchemaReqExpr(const PSRExpr::Node& reqs) {
+    ExplainGeneratorV2 gen;
+    return gen.printPartialSchemaRequirements(reqs).str();
+}
+
 std::string ExplainGenerator::explainResidualRequirements(
     const ResidualRequirements::Node& resReqs) {
     ExplainGeneratorV2 gen;

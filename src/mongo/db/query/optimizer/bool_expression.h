@@ -207,6 +207,15 @@ struct BoolExpr {
     }
 
     template <typename NodeType, typename Visitor>
+    static size_t visitConjDisj(const bool conjunctive, NodeType&& node, const Visitor& visitor) {
+        if (conjunctive) {
+            return visitConjuncts(node, visitor);
+        } else {
+            return visitDisjuncts(node, visitor);
+        }
+    }
+
+    template <typename NodeType, typename Visitor>
     static void visitAtom(NodeType&& node, const Visitor& visitor) {
         const VisitorContext ctx;
         visitor(node.template cast<Atom>()->getExpr(), ctx);
