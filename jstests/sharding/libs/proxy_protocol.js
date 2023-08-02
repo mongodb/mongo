@@ -1,16 +1,14 @@
 /**
  * Control the proxy protocol server.
  */
+
+load("jstests/libs/python.js");
 class ProxyProtocolServer {
     /**
      * Create a new proxy protocol server.
      */
     constructor(ingress_port, egress_port, version) {
-        this.python = "python3";
-
-        if (_isWindows()) {
-            this.python = "python.exe";
-        }
+        this.python = getPython3Binary();
 
         print("Using python interpreter: " + this.python);
         this.web_server_py = "jstests/sharding/libs/proxy_protocol_server.py";

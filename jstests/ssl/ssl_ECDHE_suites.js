@@ -1,6 +1,7 @@
 // Test that the server supports ECDHE and DHE tls cipher suites.
 
 load('jstests/ssl/libs/ssl_helpers.js');
+load("jstests/libs/python.js");
 
 (function() {
 "use strict";
@@ -35,11 +36,7 @@ const x509_options = {
 const mongod = MongoRunner.runMongod(x509_options);
 
 // Use new toolchain python, if it exists
-let python_binary = '/opt/mongodbtoolchain/v4/bin/python3';
-if (runProgram('/bin/sh', '-c', 'ls ' + python_binary) !== 0) {
-    // We are running on mac
-    python_binary = 'python3';
-}
+let python_binary = getPython3Binary();
 
 // Run the tls cipher suite enumerator
 const python = '/usr/bin/env ' + python_binary;

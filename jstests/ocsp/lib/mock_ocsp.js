@@ -3,6 +3,7 @@
  * OCSP certificate revocation.
  */
 load("jstests/ocsp/lib/ocsp_helpers.js");
+load("jstests/libs/python.js");
 
 // These are a list of faults to match the list of faults
 // in ocsp_mock.py.
@@ -46,12 +47,8 @@ class MockOCSPServer {
                 response_delay_secs = 0,
                 include_extraneous_status = false,
                 issuer_hash_algorithm = "") {
-        this.python = "python3";
+        this.python = getPython3Binary();
         this.fault_type = fault_type;
-
-        if (_isWindows()) {
-            this.python = "python.exe";
-        }
 
         this.ca_file = responder_certificate_set.cafile;
         this.ocsp_cert_file = responder_certificate_set.certfile;

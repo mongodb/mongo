@@ -180,7 +180,7 @@ buildscripts/golden_test.py setup
 Run buildscripts/golden_test.py setup utility.
 You may be asked for a password, when not running in "Run as administrator" shell.
 ```cmd
-c:\python\Python37\python.exe buildscripts/golden_test.py setup
+c:\python\python310\python.exe buildscripts/golden_test.py setup
 ```
 
 ### Manual Setup (Default config)

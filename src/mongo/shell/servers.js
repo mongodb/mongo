@@ -1,3 +1,5 @@
+load("jstests/libs/python.js");
+
 var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoProgramNoConnect,
     myPort;
 
@@ -169,8 +171,18 @@ function runHangAnalyzer(pids) {
     print(`Running hang analyzer for pids [${pids}]`);
 
     const scriptPath = pathJoin('.', 'buildscripts', 'resmoke.py');
-    const args =
-        ['python', scriptPath, 'hang-analyzer', '-k', '-o', 'file', '-o', 'stdout', '-d', pids];
+    const args = [
+        getPython3Binary(),
+        scriptPath,
+        'hang-analyzer',
+        '-k',
+        '-o',
+        'file',
+        '-o',
+        'stdout',
+        '-d',
+        pids
+    ];
 
     if (jsTest.options().evergreenTaskId) {
         args.push('-t', jsTest.options().evergreenTaskId);

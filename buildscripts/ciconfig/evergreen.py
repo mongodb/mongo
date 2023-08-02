@@ -6,11 +6,11 @@ configuration file.
 from __future__ import annotations
 
 import datetime
-import distutils.spawn
+import shutil
 import os
 import subprocess
+import structlog
 import sys
-import time
 from typing import Set, List, Optional
 
 import yaml
@@ -20,20 +20,46 @@ from buildscripts.util import runcommand
 ENTERPRISE_MODULE_NAME = "enterprise"
 ASAN_SIGNATURE = "detect_leaks=1"
 
+LOGGER = structlog.get_logger(__name__)
+
 
 def parse_evergreen_file(path, evergreen_binary="evergreen"):
     """Read an Evergreen file and return EvergreenProjectConfig instance."""
     if evergreen_binary:
-        if not distutils.spawn.find_executable(evergreen_binary):
+        print(f"os.environ={os.environ}")
+        if not shutil.which(evergreen_binary):
+            # On windows in python3.8 there was an update to no longer use HOME in os.path.expanduser
+            # However, cygwin is weird and has HOME but not USERPROFILE
+            # So we just check if HOME is set and USERPROFILE is not
+            # Then we just set USERPROFILE and unset it after
+            # Bug is here: https://bugs.python.org/issue36264
+
+            prev_environ = os.environ.copy()
+            if sys.platform in ("win32", "cygwin"):
+                LOGGER.info(f"Previous os.environ={os.environ} before updating 'USERPROFILE'")
+                if 'HOME' in os.environ:
+                    os.environ['USERPROFILE'] = os.environ['HOME']
+                else:
+                    LOGGER.warn(
+                        "'HOME' enviorment variable unset. This will likely cause us to be unable to find evergreen binary."
+                    )
+
             default_evergreen_location = os.path.expanduser(os.path.join("~", "evergreen"))
+
+            # Restore enviorment if it was modified above on windows
+            os.environ.clear()
+            os.environ.update(prev_environ)
+
             if os.path.exists(default_evergreen_location):
                 evergreen_binary = default_evergreen_location
             elif os.path.exists(f"{default_evergreen_location}.exe"):
                 evergreen_binary = f"{default_evergreen_location}.exe"
             else:
                 raise EnvironmentError(
-                    "Executable '{}' does not exist or is not in the PATH.".format(
-                        evergreen_binary))
+                    f"Executable {evergreen_binary} (default location: {default_evergreen_location}) does not exist or is not in the PATH. PATH={os.environ.get('PATH')}"
+                )
+        else:
+            evergreen_binary = shutil.which(evergreen_binary)
 
         # Call 'evergreen evaluate path' to pre-process the project configuration file.
         cmd = [evergreen_binary, "evaluate", path]

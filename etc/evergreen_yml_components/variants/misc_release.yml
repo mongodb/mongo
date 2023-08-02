@@ -2514,7 +2514,7 @@ buildvariants:
       --win-version-min=win10
       --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
     large_distro_name: windows-vsCurrent-large
@@ -2580,7 +2580,7 @@ buildvariants:
       --win-version-min=win10
       --use-diagnostic-latches=off
     num_scons_link_jobs_available: 0.25
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows

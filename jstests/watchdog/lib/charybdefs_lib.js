@@ -6,10 +6,13 @@ const EXIT_WATCHDOG = 61;
  *
  * @param {string} test_name unique name for test directories
  */
+
+load("jstests/libs/python.js");
+
 function CharybdefsControl(test_name) {
     'use strict';
 
-    const python = "python";
+    const python = getPython3Binary();
     let control_py = "/data/charybdefs/mongo/control.py";
 
     // Use the minimum watchdog period

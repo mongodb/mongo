@@ -3,6 +3,8 @@
  * Control the Free Monitoring Mock Webserver.
  */
 
+load("jstests/libs/python.js");
+
 // These faults must match the list of faults in mock_http_server.py, see the
 // SUPPORTED_FAULT_TYPES list in mock_http_server.py
 const FAULT_FAIL_REGISTER = "fail_register";
@@ -23,13 +25,9 @@ class FreeMonWebServer {
      * @param {bool} disableFaultsOnStartup optionally disable fault on startup
      */
     constructor(fault_type, disableFaultsOnStartup) {
-        this.python = "python3";
+        this.python = getPython3Binary();
         this.disableFaultsOnStartup = disableFaultsOnStartup || false;
         this.fault_type = fault_type;
-
-        if (_isWindows()) {
-            this.python = "python.exe";
-        }
 
         print("Using python interpreter: " + this.python);
         this.web_server_py = "jstests/free_mon/libs/mock_http_server.py";

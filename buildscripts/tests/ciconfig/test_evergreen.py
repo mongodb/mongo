@@ -14,7 +14,11 @@ class TestEvergreenProjectConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        env = os.environ.copy()
         cls.conf = _evergreen.parse_evergreen_file(TEST_FILE_PATH, evergreen_binary=None)
+
+        # Assert there is no leakage of env variables from this function
+        assert env == os.environ
 
     def test_invalid_path(self):
         invalid_path = "non_existing_file"

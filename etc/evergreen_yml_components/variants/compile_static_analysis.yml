@@ -205,7 +205,7 @@ buildvariants:
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
       --win-version-min=win10
     num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     scons_cache_scope: shared
     compile_variant: *windows-compile-required
   tasks:

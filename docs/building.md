@@ -19,7 +19,7 @@ To build MongoDB, you will need:
       * `libcurl4-gnutls-dev`
     * On Ubuntu, the lzma library is required. Install `liblzma-dev`
     * On Amazon Linux, the xz-devel library is required. `yum install xz-devel`
-* Python 3.7.x and Pip modules:
+* Python 3.9.x and Pip modules:
   * See the section "Python Prerequisites" below.
 * About 13 GB of free disk space for the core binaries (`mongod`,
   `mongos`, and `mongo`) and about 600 GB for the install-all target.
@@ -43,7 +43,7 @@ The source for the tools is now available at
 Python Prerequisites
 ---------------
 
-In order to build MongoDB, Python 3.7+ is required, and several Python
+In order to build MongoDB, Python 3.9+ is required, and several Python
 modules must be installed. Python 3 is included in macOS 10.15 and later.
 For earlier macOS versions, Python 3 can be installed using Homebrew or
 MacPorts or similar.
@@ -131,7 +131,7 @@ Windows
 
 Build requirements:
 * Visual Studio 2022 version 17.0 or newer
-* Python 3.7
+* Python 3.9
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
 

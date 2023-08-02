@@ -168,7 +168,7 @@ variables:
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     num_scons_link_jobs_available: 0.5
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -551,7 +551,7 @@ buildvariants:
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
       MONGO_DISTMOD=windows
     num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -631,7 +631,7 @@ buildvariants:
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     multiversion_platform: windows
     multiversion_edition: enterprise
@@ -684,7 +684,7 @@ buildvariants:
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     multiversion_platform: windows
     multiversion_edition: enterprise
@@ -773,7 +773,7 @@ buildvariants:
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
     num_scons_link_jobs_available: 0.25
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     resmoke_jobs_max: 1
     scons_cache_scope: shared
@@ -1890,7 +1890,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
   tasks:
   - name: build_metrics_gen_TG
 
@@ -2908,7 +2908,7 @@ buildvariants:
   - windows-vsCurrent-small
   stepback: false
   expansions:
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
   tasks:
   - name: win_shared_scons_cache_pruning
 
@@ -2975,7 +2975,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
-    python: '/cygdrive/c/python/python37/python.exe'
+    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
     has_packages: false
     scons_cache_scope: shared
