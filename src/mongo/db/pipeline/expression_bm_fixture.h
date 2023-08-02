@@ -233,11 +233,6 @@ public:
 
     void benchmarkPercentile(benchmark::State& state, int arraySize, const std::vector<double>& ps);
 
-    void benchmarkPowIntegers(benchmark::State& state);
-    void benchmarkPowDoubles(benchmark::State& state);
-    void benchmarkPowDecimals(benchmark::State& state);
-    void benchmarkPowNullAndMissing(benchmark::State& state);
-
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -861,19 +856,6 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, Percentile_SingleMid_50000)(benchmark::State & state) {                \
         benchmarkPercentile(state, 50000, {0.5});                                               \
-    }                                                                                           \
-                                                                                                \
-    BENCHMARK_F(Fixture, PowIntegers)(benchmark::State & state) {                               \
-        benchmarkPowIntegers(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowDoubles)(benchmark::State & state) {                                \
-        benchmarkPowDoubles(state);                                                             \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowDecimals)(benchmark::State & state) {                               \
-        benchmarkPowDecimals(state);                                                            \
-    }                                                                                           \
-    BENCHMARK_F(Fixture, PowNullAndMissing)(benchmark::State & state) {                         \
-        benchmarkPowNullAndMissing(state);                                                      \
     }
 
 
