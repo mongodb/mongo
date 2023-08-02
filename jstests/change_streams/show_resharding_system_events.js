@@ -138,6 +138,9 @@ if (FeatureFlagUtil.isEnabled(st.s, "ReshardingImprovements")) {
             documentKey: {a: 1, _id: 1}
         },
         {
+            operationType: "endOfTransaction",
+        },
+        {
             ns: reshardingNs,
             collectionUUID: newUUID,
             operationType: "createIndexes",
@@ -158,6 +161,9 @@ if (FeatureFlagUtil.isEnabled(st.s, "ReshardingImprovements")) {
             documentKey: {a: 2, _id: 2}
         },
     ];
+    if (!FeatureFlagUtil.isEnabled(st.s, "EndOfTransactionChangeEvent"))
+        expectedReshardingEvents = expectedReshardingEvents.filter(
+            (event) => (event.operationType !== "endOfTransaction"));
 }
 
 // Helper to confirm the sequence of events observed in the change stream.
@@ -179,7 +185,7 @@ assertChangeStreamEventSequence({showSystemEvents: true}, expectedReshardingEven
 
 // With showSystemEvents set to false, we expect to only see events on the original namespace.
 const nonSystemEvents =
-    expectedReshardingEvents.filter((event) => (event.ns.coll === testColl.getName()));
+    expectedReshardingEvents.filter((event) => (event.ns && event.ns.coll === testColl.getName()));
 assertChangeStreamEventSequence({showSystemEvents: false}, nonSystemEvents);
 
 st.stop();

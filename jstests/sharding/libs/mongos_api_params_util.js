@@ -1246,7 +1246,7 @@ export let MongosAPIParametersUtil = (function() {
                 configServerCommandName: "setFeatureCompatibilityVersion",
                 permittedInTxn: false,
                 runsAgainstAdminDb: true,
-                command: () => ({setFeatureCompatibilityVersion: latestFCV})
+                command: () => ({setFeatureCompatibilityVersion: latestFCV, confirm: true})
             }
         },
         {

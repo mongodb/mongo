@@ -106,6 +106,19 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
     return result;
 }
 
+ABT translateShardKeyField(std::string shardKey) {
+    auto abt = make<PathIdentity>();
+    size_t curPos = 0;
+    size_t nextPos = 0;
+    while (nextPos != std::string::npos) {
+        nextPos = shardKey.find('.', curPos);
+        abt =
+            make<PathGet>(FieldNameType{shardKey.substr(curPos, nextPos - curPos)}, std::move(abt));
+        curPos = nextPos + 1;
+    }
+    return abt;
+}
+
 std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
                                                             const sbe::value::TypeTags& tag) {
     switch (tag) {

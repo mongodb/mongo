@@ -4,7 +4,9 @@
  * Pauses a compact command in the MDB layer, sets interrupt via killOp, and then releases the
  * command to discover the interrupt in the storage engine layer.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *     requires_persistence,
+ * ]
  */
 
 (function() {
@@ -34,7 +36,8 @@ function loadData(conn, dbName, collName, coll) {
 
             // This is a sufficient amount of data for WT::compact to run. If the data size is too
             // small, WT::compact skips.
-            const size = 500;
+            // This also needs to be large enough to pass the "available bytes" check in WT-11332.
+            const size = 4096;
             const count = 25000;
             const doc = {a: -1, x: 'x'.repeat(size), b: -1, t: t};
 

@@ -1,7 +1,6 @@
 // Tests "stacking" multiple migration cleanup threads and their behavior when the collection
 // changes
-// TODO SERVER-71169: Re-enable this test once shard filtering is implemented for CQF.
-// @tags: [assumes_balancer_off, cqf_incompatible]
+// @tags: [assumes_balancer_off]
 (function() {
 'use strict';
 

@@ -7,9 +7,10 @@
  */
 
 struct __wt_compact_state {
-    uint32_t lsm_count;  /* Number of LSM trees seen */
-    uint32_t file_count; /* Number of files seen */
-    uint64_t max_time;   /* Configured timeout */
+    uint32_t file_count;        /* Number of files seen */
+    uint32_t lsm_count;         /* Number of LSM trees seen */
+    uint64_t free_space_target; /* Configured minimum space that should be recovered */
+    uint64_t max_time;          /* Configured timeout */
 
     struct timespec begin; /* Starting time */
 };

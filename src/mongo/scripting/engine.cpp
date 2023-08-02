@@ -268,12 +268,13 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_loadedVersion == lastVersion)
         return;
 
-    NamespaceString coll(_localDBName, "system.js");
+    const auto collNss =
+        NamespaceStringUtil::parseNamespaceFromRequest(boost::none, _localDBName, "system.js");
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
     std::unique_ptr<DBClientCursor> c = directDBClient->find(
-        FindCommandRequest{coll}, ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
+        FindCommandRequest{collNss}, ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     massert(16669, "unable to get db client cursor from query", c.get());
 
     set<string> thisTime;

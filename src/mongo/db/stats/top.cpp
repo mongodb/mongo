@@ -204,9 +204,8 @@ void Top::_appendToUsageMap(BSONObjBuilder& b, const UsageMap& map) const {
 
         const CollectionData& coll = map.find(names[i])->second;
         auto pos = names[i].find('.');
-        auto nss = NamespaceString(names[i].substr(0, pos), names[i].substr(pos + 1));
-
-        if (coll.isStatsRecordingAllowed && !nss.isFLE2StateCollection()) {
+        if (coll.isStatsRecordingAllowed &&
+            !NamespaceString::isFLE2StateCollection(names[i].substr(pos + 1))) {
             _appendStatsEntry(b, "total", coll.total);
 
             _appendStatsEntry(b, "readLock", coll.readLock);

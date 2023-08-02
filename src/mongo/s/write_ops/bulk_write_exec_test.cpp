@@ -1167,9 +1167,7 @@ BulkOp makeTestUpdateOp(BSONObj filter,
                         boost::optional<std::vector<mongo::BSONObj>> arrayFilters,
                         boost::optional<mongo::BSONObj> constants,
                         boost::optional<mongo::BSONObj> collation,
-                        boost::optional<mongo::BSONObj> sort,
-                        boost::optional<StringData> returnValue,
-                        boost::optional<mongo::BSONObj> returnFields) {
+                        boost::optional<mongo::BSONObj> sort) {
     BulkWriteUpdateOp op;
     op.setUpdate(0);
     op.setFilter(filter);
@@ -1183,25 +1181,19 @@ BulkOp makeTestUpdateOp(BSONObj filter,
     op.setConstants(constants);
     op.setCollation(collation);
     op.setSort(sort);
-    op.setReturn(returnValue);
-    op.setReturnFields(returnFields);
     return op;
 }
 
 BulkOp makeTestDeleteOp(BSONObj filter,
                         mongo::BSONObj hint,
                         boost::optional<mongo::BSONObj> collation,
-                        boost::optional<mongo::BSONObj> sort,
-                        mongo::OptionalBool returnValue,
-                        boost::optional<mongo::BSONObj> returnFields) {
+                        boost::optional<mongo::BSONObj> sort) {
     BulkWriteDeleteOp op;
     op.setDeleteCommand(0);
     op.setFilter(filter);
     op.setHint(hint);
     op.setCollation(collation);
     op.setSort(sort);
-    op.setReturn(returnValue);
-    op.setReturnFields(returnFields);
     return op;
 }
 
@@ -1237,8 +1229,6 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                         boost::none,
                                         boost::none,
                                         boost::none,
-                                        boost::none,
-                                        boost::none,
                                         boost::none);
     ASSERT_EQ(getSizeEstimate(basicUpdate), getActualSize(basicUpdate));
 
@@ -1250,9 +1240,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          boost::none,
                          fromjson("{z: 1}") /* constants */,
                          fromjson("{locale: 'simple'}") /* collation */,
-                         fromjson("{p: 1}") /* sort */,
-                         StringData("pre") /* returnValue */,
-                         fromjson("{abc: 1, def: 1}") /* returnFields */);
+                         fromjson("{p: 1}") /* sort */);
     ASSERT_EQ(getSizeEstimate(updateAllFieldsSetBesidesArrayFilters),
               getActualSize(updateAllFieldsSetBesidesArrayFilters));
 
@@ -1265,9 +1253,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          arrayFilters,
                          fromjson("{z: 1}") /* constants */,
                          fromjson("{locale: 'simple'}") /* collation */,
-                         fromjson("{p: 1}") /* sort */,
-                         StringData("pre") /* returnValue */,
-                         fromjson("{abc: 1, def: 1}") /* returnFields */);
+                         fromjson("{p: 1}") /* sort */);
     // We can't make an exact assertion when arrayFilters is set, because the way we estimate BSON
     // array index size overcounts for simplicity.
     ASSERT(getSizeEstimate(updateAllFieldsSet) > getActualSize(updateAllFieldsSet));
@@ -1280,8 +1266,6 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                                boost::none,
                                                boost::none,
                                                boost::none,
-                                               boost::none,
-                                               boost::none,
                                                boost::none);
     // We can't make an exact assertion when an update pipeline is used, because the way we estimate
     // BSON array index size overcounts for simplicity.
@@ -1290,20 +1274,14 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
 
 // Test that we calculate accurate estimates for bulkWrite delete ops.
 TEST_F(BulkWriteOpTest, TestBulkWriteDeleteSizeEstimation) {
-    auto basicDelete = makeTestDeleteOp(fromjson("{x: 1}"),
-                                        BSONObj() /* hint */,
-                                        boost::none,
-                                        boost::none,
-                                        OptionalBool() /* returnValue */,
-                                        boost::none);
+    auto basicDelete =
+        makeTestDeleteOp(fromjson("{x: 1}"), BSONObj() /* hint */, boost::none, boost::none);
     ASSERT_EQ(getSizeEstimate(basicDelete), getActualSize(basicDelete));
 
     auto deleteAllFieldsSet = makeTestDeleteOp(fromjson("{x: 1}") /* filter */,
                                                fromjson("{y: 1}") /* hint */,
                                                fromjson("{locale: 'simple'}") /* collation */,
-                                               fromjson("{z: -1}") /* sort */,
-                                               OptionalBool(true) /* returnValue */,
-                                               fromjson("{a: 1, b: 1}") /* returnFields */);
+                                               fromjson("{z: -1}") /* sort */);
     ASSERT_EQ(getSizeEstimate(deleteAllFieldsSet), getActualSize(deleteAllFieldsSet));
 }
 

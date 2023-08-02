@@ -124,7 +124,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         fixedBuckets = boost::optional<bool>(fixedBucketsElem.boolean());
     }
 
-    return {NamespaceString(viewDef["ns"].valueStringData()),
+    return {NamespaceStringUtil::deserializeForErrorMsg(viewDef["ns"].valueStringData()),
             std::move(pipeline),
             std::move(collationSpec),
             std::move(timeseriesOptions),
@@ -135,7 +135,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
     BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
-    subObj.append("ns", NamespaceStringUtil::serialize(_namespace));
+    subObj.append("ns", _namespace.toStringForErrorMsg());
     subObj.append("pipeline", _pipeline);
     if (_timeseriesOptions) {
         BSONObjBuilder tsObj(builder->subobjStart(kTimeseriesOptions));

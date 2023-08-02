@@ -253,40 +253,35 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
 
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            for (std::string returnField : {"pre", "post"}) {
-                BulkWriteCommandRequest request;
-                BulkWriteCommandModifier builder(&request);
-                builder.addUpdateOp(nss,
-                                    query,
-                                    update,
-                                    upsert,
-                                    multi,
-                                    returnField,
-                                    {{arrayFilter}},
-                                    collation,
-                                    boost::none,
-                                    boost::none,
-                                    boost::none);
-                builder.finishBuild();
+            BulkWriteCommandRequest request;
+            BulkWriteCommandModifier builder(&request);
+            builder.addUpdateOp(nss,
+                                query,
+                                update,
+                                upsert,
+                                multi,
+                                {{arrayFilter}},
+                                collation,
+                                boost::none,
+                                boost::none);
+            builder.finishBuild();
 
-                auto nsInfo = request.getNsInfo();
-                ASSERT_EQ(1, nsInfo.size());
-                ASSERT_EQ("TestDB", nsInfo[0].getNs().db_forTest());
-                ASSERT_EQ("test", nsInfo[0].getNs().coll());
-                ASSERT_EQ(boost::none, nsInfo[0].getShardVersion());
+            auto nsInfo = request.getNsInfo();
+            ASSERT_EQ(1, nsInfo.size());
+            ASSERT_EQ("TestDB", nsInfo[0].getNs().db_forTest());
+            ASSERT_EQ("test", nsInfo[0].getNs().coll());
+            ASSERT_EQ(boost::none, nsInfo[0].getShardVersion());
 
-                ASSERT_EQ(1, request.getOps().size());
-                auto op = BulkWriteCRUDOp(request.getOps()[0]);
-                ASSERT_EQ(upsert, op.getUpdate()->getUpsert());
-                ASSERT_EQ(multi, op.getUpdate()->getMulti());
-                ASSERT_BSONOBJ_EQ(query, op.getUpdate()->getFilter());
-                ASSERT_BSONOBJ_EQ(update, op.getUpdate()->getUpdateMods().getUpdateModifier());
-                ASSERT_BSONOBJ_EQ(collation, op.getUpdate()->getCollation().value_or(BSONObj()));
-                ASSERT(op.getUpdate()->getArrayFilters());
-                auto filter = (*op.getUpdate()->getArrayFilters())[0];
-                ASSERT_BSONOBJ_EQ(arrayFilter, filter);
-                ASSERT_EQ(returnField, *op.getUpdate()->getReturn());
-            }
+            ASSERT_EQ(1, request.getOps().size());
+            auto op = BulkWriteCRUDOp(request.getOps()[0]);
+            ASSERT_EQ(upsert, op.getUpdate()->getUpsert());
+            ASSERT_EQ(multi, op.getUpdate()->getMulti());
+            ASSERT_BSONOBJ_EQ(query, op.getUpdate()->getFilter());
+            ASSERT_BSONOBJ_EQ(update, op.getUpdate()->getUpdateMods().getUpdateModifier());
+            ASSERT_BSONOBJ_EQ(collation, op.getUpdate()->getCollation().value_or(BSONObj()));
+            ASSERT(op.getUpdate()->getArrayFilters());
+            auto filter = (*op.getUpdate()->getArrayFilters())[0];
+            ASSERT_BSONOBJ_EQ(arrayFilter, filter);
         }
     }
 }
@@ -393,26 +388,22 @@ TEST(BulkWriteCommandModifier, AddDeleteOps) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     for (bool multi : {false, true}) {
-        for (bool returnField : {false, true}) {
-            BulkWriteCommandRequest request;
-            BulkWriteCommandModifier builder(&request);
-            builder.addDeleteOp(
-                nss, query, multi, returnField, collation, boost::none, boost::none, boost::none);
-            builder.finishBuild();
+        BulkWriteCommandRequest request;
+        BulkWriteCommandModifier builder(&request);
+        builder.addDeleteOp(nss, query, multi, collation, boost::none, boost::none);
+        builder.finishBuild();
 
-            auto nsInfo = request.getNsInfo();
-            ASSERT_EQ(1, nsInfo.size());
-            ASSERT_EQ("TestDB", nsInfo[0].getNs().db_forTest());
-            ASSERT_EQ("test", nsInfo[0].getNs().coll());
-            ASSERT_EQ(boost::none, nsInfo[0].getShardVersion());
+        auto nsInfo = request.getNsInfo();
+        ASSERT_EQ(1, nsInfo.size());
+        ASSERT_EQ("TestDB", nsInfo[0].getNs().db_forTest());
+        ASSERT_EQ("test", nsInfo[0].getNs().coll());
+        ASSERT_EQ(boost::none, nsInfo[0].getShardVersion());
 
-            ASSERT_EQ(1, request.getOps().size());
-            auto op = BulkWriteCRUDOp(request.getOps()[0]);
-            ASSERT_EQ(multi, op.getDelete()->getMulti());
-            ASSERT_EQ(returnField, op.getDelete()->getReturn());
-            ASSERT_BSONOBJ_EQ(query, op.getDelete()->getFilter());
-            ASSERT_BSONOBJ_EQ(collation, op.getDelete()->getCollation().value_or(BSONObj()));
-        }
+        ASSERT_EQ(1, request.getOps().size());
+        auto op = BulkWriteCRUDOp(request.getOps()[0]);
+        ASSERT_EQ(multi, op.getDelete()->getMulti());
+        ASSERT_BSONOBJ_EQ(query, op.getDelete()->getFilter());
+        ASSERT_BSONOBJ_EQ(collation, op.getDelete()->getCollation().value_or(BSONObj()));
     }
 }
 
@@ -429,7 +420,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);
     builder.addInsertOps(nss, docs);
-    builder.addDeleteOp(nss, query, true, true, collation, boost::none, boost::none, boost::none);
+    builder.addDeleteOp(nss, query, true, collation, boost::none, boost::none);
     builder.finishBuild();
 
     auto nsInfo = request.getNsInfo();
@@ -451,7 +442,6 @@ TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
         auto op = BulkWriteCRUDOp(request.getOps()[2]);
         ASSERT_EQ(BulkWriteCRUDOp::kDelete, op.getType());
         ASSERT_EQ(true, op.getDelete()->getMulti());
-        ASSERT_EQ(true, op.getDelete()->getReturn());
         ASSERT_BSONOBJ_EQ(query, op.getDelete()->getFilter());
         ASSERT_BSONOBJ_EQ(collation, op.getDelete()->getCollation().value_or(BSONObj()));
     }
@@ -472,7 +462,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsDifferentNs) {
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);
     builder.addInsertOps(nss, docs);
-    builder.addDeleteOp(nss2, query, true, true, collation, boost::none, boost::none, boost::none);
+    builder.addDeleteOp(nss2, query, true, collation, boost::none, boost::none);
     builder.finishBuild();
 
     auto nsInfo = request.getNsInfo();
@@ -499,7 +489,6 @@ TEST(BulkWriteCommandModifier, TestMultiOpsDifferentNs) {
         ASSERT_EQ(BulkWriteCRUDOp::kDelete, op.getType());
         ASSERT_EQ(1, op.getNsInfoIdx());
         ASSERT_EQ(true, op.getDelete()->getMulti());
-        ASSERT_EQ(true, op.getDelete()->getReturn());
         ASSERT_BSONOBJ_EQ(query, op.getDelete()->getFilter());
         ASSERT_BSONOBJ_EQ(collation, op.getDelete()->getCollation().value_or(BSONObj()));
     }

@@ -63,6 +63,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -107,6 +108,7 @@ std::unique_ptr<ReshardingCollectionCloner> ReshardingDataReplication::_makeColl
     Timestamp cloneTimestamp) {
     return std::make_unique<ReshardingCollectionCloner>(
         metrics,
+        metadata.getReshardingUUID(),
         ShardKeyPattern{metadata.getReshardingKey()},
         metadata.getSourceNss(),
         metadata.getSourceUUID(),
@@ -238,6 +240,12 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
 
     if (!cloningDone) {
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility))
+            resharding::data_copy::ensureCollectionExists(
+                opCtx,
+                NamespaceString::kRecipientReshardingResumeDataNamespace,
+                CollectionOptions{});
         collectionCloner = _makeCollectionCloner(metrics, metadata, myShardId, cloneTimestamp);
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }

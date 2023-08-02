@@ -187,7 +187,6 @@ public:
                         int numMatched,
                         int numDocsModified,
                         const boost::optional<mongo::write_ops::Upserted>& upserted,
-                        const boost::optional<BSONObj>& value,
                         const boost::optional<int32_t>& stmtId) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setNModified(numDocsModified);
@@ -196,10 +195,6 @@ public:
             replyItem.setN(1);
         } else {
             replyItem.setN(numMatched);
-        }
-
-        if (value) {
-            replyItem.setValue(value);
         }
 
         if (stmtId) {
@@ -213,7 +208,6 @@ public:
                         int numMatched,
                         int numDocsModified,
                         const boost::optional<IDLAnyTypeOwned>& upsertedAnyType,
-                        const boost::optional<BSONObj>& value,
                         const boost::optional<int32_t>& stmtId) {
 
         boost::optional<mongo::write_ops::Upserted> upserted;
@@ -221,32 +215,25 @@ public:
             upserted = write_ops::Upserted(0, upsertedAnyType.value());
         }
 
-        addUpdateReply(currentOpIdx, numMatched, numDocsModified, upserted, value, stmtId);
+        addUpdateReply(currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
     }
 
     void addUpdateReply(size_t currentOpIdx,
                         const UpdateResult& result,
-                        const boost::optional<BSONObj>& value,
                         const boost::optional<int32_t>& stmtId) {
         boost::optional<IDLAnyTypeOwned> upserted;
         if (!result.upsertedId.isEmpty()) {
             upserted = IDLAnyTypeOwned(result.upsertedId.firstElement());
         }
-        addUpdateReply(
-            currentOpIdx, result.numMatched, result.numDocsModified, upserted, value, stmtId);
+        addUpdateReply(currentOpIdx, result.numMatched, result.numDocsModified, upserted, stmtId);
     }
 
 
     void addDeleteReply(size_t currentOpIdx,
                         long long nDeleted,
-                        const boost::optional<BSONObj>& value,
                         const boost::optional<int32_t>& stmtId) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setN(nDeleted);
-
-        if (value) {
-            replyItem.setValue(value);
-        }
 
         if (stmtId) {
             _retriedStmtIds.emplace_back(*stmtId);
@@ -547,103 +534,26 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     }
 }
 
-std::tuple<long long, boost::optional<BSONObj>> getRetryResultForDelete(
-    OperationContext* opCtx,
-    const NamespaceString& nsString,
-    const boost::optional<repl::OplogEntry>& entry) {
-    // Use a SideTransactionBlock since 'parseOplogEntryForFindAndModify' might need
-    // to fetch a pre/post image from the oplog and if this is a retry inside an
-    // in-progress retryable internal transaction, this 'opCtx' would have an active
-    // WriteUnitOfWork and it is illegal to read the the oplog when there is an
-    // active WriteUnitOfWork.
-    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-
-    // Need to create a dummy FindAndModifyRequest to use to parse the oplog entry
-    // using existing helpers.
-    // The helper only checks a couple of booleans for validation so we do not need
-    // to copy over all fields.
-    auto findAndModifyReq = write_ops::FindAndModifyCommandRequest(nsString);
-    findAndModifyReq.setRemove(true);
-    findAndModifyReq.setNew(false);
-
-    auto findAndModifyReply = parseOplogEntryForFindAndModify(opCtx, findAndModifyReq, *entry);
-
-    return std::make_tuple(findAndModifyReply.getLastErrorObject().getNumDocs(),
-                           findAndModifyReply.getValue());
-}
-
-std::tuple<int /*numMatched*/,
-           int /*numDocsModified*/,
-           boost::optional<IDLAnyTypeOwned>,
-           boost::optional<BSONObj>>
+std::tuple<int /*numMatched*/, int /*numDocsModified*/, boost::optional<IDLAnyTypeOwned>>
 getRetryResultForUpdate(OperationContext* opCtx,
                         const NamespaceString& nsString,
                         const BulkWriteUpdateOp* op,
                         const boost::optional<repl::OplogEntry>& entry) {
-    // If 'return' is not specified then fetch this statement using the normal update
-    // helpers. If 'return' is specified we need to use the findAndModify helpers.
-    // findAndModify helpers do not support Updates executed with a none return so this
-    // split is necessary.
-    if (!op->getReturn()) {
-        auto writeResult = parseOplogEntryForUpdate(*entry);
-
-        // Since multi cannot be true for retryable writes numDocsModified + upserted should be 1
-        tassert(ErrorCodes::BadValue,
-                "bulkWrite retryable update must only modify one document",
-                writeResult.getNModified() + (writeResult.getUpsertedId().isEmpty() ? 0 : 1) == 1);
-
-        boost::optional<IDLAnyTypeOwned> upserted;
-        if (!writeResult.getUpsertedId().isEmpty()) {
-            upserted = IDLAnyTypeOwned(writeResult.getUpsertedId().firstElement());
-        }
-
-        // We only care about the values of numDocsModified and upserted from the Update
-        // result.
-        return std::make_tuple(
-            writeResult.getN(), writeResult.getNModified(), upserted, boost::none);
-    }
-
-    // Use a SideTransactionBlock since 'parseOplogEntryForFindAndModify' might need
-    // to fetch a pre/post image from the oplog and if this is a retry inside an
-    // in-progress retryable internal transaction, this 'opCtx' would have an active
-    // WriteUnitOfWork and it is illegal to read the the oplog when there is an
-    // active WriteUnitOfWork.
-    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-
-    // Need to create a dummy FindAndModifyRequest to use to parse the oplog entry
-    // using existing helpers.
-    // The helper only checks a couple of booleans for validation so we do not need
-    // to copy over all fields.
-    auto findAndModifyReq = write_ops::FindAndModifyCommandRequest(nsString);
-    findAndModifyReq.setUpsert(op->getUpsert());
-    findAndModifyReq.setRemove(false);
-    if (op->getReturn() && op->getReturn().get() == "post") {
-        findAndModifyReq.setNew(true);
-    }
-
-    auto findAndModifyReply = parseOplogEntryForFindAndModify(opCtx, findAndModifyReq, *entry);
-
-    int numDocsModified = findAndModifyReply.getLastErrorObject().getNumDocs();
-
-    boost::optional<IDLAnyTypeOwned> upserted =
-        findAndModifyReply.getLastErrorObject().getUpserted();
-    if (upserted.has_value()) {
-        // An 'upserted' doc does not count as a modified doc but counts in the
-        // numDocs total. Since numDocs is either 1 or 0 it should be 0 here.
-        numDocsModified = 0;
-    }
+    auto writeResult = parseOplogEntryForUpdate(*entry);
 
     // Since multi cannot be true for retryable writes numDocsModified + upserted should be 1
     tassert(ErrorCodes::BadValue,
             "bulkWrite retryable update must only modify one document",
-            numDocsModified + (upserted.has_value() ? 1 : 0) == 1);
+            writeResult.getNModified() + (writeResult.getUpsertedId().isEmpty() ? 0 : 1) == 1);
+
+    boost::optional<IDLAnyTypeOwned> upserted;
+    if (!writeResult.getUpsertedId().isEmpty()) {
+        upserted = IDLAnyTypeOwned(writeResult.getUpsertedId().firstElement());
+    }
 
     // We only care about the values of numDocsModified and upserted from the Update
     // result.
-    return std::make_tuple(findAndModifyReply.getLastErrorObject().getNumDocs(),
-                           numDocsModified,
-                           upserted,
-                           findAndModifyReply.getValue());
+    return std::make_tuple(writeResult.getN(), writeResult.getNModified(), upserted);
 }
 
 bool handleInsertOp(OperationContext* opCtx,
@@ -721,11 +631,6 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    // op->getReturn() should not be set for this code path, see attemptProcessFLEFindAndModify.
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite update with sort is supported only with return.",
-            !op->getReturn() && !op->getSort());
-
     write_ops::UpdateOpEntry update;
     update.setQ(op->getFilter());
     update.setMulti(op->getMulti());
@@ -772,67 +677,9 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
             upserted = upsertedDocuments[0];
         }
 
-        responses.addUpdateReply(currentOpIdx,
-                                 updateReply.getN(),
-                                 updateReply.getNModified(),
-                                 upserted,
-                                 /* value */ boost::none,
-                                 stmtId);
+        responses.addUpdateReply(
+            currentOpIdx, updateReply.getN(), updateReply.getNModified(), upserted, stmtId);
 
-        return true;
-    }
-}
-
-// Unlike attemptProcessFLEInsert, no fallback to non-FLE path is needed,
-// returning false only indicate an error occurred.
-bool attemptProcessFLEFindAndModify(OperationContext* opCtx,
-                                    const BulkWriteUpdateOp* op,
-                                    const BulkWriteCommandRequest& req,
-                                    size_t currentOpIdx,
-                                    BulkWriteReplies& responses,
-                                    const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite update with Queryable Encryption and return does not support constants or "
-            "multi.",
-            !op->getMulti() && !op->getConstants());
-
-    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nsInfoEntry.getNs());
-    findAndModifyRequest.setDollarTenant(req.getDollarTenant());
-    findAndModifyRequest.setExpectPrefix(req.getExpectPrefix());
-    findAndModifyRequest.setBypassDocumentValidation(req.getBypassDocumentValidation());
-    findAndModifyRequest.setQuery(op->getFilter());
-    findAndModifyRequest.setLet(req.getLet());
-    findAndModifyRequest.setFields(op->getReturnFields());
-    findAndModifyRequest.setUpdate(op->getUpdateMods());
-    findAndModifyRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    findAndModifyRequest.setSort(op->getSort().value_or(BSONObj()));
-    findAndModifyRequest.setHint(op->getHint());
-    if (op->getCollation()) {
-        findAndModifyRequest.setCollation(op->getCollation().value());
-    }
-    findAndModifyRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-    findAndModifyRequest.setUpsert(op->getUpsert());
-    if (op->getReturn()) {
-        findAndModifyRequest.setNew(op->getReturn().get() != "pre");
-    }
-    findAndModifyRequest.setEncryptionInformation(nsInfoEntry.getEncryptionInformation());
-
-    StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>> status =
-        processFLEFindAndModifyHelper(opCtx, findAndModifyRequest);
-    if (!status.isOK()) {
-        responses.addUpdateErrorReply(opCtx, currentOpIdx, status.getStatus());
-        return false;
-    } else {
-        const auto& reply = status.getValue().first;
-        int numDocs = reply.getLastErrorObject().getNumDocs();
-        responses.addUpdateReply(currentOpIdx,
-                                 numDocs,
-                                 numDocs,
-                                 reply.getLastErrorObject().getUpserted(),
-                                 op->getReturn() ? reply.getValue() : boost::none,
-                                 reply.getRetriedStmtId());
         return true;
     }
 }
@@ -847,11 +694,9 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    // TODO SERVER-78678 : It is possible to support delete with return by mapping it to
-    // processFLEFindAndModifyHelper instead and using FindAndModifyCommandRequest.setRemove.
     uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite delete with Queryable Encryption does not support return or sort.",
-            !op->getReturn() && !op->getReturnFields() && !op->getSort());
+            "BulkWrite delete with Queryable Encryption does not support sort.",
+            !op->getSort());
 
     write_ops::DeleteOpEntry deleteEntry;
     if (op->getCollation()) {
@@ -888,10 +733,7 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
             stmtId = retriedStmtIds[0];
         }
 
-        responses.addDeleteReply(currentOpIdx,
-                                 deleteReply.getN(),
-                                 /* value */ boost::none,
-                                 stmtId);
+        responses.addDeleteReply(currentOpIdx, deleteReply.getN(), stmtId);
         return true;
     }
 }
@@ -908,18 +750,8 @@ bool handleUpdateOp(OperationContext* opCtx,
     try {
         if (op->getMulti()) {
             uassert(ErrorCodes::InvalidOptions,
-                    "May not specify both multi and return in bulkWrite command.",
-                    !op->getReturn());
-
-            uassert(ErrorCodes::InvalidOptions,
                     "Cannot use retryable writes with multi=true",
                     !opCtx->isRetryableWrite());
-        }
-
-        if (op->getReturnFields()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Must specify return if returnFields is provided in bulkWrite command.",
-                    op->getReturn());
         }
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
@@ -929,15 +761,8 @@ bool handleUpdateOp(OperationContext* opCtx,
             // For BulkWrite, re-entry is un-expected.
             invariant(!nsInfo[idx].getEncryptionInformation()->getCrudProcessed().value_or(false));
 
-            if (!op->getReturn()) {
-                // Map to processFLEUpdate.
-                return attemptProcessFLEUpdate(
-                    opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
-            } else {
-                // Map to processFLEFindAndModify.
-                return attemptProcessFLEFindAndModify(
-                    opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
-            }
+            // Map to processFLEUpdate.
+            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
         }
 
         OpDebug* opDebug = &curOp->debug();
@@ -952,11 +777,11 @@ bool handleUpdateOp(OperationContext* opCtx,
             if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
 
-                auto [numMatched, numDocsModified, upserted, image] =
+                auto [numMatched, numDocsModified, upserted] =
                     getRetryResultForUpdate(opCtx, nsString, op, entry);
 
                 responses.addUpdateReply(
-                    currentOpIdx, numMatched, numDocsModified, upserted, image, stmtId);
+                    currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
 
                 return true;
             }
@@ -967,7 +792,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nsString);
         updateRequest.setQuery(op->getFilter());
-        updateRequest.setProj(op->getReturnFields().value_or(BSONObj()));
+        updateRequest.setProj(BSONObj());
         updateRequest.setUpdateModification(op->getUpdateMods());
         updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
         updateRequest.setUpdateConstants(op->getConstants());
@@ -978,13 +803,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
         updateRequest.setUpsert(op->getUpsert());
         updateRequest.setUpsertSuppliedDocument(op->getUpsertSupplied().value_or(false));
-        if (op->getReturn()) {
-            updateRequest.setReturnDocs((op->getReturn().get() == "pre")
-                                            ? UpdateRequest::RETURN_OLD
-                                            : UpdateRequest::RETURN_NEW);
-        } else {
-            updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
-        }
+        updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
         updateRequest.setMulti(op->getMulti());
 
         updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
@@ -1019,7 +838,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 docFound,
                                                                 updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
-                    responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
+                    responses.addUpdateReply(currentOpIdx, result, boost::none);
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                     auto cq = uassertStatusOK(
@@ -1063,18 +882,8 @@ bool handleDeleteOp(OperationContext* opCtx,
     try {
         if (op->getMulti()) {
             uassert(ErrorCodes::InvalidOptions,
-                    "May not specify both multi and return in bulkWrite command.",
-                    !op->getReturn());
-
-            uassert(ErrorCodes::InvalidOptions,
                     "Cannot use retryable writes with multi=true",
                     !opCtx->isRetryableWrite());
-        }
-
-        if (op->getReturnFields()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Must specify return if returnFields is provided in bulkWrite command.",
-                    op->getReturn());
         }
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
@@ -1093,36 +902,25 @@ bool handleDeleteOp(OperationContext* opCtx,
             : kUninitializedStmtId;
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
-            // If 'return' is not specified then we do not need to parse the statement. Since
-            // multi:true is not allowed with retryable writes if the statement was executed
-            // there will always be 1 document deleted.
-            if (!op->getReturn()) {
-                if (txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
-                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                    responses.addDeleteReply(currentOpIdx, 1, boost::none, stmtId);
-                    return true;
-                }
-            } else {
-                if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
-                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                    auto [numDocs, image] = getRetryResultForDelete(opCtx, nsString, entry);
-                    responses.addDeleteReply(currentOpIdx, numDocs, image, stmtId);
-                    return true;
-                }
+            if (txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
+                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                // Since multi:true is not allowed with retryable writes if the statement was
+                // executed there will always be 1 document deleted.
+                responses.addDeleteReply(currentOpIdx, 1, stmtId);
+                return true;
             }
         }
 
         auto deleteRequest = DeleteRequest();
         deleteRequest.setNsString(nsString);
         deleteRequest.setQuery(op->getFilter());
-        deleteRequest.setProj(op->getReturnFields().value_or(BSONObj()));
+        deleteRequest.setProj(BSONObj());
         deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
         deleteRequest.setLet(req.getLet());
         deleteRequest.setSort(op->getSort().value_or(BSONObj()));
         deleteRequest.setHint(op->getHint());
         deleteRequest.setCollation(op->getCollation().value_or(BSONObj()));
         deleteRequest.setMulti(op->getMulti());
-        deleteRequest.setReturnDeleted(op->getReturn());
         deleteRequest.setIsExplain(false);
 
         deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
@@ -1142,7 +940,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                                                           nsInfo[idx].getCollectionUUID(),
                                                           docFound);
             lastOpFixer.finishedOpSuccessfully();
-            responses.addDeleteReply(currentOpIdx, nDeleted, docFound, boost::none);
+            responses.addDeleteReply(currentOpIdx, nDeleted, boost::none);
             return true;
         });
     } catch (const DBException& ex) {
@@ -1211,7 +1009,7 @@ public:
 
             auto& req = request();
 
-            bulk_write_common::validateRequest(req, opCtx->isRetryableWrite());
+            bulk_write_common::validateRequest(req);
 
             // Apply all of the write operations.
             auto [replies, retriedStmtIds, numErrors] = bulk_write::performWrites(opCtx, req);

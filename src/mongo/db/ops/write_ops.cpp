@@ -348,9 +348,7 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
                                    const boost::optional<mongo::BSONObj>& collation,
                                    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
                                    const BSONObj& hint,
-                                   const boost::optional<mongo::BSONObj>& sort,
-                                   const boost::optional<StringData> returnValue,
-                                   const boost::optional<mongo::BSONObj>& returnFields) {
+                                   const boost::optional<mongo::BSONObj>& sort) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'update' field which contains the index of the corresponding namespace.
@@ -400,20 +398,6 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
             (BulkWriteUpdateOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
     }
 
-    // Add the size of the 'return' field, if present.
-    if (returnValue) {
-        estSize += (BulkWriteUpdateOp::kReturnFieldName.size() +
-                    // A string is stored with a leading int32 containing its length and a null byte
-                    // as terminator.
-                    (kIntSize + returnValue->size() + 1) + kPerElementOverhead);
-    }
-
-    // Add the size of the 'returnFields' field, if present.
-    if (returnFields) {
-        estSize += (BulkWriteUpdateOp::kReturnFieldsFieldName.size() + returnFields->objsize() +
-                    kPerElementOverhead);
-    }
-
     return estSize;
 }
 
@@ -453,9 +437,7 @@ int getDeleteSizeEstimate(const BSONObj& q,
 int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
                                    const boost::optional<mongo::BSONObj>& collation,
                                    const mongo::BSONObj& hint,
-                                   const boost::optional<mongo::BSONObj>& sort,
-                                   bool includeReturn,
-                                   const boost::optional<mongo::BSONObj>& returnFields) {
+                                   const boost::optional<mongo::BSONObj>& sort) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'delete' field which contains the index of the corresponding namespace.
@@ -483,17 +465,6 @@ int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
     if (sort) {
         estSize +=
             (BulkWriteDeleteOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
-    }
-
-    // Add the size of the 'return' field, if present.
-    if (includeReturn) {
-        estSize += (BulkWriteDeleteOp::kReturnFieldName.size() + kBoolSize + kPerElementOverhead);
-    }
-
-    // Add the size of the 'returnFields' field, if present.
-    if (returnFields) {
-        estSize += (BulkWriteDeleteOp::kReturnFieldsFieldName.size() + returnFields->objsize() +
-                    kPerElementOverhead);
     }
 
     return estSize;
@@ -859,7 +830,8 @@ InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
 InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    InsertCommandRequest op(NamespaceString(msg.getns()));
+    // Passing boost::none since this is legacy code and should not be running in serverless.
+    InsertCommandRequest op(NamespaceStringUtil::deserialize(boost::none, msg.getns()));
 
     {
         WriteCommandRequestBase writeCommandBase;

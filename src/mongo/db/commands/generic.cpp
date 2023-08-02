@@ -137,7 +137,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {}
 
         NamespaceString ns() const override {
-            return NamespaceString(request().request.getDatabase());
+            return NamespaceString(request().request.getDbName());
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {

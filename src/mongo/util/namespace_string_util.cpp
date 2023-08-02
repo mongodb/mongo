@@ -341,4 +341,10 @@ NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
     return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 
+NamespaceString NamespaceStringUtil::deserializeForErrorMsg(StringData nsInErrMsg) {
+    // TenantId always prefix in the error message. This method returns either (tenantId,
+    // nonPrefixedDb) or (none, prefixedDb) depending on gMultitenancySupport flag.
+    return NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(nsInErrMsg);
+}
+
 }  // namespace mongo

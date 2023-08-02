@@ -690,7 +690,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
 
     invariant(options.isView());
 
-    NamespaceString viewOnNss(viewName.db_deprecated(), options.viewOn);
+    const auto viewOnNss = NamespaceStringUtil::deserialize(viewName.dbName(), options.viewOn);
     _checkCanCreateCollection(opCtx, viewName, options);
 
     BSONArray pipeline(options.pipeline);

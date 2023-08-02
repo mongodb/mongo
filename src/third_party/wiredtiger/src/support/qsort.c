@@ -221,10 +221,14 @@ __qsort(void *arr, size_t nmemb, size_t elem_sz, wt_cmp_t cmp, void *context)
         lhs_unsorted = (size_t)(lo_unknown - lowest_lt_median);
         rhs_unsorted = (size_t)(highest_gt_median - hi_unknown);
         if (lhs_unsorted <= rhs_unsorted) {
-            /* Recurse on left partition, then iterate on right partition. */
+            /* Recurse on left partition. */
             if (lhs_unsorted > elem_sz)
                 __qsort(a, lhs_unsorted / elem_sz, elem_sz, cmp, context);
 
+            /*
+             * Iterate on the right partition. The continue statement is not needed here and is used
+             * to show control flow that we are continuing onto the right partition.
+             */
             if (rhs_unsorted > elem_sz) {
                 a = hi_pseudomedian - rhs_unsorted;
                 nmemb = rhs_unsorted / elem_sz;
@@ -232,11 +236,15 @@ __qsort(void *arr, size_t nmemb, size_t elem_sz, wt_cmp_t cmp, void *context)
             } else
                 break;
         } else {
-            /* Recurse on right partition, then iterate on left partition. */
+            /* Recurse on right partition. */
             if (rhs_unsorted > elem_sz)
                 __qsort(
                   hi_pseudomedian - rhs_unsorted, rhs_unsorted / elem_sz, elem_sz, cmp, context);
 
+            /*
+             * Iterate on the left partition. The continue statement is not needed here and is used
+             * to show control flow that we are continuing onto the left partition.
+             */
             if (lhs_unsorted > elem_sz) {
                 nmemb = lhs_unsorted / elem_sz;
                 continue;

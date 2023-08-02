@@ -36,8 +36,9 @@ function makeTokenAndExpect(user, db) {
 function runTest(conn, multitenancyEnabled, rst = undefined) {
     const admin = conn.getDB('admin');
 
-    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant
-    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
+    // Must be authenticated as a user with read/write privileges on non-normal collections, since
+    // we are accessing system.users for another tenant.
+    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['__system']}));
     assert(admin.auth('admin', 'pwd'));
 
     // Create a tenant-local user.

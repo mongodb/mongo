@@ -1342,6 +1342,9 @@ methods = {
 'WT_SESSION.close' : Method([]),
 
 'WT_SESSION.compact' : Method([
+    Config('free_space_target', '20MB', r'''
+        minimum amount of space recoverable for compaction to proceed''',
+        min='1MB'),
     Config('timeout', '1200', r'''
         maximum amount of time to allow for compact in seconds. The actual amount of time spent
         in compact may exceed the configured value. A value of zero disables the timeout''',

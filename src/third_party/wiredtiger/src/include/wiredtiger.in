@@ -1391,6 +1391,8 @@ struct __wt_session {
      * @param name the URI of the object to compact, such as
      * \c "table:stock"
      * @configstart{WT_SESSION.compact, see dist/api_data.py}
+     * @config{free_space_target, minimum amount of space recoverable for compaction to proceed., an
+     * integer greater than or equal to \c 1MB; default \c 20MB.}
      * @config{timeout, maximum amount of time to allow for compact in seconds.  The actual amount
      * of time spent in compact may exceed the configured value.  A value of zero disables the
      * timeout., an integer; default \c 1200.}

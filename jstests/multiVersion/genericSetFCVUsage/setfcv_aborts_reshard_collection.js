@@ -90,7 +90,7 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
 
             let codeToRunInParallelShell =
                 `{
-                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+                assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
             }`;
 
             awaitShell = startParallelShell(codeToRunInParallelShell, mongos.port);
@@ -142,10 +142,11 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
             assert.soon(() => {
                 return mongos.getDB('config').reshardingOperations.findOne() != null;
             }, "timed out waiting for coordinator doc to be written", 30 * 1000);
-            awaitShell = startParallelShell(funWithArgs(function(latestFCV) {
-                                                assert.commandWorked(db.adminCommand(
-                                                    {setFeatureCompatibilityVersion: latestFCV}));
-                                            }, latestFCV), mongos.port);
+            awaitShell = startParallelShell(
+                funWithArgs(function(latestFCV) {
+                    assert.commandWorked(db.adminCommand(
+                        {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                }, latestFCV), mongos.port);
             checkCoordinatorDoc();
         },
         {

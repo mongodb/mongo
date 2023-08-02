@@ -44,7 +44,8 @@ function testMigrationSucceedsWhileUpgradingSource() {
     let st = setup();
 
     // Ensure last-lts FCV on shard0.
-    assert.commandWorked(st.shard0.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        st.shard0.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
@@ -53,7 +54,8 @@ function testMigrationSucceedsWhileUpgradingSource() {
     let failpoint = configureFailPoint(shard0Primary, 'failUpgrading');
 
     // Upgrade source.
-    assert.commandFailed(st.shard0.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        st.shard0.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
@@ -78,7 +80,8 @@ function testMigrationSucceedsWhileDowngradingSource() {
     let failpoint = configureFailPoint(shard0Primary, 'failDowngrading');
 
     // Downgrade source.
-    assert.commandFailed(st.shard0.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        st.shard0.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
@@ -95,8 +98,8 @@ function testMigrationSucceedsWhileUpgradingDestination() {
     let st = setup();
 
     // Ensure last-lts FCV on shard1.
-    assert.commandWorked(
-        st.shard1.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.shard1.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(st.shard0.getDB("admin"), latestFCV);
     checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
 
@@ -105,7 +108,8 @@ function testMigrationSucceedsWhileUpgradingDestination() {
     let failpoint = configureFailPoint(shard1Primary, 'failUpgrading');
 
     // Upgrade destination.
-    assert.commandFailed(st.shard1.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        st.shard1.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
@@ -130,7 +134,8 @@ function testMigrationSucceedsWhileDowngradingDestination() {
     let failpoint = configureFailPoint(shard1Primary, 'failDowngrading');
 
     // Downgrade destination.
-    assert.commandFailed(st.shard1.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        st.shard1.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Move chunk [50, inf) to shard1 should succeed.
     assert.commandWorked(
@@ -145,8 +150,8 @@ function testMigrateFromLastLTSToLastLTS() {
     jsTestLog("Test last-lts FCV -> last-lts FCV");
     let st = setup();
 
-    assert.commandWorked(
-        st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.s.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
     checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
 
@@ -161,8 +166,8 @@ function testMigrateFromLatestToLastLTS() {
     jsTestLog("Test latest FCV -> last-lts FCV");
     let st = setup();
 
-    assert.commandWorked(
-        st.shard1.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.shard1.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(st.shard0.getDB("admin"), latestFCV);
     checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
 
@@ -177,8 +182,8 @@ function testMigrateFromLastLTSToLatest() {
     jsTestLog("Test last-lts FCV -> latest FCV fail");
     let st = setup();
 
-    assert.commandWorked(
-        st.shard0.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
     checkFCV(st.shard1.getDB("admin"), latestFCV);
 
@@ -205,8 +210,8 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
     let st = setup();
 
     // Set config and shards to last-lts FCV
-    assert.commandWorked(
-        st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(st.s.getDB("admin").runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     checkFCV(st.shard0.getDB("admin"), lastLTSFCV);
     checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
@@ -223,7 +228,7 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
 
     // Send FCV command with a maxTimeMS and assert that it does not timeout.
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setFeatureCompatibilityVersion: latestFCV, maxTimeMS: 10000}));
+        {setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 10000}));
 
     failpoint.off();
     awaitShell();

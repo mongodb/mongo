@@ -345,16 +345,20 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     for (auto& i : shardKeyPaths) {
         projectFields.push_back(PathStringify::stringify(i));
     }
+
     // Fill out the values with SlotId variables. The specified slot will supply the values
     // corresponding to the shard key.
     for (const ABT& node : fn.nodes()) {
-        const auto* child = node.cast<Variable>();
-        tassert(7814406,
-                "All child nodes of a shardFilter function call must be of type Variable",
-                child);
-        sbe::value::SlotId slotId = _slotMap.at(child->name());
-        auto slotIdVariable = sbe::makeE<sbe::EVariable>(std::move(slotId));
-        projectValues.push_back(std::move(slotIdVariable));
+        // If the child of FunctionCall['shardFilter'] is a Variable, look up the variable in the
+        // slot map.
+        if (node.is<Variable>()) {
+            sbe::value::SlotId slotId = _slotMap.at(node.cast<Variable>()->name());
+            projectValues.push_back(sbe::makeE<sbe::EVariable>(slotId));
+        } else {
+            // Otherwise, lower the expression to be referenced by the 'shardFilter' function call.
+            SBEExpressionLowering exprLower{_env, _slotMap, _runtimeEnv};
+            projectValues.push_back(exprLower.optimize(node));
+        }
     }
 
     auto makeObjSpec = sbe::makeE<sbe::EConstant>(

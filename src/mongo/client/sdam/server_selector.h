@@ -97,7 +97,7 @@ public:
 private:
     void _getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                               TopologyDescriptionPtr topologyDescription,
-                              const ReadPreferenceSetting& criteria,
+                              ReadPreferenceSetting effectiveCriteria,
                               const std::vector<HostAndPort>& excludedHosts);
 
     bool _containsAllTags(ServerDescriptionPtr server, const BSONObj& tags);

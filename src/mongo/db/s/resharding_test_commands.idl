@@ -57,3 +57,7 @@ commands:
       uuid:
         description: "The source collection's UUID."
         type: uuid
+      reshardingUUID:
+        description: "The unique identifier for the resharding run."
+        optional: true
+        type: uuid

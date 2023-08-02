@@ -1,6 +1,6 @@
 /**
  * Test that the queryStats metrics are aggregated properly by distinct query shape over getMore
- * calls.
+ * calls, for agg commands.
  * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.

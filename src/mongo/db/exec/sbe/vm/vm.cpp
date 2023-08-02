@@ -1635,6 +1635,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags 
     return genericAdd(accTag, accValue, fieldTag, fieldValue);
 }
 
+std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState() {
+    auto [accTag, accValue] = value::makeNewArray();
+    value::ValueGuard newArrGuard{accTag, accValue};
+    auto arr = value::getArrayView(accValue);
+    arr->reserve(AggSumValueElems::kMaxSizeOfArray);
+
+    // The order of the following three elements should match to 'AggSumValueElems'. An absent
+    // 'kDecimalTotal' element means that we've not seen any decimal value. So, we're not adding
+    // 'kDecimalTotal' element yet.
+    arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
+    arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    newArrGuard.reset();
+    return {accTag, accValue};
+}
+
 template <bool merging>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleSum(
     ArityType arity) {
@@ -1645,18 +1661,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleS
 
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
-        std::tie(accTag, accValue) = value::makeNewArray();
-        value::ValueGuard newArrGuard{accTag, accValue};
-        auto arr = value::getArrayView(accValue);
-        arr->reserve(AggSumValueElems::kMaxSizeOfArray);
-
-        // The order of the following three elements should match to 'AggSumValueElems'. An absent
-        // 'kDecimalTotal' element means that we've not seen any decimal value. So, we're not adding
-        // 'kDecimalTotal' element yet.
-        arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        newArrGuard.reset();
+        std::tie(accTag, accValue) = initializeDoubleDoubleSumState();
     }
 
     value::ValueGuard guard{accTag, accValue};
@@ -7025,6 +7030,28 @@ template <int sign>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSum(ArityType arity) {
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     auto [_, fieldTag, fieldVal] = getFromStack(1);
+
+    // Initialize the accumulator.
+    if (stateTag == value::TypeTags::Nothing) {
+        std::tie(stateTag, stateVal) = value::makeNewArray();
+        value::ValueGuard newStateGuard{stateTag, stateVal};
+        auto state = value::getArrayView(stateVal);
+        state->reserve(static_cast<size_t>(AggRemovableSumElems::kSizeOfArray));
+
+        auto [sumAccTag, sumAccVal] = initializeDoubleDoubleSumState();
+        state->push_back(sumAccTag, sumAccVal);  // kSumAcc
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kNanCount
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kPosInfinityCount
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kNegInfinityCount
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kDoubleCount
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kDecimalCount
+        newStateGuard.reset();
+    }
 
     value::ValueGuard stateGuard{stateTag, stateVal};
     uassert(7795108, "state should be of array type", stateTag == value::TypeTags::Array);

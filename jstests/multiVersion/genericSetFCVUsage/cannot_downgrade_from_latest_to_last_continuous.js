@@ -17,11 +17,13 @@ function runTest(conn, configSvrPrimary = null) {
 
     // Fail when attempting to transition from latest to last continuous.
     assert.commandFailedWithCode(
-        conn.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}), 5147403);
+        conn.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}),
+        5147403);
     checkFCV(checkFCVConn, latestFCV);
 
     // Successfully downgrade to last LTS FCV.
-    assert.commandWorked(conn.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        conn.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(checkFCVConn, lastLTSFCV);
 }
 

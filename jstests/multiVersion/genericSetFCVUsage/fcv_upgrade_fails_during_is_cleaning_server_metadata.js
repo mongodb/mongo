@@ -16,14 +16,15 @@ function upgradeFailsDuringIsCleaningServerMetadata(
 
     configureFailPointFn('failDowngradingDuringIsCleaningServerMetadata', 'alwaysOn');
 
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     let fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("Current FCV should be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV, true /* isCleaningServerMetadata */);
 
     // Upgrade should fail because we are in isCleaningServerMetadata.
-    assert.commandFailedWithCode(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 7428200);
+    assert.commandFailedWithCode(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}), 7428200);
 
     configureFailPointFn('failDowngradingDuringIsCleaningServerMetadata', 'off');
 
@@ -32,14 +33,15 @@ function upgradeFailsDuringIsCleaningServerMetadata(
     jsTestLog(
         "Test that retrying downgrade and failing at an earlier point will still keep failing upgrade");
     configureFailPointFn('failDowngrading', 'alwaysOn');
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV, true /* isCleaningServerMetadata */);
 
     // Upgrade should fail because we are in isCleaningServerMetadata.
-    assert.commandFailedWithCode(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 7428200);
+    assert.commandFailedWithCode(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}), 7428200);
 
     jsTestLog("isCleaningServerMetadata should persist through restarts.");
     conn = restartDeploymentFn();
@@ -50,14 +52,16 @@ function upgradeFailsDuringIsCleaningServerMetadata(
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV, true /* isCleaningServerMetadata */);
 
     // Upgrade should still fail because we are in isCleaningServerMetadata.
-    assert.commandFailedWithCode(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 7428200);
+    assert.commandFailedWithCode(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}), 7428200);
 
     // Completing downgrade and then upgrading succeeds.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(adminDB, lastLTSFCV);
 
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(adminDB, latestFCV);
 }
 

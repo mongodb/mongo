@@ -1144,10 +1144,10 @@ TEST(PhysRewriter, FilterIndexing4) {
 
     // Assert the correct CEs for each node in group 1. Group 1 contains residual predicates.
     std::vector<std::pair<std::string, double>> pathAndCEs = {
-        {"Memo.1.physicalNodes.1.nodeInfo.node.ce", 143.6810174757394},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.ce", 189.57056733575502},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.ce", 330.00000000000006},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.child.ce", 330.00000000000006}};
+        {"Memo.1.physicalNodes.1.nodeInfo.node.ce", 125.087},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.ce", 143.681},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.ce", 189.571},
+        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.child.ce", 330}};
     const BSONObj explain = ExplainGenerator::explainMemoBSONObj(phaseManager.getMemo());
     for (const auto& pathAndCE : pathAndCEs) {
         BSONElement el = dotted_path_support::extractElementAtPath(explain, pathAndCE.first);
@@ -3270,7 +3270,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|       removeOrphans: \n"
         "|           false\n"
         "Root [{pa}]\n"
-        "Properties [cost: 0.176361, localCost: 0.176361, adjustedCE: 330]\n"
+        "Properties [cost: 0.176361, localCost: 0.176361, adjustedCE: 189.571]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -5455,10 +5455,10 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                |   MemoPhysicalDelegator [groupId: 0, index: 0]\n"
         "                MemoPhysicalDelegator [groupId: 3, index: 0]\n"
         "            rejectedPlans: \n"
-        "                cost: 0.513676, localCost: 0.513676, adjustedCE: 1000, rule: "
+        "                cost: 0.513676, localCost: 0.513676, adjustedCE: 31.6228, rule: "
         "SargableToPhysicalScan, node: \n"
         "                    Filter []\n"
-        "                        ce: 1000\n"
+        "                        ce: 31.6228\n"
         "                    |   EvalFilter []\n"
         "                    |   |   Variable [evalTemp_0]\n"
         "                    |   PathTraverse [1]\n"
@@ -5622,7 +5622,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
         getExplainForPlan(1));
 
     ASSERT_STR_EQ_AUTO(  // NOLINT
-        "Cost: 0.0973208\n"
+        "Cost: 0.0955468\n"
         "Root [{root}]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"

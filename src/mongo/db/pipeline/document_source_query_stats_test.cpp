@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -64,6 +65,7 @@ public:
 };
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfSpecIsNotObject) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: 1}").firstElement(), getExpCtx()),
                        AssertionException,
@@ -71,6 +73,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfSpecIsNotObject) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunOnAdmin) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     getExpCtx()->ns = NamespaceString::makeCollectionlessAggregateNSS(
         DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
@@ -80,6 +83,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunOnAdmin) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunWithAggregateOne) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     getExpCtx()->ns = NamespaceString::createNamespaceString_forTest("admin.foo");
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {}}").firstElement(), getExpCtx()),
@@ -88,6 +92,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfNotRunWithAggregateOne) 
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
@@ -95,6 +100,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpe
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     const auto obj = fromjson("{$queryStats: {}}");
     const auto doc = DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx());
     const auto queryStatsOp = static_cast<DocumentSourceQueryStats*>(doc.get());
@@ -109,6 +115,7 @@ TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ParseAndSerializeShouldIncludeHmacKey) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     const auto obj = fromjson(R"({
         $queryStats: {
             transformIdentifiers: {
@@ -140,6 +147,7 @@ TEST_F(DocumentSourceQueryStatsTest, ParseAndSerializeShouldIncludeHmacKey) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfAlgorithmIsNotSupported) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     auto obj = fromjson(R"({
         $queryStats: {
             transformIdentifiers: {
@@ -154,6 +162,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfAlgorithmIsNotSupported)
 
 TEST_F(DocumentSourceQueryStatsTest,
        ShouldFailToParseIfTransformIdentifiersSpecifiedButEmptyAlgorithm) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     auto obj = fromjson(R"({
         $queryStats: {
             transformIdentifiers: {
@@ -168,6 +177,7 @@ TEST_F(DocumentSourceQueryStatsTest,
 
 TEST_F(DocumentSourceQueryStatsTest,
        ShouldFailToParseIfTransformIdentifiersSpecifiedButNoAlgorithm) {
+    RAIIServerParameterControllerForTest queryStatsFeatureFlag{"featureFlagQueryStats", true};
     auto obj = fromjson(R"({
         $queryStats: {
             transformIdentifiers: {

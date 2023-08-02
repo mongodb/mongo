@@ -348,7 +348,8 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
                 // _getDatabase with the potential for allowLocks to be true. The caller should
                 // convert this to ErrorCodes::ShardCannotRefreshDueToLocksHeld with the full
                 // namespace.
-                return Status{ShardCannotRefreshDueToLocksHeldInfo(NamespaceString(dbName)),
+                return Status{ShardCannotRefreshDueToLocksHeldInfo(NamespaceString(
+                                  DatabaseNameUtil::deserialize(boost::none, dbName))),
                               "Database info refresh did not complete"};
             }
         }

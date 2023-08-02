@@ -17,16 +17,16 @@ CONFIG_PORT = 27019
 class DockerClusterConfigWriter(object):
     """Create necessary files and topology for a suite to run with Antithesis."""
 
-    def __init__(self, fixture):
+    def __init__(self, suite_name, fixture):
         """
         Initialize the class with the specified fixture.
 
+        :param suite: Suite we wish to generate files and topology for.
         :param fixture: Fixture for the suite we wish to generate files and topology for.
         """
         self.ip_address = 1
         self.fixture = fixture
-        self.suite_path = os.path.join(os.getcwd(),
-                                       f"antithesis/antithesis_config/{config.SUITE_FILES.pop()}")
+        self.suite_path = os.path.join(os.getcwd(), f"antithesis/antithesis_config/{suite_name}")
         self.jinja_env = Environment(
             loader=FileSystemLoader(os.path.join(os.getcwd(), "antithesis/templates/")))
 
@@ -179,7 +179,10 @@ class DockerClusterConfigWriter(object):
         suite_set_parameters.pop("logComponentVerbosity", None)
         suite_set_parameters.pop("backtraceLogFile", None)
         mongod_options.pop("dbpath", None)
-        mongod_options.pop("port", None)
+        if "configsvr" in mongod_options:
+            mongod_options["port"] = CONFIG_PORT
+        else:
+            mongod_options["port"] = MONGOD_PORT
         mongod_options.update({
             "logpath": "/var/log/mongodb/mongodb.log", "bind_ip": "0.0.0.0", "oplogSize": "256",
             "wiredTigerCacheSizeGB": "1"

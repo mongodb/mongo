@@ -28,7 +28,7 @@ function runTest(downgradeFCV) {
 
     const parallelFn = `
     assert.commandFailedWithCode(
-        db.adminCommand({setFeatureCompatibilityVersion: "${downgradeFCV}"}),
+        db.adminCommand({setFeatureCompatibilityVersion: "${downgradeFCV}", confirm: true}),
         ErrorCodes.InterruptedDueToReplStateChange); `;
 
     const awaitShell = startParallelShell(parallelFn, primary.port);
@@ -44,7 +44,8 @@ function runTest(downgradeFCV) {
     const secondary = rst.getSecondaries()[0];
 
     jsTestLog("Issue a setFeatureCompatibilityVersion command on the new primary");
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     rst.awaitReplication();
 
     jsTestLog("Unset the failpoint on the former primary so it finishes running " +

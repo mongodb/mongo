@@ -47,7 +47,8 @@ const hangWhileDowngradingFp = configureFailPoint(adminDb, "hangBeforeTransition
 let lastLTSFCVMajorMinor = lastLTSFCV.split('.');
 
 const downgradeThread = startParallelShell(function() {
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 }, conn.port);
 
 assert.soon(function() {
@@ -72,7 +73,8 @@ assert.soon(function() {
 let hangWhileUpgradingFp = configureFailPoint(adminDb, "hangWhileUpgrading");
 
 const upgradeThread = startParallelShell(function() {
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }, conn.port);
 
 assert.soon(function() {

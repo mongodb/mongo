@@ -105,7 +105,8 @@ MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 MONGO_FAIL_POINT_DEFINE(setMinVisibleForAllCollectionsToOldestOnStartup);
 
 namespace {
-const std::string kCatalogInfo = "_mdb_catalog";
+const std::string kCatalogInfo = DatabaseName::kMdbCatalog.db().toString();
+const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 }  // namespace
 
@@ -180,7 +181,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         WriteUnitOfWork uow(opCtx);
 
         auto status = _engine->createRecordStore(
-            opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+            opCtx, kCatalogInfoNamespace, kCatalogInfo, CollectionOptions());
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -191,8 +192,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         uow.commit();
     }
 
-    _catalogRecordStore = _engine->getRecordStore(
-        opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+    _catalogRecordStore =
+        _engine->getRecordStore(opCtx, kCatalogInfoNamespace, kCatalogInfo, CollectionOptions());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);

@@ -71,12 +71,12 @@ SdamServerSelector::SdamServerSelector(const SdamConfiguration& config) : _confi
 
 void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                                               const TopologyDescriptionPtr topologyDescription,
-                                              const ReadPreferenceSetting& criteria,
+                                              ReadPreferenceSetting effectiveCriteria,
                                               const std::vector<HostAndPort>& excludedHosts) {
     // when querying the primary we don't need to consider tags
     bool shouldTagFilter = true;
 
-    if (!criteria.minClusterTime.isNull()) {
+    if (!effectiveCriteria.minClusterTime.isNull()) {
         auto eligibleServers =
             topologyDescription->findServers([excludedHosts](const ServerDescriptionPtr& s) {
                 auto isPrimaryOrSecondary = (s->getType() == ServerType::kRSPrimary ||
@@ -95,32 +95,32 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
                                                             const ServerDescriptionPtr& right) {
                                           return left->getOpTime() < right->getOpTime();
                                       });
+
         if (maxIt != endIt) {
             auto maxOpTime = (*maxIt)->getOpTime();
-            if (maxOpTime->getTimestamp() < criteria.minClusterTime) {
+            if (maxOpTime->getTimestamp() < effectiveCriteria.minClusterTime) {
                 // ignore minClusterTime
-                auto newCriteria = criteria;
-                newCriteria.minClusterTime = Timestamp{};
-                const_cast<ReadPreferenceSetting&>(criteria) = newCriteria;
+                effectiveCriteria.minClusterTime = Timestamp{};
             }
         }
     }
 
-    switch (criteria.pref) {
+    switch (effectiveCriteria.pref) {
         case ReadPreference::Nearest: {
             auto filter = (topologyDescription->getType() != TopologyType::kSharded)
-                ? nearestFilter(criteria, excludedHosts)
-                : shardedFilter(criteria, excludedHosts);
+                ? nearestFilter(effectiveCriteria, excludedHosts)
+                : shardedFilter(effectiveCriteria, excludedHosts);
             *result = topologyDescription->findServers(filter);
             break;
         }
 
         case ReadPreference::SecondaryOnly:
-            *result = topologyDescription->findServers(secondaryFilter(criteria, excludedHosts));
+            *result =
+                topologyDescription->findServers(secondaryFilter(effectiveCriteria, excludedHosts));
             break;
 
         case ReadPreference::PrimaryOnly: {
-            const auto primaryCriteria = ReadPreferenceSetting(criteria.pref);
+            const auto primaryCriteria = ReadPreferenceSetting(effectiveCriteria.pref);
             *result =
                 topologyDescription->findServers(primaryFilter(primaryCriteria, excludedHosts));
             shouldTagFilter = false;
@@ -137,7 +137,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             }
 
             // keep tags and maxStaleness for secondary query
-            auto secondaryCriteria = criteria;
+            auto secondaryCriteria = effectiveCriteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
             _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             break;
@@ -145,7 +145,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
 
         case ReadPreference::SecondaryPreferred: {
             // keep tags and maxStaleness for secondary query
-            auto secondaryCriteria = criteria;
+            auto secondaryCriteria = effectiveCriteria;
             secondaryCriteria.pref = ReadPreference::SecondaryOnly;
             _getCandidateServers(result, topologyDescription, secondaryCriteria, excludedHosts);
             if (result->size()) {
@@ -164,7 +164,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
     }
 
     if (shouldTagFilter) {
-        filterTags(result, criteria.tags);
+        filterTags(result, effectiveCriteria.tags);
     }
 }
 

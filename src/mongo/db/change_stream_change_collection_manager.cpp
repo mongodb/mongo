@@ -151,11 +151,14 @@ bool shouldSkipOplogEntry(const BSONObj& oplogEntry) {
     }
 
     const auto opTypeFieldElem = oplogEntry.getStringField(repl::OplogEntry::kOpTypeFieldName);
-
+    boost::optional<TenantId> tid = boost::none;
+    if (auto tidFieldElem = oplogEntry.getField(repl::OplogEntry::kTidFieldName)) {
+        tid = TenantId{Value(tidFieldElem).getOid()};
+    }
     // The oplog entry might be a single delete command on a change collection, avoid
     // inserting such oplog entries back to the change collection.
     if (opTypeFieldElem == repl::OpType_serializer(repl::OpTypeEnum::kDelete) &&
-        NamespaceString(nss).isChangeCollection()) {
+        NamespaceStringUtil::deserialize(tid, nss).isChangeCollection()) {
         return true;
     }
 

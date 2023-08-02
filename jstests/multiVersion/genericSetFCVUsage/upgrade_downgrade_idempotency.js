@@ -24,7 +24,8 @@ function runTest(downgradeVersion) {
     let primary = replTest.getPrimary();
     // Enable failpoint to fail downgrading.
     let failpoint = configureFailPoint(primary, 'failDowngrading');
-    assert.commandFailed(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandFailed(
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
 
     // Verify the node is in an intermediary state. If the response object has the 'targetVersion'
     // field, we are in a partially upgraded or downgraded state.
@@ -32,7 +33,8 @@ function runTest(downgradeVersion) {
 
     failpoint.off();
 
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
 
     // Verify the feature compatibility version transition is complete.
     checkFCV(primary.getDB("admin"), downgradeFCV);
@@ -40,14 +42,16 @@ function runTest(downgradeVersion) {
     const latestFCV = binVersionToFCV('latest');
     // Enable failpoint to fail upgrading.
     failpoint = configureFailPoint(primary, 'failUpgrading');
-    assert.commandFailed(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Verify the node is in an intermediary state. If the response object has the 'targetVersion'
     // field, we are in a partially upgraded or downgraded state.
     checkFCV(primary.getDB("admin"), downgradeFCV, latestFCV);
 
     failpoint.off();
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Verify the feature compatibility version transition is complete.
     checkFCV(primary.getDB("admin"), latestFCV);

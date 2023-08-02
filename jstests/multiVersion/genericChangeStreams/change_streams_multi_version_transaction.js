@@ -128,7 +128,7 @@ function runTest(downgradeVersion) {
     // Upgrade the featureCompatibilityVersion and verify that we can correctly resume from any
     // resume token.
     assert.commandWorked(
-        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(rst.getPrimary().getDB("admin"), latestFCV);
     resumeChangeStreamFromEachToken(rst.getPrimary(), changeStreamDocs, expectedChanges);
 

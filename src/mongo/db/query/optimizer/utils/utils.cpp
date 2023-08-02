@@ -1770,13 +1770,13 @@ void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
                                    const Requirements::VisitorContext&) {
                                    auto residualCE = baseCE;
                                    if (residualCE) {
+                                       // Compute CE for the node implementing the current
+                                       // PartialSchemaRequirement.
+                                       if (entry._ce && *scanGroupCE > 0.0) {
+                                           indexPredSels.push_back(*entry._ce / *scanGroupCE);
+                                       }
                                        if (!indexPredSels.empty()) {
                                            *residualCE *= ce::conjExponentialBackoff(indexPredSels);
-                                       }
-                                       if (entry._ce && *scanGroupCE > 0.0) {
-                                           // Compute the selectivity after we assign CE, which is
-                                           // the "input" to the cost.
-                                           indexPredSels.push_back(*entry._ce / *scanGroupCE);
                                        }
                                    }
 

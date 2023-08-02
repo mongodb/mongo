@@ -277,7 +277,7 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            bulk_write_common::validateRequest(bulkRequest, opCtx->isRetryableWrite());
+            bulk_write_common::validateRequest(bulkRequest);
 
             auto replyItems = cluster::bulkWrite(opCtx, bulkRequest);
             response = _populateCursorReply(opCtx, bulkRequest, request, std::move(replyItems));

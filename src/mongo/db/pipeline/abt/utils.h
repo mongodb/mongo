@@ -64,6 +64,12 @@ ABT translateFieldPath(const FieldPath& fieldPath,
 ABT translateFieldRef(const FieldRef& fieldRef, ABT initial);
 
 /**
+ * Translates a given field of a shard key into an ABT. The resulting paths will not contain
+ * 'PathTraverse' elements because shard keys are guarenteed to be non-multikey.
+ */
+ABT translateShardKeyField(std::string shardKey);
+
+/**
  * Return the minimum or maximum value for the "class" of values represented by the input
  * constant. Used to support type bracketing.
  * Return format is <min/max value, bool inclusive>

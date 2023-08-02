@@ -17,7 +17,8 @@ const setup = function(conn, configPrimary) {
             conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
     }
 
-    assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     // Check FCV is in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
 };
@@ -27,7 +28,8 @@ const runTest = function(conn) {
     // Check FCV is still in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
     jsTestLog("Set FCV to upgrade");
-    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(adminDB, latestFCV);
 };
 

@@ -168,6 +168,12 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         continue;
                     }
 
+                    // TODO: SERVER-78765 add proper consistency check in case of tracked unsharded
+                    // colls
+                    if (coll.getUnsplittable())
+                        continue;
+
+
                     auto request = aggregation_request_helper::parseFromBSON(
                         opCtx, nss, aggRequestBSON, boost::none, false);
 

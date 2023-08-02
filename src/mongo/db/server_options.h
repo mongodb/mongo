@@ -52,6 +52,12 @@
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
 
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <sys/socket.h>
+#endif
+
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
@@ -78,7 +84,7 @@ struct ServerGlobalParams {
     bool enableIPv6 = false;
     bool rest = false;  // --rest
 
-    int listenBacklog = 0;  // --listenBacklog, real default is SOMAXCONN
+    int listenBacklog = SOMAXCONN;  // --listenBacklog
 
     AtomicWord<bool> quiet{false};  // --quiet
 

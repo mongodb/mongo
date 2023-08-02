@@ -485,7 +485,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
 
     auto tempUsersColl = request.getTempUsersCollection();
     if (!tempUsersColl.empty()) {
-        auto tempUsersNS = NamespaceString(tempUsersColl);
+        auto tempUsersNS = NamespaceStringUtil::deserialize(
+            request.getDollarTenant(), tempUsersColl, request.getSerializationContext());
         uassert(ErrorCodes::Unauthorized,
                 "Not authorized to update user data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(
@@ -498,7 +499,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
 
     auto tempRolesColl = request.getTempRolesCollection();
     if (!tempRolesColl.empty()) {
-        auto tempRolesNS = NamespaceString(tempRolesColl);
+        auto tempRolesNS = NamespaceStringUtil::deserialize(
+            request.getDollarTenant(), tempRolesColl, request.getSerializationContext());
         uassert(ErrorCodes::Unauthorized,
                 "Not authorized to update role data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(

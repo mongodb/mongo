@@ -21,7 +21,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog('Executing FCV state, setting to:' + targetFCV);
         try {
             assertAlways.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: targetFCV}));
+                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
         } catch (e) {
             if (e.code === 5147403) {
                 // Invalid fcv transition (e.g lastContinuous -> lastLTS)
@@ -53,7 +53,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.teardown = function(db, collName, cluster) {
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
 
     return $config;

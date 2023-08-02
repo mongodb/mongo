@@ -1,0 +1,1135 @@
+-- Copyright (C) 2014 MongoDB, Inc.  All Rights Reserved.
+
+MONGODB-MIB DEFINITIONS ::= BEGIN
+
+--======================================================================
+-- MIB compatible with MongoDB version >= 2.6.0
+-- For more information, please see http://www.mongodb.org/
+--======================================================================
+
+IMPORTS
+   enterprises, MODULE-IDENTITY, Integer32, Counter32, Counter64
+      FROM SNMPv2-SMI
+   DateAndTime
+      FROM SNMPv2-TC
+   OBJECT-TYPE, TimeTicks
+      FROM RFC1155-SMI
+   DisplayString
+      FROM RFC1213-MIB;
+
+mongodbInc      OBJECT IDENTIFIER ::= { enterprises 34601 }
+
+-- =====
+-- X.509
+-- =====
+x509                    OBJECT IDENTIFIER ::= { mongodbInc 2 }
+certificateExtensions   OBJECT IDENTIFIER ::= { x509 1 }
+
+RoleEntry ::= SEQUENCE {
+    roleName        DisplayString,
+    databaseName    DisplayString
+}
+
+-- 1.3.6.1.4.1.34601.2.1.1 == X509 roles extension (MongodB >= 3.4.0)
+authorizationGrants     OBJECT-TYPE
+    SYNTAX SET OF RoleEntry
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "set of RoleNames granted to certificate holder"
+    ::= { certificateExtensions 1 }
+
+-- 1.3.6.1.4.1.34601.2.1.2 == X509 cluster membership extension (MongodB >= 7.0.0)
+clusterMembership       OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "cluster membership name"
+    ::= { certificateExtensions 2 }
+
+-- ====
+-- SNMP
+-- ====
+-- 1.3.6.1.4.1.34601.1.1.1.2.* == SNMP reporting (MongoDB 2.6.0 - 6.3.999)
+software        OBJECT IDENTIFIER ::= { mongodbInc 1 }
+mongodb         OBJECT IDENTIFIER ::= { software 1 }
+mongod          OBJECT IDENTIFIER ::= { mongodb 1 }
+
+--
+-- mongod (1.3.6.1.4.1.34601.1.1.1)
+--   serverTable 2
+--     serverName 1,1
+--     system 1,2
+--        port 1,2,1
+--        sysUpTime 1,2,2
+--        version 1,2,3
+--        pid 1,2,4
+--     opcounts 1,3
+--        globalOpcounts 1,3,1
+--        replOpcounts 1,3,2
+--     memory 1,4
+--     connections 1,5
+--     asserts 1,6
+--     backgroundFlushing 1,7
+--     cursors 1,8
+--     dur 1,9
+--     extra_info 1,10
+--        note 1,10,1
+--        pageFaults 1,10,2
+--     indexCounters 1,11
+--     network 1,12
+--     writeBacksQueued 1,13
+--     globalLock 1,14
+--        totalTime 1,14,1
+--        lockTime 1,14,2
+--        currentQueue 1,14,3
+--           total 1,14,3,1
+--           readers 1,14,3,2
+--           writers 1,14,3,3
+--        activeClients 1,14,4
+--           total 1,14,4,1
+--           readers 1,14,4,2
+--           writers 1,14,4,3
+--     metrics 1,15
+--        document 1,15,1
+--        getLastError 1,15,2
+--           wtime 1,15,2,1
+--              num 1,15,2,1,1
+--           wtimeouts 1,15,2,2
+--        operation 1,15,3
+--        queryExecutor 1,15,4
+--        record 1,15,5
+--           moved 1,15,5,1
+--        replMetrics 1,15,6
+--           apply 1,15,6,1
+--              batches 1,15,6,1,1
+--                 num 1,15,6,1,1,1
+--                 totalMillis 1,15,6,1,1,2
+--              ops 1,15,6,1,2
+--           buffer 1,15,6,2
+--              count 1,15,6,2,1
+--              maxSizeBytes 1,15,6,2,2
+--              sizeBytes 1,15,6,2,3
+--           networkRepl 1,15,6,3
+--              bytes 1,15,6,3,1
+--              getmores 1,15,6,3,2
+--                 num 1,15,6,3,2,1
+--                 totalMillis 1,15,6,3,2,2
+--              ops 1,15,6,3,2
+--              readersCreated 1,15,6,3,3
+--           oplog 1,15,6,4
+--              insert 1,15,6,4,1
+--                 num 1,15,6,4,1,1
+--                 totalMillis 1,15,6,4,1,2
+--              insertBytes 1,15,6,4,2
+--           preload 1,15,6,5
+--              docs 1,15,6,5,1
+--                 num 1,15,6,5,1,1
+--                 totalMillis 1,15,6,5,1,2
+--              indexes 1,15,6,5,2
+--                 num 1,15,6,5,2,1
+--                 totalMillis 1,15,6,5,2,2
+--        ttl 1,15,7
+--           deletedDocuments 1,15,7,1
+--           passes 1,15,7,2
+--     repl 1,16
+--        setName 1,16,1
+--        isMaster 1,16,2
+--        secondary 1,16,3
+--        hostList 1,16,4
+--        primary 1,16,5
+--        me 1,16,6
+
+
+serverTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF ServerEntry
+   MAX-ACCESS not-accessible
+   STATUS obsolete
+   DESCRIPTION
+      "This table gives information and statistics for each server."
+   ::= { mongod 2 }
+
+serverTableEntry OBJECT-TYPE
+    SYNTAX ServerEntry
+    MAX-ACCESS not-accessible
+    STATUS obsolete
+    DESCRIPTION
+        "This defines a server."
+    INDEX { serverName }
+    ::= { serverTable 1 }
+
+serverName OBJECT-TYPE
+   SYNTAX DisplayString (SIZE (0..255))
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "The port of the virtual server is the name."
+   ::= { serverTableEntry 1 }
+
+ServerEntry ::= SEQUENCE {
+     serverName         DisplayString,
+     system             OBJECT IDENTIFIER,
+     opcounts           OBJECT IDENTIFIER,
+     memory             OBJECT IDENTIFIER,
+     connections        OBJECT IDENTIFIER,
+     asserts            OBJECT IDENTIFIER,
+     backgroundFlushing OBJECT IDENTIFIER,
+     cursors            OBJECT IDENTIFIER,
+     dur                OBJECT IDENTIFIER,
+     extraInfo          OBJECT IDENTIFIER,
+     indexCounters      OBJECT IDENTIFIER,
+     network            OBJECT IDENTIFIER,
+     writeBacksQueued   Integer32,
+     globalLock         OBJECT IDENTIFIER,
+     metrics            OBJECT IDENTIFIER,
+     repl               OBJECT IDENTIFIER
+}
+
+system                  OBJECT IDENTIFIER ::= { serverTableEntry 2 }
+
+opcounts                OBJECT IDENTIFIER ::= { serverTableEntry 3 }
+globalOpcounts          OBJECT IDENTIFIER ::= { opcounts 1 }
+replOpcounts            OBJECT IDENTIFIER ::= { opcounts 2 }
+
+memory                  OBJECT IDENTIFIER ::= { serverTableEntry 4 }
+connections             OBJECT IDENTIFIER ::= { serverTableEntry 5 }
+asserts                 OBJECT IDENTIFIER ::= { serverTableEntry 6 }
+backgroundFlushing      OBJECT IDENTIFIER ::= { serverTableEntry 7 }
+cursors                 OBJECT IDENTIFIER ::= { serverTableEntry 8 }
+dur                     OBJECT IDENTIFIER ::= { serverTableEntry 9 }
+extraInfo               OBJECT IDENTIFIER ::= { serverTableEntry 10 }
+indexCounters           OBJECT IDENTIFIER ::= { serverTableEntry 11 }
+network                 OBJECT IDENTIFIER ::= { serverTableEntry 12 }
+
+writeBacksQueued        OBJECT-TYPE
+   SYNTAX Integer32
+   MAX-ACCESS read-only
+   STATUS deprecated
+   DESCRIPTION
+        "number of writebacks currently queued (mongos only)"
+   ::= { serverTableEntry 13 }
+
+globalLock              OBJECT IDENTIFIER ::= { serverTableEntry 14 }
+metrics                 OBJECT IDENTIFIER ::= { serverTableEntry 15 }
+repl                    OBJECT IDENTIFIER ::= { serverTableEntry 16 }
+
+--------
+-- system
+--------
+
+port OBJECT-TYPE
+   SYNTAX Integer32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "port for this process"
+   ::= { system 1 }
+
+
+sysUpTime OBJECT-TYPE
+   SYNTAX TimeTicks
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "uptime (in hundredths of a second)"
+   ::= { system 2 }
+
+version OBJECT-TYPE
+   SYNTAX DisplayString (SIZE (0..255))
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "MongoDB version"
+   ::= { system 3 }
+
+pid OBJECT-TYPE
+   SYNTAX Integer32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "process ID"
+   ::= { system 4 }
+
+--------
+-- op counters
+--------
+
+globalOpInsert OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global insert count"
+   ::= { globalOpcounts 1 }
+
+globalOpQuery OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global query count"
+   ::= { globalOpcounts 2 }
+
+globalOpUpdate OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global update count"
+   ::= { globalOpcounts 3 }
+
+globalOpDelete OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global delete count"
+   ::= { globalOpcounts 4 }
+
+globalOpGetMore OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global getmore count"
+   ::= { globalOpcounts 5 }
+
+globalOpCommand OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "global command count"
+   ::= { globalOpcounts 6 }
+
+replOpInsert OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl insert count"
+   ::= { replOpcounts 1 }
+
+replOpQuery OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl query count"
+   ::= { replOpcounts 2 }
+
+replOpUpdate OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl update count"
+   ::= { replOpcounts 3 }
+
+replOpDelete OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl delete count"
+   ::= { replOpcounts 4 }
+
+replOpGetMore OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl getmore count"
+   ::= { replOpcounts 5 }
+
+replOpCommand OBJECT-TYPE
+   SYNTAX Counter32
+   MAX-ACCESS read-only
+   STATUS obsolete
+   DESCRIPTION
+      "repl command count"
+   ::= { replOpcounts 6 }
+
+--------
+-- memory
+--------
+
+memoryResident OBJECT-TYPE
+   SYNTAX Integer32
+   UNITS       "MB"
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "resident memory used by mongod"
+   ::= { memory 1 }
+
+memoryVirtual OBJECT-TYPE
+   SYNTAX Integer32
+   UNITS       "MB"
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "virtual memory used by mongod"
+   ::= { memory 2 }
+
+memoryMapped OBJECT-TYPE
+   SYNTAX Integer32
+   UNITS       "MB"
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "provides the amount of mapped memory, in megabytes (MB), by the database"
+   ::= { memory 3 }
+
+memoryMappedWithJournal OBJECT-TYPE
+   SYNTAX Integer32
+   UNITS       "MB"
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "provides the amount of mapped memory, in megabytes (MB), including the memory used for journaling"
+   ::= { memory 4 }
+
+
+--------------
+-- connections
+--------------
+
+connectionsCurrent OBJECT-TYPE
+   SYNTAX Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "current # of open connections"
+   ::= { connections 1 }
+
+connectionsAvailable OBJECT-TYPE
+   SYNTAX Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "# of available connections"
+   ::= { connections 2 }
+
+connectionsTotalCreated OBJECT-TYPE
+   SYNTAX Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "count of all connections created to mongod, including those now closed"
+   ::= { connections 3 }
+
+
+--------------
+-- asserts
+--------------
+
+assertRegular OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of regular assertions"
+   ::= { asserts 1 }
+
+assertWarning OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of warnings raised"
+   ::= { asserts 2 }
+
+assertMsg OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of message assertions"
+   ::= { asserts 3 }
+
+assertUser OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of user assertions"
+   ::= { asserts 4 }
+
+assertRollovers OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of assertion counter rollovers"
+   ::= { asserts 5 }
+
+
+--------------
+-- background flushing
+--------------
+flushCount OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of flush operations"
+   ::= { backgroundFlushing 1 }
+
+flushTotalMs OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total cumulative flush time (ms)"
+   ::= { backgroundFlushing 2 }
+
+-- Note that MIB does not provide a floating point type. Representing float as string.
+flushAverageMs OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 16))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "average flush time (ms)"
+   ::= { backgroundFlushing 3 }
+
+flushLastMs OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "time spent for last flush (ms)"
+   ::= { backgroundFlushing 4 }
+
+flushLastDateTime OBJECT-TYPE
+   SYNTAX      DateAndTime
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "date and time of last flush (UTC)"
+   ::= { backgroundFlushing 5 }
+
+
+--------------
+-- cursors
+--------------
+cursorTotalOpen OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total # of open cursors"
+   ::= { cursors 1 }
+
+cursorClientSize OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "# of cursors open by clients"
+   ::= { cursors 2 }
+
+cursorTimedOut OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "# of cursors that have timed out"
+   ::= { cursors 3 }
+
+
+--------------
+-- dur
+--------------
+durCommits OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "# of journal commits"
+   ::= { dur 1 }
+
+-- Note that MIB does not provide a floating point type. Representing float as string.
+durJournaledMb OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 16))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "data in megabytes (MB) written to journal during the last journal group commit interval"
+   ::= { dur 2 }
+
+-- Note that MIB does not provide a floating point type. Representing float as string.
+durWritesToDataFilesMb OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 16))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "data in megabytes (MB) written from journal to the data files during the last journal group commit interval"
+   ::= { dur 3 }
+
+-- Note that MIB does not provide a floating point type. Representing float as string.
+durCompression OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 20))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the compression ratio of the data written to the journal"
+   ::= { dur 4 }
+
+durCommitsInWriteLock OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "count of the commits that occurred while a write lock was held"
+   ::= { dur 5 }
+
+durEarlyCommits OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the number of times MongoDB requested a commit before the scheduled journal group commit interval"
+   ::= { dur 6 }
+
+durTimeMs OBJECT IDENTIFIER ::= { dur 7 }
+
+durTimeMsDt OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the amount of time (in milliseconds) over which MongoDB collected the timeMS data"
+   ::= { durTimeMs 1 }
+
+durTimeMsPrepLogBuffer OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the amount of time (in milliseconds) spent preparing to write to the journal"
+   ::= { durTimeMs 2 }
+
+durTimeMsWriteToJournal OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the amount of time (in milliseconds) spent actually writing to the journal"
+   ::= { durTimeMs 3 }
+
+durTimeMsWriteToDataFiles OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the amount of time (in milliseconds) spent writing to data files after journaling"
+   ::= { durTimeMs 4 }
+
+durTimeMsRemapPrivateView OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "the amount of time (in milliseconds) spent remapping copy-on-write memory mapped views"
+   ::= { durTimeMs 5 }
+
+
+--------------
+-- extraInfo
+--------------
+extraInfoNote OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 128))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "reports that the data in this structure depend on the underlying platform"
+   ::= { extraInfo 1 }
+
+extraInfoHeapUsageBytes OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "total size in bytes of heap space used by the database process (Linux Only)"
+   ::= { extraInfo 2 }
+
+extraInfoPageFaults OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of page faults that require disk operations"
+   ::= {extraInfo 3 }
+
+
+--------------
+-- indexCounters
+--------------
+indexCounterAccesses OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of times that operations have accessed indexes"
+   ::= { indexCounters 1 }
+
+indexCounterHits OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of times that an index has been accessed and mongod is able to return the index from memory"
+   ::= { indexCounters 2 }
+
+indexCounterMisses OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of times that an operation attempted to access an index that was not in memory"
+   ::= { indexCounters 3 }
+
+indexCounterResets OBJECT-TYPE
+   SYNTAX      Counter32
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of times that the index counters have been reset since the database last restarted"
+   ::= { indexCounters 4 }
+
+-- Note that MIB does not provide a floating point type. Representing float as string.
+indexCounterMissRatio OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 16))
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "ratio of hits to misses"
+   ::= { indexCounters 5 }
+
+--------------
+-- network
+--------------
+networkBytesIn OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "amount of network traffic, in bytes, received by this database"
+   ::= { network 1 }
+
+networkBytesOut OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "amount of network traffic, in bytes, sent by this database"
+   ::= { network 2 }
+
+networkNumRequests OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of distinct requests that the server has received"
+   ::= { network 3 }
+
+
+--------------
+-- globalLock
+--------------
+globalLockTotalTime OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "time, in microseconds, since the database last started and created the globalLock (roughly server uptime)"
+   ::= { globalLock 1 }
+
+globalLockLockTime OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "time, in microseconds, since the database last started, that the globalLock has been held"
+   ::= { globalLock 2 }
+
+globalLockCurrentQueue OBJECT IDENTIFIER ::= { globalLock 3 }
+
+globalLockCurrentQueueTotal OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "combined total of operations queued waiting for the lock"
+   ::= { globalLockCurrentQueue 1 }
+
+globalLockCurrentQueueReaders OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of operations that are currently queued and waiting for the read lock"
+   ::= { globalLockCurrentQueue 2 }
+
+globalLockCurrentQueueWriters OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of operations that are currently queued and waiting for the write lock"
+   ::= { globalLockCurrentQueue 3 }
+
+
+globalLockActiveClients OBJECT IDENTIFIER ::= { globalLock 4 }
+
+globalLockActiveClientsTotal OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of active client connections to the database"
+   ::= { globalLockActiveClients 1 }
+
+globalLockActiveClientsReaders OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "count of the active client connections performing read operations"
+   ::= { globalLockActiveClients 2 }
+
+globalLockActiveClientsWriters OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "count of the active client connections performing write operations"
+   ::= { globalLockActiveClients 3 }
+
+
+--------------
+-- metrics
+--------------
+metricsDocument OBJECT IDENTIFIER ::= { metrics 1 }
+
+metricsDocumentDeleted OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents deleted"
+   ::= { metricsDocument 1 }
+
+metricsDocumentInserted OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents inserted"
+   ::= { metricsDocument 2 }
+
+metricsDocumentReturned OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents returned"
+   ::= { metricsDocument 3 }
+
+metricsDocumentUpdated OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents updated"
+   ::= { metricsDocument 4 }
+
+metricsGetLastError OBJECT IDENTIFIER ::= { metrics 2 }
+
+metricsGetLastErrorWtime OBJECT IDENTIFIER ::= { metricsGetLastError 1 }
+
+metricsGetLastErrorWtimeNum OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of getLastError operations with write concern (i.e. w) greater than 1"
+   ::= { metricsGetLastErrorWtime 1 }
+
+metricsGetLastErrorWtimeTotalMillis OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+       "amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) greater than 1"
+   ::= { metricsGetLastErrorWtime 2 }
+
+metricsGetLastErrorWtimeouts OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError"
+   ::= { metricsGetLastError 2 }
+
+metricsOperation OBJECT IDENTIFIER ::= { metrics 3 }
+
+metricsOperationFastmod OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of update operations that neither cause documents to grow nor require updates to the index"
+   ::= { metricsOperation 1 }
+
+metricsOperationIdhack OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "number of queries that contain the _id field"
+   ::= { metricsOperation 2 }
+
+metricsOperationScanAndOrder OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of queries that return sorted numbers that cannot perform the sort operation using an index"
+   ::= { metricsOperation 3 }
+
+metricsQueryExecutor OBJECT IDENTIFIER ::= { metrics 4 }
+
+metricsQueryExecutorScanned OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of index items scanned during queries and query-plan evaluation"
+   ::= { metricsQueryExecutor 1 }
+
+metricsRecord OBJECT IDENTIFIER ::= { metrics 5 }
+
+metricsRecordMoves OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      deprecated
+   DESCRIPTION
+      "total number of times documents move within the on-disk representation of the MongoDB data set"
+   ::= { metricsRecord  1}
+
+metricsRepl OBJECT IDENTIFIER ::= { metrics 6 }
+
+metricsReplApply OBJECT IDENTIFIER ::= { metricsRepl 1 }
+
+metricsReplApplyBatches OBJECT IDENTIFIER ::= { metricsReplApply 1 }
+
+metricsReplApplyBatchesNum OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of batches applied across all databases"
+   ::= { metricsReplApplyBatches 1 }
+
+metricsReplApplyBatchesTotalMillis OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total amount of time the mongod has spent applying operations from the oplog"
+   ::= { metricsReplApplyBatches 2 }
+
+metricsReplApplyOps OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of oplog operations applied"
+   ::= { metricsReplApply 2 }
+
+metricsReplBuffer OBJECT IDENTIFIER ::= { metricsRepl 2 }
+
+-- Note that MIB does not provide a 64bit integer type. Representing int64 as string.
+metricsReplBufferCount OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 20))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "current number of operations in the oplog buffer"
+   ::= { metricsReplBuffer 1 }
+
+-- Note that MIB does not provide a 64bit integer type. Representing int64 as string.
+metricsReplBufferMaxSizeBytes OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 20))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "maximum size of the buffer"
+   ::= { metricsReplBuffer 2 }
+
+-- Note that MIB does not provide a 64bit integer type. Representing int64 as string.
+metricsReplBufferSizeBytes OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 20))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "current size in bytes of the oplog buffer contents"
+   ::= { metricsReplBuffer 3 }
+
+metricsReplNetwork OBJECT IDENTIFIER ::= { metricsRepl 3 }
+
+metricsReplNetworkBytes OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total amount of data in bytes read from the replication sync source"
+   ::= { metricsReplNetwork 1 }
+
+metricsReplNetworkGetmores OBJECT IDENTIFIER ::= { metricsReplNetwork 2 }
+
+metricsReplNetworkGetmoresNum OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+     "total number of getmore operations, which are operations that request an additional set of operations from the replication sync source"
+   ::= { metricsReplNetworkGetmores 1 }
+
+metricsReplNetworkGetmoresTotalMillis OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total amount of time required to collect data from getmore operations"
+   ::= { metricsReplNetworkGetmores 2 }
+
+metricsReplNetworkOps OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of operations read from the replication source"
+   ::= { metricsReplNetwork 3 }
+
+metricsReplNetworkReadersCreated OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of oplog query processes created"
+   ::= { metricsReplNetwork 4 }
+
+metricsReplPreload OBJECT IDENTIFIER ::= { metricsRepl 4 }
+
+metricsReplPreloadDocs OBJECT IDENTIFIER ::= { metricsReplPreload 1 }
+
+metricsReplPreloadDocsNum OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents loaded during the pre-fetch stage of replication"
+   ::= { metricsReplPreloadDocs 1 }
+
+metricsReplPreloadDocsTotalMillis OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total amount of time spent loading documents as part of the pre-fetch stage of replication"
+   ::= { metricsReplPreloadDocs 2 }
+
+metricsReplPreloadIndexes OBJECT IDENTIFIER ::= { metricsReplPreload 2 }
+
+metricsReplPreloadIndexesNum OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication"
+   ::= { metricsReplPreloadIndexes 1 }
+
+metricsReplPreloadIndexesTotalMillis OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total amount of time spent loading documents as part of the pre-fetch stage of replication"
+   ::= { metricsReplPreloadIndexes 2 }
+
+metricsTtl OBJECT IDENTIFIER ::= { metrics 7 }
+
+metricsTtlDeletedDocuments OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "total number of documents deleted from collections with a ttl index"
+   ::= { metricsTtl 1 }
+
+metricsTtlPasses OBJECT-TYPE
+   SYNTAX      Counter64
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "number of times the background process removes documents from collections with a ttl index"
+   ::= { metricsTtl 2 }
+
+
+--------------
+-- repl
+--
+-- note: repl stats are only available when running a replica set
+--------------
+replSetName OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 255))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "replica set name"
+   ::= { repl 1 }
+
+replSetVersion OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "version # of the current replica set configuration"
+   ::= { repl 2 }
+
+replIsMaster OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "reflects whether the current node is the master or primary node in the replica set"
+   ::= { repl 3 }
+
+replIsSecondary OBJECT-TYPE
+   SYNTAX      Integer32
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "reflects whether the current node is a secondary node in the replica set"
+   ::= { repl 4 }
+
+replPrimary OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 255))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "current primary in the form of hostname:port"
+   ::= { repl 5 }
+
+replMe OBJECT-TYPE
+   SYNTAX      DisplayString (SIZE (0.. 255))
+   MAX-ACCESS  read-only
+   STATUS      obsolete
+   DESCRIPTION
+      "my hostname and port in the form of hostname:port"
+   ::= { repl 6 }
+
+
+END

@@ -38,7 +38,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace mongo::transport::grpc {
+namespace mongo::transport {
 namespace {
 
 class TransportLayerManagerTest : public unittest::Test {
@@ -107,5 +107,6 @@ TEST_F(TransportLayerManagerTest, ConnectEgressLayer) {
     ASSERT_OK(swSession);
     ASSERT_TRUE(egressPtr->owns(swSession.getValue()->id()));
 }
+
 }  // namespace
-}  // namespace mongo::transport::grpc
+}  // namespace mongo::transport

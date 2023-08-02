@@ -16,8 +16,8 @@ configRS.initiate(replConfig);
 
 // Ensure the featureCompatibilityVersion is lastLTSFCV so that the mongos can connect if it is
 // binary version last-lts.
-assert.commandWorked(
-    configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+assert.commandWorked(configRS.getPrimary().adminCommand(
+    {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 jsTestLog("getting mongos");
 var e;

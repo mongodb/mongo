@@ -35,6 +35,7 @@ static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
 static void config_checksum(TABLE *);
+static void config_compact(void);
 static void config_compression(TABLE *, const char *);
 static void config_directio(void);
 static void config_encryption(void);
@@ -509,6 +510,7 @@ config_run(void)
     config_backward_compatible();                    /* Reset backward compatibility as needed */
     config_mirrors();                                /* Mirrors */
     config_statistics();                             /* Statistics */
+    config_compact();                                /* Compaction */
 
     /* Configure the cache last, cache size depends on everything else. */
     config_cache();
@@ -2248,4 +2250,17 @@ config_file_type(u_int type)
         break;
     }
     return ("error: unknown file type");
+}
+
+/*
+ * config_compact --
+ *     Generate compaction related configurations.
+ */
+static void
+config_compact(void)
+{
+    if (config_explicit(NULL, "compact.free_space_target"))
+        return;
+
+    GV(COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
 }

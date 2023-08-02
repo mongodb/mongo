@@ -51,3 +51,7 @@ DBNAME_CONSTANT(kExternal, "$external"_sd)
 DBNAME_CONSTANT(kEmpty, ""_sd)
 
 DBNAME_CONSTANT(kMdbTesting, "mdb_testing"_sd)
+
+DBNAME_CONSTANT(kGlobal, "global"_sd)
+
+DBNAME_CONSTANT(kMdbCatalog, "_mdb_catalog"_sd)

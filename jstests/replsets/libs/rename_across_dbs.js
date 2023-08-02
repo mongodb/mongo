@@ -60,8 +60,10 @@ var RenameAcrossDatabasesTest = function(options) {
         // If provided in 'options', we set the featureCompatibilityVersion. We do this prior to
         // adding any other members to the replica set.
         if (options.setFeatureCompatibilityVersion) {
-            assert.commandWorked(replTest.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion}));
+            assert.commandWorked(replTest.getPrimary().adminCommand({
+                setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion,
+                confirm: true
+            }));
         }
 
         for (let i = 1; i < nodes.length; ++i) {

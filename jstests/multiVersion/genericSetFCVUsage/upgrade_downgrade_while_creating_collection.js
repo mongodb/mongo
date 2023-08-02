@@ -26,7 +26,7 @@ function runTest(downgradeFCV) {
         jsTestLog("Changing FeatureCompatibilityVersion from " + versions.from + " to " +
                   versions.to + " while creating a collection");
         assert.commandWorked(
-            primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from}));
+            primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from, confirm: true}));
 
         assert.commandWorked(primaryDB.adminCommand(
             {configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "alwaysOn"}));
@@ -48,7 +48,7 @@ function runTest(downgradeFCV) {
             awaitUpgradeFCV = startParallelShell(
                 funWithArgs(function(version) {
                     assert.commandWorked(
-                        db.adminCommand({setFeatureCompatibilityVersion: version}));
+                        db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
                 }, versions.to), primary.port);
 
             {

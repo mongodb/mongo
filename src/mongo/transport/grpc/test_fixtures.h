@@ -44,6 +44,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/bidirectional_pipe.h"
+#include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_client.h"
 #include "mongo/transport/grpc/mock_client_context.h"
@@ -54,7 +55,9 @@
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/grpc/util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
@@ -355,6 +358,14 @@ public:
         return makeStub("localhost:{}"_format(kBindPort), options);
     }
 
+    static CommandService::RPCHandler makeEchoHandler() {
+        return [](std::shared_ptr<IngressSession> session) {
+            auto msg = uassertStatusOK(session->sourceMessage());
+            uassertStatusOK(session->sinkMessage(std::move(msg)));
+            session->end();
+        };
+    }
+
     static Stub makeStub(StringData address, boost::optional<Stub::Options> options = boost::none) {
         if (!options) {
             options.emplace();
@@ -399,5 +410,20 @@ public:
         addClientMetadataDocument(ctx);
     }
 };
+
+inline std::shared_ptr<EgressSession> makeEgressSession(
+    GRPCTransportLayer& tl,
+    const HostAndPort& addr = CommandServiceTestFixtures::defaultServerAddress()) {
+    auto swSession = tl.connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(5000));
+    return std::dynamic_pointer_cast<EgressSession>(uassertStatusOK(swSession));
+}
+
+inline void assertEchoSucceeds(Session& session) {
+    auto msg = makeUniqueMessage();
+    ASSERT_OK(session.sinkMessage(msg));
+    auto swResponse = session.sourceMessage();
+    ASSERT_OK(swResponse);
+    ASSERT_EQ_MSG(swResponse.getValue(), msg);
+}
 
 }  // namespace mongo::transport::grpc

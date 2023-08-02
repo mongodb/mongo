@@ -54,7 +54,8 @@ function makeInsertCmdObj(childLsid, txnNumber, startTransaction) {
 
     // By being unable to insert documents, verify that both transactions are aborted when FCV is
     // downgraded.
-    assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     assert.commandFailedWithCode(testDB.runCommand(makeInsertCmdObj(childLsid0, NumberLong(0))),
                                  ErrorCodes.NoSuchTransaction);
@@ -95,21 +96,24 @@ function makeInsertCmdObj(childLsid, txnNumber, startTransaction) {
     // lock is currently held by prepare, so that will block. We use a failpoint to make that
     // command fails when it tries to get the lock.
     let fp = configureFailPoint(shard0Primary, "failNonIntentLocksIfWaitNeeded");
-    assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                                 ErrorCodes.LockTimeout);
+    assert.commandFailedWithCode(
+        testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        ErrorCodes.LockTimeout);
     fp.wait();
     fp.off();
 
     assert.commandWorked(adminDB.runCommand(makeAbortTransactionCmdObj(childLsid0, NumberLong(0))));
     fp = configureFailPoint(shard0Primary, "failNonIntentLocksIfWaitNeeded");
-    assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                                 ErrorCodes.LockTimeout);
+    assert.commandFailedWithCode(
+        testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+        ErrorCodes.LockTimeout);
     fp.wait();
     fp.off();
     assert.commandWorked(adminDB.runCommand(makeAbortTransactionCmdObj(childLsid1, NumberLong(0))));
 
     // We are able to downgrade FCV only when both transactions are no longer in the prepared state.
-    assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     st.stop();
 })();

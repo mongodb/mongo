@@ -508,11 +508,6 @@ TEST_F(CommandServiceTest, AuthTokenHandling) {
 }
 
 TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
-    auto serverHandler = [](auto session) {
-        auto message = uassertStatusOK(session->sourceMessage());
-        ASSERT_OK(session->sinkMessage(message));
-    };
-
     ClientCallbackType clientCallback = [&](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
         ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
@@ -531,7 +526,7 @@ TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
         ASSERT_EQ(it->second, std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
     };
 
-    runTestWithBothMethods(serverHandler, clientCallback);
+    runTestWithBothMethods(CommandServiceTestFixtures::makeEchoHandler(), clientCallback);
 }
 
 TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {

@@ -11,8 +11,8 @@ load("jstests/libs/check_unique_indexes.js");
 const latestBinary = "latest";
 
 let setFCV = function(adminDB, version) {
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: version, writeConcern: {w: 1}}));
+    assert.commandWorked(adminDB.runCommand(
+        {setFeatureCompatibilityVersion: version, confirm: true, writeConcern: {w: 1}}));
     checkFCV(adminDB, version);
 };
 
@@ -171,6 +171,7 @@ let standaloneTest = function(nodeOptions, downgradeVersion) {
         // setFeatureCompatibilityVersion is called with fromConfigServer: true.
         assert.commandWorked(adminDB.runCommand({
             setFeatureCompatibilityVersion: downgradeFCV,
+            confirm: true,
             fromConfigServer: true,
             writeConcern: {w: 1}
         }));
@@ -271,6 +272,7 @@ let replicaSetTest = function(nodeOptions, downgradeVersion, numNodes = 3) {
         // setFeatureCompatibilityVersion is called with fromConfigServer: true.
         assert.commandWorked(primaryAdminDB.runCommand({
             setFeatureCompatibilityVersion: downgradeFCV,
+            confirm: true,
             fromConfigServer: true,
             writeConcern: {w: 1}
         }));

@@ -15,7 +15,6 @@ from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import testcases
-from buildscripts.resmokelib.testing import docker_cluster_config_writer as _docker_cluster_config_writer
 from buildscripts.resmokelib.testing.queue_element import queue_elem_factory, QueueElem
 from buildscripts.resmokelib.utils import queue as _queue
 
@@ -72,13 +71,6 @@ class TestSuiteExecutor(object):
         Any exceptions that occur during setting up or tearing down a
         fixture are propagated.
         """
-
-        if _config.CREATE_DOCKER_COMPOSE:
-            fixture = self._make_fixture(0)
-            docker_writer = _docker_cluster_config_writer.DockerClusterConfigWriter(fixture)
-            docker_writer.generate_docker_sharded_cluster_config()
-            self._suite.return_code = 0
-            return
 
         self.logger.info("Starting execution of %ss...", self._suite.test_kind)
 

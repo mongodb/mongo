@@ -1,8 +1,8 @@
 /**
- * Test that telemetry key generation works for queries with non-object fields.
+ * Test that query stats key generation works for queries with non-object fields.
  * @tags: [featureFlagQueryStats]
  */
-// Turn on the collecting of telemetry metrics.
+// Turn on the collecting of query stats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };

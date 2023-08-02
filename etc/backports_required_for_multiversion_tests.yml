@@ -959,4 +959,6 @@ last-lts:
     ticket: SERVER-79136
   - test_file: jstests/replsets/tenant_migration_shard_merge_journal_compressor.js
     ticket: SERVER-61475
+  - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
+    ticket: SERVER-78650
   suites: null

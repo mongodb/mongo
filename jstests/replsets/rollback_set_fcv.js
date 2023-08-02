@@ -15,8 +15,9 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
 
 function setFCV(fcv) {
-    assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: fcv}),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        db.adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true}),
+        ErrorCodes.InterruptedDueToReplStateChange);
 }
 
 // Using getParameter results in waiting for the current FCV to be majority committed.  In this
@@ -44,7 +45,8 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     let secondaryAdminDB = secondary.getDB('admin');
 
     // Ensure the cluster starts at the correct FCV.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: toFCV, confirm: true}));
     // Wait until the config has propagated to the other nodes and the primary has learned of it, so
     // that the config replication check in 'setFeatureCompatibilityVersion' is satisfied. This is
     // only important since 'setFeatureCompatibilityVersion' is known to implicitly call internal
@@ -92,7 +94,8 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     // As a rule, we forbid downgrading a node while a node is still in the upgrading state and
     // vice versa. Ensure that the in-memory and on-disk FCV are consistent by checking that we are
     // able to set the FCV back to the original version.
-    assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    assert.commandWorked(
+        newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV, confirm: true}));
 }
 
 // fromFCV refers to the FCV we will test rolling back from.
@@ -104,7 +107,8 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     let secondaryAdminDB = secondary.getDB('admin');
 
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: toFCV, confirm: true}));
     // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
     // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
     // it into the node's majority committed snapshot.
@@ -168,10 +172,12 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // upheld after rollback.
     if (fromFCV === lastLTSFCV && toFCV === latestFCV) {
         assert.commandFailedWithCode(
-            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 7428200);
+            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV, confirm: true}),
+            7428200);
     } else {
         assert.commandFailedWithCode(
-            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 5147403);
+            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV, confirm: true}),
+            5147403);
     }
 }
 
@@ -187,7 +193,8 @@ function rollbackFCVFromUpgradingToDowngrading() {
     const syncSourceAdminDB = syncSource.getDB('admin');
 
     // Ensure the cluster starts at the correct FCV.
-    assert.commandWorked(rollbackNode.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        rollbackNode.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     fcvDoc = rollbackNodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(`rollbackNode's version at start: ${tojson(fcvDoc)}`);
@@ -200,8 +207,8 @@ function rollbackFCVFromUpgradingToDowngrading() {
         rollbackNode.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}));
 
     // Go to downgrading state (downgrading from latest to lastLTS).
-    assert.commandFailed(
-        rollbackNodeAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(rollbackNodeAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     fcvDoc = rollbackNodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog(`rollbackNode's version after downgrading: ${tojson(fcvDoc)}`);
@@ -274,7 +281,8 @@ function rollbackFCVFromUpgradingToDowngrading() {
     const newPrimary = rollbackTest.getPrimary();
     const newPrimaryAdminDB = newPrimary.getDB('admin');
     // We should now be able to set the FCV from downgrading to upgrading to upgraded.
-    assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(newPrimaryAdminDB, latestFCV);
 
     assert.commandWorked(
@@ -291,7 +299,8 @@ function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
     let secondaryAdminDB = secondary.getDB('admin');
 
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
     // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
     // it into the node's majority committed snapshot.
@@ -336,7 +345,8 @@ function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
     let newPrimary = rollbackTest.getPrimary();
     // With the new downgrading to upgrading path, we can still go from downgrading -> upgrading
     // after rollback.
-    assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }
 
 const testName = jsTest.name();

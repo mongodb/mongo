@@ -113,11 +113,6 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
     options.tlsAllowConnectionsWithoutCertificates = true;
 
-    auto serverHandler = [&](std::shared_ptr<IngressSession> session) {
-        auto swMsg = session->sourceMessage();
-        ASSERT_OK(session->sinkMessage(uassertStatusOK(swMsg)));
-    };
-
     auto clientThreadBody = [&](auto&, auto& monitor) {
         GRPCClient::Options options;
         options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
@@ -134,7 +129,8 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         ASSERT_OK(session->finish());
     };
 
-    CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
+    CommandServiceTestFixtures::runWithServer(
+        CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
 }
 
 TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {

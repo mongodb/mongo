@@ -52,7 +52,11 @@ public:
     ItoA& operator=(const ItoA&) = delete;
 
     std::string toString() const {
-        return _str.toString();
+        return std::string{_str};
+    }
+
+    StringData toStringData() const {
+        return _str;
     }
 
     operator StringData() const {

@@ -1309,7 +1309,7 @@ struct __wt_update {
 #define WT_UPDATE_RESERVE 2   /* reserved */
 #define WT_UPDATE_STANDARD 3  /* complete value */
 #define WT_UPDATE_TOMBSTONE 4 /* deleted */
-    const uint8_t type;       /* type (one byte to conserve memory) */
+    uint8_t type; /* type (one byte to conserve memory); also read-only after initialization */
 
 /* If the update includes a complete value. */
 #define WT_UPDATE_DATA_VALUE(upd) \

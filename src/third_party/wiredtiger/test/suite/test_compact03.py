@@ -71,7 +71,7 @@ class test_compact03(wttest.WiredTigerTestCase):
     #
     # We want to have around 20000 leaf pages. With minimum 1KB page allocation size, the table
     # is expected to have at least 25 MByte worth of data. We can then experiment with deleting
-    # range of keys in middle to test how comapction works.
+    # range of keys in middle to test how compaction works.
 
     normalValue = "abcde" * 10
     overflowValue = "abcde" * 1000

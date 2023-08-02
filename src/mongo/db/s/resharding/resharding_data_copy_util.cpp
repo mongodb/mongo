@@ -54,8 +54,11 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -64,6 +67,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -81,10 +85,14 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo::resharding::data_copy {
 
@@ -208,6 +216,33 @@ void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
         renameCollection(opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), options));
 }
 
+void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUUID) {
+    writeConflictRetry(
+        opCtx,
+        "resharding::data_copy::deleteRecipientResumeData",
+        NamespaceString::kRecipientReshardingResumeDataNamespace,
+        [&] {
+            const auto coll =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kRecipientReshardingResumeDataNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+            if (!coll.exists())
+                return;
+            WriteUnitOfWork wuow(opCtx);
+            deleteObjects(opCtx,
+                          coll,
+                          BSON(ReshardingRecipientResumeData::kIdFieldName + "." +
+                                   ReshardingRecipientResumeDataId::kReshardingUUIDFieldName
+                               << reshardingUUID),
+                          false /* justOne */);
+            wuow.commit();
+        });
+}
+
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
     auto doc = findDocWithHighestInsertedId(opCtx, collection);
     if (!doc) {
@@ -265,6 +300,80 @@ std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSiz
     } while (numBytes < batchSizeLimitBytes);
 
     return batch;
+}
+
+int insertBatchTransactionally(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const boost::optional<ShardingIndexesCatalogCache>& sii,
+                               TxnNumber& txnNumber,
+                               std::vector<InsertStatement>& batch,
+                               const UUID& reshardingUUID,
+                               ShardId donorShard,
+                               HostAndPort donorHost,
+                               const BSONObj& resumeToken) {
+    int numBytes = 0;
+    int attempt = 1;
+    for (auto insert = batch.begin(); insert != batch.end(); ++insert) {
+        numBytes += insert->doc.objsize();
+    }
+    invariant(numBytes > 0);
+    while (true) {
+        try {
+            ++txnNumber;
+            opCtx->setTxnNumber(txnNumber);
+            runWithTransactionFromOpCtx(opCtx, nss, sii, [&](OperationContext* opCtx) {
+                const auto outputColl =
+                    acquireCollection(opCtx,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_IX);
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "Collection '" << nss.toStringForErrorMsg()
+                                      << "' did not already exist",
+                        outputColl.exists());
+
+                uassertStatusOK(collection_internal::insertDocuments(
+                    opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
+
+                auto resumeDataColl = acquireCollection(
+                    opCtx,
+                    CollectionAcquisitionRequest::fromOpCtx(
+                        opCtx,
+                        static_cast<const NamespaceString&>(
+                            NamespaceString::kRecipientReshardingResumeDataNamespace),
+                        AcquisitionPrerequisites::kWrite),
+                    MODE_IX);
+                ReshardingRecipientResumeData resumeData({reshardingUUID, donorShard});
+                resumeData.setDonorHost(donorHost);
+                resumeData.setResumeToken(resumeToken);
+                auto resumeDataBSON = resumeData.toBSON();
+                UpdateRequest updateRequest;
+                updateRequest.setNamespaceString(
+                    NamespaceString::kRecipientReshardingResumeDataNamespace);
+                updateRequest.setQuery(resumeDataBSON["_id"].wrap());
+                updateRequest.setUpdateModification(resumeDataBSON);
+                updateRequest.setUpsert(true);
+                UpdateResult ur = update(opCtx, resumeDataColl, updateRequest);
+                // We always expect to make progress.  If we don't,
+                // we just inserted duplicate documents, so fail.
+                invariant(ur.numDocsModified == 1 || !ur.upsertedId.isEmpty());
+            });
+            return numBytes;
+        } catch (const DBException& ex) {
+            // Stale config errors requires that we refresh shard version, not just try again, so
+            // we let the layer above handle them.
+            if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
+                !isTransientTransactionError(
+                    ex.code(), false /* hasWriteConcernError */, false /* isCommitOrAbort */))
+                throw;
+            logAndBackoff(7973400,
+                          MONGO_LOGV2_DEFAULT_COMPONENT,
+                          logv2::LogSeverity::Debug(1),
+                          attempt++,
+                          "Transient transaction error while inserting data, retrying.",
+                          "reason"_attr = redact(ex.toStatus()));
+        }
+    }
 }
 
 int insertBatch(OperationContext* opCtx,
@@ -352,6 +461,63 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
 
     callable();
     return boost::none;
+}
+
+void runWithTransactionFromOpCtx(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const boost::optional<ShardingIndexesCatalogCache>& sii,
+                                 unique_function<void(OperationContext*)> func) {
+    auto* const client = opCtx->getClient();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+    AuthorizationSession::get(client)->grantInternalAuthorization(client);
+    TxnNumber txnNumber = *opCtx->getTxnNumber();
+    opCtx->setInMultiDocumentTransaction();
+
+    // ReshardingOpObserver depends on the collection metadata being known when processing writes to
+    // the temporary resharding collection. We attach placement version IGNORED to the write
+    // operations and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a
+    // StaleConfig error to allow the collection metadata information to be recovered.
+    ScopedSetShardRole scopedSetShardRole(
+        opCtx,
+        nss,
+        ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                  sii ? boost::make_optional(sii->getCollectionIndexes())
+                                      : boost::none) /* shardVersion */,
+        boost::none /* databaseVersion */);
+
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+
+    ScopeGuard guard([opCtx, &txnParticipant] {
+        try {
+            txnParticipant.abortTransaction(opCtx);
+        } catch (DBException& e) {
+            LOGV2_WARNING(
+                4990200,
+                "Failed to abort transaction in resharding::data_copy::runWithTransaction",
+                "error"_attr = redact(e));
+        }
+    });
+
+    txnParticipant.beginOrContinue(
+        opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+    txnParticipant.unstashTransactionResources(opCtx, "reshardingOplogApplication");
+
+    func(opCtx);
+
+    if (!txnParticipant.retrieveCompletedTransactionOperations(opCtx)->isEmpty()) {
+        // Similar to the `isTimestamped` check in `applyOperation`, we only want to commit the
+        // transaction if we're doing replicated writes.
+        txnParticipant.commitUnpreparedTransaction(opCtx);
+    } else {
+        txnParticipant.abortTransaction(opCtx);
+    }
+    txnParticipant.stashTransactionResources(opCtx);
+
+    guard.dismiss();
 }
 
 void updateSessionRecord(OperationContext* opCtx,

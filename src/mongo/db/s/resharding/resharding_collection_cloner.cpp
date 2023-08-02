@@ -53,6 +53,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -78,6 +79,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
@@ -115,6 +117,7 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 }  // namespace
 
 ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metrics,
+                                                       const UUID& reshardingUUID,
                                                        ShardKeyPattern newShardKeyPattern,
                                                        NamespaceString sourceNss,
                                                        const UUID& sourceUUID,
@@ -122,6 +125,7 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
                                                        Timestamp atClusterTime,
                                                        NamespaceString outputNss)
     : _metrics(metrics),
+      _reshardingUUID(std::move(reshardingUUID)),
       _newShardKeyPattern(std::move(newShardKeyPattern)),
       _sourceNss(std::move(sourceNss)),
       _sourceUUID(std::move(sourceUUID)),
@@ -296,7 +300,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
     return pipeline;
 }
 
-bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& pipeline) {
+bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx,
+                                            Pipeline& pipeline,
+                                            TxnNumber& txnNum) {
     pipeline.reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
 
@@ -318,14 +324,30 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
         // information to be recovered.
         auto [_, sii] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
-        ScopedSetShardRole scopedSetShardRole(
-            opCtx,
-            _outputNss,
-            ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                      sii ? boost::make_optional(sii->getCollectionIndexes())
-                                          : boost::none) /* shardVersion */,
-            boost::none /* databaseVersion */);
-        return resharding::data_copy::insertBatch(opCtx, _outputNss, batch);
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            // TODO(SERVER-77636) -- This is temporary code, passing a dummy shard ID and the last
+            // "_id" instead of the real source shard and the resume token.
+            return resharding::data_copy::insertBatchTransactionally(
+                opCtx,
+                _outputNss,
+                sii,
+                txnNum,
+                batch,
+                _reshardingUUID,
+                {"dummy"},
+                HostAndPort("dummyHost", 27017),
+                batch.back().doc["_id"].wrap());
+        } else {
+            ScopedSetShardRole scopedSetShardRole(
+                opCtx,
+                _outputNss,
+                ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                          sii ? boost::make_optional(sii->getCollectionIndexes())
+                                              : boost::none) /* shardVersion */,
+                boost::none /* databaseVersion */);
+            return resharding::data_copy::insertBatch(opCtx, _outputNss, batch);
+        }
     });
 
     _metrics->onDocumentsProcessed(
@@ -342,6 +364,8 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     struct ChainContext {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
         bool moreToCome = true;
+        boost::optional<LogicalSessionId> batchLogicalSessionId;
+        TxnNumber batchTxnNumber = TxnNumber(0);
     };
 
     auto chainCtx = std::make_shared<ChainContext>();
@@ -357,7 +381,15 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    chainCtx->pipeline->dispose(opCtx.get());
                    chainCtx->pipeline.reset();
                });
-               chainCtx->moreToCome = doOneBatch(opCtx.get(), *chainCtx->pipeline);
+               if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                       serverGlobalParams.featureCompatibility)) {
+                   if (!chainCtx->batchLogicalSessionId) {
+                       chainCtx->batchLogicalSessionId = makeLogicalSessionId(opCtx.get());
+                   }
+                   opCtx->setLogicalSessionId(*chainCtx->batchLogicalSessionId);
+               }
+               chainCtx->moreToCome =
+                   doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
                guard.dismiss();
            })
         .onTransientError([this](const Status& status) {

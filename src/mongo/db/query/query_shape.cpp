@@ -389,7 +389,8 @@ NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
         tassert(7632903,
                 "Exactly one of 'uuid' and 'coll' can be defined.",
                 !cmdNs.getUuid().has_value());
-        return NamespaceString(cmdNs.getDb(), cmdNs.getColl().value());
+        return NamespaceStringUtil::parseNamespaceFromRequest(
+            tenantId, cmdNs.getDb(), cmdNs.getColl().value());
     } else {
         tassert(7632904,
                 "Exactly one of 'uuid' and 'coll' can be defined.",

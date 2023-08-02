@@ -288,7 +288,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
   {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
-  {"timeout", "int", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"free_space_target", "int", NULL, "min=1MB", NULL, 0}, {"timeout", "int", NULL, NULL, NULL, 0},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_create_encryption_subconfigs[] = {
   {"keyid", "string", NULL, NULL, NULL, 0}, {"name", "string", NULL, NULL, NULL, 0},
@@ -1339,7 +1340,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "commit_timestamp=,durable_timestamp=,operation_timeout_ms=0,"
     "sync=",
     confchk_WT_SESSION_commit_transaction, 4},
-  {"WT_SESSION.compact", "timeout=1200", confchk_WT_SESSION_compact, 1},
+  {"WT_SESSION.compact", "free_space_target=20MB,timeout=1200", confchk_WT_SESSION_compact, 2},
   {"WT_SESSION.create",
     "access_pattern_hint=none,allocation_size=4KB,app_metadata=,"
     "assert=(commit_timestamp=none,durable_timestamp=none,"

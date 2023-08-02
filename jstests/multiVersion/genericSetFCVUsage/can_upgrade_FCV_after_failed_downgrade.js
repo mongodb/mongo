@@ -19,7 +19,8 @@ function downgradingToUpgradingTest(conn, adminDB) {
     // 2) Should be stuck in downgrading from latest to lastLTS.
     assert.commandWorked(  // failpoint: fail after transitional state.
         conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("2) current FCV (should be downgrading):");
     printjson(fcvDoc);
@@ -27,7 +28,8 @@ function downgradingToUpgradingTest(conn, adminDB) {
 
     // 3) FCV should be set to latest.
     assert.commandWorked(conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "off"}));
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     let newFcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("3) current FCV (should be upgraded to latest):");
     printjson(fcvDoc);
@@ -78,11 +80,13 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
     // 1) Calling downgrade twice (one with failpoint).
     assert.commandWorked(
         configPrimary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     fcvDoc = mongosAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     assert.commandWorked(
         configPrimary.adminCommand({configureFailPoint: 'failDowngrading', mode: "off"}));
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     checkFCV(mongosAdminDB, lastLTSFCV);
     // Timestamp from fcvDoc should be less than the timestamp from newFcvDoc.
@@ -91,11 +95,13 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
     // 2) Calling upgrade twice (one with failpoint).
     assert.commandWorked(
         configPrimary.adminCommand({configureFailPoint: 'failUpgrading', mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     fcvDoc = mongosAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     assert.commandWorked(
         configPrimary.adminCommand({configureFailPoint: 'failUpgrading', mode: "off"}));
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     checkFCV(mongosAdminDB, latestFCV);
     // Timestamp from fcvDoc should be less than the timestamp from newFcvDoc.
@@ -108,7 +114,8 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
 // assert all servers/router in the cluster have the latest fcv.
 function setFCVToLatestSharding(
     mongosAdminDB, configPrimaryAdminDB, shard0PrimaryAdminDB, shard1PrimaryAdminDB) {
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(mongosAdminDB, latestFCV);
     checkFCV(configPrimaryAdminDB, latestFCV);
     checkFCV(shard0PrimaryAdminDB, latestFCV);
@@ -135,7 +142,8 @@ function runShardingTest() {
         shard0Primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
     assert.commandWorked(
         shard1Primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(configPrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard0PrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard1PrimaryAdminDB, lastLTSFCV, lastLTSFCV);
@@ -150,7 +158,8 @@ function runShardingTest() {
     // 2. Test downgrading to upgraded with config in downgrading, both shards in upgraded.
     assert.commandWorked(configPrimary.adminCommand(
         {configureFailPoint: 'failBeforeSendingShardsToDowngradingOrUpgrading', mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(configPrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard0PrimaryAdminDB, latestFCV);
     checkFCV(shard1PrimaryAdminDB, latestFCV);
@@ -166,7 +175,8 @@ function runShardingTest() {
         shard0Primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
     assert.commandWorked(shard1Primary.adminCommand(
         {configureFailPoint: 'failBeforeTransitioning', mode: "alwaysOn"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(configPrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard0PrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard1PrimaryAdminDB, latestFCV);

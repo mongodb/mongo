@@ -64,7 +64,6 @@ public:
     static constexpr auto kNModifiedFieldName = "nModified"_sd;
     static constexpr auto kOkFieldName = "ok"_sd;
     static constexpr auto kUpsertedFieldName = "upserted"_sd;
-    static constexpr auto kValueFieldName = "value"_sd;
 
     BulkWriteReplyItem();
     BulkWriteReplyItem(std::int32_t idx, Status status = Status::OK());
@@ -140,18 +139,6 @@ public:
     }
 
     /**
-     * The document after the write, if the 'return' field of the request is 'post'.
-     * Otherwise, the document before the write.
-     */
-    const boost::optional<mongo::BSONObj>& getValue() const {
-        return _value;
-    }
-
-    void setValue(boost::optional<mongo::BSONObj> value) {
-        _value = std::move(value);
-    }
-
-    /**
      * The status associated with the reply potentially containing error data for why the
      * operation failed.
      */
@@ -177,7 +164,6 @@ private:
     boost::optional<std::int32_t> _n;
     boost::optional<std::int32_t> _nModified;
     boost::optional<mongo::write_ops::Upserted> _upserted;
-    boost::optional<BSONObj> _value;
     Status _status = Status::OK();
     bool _hasOk : 1;
     bool _hasIdx : 1;

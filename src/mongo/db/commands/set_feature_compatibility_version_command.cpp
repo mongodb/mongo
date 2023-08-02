@@ -320,21 +320,18 @@ public:
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
 
         auto isConfirmed = request.getConfirm().value_or(false);
-        // TODO (SERVER-74398): Remove this flag once 7.0 is last LTS.
-        if (mongo::repl::requireConfirmInSetFcv) {
-            const auto upgradeMsg =
-                "Once you have upgraded to {}, you will not be able to downgrade FCV and binary version without support assistance. Please re-run this command with 'confirm: true' to acknowledge this and continue with the FCV upgrade."_format(
-                    multiversion::toString(requestedVersion));
-            const auto downgradeMsg =
-                "Once you have downgraded the FCV, if you choose to downgrade the binary version, "
-                "it will require support assistance. Please re-run this command with 'confirm: "
-                "true' to acknowledge this and continue with the FCV downgrade.";
-            uassert(7369100,
-                    (requestedVersion > actualVersion ? upgradeMsg : downgradeMsg),
-                    // If the request is from a config svr, skip requiring the 'confirm: true'
-                    // parameter.
-                    (isFromConfigServer || isConfirmed));
-        }
+        const auto upgradeMsg =
+            "Once you have upgraded to {}, you will not be able to downgrade FCV and binary version without support assistance. Please re-run this command with 'confirm: true' to acknowledge this and continue with the FCV upgrade."_format(
+                multiversion::toString(requestedVersion));
+        const auto downgradeMsg =
+            "Once you have downgraded the FCV, if you choose to downgrade the binary version, "
+            "it will require support assistance. Please re-run this command with 'confirm: "
+            "true' to acknowledge this and continue with the FCV downgrade.";
+        uassert(7369100,
+                (requestedVersion > actualVersion ? upgradeMsg : downgradeMsg),
+                // If the request is from a config svr, skip requiring the 'confirm: true'
+                // parameter.
+                (isFromConfigServer || isConfirmed));
 
         // Always wait for at least majority writeConcern to ensure all writes involved in the
         // upgrade/downgrade process cannot be rolled back. There is currently no mechanism to

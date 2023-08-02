@@ -64,7 +64,8 @@ function runTest(downgradeVersion) {
     });
 
     // Explicitly set feature compatibility version to the latest FCV.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     const streamStartedOnNewVersion = coll.watch();
 

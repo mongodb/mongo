@@ -105,7 +105,10 @@ TEST(ItoA, StringDataEquality) {
     }
 
     for (const auto& i : cases) {
-        ASSERT_EQ(StringData(ItoA{i}), std::to_string(i)) << ", i=" << i;
+        ItoA a{i};
+        std::string expected = std::to_string(i);
+        ASSERT_EQ(StringData(a), expected) << ", i=" << i;
+        ASSERT_EQ(a.toStringData(), expected) << ", i=" << i;
     }
 }
 

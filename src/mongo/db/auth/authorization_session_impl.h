@@ -240,7 +240,9 @@ private:
     // set of checks performed is a subset of the checks declared in the contract.
     AuthorizationContract _contract;
 
-    bool _mayBypassWriteBlockingMode;
+    bool _mayBypassWriteBlockingMode = false;
+
+    bool _mayUseTenant = false;
 
     // The expiration time for this session, expressed as a Unix timestamp. After this time passes,
     // the session will be expired and requests will fail until the expiration time is refreshed.

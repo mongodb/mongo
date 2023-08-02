@@ -23,7 +23,7 @@ const conn = db.getMongo();
 const sendFCVUpDown = function(ver) {
     try {
         print("Running adminCommand({setFeatureCompatibilityVersion: " + ver + "}");
-        const res = conn.adminCommand({setFeatureCompatibilityVersion: ver});
+        const res = conn.adminCommand({setFeatureCompatibilityVersion: ver, confirm: true});
         assert.commandWorked(res);
     } catch (e) {
         if (e.code === 332) {

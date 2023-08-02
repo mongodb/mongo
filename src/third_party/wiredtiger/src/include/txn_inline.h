@@ -963,11 +963,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
         upd->size = WT_STORE_SIZE(value->size);
         memcpy(upd->data, value->data, value->size);
     }
-    /*
-     * This field is const but we need to set it once at allocation time, to do so temporarily cast
-     * as a non-const.
-     */
-    *(uint8_t *)&upd->type = (uint8_t)modify_type;
+    upd->type = (uint8_t)modify_type;
 
     *updp = upd;
     if (sizep != NULL)

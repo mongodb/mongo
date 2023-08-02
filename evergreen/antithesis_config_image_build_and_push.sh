@@ -17,7 +17,7 @@ fi
 # Build Image
 cd src
 activate_venv
-$python buildscripts/resmoke.py run --suite ${suite} --createDockerCompose
+$python buildscripts/resmoke.py generate-docker-compose --suite ${suite}
 cp mongo-debugsymbols.tgz antithesis/antithesis_config/${suite}/debug
 
 cd antithesis/antithesis_config/${suite}

@@ -110,7 +110,8 @@ function runTest(downgradeVersion) {
     // Set the FCV to the "latest" version, and then open and read a change stream on the completely
     // upgraded cluster.
     //
-    assert.commandWorked(mongosConn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        mongosConn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(st.configRS.getPrimary().getDB("admin"), latestFCV);
     checkFCV(st.rs0.getPrimary().getDB("admin"), latestFCV);
     checkFCV(st.rs1.getPrimary().getDB("admin"), latestFCV);

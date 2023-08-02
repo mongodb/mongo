@@ -126,7 +126,7 @@ getFCVAndClusterParametersFromConfigServer() {
     auto fcv = std::make_shared<multiversion::FeatureCompatibilityVersion>();
     auto doFetch = [allDocs, fcv, &tenantIds](const txn_api::TransactionClient& txnClient,
                                               ExecutorPtr txnExec) {
-        FindCommandRequest findFCV{NamespaceString("admin.system.version")};
+        FindCommandRequest findFCV{NamespaceString::kServerConfigurationNamespace};
         findFCV.setFilter(BSON("_id"
                                << "featureCompatibilityVersion"));
         return txnClient.exhaustiveFind(findFCV)

@@ -94,8 +94,19 @@ for (let i = 0; i < versions.length; i++) {
     // Set the appropriate featureCompatibilityVersion upon upgrade, if applicable.
     if (version.hasOwnProperty('featureCompatibilityVersion')) {
         let adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand(
-            {"setFeatureCompatibilityVersion": version.featureCompatibilityVersion}));
+        const res = adminDB.runCommand(
+            {"setFeatureCompatibilityVersion": version.featureCompatibilityVersion});
+        if (!res.ok && res.code === 7369100) {
+            // We failed due to requiring 'confirm: true' on the command. This will only
+            // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
+            // setFCV command with 'confirm: true'.
+            assert.commandWorked(adminDB.runCommand({
+                "setFeatureCompatibilityVersion": version.featureCompatibilityVersion,
+                confirm: true,
+            }));
+        } else {
+            assert.commandWorked(res);
+        }
     }
 
     // Shutdown the current mongod.
@@ -180,16 +191,25 @@ for (let i = 0; i < versions.length; i++) {
     // Set the appropriate featureCompatibilityVersion upon upgrade, if applicable.
     if (version.hasOwnProperty('featureCompatibilityVersion')) {
         let primaryAdminDB = primary.getDB("admin");
-        assert.commandWorked(primaryAdminDB.runCommand(
-            {setFeatureCompatibilityVersion: version.featureCompatibilityVersion}));
+        const res = primaryAdminDB.runCommand(
+            {"setFeatureCompatibilityVersion": version.featureCompatibilityVersion});
+        if (!res.ok && res.code === 7369100) {
+            // We failed due to requiring 'confirm: true' on the command. This will only
+            // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
+            // setFCV command with 'confirm: true'.
+            assert.commandWorked(primaryAdminDB.runCommand({
+                "setFeatureCompatibilityVersion": version.featureCompatibilityVersion,
+                confirm: true,
+            }));
+        } else {
+            assert.commandWorked(res);
+        }
         rst.awaitReplication();
+
         // Make sure we reach the new featureCompatibilityVersion in the committed snapshot on
         // on all nodes before continuing to upgrade.
-        // checkFCV does not work for version 3.4 (and below)
-        if (version.featureCompatibilityVersion != '3.4') {
-            for (let n of rst.nodes) {
-                checkFCV(n.getDB("admin"), version.featureCompatibilityVersion);
-            }
+        for (let n of rst.nodes) {
+            checkFCV(n.getDB("admin"), version.featureCompatibilityVersion);
         }
     }
 }

@@ -52,7 +52,7 @@
 namespace mongo {
 namespace bulk_write_common {
 
-void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) {
+void validateRequest(const BulkWriteCommandRequest& req) {
     const auto& ops = req.getOps();
     const auto& nsInfos = req.getNsInfo();
 
@@ -87,8 +87,6 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
     }
 
     // Validate that every ops entry has a valid nsInfo index.
-    // Also validate that we only have one findAndModify for retryable writes.
-    bool seenFindAndModify = false;
     for (const auto& op : ops) {
         const auto& bulkWriteOp = BulkWriteCRUDOp(op);
         unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();
@@ -96,35 +94,6 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
                 str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
                               << " has an invalid nsInfo index.",
                 nsInfoIdx < nsInfos.size());
-
-        if (isRetryableWrite) {
-            switch (bulkWriteOp.getType()) {
-                case BulkWriteCRUDOp::kInsert:
-                    break;
-                case BulkWriteCRUDOp::kUpdate: {
-                    auto update = bulkWriteOp.getUpdate();
-                    if (update->getReturn()) {
-                        uassert(
-                            ErrorCodes::BadValue,
-                            "BulkWrite can only support 1 op with a return for a retryable write",
-                            !seenFindAndModify);
-                        seenFindAndModify = true;
-                    }
-                    break;
-                }
-                case BulkWriteCRUDOp::kDelete: {
-                    auto deleteOp = bulkWriteOp.getDelete();
-                    if (deleteOp->getReturn()) {
-                        uassert(
-                            ErrorCodes::BadValue,
-                            "BulkWrite can only support 1 op with a return for a retryable write",
-                            !seenFindAndModify);
-                        seenFindAndModify = true;
-                    }
-                    break;
-                }
-            }
-        }
     }
 }
 
