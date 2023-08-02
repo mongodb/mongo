@@ -33,14 +33,14 @@
 
 namespace mongo {
 
-std::string ResourcePattern::toString() const {
+std::string ResourcePattern::serialize(const SerializationContext& context) const {
     switch (_matchType) {
         case MatchTypeEnum::kMatchNever:
             return "<no resources>";
         case MatchTypeEnum::kMatchClusterResource:
             return "<system resource>";
         case MatchTypeEnum::kMatchDatabaseName:
-            return "<database " + DatabaseNameUtil::serializeForAuth(_ns.dbName()) + ">";
+            return "<database " + DatabaseNameUtil::serialize(_ns.dbName(), context) + ">";
         case MatchTypeEnum::kMatchCollectionName:
             return "<collection " + _ns.coll().toString() + " in any database>";
         case MatchTypeEnum::kMatchExactNamespace:
@@ -50,17 +50,21 @@ std::string ResourcePattern::toString() const {
         case MatchTypeEnum::kMatchAnyResource:
             return "<all resources>";
         case MatchTypeEnum::kMatchExactSystemBucketResource:
-            return "<" + DatabaseNameUtil::serializeForAuth(_ns.dbName()) + ".system.bucket" +
+            return "<" + DatabaseNameUtil::serialize(_ns.dbName(), context) + ".system.bucket" +
                 _ns.coll().toString() + " resources>";
         case MatchTypeEnum::kMatchSystemBucketInAnyDBResource:
             return "<any system.bucket." + _ns.coll().toString() + ">";
         case MatchTypeEnum::kMatchAnySystemBucketInDBResource:
-            return "<" + DatabaseNameUtil::serializeForAuth(_ns.dbName()) + "system.bucket.*>";
+            return "<" + DatabaseNameUtil::serialize(_ns.dbName(), context) + "system.bucket.*>";
         case MatchTypeEnum::kMatchAnySystemBucketResource:
             return "<any system.bucket resources>";
         default:
             return "<unknown resource pattern type>";
     }
+}
+
+std::string ResourcePattern::toString() const {
+    return serialize();
 }
 
 std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern) {

@@ -249,7 +249,8 @@ SaslReply runSaslStart(OperationContext* opCtx,
     opCtx->markKillOnClientDisconnect();
 
     // Note that while updateDatabase can throw, it should not be able to for saslStart.
-    session->updateDatabase(DatabaseNameUtil::serializeForAuth(request.getDbName()));
+    session->updateDatabase(
+        DatabaseNameUtil::serialize(request.getDbName(), request.getSerializationContext()));
     session->setMechanismName(request.getMechanism());
 
     return doSaslStart(opCtx, session, request);

@@ -146,8 +146,8 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
             } else if (db.empty()) {
                 ret._resource = ResourcePattern::forCollectionName(tenantId, coll);
             } else if (coll.empty()) {
-                ret._resource = ResourcePattern::forDatabaseName(
-                    DatabaseName::createDatabaseNameForAuth(tenantId, db));
+                ret._resource =
+                    ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(tenantId, db));
             } else {
                 ret._resource = ResourcePattern::forExactNamespace(
                     NamespaceString::createNamespaceStringForAuth(tenantId, db, coll));
@@ -160,7 +160,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
                 ret._resource = ResourcePattern::forAnySystemBuckets(tenantId);
             } else if (bucket.empty()) {
                 ret._resource = ResourcePattern::forAnySystemBucketsInDatabase(
-                    DatabaseName::createDatabaseNameForAuth(tenantId, rsrc.getDb().get()));
+                    DatabaseNameUtil::deserialize(tenantId, rsrc.getDb().get()));
             } else if (emptyDb) {
                 ret._resource = ResourcePattern::forAnySystemBucketsInAnyDatabase(tenantId, bucket);
             } else {

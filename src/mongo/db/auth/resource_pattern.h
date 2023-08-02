@@ -262,6 +262,8 @@ public:
 
     std::string toString() const;
 
+    std::string serialize(const SerializationContext& context = SerializationContext()) const;
+
     bool operator==(const ResourcePattern& other) const {
         return (_matchType == other._matchType) && (_ns == other._ns);
     }

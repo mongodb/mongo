@@ -460,14 +460,12 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     // a system and add the first user.
     if (_externalState->shouldAllowLocalhost()) {
 
-        const DatabaseName kAdminDB =
-            DatabaseName::createDatabaseNameForAuth(boost::none, ADMIN_DBNAME);
+        const DatabaseName kAdminDB = DatabaseNameUtil::deserialize(boost::none, ADMIN_DBNAME);
         const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(kAdminDB);
         const ActionSet setupAdminUserActionSet{ActionType::createUser, ActionType::grantRole};
         Privilege setupAdminUserPrivilege(adminDBResource, setupAdminUserActionSet);
 
-        const DatabaseName kExternalDB =
-            DatabaseName::createDatabaseNameForAuth(boost::none, "$external"_sd);
+        const DatabaseName kExternalDB = DatabaseNameUtil::deserialize(boost::none, "$external"_sd);
         const ResourcePattern externalDBResource = ResourcePattern::forDatabaseName(kExternalDB);
         Privilege setupExternalUserPrivilege(externalDBResource, ActionType::createUser);
 

@@ -147,9 +147,10 @@ public:
             auto dbname = request().getDbName();
             auto* as = AuthorizationSession::get(opCtx->getClient());
 
-            as->logoutDatabase(opCtx->getClient(),
-                               DatabaseNameUtil::serializeForAuth(dbname),
-                               "Logging out on user request");
+            as->logoutDatabase(
+                opCtx->getClient(),
+                DatabaseNameUtil::serialize(dbname, request().getSerializationContext()),
+                "Logging out on user request");
             if (getTestCommandsEnabled() && (dbname.isAdminDB())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to

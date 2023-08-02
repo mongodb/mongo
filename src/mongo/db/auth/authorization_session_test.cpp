@@ -127,6 +127,7 @@ private:
 class AuthorizationSessionTest : public ServiceContextMongoDTest {
 public:
     void setUp() {
+        gMultitenancySupport = true;
         ServiceContextMongoDTest::setUp();
 
         // AuthorizationManager must be initialized prior to creating Client objects.
@@ -163,6 +164,7 @@ public:
     void tearDown() override {
         authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");
         ServiceContextMongoDTest::tearDown();
+        gMultitenancySupport = false;
     }
 
     Status createUser(const UserName& username, const std::vector<RoleName>& roles) {

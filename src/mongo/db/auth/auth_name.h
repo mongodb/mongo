@@ -50,6 +50,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -122,7 +123,7 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseName::createDatabaseNameForAuth(_tenant, _db);
+        return DatabaseNameUtil::deserialize(_tenant, _db);
     }
 
     /**
