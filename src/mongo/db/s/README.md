@@ -23,6 +23,7 @@ The graph further down visualises the architecture of the MongoDB Sharding syste
 - [Routing Info Consistency Model](README_routing_info_cache_consistency_model.md)
 - [Shard versioning protocol](README_versioning_protocols.md)
 - [Balancer](README_balancer.md)
+- [Range deleter](README_range_deleter.md)
 - [DDL Operations](README_ddl_operations.md)
   - [Migrations](README_migrations.md)
   - [UserWriteBlocking](README_user_write_blocking.md)
