@@ -241,17 +241,14 @@ BSONObj extractQueryShape(const BSONObj& cmd,
             IDLParserContext("findCommandRequest", false /* apiStrict */, tenantId), cmd));
         auto parsedFindCommand =
             uassertStatusOK(parsed_find_command::parse(expCtx, std::move(findCommandRequest)));
-        return extractQueryShape(*parsedFindCommand, SerializationOptions(), expCtx);
+        return extractQueryShape(*parsedFindCommand, opts, expCtx);
     } else if (cmd.firstElementFieldName() == AggregateCommandRequest::kCommandName) {
         auto aggregateCommandRequest = AggregateCommandRequest::parse(
             IDLParserContext("aggregateCommandRequest", false /* apiStrict */, tenantId), cmd);
         auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
         auto ns = aggregateCommandRequest.getNamespace();
-        return extractQueryShape(std::move(aggregateCommandRequest),
-                                 std::move(*pipeline),
-                                 SerializationOptions(),
-                                 expCtx,
-                                 ns);
+        return extractQueryShape(
+            std::move(aggregateCommandRequest), std::move(*pipeline), opts, expCtx, ns);
     } else {
         uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
     }

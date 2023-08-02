@@ -43,6 +43,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
+#include <algorithm>
 
 namespace mongo {
 namespace {
@@ -76,6 +77,24 @@ SetClusterParameter makeSetClusterParameterRequest(
 void setClusterParameter(OperationContext* opCtx, const SetClusterParameter& request) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(setClusterParameter);
     w(opCtx, request);
+}
+
+/**
+ * Merges the query settings 'lhs' with query settings 'rhs', by replacing all attributes in 'lhs'
+ * with the existing attributes in 'rhs'.
+ */
+QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
+    QuerySettings querySettings = lhs;
+
+    if (rhs.getQueryEngineVersion()) {
+        querySettings.setQueryEngineVersion(rhs.getQueryEngineVersion());
+    }
+
+    if (rhs.getIndexHints()) {
+        querySettings.setIndexHints(rhs.getIndexHints());
+    }
+
+    return querySettings;
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -124,11 +143,39 @@ public:
 
         SetQuerySettingsCommandReply updateQuerySettings(
             OperationContext* opCtx,
-            QueryShapeConfiguration currentQueryShapeConfiguration,
-            QuerySettings newQuerySettings) {
-            // TODO: SERVER-77465 Implement setQuerySettings command (update case).
-            uasserted(ErrorCodes::NotImplemented,
-                      "setQuerySettings command can not update query settings yet");
+            const QuerySettings& newQuerySettings,
+            const QueryShapeConfiguration& currentQueryShapeConfiguration) {
+            // Compute the merged query settings.
+            auto mergedQuerySettings =
+                mergeQuerySettings(currentQueryShapeConfiguration.getSettings(), newQuerySettings);
+
+            // Build the new 'settingsArray' by updating the existing QueryShapeConfiguration with
+            // the 'mergedQuerySettings'.
+            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
+            auto settingsArray = querySettingsManager.getAllQueryShapeConfigurations(
+                opCtx, request().getDbName().tenantId());
+
+            // Ensure the to be updated QueryShapeConfiguration is present in the 'settingsArray'.
+            auto updatedQueryShapeConfigurationIt =
+                std::find_if(settingsArray.begin(),
+                             settingsArray.end(),
+                             [&](const QueryShapeConfiguration& queryShapeConfiguration) {
+                                 return queryShapeConfiguration.getQueryShapeHash() ==
+                                     currentQueryShapeConfiguration.getQueryShapeHash();
+                             });
+            tassert(7746500,
+                    "In order to perform an update, QueryShapeConfiguration must be present in "
+                    "QuerySettingsManager",
+                    updatedQueryShapeConfigurationIt != settingsArray.end());
+            updatedQueryShapeConfigurationIt->setSettings(mergedQuerySettings);
+
+            // Run SetClusterParameter command with the new value of the 'querySettings' cluster
+            // parameter.
+            setClusterParameter(
+                opCtx, makeSetClusterParameterRequest(settingsArray, request().getDbName()));
+            SetQuerySettingsCommandReply reply;
+            reply.setQueryShapeConfiguration(*updatedQueryShapeConfigurationIt);
+            return reply;
         }
 
         SetQuerySettingsCommandReply setQuerySettingsByQueryShapeHash(
@@ -142,10 +189,10 @@ public:
                     "hash was given.",
                     querySettings.has_value());
             return updateQuerySettings(opCtx,
+                                       request().getSettings(),
                                        QueryShapeConfiguration(queryShapeHash,
                                                                std::move(querySettings->first),
-                                                               std::move(querySettings->second)),
-                                       std::move(request().getSettings()));
+                                                               std::move(querySettings->second)));
         }
 
         SetQuerySettingsCommandReply setQuerySettingsByQueryInstance(
@@ -154,18 +201,22 @@ public:
             auto tenantId = request().getDbName().tenantId();
             auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
             auto queryShape = query_shape::extractQueryShape(
-                queryInstance, SerializationOptions(), std::move(expCtx), tenantId);
+                queryInstance,
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                std::move(expCtx),
+                tenantId);
             auto queryShapeHash = query_shape::hash(std::move(queryShape));
 
             // If there is already an entry for a given QueryShapeHash, then perform
             // an update, otherwise insert.
             if (auto lookupResult = querySettingsManager.getQuerySettingsForQueryShapeHash(
                     opCtx, queryShapeHash, tenantId)) {
-                return updateQuerySettings(opCtx,
-                                           QueryShapeConfiguration(std::move(queryShapeHash),
-                                                                   std::move(lookupResult->first),
-                                                                   std::move(lookupResult->second)),
-                                           std::move(request().getSettings()));
+                return updateQuerySettings(
+                    opCtx,
+                    request().getSettings(),
+                    QueryShapeConfiguration(std::move(queryShapeHash),
+                                            std::move(lookupResult->first),
+                                            std::move(lookupResult->second)));
             } else {
                 return insertQuerySettings(
                     opCtx,
@@ -248,7 +299,10 @@ public:
                         // during search for the matching QueryShapeConfiguration.
                         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
                         auto queryShape = query_shape::extractQueryShape(
-                            queryInstance, SerializationOptions(), std::move(expCtx), tenantId);
+                            queryInstance,
+                            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                            std::move(expCtx),
+                            tenantId);
                         return query_shape::hash(std::move(queryShape));
                     },
                 },
