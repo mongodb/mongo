@@ -338,9 +338,17 @@ Status removeIndexBuildEntry(OperationContext* opCtx,
 }
 
 StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
-    // Read the most up to date data.
+    // Read the most up to date data. This is safe to do even on a secondary during batch
+    // application because we are querying a specific key based on a UUID, and the same key cannot
+    // be written to out-of-order. Temporarily do not enforce constraints in order to bypass this
+    // check when getting the collection.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               opCtx->recoveryUnit()->getTimestampReadSource());
+    ScopeGuard guard{[opCtx, isEnforcingConstraints = opCtx->isEnforcingConstraints()] {
+        opCtx->setEnforceConstraints(isEnforcingConstraints);
+    }};
+    opCtx->setEnforceConstraints(false);
+
     AutoGetCollectionForRead collection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
 
     // Must not be interruptible. This fail point is used to test the scenario where the index
