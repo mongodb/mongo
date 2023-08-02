@@ -737,7 +737,7 @@ Union [{rid_0, sideId_0}]
 |   Evaluation [{sideId_0} = Const [1]]
 |   IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {(Const [70], Const [""])}]
 Evaluation [{sideId_0} = Const [0]]
-IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [nan], Const [90])}]
+IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {(Const [nan], Const [90])}]
 
 
 ==== VARIATION: optimized index on two keys ====

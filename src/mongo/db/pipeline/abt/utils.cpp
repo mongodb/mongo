@@ -127,7 +127,7 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
         case sbe::value::TypeTags::NumberDouble:
         case sbe::value::TypeTags::NumberDecimal:
             if (isMin) {
-                return {Constant::fromDouble(std::numeric_limits<double>::quiet_NaN()), true};
+                return {Constant::fromDouble(std::numeric_limits<double>::quiet_NaN()), false};
             } else {
                 return {Constant::str(""), false};
             }

@@ -37,6 +37,7 @@ const docs = [
     {_id: 28, a: new Code("noScope")},
     {_id: 29, b: ""},
     {_id: 30, a: 0},
+    {_id: 31, a: NaN},
     {_id: 0xffffffffffffffffffffffff, a: MaxKey()},
 ];
 
@@ -53,6 +54,11 @@ let tests = [
     // Number
     {filter: {a: {$gt: NumberInt(0)}}, expected: [docs[2], docs[3], docs[4], docs[7], docs[15]]},
     {filter: {a: {$lte: 0}}, expected: [docs[30]]},
+    {filter: {a: {$lt: 0}}, expected: []},
+
+    // Negative Infinity
+    {filter: {a: {$lt: -Infinity}}, expected: []},
+    {filter: {a: {$lte: -Infinity}}, expected: []},
 
     // String
     {filter: {a: {$gt: "h"}}, expected: [docs[6]]},
@@ -117,7 +123,7 @@ let tests = [
     // MinKey/MaxKey
     {filter: {a: {$lte: MinKey()}}, expected: [docs[0]]},
     {filter: {a: {$lt: MinKey()}}, expected: []},
-    {filter: {a: {$gte: MaxKey()}}, expected: [docs[31]]},
+    {filter: {a: {$gte: MaxKey()}}, expected: [docs[32]]},
     {filter: {a: {$gt: MaxKey()}}, expected: []}
 ];
 
@@ -137,7 +143,7 @@ tests.push(
 
     // MaxKey
     {filter: {a: {$lte: MaxKey()}}, expectedList: [docs, docsWithA]},
-    {filter: {a: {$lt: MaxKey()}}, expectedList: [docs.slice(0, 31), docsWithA.slice(0, 30)]});
+    {filter: {a: {$lt: MaxKey()}}, expectedList: [docs.slice(0, 32), docsWithA.slice(0, 31)]});
 
 for (const testData of tests) {
     if (testData.hasOwnProperty("expected")) {
