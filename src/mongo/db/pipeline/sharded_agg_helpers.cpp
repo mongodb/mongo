@@ -91,6 +91,7 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
@@ -1682,7 +1683,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             const auto& cm = cri.cm;
             auto pipelineToTarget = pipeline->clone();
 
-            if (!cm.isSharded()) {
+            const bool useLocalRead = !cm.isSharded() &&
+                (!expCtx->mongoProcessInterface->inShardedEnvironment(opCtx) ||
+                 cm.dbPrimary() ==
+                     (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
+                          ? ShardId::kConfigServerId
+                          : ShardingState::get(opCtx)->shardId()));
+
+            if (useLocalRead) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,
                 // but the local read path will do a db version check before it establishes a cursor
@@ -1692,21 +1700,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                         expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
                             expCtx->opCtx, expCtx->ns, cm.dbVersion()));
 
-                    expCtx->mongoProcessInterface->checkOnPrimaryShardForDb(expCtx->opCtx,
-                                                                            expCtx->ns);
+                    // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
+                    // catching gexceptions. attachCursorSourceToPipelineForLocalRead enters the
+                    // shard role but does not refresh the shard if the shard has stale metadata.
+                    // Proceeding to do normal shard targeting, which will go through the
+                    // service_entry_point and refresh the shard if needed.
+                    auto pipelineWithCursor =
+                        expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                            pipelineToTarget.release());
 
                     LOGV2_DEBUG(5837600,
                                 3,
                                 "Performing local read",
                                 logAttrs(expCtx->ns),
-                                "pipeline"_attr = pipelineToTarget->serializeToBson(),
+                                "pipeline"_attr = pipelineWithCursor->serializeToBson(),
                                 "comment"_attr = expCtx->opCtx->getComment());
 
-                    return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                        pipelineToTarget.release());
-                } catch (ExceptionFor<ErrorCodes::IllegalOperation>&) {
-                    // The current node isn't the primary for or has stale information about this
-                    // collection, proceed with shard targeting.
+                    return pipelineWithCursor;
                 } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
                     // The current node has stale information about this collection, proceed with
                     // shard targeting, which has logic to handle refreshing that may be needed.

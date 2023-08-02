@@ -2,9 +2,8 @@
  * Tests $lookup, $graphLookup, and $unionWith in a sharded environment to verify the local read
  * behavior of subpipelines dispatched as part of these stages.
  *
- * # Ban this test in pre-6.0 versions because the SBE is disabled in v6.0 but enabled in v5.3,
- * # which could be problematic in multiversion tasks.
- * @tags: [requires_majority_read_concern, requires_fcv_60]
+ * Requiers 7.1 to avoid multiversion problems because we updated targeting logic.
+ * @tags: [requires_majority_read_concern, requires_fcv_71]
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -252,7 +251,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_foreign_do
     toplevelExec: [1, 0],
     // The node executing the $unionWith believes it has stale information about the foreign
     // collection and needs to target shards to properly resolve it.
-    subPipelineLocal: [1, 0],
+    subPipelineLocal: [0, 0],
     subPipelineRemote: [1, 0],
 });
 
@@ -346,7 +345,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_
     // results in 3 remote reads. If the non-primary shard sends a subpipeline to execute on the
     // primary shard first, then the primary does a coll refresh before it attempts to run one of
     // its own subpipelines and does not need to target shards. This results in 2 remote reads.
-    subPipelineLocal: [2, 0],
+    subPipelineLocal: [1, 0],
     subPipelineRemote: [[2, 3], 0]
 });
 

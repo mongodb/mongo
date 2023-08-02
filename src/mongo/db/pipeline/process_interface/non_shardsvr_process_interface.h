@@ -175,10 +175,6 @@ public:
         return std::make_unique<ScopedExpectUnshardedCollectionNoop>();
     }
 
-    void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) override {
-        // Do nothing on a non-shardsvr mongoD.
-    }
-
 protected:
     // This constructor is marked as protected in order to prevent instantiation since this
     // interface is designed to have a concrete process interface for each possible
