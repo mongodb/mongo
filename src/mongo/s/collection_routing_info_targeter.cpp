@@ -183,25 +183,46 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
 }
 
 /**
- * Whether or not the manager/primary pair is different from the other manager/primary pair.
+ * Returns true if the two CollectionRoutingInfo objects are different.
  */
-bool isMetadataDifferent(const CollectionRoutingInfo& managerA,
-                         const CollectionRoutingInfo& managerB) {
-    if (managerA.cm.isSharded() != managerB.cm.isSharded())
+bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRoutingInfo& criB) {
+    if (criA.cm.hasRoutingTable() != criB.cm.hasRoutingTable())
         return true;
 
-    if (managerA.cm.isSharded()) {
-        if (managerA.cm.getVersion() != managerB.cm.getVersion())
+    if (criA.cm.hasRoutingTable()) {
+        if (criA.cm.getVersion() != criB.cm.getVersion())
             return true;
 
-        if (managerA.sii.is_initialized() != managerB.sii.is_initialized())
+        if (criA.sii.is_initialized() != criB.sii.is_initialized())
             return true;
 
-        return managerA.sii.is_initialized() &&
-            managerA.sii->getCollectionIndexes() != managerB.sii->getCollectionIndexes();
+        return criA.sii.is_initialized() &&
+            criA.sii->getCollectionIndexes() != criB.sii->getCollectionIndexes();
     }
 
-    return managerA.cm.dbVersion() != managerB.cm.dbVersion();
+    return criA.cm.dbVersion() != criB.cm.dbVersion();
+}
+
+ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
+                                        const CollectionRoutingInfo& cri) {
+    invariant(!cri.cm.isSharded());
+    if (cri.cm.hasRoutingTable()) {
+        // Target the only shard that owns this collection.
+        std::set<ShardId> shardsOwningChunks;
+        cri.cm.getAllShardIds(&shardsOwningChunks);
+        invariant(shardsOwningChunks.size() == 1);
+        return ShardEndpoint(*shardsOwningChunks.begin(),
+                             cri.getShardVersion(*shardsOwningChunks.begin()),
+                             boost::none);
+    } else {
+        // Target the db-primary shard. Attach 'dbVersion: X, shardVersion: UNSHARDED'.
+        // TODO (SERVER-51070): Remove the boost::none when the config server can support
+        // shardVersion in commands
+        return ShardEndpoint(
+            cri.cm.dbPrimary(),
+            nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
+            nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.cm.dbVersion());
+    }
 }
 
 }  // namespace
@@ -211,8 +232,11 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* o
                                                              boost::optional<OID> targetEpoch)
     : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {}
 
-CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const CollectionRoutingInfo& cri)
-    : _nss(cri.cm.getNss()), _cri(cri) {}
+CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
+                                                             const CollectionRoutingInfo& cri)
+    : _nss(nss), _cri(cri) {
+    invariant(!cri.cm.hasRoutingTable() || cri.cm.getNss() == nss);
+}
 
 /**
  * Initializes and returns the CollectionRoutingInfo which needs to be used for targeting.
@@ -273,7 +297,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
     }
 
     if (_targetEpoch) {
-        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", cm.isSharded());
+        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", cm.hasRoutingTable());
         uassert(ErrorCodes::StaleEpoch,
                 "Collection epoch has changed",
                 cm.getVersion().epoch() == *_targetEpoch);
@@ -362,10 +386,14 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
 ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCtx,
                                                           const BSONObj& doc,
                                                           std::set<ChunkRange>* chunkRanges) const {
-    BSONObj shardKey;
+    if (!_cri.cm.isSharded()) {
+        return targetUnshardedCollection(_nss, _cri);
+    }
 
-    if (_cri.cm.isSharded()) {
+    // Collection is sharded
+    const BSONObj shardKey = [&]() {
         const auto& shardKeyPattern = _cri.cm.getShardKeyPattern();
+        BSONObj shardKey;
         if (_isRequestOnTimeseriesViewNamespace) {
             auto tsFields = _cri.cm.getTimeseriesFields();
             tassert(5743701, "Missing timeseriesFields on buckets collection", tsFields);
@@ -382,19 +410,12 @@ ShardEndpoint CollectionRoutingInfoTargeter::targetInsert(OperationContext* opCt
         uassert(ErrorCodes::ShardKeyNotFound,
                 "Shard key cannot contain array values or array descendants.",
                 !shardKey.isEmpty());
-    }
+        return shardKey;
+    }();
 
-    // Target the shard key or database primary
-    if (!shardKey.isEmpty()) {
-        return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec, chunkRanges));
-    }
 
-    // TODO (SERVER-51070): Remove the boost::none when the config server can support shardVersion
-    // in commands
-    return ShardEndpoint(
-        _cri.cm.dbPrimary(),
-        _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
-        _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cri.cm.dbVersion());
+    // Target the shard key
+    return uassertStatusOK(_targetShardKey(shardKey, CollationSpec::kSimpleSpec, chunkRanges));
 }
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
@@ -423,19 +444,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         updateManyCount.increment(1);
     }
 
-    // If the collection is not sharded, forward the update to the primary shard.
     if (!_cri.cm.isSharded()) {
         if (!isMulti) {
             updateOneUnshardedCount.increment(1);
         }
-        // TODO (SERVER-51070): Remove the boost::none when the config server can support
-        // shardVersion in commands
-        return std::vector{ShardEndpoint(
-            _cri.cm.dbPrimary(),
-            _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
-            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cri.cm.dbVersion())};
+
+        return {targetUnshardedCollection(_nss, _cri)};
     }
 
+    // Collection is sharded
     const auto& shardKeyPattern = _cri.cm.getShardKeyPattern();
     const auto collation = write_ops::collationOf(updateOp);
 
@@ -597,6 +614,18 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     const bool isMulti = deleteOp.getMulti();
     const auto collation = write_ops::collationOf(deleteOp);
 
+    if (isMulti) {
+        deleteManyCount.increment(1);
+    }
+
+    if (!_cri.cm.isSharded()) {
+        if (!isMulti) {
+            deleteOneUnshardedCount.increment(1);
+        }
+        return {targetUnshardedCollection(_nss, _cri)};
+    }
+
+    // Collection is sharded
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                _nss,
                                                                collation,
@@ -604,25 +633,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                                                                itemRef.getLet(),
                                                                itemRef.getLegacyRuntimeConstants());
 
-    if (isMulti) {
-        deleteManyCount.increment(1);
-    }
-
-    // If the collection is not sharded, forward the update to the primary shard.
-    if (!_cri.cm.isSharded()) {
-        if (!isMulti) {
-            deleteOneUnshardedCount.increment(1);
-        }
-        // TODO (SERVER-51070): Remove the boost::none when the config server can support
-        // shardVersion in commands
-        return std::vector{ShardEndpoint(
-            _cri.cm.dbPrimary(),
-            _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
-            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cri.cm.dbVersion())};
-    }
-
     BSONObj deleteQuery = deleteOp.getFilter();
-    BSONObj shardKey;
 
     if (_isRequestOnTimeseriesViewNamespace) {
         uassert(ErrorCodes::IllegalOperation,
@@ -849,7 +860,7 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
 }
 
 int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {
-    if (_cri.cm.isSharded()) {
+    if (_cri.cm.hasRoutingTable()) {
         return _cri.cm.getNShardsOwningChunks();
     }
 

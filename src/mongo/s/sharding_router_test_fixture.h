@@ -127,7 +127,8 @@ protected:
                      const StatusWith<long long>& response);
 
     /**
-     *
+     * Expects a find command on configHost's 'config' database and returns an array of objects
+     * 'obj' as a response.
      */
     void expectFindSendBSONObjVector(const HostAndPort& configHost, std::vector<BSONObj> obj);
 

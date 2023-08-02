@@ -86,7 +86,7 @@ public:
 
     /* Initializes the targeter with a custom CollectionRoutingInfo cri, in order to support
      * using a custom (synthetic) routing table */
-    CollectionRoutingInfoTargeter(const CollectionRoutingInfo& cri);
+    CollectionRoutingInfoTargeter(const NamespaceString& nss, const CollectionRoutingInfo& cri);
 
     const NamespaceString& getNS() const override;
 
@@ -144,6 +144,9 @@ public:
      */
     bool refreshIfNeeded(OperationContext* opCtx) override;
 
+    /**
+     * Returns the number of shards on which the collection has any chunks.
+     */
     int getNShardsOwningChunks() const override;
 
     bool isShardedTimeSeriesBucketsNamespace() const override;

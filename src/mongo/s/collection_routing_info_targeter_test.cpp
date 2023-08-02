@@ -97,6 +97,9 @@ auto buildDelete(const NamespaceString& nss, BSONObj query) {
     return BatchedCommandRequest{std::move(deleteOp)};
 }
 
+/**
+ * Fixture that populates the CatalogCache with 'kNss' as a sharded collection.
+ */
 class CollectionRoutingInfoTargeterTest : public CatalogCacheTestFixture {
 public:
     CollectionRoutingInfoTargeter prepare(BSONObj shardKeyPattern,
@@ -326,8 +329,10 @@ void CollectionRoutingInfoTargeterTest::
                                                       << "hashed"));
 
     auto cm = makeCustomChunkManager(shardKeyPattern, splitPoints);
-    auto criTargeter = CollectionRoutingInfoTargeter(CollectionRoutingInfo{
-        std::move(cm), boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+    auto criTargeter = CollectionRoutingInfoTargeter(
+        kNss,
+        CollectionRoutingInfo{std::move(cm),
+                              boost::optional<ShardingIndexesCatalogCache>(boost::none)});
     ASSERT_EQ(criTargeter.getRoutingInfo().cm.numChunks(), 5);
 
     // Cause the global chunk manager to have some other configuration.
@@ -978,6 +983,117 @@ TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocu
     checkShardKey(BSON(timeField << 1 << metaField << 1), BSON("nested" << 123));
     checkShardKey(BSON(timeField << 1 << (str::stream() << metaField << ".nested.value") << 1),
                   BSON("nested" << BSON("value" << 123)));
+}
+
+/**
+ * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection not tracked on the
+ * configsvr, or a non-existent collection.
+ */
+class CollectionRoutingInfoTargeterUntrackedTest : public CatalogCacheTestFixture {
+public:
+    CollectionRoutingInfoTargeter prepare() {
+        const auto cri = makeUntrackedCollectionRoutingInfo(kNss);
+        primaryShard = cri.cm.dbPrimary();
+        dbVersion = cri.cm.dbVersion();
+        return CollectionRoutingInfoTargeter(kNss, cri);
+    };
+
+    ShardId primaryShard;
+    DatabaseVersion dbVersion;
+};
+
+TEST_F(CollectionRoutingInfoTargeterUntrackedTest, InsertIsTargetedToDbPrimaryShard) {
+    const auto targeter = prepare();
+    const auto shardEndpoint = targeter.targetInsert(operationContext(), BSON("x" << 10));
+    ASSERT_EQ(primaryShard, shardEndpoint.shardName);
+    ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
+    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
+}
+
+TEST_F(CollectionRoutingInfoTargeterUntrackedTest, UpdateIsTargetedToDbPrimaryShard) {
+    const auto targeter = prepare();
+    const auto update = buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 1}}"), false);
+    const auto shardEndpoints =
+        targeter.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+
+    ASSERT_EQ(1, shardEndpoints.size());
+    const auto& shardEndpoint = shardEndpoints.front();
+    ASSERT_EQ(primaryShard, shardEndpoint.shardName);
+    ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
+    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
+}
+
+TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimaryShard) {
+    const auto targeter = prepare();
+    const auto deleteOp = buildDelete(kNss, fromjson("{}"));
+    const auto shardEndpoints =
+        targeter.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+
+    ASSERT_EQ(1, shardEndpoints.size());
+    const auto& shardEndpoint = shardEndpoints.front();
+    ASSERT_EQ(primaryShard, shardEndpoint.shardName);
+    ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
+    ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
+}
+
+/**
+ * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection tracked on the
+ * configsvr.
+ */
+class CollectionRoutingInfoTargeterUnshardedTest : public CatalogCacheTestFixture {
+public:
+    CollectionRoutingInfoTargeter prepare() {
+        const auto cri = makeUnshardedCollectionRoutingInfo(kNss);
+
+        std::set<ShardId> shards;
+        cri.cm.getAllShardIds(&shards);
+        ASSERT_EQ(1, shards.size());
+        owningShard = *shards.begin();
+
+        shardVersion = cri.getCollectionVersion();
+
+        return CollectionRoutingInfoTargeter(kNss, cri);
+    };
+
+    ShardId owningShard;
+    ShardVersion shardVersion;
+};
+
+TEST_F(CollectionRoutingInfoTargeterUnshardedTest, InsertIsTargetedToOwningShard) {
+    const auto targeter = prepare();
+    const auto shardEndpoint = targeter.targetInsert(operationContext(), BSON("x" << 10));
+    ASSERT_EQ(owningShard, shardEndpoint.shardName);
+    ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
+    ASSERT_EQ(shardVersion, shardEndpoint.shardVersion);
+}
+
+TEST_F(CollectionRoutingInfoTargeterUnshardedTest, UpdateIsTargetedToOwningShard) {
+    const auto targeter = prepare();
+    const auto update = buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 1}}"), false);
+    const auto shardEndpoints =
+        targeter.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+
+    ASSERT_EQ(1, shardEndpoints.size());
+    const auto& shardEndpoint = shardEndpoints.front();
+    ASSERT_EQ(owningShard, shardEndpoint.shardName);
+    ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
+    ASSERT_EQ(shardVersion, shardEndpoint.shardVersion);
+}
+
+TEST_F(CollectionRoutingInfoTargeterUnshardedTest, DeleteIsTargetedToOwningShard) {
+    const auto targeter = prepare();
+    const auto deleteOp = buildDelete(kNss, fromjson("{}"));
+    const auto shardEndpoints =
+        targeter.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+
+    ASSERT_EQ(1, shardEndpoints.size());
+    const auto& shardEndpoint = shardEndpoints.front();
+    ASSERT_EQ(owningShard, shardEndpoint.shardName);
+    ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
+    ASSERT_EQ(shardVersion, shardEndpoint.shardVersion);
 }
 
 }  // namespace

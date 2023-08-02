@@ -164,7 +164,8 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
     bool unique,
     const std::vector<BSONObj>& splitPoints,
     const std::vector<BSONObj>& globalIndexes,
-    boost::optional<ReshardingFields> reshardingFields) {
+    boost::optional<ReshardingFields> reshardingFields,
+    boost::optional<bool> unsplittable) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
     DatabaseType db(nss.db_forTest().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
@@ -192,6 +193,8 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
         if (indexVersion) {
             coll.setIndexVersion({uuid, *indexVersion});
         }
+
+        coll.setUnsplittable(unsplittable);
 
         return coll.toBSON();
     }();
@@ -240,6 +243,29 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
         });
     }
 
+    return *future.default_timed_get();
+}
+
+CollectionRoutingInfo CatalogCacheTestFixture::makeUnshardedCollectionRoutingInfo(
+    const NamespaceString& nss) {
+    return makeCollectionRoutingInfo(nss,
+                                     ShardKeyPattern(BSON("_id" << 1)),
+                                     nullptr /* defaultCollator */,
+                                     false /* unique */,
+                                     {} /* splitPoints */,
+                                     {} /* globalIndexes */,
+                                     boost::none /* reshardingFields */,
+                                     true /* unsplittable */);
+}
+
+CollectionRoutingInfo CatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
+    const NamespaceString& nss) {
+    setupNShards(1);
+    DatabaseType db(nss.db_forTest().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
+
+    auto future = scheduleRoutingInfoUnforcedRefresh(nss);
+    expectFindSendBSONObjVector(kConfigHostAndPort, {db.toBSON()});
+    expectFindSendBSONObjVector(kConfigHostAndPort, std::vector<BSONObj>{});
     return *future.default_timed_get();
 }
 

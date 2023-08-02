@@ -71,7 +71,19 @@ protected:
         bool unique,
         const std::vector<BSONObj>& splitPoints,
         const std::vector<BSONObj>& globalIndexes,
-        boost::optional<ReshardingFields> reshardingFields = boost::none);
+        boost::optional<ReshardingFields> reshardingFields = boost::none,
+        boost::optional<bool> unsplittable = boost::none);
+
+    /**
+     * Returns a chunk manager representing an unsharded collection tracked on the configsvr.
+     */
+    CollectionRoutingInfo makeUnshardedCollectionRoutingInfo(const NamespaceString& nss);
+
+    /**
+     * Returns a chunk manager representing an unsharded collection not tracked on the configsvr,
+     * or a non-existent collection.
+     */
+    CollectionRoutingInfo makeUntrackedCollectionRoutingInfo(const NamespaceString& nss);
 
     /**
      * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'

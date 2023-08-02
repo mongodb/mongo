@@ -229,8 +229,10 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                std::move(routingTableHistory))),
                            boost::none);
 
-    return CollectionRoutingInfoTargeter(CollectionRoutingInfo{
-        std::move(cm), boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+    return CollectionRoutingInfoTargeter(
+        nss,
+        CollectionRoutingInfo{std::move(cm),
+                              boost::optional<ShardingIndexesCatalogCache>(boost::none)});
 }
 
 /**

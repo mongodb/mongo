@@ -157,8 +157,10 @@ protected:
                                RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
                                    std::move(routingTableHistory))),
                                boost::none);
-        return CollectionRoutingInfoTargeter(CollectionRoutingInfo{
-            std::move(cm), boost::optional<ShardingIndexesCatalogCache>(boost::none)});
+        return CollectionRoutingInfoTargeter(
+            nss,
+            CollectionRoutingInfo{std::move(cm),
+                                  boost::optional<ShardingIndexesCatalogCache>(boost::none)});
     }
 
     int32_t getRandomInt(int32_t limit) const {
