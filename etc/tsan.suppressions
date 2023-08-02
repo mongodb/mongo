@@ -18,6 +18,7 @@ race:tzset_internal
 # fixed the ones we know are real.
 # TODO: https://jira.mongodb.org/browse/SERVER-48599
 called_from_lib:libwiredtiger.so
+called_from_lib:libwiredtiger_snappy.so
 race:src/third_party/wiredtiger/*
 
 # These functions call malloc() down the line while inside a signal handler.
