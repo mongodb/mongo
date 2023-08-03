@@ -433,6 +433,8 @@ last-continuous:
     ticket: SERVER-78650
   - test_file: jstests/replsets/tenant_migration_shard_merge_journal_compressor.js
     ticket: SERVER-61475
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
+    ticket: SERVER-78855
   suites: null
 
 last-lts:
