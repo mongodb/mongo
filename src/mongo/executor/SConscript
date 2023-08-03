@@ -390,6 +390,7 @@ env.CppUnitTest(
     target='executor_test',
     source=[
         'async_rpc_test.cpp',
+        'async_rpc_util_test.cpp',
         'cancelable_executor_test.cpp',
         'connection_pool_test.cpp',
         'connection_pool_test_fixture.cpp',
@@ -414,6 +415,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/commands/standalone',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/repl/hello_command',
+        '$BUILD_DIR/mongo/db/repl/task_executor_mock',
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',

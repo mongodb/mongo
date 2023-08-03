@@ -87,6 +87,10 @@ public:
         [](const executor::RemoteCommandRequestOnAny&) {
             return false;
         };
+
+    // Override to specify the ErrorCode calls to schedule should fail with when configured to do
+    // so.
+    ErrorCodes::Error failureCode = ErrorCodes::OperationFailed;
 };
 
 }  // namespace repl

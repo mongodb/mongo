@@ -157,14 +157,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
             .getNoThrow();
 
     if (auto status = responses.getStatus(); status != Status::OK()) {
-        // TODO: SERVER-79070 Remove the if/else, invariant on RemoteCommandExecutionError instead.
-        if (status == ErrorCodes::RemoteCommandExecutionError) {
-            uassertStatusOK(async_rpc::unpackRPCStatus(status));
-        } else {
-            // Matches behavior in ScopedTaskExecutor on shutdown.
-            invariant(status.code() == ErrorCodes::BrokenPromise);
-            uassertStatusOK(Status{ErrorCodes::CallbackCanceled, status.reason()});
-        }
+        uassertStatusOK(async_rpc::unpackRPCStatus(status));
     }
 
     return responses.getValue();

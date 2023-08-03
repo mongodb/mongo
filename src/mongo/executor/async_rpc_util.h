@@ -34,6 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
@@ -113,6 +114,8 @@ Future<ResultType> processMultipleFutures(std::vector<ExecutorFuture<FutureType>
 
     for (size_t i = 0; i < futures.size(); ++i) {
         std::move(futures[i])
+            .unsafeToInlineFuture()  // always process the result, even if an executor is rejecting
+                                     // work
             .getAsync(
                 [index = i, sharedPromise, processStatusWith](StatusOrStatusWith<FutureType> sw) {
                     processStatusWith(sw, sharedPromise, index);
