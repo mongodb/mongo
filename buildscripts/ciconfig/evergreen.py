@@ -26,7 +26,6 @@ LOGGER = structlog.get_logger(__name__)
 def parse_evergreen_file(path, evergreen_binary="evergreen"):
     """Read an Evergreen file and return EvergreenProjectConfig instance."""
     if evergreen_binary:
-        print(f"os.environ={os.environ}")
         if not shutil.which(evergreen_binary):
             # On windows in python3.8 there was an update to no longer use HOME in os.path.expanduser
             # However, cygwin is weird and has HOME but not USERPROFILE
