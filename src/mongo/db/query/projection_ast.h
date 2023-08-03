@@ -40,6 +40,8 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -160,14 +162,19 @@ private:
     CopyableMatchExpression _matchExpr;
 };
 
+/*
+ * This node behaves as a map from field name to child in a projection. Internally, we hold a vector
+ * of field names until the size reaches 100, where we switch to a map type for faster searching. We
+ * behave this way to avoid the overhead of a map for small queries, where the linear search is
+ * faster. Note that we do not go back to using a vector if the size drops below 100 due to
+ * removeChild() calls.
+ */
 class ProjectionPathASTNode final : public ASTNode {
 public:
-    ProjectionPathASTNode() {}
-
-    ProjectionPathASTNode(ASTNodeVector children, std::vector<std::string> fieldNames)
-        : ASTNode(std::move(children)), _fieldNames(std::move(fieldNames)) {
-        invariant(_children.size() == _fieldNames.size());
-    }
+    // Threshold of number of children for when this class internally begins to use a map structure
+    // for efficient lookup. This was chosen by finding the crossover point where a linear search
+    // becomes worse than map lookups. Most queries are small enough to never reach this threshold.
+    static constexpr size_t kUseMapThreshold = 100;
 
     void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {
         visitor->visit(this);
@@ -178,22 +185,57 @@ public:
     }
 
     std::unique_ptr<ASTNode> clone() const override final {
-        return std::make_unique<ProjectionPathASTNode>(*this);
+        auto cloneNode = std::make_unique<ProjectionPathASTNode>(*this);
+        if (usingMap) {
+            // Change the addresses in the new map to point to the cloned children.
+            for (size_t i = 0; i < _fieldNames.size(); ++i) {
+                cloneNode->_fieldToChild.insert_or_assign(_fieldNames.at(i),
+                                                          cloneNode->_children.at(i).get());
+            }
+        }
+        return cloneNode;
     }
 
     ASTNode* getChild(StringData fieldName) const {
-        invariant(_fieldNames.size() == _children.size());
-        for (size_t i = 0; i < _fieldNames.size(); ++i) {
-            if (_fieldNames[i] == fieldName) {
-                return _children[i].get();
+        tassert(7858000,
+                "Expected the same number of field names as children, and either not using the "
+                "internal field name to child map or the map should have the same size.",
+                _fieldNames.size() == _children.size() &&
+                    (!usingMap || _fieldToChild.size() == _children.size()));
+
+        // Use the map if available. Otherwise linearly search through the vector.
+        if (usingMap) {
+            auto it = _fieldToChild.find(fieldName.toString());
+            if (it == _fieldToChild.end()) {
+                return nullptr;
             }
+            return it->second;
+        } else {
+            for (size_t i = 0; i < _fieldNames.size(); ++i) {
+                if (_fieldNames[i] == fieldName) {
+                    return _children[i].get();
+                }
+            }
+            return nullptr;
         }
-        return nullptr;
     }
 
     void addChild(StringData fieldName, std::unique_ptr<ASTNode> node) {
+        auto rawPtrNode = node.get();
         addChildToInternalVector(std::move(node));
         _fieldNames.push_back(fieldName.toString());
+
+        if (usingMap) {
+            _fieldToChild.emplace(fieldName.toString(), rawPtrNode);
+        } else if (!usingMap && _fieldNames.size() >= kUseMapThreshold) {
+            // Start using the map, so we can perform getChild lookups faster.
+            usingMap = true;
+            for (size_t i = 0; i < _fieldNames.size(); i++) {
+                const auto& field = _fieldNames.at(i);
+                const auto rawPtrChild = _children.at(i).get();
+                _fieldToChild.emplace(field, rawPtrChild);
+            }
+        }
     }
 
     /**
@@ -205,6 +247,8 @@ public:
             it != _fieldNames.end()) {
             _children.erase(_children.begin() + std::distance(_fieldNames.begin(), it));
             _fieldNames.erase(it);
+            if (usingMap)
+                _fieldToChild.erase(fieldName.toString());
             return true;
         }
 
@@ -216,8 +260,12 @@ public:
     }
 
 private:
+    bool usingMap = false;
     // Names associated with the child nodes. Must be same size as _children.
     std::vector<std::string> _fieldNames;
+    // Field names to child map, used for quick lookup of children when our size is greater than
+    // kUseMapThreshold.
+    absl::flat_hash_map<std::string, ASTNode*> _fieldToChild;
 };
 
 class ProjectionPositionalASTNode final : public ASTNode {

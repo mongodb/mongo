@@ -31,9 +31,11 @@
 #include <boost/none.hpp>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <string>
 
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -106,6 +108,18 @@ void assertCanClone(Projection proj) {
     // Make sure we can still serialize the clone.
     auto cloneBSON2 = projection_ast::astToDebugBSON(clone.get());
     ASSERT_BSONOBJ_EQ(cloneBSON, cloneBSON2);
+
+    // Iterate through the children to access the grandchildren. We want to make sure the cloned
+    // children aren't pointing to the original children. ASAN will pick this up if there's an
+    // issue.
+    size_t numGrandChildren = 0;
+    auto asPathNode = static_cast<projection_ast::ProjectionPathASTNode*>(clone.get());
+    for (const auto& field : asPathNode->fieldNames()) {
+        auto child = asPathNode->getChild(field);
+        // Use the "child" variable so it doesn't get optimized away. Without this, there is no
+        // access of "child" so ASAN won't pick up any potential errors.
+        numGrandChildren += child->children().size();
+    }
 }
 
 TEST_F(ProjectionASTTest, TestParsingTypeEmptyProjectionIsExclusionInFind) {
@@ -364,6 +378,24 @@ TEST_F(ProjectionASTTest, TestCloningWithExpression) {
     assertCanClone(std::move(proj));
 }
 
+TEST_F(ProjectionASTTest, TestCloningWithLargeProject) {
+    const size_t numFields = 200;
+    StringBuilder sb;
+    sb.append("{");
+    for (size_t i = 0; i < numFields; i++) {
+        sb.append("a" + std::to_string(i) + ": 1");
+        if (i == numFields - 1) {
+            sb.append("}");
+        } else {
+            sb.append(", ");
+        }
+    }
+
+    Projection proj = parseWithDefaultPolicies(fromjson(sb.str()));
+    ASSERT(proj.type() == ProjectType::kInclusion);
+    assertCanClone(std::move(proj));
+}
+
 TEST_F(ProjectionASTTest, TestDebugBSONWithPositionalAndSliceSkipLimit) {
     Projection proj = parseWithFindFeaturesEnabled(
         fromjson("{'a.b': 1, b: 1, 'c.d.$': 1, f: {$slice: [1, 2]}}"), fromjson("{'c.d': 1}"));
@@ -489,6 +521,67 @@ TEST_F(ProjectionASTTest, TestDebugBSONWithLiteralValue) {
     BSONObj output = projection_ast::astToDebugBSON(proj.root());
     BSONObj expected = fromjson("{a: {$const: 'abc'}, _id: true}");
     ASSERT_BSONOBJ_EQ(output, expected);
+}
+
+TEST_F(ProjectionASTTest, TestDebugLargeBSONWithLiteralValue) {
+    const auto joinFields = [](const std::vector<std::string>& fields) {
+        return "{{{}}}"_format(fmt::join(fields, ", "));
+    };
+    const auto compareProjectionAndFields = [&](const Projection& projection,
+                                                const std::vector<std::string>& fields) {
+        auto output = projection_ast::astToDebugBSON(projection.root());
+        auto expected = fromjson(joinFields(fields));
+        ASSERT_BSONOBJ_EQ(output, expected);
+    };
+
+    const size_t numFields = 2 * projection_ast::ProjectionPathASTNode::kUseMapThreshold;
+    std::vector<std::string> fields;
+    // Create a list of strings of the form "ai: {$const: 'i'}" where "i" is an integer. We will
+    // add/remove and eventually join this list together for testing debug output.
+    for (size_t i = 0; i < numFields; i++) {
+        std::string i_str = std::to_string(i);
+        fields.push_back("a{}: {{$const: '{}'}}"_format(i_str, i_str));
+    }
+
+    Projection proj = parseWithDefaultPolicies(fromjson(joinFields(fields)));
+
+    {
+        // _id: true is implicit.
+        fields.push_back("_id: true");
+        compareProjectionAndFields(proj, fields);
+    }
+
+    {
+        // Test removal of fields.
+        proj.root()->removeChild("a150");
+        fields.erase(fields.begin() + 150);
+        compareProjectionAndFields(proj, fields);
+
+        proj.root()->removeChild("a0");
+        fields.erase(fields.begin());
+        compareProjectionAndFields(proj, fields);
+
+        proj.root()->removeChild("a" + std::to_string(numFields - 1));
+        // We use 997 because we've removed two children previously.
+        fields.erase(fields.begin() + numFields - 3);
+        compareProjectionAndFields(proj, fields);
+
+        // Test removal of implicit _id.
+        proj.root()->removeChild("_id");
+        fields.pop_back();
+        compareProjectionAndFields(proj, fields);
+    }
+
+    {
+        // Remove enough fields so that we are below the map threshold (100). Test that we still get
+        // the expected output below this size.
+        for (size_t i = 0; i < projection_ast::ProjectionPathASTNode::kUseMapThreshold + 50; i++) {
+            auto lastFieldName = proj.root()->fieldNames().back();
+            proj.root()->removeChild(lastFieldName);
+            fields.pop_back();
+            compareProjectionAndFields(proj, fields);
+        }
+    }
 }
 
 TEST_F(ProjectionASTTest, TestDebugBSONWithNestedLiteralValue) {
