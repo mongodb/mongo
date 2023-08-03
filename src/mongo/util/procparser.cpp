@@ -37,6 +37,8 @@
 #include <cstddef>
 #include <fcntl.h>
 #include <istream>
+#include <map>
+#include <set>
 #include <string>
 #include <system_error>
 
@@ -530,6 +532,72 @@ Status parseProcNetstatFile(const std::vector<StringData>& keys,
         return swString.getStatus();
     }
     return parseProcNetstat(keys, swString.getValue(), builder);
+}
+
+Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& linesAndKeys,
+                         StringData data,
+                         BSONObjBuilder* builder) {
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+    auto newlineFinder =
+        boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on);
+    auto spaceAndColonFinder =
+        boost::token_finder([](char c) { return c == ' ' || c == ':'; }, boost::token_compress_on);
+
+    bool foundKeys = false;
+
+    // Split the file by lines.
+    for (string_split_iterator lineIt(data.begin(), data.end(), newlineFinder);
+         lineIt != string_split_iterator();
+         ++lineIt) {
+        StringData line(lineIt->begin(), lineIt->end());
+        // Split the line by spaces and colons since these are the delimeters for sockstat files.
+        string_split_iterator partIt(line.begin(), line.end(), spaceAndColonFinder);
+        // Check the line-key, which is the first part of the line, to see if we care about it.
+        StringData lineKey(partIt->begin(), partIt->end());
+        auto bucketIt = linesAndKeys.find(lineKey);
+        if (bucketIt == linesAndKeys.end()) {
+            // We don't care about this line.
+            continue;
+        }
+
+        // We do care about this line; extract the values we care about.
+        // Start a new document with the line key as the name.
+        BSONObjBuilder sub(builder->subobjStart(lineKey));
+        ++partIt;
+        auto lineKeySet = bucketIt->second;
+        while (partIt != string_split_iterator()) {
+            StringData key(partIt->begin(), partIt->end());
+            if (!lineKeySet.count(key)) {
+                // Don't care about this key/value. Skip past it.
+                ++partIt;
+                ++partIt;
+                continue;
+            }
+            // We do care about this key. Get the value.
+            ++partIt;
+            StringData stringValue(partIt->begin(), partIt->end());
+            long long value;
+            if (!NumberParser{}(stringValue, &value).isOK()) {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Couldn't parse '" << stringValue << "' to number");
+            }
+            sub.appendNumber(key.toString(), value);
+            foundKeys = true;
+            ++partIt;
+        }
+    }
+    return foundKeys ? Status::OK()
+                     : Status(ErrorCodes::NoSuchKey, "Failed to find any keys in sockStats string");
+}
+
+Status parseProcSockstatFile(const std::map<StringData, std::set<StringData>>& keys,
+                             StringData filename,
+                             BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+    return parseProcSockstat(keys, swString.getValue(), builder);
 }
 
 

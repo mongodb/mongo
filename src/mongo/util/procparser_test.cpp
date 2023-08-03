@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace procparser {
 Status parseProcSelfMountStatsImpl(StringData data,
                                    BSONObjBuilder* builder,
@@ -1072,6 +1074,107 @@ TEST(FTDCProcPressure, TestLocalPressureInfo) {
 
         ASSERT(obj["io"]["full"]);
         ASSERT(obj["io"]["full"]["totalMicros"]);
+    }
+}
+
+// Parse "keys" out of "input", which should be a string matching the format of a /proc/net/sockstat
+// file. Asserts that we can parse the keys successfully and returns a BSONObj of the parsed data.
+BSONObj assertParseSockstat(std::map<StringData, std::set<StringData>> keys, StringData input) {
+    BSONObjBuilder builder;
+    ASSERT_OK(procparser::parseProcSockstat(keys, input, &builder));
+    return builder.obj();
+}
+
+TEST(FTDCProcSockstat, TestSockstatSuccess) {
+
+    std::map<StringData, std::set<StringData>> testKeys{
+        {"sockets", {"used"}},
+        {"TCP", {"inuse", "tw", "mem"}},
+    };
+
+    auto obj = assertParseSockstat(testKeys,
+                                   "sockets: used 290\n"
+                                   "TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1\n"
+                                   "UDP: inuse 6 mem 4\n");
+
+    // Requested keys present with correct values.
+    ASSERT_EQ(obj["sockets"]["used"].Int(), 290);
+    ASSERT_EQ(obj["TCP"]["inuse"].Int(), 8);
+    ASSERT_EQ(obj["TCP"]["tw"].Int(), 0);
+    ASSERT_EQ(obj["TCP"]["mem"].Int(), 1);
+
+    // Keys aren't present if they weren't requested.
+    ASSERT(obj["TCP"]["alloc"].eoo());
+    // Sections aren't present if they weren't requested.
+    ASSERT(obj["UDP"].eoo());
+}
+
+TEST(FTDCProcSockstat, TestSockstatFailure) {
+
+    std::map<StringData, std::set<StringData>> testKeys{
+        {"sockets", {"used"}},
+        {"TCP", {"inuse", "tw", "mem"}},
+    };
+    {
+        // Garbage sockstat string.
+        StringData badString = "I'm not in the right format";
+        BSONObjBuilder bob;
+        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+        // No desired keys found so error.
+        ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
+    }
+    {
+        // Ditto for empty string.
+        StringData badString = "";
+        BSONObjBuilder bob;
+        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+        // No desired keys found so error.
+        ASSERT_EQ(s.code(), ErrorCodes::NoSuchKey);
+    }
+    {
+        // Nan for any key gives a parse error.
+        StringData badString = "sockets: used alot";
+        BSONObjBuilder bob;
+        auto s = procparser::parseProcSockstat(testKeys, badString, &bob);
+        ASSERT_EQ(s.code(), ErrorCodes::FailedToParse);
+    }
+    {
+        // OK if string doesn't terminate with newline.
+        auto obj = assertParseSockstat(testKeys,
+                                       "sockets: used 290\n"
+                                       "TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1\n"
+                                       "UDP: inuse 6 mem 4");
+
+        // Requested keys present with correct values.
+        ASSERT_EQ(obj["sockets"]["used"].Int(), 290);
+        ASSERT_EQ(obj["TCP"]["inuse"].Int(), 8);
+        ASSERT_EQ(obj["TCP"]["tw"].Int(), 0);
+        ASSERT_EQ(obj["TCP"]["mem"].Int(), 1);
+    }
+}
+
+// Test we can parse the /proc/net/sockset on this machine and assert we have some expected fields.
+// Can't test values because they vary at runtime.
+TEST(FTDCProcNetstat, TestLocalSockstat) {
+
+    BSONObjBuilder builder;
+
+    std::map<StringData, std::set<StringData>> testKeys{
+        {"sockets", {"used"}},
+        {"TCP", {"inuse", "orphan", "tw", "alloc", "mem"}},
+    };
+
+    ASSERT_OK(procparser::parseProcSockstatFile(testKeys, "/proc/net/sockstat", &builder));
+
+    BSONObj obj = builder.obj();
+    LOGV2(4840200, "Parsed local /net/proc/sockstat file", "obj"_attr = obj);
+
+    for (auto&& [category, nodes] : testKeys) {
+        ASSERT(obj[category].isABSONObj()) << ", category={}"_format(category);
+        for (auto&& node : nodes) {
+            ASSERT(obj[category][node].isNumber())
+                << ", category={}, node={}"_format(category, node);
+        }
     }
 }
 

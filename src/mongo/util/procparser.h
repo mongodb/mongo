@@ -30,6 +30,8 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -99,13 +101,56 @@ Status parseProcMemInfoFile(StringData filename,
 Status parseProcNetstat(const std::vector<StringData>& keys,
                         StringData data,
                         BSONObjBuilder* builder);
-
 /**
  * Read from file, and write the keys found in that file into builder.
  */
 Status parseProcNetstatFile(const std::vector<StringData>& keys,
                             StringData filename,
                             BSONObjBuilder* builder);
+
+
+/**
+ * Read a string matching /proc/net/sockstat format, and write the relevant keys found into builder.
+ * /proc/net/sockstat lines begin with a section key, like "sockets" or "TCP". The line continues
+ * with space-separated pairs of keys and values until a newline begins a new section.
+ *
+ * keys - Map of section-keys to the relevant keys in that section.
+ * data - string to parse
+ * builder - BSON output. A sub-document for each request section is written with the requested
+ * key-value pairs.
+ *
+ * For example, if the /proc/net/sockstat contained:
+ *
+ * sockets: used 299
+ * TCP: inuse 8 orphan 0 tw 0 alloc 12 mem 1
+ * ...
+ *
+ * And `keys` contained:
+ *    keys["sockets"] = {"used"}
+ *    keys["TCP" = {"alloc", "inuse"}
+ *
+ * The resulting BSONObj would look like:
+ *    {
+ *        "sockets": {
+ *           "used": 299,
+ *        },
+ *        "TCP": {
+ *           "inuse": 8,
+ *           "alloc": 12,
+ *        }
+ *    }
+ */
+Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& keys,
+                         StringData data,
+                         BSONObjBuilder* builder);
+/**
+ * Read from file, and write the keys found in that file into builder.
+ * See the above parseProcSockStats for details on the arguments and format
+ * of the BSONObj written into builder.
+ */
+Status parseProcSockstatFile(const std::map<StringData, std::set<StringData>>& keys,
+                             StringData filename,
+                             BSONObjBuilder* builder);
 
 /**
  * Read a string matching /proc/diskstats format, and write the specified list of disks in builder.

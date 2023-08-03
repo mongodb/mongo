@@ -88,6 +88,12 @@ static const std::vector<StringData> kVMKeys{
     "pswpout"_sd,
 };
 
+// Keys the system stats collector wants to collect out of the /proc/net/sockstat file.
+static const std::map<StringData, std::set<StringData>> kSockstatKeys{
+    {"sockets"_sd, {"used"_sd}},
+    {"TCP"_sd, {"inuse"_sd, "orphan"_sd, "tw"_sd, "alloc"_sd}},
+};
+
 /**
  *  Collect metrics from the Linux /proc file system.
  */
@@ -129,6 +135,14 @@ public:
             processStatusErrors(
                 procparser::parseProcNetstatFile(kNetstatKeys, "/proc/net/snmp"_sd, &subObjBuilder),
                 &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("sockstat"_sd));
+            processStatusErrors(procparser::parseProcSockstatFile(
+                                    kSockstatKeys, "/proc/net/sockstat"_sd, &subObjBuilder),
+                                &subObjBuilder);
             subObjBuilder.doneFast();
         }
 
