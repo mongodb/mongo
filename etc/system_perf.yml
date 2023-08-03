@@ -52,11 +52,24 @@ variables:
       - name: schedule_global_auto_tasks
         variant: task_generation
   _skip_expansions: &_expansion_updates
-      # This is the normal (amazon2) "compile" artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_patch_cbba2a682920b2b5f587c7ededf460a5cc4ab230_64c79b8b3066157239cc356b_23_07_31_11_32_24/logs?execution=0
+      # ARM compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_1e00cf6a84c15444ed0df965fada1f3ca1526a9a_23_08_01_23_13_41/files?execution=0
       - key: mdb_binary_for_client
-        value: https://mciuploads.s3.amazonaws.com/dsi/64c79b8b3066157239cc356b/cbba2a682920b2b5f587c7ededf460a5cc4ab230/linux/mongodb-arm64-64c79b8b3066157239cc356b.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-arm64-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
       - key: mdb_binary_for_server
-        value: https://mciuploads.s3.amazonaws.com/dsi/64c79b8b3066157239cc356b/cbba2a682920b2b5f587c7ededf460a5cc4ab230/linux/mongodb-arm64-64c79b8b3066157239cc356b.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-arm64-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
+      #
+      # # Intel compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon2_compile_1e00cf6a84c15444ed0df965fada1f3ca1526a9a_23_08_01_23_13_41/files?execution=0
+      # - key: mdb_binary_for_client
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
+      # - key: mdb_binary_for_server
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
+      #
+      # # Atlas-like compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_rhel70_compile_1e00cf6a84c15444ed0df965fada1f3ca1526a9a_23_08_01_23_13_41/files?execution=0
+      # - key: mdb_binary_for_client
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-rhel70-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
+      # - key: mdb_binary_for_server
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a/1e00cf6a84c15444ed0df965fada1f3ca1526a9a/linux/mongodb-rhel70-sys_perf_1e00cf6a84c15444ed0df965fada1f3ca1526a9a.tar.gz
+      #
 ###
 
   _src_dir: &src_dir src/mongo
