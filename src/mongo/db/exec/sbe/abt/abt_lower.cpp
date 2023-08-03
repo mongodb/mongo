@@ -1232,7 +1232,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                                       boost::none,
                                                       fields,
                                                       vars,
-                                                      nullptr /*yieldPolicy*/,
+                                                      _yieldPolicy /*yieldPolicy*/,
                                                       planNodeId,
                                                       callbacks);
         }
@@ -1262,7 +1262,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             boost::none /* minRecordIdSlot */,
             boost::none /* maxRecordIdSlot */,
             forwardScan,
-            nullptr /*yieldPolicy*/,
+            _yieldPolicy /*yieldPolicy*/,
             planNodeId,
             callbacks,
             gDeprioritizeUnboundedUserCollectionScans.load(), /* lowPriority */
@@ -1388,7 +1388,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
                                                  vars,
                                                  std::move(lowerBoundExpr),
                                                  std::move(upperBoundExpr),
-                                                 nullptr /*yieldPolicy*/,
+                                                 _yieldPolicy /*yieldPolicy*/,
                                                  planNodeId);
 }
 
@@ -1428,7 +1428,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
                                       boost::none /* minRecordIdSlot */,
                                       boost::none /* maxRecordIdSlot */,
                                       true /*forward*/,
-                                      nullptr /*yieldPolicy*/,
+                                      _yieldPolicy /*yieldPolicy*/,
                                       planNodeId,
                                       callbacks);
 }

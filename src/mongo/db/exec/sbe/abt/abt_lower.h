@@ -132,13 +132,15 @@ public:
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    const ScanOrder scanOrder)
+                    const ScanOrder scanOrder,
+                    PlanYieldPolicy* yieldPolicy = nullptr)
         : _env(env),
           _runtimeEnv(runtimeEnv),
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
-          _scanOrder(scanOrder) {}
+          _scanOrder(scanOrder),
+          _yieldPolicy(yieldPolicy) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -360,6 +362,9 @@ private:
     // (non parallel-scanned) mongod collections.
     // TODO SERVER-73010: handle cases where we have more than one collection scan.
     const ScanOrder _scanOrder;
+
+    // Specifies the yielding policy to initialize the corresponding PlanStages with.
+    PlanYieldPolicy* _yieldPolicy;
 };
 
 }  // namespace mongo::optimizer

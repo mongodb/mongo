@@ -381,24 +381,48 @@ void setupShardFiltering(OperationContext* opCtx,
     }
 }
 
-static ExecParams createExecutor(OptPhaseManager phaseManager,
-                                 PlanAndProps planAndProps,
-                                 OperationContext* opCtx,
-                                 boost::intrusive_ptr<ExpressionContext> expCtx,
-                                 const NamespaceString& nss,
-                                 const MultipleCollectionAccessor& collections,
-                                 const bool requireRID,
-                                 const ScanOrder scanOrder,
-                                 const bool needsExplain) {
+static ExecParams createExecutor(
+    OptPhaseManager phaseManager,
+    PlanAndProps planAndProps,
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const MultipleCollectionAccessor& collections,
+    const bool requireRID,
+    const ScanOrder scanOrder,
+    const bool needsExplain,
+    PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
+
+    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
+        PlanYieldPolicy::YieldThroughAcquisitions{};
+
+    if (!collections.isAcquisition()) {
+        yieldable = &(collections.getMainCollection());
+    }
+
+    auto sbeYieldPolicy =
+        std::make_unique<PlanYieldPolicySBE>(opCtx,
+                                             yieldPolicy,
+                                             opCtx->getServiceContext()->getFastClockSource(),
+                                             internalQueryExecYieldIterations.load(),
+                                             Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                                             yieldable,
+                                             std::make_unique<YieldPolicyCallbacksImpl>(nss));
+
     // Construct the ShardFilterer and bind it to the correct slot.
     setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
-    SBENodeLowering g{
-        env, *runtimeEnvironment, ids, phaseManager.getMetadata(), planAndProps._map, scanOrder};
+    SBENodeLowering g{env,
+                      *runtimeEnvironment,
+                      ids,
+                      phaseManager.getMetadata(),
+                      planAndProps._map,
+                      scanOrder,
+                      sbeYieldPolicy.get()};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
 
@@ -423,15 +447,6 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
     if (needsExplain || expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
-
-    auto yieldPolicy =
-        std::make_unique<PlanYieldPolicySBE>(opCtx,
-                                             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                             opCtx->getServiceContext()->getFastClockSource(),
-                                             internalQueryExecYieldIterations.load(),
-                                             Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                                             nullptr,
-                                             std::make_unique<YieldPolicyCallbacksImpl>(nss));
 
     std::unique_ptr<ABTPrinter> abtPrinter;
     if (needsExplain) {
@@ -469,7 +484,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
             std::move(abtPrinter),
             QueryPlannerParams::Options::DEFAULT,
             nss,
-            std::move(yieldPolicy),
+            std::move(sbeYieldPolicy),
             false /*isFromPlanCache*/,
             true /* generatedByBonsai */};
 }
