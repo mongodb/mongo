@@ -279,7 +279,7 @@ std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& in
 
 boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& intervalDNF,
                                                          const ConstFoldFn& constFold) {
-    IntervalReqExpr::Builder builder;
+    BoolExprBuilder<IntervalRequirement> builder;
     builder.pushDisj();
 
     // Since our input intervals are sorted, constDisjIntervals will be sorted as well.
@@ -369,7 +369,7 @@ void combineIntervalsDNF(const bool intersect,
         return;
     }
 
-    IntervalReqExpr::Builder builder;
+    BoolExprBuilder<IntervalRequirement> builder;
     builder.pushDisj();
 
     const auto pushConjNodesFn = [&builder](const IntervalReqExpr::Node& conj) {
@@ -602,7 +602,33 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
 
 boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
     const IntervalReqExpr::Node& intervalDNF, const ConstFoldFn& constFold) {
-    IntervalReqExpr::Builder<false /*simplifyEmptyOrSingular*/, true /*removeDups*/> builder;
+
+    struct IntervalComparator {
+        bool operator()(const IntervalReqExpr::Node& i1, const IntervalReqExpr::Node& i2) const {
+            return compareIntervalExpr(i1, i2) < 0;
+        }
+    };
+    struct IntervalSimplifier {
+        boost::optional<IntervalReqExpr::Node> operator()(
+            const BuilderNodeType type, std::vector<IntervalReqExpr::Node> v) const {
+            if (v.empty()) {
+                return boost::optional<IntervalReqExpr::Node>();
+            }
+
+            // Deduplicate via sort + unique.
+            std::sort(v.begin(), v.end(), IntervalComparator{});
+            auto end = std::unique(v.begin(), v.end());
+            v.erase(end, v.end());
+
+            if (type == BuilderNodeType::Conj) {
+                return IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(v));
+            } else {
+                return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(v));
+            }
+        }
+    };
+
+    BoolExprBuilder<IntervalRequirement, IntervalSimplifier> builder;
     builder.pushDisj();
 
     for (const auto& disjunct : intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes()) {
@@ -662,7 +688,7 @@ boost::optional<IntervalReqExpr::Node> simplifyDNFIntervals(const IntervalReqExp
 bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
                                  bool reverseSource) {
-    CompoundIntervalReqExpr::Builder builder;
+    BoolExprBuilder<CompoundIntervalRequirement> builder;
     builder.pushDisj();
 
     for (const auto& sourceConjunction :
@@ -706,7 +732,7 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
 
 void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                              const bool reverseSource) {
-    CompoundIntervalReqExpr::Builder builder;
+    BoolExprBuilder<CompoundIntervalRequirement> builder;
     builder.pushDisj();
 
     for (const auto& targetConjunction :

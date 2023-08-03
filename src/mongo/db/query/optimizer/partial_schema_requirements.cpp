@@ -123,7 +123,7 @@ bool PartialSchemaRequirements::isNoop() const {
     // ...or if it has exactly one predicate which is a no-op.
     auto reqIsNoop = false;
 
-    auto checkNoop = [&](const Entry& entry, const PSRExpr::VisitorContext&) {
+    auto checkNoop = [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
         reqIsNoop = (entry == makeNoopPartialSchemaEntry());
     };
     if (PSRExpr::isCNF(_expr)) {
@@ -142,7 +142,7 @@ boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
     }
 
     boost::optional<ProjectionName> proj;
-    PSRExpr::visitDNF(_expr, [&](const Entry& entry, const PSRExpr::VisitorContext&) {
+    PSRExpr::visitDNF(_expr, [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
         if (!proj && entry.first == key) {
             proj = entry.second.getBoundProjectionName();
         }
@@ -179,14 +179,14 @@ void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequireme
         _expr, [&](PSRExpr::Node& disjunct, const PSRExpr::VisitorContext& ctx) {
             const auto& conjunction = disjunct.cast<PSRExpr::Conjunction>();
             conjunction->nodes().emplace_back(
-                PSRExpr::make<PSRExpr::Atom>(Entry(std::move(key), std::move(req))));
+                PSRExpr::make<PSRExpr::Atom>(PartialSchemaEntry{std::move(key), std::move(req)}));
             ctx.returnEarly();
         });
     normalize();
 }
 
 namespace {
-// TODO SERVER-73827: Apply this simplification during BoolExpr building.
+// TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
 template <bool isCNF,
           class TopLevel = std::conditional_t<isCNF, PSRExpr::Conjunction, PSRExpr::Disjunction>,
           class SecondLevel = std::conditional_t<isCNF, PSRExpr::Disjunction, PSRExpr::Conjunction>>

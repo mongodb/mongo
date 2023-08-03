@@ -249,14 +249,14 @@ TEST_F(IntervalIntersection, VariableIntervals1) {
     // (max(v1, v2), +inf) U [v2 >= v1 ? MaxKey : v1, max(v1, v2)]
     ASSERT_INTERVAL_AUTO(
         "{\n"
+        "    {{>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}}\n"
+        " U \n"
         "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v2] Variable [v1] Const [true] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v2] Const [maxKey] Const [true] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v2] BinaryOp [Lt] Variable [v2] Const [maxKey] Const [true] "
         "BinaryOp [Lt] Variable [v2] Const [maxKey] BinaryOp [Gt] Variable [v1] Variable [v2] "
         "Variable [v1] Const [maxKey], Variable [v1]]}}\n"
-        " U \n"
-        "    {{>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}}\n"
         "}\n",
         *result);
 
@@ -294,6 +294,9 @@ TEST_F(IntervalIntersection, VariableIntervals3) {
 
     ASSERT_INTERVAL_AUTO(
         "{\n"
+        "    {{(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If "
+        "[] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}}\n"
+        " U \n"
         "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
         "BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] Variable [v4] "
         "BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lte] Variable [v3] "
@@ -302,9 +305,6 @@ TEST_F(IntervalIntersection, VariableIntervals3) {
         "Variable [v4] BinaryOp [Lte] Variable [v4] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
         "Variable [v1] Variable [v3] BinaryOp [Lte] Variable [v2] Variable [v4] BinaryOp [Gt] "
         "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}}\n"
-        " U \n"
-        "    {{(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If "
-        "[] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4]]}}\n"
         "}\n",
         *result);
 
@@ -323,15 +323,6 @@ TEST_F(IntervalIntersection, VariableIntervals4) {
 
     ASSERT_INTERVAL_AUTO(
         "{\n"
-        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
-        "BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] Variable [v4] "
-        "BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lt] Variable [v3] "
-        "Variable [v4] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] Variable [v1] Variable [v2] "
-        "BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [And] BinaryOp [Lt] Variable [v1] "
-        "Variable [v4] BinaryOp [Lt] Variable [v4] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
-        "Variable [v1] Variable [v3] BinaryOp [Lt] Variable [v2] Variable [v4] BinaryOp [Gt] "
-        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}}\n"
-        " U \n"
         "    {{[Variable [v3], If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] "
         "BinaryOp [And] BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] "
         "Variable [v4] BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lt] "
@@ -343,6 +334,15 @@ TEST_F(IntervalIntersection, VariableIntervals4) {
         " U \n"
         "    {{(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2], If "
         "[] BinaryOp [Lte] Variable [v3] Variable [v4] Variable [v3] Variable [v4])}}\n"
+        " U \n"
+        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
+        "BinaryOp [Lt] Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v1] Variable [v4] "
+        "BinaryOp [And] BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [Lt] Variable [v3] "
+        "Variable [v4] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] Variable [v1] Variable [v2] "
+        "BinaryOp [Lte] Variable [v2] Variable [v3] BinaryOp [And] BinaryOp [Lt] Variable [v1] "
+        "Variable [v4] BinaryOp [Lt] Variable [v4] Variable [v3] BinaryOp [And] BinaryOp [Lt] "
+        "Variable [v1] Variable [v3] BinaryOp [Lt] Variable [v2] Variable [v4] BinaryOp [Gt] "
+        "Variable [v2] Variable [v1] Variable [v2] Const [maxKey], Variable [v2]]}}\n"
         "}\n",
         *result);
 
@@ -789,7 +789,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Intersect with multiple intervals.
     {
-        IntervalReqExpr::Builder builder;
+        BoolExprBuilder<IntervalRequirement> builder;
         builder.pushDisj().pushConj();
         for (size_t i = 0; i < numIntervals; i++) {
             builder.atom(makeRandomBound<N, true>(threadLocalRNG, vars),
@@ -824,7 +824,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
         std::vector<IntervalRequirement> unionResult =
             unionTwoIntervals(int1, int2, ConstEval::constFold);
 
-        IntervalReqExpr::Builder builder;
+        BoolExprBuilder<IntervalRequirement> builder;
         builder.pushDisj();
         for (IntervalRequirement& interval : unionResult) {
             builder.pushConj().atom(std::move(interval)).pop();
@@ -842,7 +842,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Union with multiple intervals.
     {
-        IntervalReqExpr::Builder builder;
+        BoolExprBuilder<IntervalRequirement> builder;
         builder.pushDisj();
         for (size_t i = 0; i < numIntervals; i++) {
             builder.pushConj()
@@ -869,7 +869,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Test a mix of unions and intersections.
     {
-        IntervalReqExpr::Builder builder;
+        BoolExprBuilder<IntervalRequirement> builder;
         builder.pushDisj();
         for (size_t i = 0; i < numIntervals; i++) {
             const size_t numConjuncts = 1 + threadLocalRNG.nextInt32(3);
@@ -989,13 +989,13 @@ TEST(IntervalIntersection, IntersectionSpecialCase) {
 
 TEST(BoolExprBuilder, Builder1) {
     struct SelNegator {
-        SelectivityType operator()(const SelectivityType sel) const {
-            return ce::negateSel(sel);
+        void operator()(SelectivityType& sel) const {
+            sel = ce::negateSel(sel);
         }
     };
 
-    using SelTreeBuilder = BoolExpr<
-        SelectivityType>::Builder<true /*simplifyEmptyConjDisj*/, false /*removeDups*/, SelNegator>;
+    using SelTreeBuilder =
+        BoolExprBuilder<SelectivityType, DefaultSimplifyAndCreateNode<SelectivityType>, SelNegator>;
     using PrinterType = BoolExprPrinter<SelectivityType>;
 
     {

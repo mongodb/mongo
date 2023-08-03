@@ -186,7 +186,7 @@ std::pair<IntBoolExpr::Node, int> buildExpr(int rootChildren, int permutation, i
     };
 
     int varId = 0;
-    IntBoolExpr::Builder builder;
+    BoolExprBuilder<int> builder;
     builder.push(buildCNF);
     for (int i = 0; i < rootChildren; i++) {
         builder.push(!buildCNF);
@@ -244,7 +244,7 @@ TEST(BoolExpr, BoolExprPermutations) {
 
 TEST(BoolExpr, BoolExprVisitorTest) {
     // Show const visitors
-    IntBoolExpr::Builder b;
+    BoolExprBuilder<int> b;
     b.pushConj().pushDisj().atom(1).atom(2).atom(3).pop().pushDisj().atom(4).atom(5).pop();
     auto intExprCNF = b.finish().get();
 
@@ -290,7 +290,7 @@ TEST(BoolExpr, BoolExprVisitorTest) {
 }
 
 TEST(BoolExpr, BoolExprVisitorEarlyReturnTest) {
-    IntBoolExpr::Builder b;
+    BoolExprBuilder<int> b;
     b.pushConj().pushDisj().atom(1).atom(2).atom(3).pop().pushDisj().atom(4).atom(5).pop();
     auto intExprCNF = b.finish().get();
 

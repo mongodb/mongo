@@ -71,7 +71,7 @@ TEST(LogicalRewriter, MakeSargableNodeWithTopLevelDisjunction) {
         return PartialSchemaKey("ptest",
                                 make<PathGet>(FieldNameType{pathName}, make<PathIdentity>()));
     };
-    PSRExpr::Builder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})
@@ -394,7 +394,7 @@ TEST(PhysRewriter, LowerRequirementsWithTopLevelDisjunction) {
     builder.make<PhysicalScanNode>(
         scanGroupCE, fieldProjectionMap, "test" /* scanDefName */, false /* parallelScan */);
 
-    ResidualRequirementsWithOptionalCE::Builder residReqsBuilder;
+    BoolExprBuilder<ResidualRequirementWithOptionalCE> residReqsBuilder;
     residReqsBuilder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req, CEType{2.0}})
@@ -449,7 +449,7 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     };
 
     // Create three SargableNodes with top-level disjunctions.
-    PSRExpr::Builder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})
@@ -549,7 +549,7 @@ TEST(PhysRewriter, ThreeWayIndexUnion) {
     };
 
     // Create three SargableNodes with a 3-argument disjunction.
-    PSRExpr::Builder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})

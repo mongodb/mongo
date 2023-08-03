@@ -5654,7 +5654,7 @@ TEST(PhysRewriter, AvoidFetchingNonNullIndexedFields) {
     hints.emplace(PartialSchemaKey{"p0", _get("b", _id())._n}, SelectivityType{0.1});
 
     ce::PartialSchemaIntervalSelHints intervalHints;
-    IntervalReqExpr::Node intervals = *IntervalReqExpr::Builder{}
+    IntervalReqExpr::Node intervals = *BoolExprBuilder<IntervalRequirement>{}
                                            .pushDisj()
                                            .pushConj()
                                            .atom(IntervalRequirement{_minusInf(), _incl(_cnull())})

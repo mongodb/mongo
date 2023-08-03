@@ -222,7 +222,7 @@ TEST(ReferenceTrackerTest, GetDefinitionsForRIDUnion) {
 
     ABT path = make<PathGet>("a", make<PathIdentity>());
     IntervalReqExpr::Node interval =
-        *IntervalReqExpr::Builder{}
+        *BoolExprBuilder<IntervalRequirement>{}
              .pushDisj()
              .pushConj()
              .atom({{true, Constant::int64(10)}, {true, Constant::int64(20)}})

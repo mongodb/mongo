@@ -45,13 +45,14 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_builder.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 
 using PartialSchemaEntry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
 using PSRExpr = BoolExpr<PartialSchemaEntry>;
-using PSRExprBuilder = PSRExpr::Builder<false /*simplifyEmptyOrSingular*/, false /*removeDups*/>;
+using PSRExprBuilder = BoolExprBuilder<PartialSchemaEntry>;
 
 /**
  * Represents a set of predicates and projections composed in a boolean expression in CNF or DNF.
@@ -79,8 +80,6 @@ using PSRExprBuilder = PSRExpr::Builder<false /*simplifyEmptyOrSingular*/, false
  */
 class PartialSchemaRequirements {
 public:
-    using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
-
     // Default PartialSchemaRequirements is a singular DNF of an empty PartialSchemaKey and
     // fully-open PartialSchemaRequirement which does not bind.
     PartialSchemaRequirements();
@@ -129,7 +128,7 @@ public:
      * This method will also remove any predicates that are trivially true (those will
      * a fully open DNF interval).
      *
-     * TODO SERVER-73827: Consider applying this simplification during BoolExpr building.
+     * TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
      */
     bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
     static bool simplify(PSRExpr::Node& expr,
@@ -142,7 +141,7 @@ public:
      * For example, in ((a ^ b) U (z) U (a ^ b ^ c)) the (a ^ b) is redundant because
      * (a ^ b ^ c) implies (a ^ b).
      *
-     * TODO SERVER-73827 Consider doing this simplification as part of BoolExpr::Builder.
+     * TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
      */
     static void simplifyRedundantDNF(PSRExpr::Node& expr);
 
@@ -156,7 +155,7 @@ public:
 
 private:
     // Restore the invariant that the entries are sorted by key.
-    // TODO SERVER-73827: Consider applying this normalization during BoolExpr building.
+    // TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
     void normalize();
 
     // _expr is currently always in DNF.

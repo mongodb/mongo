@@ -98,7 +98,7 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
 bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type) {
     // Create a conjunction of the interval and the min-max interval for the type as input for the
     // intersection function.
-    auto intervals = std::move(*IntervalReqExpr::Builder{}
+    auto intervals = std::move(*BoolExprBuilder<IntervalRequirement>{}
                                     .pushDisj()
                                     .pushConj()
                                     .atom(interval)

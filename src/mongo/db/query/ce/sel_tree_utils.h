@@ -45,8 +45,7 @@ namespace mongo::optimizer::ce {
  * This tree is passed to a Boolean selectivity estimator that knows how to combine child estimates.
  */
 using SelectivityTree = BoolExpr<SelectivityType>;
-using SelectivityTreeBuilder =
-    SelectivityTree::Builder<false /* simplifyEmptyOrSingular */, false /*removeDups*/>;
+using SelectivityTreeBuilder = BoolExprBuilder<SelectivityType>;
 
 SelectivityType estimateSelectivityTree(const SelectivityTree::Node& selTree);
 
