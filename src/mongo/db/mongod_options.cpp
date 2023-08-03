@@ -66,6 +66,7 @@
 #include "mongo/db/mongod_options_replication_gen.h"
 #include "mongo/db/mongod_options_sharding_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -167,7 +168,8 @@ StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& para
         replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         replSettings.setShouldAutoInitiate();
-        replSettings.setReplSetString(repl::ReplSettings::kDefaultSetName);
+        // When autobootstrapping, we generate a UUID for the replica set name.
+        replSettings.setReplSetString(UUID::gen().toString());
     }
 
     if (params.count("replication.oplogSizeMB")) {
@@ -668,6 +670,8 @@ Status storeMongodOptions(const moe::Environment& params) {
             params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
             serverGlobalParams.clusterRole += ClusterRole::RouterServer;
         }
+    } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 
     if (!params.count("net.port")) {

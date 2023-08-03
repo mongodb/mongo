@@ -40,9 +40,6 @@ namespace repl {
 
 class ReplSettings {
 public:
-    // TODO SERVER-79188: Generate a random default replica set name instead of hard-coding 'rs'.
-    static constexpr char kDefaultSetName[] = "rs";
-
     std::string ourSetName() const;
     bool isReplSet() const;
 
