@@ -2379,20 +2379,12 @@ buildvariants:
       --excludeWithAnyTags=tsan_incompatible
   tasks:
   - name: compile_test_and_package_serial_TG
-  # - name: compile_integration_and_test_parallel_stream_TG # Not passing
-  # - name: test_api_version_compatibility # Not relevant for TSAN
+  - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
   - name: .aggfuzzer !.feature_flag_guarded
-  # - name: .aggregation !.feature_flag_guarded # Not passing
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   # - name: .auth  # Not passing
-  # - name: burn_in_tags_gen # No burn in tests needed
-  #   depends_on:
-  #   - name: version_burn_in_gen
-  #     variant: generate-tasks-for-version
-  #     omit_generated_tasks: true
-  #   - name: archive_dist_test_debug
-  #     variant: *enterprise-rhel80-debug-tsan
   - name: buildscripts_test
   # - name: unittest_shell_hang_analyzer_gen # Not passing
   # - name: .config_fuzzer # Not passing
@@ -2400,9 +2392,9 @@ buildvariants:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_parallel
-  # - name: .causally_consistent !.sharding # Not passing
-  # - name: .change_streams # Not passing
-  # - name: .change_stream_fuzzer # Not passing
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
   # - name: .misc_js # Not passing
   # - name: .concurrency !.large !.ubsan !.no_txns # Not passing
   # - name: .concurrency .large !.ubsan !.no_txns # Not passing
@@ -2410,10 +2402,7 @@ buildvariants:
   #   - rhel80-medium
   - name: disk_wiredtiger
   # - name: .encrypt # Not passing
-  # - name: idl_tests # Not relevant for TSAN
   - name: initial_sync_fuzzer_gen
-  #   distros:
-  #   - rhel80-medium
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -2438,18 +2427,24 @@ buildvariants:
   # - name: .replica_sets !.encrypt !.auth # Not passing
   #   distros:
   #   - rhel80-xlarge
-  # - name: replica_sets_api_version_jscore_passthrough_gen # Not passing
-  # - name: replica_sets_reconfig_jscore_passthrough_gen # Not passing
-  # - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen # Not passing
-  #   distros:
-  #   - rhel80-xlarge
-  # - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen # Not passing
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  # - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen # Not passing
   #   distros:
   #   - rhel80-xlarge
   # - name: retryable_writes_jscore_passthrough_gen # Not passing
-  # - name: retryable_writes_jscore_stepdown_passthrough_gen # Not passing
-  #   distros:
-  #   - rhel80-medium
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
   - name: .read_only
   - name: .rollbackfuzzer
   - name: sasl
@@ -2459,7 +2454,7 @@ buildvariants:
   - name: search_ssl
   - name: session_jscore_passthrough
   # - name: .sharding .jscore !.wo_snapshot !.multi_stmt # Not passing
-  # - name: sharding_api_version_jscore_passthrough_gen # Not passing
+  - name: sharding_api_version_jscore_passthrough_gen # Not passing
   # - name: .sharding .txns # Not passing
   # - name: .sharding .common # Not passing
   # - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen # Not passing
@@ -2468,7 +2463,7 @@ buildvariants:
   #   distros:
   #   - rhel80-xlarge
   # - name: .updatefuzzer # Cannot find the variant on older versions. Should not be enabled with TSAN
-  # - name: secondary_reads_passthrough_gen # Not passing
+  - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   # - name: .serverless # Not passing
   #   distros:
@@ -2476,6 +2471,8 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: streams
+  - name: streams_auth
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -2496,13 +2493,8 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_integration_and_test_parallel_stream_TG
-  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .change_stream_fuzzer
   - name: .misc_js
   - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
   - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
@@ -2524,26 +2516,11 @@ buildvariants:
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-xlarge
-  - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
   - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
@@ -2551,12 +2528,9 @@ buildvariants:
   #   distros:
   #   - rhel80-xlarge
   # - name: .updatefuzzer # Cannot find the variant on older versions
-  - name: secondary_reads_passthrough_gen
   - name: .serverless
     distros:
     - rhel80-xlarge
-  - name: streams
-  - name: streams_auth
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
