@@ -232,7 +232,6 @@ public:
         OperationContext* const _opCtx;
         LockResult _result{LOCK_INVALID};
 
-        boost::optional<ResourceLock> _pbwm;
         boost::optional<ResourceLock> _fcvLock;
 
         InterruptBehavior _interruptBehavior;

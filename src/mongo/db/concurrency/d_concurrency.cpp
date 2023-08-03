@@ -109,15 +109,6 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
     }
 
     try {
-        if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.emplace(opCtx, resourceIdParallelBatchWriterMode, MODE_IS, deadline);
-        }
-        ScopeGuard unlockPBWM([this] {
-            if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-                _pbwm.reset();
-            }
-        });
-
         if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
             _fcvLock.emplace(_opCtx,
                              resourceIdFeatureCompatibilityVersion,
@@ -139,7 +130,6 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
         _result = LOCK_OK;
 
         unlockFCVLock.dismiss();
-        unlockPBWM.dismiss();
     } catch (const DBException& ex) {
         // If our opCtx is interrupted or we got a LockTimeout or MaxTimeMSExpired, either throw or
         // suppress the exception depending on the specified interrupt behavior. For any other
@@ -171,7 +161,6 @@ void Lock::GlobalLock::_takeGlobalAndRSTLLocks(LockMode lockMode, Date_t deadlin
 Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     : _opCtx(otherLock._opCtx),
       _result(otherLock._result),
-      _pbwm(std::move(otherLock._pbwm)),
       _fcvLock(std::move(otherLock._fcvLock)),
       _interruptBehavior(otherLock._interruptBehavior),
       _skipRSTLLock(otherLock._skipRSTLLock),
