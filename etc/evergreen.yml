@@ -2359,6 +2359,7 @@ buildvariants:
   #   - rhel80-medium
   - name: disk_wiredtiger
   # - name: .encrypt # Not passing
+  - name: external_auth
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
