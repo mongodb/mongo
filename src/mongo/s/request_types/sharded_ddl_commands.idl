@@ -170,6 +170,12 @@ structs:
                             chunks. If unsplittable, the collection is always equivalent to a 1 
                             chunk collection. The shardKey must be set to {_id:1} in case this 
                             flag is enabled"
+            dataShard:
+                description: >-
+                    If set, specify shard where the collection should be created, if the collection
+                    doesn't already exist. Only allowed if `unsplittable` is true.
+                type: shard_id
+                optional: true
 
     CreateCollectionResponse:
         description: "Response of the create collection command"

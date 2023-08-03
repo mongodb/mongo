@@ -599,66 +599,29 @@ void checkCommandArguments(OperationContext* opCtx,
             "Special collection '" + originalNss.toStringForErrorMsg() + "' cannot be sharded",
             !originalNss.isNamespaceAlwaysUntracked());
 
-    if (!request.getUnsplittable()) {
-        // Ensure that hashed and unique are not both set.
-        uassert(
-            ErrorCodes::InvalidOptions,
+    // Ensure that hashed and unique are not both set.
+    uassert(ErrorCodes::InvalidOptions,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
             !ShardKeyPattern(*request.getShardKey()).isHashedPattern() ||
                 !request.getUnique().value_or(false));
 
+    if (request.getNumInitialChunks()) {
+        // Ensure numInitialChunks is within valid bounds.
+        // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
+        // 1,000,000 chunks in total to limit the amount of memory this command consumes so
+        // there is less danger of an OOM error.
 
-        if (request.getNumInitialChunks()) {
-            // Ensure numInitialChunks is within valid bounds.
-            // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
-            // 1,000,000 chunks in total to limit the amount of memory this command consumes so
-            // there is less danger of an OOM error.
-
-            const int maxNumInitialChunksForShards =
-                Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
-            const int maxNumInitialChunksTotal =
-                1000 * 1000;  // Arbitrary limit to memory consumption
-            int numChunks = request.getNumInitialChunks().value();
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "numInitialChunks cannot be more than either: "
-                                  << maxNumInitialChunksForShards << ", "
-                                  << shardutil::kMaxSplitPoints << " * number of shards; or "
-                                  << maxNumInitialChunksTotal,
-                    numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
-                        numChunks <= maxNumInitialChunksTotal);
-        }
-    } else {
-        // Ensure that unsplittable collections requests (empty shard key) don't come with any shard
-        // key request options
-        // Note: this are checks for developers, not for users! the _shardsvrCreateCollection
-        // command might pass from shardCollection or from createUnsplittedCollection.
+        const int maxNumInitialChunksForShards =
+            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
+        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
+        int numChunks = request.getNumInitialChunks().value();
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "shard key must be { _id : 1 } when creating an "
-                                 "unsplittable collections",
-                request.getShardKey()->woCompare(BSON("_id" << 1)) == 0);
-        uassert(
-            ErrorCodes::InvalidOptions,
-            str::stream()
-                << "shard key option field 'unique' must not be set when creating an unsplittable "
-                   "collection",
-            !request.getUnique());
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "shard key option field 'numInitialChunks' must not be set when "
-                                 "creating an unsplittable collection",
-                !request.getNumInitialChunks());
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "shard key option field 'presplitHashedZones' must not be set "
-                                 "when creating an unsplittable collection",
-                !request.getPresplitHashedZones());
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "shard key option field 'implicitlyCreateIndex' must not be set "
-                                 "when creating an unsplittable collection",
-                !request.getImplicitlyCreateIndex());
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "shard key option field 'enforceUniquenessCheck' must not be set "
-                                 "when creating an unsplittable collection",
-                !request.getEnforceUniquenessCheck());
+                str::stream() << "numInitialChunks cannot be more than either: "
+                              << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
+                              << " * number of shards; or " << maxNumInitialChunksTotal,
+                numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
+                    numChunks <= maxNumInitialChunksTotal);
     }
 
     if (originalNss.dbName() == DatabaseName::kConfig) {
@@ -1090,7 +1053,8 @@ void CreateCollectionCoordinatorLegacy::_createPolicy(OperationContext* opCtx,
         getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
         getNumShards(opCtx),
         *_collectionEmpty,
-        _request.getUnsplittable());
+        _request.getUnsplittable(),
+        _request.getDataShard());
 }
 
 void CreateCollectionCoordinatorLegacy::_createChunks(OperationContext* opCtx,

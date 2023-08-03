@@ -87,6 +87,7 @@ public:
             requestParamsObj.setTimeseries(req.getTimeseries());
             requestParamsObj.setCollectionUUID(req.getCollectionUUID());
             requestParamsObj.setUnsplittable(true);
+            requestParamsObj.setDataShard(req.getDataShard());
             shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
             shardsvrCollRequest.setDbName(nss.dbName());
 

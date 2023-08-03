@@ -236,6 +236,95 @@ TEST(CalculateHashedSplitPointsTest, HashedInfix) {
         InitialSplitPolicy::calculateHashedSplitPoints(shardKeyPattern, preDefinedPrefix, 4));
 }
 
+class InitialSingleChunkOnShardSplitChunks : public ConfigServerTestFixture {
+public:
+    OperationContext* opCtx() {
+        return operationContext();
+    }
+
+protected:
+    const ShardId kShardId0 = ShardId("shard0");
+
+    const ShardId kShardId1 = ShardId("shard1");
+
+    const HostAndPort kShardHost0 = HostAndPort("TestHost0", 12345);
+
+    const HostAndPort kShardHost1 = HostAndPort("TestHost1", 12345);
+
+    const ShardType kShard0{kShardId0.toString(), kShardHost0.toString()};
+
+    const ShardType kShard1{kShardId1.toString(), kShardHost1.toString()};
+
+    const ShardKeyPattern kCorrectShardKey = ShardKeyPattern(BSON("_id" << 1));
+};
+
+TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunks) {
+    setupShards({kShard0, kShard1});
+
+    // Wrong shard key.
+    ASSERT_THROWS_CODE(
+        InitialSplitPolicy::calculateOptimizationStrategy(
+            opCtx(), ShardKeyPattern(BSON("x" << 1)), 0, false, {}, 1, true, true, kShardId0),
+        DBException,
+        ErrorCodes::InvalidOptions);
+
+    // Non existing shard.
+    ASSERT_THROWS_CODE(
+        InitialSplitPolicy::calculateOptimizationStrategy(
+            opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true, ShardId("shard2")),
+        DBException,
+        ErrorCodes::ShardNotFound);
+
+    // numInitialChunks must be 0.
+    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+                           opCtx(), kCorrectShardKey, 100, false, {}, 1, true, true, kShardId0),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // No presplit hashed zones should be passed.
+    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+                           opCtx(), kCorrectShardKey, 0, true, {}, 1, true, true, kShardId0),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // Collection must be empty.
+    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+                           opCtx(), kCorrectShardKey, 0, false, {}, 1, false, true, kShardId0),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // We can only specify a shard for the data with unsplittable collections.
+    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(opCtx(),
+                                                                         kCorrectShardKey,
+                                                                         0,
+                                                                         false,
+                                                                         {},
+                                                                         1,
+                                                                         true,
+                                                                         false /*unsplittable*/,
+                                                                         ShardId("shard1")),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    auto singleChunksOnShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId0);
+
+    auto config = singleChunksOnShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
+
+    ASSERT_EQ(config.chunks.size(), 1);
+    ASSERT_EQ(config.chunks[0].getShard(), kShardId0);
+
+    auto singleChunksOnNonPrimaryShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId1);
+
+    auto nonPrimaryConfig = singleChunksOnNonPrimaryShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
+
+    ASSERT_EQ(nonPrimaryConfig.chunks.size(), 1);
+    ASSERT_EQ(nonPrimaryConfig.chunks[0].getShard(), kShardId1);
+}
+
 class GenerateInitialSplitChunksTestBase : public ConfigServerTestFixture {
 public:
     /**

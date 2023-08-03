@@ -32,6 +32,7 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/timeseries/timeseries.idl"
+  - "mongo/s/sharding_types.idl"
 
 structs:
   ShardCollection:
@@ -88,8 +89,10 @@ structs:
         type: optionalBool
 
 commands:
-    #Temporary command to run shardCollection with unsplittable=true and track unsharded collection.
-    #This command will stay until SERVER-79158 is committed
+    # Temporary command to run shardCollection with unsplittable=true and track unsharded
+    # collection.
+    # TODO SERVER-79158: Remove this test command once createCollection can create unsplittable
+    # collections.
     createUnsplittableCollection:
         command_name: createUnsplittableCollection
         cpp_name: CreateUnsplittableCollection
@@ -105,4 +108,8 @@ commands:
               collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
+                optional: true
+              dataShard:
+                description: "If set, the data for the collection will reside on the specified shard."
+                type: shard_id
                 optional: true

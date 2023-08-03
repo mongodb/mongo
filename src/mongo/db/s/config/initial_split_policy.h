@@ -67,6 +67,9 @@ public:
     /**
      * Returns the optimization strategy for building initial chunks based on the input parameters
      * and the collection state.
+     *
+     * If dataShard is specified, isUnsplittable must be true, because we can only select the shard
+     * that will hold the data for unsplittable collections.
      */
     static std::unique_ptr<InitialSplitPolicy> calculateOptimizationStrategy(
         OperationContext* opCtx,
@@ -76,7 +79,8 @@ public:
         const std::vector<TagsType>& tags,
         size_t numShards,
         bool collectionIsEmpty,
-        bool isUnsplittable);
+        bool isUnsplittable,
+        boost::optional<ShardId> dataShard);
 
     virtual ~InitialSplitPolicy() {}
 
@@ -148,6 +152,21 @@ public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
                                             const SplitPolicyParams& params) override;
+};
+
+/**
+ * Create a single chunk on a specified shard.
+ */
+class SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
+public:
+    SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardId dataShard);
+
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            const SplitPolicyParams& params) override;
+
+private:
+    ShardId _dataShard;
 };
 
 /**
