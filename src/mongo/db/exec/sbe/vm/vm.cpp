@@ -7449,6 +7449,156 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralFinal
     }
 }
 
+/**
+ * functions for $derivative
+ */
+std::tuple<value::Array*, value::Array*, value::Array*, boost::optional<int64_t>>
+getDerivativeState(value::TypeTags stateTag, value::Value stateVal) {
+    uassert(
+        7821000, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    auto maxSize = static_cast<size_t>(AggDerivativeElems::kMaxSizeOfArray);
+    uassert(7821001,
+            "The accumulator state should have correct number of elements",
+            state->size() == maxSize);
+
+    auto [inputQueueTag, inputQueueVal] =
+        state->getAt(static_cast<size_t>(AggDerivativeElems::kInputQueue));
+    uassert(7821002, "InputQueue should be of array type", inputQueueTag == value::TypeTags::Array);
+    auto inputQueue = value::getArrayView(inputQueueVal);
+
+    auto [sortByQueueTag, sortByQueueVal] =
+        state->getAt(static_cast<size_t>(AggDerivativeElems::kSortByQueue));
+    uassert(
+        7821003, "SortByQueue should be of array type", sortByQueueTag == value::TypeTags::Array);
+    auto sortByQueue = value::getArrayView(sortByQueueVal);
+
+    boost::optional<int64_t> unitMillis;
+    auto [unitMillisTag, unitMillisVal] =
+        state->getAt(static_cast<size_t>(AggDerivativeElems::kUnitMillis));
+    if (unitMillisTag != value::TypeTags::Null) {
+        uassert(7821004,
+                "unitMillis should be of type NumberInt64",
+                unitMillisTag == value::TypeTags::NumberInt64);
+        unitMillis = value::bitcastTo<int64_t>(unitMillisVal);
+    }
+
+    return {state, inputQueue, sortByQueue, unitMillis};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDerivativeAdd(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    auto [inputTag, inputVal] = moveOwnedFromStack(1);
+    auto [sortByTag, sortByVal] = moveOwnedFromStack(2);
+
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    value::ValueGuard inputGuard{inputTag, inputVal};
+    value::ValueGuard sortByGuard{sortByTag, sortByVal};
+
+    auto [state, inputQueue, sortByQueue, unitMillis] = getDerivativeState(stateTag, stateVal);
+
+    if (unitMillis) {
+        uassert(7821005, "Unexpected type for sortBy value", sortByTag == value::TypeTags::Date);
+    } else {
+        uassert(7821006, "Unexpected type for sortBy value", value::isNumber(sortByTag));
+    }
+    uassert(7821007,
+            "Unexpected type for input value",
+            value::isNumber(inputTag) || inputTag == value::TypeTags::Date);
+
+    inputGuard.reset();
+    arrayQueuePush(inputQueue, inputTag, inputVal);
+
+    sortByGuard.reset();
+    arrayQueuePush(sortByQueue, sortByTag, sortByVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDerivativeRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    auto [sortByOwned, sortByTag, sortByVal] = getFromStack(2);
+
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, inputQueue, sortByQueue, unitMillis] = getDerivativeState(stateTag, stateVal);
+
+    // verify that the input and sortby value to be removed are the first elements of the queues
+    auto [frontInputTag, frontInputVal] = arrayQueuePop(inputQueue);
+    value::ValueGuard frontInputGuard{frontInputTag, frontInputVal};
+    auto [cmpTag, cmpVal] = value::compareValue(frontInputTag, frontInputVal, inputTag, inputVal);
+    uassert(7821008,
+            "Attempted to remove an unexpected input value",
+            cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
+
+    auto [frontSortByTag, frontSortByVal] = arrayQueuePop(sortByQueue);
+    value::ValueGuard frontSortByGuard{frontSortByTag, frontSortByVal};
+    std::tie(cmpTag, cmpVal) =
+        value::compareValue(frontSortByTag, frontSortByVal, sortByTag, sortByVal);
+    uassert(7821009,
+            "Attempted to remove an unexpected sortby value",
+            cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDerivativeFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    auto [state, inputQueue, sortByQueue, unitMillis] = getDerivativeState(stateTag, stateVal);
+
+    auto queueSize = arrayQueueSize(inputQueue);
+    uassert(7821010,
+            "Input and sortby queues should be of equal size",
+            queueSize == arrayQueueSize(sortByQueue));
+    if (queueSize <= 1) {
+        return {false, value::TypeTags::Null, 0};
+    }
+
+    auto [leftInputTag, leftInputVal] = arrayQueueFront(inputQueue);
+    auto [leftSortByTag, leftSortByVal] = arrayQueueFront(sortByQueue);
+    auto [rightInputTag, rightInputVal] = arrayQueueBack(inputQueue);
+    auto [rightSortByTag, rightSortByVal] = arrayQueueBack(sortByQueue);
+
+    auto [runOwned, runTag, runVal] =
+        genericSub(rightSortByTag, rightSortByVal, leftSortByTag, leftSortByVal);
+    value::ValueGuard runGuard{runOwned, runTag, runVal};
+
+    // Return null if the sortBy delta is zero
+    if (runTag == value::TypeTags::NumberDecimal) {
+        if (numericCast<Decimal128>(runTag, runVal).isZero()) {
+            return {false, value::TypeTags::Null, 0};
+        }
+    } else {
+        if (numericCast<double>(runTag, runVal) == 0) {
+            return {false, value::TypeTags::Null, 0};
+        }
+    }
+
+    auto [riseOwned, riseTag, riseVal] =
+        genericSub(rightInputTag, rightInputVal, leftInputTag, leftInputVal);
+    value::ValueGuard riseGuard{riseOwned, riseTag, riseVal};
+
+    uassert(7821012, "Input delta should be numeric", value::isNumber(riseTag));
+
+    auto [divOwned, divTag, divVal] = genericDiv(riseTag, riseVal, runTag, runVal);
+    value::ValueGuard divGuard{divOwned, divTag, divVal};
+
+    if (unitMillis) {
+        auto [mulOwned, mulTag, mulVal] = genericMul(
+            divTag, divVal, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(*unitMillis));
+        return {mulOwned, mulTag, mulVal};
+    } else {
+        divGuard.reset();
+        return {divOwned, divTag, divVal};
+    }
+}
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
@@ -7788,6 +7938,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggIntegralRemove(arity);
         case Builtin::aggIntegralFinalize:
             return builtinAggIntegralFinalize(arity);
+        case Builtin::aggDerivativeAdd:
+            return builtinAggDerivativeAdd(arity);
+        case Builtin::aggDerivativeRemove:
+            return builtinAggDerivativeRemove(arity);
+        case Builtin::aggDerivativeFinalize:
+            return builtinAggDerivativeFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -8132,6 +8288,12 @@ std::string builtinToString(Builtin b) {
             return "aggIntegralRemove";
         case Builtin::aggIntegralFinalize:
             return "aggIntegralFinalize";
+        case Builtin::aggDerivativeAdd:
+            return "aggDerivativeAdd";
+        case Builtin::aggDerivativeRemove:
+            return "aggDerivativeRemove";
+        case Builtin::aggDerivativeFinalize:
+            return "aggDerivativeFinalize";
         default:
             MONGO_UNREACHABLE;
     }

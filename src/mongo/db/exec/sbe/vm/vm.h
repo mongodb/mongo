@@ -816,6 +816,9 @@ enum class Builtin : uint8_t {
     aggIntegralAdd,
     aggIntegralRemove,
     aggIntegralFinalize,
+    aggDerivativeAdd,
+    aggDerivativeRemove,
+    aggDerivativeFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -994,6 +997,14 @@ enum class AggIntegralElems {
     kUnitMillis,
     kMaxSizeOfArray
 };
+
+/**
+ * This enum defines indices into an 'Array' that stores the state for $derivative accumulator
+ * Element at `kInputQueue` stores the queue of input values
+ * Element at `kSortByQueue` stores the queue of sortBy values
+ * Element at `kunitMillis` stores the date unit (Null if not valid)
+ */
+enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSizeOfArray };
 
 /**
  * This enum defines indices into an 'Array' that stores the state for a queue backed by a
@@ -1836,6 +1847,9 @@ private:
         std::pair<value::TypeTags, value::Value> prevSortByVal,
         std::pair<value::TypeTags, value::Value> newInput,
         std::pair<value::TypeTags, value::Value> newSortByVal);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeFinalize(ArityType arity);
 
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
