@@ -1,5 +1,3 @@
-load("jstests/libs/python.js");
-
 var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoProgramNoConnect,
     myPort;
 
@@ -171,18 +169,11 @@ function runHangAnalyzer(pids) {
     print(`Running hang analyzer for pids [${pids}]`);
 
     const scriptPath = pathJoin('.', 'buildscripts', 'resmoke.py');
-    const args = [
-        getPython3Binary(),
-        scriptPath,
-        'hang-analyzer',
-        '-k',
-        '-o',
-        'file',
-        '-o',
-        'stdout',
-        '-d',
-        pids
-    ];
+    // We are using a raw "python" rather than selecting the approperate python here
+    // This is because as part of SERVER-79663 we noticed that servers.js is included in the legacy
+    // shell
+    const args =
+        ['python', scriptPath, 'hang-analyzer', '-k', '-o', 'file', '-o', 'stdout', '-d', pids];
 
     if (jsTest.options().evergreenTaskId) {
         args.push('-t', jsTest.options().evergreenTaskId);
