@@ -1,8 +1,9 @@
 """Driver of the test execution framework."""
 
+from logging import Logger
 import threading
 import time
-from typing import List
+from typing import Generic, List, Optional, TypeVar, Union
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
@@ -15,7 +16,11 @@ from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import testcases
-from buildscripts.resmokelib.testing.queue_element import queue_elem_factory, QueueElem
+from buildscripts.resmokelib.testing import docker_cluster_config_writer as _docker_cluster_config_writer
+from buildscripts.resmokelib.testing.fixtures.interface import Fixture
+from buildscripts.resmokelib.testing.hooks.interface import Hook
+from buildscripts.resmokelib.testing.queue_element import QueueElemRepeatTime, queue_elem_factory, QueueElem
+from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import queue as _queue
 
 
@@ -28,8 +33,9 @@ class TestSuiteExecutor(object):
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(self, exec_logger, suite, config=None, fixture=None, hooks=None,
-                 archive_instance=None, archive=None):
+    def __init__(self, exec_logger: Logger, suite: Suite, config=None,
+                 fixture: Optional[Fixture] = None, hooks=None, archive_instance=None,
+                 archive=None):
         """Initialize the TestSuiteExecutor with the test suite to run."""
         self.logger = exec_logger
 
@@ -57,7 +63,7 @@ class TestSuiteExecutor(object):
         # Must be done after getting buildlogger configuration.
         self._jobs = self._create_jobs(suite.get_num_jobs_to_start())
 
-    def _create_jobs(self, num_jobs):
+    def _create_jobs(self, num_jobs: int) -> List[_job.Job]:
         """
         Start jobs.
 
@@ -149,7 +155,13 @@ class TestSuiteExecutor(object):
 
             self._suite.return_code = return_code
 
-    def _run_tests(self, test_queue, setup_flag, teardown_flag, hook_failure_flag):
+    def _run_tests(
+            self,
+            test_queue: 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]',
+            setup_flag: Optional[threading.Event],
+            teardown_flag: Optional[threading.Event],
+            hook_failure_flag: Optional[threading.Event],
+    ):
         """Start a thread for each Job instance and block until all of the tests are run.
 
         Returns a (combined report, user interrupted) pair, where the
@@ -165,8 +177,10 @@ class TestSuiteExecutor(object):
             for job in self._jobs:
                 thr = threading.Thread(
                     target=job, args=(test_queue, interrupt_flag), kwargs=dict(
-                        setup_flag=setup_flag, teardown_flag=teardown_flag,
-                        hook_failure_flag=hook_failure_flag))
+                        setup_flag=setup_flag,
+                        teardown_flag=teardown_flag,
+                        hook_failure_flag=hook_failure_flag,
+                    ))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()
@@ -235,7 +249,7 @@ class TestSuiteExecutor(object):
 
         return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, fixture, job_num):
+    def _make_hooks(self, fixture, job_num) -> List[Hook]:
         """Create the hooks for the job's fixture."""
 
         hooks = []
@@ -278,7 +292,7 @@ class TestSuiteExecutor(object):
                                              test_name, **self.test_config)
         return queue_elem_factory(test_case, self.test_config, self._suite.options)
 
-    def _make_test_queue(self):
+    def _make_test_queue(self) -> 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]':
         """
         Create a queue of test cases to run.
 
@@ -291,7 +305,7 @@ class TestSuiteExecutor(object):
         be dispatched to multiple threads.
         :return: Queue of testcases to run.
         """
-        test_queue = TestQueue()
+        test_queue: TestQueue[Union[QueueElemRepeatTime, QueueElem]] = TestQueue()
         test_cases = []
 
         # Make test cases to put in test queue
@@ -309,7 +323,10 @@ class TestSuiteExecutor(object):
             'to send a SIGQUIT on Linux or ctrl-c again on Windows ***', seconds)
 
 
-class TestQueue(_queue.Queue):
+T = TypeVar('T')
+
+
+class TestQueue(_queue.Queue, Generic[T]):
     """A queue of test cases to run.
 
     Use a multi-consumer queue instead of a unittest.TestSuite so that the test cases can

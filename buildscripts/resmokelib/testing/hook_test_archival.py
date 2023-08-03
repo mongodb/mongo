@@ -7,13 +7,14 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
+from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import globstar
 
 
 class HookTestArchival(object):
     """Archive hooks and tests to S3."""
 
-    def __init__(self, suite, hooks, archive_instance, archive_config):  #pylint: disable=unused-argument
+    def __init__(self, suite: Suite, hooks, archive_instance, archive_config):  #pylint: disable=unused-argument
         """Initialize HookTestArchival."""
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})

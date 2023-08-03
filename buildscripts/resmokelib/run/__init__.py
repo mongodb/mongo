@@ -2,6 +2,7 @@
 
 import argparse
 import collections
+from logging import Logger
 import os
 import os.path
 import random
@@ -9,10 +10,8 @@ import shlex
 import sys
 import textwrap
 import time
-import shutil
+from typing import List, Optional
 
-import curatorbin
-import pkg_resources
 import psutil
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
@@ -32,6 +31,7 @@ from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.suitesconfig import get_suite_files
+from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -44,12 +44,12 @@ _CEDAR_ARGUMENT_TITLE = "Cedar options"
 class TestRunner(Subcommand):
     """The main class to run tests with resmoke."""
 
-    def __init__(self, command, start_time=time.time()):
+    def __init__(self, command: str, start_time=time.time()):
         """Initialize the Resmoke instance."""
         self.__start_time = start_time
         self.__command = command
-        self._exec_logger = None
-        self._resmoke_logger = None
+        self._exec_logger: Optional[Logger] = None
+        self._resmoke_logger: Optional[Logger] = None
         self._archive = None
         self._interrupted = False
         self._exit_code = 0
@@ -182,7 +182,7 @@ class TestRunner(Subcommand):
             config.MULTIVERSION_BIN_VERSION, config.EXCLUDE_TAGS_FILE_PATH, self._resmoke_logger)
 
     @staticmethod
-    def _find_suites_by_test(suites):
+    def _find_suites_by_test(suites: List[Suite]):
         """
         Look up what other resmoke suites run the tests specified in the suites parameter.
 
@@ -250,7 +250,7 @@ class TestRunner(Subcommand):
             if suites:
                 reportfile.write(suites)
 
-    def _run_suite(self, suite):
+    def _run_suite(self, suite: Suite):
         """Run a test suite."""
         self._log_suite_config(suite)
         suite.record_suite_start()
@@ -486,14 +486,14 @@ class TestRunner(Subcommand):
         if len(config.SUITE_FILES) > 1:
             testing.suite.Suite.log_summaries(self._resmoke_logger, suites, time_taken)
 
-    def _log_suite_summary(self, suite):
+    def _log_suite_summary(self, suite: Suite):
         """Log a summary of the suite run."""
         self._resmoke_logger.info("=" * 80)
         self._resmoke_logger.info("Summary of %s suite: %s", suite.get_display_name(),
                                   self._get_suite_summary(suite))
 
-    def _execute_suite(self, suite):
-        """Execute a suite and return True if interrupted, False otherwise."""
+    def _execute_suite(self, suite: Suite) -> bool:
+        """Execute Fa suite and return True if interrupted, False otherwise."""
         self._shuffle_tests(suite)
         if not suite.tests:
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
@@ -520,7 +520,7 @@ class TestRunner(Subcommand):
             return False
         return False
 
-    def _shuffle_tests(self, suite):
+    def _shuffle_tests(self, suite: Suite):
         """Shuffle the tests if the shuffle cli option was set."""
         random.seed(config.RANDOM_SEED)
         if not config.SHUFFLE:
@@ -530,7 +530,7 @@ class TestRunner(Subcommand):
         random.shuffle(suite.tests)
 
     # pylint: disable=inconsistent-return-statements
-    def _get_suites(self):
+    def _get_suites(self) -> List[Suite]:
         """Return the list of suites for this resmoke invocation."""
         try:
             return suitesconfig.get_suites(config.SUITE_FILES, config.TEST_FILES)
@@ -546,8 +546,9 @@ class TestRunner(Subcommand):
                 "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override: %s",
                 str(err))
             self.exit(1)
+        return []
 
-    def _log_suite_config(self, suite):
+    def _log_suite_config(self, suite: Suite):
         sb = [
             "YAML configuration of suite {}".format(suite.get_display_name()),
             utils.dump_yaml({"test_kind": suite.get_test_kind_config()}), "",
@@ -558,13 +559,13 @@ class TestRunner(Subcommand):
         self._resmoke_logger.info("\n".join(sb))
 
     @staticmethod
-    def _get_suite_summary(suite):
+    def _get_suite_summary(suite: Suite):
         """Return a summary of the suite run."""
-        sb = []
+        sb: List[str] = []
         suite.summarize(sb)
         return "\n".join(sb)
 
-    def _setup_signal_handler(self, suites):
+    def _setup_signal_handler(self, suites: List[Suite]):
         """Set up a SIGUSR1 signal handler that logs a test result summary and a thread dump."""
         sighandler.register(self._resmoke_logger, suites, self.__start_time)
 
@@ -580,7 +581,7 @@ class TestRunner(Subcommand):
         if self._archive and not self._interrupted:
             self._archive.exit()
 
-    def exit(self, exit_code):
+    def exit(self, exit_code: int):
         """Exit with the provided exit code."""
         self._exit_code = exit_code
         self._resmoke_logger.info("Exiting with code: %d", exit_code)
@@ -642,7 +643,7 @@ class TestRunnerEvg(TestRunner):
 
         return combinations
 
-    def _get_suites(self):
+    def _get_suites(self) -> List[Suite]:
         """Return a list of resmokelib.testing.suite.Suite instances to execute.
 
         For every resmokelib.testing.suite.Suite instance returned by resmoke.Main._get_suites(),
@@ -720,7 +721,7 @@ class RunPlugin(PluginInterface):
         return None
 
     @classmethod
-    def _add_run(cls, subparsers):
+    def _add_run(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the Run subcommand."""
         parser = subparsers.add_parser("run", help="Runs the specified tests.")
 
@@ -1217,7 +1218,7 @@ class RunPlugin(PluginInterface):
             metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
 
     @classmethod
-    def _add_list_suites(cls, subparsers):
+    def _add_list_suites(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the list-suites subcommand."""
         parser = subparsers.add_parser("list-suites",
                                        help="Lists the names of the suites available to execute.")
@@ -1230,13 +1231,13 @@ class RunPlugin(PluginInterface):
         parser.set_defaults(logger_file="console")
 
     @classmethod
-    def _add_generate(cls, subparsers):
+    def _add_generate(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the generate subcommand."""
         subparsers.add_parser("generate-matrix-suites",
                               help="Generate matrix suite config files from the mapping files.")
 
     @classmethod
-    def _add_find_suites(cls, subparsers):
+    def _add_find_suites(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the find-suites subcommand."""
         parser = subparsers.add_parser(
             "find-suites",
@@ -1250,7 +1251,7 @@ class RunPlugin(PluginInterface):
                             help="Explicit test files to run")
 
     @classmethod
-    def _add_list_tags(cls, subparsers):
+    def _add_list_tags(cls, subparsers: argparse._SubParsersAction):
         """Create and add the parser for the list-tags subcommand."""
         parser = subparsers.add_parser(
             "list-tags", help="Lists the tags and their documentation available in the suites.")
@@ -1261,7 +1262,7 @@ class RunPlugin(PluginInterface):
                   " All suites are used if unspecified."))
 
     @classmethod
-    def _add_generate_multiversion_exclude_tags(cls, subparser):
+    def _add_generate_multiversion_exclude_tags(cls, subparser: argparse._SubParsersAction):
         """Create and add the parser for the generate-multiversion-exclude-tags subcommand."""
         parser = subparser.add_parser(
             "generate-multiversion-exclude-tags",
@@ -1278,7 +1279,7 @@ class RunPlugin(PluginInterface):
                             help="Where to output the generated tags.")
 
 
-def to_local_args(input_args=None):
+def to_local_args(input_args: Optional[List[str]] = None):
     """
     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
 
@@ -1392,7 +1393,7 @@ def to_local_args(input_args=None):
                       ] + other_local_args + positional_args
 
 
-def strip_fuzz_config_params(input_args):
+def strip_fuzz_config_params(input_args: List[str]):
     """Delete fuzz related command line args because we have to add the seed manually."""
 
     ret = []

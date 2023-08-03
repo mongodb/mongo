@@ -10,7 +10,7 @@ import time
 from buildscripts.resmokelib.utils import scheduler
 
 _FLUSH_THREAD_LOCK = threading.Lock()
-_FLUSH_THREAD = None
+_FLUSH_THREAD: '_FlushThread' = None
 
 
 def start_thread():

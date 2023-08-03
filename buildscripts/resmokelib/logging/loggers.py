@@ -123,7 +123,7 @@ def new_resmoke_logger():
     return logger
 
 
-def new_job_logger(test_kind, job_num):
+def new_job_logger(test_kind, job_num) -> logging.Logger:
     """Create a new logger for a given job thread."""
     name = "executor:%s:job%d" % (test_kind, job_num)
     logger = logging.Logger(name)

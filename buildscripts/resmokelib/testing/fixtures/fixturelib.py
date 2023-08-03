@@ -1,4 +1,5 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
+from logging import Logger, Handler
 from typing import Dict
 
 from buildscripts.resmokelib import config
@@ -20,12 +21,12 @@ class FixtureLib:
     # Logger tools #
     #################
 
-    def assert_logger(self, logger):
+    def assert_logger(self, logger: Logger):
         """Assert that the given logger has the correct type."""
-        if not isinstance(logger, logging.Logger):
+        if not isinstance(logger, Logger):
             raise TypeError("logger must be a Logger instance")
 
-    def close_loggers(self, handler):
+    def close_loggers(self, handler: Handler):
         """Add 'handler' to the queue so that it is closed later by the flush thread.
 
         Return the scheduled event which may be used for later cancelation (see cancel()).

@@ -152,7 +152,7 @@ class JSTestCaseBuilder:
 
         return shell_options
 
-    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0):
+    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0) -> _SingleJSTestCase:
         """Create and configure a _SingleJSTestCase to be run in a separate thread."""
 
         shell_options = self._get_shell_options_for_thread(num_clients, thread_id)

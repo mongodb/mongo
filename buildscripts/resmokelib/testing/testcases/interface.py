@@ -11,10 +11,12 @@ import uuid
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry
 
-_TEST_CASES = {}  # type: ignore
+from typing import Dict, Callable
+
+_TEST_CASES: Dict[str, Callable] = {}  # type: ignore
 
 
-def make_test_case(test_kind, *args, **kwargs):
+def make_test_case(test_kind, *args, **kwargs) -> 'TestCase':
     """Provide factory function for creating TestCase instances."""
     if test_kind not in _TEST_CASES:
         raise ValueError("Unknown test kind '%s'" % test_kind)
@@ -73,6 +75,10 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
     def id(self):
         """Return the id of the test."""
         return self._id
+
+    def get_test_kind(self):
+        """Return the kind of the test. This will be something like JSTest."""
+        return self.test_kind
 
     def short_description(self):
         """Return the short_description of the test."""

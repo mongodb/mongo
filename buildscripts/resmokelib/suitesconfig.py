@@ -83,7 +83,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     return test_membership
 
 
-def get_suites(suite_names_or_paths, test_files):
+def get_suites(suite_names_or_paths, test_files) -> List[_suite.Suite]:
     """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:

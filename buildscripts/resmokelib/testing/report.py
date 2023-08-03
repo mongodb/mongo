@@ -12,6 +12,7 @@ import unittest
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.testing.symbolizer_service import ResmokeSymbolizer
+from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 
 # pylint: disable=attribute-defined-outside-init
@@ -104,7 +105,7 @@ class TestReport(unittest.TestResult):
 
         return combined_report
 
-    def startTest(self, test):
+    def startTest(self, test: TestCase):
         """Call before 'test' is run."""
 
         unittest.TestResult.startTest(self, test)
@@ -141,7 +142,7 @@ class TestReport(unittest.TestResult):
         test.override_logger(test_logger)
         test_info.start_time = time.time()
 
-    def stopTest(self, test):
+    def stopTest(self, test: TestCase):
         """Call after 'test' has run."""
 
         try:
@@ -174,7 +175,7 @@ class TestReport(unittest.TestResult):
             # Restore the original logger for the test.
             test.reset_logger()
 
-    def addError(self, test, err):
+    def addError(self, test: TestCase, err):
         """Call when a non-failureException was raised during the execution of 'test'."""
 
         unittest.TestResult.addError(self, test, err)

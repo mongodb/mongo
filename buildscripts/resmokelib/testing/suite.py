@@ -3,6 +3,7 @@
 import itertools
 import threading
 import time
+from typing import List
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
@@ -251,7 +252,7 @@ class Suite(object):
         return self._reports
 
     @synchronized
-    def summarize(self, sb):
+    def summarize(self, sb: List[str]):
         """Append a summary of the suite onto the string builder 'sb'."""
         if not self._reports and not self._partial_reports:
             sb.append("No tests ran.")

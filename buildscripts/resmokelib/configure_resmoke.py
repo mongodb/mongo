@@ -22,7 +22,6 @@ from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongo_fuzzer_configs
-from buildscripts.resmokelib.suitesconfig import SuiteFinder
 
 
 def validate_and_update_config(parser, args):

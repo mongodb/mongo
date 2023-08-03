@@ -1,15 +1,20 @@
 """Interface of the different fixtures for executing JSTests against."""
 
+from logging import Logger
 import os.path
 import time
 from enum import Enum
 from collections import namedtuple
-from typing import List
+from typing import List, TYPE_CHECKING
 
 import pymongo
 import pymongo.errors
 
 from buildscripts.resmokelib.utils import registry
+
+# TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
+if TYPE_CHECKING:
+    from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 _VERSIONS = {}  # type: ignore
 
@@ -86,7 +91,8 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
 
     AWAIT_READY_TIMEOUT_SECS = 300
 
-    def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None):
+    def __init__(self, logger: Logger, job_num: int, fixturelib: 'FixtureLib',
+                 dbpath_prefix: str = None):
         """Initialize the fixture with a logger instance."""
 
         self.fixturelib = fixturelib

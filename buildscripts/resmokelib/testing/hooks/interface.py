@@ -1,6 +1,8 @@
 """Interface for customizing the behavior of a test fixture."""
 
 import sys
+import threading
+from typing import Optional
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.testcases import interface as testcase
@@ -42,7 +44,7 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
         """Test runner calls this exactly once before they start running the suite."""
         pass
 
-    def after_suite(self, test_report, teardown_flag=None):
+    def after_suite(self, test_report, teardown_flag: Optional[threading.Event] = None):
         """Invoke by test runner calls this exactly once after all tests have finished executing.
 
         Be sure to reset the behavior back to its original state so that it can be run again.
