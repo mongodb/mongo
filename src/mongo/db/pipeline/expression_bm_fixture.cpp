@@ -1622,5 +1622,35 @@ void ExpressionBenchmarkFixture::benchmarkPercentile(benchmark::State& state,
                         std::vector<Document>(1, {{"data"_sd, vectorToBSON(inputs)}}));
 }
 
+/**
+ * Tests performance of $strLenBytes expression against a single string field.
+ */
+void ExpressionBenchmarkFixture::benchmarkStrLenBytes(benchmark::State& state) {
+    benchmarkExpression(BSON("$strLenBytes"
+                             << "$data"),
+                        state,
+                        std::vector<Document>(1, {{"data"_sd, "hello world"_sd}}));
+}
+
+/**
+ * Tests performance of $trim expression against a single string field.
+ */
+void ExpressionBenchmarkFixture::benchmarkTrim(benchmark::State& state, std::string chars) {
+    benchmarkExpression(BSON("$trim" << BSON("input"
+                                             << "$data"
+                                             << "chars" << chars)),
+                        state,
+                        std::vector<Document>(1, {{"data"_sd, " hello world   "_sd}}));
+}
+
+/**
+ * Tests performance of $trunc expression against a single field.
+ */
+void ExpressionBenchmarkFixture::benchmarkTrunc(benchmark::State& state, int place) {
+    benchmarkExpression(BSON("$trunc" << BSON_ARRAY("$value" << place)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 123.45}}));
+}
+
 
 }  // namespace mongo
