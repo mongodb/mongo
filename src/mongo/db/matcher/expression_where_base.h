@@ -96,7 +96,6 @@ public:
         return _inputParamId;
     }
 
-protected:
     const std::string& getCode() const {
         return _code;
     }

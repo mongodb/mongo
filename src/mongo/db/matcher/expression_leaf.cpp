@@ -103,6 +103,8 @@ bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) con
         return false;
     }
 
+    // Please, keep BSONElementComparator consistent with MatchExpressionHasher defined in
+    // db/matcher/expression_hasher.cpp.
     const StringData::ComparatorInterface* stringComparator = nullptr;
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
     return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);

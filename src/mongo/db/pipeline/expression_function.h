@@ -106,5 +106,8 @@ private:
     bool _assignFirstArgToThis;
     std::string _funcSource;
     std::string _lang;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 }  // namespace mongo

@@ -188,6 +188,9 @@ private:
     const FieldPath _path;
     const boost::optional<int> _skip;
     const int _limit;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 /**

@@ -31,11 +31,10 @@
 
 #include <fmt/format.h>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -80,28 +79,48 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
 
 void assertEquivalent(const char* queryStr,
                       const MatchExpression* expected,
-                      const MatchExpression* actual) {
-    if (actual->equivalent(expected)) {
-        return;
+                      const MatchExpression* actual,
+                      bool skipHashTest = false) {
+    str::stream stream;
+
+    const MatchExpressionHasher hash{};
+    if (!skipHashTest && hash(expected) != hash(actual)) {
+        stream << "MatchExpressions' hashes are not equal.\n";
     }
-    str::stream ss;
-    ss << "Match expressions are not equivalent."
-       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
-       << "\nActual: " << actual->debugString();
-    FAIL(ss);
+
+    if (!expected->equivalent(actual)) {
+        stream << "MatchExpressions are not equivalent.\n";
+    }
+
+    if (stream.ss.len() > 0) {
+        stream << "Original query: " << queryStr << "\nExpected: " << expected->debugString()
+               << "\nActual: " << actual->debugString();
+
+        FAIL(stream);
+    }
 }
 
 void assertNotEquivalent(const char* queryStr,
                          const MatchExpression* expected,
-                         const MatchExpression* actual) {
-    if (!actual->equivalent(expected)) {
-        return;
+                         const MatchExpression* actual,
+                         bool skipHashTest = false) {
+    str::stream stream;
+
+    const MatchExpressionHasher hash{};
+    if (!skipHashTest && hash(expected) == hash(actual)) {
+        stream << "MatchExpressions' hashes are equal.\n";
     }
-    str::stream ss;
-    ss << "Match expressions are equivalent."
-       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
-       << "\nActual: " << actual->debugString();
-    FAIL(ss);
+
+    if (expected->equivalent(actual)) {
+        stream << "MatchExpressions are equivalent.\n";
+    }
+
+    if (stream.ss.len() > 0) {
+        stream << "Original query: " << queryStr << "\nExpected: " << expected->debugString()
+               << "\nActual: " << actual->debugString();
+
+        FAIL(stream);
+    }
 }
 
 TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
@@ -223,12 +242,14 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
 /**
  * Test function for CanonicalQuery::normalize.
  */
-void testNormalizeQuery(const char* queryStr, const char* expectedExprStr) {
+void testNormalizeQuery(const char* queryStr,
+                        const char* expectedExprStr,
+                        bool skipHashTest = false) {
     unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
     MatchExpression* me = cq->root();
     BSONObj expectedExprObj = fromjson(expectedExprStr);
     unique_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
-    assertEquivalent(queryStr, expectedExpr.get(), me);
+    assertEquivalent(queryStr, expectedExpr.get(), me, skipHashTest);
 }
 
 TEST(CanonicalQueryTest, NormalizeQuerySort) {
@@ -246,7 +267,7 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // Single-child $and elimination.
     testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
     // Single-child $_internalSchemaXor elimination.
-    testNormalizeQuery("{$_internalSchemaXor: [{b: 1}]}", "{b: 1}");
+    testNormalizeQuery("{$_internalSchemaXor: [{b: 1}]}", "{b: 1}", /*skipHashTest*/ true);
     // $or absorbs $or children.
     testNormalizeQuery("{$or: [{a: 1}, {$or: [{b: 1}, {$or: [{c: 1}]}]}, {d: 1}]}",
                        "{$or: [{a: 1}, {b: 1}, {c: 1}, {d: 1}]}");
@@ -257,7 +278,8 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     testNormalizeQuery(
         "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: 1}]}]}",
         "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: "
-        "1}]}]}");
+        "1}]}]}",
+        /*skipHashTest*/ true);
     // $in with one argument is rewritten as an equality or regex predicate.
     testNormalizeQuery("{a: {$in: [1]}}", "{a: {$eq: 1}}");
     testNormalizeQuery("{a: {$in: [/./]}}", "{a: {$regex: '.'}}");
@@ -274,7 +296,8 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
         "  {$or: [{b: 1}]},"
         "  {$_internalSchemaXor: [{c: 1}]}"
         "]}",
-        "{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}");
+        "{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}",
+        /*skipHashTest*/ true);
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {

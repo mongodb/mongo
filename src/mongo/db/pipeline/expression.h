@@ -823,6 +823,9 @@ private:
     std::vector<double> _ps;
     boost::intrusive_ptr<Expression> _input;
     PercentileMethod _method;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 /**
@@ -1593,6 +1596,9 @@ private:
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateFromParts final : public Expression {
@@ -1678,6 +1684,9 @@ private:
     // $dateFromParts: inputs that fit within a 16-bit int are permitted.
     static constexpr long long kMaxValueForDatePart = std::numeric_limits<int16_t>::max();
     static constexpr long long kMinValueForDatePart = std::numeric_limits<int16_t>::lowest();
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateToParts final : public Expression {
@@ -1715,6 +1724,9 @@ private:
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDateToString final : public Expression {
@@ -1769,6 +1781,9 @@ private:
 
     // Pre-parsed timezone, if the above expression is a constant.
     boost::optional<TimeZone> _parsedTimeZone;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDayOfMonth final : public DateExpressionAcceptingTimeZone<ExpressionDayOfMonth> {
@@ -1919,6 +1934,9 @@ private:
 
     // Pre-parsed start of week, if the above expression is a constant.
     boost::optional<DayOfWeek> _parsedStartOfWeek;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
@@ -2146,6 +2164,9 @@ private:
     Variables::Id _varId;
     // The optional expression determining how many elements should be present in the result array.
     boost::optional<size_t> _limit;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
@@ -2530,6 +2551,9 @@ private:
     static constexpr size_t _kEach = 1;
     std::string _varName;
     Variables::Id _varId;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionMeta final : public Expression {
@@ -2876,6 +2900,9 @@ private:
 
     Variables::Id _thisVar;
     Variables::Id _valueVar;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
@@ -3026,6 +3053,9 @@ private:
     // The first element in the pair represent the position on the constant in the '_children'
     // array. The second element is the constant set.
     boost::optional<std::pair<size_t, ValueUnorderedSet>> _cachedConstant;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 
@@ -4391,6 +4421,9 @@ private:
 
     // Pre-parsed start of week, if the above expression is a constant.
     boost::optional<DayOfWeek> _parsedStartOfWeek;
+
+    template <typename H>
+    friend class ExpressionHashVisitor;
 };
 
 class ExpressionGetField final : public Expression {

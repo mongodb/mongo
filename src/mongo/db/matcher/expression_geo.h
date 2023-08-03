@@ -166,6 +166,9 @@ private:
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoExpression> _query;
     bool _canSkipValidation;
+
+    template <typename H>
+    friend class MatchExpressionHashVisitor;
 };
 
 
@@ -262,6 +265,9 @@ private:
 
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoNearExpression> _query;
+
+    template <typename H>
+    friend class MatchExpressionHashVisitor;
 };
 
 /**
