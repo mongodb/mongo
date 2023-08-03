@@ -5,8 +5,10 @@
 'use strict';
 
 // Use a relatively small record size to more reliably hit a tipping point where the write batching
-// logic thinks we have more space available for metadata than we really do.
-const kDataBlockSize = 64 * 1024;
+// logic thinks we have more space available for metadata than we really do. Note also that by using
+// small records, we are verifying that the batching logic is accounting for the overhead required
+// to serialize each document into a BSONArray.
+const kDataBlockSize = 4 * 1024;
 const kDataBlock = 'x'.repeat(kDataBlockSize);
 const kBSONMaxObjSize = 16 * 1024 * 1024;
 const kNumRows = (kBSONMaxObjSize / kDataBlockSize) + 5;
