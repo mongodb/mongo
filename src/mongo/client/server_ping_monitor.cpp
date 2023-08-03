@@ -87,11 +87,18 @@ auto SingleServerPingMonitor::_scheduleWorkAt(Date_t when, Callback&& cb) const 
     auto wrappedCallback = [cb = std::forward<Callback>(cb),
                             anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
         if (ErrorCodes::isCancellationError(cbArgs.status)) {
+            LOGV2(7926101,
+                  "ServerPingMonitor stopping pings to host because request was cancelled",
+                  "host"_attr = anchor->_hostAndPort,
+                  "status"_attr = cbArgs.status);
             return;
         }
 
         stdx::lock_guard lk(anchor->_mutex);
         if (anchor->_isDropped) {
+            LOGV2(7926102,
+                  "ServerPingMonitor stopping pings to host because the component was shutdown",
+                  "host"_attr = anchor->_hostAndPort);
             return;
         }
         cb(cbArgs);
@@ -151,12 +158,21 @@ void SingleServerPingMonitor::_doServerPing() {
             if (ErrorCodes::isCancellationError(result.response.status)) {
                 // Do no more work if the SingleServerPingMonitor is removed or the request is
                 // canceled.
+                LOGV2(7926103,
+                      "ServerPingMonitor stopping pings to host because monitor was removed or "
+                      "request was cancelled",
+                      "host"_attr = anchor->_hostAndPort,
+                      "status"_attr = result.response.status);
                 return;
             }
             {
                 stdx::lock_guard lk(anchor->_mutex);
                 int rttValue = 0;
                 if (anchor->_isDropped) {
+                    LOGV2(7926104,
+                          "ServerPingMonitor stopping pings to host because the component was "
+                          "shutdown",
+                          "host"_attr = anchor->_hostAndPort);
                     return;
                 }
 
