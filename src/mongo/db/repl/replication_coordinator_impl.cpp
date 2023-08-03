@@ -2552,7 +2552,6 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
 
 StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(
     OperationContext* opCtx) const noexcept try {
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
     // Check if the node is primary after acquiring global IS lock.
     if (!canAcceptNonLocalWrites()) {
@@ -3317,10 +3316,6 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
 
     boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
     try {
-        // Retrieving last stable recovery timestamp should not be blocked by oplog
-        // application.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-            opCtx->lockState());
         opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
         // We need to hold the lock so that we don't run when storage is being shutdown.
         Lock::GlobalLock lk(opCtx,

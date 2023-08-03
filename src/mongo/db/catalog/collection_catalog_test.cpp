@@ -62,6 +62,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/server_options.h"
@@ -116,6 +117,10 @@ public:
         col = CollectionPtr(collection.get());
         // Register dummy collection in catalog.
         catalog.registerCollection(opCtx.get(), collection, boost::none);
+
+        repl::ReplicationCoordinator::set(
+            getServiceContext(),
+            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
     }
 
     void tearDown() {

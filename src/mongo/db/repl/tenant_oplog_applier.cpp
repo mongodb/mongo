@@ -1241,9 +1241,6 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<ApplierOperatio
     opCtx->setEnforceConstraints(false);
     tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);
 
-    // Set this to satisfy low-level locking invariants.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
     auto status = OplogApplierUtils::applyOplogBatchCommon(
         opCtx.get(),
         ops,

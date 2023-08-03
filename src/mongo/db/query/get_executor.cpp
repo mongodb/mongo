@@ -1818,13 +1818,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     const DeleteRequest* request = parsedDelete->getRequest();
 
     const NamespaceString& nss(request->getNsString());
-    if (!request->getGod()) {
-        if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            uassert(12050,
-                    "cannot delete from system namespace",
-                    nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
-        }
-    }
 
     if (collectionPtr && collectionPtr->isCapped()) {
         expCtx->setIsCappedDelete();
@@ -2049,12 +2042,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     UpdateDriver* driver = parsedUpdate->getDriver();
 
     const NamespaceString& nss = request->getNamespaceString();
-
-    if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        uassert(10156,
-                str::stream() << "cannot update a system namespace: " << nss.toStringForErrorMsg(),
-                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
-    }
 
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do

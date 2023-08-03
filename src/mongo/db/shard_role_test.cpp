@@ -1837,8 +1837,6 @@ TEST_F(ShardRoleTest, ReadSourceChangesOnSecondary) {
     opCtx()->getClient()->setInDirectClient(true);
     ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    // Don't conflict with PBWM lock, as lock free reads do.
-    ShouldNotConflictWithSecondaryBatchApplicationBlock skipPBWMConflict(opCtx()->lockState());
 
     // Initially we start with kNoTimestamp as our ReadSource.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,

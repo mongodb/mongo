@@ -90,7 +90,6 @@ auto SessionsCollectionRS::_makePrimaryConnection(OperationContext* opCtx) {
 
 bool SessionsCollectionRS::_isStandaloneOrPrimary(const NamespaceString& ns,
                                                   OperationContext* opCtx) {
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
     Lock::DBLock lk(opCtx, ns.dbName(), MODE_IS);
     Lock::CollectionLock lock(opCtx, NamespaceString::kLogicalSessionsNamespace, MODE_IS);
 

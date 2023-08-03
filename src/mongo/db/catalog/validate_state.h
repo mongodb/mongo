@@ -255,7 +255,6 @@ private:
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
 
-    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;
     boost::optional<AutoGetDb> _databaseLock;
     boost::optional<CollectionNamespaceOrUUIDLock> _collectionLock;

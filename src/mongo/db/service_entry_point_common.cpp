@@ -767,7 +767,6 @@ private:
     // Do any initialization of the lock state required for a transaction.
     void _setLockStateForTransaction(OperationContext* opCtx) {
         opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
-        opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
     }
 
     // Clear any lock state which may have changed after the locker update.

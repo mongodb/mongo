@@ -730,8 +730,6 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return;
     }
 
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
-
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               opCtx->recoveryUnit()->getTimestampReadSource());
@@ -947,7 +945,6 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
 
 void BackgroundSync::start(OperationContext* opCtx) {
     OpTime lastAppliedOpTime;
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
 
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==

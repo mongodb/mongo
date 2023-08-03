@@ -106,9 +106,6 @@ struct ResolvedNamespaceOrViewAcquisitionRequest {
 
     // Resources for lock free reads.
     struct LockFreeReadsResources {
-        // If this field is set, the reader will not take the ParallelBatchWriterMode lock and
-        // conflict with secondary batch application.
-        std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
         std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
         std::shared_ptr<Lock::GlobalLock> globalLock;
     } lockFreeReadsResources;
@@ -381,9 +378,6 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                     kLockFreeReadsGlobalLockOptions;
             }
 
-            acquisitionRequest.second.acquisitionLocks.canSkipPbwmLock =
-                bool(acquisitionRequest.second.lockFreeReadsResources.skipPBWMLock);
-
             shard_role_details::AcquiredCollection& acquiredCollection =
                 txnResources.addAcquiredCollection(
                     {currentAcquireCallNum,
@@ -391,7 +385,6 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                      std::move(acquisitionRequest.second.dbLock),
                      std::move(acquisitionRequest.second.collLock),
                      std::move(acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock),
-                     std::move(acquisitionRequest.second.lockFreeReadsResources.skipPBWMLock),
                      std::move(acquisitionRequest.second.lockFreeReadsResources.globalLock),
                      std::move(acquisitionRequest.second.acquisitionLocks),
                      std::move(snapshotedServices.collectionDescription),
@@ -503,19 +496,13 @@ void checkShardingPlacement(
 ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock(
     OperationContext* opCtx,
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
-    std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
-    if (!opCtx->isLockFreeReadsOp() &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
-        skipPBWMLock = std::make_shared<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
-            opCtx->lockState());
-    }
     auto lockFreeReadsBlock = std::make_shared<LockFreeReadsBlock>(opCtx);
     auto globalLock = std::make_shared<Lock::GlobalLock>(opCtx,
                                                          MODE_IS,
                                                          Date_t::max(),
                                                          Lock::InterruptBehavior::kThrow,
                                                          kLockFreeReadsGlobalLockOptions);
-    return {skipPBWMLock, lockFreeReadsBlock, globalLock};
+    return {lockFreeReadsBlock, globalLock};
 }
 
 std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
@@ -1325,7 +1312,6 @@ void stashTransactionResourcesFromOperationContext(OperationContext* opCtx, Clie
         acquisition.dbLock.reset();
         acquisition.globalLock.reset();
         acquisition.lockFreeReadsBlock.reset();
-        acquisition.skipPBWMLock.reset();
     }
 
     auto originalState =
@@ -1533,7 +1519,6 @@ HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(Opera
     std::shared_ptr<Lock::GlobalLock> commonGlobalLock;
     std::shared_ptr<Lock::DBLock> commonDbLock;
     std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
-    std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
     int previousAcquireCollectionCallNum = -1;
 
     // TODO SERVER-77213: This should mostly go away once the Locker resides inside
@@ -1542,14 +1527,6 @@ HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(Opera
         const auto& locks = acquisition.locks;
         bool isFromDifferentAcquireCall =
             previousAcquireCollectionCallNum != acquisition.acquireCollectionCallNum;
-        if (locks.canSkipPbwmLock) {
-            if (isFromDifferentAcquireCall) {
-                skipPBWMLock =
-                    std::make_shared<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
-                        opCtx->lockState());
-            }
-            acquisition.skipPBWMLock = skipPBWMLock;
-        }
         if (locks.hasLockFreeReadsBlock) {
             if (isFromDifferentAcquireCall) {
                 lockFreeReadsBlock = std::make_shared<LockFreeReadsBlock>(opCtx);

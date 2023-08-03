@@ -301,8 +301,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 // to fail later on when locks are reacquired. Therefore, this assertion is not
                 // required for correctness, but only intended to rate limit index builds started on
                 // primaries.
-                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                    opCtx->lockState());
                 Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -505,11 +503,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             metricsCollector.beginScopedCollecting(opCtx.get(), dbName);
         }
 
-        // Index builds should never take the PBWM lock, even on a primary. This allows the
-        // index build to continue running after the node steps down to a secondary.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-            opCtx->lockState());
-
         if (indexBuildOptions.applicationMode != ApplicationMode::kStartupRepair) {
             // The shard version protocol is only required when setting up the index build and
             // writing the 'startIndexBuild' oplog entry. If a chunk migration is in-progress while
@@ -625,20 +618,14 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     // commit quorum on (i.e., commit value set as non-zero or a valid tag) and vice-versa. So,
     // after this point, it's not possible for the index build's commit quorum value to get updated
     // to CommitQuorumOptions::kDisabled.
-    Status persistStatus = Status::OK();
 
     IndexBuildEntry indexbuildEntry(
         buildUUID, replState->collectionUUID, CommitQuorumOptions(), replState->indexNames);
     std::vector<HostAndPort> votersList{votingNode};
     indexbuildEntry.setCommitReadyMembers(votersList);
 
-    {
-        // Updates don't need to acquire pbwm lock.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-        persistStatus =
-            indexbuildentryhelpers::persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
-    }
-
+    auto persistStatus =
+        indexbuildentryhelpers::persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
     if (persistStatus.isOK()) {
         _signalIfCommitQuorumIsSatisfied(opCtx, replState);
     }

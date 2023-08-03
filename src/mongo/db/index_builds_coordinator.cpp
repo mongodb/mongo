@@ -2749,7 +2749,6 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
     // The index builder thread can abort on its own if it is interrupted by a user killop. This
     // would prevent us from taking locks. Use a new OperationContext to abort the index build.
     runOnAlternateContext(opCtx, "self-abort", [this, replState](OperationContext* abortCtx) {
-        ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
         auto autoGetColl =
             std::move(_autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
         AutoGetCollection indexBuildEntryColl(
@@ -2793,9 +2792,6 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 // our error without doing anything else, as the index build is already cleaned
                 // up, and the server will terminate otherwise.
             } else {
-                ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
-                    abortCtx->lockState());
-
                 // Take RSTL to observe and prevent replication state from changing.
                 auto autoGetcoll = std::move(
                     _autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());

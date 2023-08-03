@@ -347,9 +347,6 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         OplogBatch ops(batchLimits.ops);
         try {
             auto opCtx = cc().makeOperationContext();
-            // We do not want to serialize the OplogBatcher with oplog application, nor
-            // do we want to take a WiredTiger read ticket.
-            ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
             opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
             // During storage change operations, we may shut down storage under a global lock

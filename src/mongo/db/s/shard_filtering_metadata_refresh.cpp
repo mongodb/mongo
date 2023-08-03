@@ -563,9 +563,7 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
 
         {
             // The refresh threads do not perform any data reads themselves, therefore they don't
-            // need to synchronise with secondary oplog application or go through admission control.
-            ShouldNotConflictWithSecondaryBatchApplicationBlock skipParallelBatchWriterMutex(
-                opCtx->lockState());
+            // need to go through admission control.
             ScopedAdmissionPriorityForLock skipAdmissionControl(
                 opCtx->lockState(), AdmissionContext::Priority::kImmediate);
 

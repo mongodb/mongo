@@ -75,16 +75,6 @@ bool canReadAtLastApplied(OperationContext* opCtx) {
 bool shouldReadAtLastApplied(OperationContext* opCtx,
                              boost::optional<const NamespaceString&> nss,
                              std::string* reason) {
-    // If this is true, then the operation opted-in to the PBWM lock, implying that it cannot change
-    // its ReadSource. It's important to note that it is possible for this to be false, but still be
-    // holding the PBWM lock, explained below.
-    if (opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        if (reason) {
-            *reason = "conflicts with batch application";
-        }
-        return false;
-    }
-
     // If we are already holding the PBWM lock, do not change ReadSource. Snapshots acquired by an
     // operation after a yield/restore must see all writes in the pre-yield snapshot. Once a
     // snapshot is reading without a timestamp, we choose to continue acquiring snapshots without a

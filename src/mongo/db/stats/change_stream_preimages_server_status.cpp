@@ -70,7 +70,6 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     //
     // Fields are omitted if it cannot be immediately acquired to prevent stalling 'serverStatus'
     // observability.
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
     ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
                                                         AdmissionContext::Priority::kImmediate);
     Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked, [] {

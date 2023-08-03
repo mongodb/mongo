@@ -85,10 +85,6 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (isBackground()) {
-        // Avoid taking the PBWM lock, which will stall replication if this is a secondary node
-        // being validated.
-        _noPBWM.emplace(opCtx->lockState());
-
         _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IS);
         _collectionLock.emplace(opCtx, _nss, MODE_IS);
     } else {

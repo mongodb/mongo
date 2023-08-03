@@ -526,8 +526,6 @@ public:
     }
 
 private:
-    ShouldNotConflictWithSecondaryBatchApplicationBlock
-        _shouldNotConflictWithSecondaryBatchApplicationBlock;
     boost::optional<Lock::GlobalLock> _globalLock;
     LocalOplogInfo* _oplogInfo;
     CollectionPtr _oplog;

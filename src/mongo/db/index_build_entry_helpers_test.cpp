@@ -109,7 +109,6 @@ class IndexBuildEntryHelpersTest : public CatalogTestFixture {
 public:
     void setUp() {
         CatalogTestFixture::setUp();
-        operationContext()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
         const UUID collectionUUID = UUID::gen();
         const CommitQuorumOptions commitQuorum(CommitQuorumOptions::kMajority);

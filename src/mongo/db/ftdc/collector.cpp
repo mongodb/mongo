@@ -71,7 +71,6 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // batches. This is desirable because we want to be able to collect data in the middle of
     // batches that are taking a long time.
     auto opCtx = client->makeOperationContext();
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
     opCtx->setEnforceConstraints(false);
     opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 

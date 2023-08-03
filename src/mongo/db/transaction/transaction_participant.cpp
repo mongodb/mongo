@@ -656,8 +656,6 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         auto deadline = Date_t::now() + Milliseconds(100);
 
-        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-            opCtx->lockState());
         Lock::DBLock dbLock(opCtx.get(), nss.dbName(), MODE_IS, deadline);
         Lock::CollectionLock collLock(opCtx.get(), nss, MODE_IS, deadline);
 
@@ -1273,9 +1271,6 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = opCtx->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()), wl);
-    // Inherit the locking setting from the original one.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(
-        _locker->shouldConflictWithSecondaryBatchApplication());
     _locker->releaseTicket();
     _locker->unsetThreadId();
     if (opCtx->getLogicalSessionId()) {
@@ -1659,9 +1654,6 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     invariant(o().txnState.isPrepared());
 
     _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, AcquireTicket::kSkip);
-
-    // Snapshot transactions don't conflict with PBWM lock on both primary and secondary.
-    invariant(!opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
 
     // Transfer the txn resource back from the operation context to the stash.
     auto stashStyle =

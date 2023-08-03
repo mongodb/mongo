@@ -614,8 +614,7 @@ ReadSourceScope::~ReadSourceScope() {
     }
 }
 
-AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline)
-    : _shouldNotConflictWithSecondaryBatchApplicationBlock(opCtx->lockState()) {
+AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline) {
     auto lockMode = (mode == OplogAccessMode::kRead) ? MODE_IS : MODE_IX;
     if (mode == OplogAccessMode::kLogOp) {
         // Invariant that global lock is already held for kLogOp mode.

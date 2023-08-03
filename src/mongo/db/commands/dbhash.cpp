@@ -259,15 +259,6 @@ public:
         const bool isPointInTimeRead =
             opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kProvided;
 
-        boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> shouldNotConflictBlock;
-        if (isPointInTimeRead) {
-            // If we are performing a read at a timestamp, then we allow oplog application to
-            // proceed concurrently with the dbHash command. This is done to ensure a prepare
-            // conflict is able to eventually be resolved by processing a later commitTransaction or
-            // abortTransaction oplog entry.
-            shouldNotConflictBlock.emplace(opCtx->lockState());
-        }
-
         // We take the global lock here as dbHash runs lock-free with point-in-time catalog lookups.
         Lock::GlobalLock globalLock(opCtx, MODE_IS);
 

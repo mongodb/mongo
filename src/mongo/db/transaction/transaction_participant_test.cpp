@@ -400,7 +400,6 @@ protected:
 
     std::unique_ptr<MongoDSessionCatalog::Session> checkOutSession(
         boost::optional<bool> startNewTxn = true) {
-        opCtx()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         opCtx()->setInMultiDocumentTransaction();
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
         auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());

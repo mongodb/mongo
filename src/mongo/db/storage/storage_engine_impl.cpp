@@ -1319,8 +1319,6 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 {
                     // Take a global lock in MODE_IS while fetching timestamps to guarantee that
                     // rollback-to-stable isn't running concurrently.
-                    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                        opCtx->lockState());
                     Lock::GlobalLock lock(opCtx, MODE_IS);
 
                     // The checkpoint timestamp is not cached in mongod and needs to be fetched with

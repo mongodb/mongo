@@ -233,7 +233,6 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
                                    const boost::optional<LogicalTime>& afterClusterTime,
                                    const RecoveryUnit::ReadSource& readSource,
                                    const boost::optional<Timestamp>& readTimestamp,
-                                   bool callerWasConflicting,
                                    bool shouldReadAtLastApplied,
                                    bool isEnforcingConstraints) {
     if (readTimestamp && afterClusterTime) {
@@ -269,13 +268,11 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
     //   similar state where this is expected
     // * Certain namespaces are applied serially in oplog application, and therefore can be safely
     //   read without taking the PBWM or reading at a timestamp
-    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
-        isEnforcingConstraints && nss && !nss->mustBeAppliedInOwnOplogBatch() &&
-        shouldReadAtLastApplied) {
+    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && isEnforcingConstraints && nss &&
+        !nss->mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
         LOGV2_FATAL(4728700,
-                    "Reading from replicated collection on a secondary without read timestamp "
-                    "or PBWM lock",
-                    "collection"_attr = nss);
+                    "Reading from replicated collection on a secondary without read timestamp",
+                    logAttrs(*nss));
     }
 }
 
@@ -330,17 +327,7 @@ AutoStatsTracker::~AutoStatsTracker() {
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nsOrUUID,
                                                    const AutoGetCollection::Options& options)
-    : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
-      _shouldNotConflictWithSecondaryBatchApplicationBlock(
-          [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
-              if (opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
-                  return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
-                      opCtx->lockState());
-              }
-
-              return boost::none;
-          }()),
-      _autoDb(AutoGetDb::createForAutoGetCollection(
+    : _autoDb(AutoGetDb::createForAutoGetCollection(
           opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID), options)) {
 
     const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID);
@@ -449,7 +436,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                       readConcernArgs.getArgsAfterClusterTime(),
                                       readSource,
                                       readTimestamp,
-                                      _callerWasConflicting,
                                       shouldReadAtLastApplied,
                                       opCtx->isEnforcingConstraints());
 
@@ -581,7 +567,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     const repl::ReadConcernArgs& readConcernArgs,
-    bool callerExpectedToConflictWithSecondaryBatchApplication,
     bool allowReadSourceChange) {
     // Loop until we get a consistent catalog and snapshot or throw an exception.
     while (true) {
@@ -645,7 +630,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
                                       readConcernArgs.getArgsAfterClusterTime(),
                                       readSource,
                                       readTimestamp,
-                                      callerExpectedToConflictWithSecondaryBatchApplication,
                                       shouldReadAtLastApplied,
                                       opCtx->isEnforcingConstraints());
 
@@ -782,7 +766,6 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     const repl::ReadConcernArgs& readConcernArgs,
-    bool callerExpectedToConflictWithSecondaryBatchApplication,
     const AutoGetCollection::Options& options) {
 
     bool needsRetry = false;
@@ -793,7 +776,6 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
                                             options._secondaryNssOrUUIDsBegin,
                                             options._secondaryNssOrUUIDsEnd,
                                             readConcernArgs,
-                                            callerExpectedToConflictWithSecondaryBatchApplication,
                                             /*allowReadSourceChange=*/!needsRetry);
 
         auto [resolvedNss, collection, view] =
@@ -818,29 +800,16 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     }
 }
 
-boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
-makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
-                                                        bool isLockFreeReadSubOperation) {
-    if (!isLockFreeReadSubOperation &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
-        return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
-            opCtx->lockState());
-    } else {
-        return boost::none;
-    }
-}
-
 }  // namespace
 
 const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationContext* opCtx,
                                                                       UUID uuid) {
     auto nsOrUUID = NamespaceStringOrUUID(_resolvedDbName, uuid);
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    bool callerExpectedToConflict = _callerExpectedToConflictWithSecondaryBatchApplication;
 
     try {
-        auto catalogStateForNamespace = acquireCatalogStateForNamespace(
-            opCtx, nsOrUUID, readConcernArgs, callerExpectedToConflict, _options);
+        auto catalogStateForNamespace =
+            acquireCatalogStateForNamespace(opCtx, nsOrUUID, readConcernArgs, _options);
 
         _resolvedNss = std::move(catalogStateForNamespace.resolvedNss);
         _view = std::move(catalogStateForNamespace.view);
@@ -863,11 +832,6 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
     : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
       _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
-      _callerExpectedToConflictWithSecondaryBatchApplication(
-          opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
-      _shouldNotConflictWithSecondaryBatchApplicationBlock(
-          makeShouldNotConflictWithSecondaryBatchApplicationBlock(opCtx,
-                                                                  _isLockFreeReadSubOperation)),
       _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx,
                   MODE_IS,
@@ -919,11 +883,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         });
     } else {
         auto catalogStateForNamespace =
-            acquireCatalogStateForNamespace(opCtx,
-                                            nsOrUUID,
-                                            readConcernArgs,
-                                            _callerExpectedToConflictWithSecondaryBatchApplication,
-                                            _options);
+            acquireCatalogStateForNamespace(opCtx, nsOrUUID, readConcernArgs, _options);
 
         _resolvedNss = std::move(catalogStateForNamespace.resolvedNss);
         _resolvedDbName = _resolvedNss.dbName();

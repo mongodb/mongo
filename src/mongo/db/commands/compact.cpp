@@ -104,9 +104,6 @@ public:
                 "other running operations. use force:true to force",
                 !replCoord->getMemberState().primary() || cmdObj["force"].trueValue());
 
-        // This command is internal to the storage engine and should not block oplog application.
-        ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-
         StatusWith<int64_t> status = compactCollection(opCtx, nss);
         uassertStatusOK(status.getStatus());
 

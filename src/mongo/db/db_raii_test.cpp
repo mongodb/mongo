@@ -459,9 +459,9 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSafe) {
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
-    // Non-user read on a replicated collection should not fail because of the ShouldNotConflict
-    // block.
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
+    // Non-user read on a replicated collection should not fail because of the last applied
+    // timestamp.
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
 
     AutoGetCollectionForRead autoColl(opCtx, nss);
 }

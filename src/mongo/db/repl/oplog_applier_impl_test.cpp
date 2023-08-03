@@ -3419,7 +3419,6 @@ TEST_F(OplogApplierImplTest,
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
             onInsertsCalled = true;
             ASSERT_FALSE(opCtx->writesAreReplicated());
-            ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
             ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
             return Status::OK();
         };

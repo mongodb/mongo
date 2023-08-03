@@ -148,16 +148,6 @@ public:
     }
 
 private:
-    // The caller was expecting to conflict with batch application before entering this
-    // function.
-    // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
-    bool _callerWasConflicting;
-    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
-    // with secondary batch application. This stays in scope with the _autoColl so that locks are
-    // taken and released in the right order.
-    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
-        _shouldNotConflictWithSecondaryBatchApplicationBlock;
-
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
     AutoGetDb _autoDb;
@@ -213,15 +203,6 @@ private:
     // Whether or not this AutoGetCollectionForReadLockFree is being constructed while
     // there's already a lock-free read in progress.
     bool _isLockFreeReadSubOperation;
-
-    // Whether or not the calling context expects to conflict with secondary batch application. This
-    // is just used for invariant checking.
-    bool _callerExpectedToConflictWithSecondaryBatchApplication;
-
-    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
-    // with secondary batch application.
-    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
-        _shouldNotConflictWithSecondaryBatchApplicationBlock;
 
     // Increments a counter on the OperationContext for the number of lock-free reads when
     // constructed, and decrements on destruction.

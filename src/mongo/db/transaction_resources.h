@@ -114,7 +114,6 @@ struct AcquisitionLocks {
     LockMode globalLock = MODE_NONE;
     Lock::GlobalLockSkipOptions globalLockOptions;
     bool hasLockFreeReadsBlock = false;
-    bool canSkipPbwmLock = false;
 
     LockMode dbLock = MODE_NONE;
     Lock::DBLockSkipOptions dbLockOptions;
@@ -123,24 +122,21 @@ struct AcquisitionLocks {
 };
 
 struct AcquiredCollection {
-    AcquiredCollection(
-        int acquireCollectionCallNum,
-        AcquisitionPrerequisites prerequisites,
-        std::shared_ptr<Lock::DBLock> dbLock,
-        boost::optional<Lock::CollectionLock> collectionLock,
-        std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
-        std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock,
-        std::shared_ptr<Lock::GlobalLock> globalLock,
-        AcquisitionLocks locksRequirements,
-        boost::optional<ScopedCollectionDescription> collectionDescription,
-        boost::optional<ScopedCollectionFilter> ownershipFilter,
-        CollectionPtr collectionPtr)
+    AcquiredCollection(int acquireCollectionCallNum,
+                       AcquisitionPrerequisites prerequisites,
+                       std::shared_ptr<Lock::DBLock> dbLock,
+                       boost::optional<Lock::CollectionLock> collectionLock,
+                       std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
+                       std::shared_ptr<Lock::GlobalLock> globalLock,
+                       AcquisitionLocks locksRequirements,
+                       boost::optional<ScopedCollectionDescription> collectionDescription,
+                       boost::optional<ScopedCollectionFilter> ownershipFilter,
+                       CollectionPtr collectionPtr)
         : acquireCollectionCallNum(acquireCollectionCallNum),
           prerequisites(std::move(prerequisites)),
           dbLock(std::move(dbLock)),
           collectionLock(std::move(collectionLock)),
           lockFreeReadsBlock(std::move(lockFreeReadsBlock)),
-          skipPBWMLock(std::move(skipPBWMLock)),
           globalLock(std::move(globalLock)),
           locks(std::move(locksRequirements)),
           collectionDescription(std::move(collectionDescription)),
@@ -160,7 +156,6 @@ struct AcquiredCollection {
                              std::move(collectionLock),
                              nullptr,
                              nullptr,
-                             nullptr,
                              std::move(locksRequirements),
                              boost::none,
                              boost::none,
@@ -177,7 +172,6 @@ struct AcquiredCollection {
     boost::optional<Lock::CollectionLock> collectionLock;
 
     std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
-    std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
     std::shared_ptr<Lock::GlobalLock> globalLock;  // Only for lock-free acquisitions. Otherwise the
                                                    // global lock is held by 'dbLock'.
 

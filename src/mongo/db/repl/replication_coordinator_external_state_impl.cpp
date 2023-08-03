@@ -765,11 +765,6 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
         Status status = writeConflictRetry(
             opCtx, "save replica set lastVote", NamespaceString::kLastVoteNamespace, [&] {
-                // Writes to non-replicated collections do not need concurrency control with the
-                // OplogApplier that never accesses them. Skip taking the PBWM.
-                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                    opCtx->lockState());
-
                 auto coll =
                     acquireCollection(opCtx,
                                       CollectionAcquisitionRequest(
@@ -941,10 +936,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // below. It is possible that the JournalFlusher will not check for the interrupt signaled
     // above, if writing is imminent, so we must make sure that the code completes fully.
     JournalFlusher::get(_service)->waitForJournalFlush();
-
-    // Writes to non-replicated collections do not need concurrency control with the
-    // OplogApplier that never accesses them. Skip taking the PBWM.
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
 
     // We can clear the oplogTruncateAfterPoint because we know there are no user writes during
     // stepdown and therefore presently no oplog holes.

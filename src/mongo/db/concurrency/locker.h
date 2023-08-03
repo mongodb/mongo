@@ -497,19 +497,6 @@ public:
     virtual std::vector<LogDegugInfo> getLockInfoFromResourceHolders(ResourceId resId) = 0;
 
     /**
-     * If set to false, this opts out of conflicting with replication's use of the
-     * ParallelBatchWriterMode lock. Code that opts-out must be ok with seeing an inconsistent view
-     * of data because within a batch, secondaries apply operations in a different order than on the
-     * primary. User operations should *never* opt out.
-     */
-    void setShouldConflictWithSecondaryBatchApplication(bool newValue) {
-        _shouldConflictWithSecondaryBatchApplication = newValue;
-    }
-    bool shouldConflictWithSecondaryBatchApplication() const {
-        return _shouldConflictWithSecondaryBatchApplication;
-    }
-
-    /**
      * If set to false, this opts out of conflicting with the barrier created by the
      * setFeatureCompatibilityVersion command. Code that opts-out must be ok with writes being able
      * to start under one FCV and complete under a different FCV.
@@ -603,7 +590,6 @@ protected:
     AdmissionContext _admCtx;
 
 private:
-    bool _shouldConflictWithSecondaryBatchApplication = true;
     bool _shouldConflictWithSetFeatureCompatibilityVersion = true;
     bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
     std::string _debugInfo;  // Extra info about this locker for debugging purpose
@@ -673,31 +659,6 @@ public:
 
 private:
     Locker* const _locker;
-};
-
-/**
- * RAII-style class to opt out of replication's use of the ParallelBatchWriterMode lock.
- */
-class ShouldNotConflictWithSecondaryBatchApplicationBlock {
-    ShouldNotConflictWithSecondaryBatchApplicationBlock(
-        const ShouldNotConflictWithSecondaryBatchApplicationBlock&) = delete;
-    ShouldNotConflictWithSecondaryBatchApplicationBlock& operator=(
-        const ShouldNotConflictWithSecondaryBatchApplicationBlock&) = delete;
-
-public:
-    explicit ShouldNotConflictWithSecondaryBatchApplicationBlock(Locker* lockState)
-        : _lockState(lockState),
-          _originalShouldConflict(_lockState->shouldConflictWithSecondaryBatchApplication()) {
-        _lockState->setShouldConflictWithSecondaryBatchApplication(false);
-    }
-
-    ~ShouldNotConflictWithSecondaryBatchApplicationBlock() {
-        _lockState->setShouldConflictWithSecondaryBatchApplication(_originalShouldConflict);
-    }
-
-private:
-    Locker* const _lockState;
-    const bool _originalShouldConflict;
 };
 
 /**
