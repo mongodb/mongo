@@ -3,6 +3,11 @@
  */
 'use strict';
 
+import {
+    runDbCheckForDatabase,
+    assertForDbCheckErrorsForAllNodes
+} from "jstests/replsets/libs/dbcheck_utils.js";
+
 (function() {
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 load('jstests/libs/parallelTester.js');     // For Thread.
@@ -69,62 +74,12 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
         dbNames.delete('local');
 
         dbNames.forEach((dbName) => {
-            assert.commandWorked(primary.getDB(dbName).runCommand({dbCheck: 1}));
+            runDbCheckForDatabase(rst, primary.getDB(dbName), true /*awaitCompletion*/);
             jsTestLog("dbCheck done on database " + dbName);
-
-            const dbCheckCompleted = (db) => {
-                return db.currentOp({$all: true}).inprog.filter(x => x["desc"] === "dbCheck")[0] ===
-                    undefined;
-            };
-
-            assert.soon(() => dbCheckCompleted(adminDb),
-                        "timed out waiting for dbCheck to finish on database: " + dbName);
         });
 
-        // Wait for all secondaries to finish applying all dbcheck batches.
-        rst.awaitReplication();
-
-        const nodes = [
-            rst.getPrimary(),
-            ...rst.getSecondaries().filter(conn => {
-                return !conn.adminCommand({isMaster: 1}).arbiterOnly;
-            })
-        ];
-        nodes.forEach((node) => {
-            // Assert no errors (i.e., found inconsistencies). Allow warnings. Tolerate
-            // SnapshotTooOld errors, as they can occur if the primary is slow enough processing a
-            // batch that the secondary is unable to obtain the timestamp the primary used.
-            const healthlog = node.getDB('local').system.healthlog;
-            // Regex matching strings that start without "SnapshotTooOld"
-            const regexStringWithoutSnapTooOld = /^((?!^SnapshotTooOld).)*$/;
-
-            // healthlog is a capped collection, truncation during scan might cause cursor
-            // invalidation. Truncated data is most likely from previous tests in the fixture, so we
-            // should still be able to catch errors by retrying.
-            assert.soon(() => {
-                try {
-                    let errs = healthlog.find(
-                        {"severity": "error", "data.error": regexStringWithoutSnapTooOld});
-                    if (errs.hasNext()) {
-                        const err = "dbCheck found inconsistency on " + node.host;
-                        jsTestLog(err + ". Errors: ");
-                        for (let count = 0; errs.hasNext() && count < 20; count++) {
-                            jsTestLog(tojson(errs.next()));
-                        }
-                        assert(false, err);
-                    }
-                    return true;
-                } catch (e) {
-                    if (e.code !== ErrorCodes.CappedPositionLost) {
-                        throw e;
-                    }
-                    jsTestLog(`Retrying on CappedPositionLost error: ${tojson(e)}`);
-                    return false;
-                }
-            }, "healthlog scan could not complete.", 60000);
-
-            jsTestLog("Checked health log on " + node.host);
-        });
+        assertForDbCheckErrorsForAllNodes(
+            rst, true /*assertForErrors*/, false /*assertForWarnings*/);
 
         return {ok: 1};
     };

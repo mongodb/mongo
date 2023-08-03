@@ -15,8 +15,8 @@ import {
     checkHealthlog,
     clearHealthLog,
     dbCheckCompleted,
-    forEachNode,
-    forEachSecondary,
+    forEachNonArbiterNode,
+    forEachNonArbiterSecondary,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
@@ -167,7 +167,7 @@ function simpleTestConsistent() {
     checkLogAllConsistent(primary);
     checkTotalCounts(primary, db[multiBatchSimpleCollName]);
 
-    forEachSecondary(replSet, function(secondary) {
+    forEachNonArbiterSecondary(replSet, function(secondary) {
         checkLogAllConsistent(secondary);
         checkTotalCounts(secondary, secondary.getDB(dbName)[multiBatchSimpleCollName]);
     });
@@ -211,7 +211,7 @@ function concurrentTestConsistent() {
     checkLogAllConsistent(primary);
     // Omit check for total counts, which might have changed with concurrent updates.
 
-    forEachSecondary(replSet, secondary => checkLogAllConsistent(secondary, true));
+    forEachNonArbiterSecondary(replSet, secondary => checkLogAllConsistent(secondary, true));
 }
 
 simpleTestConsistent();
@@ -229,7 +229,7 @@ function testDbCheckParameters() {
     let docSize = bsonsize({_id: 10});
 
     function checkEntryBounds(start, end) {
-        forEachNode(replSet, function(node) {
+        forEachNonArbiterNode(replSet, function(node) {
             // These tests only run on debug builds because they rely on dbCheck health-logging
             // all info-level batch results.
             const debugBuild = node.getDB('admin').adminCommand('buildInfo').debug;

@@ -2,40 +2,45 @@
  * Contains helper functions for testing dbCheck.
  */
 
-// Apply function on all secondary nodes.
-export const forEachSecondary = (replSet, f) => {
+// Apply function on all secondary nodes except arbiters.
+export const forEachNonArbiterSecondary = (replSet, f) => {
     for (let secondary of replSet.getSecondaries()) {
-        f(secondary);
+        if (!secondary.adminCommand({isMaster: 1}).arbiterOnly) {
+            f(secondary);
+        }
     }
 };
 
 // Apply function on primary and all secondary nodes.
-export const forEachNode = (replSet, f) => {
+export const forEachNonArbiterNode = (replSet, f) => {
     f(replSet.getPrimary());
-    forEachSecondary(replSet, f);
+    forEachNonArbiterSecondary(replSet, f);
 };
 
 // Clear local.system.healthlog.
 export const clearHealthLog = (replSet) => {
-    forEachNode(replSet, conn => conn.getDB("local").system.healthlog.drop());
+    forEachNonArbiterNode(replSet, conn => conn.getDB("local").system.healthlog.drop());
 };
 
 export const dbCheckCompleted = (db) => {
-    return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
+    return db.getSiblingDB("admin").currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] ===
+        undefined;
 };
 
 // Wait for dbCheck to complete (on both primaries and secondaries).
-export const awaitDbCheckCompletion = (replSet, db) => {
+export const awaitDbCheckCompletion = (replSet, db, withClearedHealthLog = true) => {
     assert.soon(() => dbCheckCompleted(db), "dbCheck timed out");
     replSet.awaitSecondaryNodes();
     replSet.awaitReplication();
 
-    forEachNode(replSet, function(node) {
-        const healthlog = node.getDB('local').system.healthlog;
-        assert.soon(function() {
-            return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
-        }, "dbCheck command didn't complete");
-    });
+    if (withClearedHealthLog) {
+        forEachNonArbiterNode(replSet, function(node) {
+            const healthlog = node.getDB('local').system.healthlog;
+            assert.soon(function() {
+                return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
+            }, "dbCheck command didn't complete");
+        });
+    }
 };
 
 // Clear health log and insert nDocs documents.
@@ -49,14 +54,21 @@ export const resetAndInsert = (replSet, db, collName, nDocs) => {
 };
 
 // Run dbCheck with given parameters and potentially wait for completion.
-export const runDbCheck = (replSet, db, collName, parameters = {}, awaitCompletion = false) => {
+export const runDbCheck = (replSet,
+                           db,
+                           collName,
+                           parameters = {},
+                           awaitCompletion = false,
+                           withClearedHealthLog = true) => {
     let dbCheckCommand = {dbCheck: collName};
     for (let parameter in parameters) {
         dbCheckCommand[parameter] = parameters[parameter];
     }
-    assert.commandWorked(db.runCommand(dbCheckCommand));
+    // Disregard the error when the collection is not replicated, for example, 'system.profile'.
+    assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand),
+                                         40619 /* collection is not replicated error.*/);
     if (awaitCompletion) {
-        awaitDbCheckCompletion(replSet, db);
+        awaitDbCheckCompletion(replSet, db, withClearedHealthLog);
     }
 };
 
@@ -72,3 +84,79 @@ export const checkHealthlog = (healthlog, query, numExpected, timeout = 60 * 100
             query,
         timeout);
 };
+
+// Returns a list of all collections in a given database excluding views.
+function listCollectionsWithoutViews(database) {
+    var failMsg = "'listCollections' command failed";
+    var res = assert.commandWorked(database.runCommand("listCollections"), failMsg);
+    return res.cursor.firstBatch.filter(c => c.type == "collection");
+}
+
+// Run dbCheck for all collections in the database with given parameters and potentially wait for
+// completion.
+export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
+    listCollectionsWithoutViews(db)
+        .map(c => c.name)
+        .forEach(collName => runDbCheck(replSet, db, collName, false /*awaitCompletion*/));
+
+    if (awaitCompletion) {
+        awaitDbCheckCompletion(replSet, db, false /*withClearedHealthLog*/);
+    }
+};
+
+// Assert no errors/warnings (i.e., found inconsistencies). Tolerate
+// SnapshotTooOld errors, as they can occur if the primary is slow enough processing a
+// batch that the secondary is unable to obtain the timestamp the primary used.
+export const assertForDbCheckErrors = (node,
+                                       assertForErrors = true,
+                                       assertForWarnings = false,
+                                       errorsFound = []) => {
+    let severityValues = [];
+    if (assertForErrors == true) {
+        severityValues.push("error");
+    }
+
+    if (assertForWarnings == true) {
+        severityValues.push("warning");
+    }
+
+    const healthlog = node.getDB('local').system.healthlog;
+    // Regex matching strings that start without "SnapshotTooOld"
+    const regexStringWithoutSnapTooOld = /^((?!^SnapshotTooOld).)*$/;
+
+    // healthlog is a capped collection, truncation during scan might cause cursor
+    // invalidation. Truncated data is most likely from previous tests in the fixture, so we
+    // should still be able to catch errors by retrying.
+    assert.soon(() => {
+        try {
+            let errs = healthlog.find(
+                {"severity": {$in: severityValues}, "data.error": regexStringWithoutSnapTooOld});
+            if (errs.hasNext()) {
+                const errMsg = "dbCheck found inconsistency on " + node.host;
+                jsTestLog(errMsg + ". Errors/Warnings: ");
+                for (let count = 0; errs.hasNext() && count < 20; count++) {
+                    let err = errs.next();
+                    errorsFound.push(err);
+                    jsTestLog(tojson(err));
+                }
+                assert(false, err);
+            }
+            return true;
+        } catch (e) {
+            if (e.code !== ErrorCodes.CappedPositionLost) {
+                throw e;
+            }
+            jsTestLog(`Retrying on CappedPositionLost error: ${tojson(e)}`);
+            return false;
+        }
+    }, "healthlog scan could not complete.", 60000);
+
+    jsTestLog("Checked health log for on " + node.host);
+};
+
+// Check for dbcheck errors for all nodes in a replica set and ignoring arbiters.
+export const assertForDbCheckErrorsForAllNodes =
+    (rst, assertForErrors = true, assertForWarnings = false) => {
+        forEachNonArbiterNode(
+            rst, node => assertForDbCheckErrors(node, assertForErrors, assertForWarnings));
+    };
