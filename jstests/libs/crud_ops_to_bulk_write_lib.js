@@ -85,7 +85,8 @@ const BulkWriteUtils = (function() {
         return nsInfos;
     }
 
-    function flushCurrentBulkWriteBatch(conn, originalRunCommand, makeRunCommandArgs) {
+    function flushCurrentBulkWriteBatch(
+        conn, originalRunCommand, makeRunCommandArgs, additionalParameters = {}) {
         if (bufferedOps.length == 0) {
             return {};
         }
@@ -108,6 +109,9 @@ const BulkWriteUtils = (function() {
         if (wc != null) {
             bulkWriteCmd["writeConcern"] = wc;
         }
+
+        // Add in additional parameters to the bulkWrite command.
+        bulkWriteCmd = {...bulkWriteCmd, ...additionalParameters};
 
         let resp = {};
         resp = originalRunCommand.apply(conn, makeRunCommandArgs(bulkWriteCmd, "admin"));

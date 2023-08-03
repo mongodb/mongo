@@ -10,14 +10,42 @@
 load("jstests/libs/crud_ops_to_bulk_write_lib.js");
 load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
 
+function getAdditionalParameters(cmdObj) {
+    // Deep copy of original command to modify.
+    let cmdCopy = {};
+    Object.assign(cmdCopy, cmdObj);
+
+    // Remove all parameters we extract for use in bulkWrite.
+    ["bypassDocumentValidation",
+     "ordered",
+     "writeConcern",
+     "insert",
+     "update",
+     "delete",
+     "let",
+     "sampleId",
+     "documents",
+     "updates",
+     "deletes",
+     "collectionUUID",
+     "encryptionInformation"]
+        .forEach(property => {
+            if (cmdCopy.hasOwnProperty(property)) {
+                delete cmdCopy[property];
+            }
+        });
+    return cmdCopy;
+}
+
 function runCommandSingleOpBulkWriteOverride(
     conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     let cmdNameLower = cmdName.toLowerCase();
     if (BulkWriteUtils.canProcessAsBulkWrite(cmdNameLower)) {
         BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
+        let additionalParameters = getAdditionalParameters(cmdObj);
         try {
             let response = BulkWriteUtils.flushCurrentBulkWriteBatch(
-                conn, originalRunCommand, makeRunCommandArgs);
+                conn, originalRunCommand, makeRunCommandArgs, additionalParameters);
             assert.eq(response.length, 1);
             BulkWriteUtils.resetBulkWriteBatch();
             return response[0];

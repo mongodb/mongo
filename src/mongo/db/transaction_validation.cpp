@@ -76,10 +76,10 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
 
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
                             StringData cmdName,
-                            const NamespaceString& nss,
+                            const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase) {
     if (sessionOptions.getAutocommit()) {
-        CommandHelpers::canUseTransactions(nss, cmdName, allowTransactionsOnConfigDatabase);
+        CommandHelpers::canUseTransactions(namespaces, cmdName, allowTransactionsOnConfigDatabase);
     }
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {

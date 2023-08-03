@@ -80,6 +80,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
@@ -651,6 +652,7 @@ bool handleInsertOp(OperationContext* opCtx,
     const auto& ns = nsInfo[idx].getNs();
 
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
+    doTransactionValidationForWrites(opCtx, ns);
 
     if (insertGrouper.group(op, currentOpIdx)) {
         return true;
@@ -802,6 +804,7 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+        doTransactionValidationForWrites(opCtx, nsString);
 
         if (nsInfo[idx].getEncryptionInformation().has_value()) {
             // For BulkWrite, re-entry is un-expected.
@@ -812,8 +815,6 @@ bool handleUpdateOp(OperationContext* opCtx,
         }
 
         OpDebug* opDebug = &curOp->debug();
-
-        doTransactionValidationForWrites(opCtx, nsString);
 
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
@@ -934,14 +935,13 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+        doTransactionValidationForWrites(opCtx, nsString);
 
         if (nsInfo[idx].getEncryptionInformation().has_value()) {
             return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
         }
 
         OpDebug* opDebug = &curOp->debug();
-
-        doTransactionValidationForWrites(opCtx, nsString);
 
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
@@ -1045,6 +1045,17 @@ public:
 
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName());
+        }
+
+        std::vector<NamespaceString> allNamespaces() const final {
+            auto nsInfos = request().getNsInfo();
+            std::vector<NamespaceString> result(nsInfos.size());
+
+            for (auto& nsInfo : nsInfos) {
+                result.emplace_back(nsInfo.getNs());
+            }
+
+            return result;
         }
 
         Reply typedRun(OperationContext* opCtx) final {

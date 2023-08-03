@@ -906,6 +906,11 @@ long long performDelete(OperationContext* opCtx,
                           MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
 
+    if (const auto& coll = collection.getCollectionPtr()) {
+        // Transactions are not allowed to operate on capped collections.
+        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
+    }
+
     ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
@@ -916,15 +921,6 @@ long long performDelete(OperationContext* opCtx,
     }
 
     assertCanWrite_inlock(opCtx, nsString);
-
-    if (collectionPtr && collectionPtr->isCapped()) {
-        uassert(
-            ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << collection.nss().toStringForErrorMsg()
-                          << "' is a capped collection. Writes in transactions are not allowed on "
-                             "capped collections.",
-            !inTransaction);
-    }
 
     const auto exec = uassertStatusOK(
         getExecutorDelete(opDebug, collection, &parsedDelete, boost::none /* verbosity */));
@@ -1702,6 +1698,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                 request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
             }
         }
+    }
+
+    if (const auto& coll = collection.getCollectionPtr()) {
+        // Transactions are not allowed to operate on capped collections.
+        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
     ParsedDelete parsedDelete(opCtx,

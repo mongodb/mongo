@@ -66,7 +66,7 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
  */
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
                             StringData cmdName,
-                            const NamespaceString& nss,
+                            const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase);
 
 /**

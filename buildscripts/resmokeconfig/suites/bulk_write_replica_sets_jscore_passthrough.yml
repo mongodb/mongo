@@ -6,12 +6,10 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # We will handle transactions testing with the transactions override in a different suite.
-  - jstests/core/txns/**/*.js
-  - jstests/fle2/**/*txn*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*txn*.js
   # TODO (SERVER-72767/SERVER-72804/SERVER-72805): When timeseries is supported on mongod enable these.
   - jstests/core/timeseries/**/*.js
+  - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
+  - jstests/core/txns/timeseries_insert_in_txn.js
   # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
@@ -33,11 +31,6 @@ selector:
   - jstests/core/write/insert/batch_write_command_insert.js
   - jstests/core/write/update/batch_write_command_update.js
   - jstests/core/write/delete/batch_write_command_delete.js
-  # Tests that involve setting other generic command parameters that the override does not support.
-  - jstests/core/api/**/*.js
-  - jstests/core/command_json_schema_field.js
-  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/write/write_commands_reject_unknown_fields.js
   # TODO (SERVER-72767): Uses time series inserts.
   - jstests/core/catalog/list_catalog.js
   # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
@@ -45,6 +38,16 @@ selector:
   # Asserts a location specific error code failure that happens after we fail out in bulkWrite.
   - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
   - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+  # TODO (SERVER-71899): bulkWrite does not yet use stable API
+  - jstests/core/version_api_v1_command_coverage.js
+  - jstests/core/txns/api_params_transaction.js
+  # This test adds unknown fields to insert/update/delete ops which we ignore
+  - jstests/core/write/write_commands_reject_unknown_fields.js
+  # Checks for op names which bulkWrite will not show up as
+  - jstests/core/txns/transactions_profiling.js
+  - jstests/core/txns/currentop_blocked_operations.js
+  # Checks for collation at top level in profile
+  - jstests/core/txns/transactions_profiling_with_drops.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

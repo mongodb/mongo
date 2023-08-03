@@ -355,9 +355,9 @@ struct CommandHelpers {
 
     /**
      * Verifies that command is allowed to run under a transaction in the given database or
-     * namespace, and throws if that verification doesn't pass.
+     * namespaces, and throws if that verification doesn't pass.
      */
-    static void canUseTransactions(const NamespaceString& nss,
+    static void canUseTransactions(const std::vector<NamespaceString>& namespaces,
                                    StringData cmdName,
                                    bool allowTransactionsOnConfigDatabase);
 
@@ -760,6 +760,13 @@ public:
      * The primary namespace on which this command operates. May just be the db.
      */
     virtual NamespaceString ns() const = 0;
+
+    /**
+     * All of the namespaces this command operates on. For most commands will just be ns().
+     */
+    virtual std::vector<NamespaceString> allNamespaces() const {
+        return {ns()};
+    }
 
     /**
      * Returns true if this command should be parsed for a writeConcern field and wait
