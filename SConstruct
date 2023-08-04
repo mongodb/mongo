@@ -1064,6 +1064,14 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'BAZEL_BUILD_ENABLED',
+    help=
+    'Enables/disables building with bazel. Note that this project is in flight, and thus subject to breaking changes. See https://jira.mongodb.org/browse/PM-3332 for details.',
+    converter=functools.partial(bool_var_converter, var='BAZEL_BUILD_ENABLED'),
+    default="0",
+)
+
+env_vars.Add(
     'DSYMUTIL',
     help='Path to the dsymutil utility',
 )
@@ -2392,6 +2400,8 @@ if link_model.startswith("dynamic"):
                     return []
 
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
+
+env.Tool('integrate_bazel')
 
 if optBuild != "off":
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")

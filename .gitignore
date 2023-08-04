@@ -272,5 +272,12 @@ package-lock.json
 # jstestfuzz generated test directory
 jstestfuzz/
 
+# Bazel-related work
+# (Note that each string does NOT terminate with a '/' so that gitignore works properly)
+bazel-bin
+bazel-mongo*
+bazel-out
+bazel-testlogs
+
 # generated configs for antithesis
 antithesis/antithesis_config

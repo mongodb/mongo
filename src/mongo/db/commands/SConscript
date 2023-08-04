@@ -237,7 +237,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.BazelLibrary(
     target='fsync_locked',
     source=[
         'fsync_locked.cpp',
