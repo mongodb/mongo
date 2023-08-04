@@ -650,6 +650,7 @@ enum class Builtin : uint8_t {
     ln,
     log10,
     sqrt,
+    pow,
     addToArray,        // agg function to append to an array
     addToArrayCapped,  // agg function to append to an array, fails when the array reaches specified
                        // size
@@ -1329,6 +1330,10 @@ private:
                                                                 value::Value operandValue);
     FastTuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericPow(value::TypeTags baseTag,
+                                                              value::Value baseValue,
+                                                              value::TypeTags exponentTag,
+                                                              value::Value exponentValue);
     FastTuple<bool, value::TypeTags, value::Value> genericRoundTrunc(
         std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity);
     std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
@@ -1673,6 +1678,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinLn(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSqrt(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinPow(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToArrayCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);

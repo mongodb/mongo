@@ -2651,7 +2651,58 @@ public:
         visitMultiBranchLogicExpression(expr, optimizer::Operations::Or);
     }
     void visit(const ExpressionPow* expr) final {
-        unsupportedExpression("$pow");
+        _context->ensureArity(2);
+        auto rhs = _context->popABTExpr();
+        auto lhs = _context->popABTExpr();
+
+        auto lhsName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto rhsName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto checkIsNotNumber =
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                 generateABTNonNumericCheck(lhsName),
+                                                 generateABTNonNumericCheck(rhsName));
+
+        auto checkBaseIsZero = optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::Eq, makeVariable(lhsName), optimizer::Constant::int32(0));
+
+        auto checkIsZeroAndNegative = optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::And, checkBaseIsZero, generateABTNegativeCheck(rhsName));
+
+        auto checkIsNullOrMissing =
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                 generateABTNullOrMissing(lhsName),
+                                                 generateABTNullOrMissing(rhsName));
+
+        // Create an expression to invoke built-in "pow" function
+        auto powFunctionCall = makeABTFunction("pow", makeVariable(lhsName), makeVariable(rhsName));
+        // Local bind to hold the result of the built-in "pow" function
+        auto powResName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto powResVariable = makeVariable(powResName);
+
+        // Return the result or check for issues if result is empty (Nothing)
+        auto checkPowRes = optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::FillEmpty,
+            powResVariable,
+            buildABTMultiBranchConditional(
+                ABTCaseValuePair{std::move(checkIsNullOrMissing), optimizer::Constant::null()},
+                ABTCaseValuePair{
+                    std::move(checkIsNotNumber),
+                    makeABTFail(ErrorCodes::Error{5154200}, "$pow only supports numeric types")},
+                ABTCaseValuePair{std::move(checkIsZeroAndNegative),
+                                 makeABTFail(ErrorCodes::Error{5154201},
+                                             "$pow cannot raise 0 to a negative exponent")},
+                optimizer::Constant::nothing()));
+
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(lhsName),
+            std::move(lhs),
+            optimizer::make<optimizer::Let>(
+                std::move(rhsName),
+                std::move(rhs),
+                optimizer::make<optimizer::Let>(
+                    std::move(powResName), std::move(powFunctionCall), checkPowRes))));
     }
     void visit(const ExpressionRange* expr) final {
         auto startName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);

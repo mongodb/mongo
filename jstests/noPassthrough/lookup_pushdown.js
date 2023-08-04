@@ -202,15 +202,6 @@ function setLookupPushdownDisabled(value) {
             ],
             JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
 
-    // $lookup preceded by $project which features an SBE-incompatible expression.
-    // TODO SERVER-51542: Update or remove this test case once $pow is implemented in SBE.
-    runTest(coll,
-            [
-                {$project: {exp: {$pow: ["$a", 3]}}},
-                {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
-            ],
-            JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
-
     // $lookup preceded by $group.
     runTest(coll,
             [
@@ -218,15 +209,6 @@ function setLookupPushdownDisabled(value) {
                 {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
             ],
             JoinAlgorithm.HJ /* expectedJoinAlgorithm */);
-
-    // $lookup preceded by $group that is not eligible for pushdown.
-    // TODO SERVER-51542: Update or remove this test case once $pow is implemented in SBE.
-    runTest(coll,
-            [
-                {$group: {_id: {$pow: ["$a", 3]}, sum: {$sum: 1}}},
-                {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
-            ],
-            JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
 
     // Consecutive $lookups, where the first $lookup is against a view.
     runTest(coll,

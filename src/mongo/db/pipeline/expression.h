@@ -2822,9 +2822,7 @@ public:
 class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
 public:
     explicit ExpressionPow(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {}
     ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx, std::move(children)) {}
 
