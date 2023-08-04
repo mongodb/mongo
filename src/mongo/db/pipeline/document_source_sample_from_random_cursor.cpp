@@ -120,7 +120,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::doGetNext() 
 DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDuplicateDocument() {
     // We may get duplicate documents back from the random cursor, and should not return duplicate
     // documents, so keep trying until we get a new one.
-    const int kMaxAttempts = 100;
+    const int kMaxAttempts = 50;
     for (int i = 0; i < kMaxAttempts; ++i) {
         auto nextInput = pSource->getNext();
         switch (nextInput.getStatus()) {

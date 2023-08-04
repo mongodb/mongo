@@ -253,7 +253,7 @@ __random_leaf_disk(WT_CURSOR_BTREE *cbt, bool *validp)
 }
 
 /* Magic constant: cursor up to 250 next/previous records before selecting a key. */
-#define WT_RANDOM_CURSOR_MOVE 250
+#define WT_RANDOM_CURSOR_MOVE 50
 /* Magic constant: 1000 disk-based entries in a page is enough to always select from them. */
 #define WT_RANDOM_DISK_ENOUGH WT_THOUSAND
 
