@@ -305,13 +305,12 @@ is in charge of applying each batch of oplog entries received from the batcher. 
 endless loop doing the following:
 
 1. Get the next oplog applier batch from the batcher.
-2. Acquire the [Parallel Batch Writer Mode lock](#parallel-batch-writer-mode).
-3. Set the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's last applied
+2. Set the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's last applied
    optime (before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down
    in the middle of writing entries to the oplog.
-4. Write the batch of oplog entries into the oplog.
-5. Clear the `oplogTruncateAfterPoint`.
-6. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
+3. Write the batch of oplog entries into the oplog.
+4. Clear the `oplogTruncateAfterPoint`.
+5. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
    same batch are not necessarily applied in order. The operations in each batch will be divided
    among the writer threads. The only restriction for creating the vector of operations that each
    writer thread will apply serially has to do with the documents that the operation applies to.
@@ -319,12 +318,12 @@ endless loop doing the following:
    serialized. Operations on the same collection can still be parallelized if they are working with
    distinct documents. When applying operations, each writer thread will try to **group** together
    insert operations for improved performance and will apply all other operations individually.
-7. Tell the storage engine to flush the journal.
-8. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
+6. Tell the storage engine to flush the journal.
+7. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
    engine of the new oplog entries. Since entries in an oplog applier batch are applied in
    parallel, it is only safe to make these entries visible once all the entries in this batch are
    applied, otherwise an oplog hole could be made visible.
-9. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
+8. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
    last optime in the batch.
 
 #### Code References
@@ -1274,22 +1273,6 @@ error code), so that the caller knows that they can safely retry the entire tran
 
 # Concurrency Control
 
-## Parallel Batch Writer Mode
-
-The **Parallel Batch Writer Mode** lock (also known as the PBWM or the Peanut Butter Lock) is a
-global resource that helps manage the concurrency of running operations while a secondary is
-[applying a batch of oplog entries](#oplog-entry-application). Since secondary oplog application
-applies batches in parallel, operations will not necessarily be applied in order, so a node will
-hold the PBWM while it is waiting for the entire batch to be applied. For secondaries, in order to
-read at a consistent state without needing the PBWM lock, a node will try to read at the
-[`lastApplied`](#replication-timestamp-glossary) timestamp. Since `lastApplied` is set after a batch
-is completed, it is guaranteed to be at a batch boundary. However, during initial sync there could
-be changes from a background index build that occur after the `lastApplied` timestamp. Since there
-is no guarantee that `lastApplied` will be advanced again, if a node sees that there are pending
-changes ahead of `lastApplied`, it will acquire the PBWM to make sure that there isn't an in-progress
-batch when reading, and read without a timestamp to ensure all writes are visible, including those
-later than the `lastApplied`.
-
 ## Replication State Transition Lock
 
 When a node goes through state transitions, it needs something to manage the concurrency of that
@@ -1308,11 +1291,11 @@ prepared transaction, and checking/setting if the node can accept writes or serv
 
 ## Global Lock Acquisition Ordering
 
-Both the PBWM and RSTL are global resources that must be acquired before the global lock is
-acquired. The node must first acquire the PBWM in [intent
-shared](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock) mode. Next, it must
-acquire the RSTL in intent exclusive mode. Only then can it acquire the global lock in its desired
-mode.
+Both the FCV lock and RSTL are global resources that must be acquired before the global lock is
+acquired. The node must first acquire the FCV lock in [intent
+shared](https://docs.mongodb.com/manual/reference/glossary/#term-intent-lock) or intent exclusive
+mode. Next, it must acquire the RSTL in intent exclusive mode. Only then can it acquire the global
+lock in its desired mode.
 
 # Elections
 

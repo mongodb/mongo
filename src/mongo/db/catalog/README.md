@@ -787,20 +787,13 @@ _Code spelunking starting points:_
 
 The oplog applier applies entries out-of-order to provide parallelism for data replication. This
 exposes readers with no set read timestamp to the possibility of seeing inconsistent states of data.
-To solve this problem, the oplog applier takes the ParallelBatchWriterMode (PBWM) lock in X mode,
-and readers using no read timestamp are expected to take the PBWM lock in IS mode to avoid observing
-inconsistent data mid-batch.
 
-Reads on secondaries are able to opt-out of taking the PBWM lock and read at replication's
+Because of this, reads on secondaries are generally required to read at replication's
 [lastApplied](../repl/README.md#replication-timestamp-glossary) optime instead (see
 [SERVER-34192](https://jira.mongodb.org/browse/SERVER-34192)). LastApplied is used because on
 secondaries it is only updated after each oplog batch, which is a known consistent state of data.
-This allows operations to avoid taking the PBWM lock, and thus not conflict with oplog application.
 
-AGCFR provides the mechanism for secondary reads. This is implemented by [opting-out of the
-ParallelBatchWriterMode
-lock](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L98)
-and switching the ReadSource of [eligible
+AGCFR provides the mechanism for secondary reads. This is implemented by switching the ReadSource of [eligible
 readers](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/snapshot_helper.cpp#L106)
 to read at
 [kLastApplied](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/recovery_unit.h#L411).
@@ -914,7 +907,7 @@ requested lock on that same resource with the given mode compatible?
 Typically, locks are granted in the order they are queued, but some LockRequest behaviors can be
 specially selected to break this rule. One behavior is _enqueueAtFront_, which allows important lock
 acquisitions to cut to the front of the line, in order to expedite them. Currently, all mode X and S
-locks for the three Global Resources (Global, RSTL, and PBWM) automatically use this option.
+locks for the three Global Resources (Global, FCV, RSTL) automatically use this option.
 Another behavior is _compatibleFirst_, which allows compatible lock requests to cut ahead of others
 waiting in the queue and be granted immediately; note that this mode might starve queued lock
 requests indefinitely.
@@ -925,16 +918,6 @@ The Replication State Transition Lock is of ResourceType Global, so it must be l
 locking any Database level resource. This lock is used to synchronize replica state transitions
 (typically transitions between PRIMARY, SECONDARY, and ROLLBACK states).
 More information on the RSTL is contained in the [Replication Architecture Guide](https://github.com/mongodb/mongo/blob/b4db8c01a13fd70997a05857be17548b0adec020/src/mongo/db/repl/README.md#replication-state-transition-lock)
-
-### Parallel Batch Writer Mode Lock (PBWM)
-
-The Parallel Batch Writer Mode lock is of ResourceType Global, so it must be locked prior to locking
-any Database level resource. This lock is used to synchronize secondary oplog application with other
-readers, so that they do not observe inconsistent snapshots of the data. Typically this is only an
-issue with readers that read with no timestamp, readers at explicit timestamps can acquire this lock
-in a compatible mode with the oplog applier and thus are not blocked when the oplog applier is
-running.
-More information on the PBWM lock is contained in the [Replication Architecture Guide.](https://github.com/mongodb/mongo/blob/b4db8c01a13fd70997a05857be17548b0adec020/src/mongo/db/repl/README.md#parallel-batch-writer-mode)
 
 ### Global Lock
 
