@@ -5,6 +5,8 @@
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   # The killCursors command is not allowed with a security token.
+ *   not_allowed_with_security_token,
  *   requires_getmore,
  *   requires_non_retryable_commands,
  *   # Explain of a resolved view must be executed by mongos.
@@ -148,14 +150,19 @@ assert.commandWorked(viewsDB.runCommand({
                     "Expected in-memory sort to fail due to excessive memory usage",
                     {allowDiskUse: false});
 
-    assert.commandWorked(
+    const result1 = assert.commandWorked(
         viewsDB.runCommand(
             {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
         "Expected aggregate to succeed since 'allowDiskUse' was specified");
 
-    assert.commandWorked(
+    const result2 = assert.commandWorked(
         viewsDB.runCommand({aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}}),
         "Expected aggregate to succeed since 'allowDiskUse' is true by default");
+
+    // These pipelines can consume significant memory and disk space, so we manually close them to
+    // prevent them from interfering with other tests. We ignore the return value here, because an
+    // error closing cursors does not usually represent a failure.
+    viewsDB.runCommand({killCursors: "largeView", cursors: [result1.cursor.id, result2.cursor.id]});
 })();
 
 // Test explain modes on a view.
