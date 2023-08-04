@@ -221,7 +221,10 @@ optimizer::ABT generateABTNonTimestampCheck(optimizer::ProjectionName var) {
 
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::BinaryOp>(
-        optimizer::Operations::Lt, makeVariable(std::move(var)), optimizer::Constant::int32(0));
+        optimizer::Operations::And,
+        makeNot(makeABTFunction("isNaN"_sd, makeVariable(var))),
+        optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::Lt, makeVariable(var), optimizer::Constant::int32(0)));
 }
 
 optimizer::ABT generateABTNonPositiveCheck(optimizer::ProjectionName var) {
