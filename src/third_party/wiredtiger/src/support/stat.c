@@ -1758,6 +1758,7 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: split bytes currently awaiting free",
   "reconciliation: split objects currently awaiting free",
   "session: attempts to remove a local object and the object is in use",
+  "session: background compact running",
   "session: flush_tier failed calls",
   "session: flush_tier operation calls",
   "session: flush_tier tables skipped due to no checkpoint",
@@ -2399,6 +2400,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing rec_split_stashed_bytes */
     /* not clearing rec_split_stashed_objects */
     stats->local_objects_inuse = 0;
+    /* not clearing session_background_compact_running */
     stats->flush_tier_fail = 0;
     stats->flush_tier = 0;
     stats->flush_tier_skipped = 0;
@@ -3060,6 +3062,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_split_stashed_bytes += WT_STAT_READ(from, rec_split_stashed_bytes);
     to->rec_split_stashed_objects += WT_STAT_READ(from, rec_split_stashed_objects);
     to->local_objects_inuse += WT_STAT_READ(from, local_objects_inuse);
+    to->session_background_compact_running +=
+      WT_STAT_READ(from, session_background_compact_running);
     to->flush_tier_fail += WT_STAT_READ(from, flush_tier_fail);
     to->flush_tier += WT_STAT_READ(from, flush_tier);
     to->flush_tier_skipped += WT_STAT_READ(from, flush_tier_skipped);

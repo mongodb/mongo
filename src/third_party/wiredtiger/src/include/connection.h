@@ -43,6 +43,21 @@ struct __wt_process {
 extern WT_PROCESS __wt_process;
 
 /*
+ * WT_BACKGROUND_COMPACT --
+ *	Structure dedicated to the background compaction server
+ */
+struct __wt_background_compact {
+    bool running;             /* Compaction supposed to run */
+    bool signalled;           /* Compact signalled */
+    bool tid_set;             /* Thread set */
+    wt_thread_t tid;          /* Thread */
+    const char *config;       /* Configuration */
+    WT_CONDVAR *cond;         /* Wait mutex */
+    WT_SPINLOCK lock;         /* Compact lock */
+    WT_SESSION_IMPL *session; /* Thread session */
+};
+
+/*
  * WT_BUCKET_STORAGE --
  *	A list entry for a storage source with a unique name (bucket, prefix).
  */
@@ -286,6 +301,8 @@ struct __wt_connection_impl {
 
     /* Configuration */
     const WT_CONFIG_ENTRY **config_entries;
+
+    WT_BACKGROUND_COMPACT background_compact; /* Background compaction server */
 
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
 
@@ -672,11 +689,12 @@ struct __wt_connection_impl {
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_SERVER_CAPACITY 0x01u
 #define WT_CONN_SERVER_CHECKPOINT 0x02u
-#define WT_CONN_SERVER_LOG 0x04u
-#define WT_CONN_SERVER_LSM 0x08u
-#define WT_CONN_SERVER_STATISTICS 0x10u
-#define WT_CONN_SERVER_SWEEP 0x20u
-#define WT_CONN_SERVER_TIERED 0x40u
+#define WT_CONN_SERVER_COMPACT 0x04u
+#define WT_CONN_SERVER_LOG 0x08u
+#define WT_CONN_SERVER_LSM 0x10u
+#define WT_CONN_SERVER_STATISTICS 0x20u
+#define WT_CONN_SERVER_SWEEP 0x40u
+#define WT_CONN_SERVER_TIERED 0x80u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 

@@ -49,6 +49,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
     /* Spinlocks. */
     WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
     WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
+    WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
     WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
     WT_RET(__wt_spin_init(session, &conn->flush_tier_lock, "flush tier"));
@@ -113,6 +114,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_conn_foc_discard(session); /* free-on-close */
 
     __wt_spin_destroy(session, &conn->api_lock);
+    __wt_spin_destroy(session, &conn->background_compact.lock);
     __wt_spin_destroy(session, &conn->block_lock);
     __wt_spin_destroy(session, &conn->checkpoint_lock);
     __wt_rwlock_destroy(session, &conn->debug_log_retention_lock);

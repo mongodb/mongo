@@ -541,6 +541,7 @@ conn_stats = [
     ##########################################
     # Session operations
     ##########################################
+    SessionOpStat('session_background_compact_running', 'background compact running', 'no_clear,no_scale'),
     SessionOpStat('session_open', 'open session count', 'no_clear,no_scale'),
     SessionOpStat('session_query_ts', 'session query timestamp calls'),
     SessionOpStat('session_table_alter_fail', 'table alter failed calls', 'no_clear,no_scale'),

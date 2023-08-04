@@ -1180,11 +1180,12 @@ err:
     WT_TRET(__wt_sweep_destroy(session));
 
     /*
-     * Shut down the checkpoint and capacity server threads: we don't want to throttle writes and
-     * we're about to do a final checkpoint separately from the checkpoint server.
+     * Shut down the checkpoint, compact and capacity server threads: we don't want to throttle
+     * writes and we're about to do a final checkpoint separately from the checkpoint server.
      */
     WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
+    WT_TRET(__wt_compact_server_destroy(session));
 
     /* Perform a final checkpoint and shut down the global transaction state. */
     WT_TRET(__wt_txn_global_shutdown(session, cfg));

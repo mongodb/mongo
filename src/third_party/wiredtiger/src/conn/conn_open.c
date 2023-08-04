@@ -91,6 +91,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
      */
     WT_TRET(__wt_capacity_server_destroy(session));
     WT_TRET(__wt_checkpoint_server_destroy(session));
+    WT_TRET(__wt_compact_server_destroy(session));
     WT_TRET(__wt_statlog_destroy(session, true));
     WT_TRET(__wt_tiered_storage_destroy(session, false));
     WT_TRET(__wt_sweep_destroy(session));
@@ -246,6 +247,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Start the handle sweep thread. */
     WT_RET(__wt_sweep_create(session));
+
+    /* Start the compact thread. */
+    WT_RET(__wt_compact_server_create(session));
 
     /* Start the optional capacity thread. */
     WT_RET(__wt_capacity_server_create(session, cfg));
