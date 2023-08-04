@@ -137,6 +137,8 @@ public:
         Date_t deadline = Date_t::max(),
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
 
+    AutoGetCollection(AutoGetCollection&&) = default;
+
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
     }

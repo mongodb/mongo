@@ -63,6 +63,12 @@
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/message.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scoped_counter.h"
@@ -1876,6 +1882,35 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     return _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
 }
 
+StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiveWithTimeout(
+    OperationContext* opCtx, ReplIndexBuildState* replState, bool retry) {
+    const Milliseconds kStateTransitionBlockedMaxMs{10};
+    boost::optional<logv2::SeveritySuppressor> logSeveritySuppressor;
+    int retryCount = 0;
+    while (true) {
+        try {
+            return AutoGetCollection(opCtx,
+                                     {replState->dbName, replState->collectionUUID},
+                                     MODE_X,
+                                     AutoGetCollectionViewMode::kViewsForbidden,
+                                     Date_t::now() + kStateTransitionBlockedMaxMs);
+        } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
+            if (!retry) {
+                return ex.toStatus();
+            }
+            if (!logSeveritySuppressor) {
+                logSeveritySuppressor.emplace(
+                    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+            }
+            ++retryCount;
+            LOGV2_DEBUG(7866200,
+                        (*logSeveritySuppressor)().toInt(),
+                        "Index build: collection lock acquisition timeout, retrying",
+                        "retries"_attr = retryCount);
+        }
+    }
+}
+
 StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
 IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
                                                      StringData dbName,
@@ -1969,39 +2004,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     std::shared_ptr<ReplIndexBuildState> replState,
     Timestamp startTimestamp,
     const IndexBuildOptions& indexBuildOptions) {
-    auto [dbLock, collLock, rstl] = [&] {
-        while (true) {
-            Lock::DBLock dbLock{opCtx, replState->dbName, MODE_IX};
-
-            // Unlock the RSTL to avoid deadlocks with prepared transactions and replication state
-            // transitions. See SERVER-71191.
-            unlockRSTL(opCtx);
-
-            Lock::CollectionLock collLock{
-                opCtx, {replState->dbName, replState->collectionUUID}, MODE_X};
-            repl::ReplicationStateTransitionLockGuard rstl{
-                opCtx, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly{}};
-
-            try {
-                // Since this thread is not killable by state transitions, this deadline is
-                // effectively the longest period of time we can block a state transition. State
-                // transitions are infrequent, but need to happen quickly. It should be okay to set
-                // this to a low value because the RSTL is rarely contended and, if this does time
-                // out, we will retry and reacquire the RSTL again without a deadline.
-                rstl.waitForLockUntil(Date_t::now() + Milliseconds{10});
-            } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-                // We weren't able to re-acquire the RSTL within the timeout, which means there is
-                // an active state transition. Release our locks and try again from the beginning.
-                LOGV2(7119100,
-                      "Unable to acquire RSTL for index build setup within deadline, releasing "
-                      "locks and trying again",
-                      "buildUUID"_attr = replState->buildUUID);
-                continue;
-            }
-
-            return std::make_tuple(std::move(dbLock), std::move(collLock), std::move(rstl));
-        }
-    }();
+    auto autoGetColl =
+        std::move(_autoGetCollectionExclusiveWithTimeout(opCtx, replState.get()).getValue());
 
     CollectionWriter collection(opCtx, replState->collectionUUID);
     CollectionShardingState::get(opCtx, collection->ns())->checkShardVersionOrThrow(opCtx);
@@ -2244,14 +2248,8 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     runOnAlternateContext(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
             ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
-
-            // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
-            // taking a strong collection lock. See SERVER-42621.
-            unlockRSTL(abortCtx);
-
-            const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-            Lock::CollectionLock collLock(abortCtx, dbAndUUID, MODE_X);
+            auto autoGetColl = std::move(
+                _autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
             AutoGetCollection indexBuildEntryColl(
                 abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
@@ -2276,9 +2274,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
             ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
 
-            // Take RSTL (implicitly by DBLock) to observe and prevent replication state from
-            // changing.
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+            auto autoGetColl = std::move(
+                _autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
 
             // Index builds may not fail on secondaries. If a primary replicated an abortIndexBuild
             // oplog entry, then this index build would have received an IndexBuildAborted error
@@ -2291,7 +2288,6 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
                                                          << "; Database: " << replState->dbName));
             }
 
-            Lock::CollectionLock collLock(abortCtx, dbAndUUID, MODE_X);
             AutoGetCollection indexBuildEntryColl(
                 abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
@@ -2675,33 +2671,10 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         hangIndexBuildBeforeCommit.pauseWhileSet();
     }
 
-    Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
-
-    // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
-    // for a a strong collection lock. See SERVER-42621.
-    unlockRSTL(opCtx);
-
     // Need to return the collection lock back to exclusive mode to complete the index build.
-    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_X);
-
-    // If we can't acquire the RSTL within a given time period, there is an active state transition
-    // and we should release our locks and try again. We would otherwise introduce a deadlock with
-    // step-up by holding the Collection lock in exclusive mode. After it has enqueued its RSTL X
-    // lock, step-up tries to reacquire the Collection locks for prepared transactions, which will
-    // conflict with the X lock we currently hold.
-    repl::ReplicationStateTransitionLockGuard rstl(
-        opCtx, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    try {
-        // Since this thread is not killable by state transitions, this deadline is effectively the
-        // longest period of time we can block a step-up. State transitions are infrequent, but
-        // need to happen quickly. It should be okay to set this to a low value because the RSTL is
-        // rarely contended, and if this times out, we will retry and reacquire the RSTL again
-        // without a deadline at the beginning of this function.
-        auto deadline = Date_t::now() + Milliseconds(10);
-        rstl.waitForLockUntil(deadline);
-    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+    auto locksOrStatus =
+        _autoGetCollectionExclusiveWithTimeout(opCtx, replState.get(), /*retry=*/false);
+    if (!locksOrStatus.isOK()) {
         return CommitResult::kLockTimeout;
     }
 
@@ -2712,6 +2685,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
     // retry because a new signal should be received. Single-phase builds will be unable to commit
     // and will self-abort.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     bool isPrimary = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
         !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
     if (!isPrimary && IndexBuildAction::kCommitQuorumSatisfied == action) {
