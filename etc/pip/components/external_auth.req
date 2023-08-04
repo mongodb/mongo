@@ -3,7 +3,7 @@ passlib == 1.7.1
 pyOpenSSL == 19.0.0
 pyparsing == 2.4.0
 service_identity == 18.1.0
-twisted == 20.3.0
+twisted == 21.2.0
 zope.interface == 5.0.0
 
 ldaptor == 19.0.0
