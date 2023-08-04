@@ -441,6 +441,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_EQ_LOOKUP:
         case STAGE_GROUP:
         case STAGE_IDHACK:
+        case STAGE_MATCH:
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:
         case STAGE_MULTI_PLAN:

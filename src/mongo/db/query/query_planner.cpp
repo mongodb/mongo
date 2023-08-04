@@ -1718,8 +1718,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 }  // QueryPlanner::plan
 
 /**
- * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately and
- * later attach the agg portion of the plan to the solution(s) for the "find" part of the query.
+ * If 'query.pipeline()' is non-empty, it contains a prefix of the aggregation pipeline that can be
+ * pushed down to SBE. For now, we plan this separately here and later attach the agg portion of the
+ * plan to the solution(s).
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     const CanonicalQuery& query,
@@ -1776,6 +1777,13 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage->documentSource());
+        if (matchStage) {
+            solnForAgg = std::make_unique<MatchNode>(std::move(solnForAgg),
+                                                     matchStage->getMatchExpression()->clone());
+            continue;
+        }
+
         auto isSearch = getSearchHelpers(query.getOpCtx()->getServiceContext())
                             ->isSearchStage(innerStage->documentSource());
         auto isSearchMeta = getSearchHelpers(query.getOpCtx()->getServiceContext())
@@ -1789,8 +1797,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        tasserted(5842400,
-                  "Cannot support pushdown of a stage other than $group or $lookup at the moment");
+        tasserted(5842400, "Pipeline contains unsupported stage for SBE pushdown");
     }
 
     solution->extendWith(std::move(solnForAgg));

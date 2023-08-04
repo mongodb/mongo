@@ -94,10 +94,6 @@ enum struct SbeCompatibility {
     fullyCompatible,
 };
 
-inline bool operator<(SbeCompatibility a, SbeCompatibility b) {
-    return static_cast<int>(a) < static_cast<int>(b);
-}
-
 class ExpressionContext : public RefCountable {
 public:
     struct ResolvedNamespace {

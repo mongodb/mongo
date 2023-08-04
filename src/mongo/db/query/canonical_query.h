@@ -29,7 +29,6 @@
 
 #pragma once
 
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
@@ -52,6 +51,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -61,6 +61,7 @@
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -306,6 +307,22 @@ public:
      */
     bool isCountLike() const {
         return _isCountLike;
+    }
+
+    /**
+     * If a $match stage is pushed down into '_pipeline', the plan is treated as uncacheable for SBE
+     * as the binding code to replace the original parameters with those from the current query has
+     * not been implemented yet.
+     *
+     * TODO SERVER-78817 remove this method when binding is implemented.
+     */
+    bool isUncacheableSbe() const {
+        for (std::size_t stage = 0; stage < _pipeline.size(); ++stage) {
+            if (dynamic_cast<DocumentSourceMatch*>(_pipeline[stage]->documentSource())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 private:

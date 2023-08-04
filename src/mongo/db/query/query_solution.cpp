@@ -1290,6 +1290,30 @@ std::unique_ptr<QuerySolutionNode> ReturnKeyNode::clone() const {
 }
 
 //
+// MatchNode
+//
+
+void MatchNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "MATCH\n";
+    if (nullptr != filter) {
+        addIndent(ss, indent + 1);
+        *ss << "filter:\n";
+        StringBuilder sb;
+        filter->debugString(sb, indent + 2);
+        *ss << sb.str();
+    }
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+std::unique_ptr<QuerySolutionNode> MatchNode::clone() const {
+    return std::make_unique<MatchNode>(children[0]->clone(), filter ? filter->clone() : nullptr);
+}
+
+//
 // ProjectionNode
 //
 

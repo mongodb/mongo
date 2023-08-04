@@ -478,6 +478,10 @@ void encodePipeline(const OperationContext* opCtx,
                     serializedArray.size() == 1 && serializedArray[0].getType() == Object);
             const auto bson = serializedArray[0].getDocument().toBson();
             bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+        } else if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage->documentSource())) {
+            auto serializedMatch = matchStage->serialize();
+            const auto bson = serializedMatch.getDocument().toBson();
+            bufBuilder->appendBuf(bson.objdata(), bson.objsize());
         } else if (getSearchHelpers(opCtx->getServiceContext())
                        ->isSearchStage(stage->documentSource()) ||
                    getSearchHelpers(opCtx->getServiceContext())

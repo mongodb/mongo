@@ -12,6 +12,7 @@
  *   references_foreign_collection,
  * ]
  */
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 (function() {
 "use strict";
 
@@ -20,6 +21,9 @@ load("jstests/aggregation/extras/merge_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For arrayEq, assertErrorCode, and
                                               // orderedArrayEq.
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 let viewsDB = db.getSiblingDB("views_aggregation");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -158,50 +162,56 @@ assert.commandWorked(viewsDB.runCommand({
 (function testExplainOnView() {
     let explainPlan = assert.commandWorked(
         viewsDB.popSortedView.explain("queryPlanner").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
-              "views_aggregation.coll",
-              explainPlan);
-    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    if (explainPlan.hasOwnProperty("stages")) {
+        explainPlan = explainPlan.stages[0].$cursor;
+    }
+    assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
+    assert(!explainPlan.hasOwnProperty("executionStats"), explainPlan);
 
     explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("executionStats")
                                            .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
-              "views_aggregation.coll",
-              explainPlan);
-    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-           explainPlan);
+    if (explainPlan.hasOwnProperty("stages")) {
+        explainPlan = explainPlan.stages[0].$cursor;
+    }
+    assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
+    assert(explainPlan.hasOwnProperty("executionStats"), explainPlan);
+    assert.eq(explainPlan.executionStats.nReturned, 1, explainPlan);
+    assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"), explainPlan);
 
     explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("allPlansExecution")
                                            .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
-              "views_aggregation.coll",
-              explainPlan);
-    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-           explainPlan);
+    if (explainPlan.hasOwnProperty("stages")) {
+        explainPlan = explainPlan.stages[0].$cursor;
+    }
+    assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
+    assert(explainPlan.hasOwnProperty("executionStats"), explainPlan);
+    assert.eq(explainPlan.executionStats.nReturned, 1, explainPlan);
+    assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"), explainPlan);
 
     // Passing a value of true for the explain option to the aggregation command, without using the
     // shell explain helper, should continue to work.
     explainPlan = assert.commandWorked(
         viewsDB.popSortedView.aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true}));
-    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
-              "views_aggregation.coll",
-              explainPlan);
-    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
+    if (explainPlan.hasOwnProperty("stages")) {
+        explainPlan = explainPlan.stages[0].$cursor;
+    }
+    assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
+    assert(!explainPlan.hasOwnProperty("executionStats"), explainPlan);
 
     // Test allPlansExecution explain mode on the base collection.
     explainPlan = assert.commandWorked(
         viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
-    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace,
-              "views_aggregation.coll",
-              explainPlan);
-    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"), explainPlan);
-    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1, explainPlan);
-    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
-           explainPlan);
+    if (explainPlan.hasOwnProperty("stages")) {
+        explainPlan = explainPlan.stages[0].$cursor;
+    }
+    assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
+    assert(explainPlan.hasOwnProperty("executionStats"), explainPlan);
+    if (featureFlagSbeFull) {
+        assert.eq(explainPlan.executionStats.nReturned, 0, explainPlan);
+    } else {
+        assert.eq(explainPlan.executionStats.nReturned, 1, explainPlan);
+    }
+    assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"), explainPlan);
 
     // The explain:true option should not work when paired with the explain shell helper.
     assert.throws(function() {

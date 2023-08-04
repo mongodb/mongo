@@ -925,6 +925,42 @@ struct ReturnKeyNode : public QuerySolutionNode {
 };
 
 /**
+ * MatchNode is used for $match aggregation stages that are pushed down to SBE.
+ */
+struct MatchNode : public QuerySolutionNode {
+    MatchNode(std::unique_ptr<QuerySolutionNode> child, std::unique_ptr<MatchExpression> filter)
+        : QuerySolutionNode(std::move(child)) {
+        this->filter = std::move(filter);
+    }
+
+    virtual StageType getType() const {
+        return STAGE_MATCH;
+    }
+
+    /**
+     * Data from the match node is considered fetched iff the child provides fetched data.
+     */
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
+    }
+
+    bool sortedByDiskLoc() const {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    const ProvidedSortSet& providedSorts() const {
+        return children[0]->providedSorts();
+    }
+
+    void appendToString(str::stream* ss, int indent) const final;
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+};
+
+/**
  * We have a few implementations of the projection functionality. They are chosen by constructing
  * a type derived from this abstract struct. The most general implementation 'ProjectionNodeDefault'
  * is much slower than the fast-path implementations. We only really have all the information

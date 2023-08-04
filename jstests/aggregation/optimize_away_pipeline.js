@@ -325,13 +325,21 @@ assertPipelineDoesNotUseAggregation({
     expectedResult: [{_id: 2, x: 20}],
 });
 
-// $limit followed by $match cannot be fully optimized away. The $limit is pushed down, but the
-// $match is executed in the agg layer.
-assertPipelineUsesAggregation({
-    pipeline: [{$limit: 1}, {$match: {x: 20}}],
-    expectedStages: ["COLLSCAN", "LIMIT"],
-    optimizedAwayStages: ["$limit"],
-});
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: [{$limit: 1}, {$match: {x: 20}}],
+        expectedStages: ["COLLSCAN", "LIMIT"],
+        optimizedAwayStages: ["$limit"],
+    });
+} else {
+    // $limit followed by $match cannot be fully optimized away. The $limit is pushed down, but the
+    // $match is executed in the agg layer.
+    assertPipelineUsesAggregation({
+        pipeline: [{$limit: 1}, {$match: {x: 20}}],
+        expectedStages: ["COLLSCAN", "LIMIT"],
+        optimizedAwayStages: ["$limit"],
+    });
+}
 
 // $match, $project, $limit can be optimized away when the projection is covered.
 assertPipelineDoesNotUseAggregation({

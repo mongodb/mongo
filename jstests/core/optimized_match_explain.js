@@ -6,6 +6,10 @@
  * Tests that the explain output for $match reflects any optimizations.
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.match_explain;
 coll.drop();
@@ -21,4 +25,8 @@ let explain = coll.explain().aggregate(
     [{$sort: {b: -1}}, {$addFields: {c: {$mod: ["$a", 4]}}}, {$match: {$and: [{c: 1}]}}]);
 
 assert.commandWorked(explain);
-assert.eq(getAggPlanStage(explain, "$match"), {$match: {c: {$eq: 1}}});
+if (featureFlagSbeFull) {
+    assert.eq(getAggPlanStage(explain, "$match"), null);
+} else {
+    assert.eq(getAggPlanStage(explain, "$match"), {$match: {c: {$eq: 1}}});
+}

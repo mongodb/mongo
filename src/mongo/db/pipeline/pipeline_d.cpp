@@ -183,11 +183,9 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
     }
 
     const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage.getContext();
-    ON_BLOCK_EXIT([&,
-                   originalSbeCompatibility{std::exchange(expCtx->sbeCompatibility,
-                                                          SbeCompatibility::fullyCompatible)}]() {
-        expCtx->sbeCompatibility = originalSbeCompatibility;
-    });
+    SbeCompatibility originalSbeCompatibility =
+        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::fullyCompatible);
+    ON_BLOCK_EXIT([&] { expCtx->sbeCompatibility = originalSbeCompatibility; });
 
     boost::intrusive_ptr<DocumentSource> projectionStage =
         make_intrusive<DocumentSourceInternalProjection>(
@@ -213,6 +211,7 @@ struct CompatiblePipelineStages {
     // translation.
     bool transform : 1;
 
+    bool match : 1;
     bool search : 1;
 };
 
@@ -258,6 +257,14 @@ bool pushDownPipelineStageIfCompatible(
 
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
+        return true;
+    } else if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
+        if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(matchStage, isLastSource));
         return true;
     } else if (const auto& searchHelpers = getSearchHelpers(opCtx->getServiceContext());
                searchHelpers->isSearchStage(stage.get()) ||
@@ -341,8 +348,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         : SbeCompatibility::fullyCompatible;
 
     CompatiblePipelineStages allowedStages = {
-        .group = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility) &&
-            !internalQuerySlotBasedExecutionDisableGroupPushdown.load(),
+        .group = !internalQuerySlotBasedExecutionDisableGroupPushdown.load(),
 
         // If lookup pushdown isn't enabled or the main collection is sharded or any of the
         // secondary namespaces are sharded or are a view, then no $lookup stage will be eligible
@@ -352,13 +358,13 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // whether any secondary collection is a view or is sharded, not which ones are a view or
         // are sharded and which ones aren't. As such, if any secondary collection is a view or is
         // sharded, no $lookup will be eligible for pushdown.
-        .lookup = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility) &&
-            !internalQuerySlotBasedExecutionDisableLookupPushdown.load() &&
+        .lookup = !internalQuerySlotBasedExecutionDisableLookupPushdown.load() &&
             !isMainCollectionSharded && !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
-        // TODO (SERVER-72549): SBE execution of these stages requires `featureFlagSbeFull` to be
-        // enabled.
-        .transform = !(SbeCompatibility::flagGuarded < minRequiredCompatibility),
+        // TODO (SERVER-72549): SBE execution of 'transform' and 'match' stages requires
+        // 'featureFlagSbeFull' to be enabled.
+        .transform = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+        .match = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.

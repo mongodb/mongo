@@ -13,8 +13,10 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-(function() {
-"use strict";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.double_optimize;
 coll.drop();
@@ -25,10 +27,14 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 
 // is independent of the field "b".
 const inputPipe = [{$project: {b: 0}}, {$match: {$or: [{_id: 4, b: 3}]}}];
 const explain = coll.explain().aggregate(inputPipe);
-const lastStage = explain.stages[explain.stages.length - 1];
-assert(lastStage.hasOwnProperty("$match"), tojson(explain));
-assert.eq({$match: {b: {$eq: 3}}},
-          lastStage,
-          "The $match stage should have been split in two and moved in front of the $project. " +
-              explain);
-}());
+if (featureFlagSbeFull) {
+    assert.eq(undefined, explain.stages, "Entire pipeline should be pushed down to SBE. ", explain);
+} else {
+    const lastStage = explain.stages[explain.stages.length - 1];
+    assert(lastStage.hasOwnProperty("$match"), tojson(explain));
+    assert.eq(
+        {$match: {b: {$eq: 3}}},
+        lastStage,
+        "The $match stage should have been split in two and moved in front of the $project. " +
+            explain);
+}

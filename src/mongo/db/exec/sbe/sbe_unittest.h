@@ -84,7 +84,7 @@ private:
 };
 
 /** SBE Value Equal to. */
-class ValueEq : public Matcher {
+class ValueEq : public mongo::unittest::match::Matcher {
 public:
     explicit ValueEq(TypedValue v) : _v{v} {}
 

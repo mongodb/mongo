@@ -88,7 +88,7 @@ enum StageType {
 
     STAGE_IXSCAN,
     STAGE_LIMIT,
-
+    STAGE_MATCH,
     STAGE_MOCK,
 
     // Implements iterating over one or more RecordStore::Cursor.

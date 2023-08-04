@@ -56,6 +56,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_IDHACK, "IDHACK"_sd},
         {STAGE_IXSCAN, "IXSCAN"_sd},
         {STAGE_LIMIT, "LIMIT"_sd},
+        {STAGE_MATCH, "MATCH"_sd},
         {STAGE_MOCK, "MOCK"_sd},
         {STAGE_MULTI_ITERATOR, "MULTI_ITERATOR"_sd},
         {STAGE_MULTI_PLAN, "MULTI_PLAN"_sd},
