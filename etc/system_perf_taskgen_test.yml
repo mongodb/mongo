@@ -170,7 +170,7 @@ functions:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
-          genny: c70536c216d76350ad4aefdc1ce4ffaa7af1101b
+          genny: 28766e31bba4c937f9711c4e18824cb347c32523
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
           tsbs: ${tsbs_rev}
@@ -422,7 +422,7 @@ functions:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
-          genny: c70536c216d76350ad4aefdc1ce4ffaa7af1101b
+          genny: 28766e31bba4c937f9711c4e18824cb347c32523
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
           tsbs: ${tsbs_rev}
@@ -438,7 +438,7 @@ functions:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
-          genny: c70536c216d76350ad4aefdc1ce4ffaa7af1101b
+          genny: 28766e31bba4c937f9711c4e18824cb347c32523
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
           tsbs: ${tsbs_rev}
