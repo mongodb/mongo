@@ -1671,6 +1671,30 @@ env.Library(
 )
 
 env.Library(
+    target='sbe_values',
+    source=[
+        'exec/sbe/values/arith_common.cpp',
+        'exec/sbe/values/bson.cpp',
+        'exec/sbe/values/row.cpp',
+        'exec/sbe/values/slot_printer.cpp',
+        'exec/sbe/values/ts_block.cpp',
+        'exec/sbe/values/value.cpp',
+        'exec/sbe/values/value_printer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_column',
+        '$BUILD_DIR/mongo/util/indexed_string_vector',
+        '$BUILD_DIR/mongo/util/pcre_util',
+        '$BUILD_DIR/mongo/util/summation',
+        'exec/js_function',
+        'query/collation/collator_interface',
+        'query/datetime/date_time_support',
+        'storage/key_string',
+    ],
+)
+
+env.Library(
     target='query_expressions',
     source=[
         'matcher/doc_validation_error.cpp',
@@ -1756,6 +1780,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'query/query_knobs',
+        'sbe_values',
         'serialization_options',
         'stats/counters',
         'update/pattern_cmp',

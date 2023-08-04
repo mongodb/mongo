@@ -12,48 +12,25 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='query_sbe_values',
-    source=[
-        'values/arith_common.cpp',
-        'values/bson.cpp',
-        'values/value.cpp',
-        'values/value_printer.cpp',
-        'values/ts_block.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_column',
-        '$BUILD_DIR/mongo/db/exec/js_function',
-        '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/db/query/query_index_bounds',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/util/indexed_string_vector',
-        '$BUILD_DIR/mongo/util/pcre_util',
-    ],
-)
-
 sbeEnv = env.Clone()
 sbeEnv.InjectThirdParty(libraries=['snappy'])
 sbeEnv.Library(
     target='query_sbe',
     source=[
+        'column_store_encoder.cpp',
+        'columnar.cpp',
         'expressions/compile_ctx.cpp',
         'expressions/expression.cpp',
         'expressions/runtime_environment.cpp',
+        'extended_types.cpp',
         'makeobj_spec.cpp',
+        'sbe_pattern_value_cmp.cpp',
         'size_estimator.cpp',
+        'sort_spec.cpp',
         'util/debug_print.cpp',
+        'util/pcre.cpp',
         'util/spilling.cpp',
         'util/stage_results_printer.cpp',
-        'values/column_store_encoder.cpp',
-        'values/columnar.cpp',
-        'values/row.cpp',
-        'values/sbe_pattern_value_cmp.cpp',
-        'values/slot_printer.cpp',
         'vm/arith.cpp',
         'vm/datetime.cpp',
         'vm/vm.cpp',
@@ -61,10 +38,13 @@ sbeEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/fts/base_fts',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/query/query_index_bounds',
+        '$BUILD_DIR/mongo/db/sbe_values',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/third_party/shim_snappy',
-        'query_sbe_values',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -109,6 +89,7 @@ sbeEnv.Library(
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/query/plan_yield_policy',
         '$BUILD_DIR/mongo/db/query/query_index_bounds',
+        '$BUILD_DIR/mongo/db/sbe_values',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
@@ -116,7 +97,6 @@ sbeEnv.Library(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_plan_stats',
-        'query_sbe_values',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -138,6 +118,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/query/query_index_bounds',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/execution_context',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
@@ -179,6 +160,8 @@ env.Library(
 env.CppUnitTest(
     target='db_sbe_test',
     source=[
+        'column_store_encoder_test.cpp',
+        'columnar_test.cpp',
         'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',
@@ -238,6 +221,7 @@ env.CppUnitTest(
         'sbe_merge_join_test.cpp',
         'sbe_mkobj_test.cpp',
         'sbe_numeric_convert_test.cpp',
+        'sbe_pattern_value_cmp_test.cpp',
         'sbe_plan_size_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_sorted_merge_test.cpp',
@@ -248,14 +232,11 @@ env.CppUnitTest(
         'sbe_unittest.cpp',
         'sbe_window_test.cpp',
         'util/stage_results_printer_test.cpp',
-        'values/column_store_encoder_test.cpp',
-        'values/columnar_test.cpp',
-        'values/sbe_pattern_value_cmp_test.cpp',
         'values/slot_printer_test.cpp',
         'values/row_test.cpp',
         'values/value_serialization_test.cpp',
         "values/value_test.cpp",
-        'values/write_value_to_stream_test.cpp',
+        'write_value_to_stream_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

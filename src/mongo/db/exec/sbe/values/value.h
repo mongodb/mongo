@@ -111,6 +111,7 @@ struct FastTuple<A, B, C> {
 };
 
 struct MakeObjSpec;
+class SortSpec;
 
 using FrameId = int64_t;
 using SpoolId = int64_t;
@@ -120,7 +121,6 @@ static constexpr int64_t kInvalidId = LLONG_MIN;
 using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
-class SortSpec;
 struct CsiCell;
 struct ValueBlock;
 struct CellBlock;
@@ -129,6 +129,17 @@ static constexpr size_t kNewUUIDLength = 16;
 
 /**
  * Type dispatch tags.
+ *
+ * There are two kinds of SBE types: native types and extended types. In the enum below, native
+ * types are listed first followed by extended types, with 'EndOfNativeTypeTags' marking the
+ * boundary between the two.
+ *
+ * The 'sbe_values' module take a link-time dependency on the implementations for native types but
+ * not for extended types.
+ *
+ * Extended types cannot be used with value::compareValue() or value::hashValue(). Also, for any
+ * SBE type 'tag', if 'value::tagToType(tag) != EOO' is true then 'tag' must be a native type.
+ * Likewise, if 'tag' is an extended type then 'value::tagToType(tag) == EOO' must be true.
  */
 enum class TypeTags : uint8_t {
     // The value does not exist, aka Nothing in the Maybe monad.
@@ -160,7 +171,7 @@ enum class TypeTags : uint8_t {
     csiCell,
 
     // Special marker
-    EndOfShallowValues = csiCell,
+    EndOfShallowTypeTags = csiCell,
 
     // Heap values
     NumberDecimal,
@@ -193,20 +204,32 @@ enum class TypeTags : uint8_t {
     // key_string::Value
     ksValue,
 
-    // Pointer to a compiled PCRE regular expression object.
-    pcreRegex,
-
     // Pointer to a timezone database object.
     timeZoneDB,
+
+    // Pointer to a timezone object
+    timeZone,
+
+    // Pointer to a collator interface object.
+    collator,
+
+    // Pointer to a ValueBlock object.
+    valueBlock,
+
+    // Pointer to a CellBlock object.
+    cellBlock,
+
+    // Special marker
+    EndOfNativeTypeTags = cellBlock,
+
+    // Pointer to a compiled PCRE regular expression object.
+    pcreRegex,
 
     // Pointer to a compiled JS function with scope.
     jsFunction,
 
     // Pointer to a ShardFilterer for shard filtering.
     shardFilterer,
-
-    // Pointer to a collator interface object.
-    collator,
 
     // Pointer to fts::FTSMatcher for full text search.
     ftsMatcher,
@@ -220,14 +243,8 @@ enum class TypeTags : uint8_t {
     // Pointer to a IndexBounds object.
     indexBounds,
 
-    // Pointer to a timezone object
-    timeZone,
-
-    // Pointer to a ValueBlock object.
-    valueBlock,
-
-    // Pointer to a CellBlock object.
-    cellBlock,
+    // Special marker, must be last
+    TypeTagsMax,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -285,7 +302,7 @@ inline constexpr bool isCollatableType(TypeTags tag) noexcept {
 }
 
 inline constexpr bool isShallowType(TypeTags tag) noexcept {
-    return tag <= TypeTags::EndOfShallowValues;
+    return tag <= TypeTags::EndOfShallowTypeTags;
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
@@ -297,7 +314,7 @@ BSONType tagToType(TypeTags tag) noexcept;
  * For details on how sets of BSONTypes are represented as bitmasks, see mongo::getBSONTypeMask().
  */
 inline uint32_t getBSONTypeMask(value::TypeTags tag) noexcept {
-    BSONType t = value::tagToType(tag);
+    BSONType t = tagToType(tag);
     return getBSONTypeMask(t);
 }
 
@@ -1319,10 +1336,6 @@ inline key_string::Value* getKeyStringView(Value val) noexcept {
     return reinterpret_cast<key_string::Value*>(val);
 }
 
-std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options);
-
-std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex);
-
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz);
 
 std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& block);
@@ -1487,19 +1500,18 @@ inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& c
 
 std::pair<TypeTags, Value> makeCopyKeyString(const key_string::Value& inKey);
 
-std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
-
-std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer&);
-
-std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
-
-std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
-
-std::pair<TypeTags, Value> makeCopyMakeObjSpec(const MakeObjSpec&);
-
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
-std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& collator);
+struct ExtendedTypeOps {
+    std::pair<TypeTags, Value> (*const makeCopy)(Value val);
+    void (*const release)(Value val);
+    std::string (*const print)(Value val);
+    size_t (*const getApproximateSize)(Value val);
+};
+
+const ExtendedTypeOps* getExtendedTypeOps(TypeTags tag);
+
+void registerExtendedTypeOps(TypeTags tag, const ExtendedTypeOps* typeOps);
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
 /**
@@ -1563,12 +1575,6 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         }
         case TypeTags::ksValue:
             return makeCopyKeyString(*getKeyStringView(val));
-        case TypeTags::pcreRegex:
-            return makeCopyPcreRegex(*getPcreRegexView(val));
-        case TypeTags::jsFunction:
-            return makeCopyJsFunction(*getJsFunctionView(val));
-        case TypeTags::shardFilterer:
-            return makeCopyShardFilterer(*getShardFiltererView(val));
         case TypeTags::bsonRegex:
             return makeCopyBsonRegex(getBsonRegexView(val));
         case TypeTags::bsonJavascript:
@@ -1577,22 +1583,22 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyBsonDBPointer(getBsonDBPointerView(val));
         case TypeTags::bsonCodeWScope:
             return makeCopyBsonCodeWScope(getBsonCodeWScopeView(val));
-        case TypeTags::ftsMatcher:
-            return makeCopyFtsMatcher(*getFtsMatcherView(val));
-        case TypeTags::sortSpec:
-            return makeCopySortSpec(*getSortSpecView(val));
-        case TypeTags::makeObjSpec:
-            return makeCopyMakeObjSpec(*getMakeObjSpecView(val));
         case TypeTags::collator:
             return makeCopyCollator(*getCollatorView(val));
-        case TypeTags::indexBounds:
-            return makeCopyIndexBounds(*getIndexBoundsView(val));
         case TypeTags::timeZone:
             return makeCopyTimeZone(*getTimeZoneView(val));
         case TypeTags::valueBlock:
             [[fallthrough]];
         case TypeTags::cellBlock:
             tasserted(7888700, "Cannot copy a ValueBlock or CellBlock");
+        case TypeTags::pcreRegex:
+        case TypeTags::jsFunction:
+        case TypeTags::shardFilterer:
+        case TypeTags::ftsMatcher:
+        case TypeTags::sortSpec:
+        case TypeTags::makeObjSpec:
+        case TypeTags::indexBounds:
+            return getExtendedTypeOps(tag)->makeCopy(val);
         default:
             break;
     }

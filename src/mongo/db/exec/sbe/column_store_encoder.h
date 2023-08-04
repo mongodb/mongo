@@ -55,7 +55,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo::sbe::value {
+namespace mongo::sbe {
 /**
  * This encoder provides a mechanism to represent BSON values as 'sbe::value' pairs, suitable for
  * use in the SBE VM.
@@ -67,6 +67,8 @@ namespace mongo::sbe::value {
  * Callers that need long-lived values should make "owned" copies.
  */
 struct ColumnStoreEncoder {
+    using TypeTags = value::TypeTags;
+    using Value = value::Value;
     using Out = boost::optional<std::pair<TypeTags, Value>>;
 
     std::pair<TypeTags, Value> operator()(BSONElement value) {
@@ -87,33 +89,33 @@ struct ColumnStoreEncoder {
 
     std::pair<TypeTags, Value> operator()(BSONObj value) {
         tassert(6343901, "Unexpected non-trivial object in columnar value", value.isEmpty());
-        return {TypeTags::Object, bitcastFrom<const Object*>(&emptyObject)};
+        return {TypeTags::Object, value::bitcastFrom<const value::Object*>(&emptyObject)};
     }
 
     std::pair<TypeTags, Value> operator()(BSONArray value) {
         tassert(6343902, "Unexpected non-trivial array in columnar value", value.isEmpty());
-        return {TypeTags::Array, bitcastFrom<const Array*>(&emptyArray)};
+        return {TypeTags::Array, value::bitcastFrom<const value::Array*>(&emptyArray)};
     }
 
     std::pair<TypeTags, Value> operator()(bool value) {
-        return {TypeTags::Boolean, bitcastFrom<bool>(value)};
+        return {TypeTags::Boolean, value::bitcastFrom<bool>(value)};
     }
 
     std::pair<TypeTags, Value> operator()(int32_t value) {
-        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(value)};
+        return {TypeTags::NumberInt32, value::bitcastFrom<int32_t>(value)};
     }
 
     std::pair<TypeTags, Value> operator()(int64_t value) {
-        return {TypeTags::NumberInt64, bitcastFrom<int64_t>(value)};
+        return {TypeTags::NumberInt64, value::bitcastFrom<int64_t>(value)};
     }
 
     std::pair<TypeTags, Value> operator()(double value) {
-        return {TypeTags::NumberDouble, bitcastFrom<double>(value)};
+        return {TypeTags::NumberDouble, value::bitcastFrom<double>(value)};
     }
 
     std::pair<TypeTags, Value> operator()(StringData value) {
-        if (canUseSmallString(value)) {
-            auto [tag, newValue] = makeSmallString(value);
+        if (value::canUseSmallString(value)) {
+            auto [tag, newValue] = value::makeSmallString(value);
             return {tag, newValue};
         } else {
             uassert(6343903,
@@ -127,20 +129,20 @@ struct ColumnStoreEncoder {
                 std::exchange(outputPtr, outputPtr + value.size()), value.rawData(), value.size());
             DataView(outputPtr).write<LittleEndian<char>>('\0');
 
-            return {TypeTags::StringBig, bitcastFrom<const char*>(temporaryStorage.data())};
+            return {TypeTags::StringBig, value::bitcastFrom<const char*>(temporaryStorage.data())};
         }
     }
 
     std::pair<TypeTags, Value> operator()(Decimal128 value) {
         DataView(temporaryStorage.data()).write(value);
-        return {TypeTags::NumberDecimal, bitcastFrom<const char*>(temporaryStorage.data())};
+        return {TypeTags::NumberDecimal, value::bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
     std::pair<TypeTags, Value> operator()(const OID& value) {
         auto oidBytes = value.view().view();
         std::copy(oidBytes, oidBytes + OID::kOIDSize, temporaryStorage.begin());
 
-        return {TypeTags::ObjectId, bitcastFrom<const char*>(temporaryStorage.data())};
+        return {TypeTags::ObjectId, value::bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
     std::pair<TypeTags, Value> operator()(const UUID& value) {
@@ -160,12 +162,12 @@ struct ColumnStoreEncoder {
         static_assert(sizeof(value.data()) == UUID::kNumBytes);
         binDataView.write(value.data(), offset);  // No need to update 'offset' for the last write.
 
-        return {TypeTags::ObjectId, bitcastFrom<const char*>(temporaryStorage.data())};
+        return {TypeTags::ObjectId, value::bitcastFrom<const char*>(temporaryStorage.data())};
     }
 
 private:
-    static const Object emptyObject;
-    static const Array emptyArray;
+    static const value::Object emptyObject;
+    static const value::Array emptyArray;
 
     static constexpr std::size_t kSizeOfDecimal = 2 * sizeof(long long);
     static constexpr std::size_t kSizeOfUUIDBinData = sizeof(uint32_t)   // Length field
@@ -188,4 +190,4 @@ private:
 
     std::array<char, kSizeOfTemporary> temporaryStorage;
 };
-}  // namespace mongo::sbe::value
+}  // namespace mongo::sbe

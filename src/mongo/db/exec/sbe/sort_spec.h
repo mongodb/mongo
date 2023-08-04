@@ -35,13 +35,17 @@
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/sort_pattern.h"
 
-namespace mongo::sbe::value {
+namespace mongo::sbe {
 /**
  * SortSpec is a wrapper around a BSONObj giving a sort pattern (encoded as a BSONObj), a collator,
  * and a SortKeyGenerator object.
  */
 class SortSpec {
 public:
+    using TypeTags = value::TypeTags;
+    using Value = value::Value;
+    using ValueGuard = value::ValueGuard;
+
     SortSpec(const BSONObj& sortPatternBson)
         : _sortPatternBson(sortPatternBson.getOwned()),
           _sortPattern(_sortPatternBson, nullptr /* expCtx, needed for meta sorts */),
@@ -110,4 +114,4 @@ private:
     BSONObj _tempObj;
     boost::optional<ValueGuard> _tempVal;
 };
-}  // namespace mongo::sbe::value
+}  // namespace mongo::sbe

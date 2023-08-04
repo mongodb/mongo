@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
-
 #include <cstdint>
+
+#include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -38,7 +38,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
-namespace mongo::sbe::value {
+namespace mongo::sbe {
 namespace {
 
 /*
@@ -46,7 +46,7 @@ In the case where 'tag' is TypeTags::bsonObject, this function will return a BSO
 the buffer that is doesn't own (the buffer that 'val' points to). The callers therefore should be
 careful to make sure that the BSONObj returned from this function does not outlive the Value 'val'.
 */
-BSONObj convertValueToBSONObj(TypeTags tag, Value val) {
+BSONObj convertValueToBSONObj(value::TypeTags tag, value::Value val) {
     if (tag == value::TypeTags::bsonObject) {
         return BSONObj(value::getRawPointerView(val));
     } else {
@@ -63,20 +63,21 @@ BSONObj convertValueToBSONObj(TypeTags tag, Value val) {
 
 SbePatternValueCmp::SbePatternValueCmp() = default;
 
-SbePatternValueCmp::SbePatternValueCmp(TypeTags specTag,
-                                       Value specVal,
+SbePatternValueCmp::SbePatternValueCmp(value::TypeTags specTag,
+                                       value::Value specVal,
                                        const CollatorInterface* collator)
     : sortPattern(convertValueToBSONObj(specTag, specVal)),
       useWholeValue(sortPattern.hasField("")),
       collator(collator),
       reversed(sortPattern.firstElement().number() < 0) {}
 
-bool SbePatternValueCmp::operator()(const std::pair<TypeTags, Value>& lhs,
-                                    const std::pair<TypeTags, Value>& rhs) const {
+bool SbePatternValueCmp::operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                                    const std::pair<value::TypeTags, value::Value>& rhs) const {
     auto [lhsTag, lhsVal] = lhs;
     auto [rhsTag, rhsVal] = rhs;
     if (useWholeValue) {
-        auto [comparedTag, comparedVal] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, collator);
+        auto [comparedTag, comparedVal] =
+            value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal, collator);
         if (comparedTag == value::TypeTags::NumberInt32) {
             auto val = value::bitcastTo<int32_t>(comparedVal);
             return (reversed ? val > 0 : val < 0);
@@ -96,4 +97,4 @@ bool SbePatternValueCmp::operator()(const std::pair<TypeTags, Value>& lhs,
     }
 }
 
-}  // namespace mongo::sbe::value
+}  // namespace mongo::sbe

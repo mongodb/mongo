@@ -320,8 +320,8 @@ void ColumnScanStage::open(bool reOpen) {
 }
 
 TranslatedCell ColumnScanStage::translateCell(PathView path, const SplitCellView& splitCellView) {
-    SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
-        splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(&_encoder);
+    SplitCellView::Cursor<ColumnStoreEncoder> cellCursor =
+        splitCellView.subcellValuesGenerator<ColumnStoreEncoder>(&_encoder);
     return TranslatedCell{splitCellView.arrInfo, path, std::move(cellCursor)};
 }
 

@@ -43,13 +43,13 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/column_store_encoder.h"
+#include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
-#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -259,7 +259,7 @@ private:
 
     void processRecordFromRowstore(const Record& record);
 
-    value::ColumnStoreEncoder _encoder{};
+    ColumnStoreEncoder _encoder{};
 
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;

@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -158,13 +159,13 @@ TEST_F(SBERegexTest, ComputesRegexMatch) {
         "regexMatch", sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
-    auto [regexTag, regexVal] = value::makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
     auto [inputTag, inputVal] = value::makeNewString("Many lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
     runAndAssertMatchExpression(compiledExpr.get(), true);
 
-    std::tie(regexTag, regexVal) = value::makeNewPcreRegex("link", "");
+    std::tie(regexTag, regexVal) = makeNewPcreRegex("link", "");
     std::tie(inputTag, inputVal) = value::makeNewString("Example text");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -180,13 +181,13 @@ TEST_F(SBERegexTest, ComputesRegexFind) {
         "regexFind", sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
     auto compiledExpr = compileExpression(*regexExpr);
 
-    auto [regexTag, regexVal] = value::makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
     auto [inputTag, inputVal] = value::makeNewString("Many lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
     runAndAssertFindExpression(compiledExpr.get(), "line", 5);
 
-    std::tie(regexTag, regexVal) = value::makeNewPcreRegex("line", "i");
+    std::tie(regexTag, regexVal) = makeNewPcreRegex("line", "i");
     std::tie(inputTag, inputVal) = value::makeNewString("Many LINES of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);
@@ -209,7 +210,7 @@ TEST_F(SBERegexTest, ComputesRegexFindAll) {
     addMatchResult(arrayView, "line", 4);
     addMatchResult(arrayView, "line", 16);
 
-    auto [regexTag, regexVal] = value::makeNewPcreRegex("line", "");
+    auto [regexTag, regexVal] = makeNewPcreRegex("line", "");
     auto [inputTag, inputVal] = value::makeNewString("One line or two lines of code");
     slotAccessor1.reset(regexTag, regexVal);
     slotAccessor2.reset(inputTag, inputVal);

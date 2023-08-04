@@ -52,8 +52,8 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/exec/sbe/vm/label.h"
@@ -841,7 +841,7 @@ enum class AggMultiElems { kInternalArr, kStartIdx, kMaxSize, kMemUsage, kMemLim
  * Less than comparison based on a sort pattern.
  */
 struct SortPatternLess {
-    SortPatternLess(const value::SortSpec* sortSpec) : _sortSpec(sortSpec) {}
+    SortPatternLess(const SortSpec* sortSpec) : _sortSpec(sortSpec) {}
 
     bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
                     const std::pair<value::TypeTags, value::Value>& rhs) const {
@@ -851,14 +851,14 @@ struct SortPatternLess {
     }
 
 private:
-    const value::SortSpec* _sortSpec;
+    const SortSpec* _sortSpec;
 };
 
 /**
  * Greater than comparison based on a sort pattern.
  */
 struct SortPatternGreater {
-    SortPatternGreater(const value::SortSpec* sortSpec) : _sortSpec(sortSpec) {}
+    SortPatternGreater(const SortSpec* sortSpec) : _sortSpec(sortSpec) {}
 
     bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
                     const std::pair<value::TypeTags, value::Value>& rhs) const {
@@ -868,7 +868,7 @@ struct SortPatternGreater {
     }
 
 private:
-    const value::SortSpec* _sortSpec;
+    const SortSpec* _sortSpec;
 };
 
 /**
@@ -1780,7 +1780,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
-    std::pair<value::SortSpec*, CollatorInterface*> generateSortKeyHelper(ArityType arity);
+    std::pair<SortSpec*, CollatorInterface*> generateSortKeyHelper(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinGenerateCheapSortKey(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorGetElement(

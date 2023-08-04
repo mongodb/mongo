@@ -35,7 +35,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
-namespace mongo::sbe::value {
+namespace mongo::sbe {
 
 class SbePatternValueCmp {
 public:
@@ -46,10 +46,12 @@ public:
     responsibility of the caller to make sure that a given 'SbePatternValueCmp' does not outlive
     the 'specTag' and the 'specVal'.
     */
-    SbePatternValueCmp(TypeTags specTag, Value specVal, const CollatorInterface* collator);
+    SbePatternValueCmp(value::TypeTags specTag,
+                       value::Value specVal,
+                       const CollatorInterface* collator);
 
-    bool operator()(const std::pair<TypeTags, Value>& lhs,
-                    const std::pair<TypeTags, Value>& rhs) const;
+    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
+                    const std::pair<value::TypeTags, value::Value>& rhs) const;
 
     BSONObj sortPattern;
     bool useWholeValue = true;
@@ -57,4 +59,4 @@ public:
     bool reversed = false;
 };
 
-}  // namespace mongo::sbe::value
+}  // namespace mongo::sbe

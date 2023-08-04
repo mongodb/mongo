@@ -36,7 +36,7 @@ env.Library(
     ],
     LIBDEPS=[
         # We should only depend on SBE for value representation and basic arithmetic for constant folding.
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values",
+        "$BUILD_DIR/mongo/db/sbe_values",
     ],
 )
 
@@ -103,6 +103,7 @@ env.Library(
     ],
     LIBDEPS=[
         # We do not depend on the entire pipeline target.
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/pipeline/abt_utils",
         "$BUILD_DIR/mongo/db/query/ce/query_ce_heuristic",
         "$BUILD_DIR/mongo/db/query/ce/query_ce_hinted",

@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -171,7 +172,7 @@ public:
 
         if (auto slotId = getSlotId(*compiledRegexParam)) {
             auto&& [compiledRegexTag, compiledRegexVal] =
-                sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
             bindParam(*slotId, true /*owned*/, compiledRegexTag, compiledRegexVal);
         }
     }
@@ -222,7 +223,10 @@ public:
                       sbe::value::bitcastFrom<JsFunction*>(
                           const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
         } else {
-            auto [typeTag, value] = sbe::value::makeCopyJsFunction(expr->getPredicate());
+            auto [typeTag, value] = std::pair(
+                sbe::value::TypeTags::jsFunction,
+                sbe::value::bitcastFrom<JsFunction*>(new JsFunction(expr->getPredicate())));
+
             bindParam(*slotId, true /*owned*/, typeTag, value);
         }
     }

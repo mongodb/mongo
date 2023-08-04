@@ -45,12 +45,12 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -68,7 +68,6 @@
 namespace mongo {
 namespace sbe {
 namespace value {
-
 namespace {
 template <typename T>
 auto abslHash(const T& val) {
@@ -81,6 +80,25 @@ auto abslHash(const T& val) {
     }
 }
 }  // namespace
+
+constexpr size_t gTypeOpsSize =
+    size_t(TypeTags::TypeTagsMax) - size_t(TypeTags::EndOfNativeTypeTags);
+
+const ExtendedTypeOps* gTypeOps[gTypeOpsSize] = {0};
+
+const ExtendedTypeOps* getExtendedTypeOps(TypeTags tag) {
+    dassert(size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
+
+    size_t typeOpsIdx = size_t(tag) - (size_t(TypeTags::EndOfNativeTypeTags) + 1);
+    return gTypeOps[typeOpsIdx];
+}
+
+void registerExtendedTypeOps(TypeTags tag, const ExtendedTypeOps* typeOps) {
+    dassert(size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
+
+    size_t typeOpsIdx = size_t(tag) - (size_t(TypeTags::EndOfNativeTypeTags) + 1);
+    gTypeOps[typeOpsIdx] = typeOps;
+}
 
 std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags) {
     // Add 2 to account NULL bytes after pattern and flags.
@@ -156,169 +174,9 @@ std::pair<TypeTags, Value> makeCopyKeyString(const key_string::Value& inKey) {
     return {TypeTags::ksValue, bitcastFrom<key_string::Value*>(k)};
 }
 
-std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
-    auto regex =
-        std::make_unique<pcre::Regex>(std::string{pattern}, pcre_util::flagsToOptions(options));
-    uassert(5073402, str::stream() << "Invalid Regex: " << errorMessage(regex->error()), *regex);
-    return {TypeTags::pcreRegex, bitcastFrom<pcre::Regex*>(regex.release())};
-}
-
-std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex) {
-    auto regexCopy = std::make_unique<pcre::Regex>(regex);
-    return {TypeTags::pcreRegex, bitcastFrom<pcre::Regex*>(regexCopy.release())};
-}
-
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
     auto tzCopy = std::make_unique<TimeZone>(tz);
     return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
-}
-
-key_string::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {
-    _sortKeyGen.setCollator(collator);
-    return _sortKeyGen.computeSortKeyString(obj);
-}
-
-value::SortKeyComponentVector* SortSpec::generateSortKeyComponentVector(
-    FastTuple<bool, value::TypeTags, value::Value> obj, const CollatorInterface* collator) {
-    auto [objOwned, objTag, objVal] = obj;
-    ValueGuard guard(objOwned, objTag, objVal);
-
-    // While this function accepts any type of object, for now we simply convert everything
-    // to BSON. In the future, we may change this function to avoid the conversion.
-    auto bsonObj = [&, objTag = objTag, objVal = objVal, objOwned = objOwned]() {
-        if (objTag == value::TypeTags::bsonObject) {
-            if (objOwned) {
-                // Take ownership of the temporary object here.
-                _tempVal.emplace(objTag, objVal);
-                guard.reset();
-            }
-            return BSONObj{value::bitcastTo<const char*>(objVal)};
-        } else if (objTag == value::TypeTags::Object) {
-            BSONObjBuilder objBuilder;
-            bson::convertToBsonObj(objBuilder, value::getObjectView(objVal));
-            _tempObj = objBuilder.obj();
-            return _tempObj;
-        } else {
-            MONGO_UNREACHABLE_TASSERT(7103703);
-        }
-    }();
-
-
-    _sortKeyGen.setCollator(collator);
-    // Use the generic API for getting an array of bson elements representing the
-    // sort key.
-    _sortKeyGen.generateSortKeyComponentVector(bsonObj, &_localBsonEltStorage);
-
-    // Convert this array of BSONElements into the SBE SortKeyComponentVector type.
-    {
-        size_t i = 0;
-        for (auto& elt : _localBsonEltStorage) {
-            _localSortKeyComponentStorage.elts[i++] = bson::convertFrom<true>(elt);
-        }
-    }
-    return &_localSortKeyComponentStorage;
-}
-
-std::pair<TypeTags, Value> SortSpec::compare(TypeTags leftTag,
-                                             Value leftVal,
-                                             TypeTags rightTag,
-                                             Value rightVal,
-                                             const CollatorInterface* collator) const {
-    if (_sortPattern.size() == 1) {
-        auto [cmpTag, cmpVal] = compareValue(leftTag, leftVal, rightTag, rightVal, collator);
-        if (cmpTag == TypeTags::NumberInt32) {
-            auto sign = _sortPattern[0].isAscending ? 1 : -1;
-            cmpVal = bitcastFrom<int32_t>(bitcastTo<int32_t>(cmpVal) * sign);
-            return {cmpTag, cmpVal};
-        } else {
-            return {TypeTags::Nothing, 0};
-        }
-    }
-
-    if (leftTag != TypeTags::Array || rightTag != TypeTags::Array) {
-        return {TypeTags::Nothing, 0};
-    }
-    auto leftArray = getArrayView(leftVal);
-    auto rightArray = getArrayView(rightVal);
-    if (leftArray->size() != _sortPattern.size() || rightArray->size() != _sortPattern.size()) {
-        return {TypeTags::Nothing, 0};
-    }
-
-    for (size_t i = 0; i < _sortPattern.size(); i++) {
-        auto [leftElemTag, leftElemVal] = leftArray->getAt(i);
-        auto [rightElemTag, rightElemVal] = rightArray->getAt(i);
-        auto [cmpTag, cmpVal] =
-            compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal, collator);
-        if (cmpTag == TypeTags::NumberInt32) {
-            if (cmpVal != 0) {
-                auto sign = _sortPattern[i].isAscending ? 1 : -1;
-                cmpVal = bitcastFrom<int32_t>(bitcastTo<int32_t>(cmpVal) * sign);
-                return {cmpTag, cmpVal};
-            }
-        } else {
-            return {TypeTags::Nothing, 0};
-        }
-    }
-
-    return {TypeTags::NumberInt32, 0};
-}
-
-BtreeKeyGenerator SortSpec::initKeyGen() const {
-    tassert(5037003,
-            "SortSpec should not be passed an empty sort pattern",
-            !_sortPatternBson.isEmpty());
-
-    std::vector<const char*> fields;
-    std::vector<BSONElement> fixed;
-    for (auto&& elem : _sortPatternBson) {
-        fields.push_back(elem.fieldName());
-
-        // BtreeKeyGenerator's constructor's first parameter (the 'fields' vector) and second
-        // parameter (the 'fixed' vector) are parallel vectors. The 'fixed' vector allows the
-        // caller to specify if the any sort keys have already been determined for one or more
-        // of the field paths from the 'fields' vector. In this case, we haven't determined what
-        // the sort keys are for any of the fields paths, so we populate the 'fixed' vector with
-        // EOO values to indicate this.
-        fixed.emplace_back();
-    }
-
-    const bool isSparse = false;
-    auto version = key_string::Version::kLatestVersion;
-    auto ordering = Ordering::make(_sortPatternBson);
-
-    return {std::move(fields), std::move(fixed), isSparse, version, ordering};
-}
-
-size_t SortSpec::getApproximateSize() const {
-    auto size = sizeof(SortSpec);
-    size += _sortKeyGen.getApproximateSize();
-    size += _sortPatternBson.isOwned() ? _sortPatternBson.objsize() : 0;
-    return size;
-}
-
-std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
-    auto ownedJsFunction = bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
-    return {TypeTags::jsFunction, ownedJsFunction};
-}
-
-std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer& filterer) {
-    auto filtererCopy = bitcastFrom<ShardFilterer*>(filterer.clone().release());
-    return {TypeTags::shardFilterer, filtererCopy};
-}
-
-std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher& matcher) {
-    auto copy = bitcastFrom<fts::FTSMatcher*>(new fts::FTSMatcher(matcher.query(), matcher.spec()));
-    return {TypeTags::ftsMatcher, copy};
-}
-
-std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec& ss) {
-    auto ssCopy = bitcastFrom<SortSpec*>(new SortSpec(ss));
-    return {TypeTags::sortSpec, ssCopy};
-}
-
-std::pair<TypeTags, Value> makeCopyMakeObjSpec(const MakeObjSpec& mos) {
-    auto mosCopy = bitcastFrom<MakeObjSpec*>(new MakeObjSpec(mos));
-    return {TypeTags::makeObjSpec, mosCopy};
 }
 
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator) {
@@ -345,7 +203,6 @@ std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& bounds) {
     auto boundsCopy = bitcastFrom<IndexBounds*>(new IndexBounds(bounds));
     return {TypeTags::indexBounds, boundsCopy};
 }
-
 
 void releaseValueDeep(TypeTags tag, Value val) noexcept {
     switch (tag) {
@@ -384,29 +241,8 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::ksValue:
             delete getKeyStringView(val);
             break;
-        case TypeTags::pcreRegex:
-            delete getPcreRegexView(val);
-            break;
-        case TypeTags::jsFunction:
-            delete getJsFunctionView(val);
-            break;
-        case TypeTags::shardFilterer:
-            delete getShardFiltererView(val);
-            break;
-        case TypeTags::ftsMatcher:
-            delete getFtsMatcherView(val);
-            break;
-        case TypeTags::sortSpec:
-            delete getSortSpecView(val);
-            break;
-        case TypeTags::makeObjSpec:
-            delete getMakeObjSpecView(val);
-            break;
         case TypeTags::collator:
             delete getCollatorView(val);
-            break;
-        case TypeTags::indexBounds:
-            delete getIndexBoundsView(val);
             break;
         case TypeTags::timeZone:
             delete getTimeZoneView(val);
@@ -416,6 +252,15 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::cellBlock:
             delete getCellBlock(val);
+            break;
+        case TypeTags::pcreRegex:
+        case TypeTags::jsFunction:
+        case TypeTags::shardFilterer:
+        case TypeTags::ftsMatcher:
+        case TypeTags::sortSpec:
+        case TypeTags::makeObjSpec:
+        case TypeTags::indexBounds:
+            getExtendedTypeOps(tag)->release(val);
             break;
         default:
             break;

@@ -50,6 +50,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/match_path.h"
+#include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -934,7 +935,7 @@ public:
 
             for (auto&& r : regexes) {
                 auto [pcreRegexTag, pcreRegexVal] =
-                    sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
+                    sbe::makeNewPcreRegex(r->getString(), r->getFlags());
                 pcreArr->push_back(pcreRegexTag, pcreRegexVal);
 
                 auto [regexSetTag, regexSetVal] =
@@ -1544,7 +1545,7 @@ EvalExpr generateRegexExpr(StageBuilderState& state,
             return makeVariable(compiledRegexSlotId);
         } else {
             auto [compiledRegexTag, compiledRegexVal] =
-                sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
+                sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
             return makeConstant(compiledRegexTag, compiledRegexVal);
         }
     }();

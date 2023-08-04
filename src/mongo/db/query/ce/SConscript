@@ -95,9 +95,9 @@ env.Library(
         'test_utils.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils',
+        '$BUILD_DIR/mongo/db/sbe_values',
         '$BUILD_DIR/mongo/db/server_base',
         'query_ce_heuristic',
         'query_ce_histogram',

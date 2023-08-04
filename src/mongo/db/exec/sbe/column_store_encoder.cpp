@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
+#include "mongo/db/exec/sbe/column_store_encoder.h"
 
-namespace mongo::sbe::value {
-const Object ColumnStoreEncoder::emptyObject{};
-const Array ColumnStoreEncoder::emptyArray{};
-}  // namespace mongo::sbe::value
+namespace mongo::sbe {
+const value::Object ColumnStoreEncoder::emptyObject{};
+const value::Array ColumnStoreEncoder::emptyArray{};
+}  // namespace mongo::sbe

@@ -32,7 +32,7 @@
 
 #include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/exec/sbe/values/columnar.h"
+#include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -115,7 +115,7 @@ private:
  * Helper for finding (or creating) a field of a certain type in an SBE object.
  */
 template <class T, value::TypeTags Tag, class MakeT>
-T* findOrAdd(StringData name, sbe::value::Object* obj, MakeT makeT) {
+T* findOrAdd(StringData name, value::Object* obj, MakeT makeT) {
     auto innerTagVal = obj->getField(name);
 
     if (innerTagVal.first == value::TypeTags::Nothing) {
@@ -133,14 +133,14 @@ T* findOrAdd(StringData name, sbe::value::Object* obj, MakeT makeT) {
  * Look for a field 'name' that is an object, and return it. If the field
  * does not exist, it will be created with a placeholder empty object.
  */
-value::Object* findOrAddObjInObj(StringData name, sbe::value::Object* obj) {
+value::Object* findOrAddObjInObj(StringData name, value::Object* obj) {
     return findOrAdd<value::Object, value::TypeTags::Object>(name, obj, value::makeNewObject);
 }
 
 /*
  * Similar to above, for arrays.
  */
-value::Array* findOrAddArrInObj(StringData name, sbe::value::Object* obj) {
+value::Array* findOrAddArrInObj(StringData name, value::Object* obj) {
     return findOrAdd<value::Array, value::TypeTags::Array>(name, obj, value::makeNewArray);
 }
 
@@ -148,7 +148,7 @@ value::Array* findOrAddArrInObj(StringData name, sbe::value::Object* obj) {
  * Helper for finding or creating an element of a certain type in an SBE Array.
  */
 template <class T, value::TypeTags Tag, class MakeT>
-T* findOrAddInArr(size_t idx, sbe::value::Array* arr, MakeT makeT) {
+T* findOrAddInArr(size_t idx, value::Array* arr, MakeT makeT) {
     invariant(idx < arr->size());
     auto innerTagVal = arr->getAt(idx);
 
@@ -164,10 +164,10 @@ T* findOrAddInArr(size_t idx, sbe::value::Array* arr, MakeT makeT) {
     }
 }
 
-value::Object* findOrAddObjInArr(size_t idx, sbe::value::Array* arr) {
+value::Object* findOrAddObjInArr(size_t idx, value::Array* arr) {
     return findOrAddInArr<value::Object, value::TypeTags::Object>(idx, arr, value::makeNewObject);
 }
-value::Array* findOrAddArrInArr(size_t idx, sbe::value::Array* arr) {
+value::Array* findOrAddArrInArr(size_t idx, value::Array* arr) {
     return findOrAddInArr<value::Array, value::TypeTags::Array>(idx, arr, value::makeNewArray);
 }
 

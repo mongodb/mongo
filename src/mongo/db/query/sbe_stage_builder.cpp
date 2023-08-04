@@ -66,6 +66,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/match_path.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -80,7 +81,6 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
@@ -1519,10 +1519,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         StringData sortKeyGenerator = sn->limit ? "generateCheapSortKey" : "generateSortKey";
 
-        auto sortSpec = std::make_unique<sbe::value::SortSpec>(sn->pattern);
+        auto sortSpec = std::make_unique<sbe::SortSpec>(sn->pattern);
         auto sortSpecExpr =
             makeConstant(sbe::value::TypeTags::sortSpec,
-                         sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec.release()));
+                         sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()));
 
         const auto fullSortKeySlot = _slotIdGenerator.generate();
 
@@ -2638,10 +2638,9 @@ std::unique_ptr<sbe::EExpression> getSortSpecFromTopBottomN(
     tassert(5807013, "Accumulator state must not be null", acc);
     auto sortPattern =
         acc->getSortPattern().serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
-    auto sortSpec = std::make_unique<sbe::value::SortSpec>(sortPattern);
-    auto sortSpecExpr =
-        makeConstant(sbe::value::TypeTags::sortSpec,
-                     sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec.release()));
+    auto sortSpec = std::make_unique<sbe::SortSpec>(sortPattern);
+    auto sortSpecExpr = makeConstant(sbe::value::TypeTags::sortSpec,
+                                     sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()));
     return sortSpecExpr;
 }
 

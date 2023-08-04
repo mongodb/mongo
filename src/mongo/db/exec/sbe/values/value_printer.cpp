@@ -40,7 +40,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -486,12 +486,6 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << ts.toString();
             break;
         }
-        case TypeTags::pcreRegex: {
-            auto regex = getPcreRegexView(val);
-            stream << "PcreRegex(/" << regex->pattern() << "/"
-                   << pcre_util::optionsToFlags(regex->options()) << ")";
-            break;
-        }
         case TypeTags::timeZoneDB: {
             auto tzdb = getTimeZoneDBView(val);
             auto timeZones = tzdb->getTimeZoneStrings();
@@ -500,13 +494,6 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         }
         case TypeTags::RecordId:
             stream << "RecordId(" << getRecordIdView(val)->toString() << ")";
-            break;
-        case TypeTags::jsFunction:
-            // TODO: Also include code.
-            stream << "jsFunction";
-            break;
-        case TypeTags::shardFilterer:
-            stream << "ShardFilterer";
             break;
         case TypeTags::collator:
             writeCollatorToStream(getCollatorView(val));
@@ -536,32 +523,6 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << ')';
             break;
         }
-        case TypeTags::ftsMatcher: {
-            auto ftsMatcher = getFtsMatcherView(val);
-            stream << "FtsMatcher(";
-            writeObjectToStream(ftsMatcher->query().toBSON());
-            stream << ')';
-            break;
-        }
-        case TypeTags::sortSpec:
-            stream << "SortSpec(";
-            writeObjectToStream(getSortSpecView(val)->getPattern());
-            stream << ')';
-            break;
-        case TypeTags::makeObjSpec:
-            stream << "MakeObjSpec(" << getMakeObjSpecView(val)->toString() << ")";
-            break;
-        case TypeTags::indexBounds:
-            // When calling toString() we don't know if the index has a non-simple collation or
-            // not. Passing false could produce invalid UTF-8, which is not acceptable when we are
-            // going to put the resulting string into a BSON object and return it across the wire.
-            // While passing true may be misleading in cases when the index has no collation, it is
-            // safer to do so.
-            stream << "IndexBounds(";
-            writeStringDataToStream(
-                getIndexBoundsView(val)->toString(true /* hasNonSimpleCollation */));
-            stream << ")";
-            break;
         case TypeTags::csiCell:
             stream << "CsiCell(" << getCsiCellView(val) << ")";
             break;
@@ -574,6 +535,15 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::timeZone:
             stream << getTimeZoneView(val)->toString();
+            break;
+        case TypeTags::pcreRegex:
+        case TypeTags::jsFunction:
+        case TypeTags::shardFilterer:
+        case TypeTags::ftsMatcher:
+        case TypeTags::sortSpec:
+        case TypeTags::makeObjSpec:
+        case TypeTags::indexBounds:
+            stream << getExtendedTypeOps(tag)->print(val);
             break;
         default:
             MONGO_UNREACHABLE;
