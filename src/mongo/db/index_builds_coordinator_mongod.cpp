@@ -946,8 +946,8 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                 needsToRetryWait = true;
                 break;
             case CommitResult::kLockTimeout:
-                LOGV2(4698900,
-                      "Unable to acquire RSTL for commit within deadline. Releasing locks and "
+                LOGV2(7866201,
+                      "Unable to acquire locks for commit within deadline. Releasing locks and "
                       "trying again",
                       "buildUUID"_attr = replState->buildUUID);
                 needsToRetryWait = true;

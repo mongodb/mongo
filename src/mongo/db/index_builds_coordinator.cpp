@@ -66,6 +66,12 @@
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/message.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scoped_counter.h"
@@ -2149,48 +2155,31 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     return _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
 }
 
-StatusWith<std::tuple<AutoGetCollection, repl::ReplicationStateTransitionLockGuard>>
-IndexBuildsCoordinator::_acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
-                                                           ReplIndexBuildState* replState,
-                                                           bool retry) {
-    const auto kAutoGetCollectionOptionsWithSkipRSTL =
-        makeAutoGetCollectionOptions(/*skipRSTL=*/true);
+StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiveWithTimeout(
+    OperationContext* opCtx, ReplIndexBuildState* replState, bool retry) {
+    const Milliseconds kStateTransitionBlockedMaxMs{10};
+    boost::optional<logv2::SeveritySuppressor> logSeveritySuppressor;
+    int retryCount = 0;
     while (true) {
-        AutoGetCollection autoGetColl(opCtx,
-                                      {replState->dbName, replState->collectionUUID},
-                                      MODE_X,
-                                      kAutoGetCollectionOptionsWithSkipRSTL);
-
-        // If we can't acquire the RSTL within a given time period, there is an active state
-        // transition and we should release our locks and try again. We would otherwise introduce a
-        // deadlock with step-up by holding the Collection lock in exclusive mode. After it has
-        // enqueued its RSTL X lock, step-up tries to reacquire the Collection locks for prepared
-        // transactions, which will conflict with the X lock we currently hold.
-        repl::ReplicationStateTransitionLockGuard rstl{
-            opCtx, MODE_IX, repl::ReplicationStateTransitionLockGuard::EnqueueOnly{}};
-
         try {
-            // Since this thread is not killable by state transitions, this deadline is
-            // effectively the longest period of time we can block a state transition. State
-            // transitions are infrequent, but need to happen quickly. It should be okay to set
-            // this to a low value because the RSTL is rarely contended and, if this does time
-            // out, we will retry.
-            rstl.waitForLockUntil(Date_t::now() + Milliseconds{10});
+            AutoGetCollection::Options autoGetCollOptions;
+            autoGetCollOptions.deadline(Date_t::now() + kStateTransitionBlockedMaxMs);
+            return AutoGetCollection(
+                opCtx, {replState->dbName, replState->collectionUUID}, MODE_X, autoGetCollOptions);
         } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
             if (!retry) {
                 return ex.toStatus();
             }
-
-            // We weren't able to re-acquire the RSTL within the timeout, which means there is
-            // an active state transition. Release our locks and try again from the beginning.
-            LOGV2(7119100,
-                  "Unable to acquire RSTL for index build within deadline, releasing "
-                  "locks and trying again",
-                  "buildUUID"_attr = replState->buildUUID);
-            continue;
+            if (!logSeveritySuppressor) {
+                logSeveritySuppressor.emplace(
+                    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2));
+            }
+            ++retryCount;
+            LOGV2_DEBUG(7866200,
+                        (*logSeveritySuppressor)().toInt(),
+                        "Index build: collection lock acquisition timeout, retrying",
+                        "retries"_attr = retryCount);
         }
-
-        return std::make_tuple(std::move(autoGetColl), std::move(rstl));
     }
 }
 
@@ -2294,8 +2283,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
 
     hangIndexBuildOnSetupBeforeTakingLocks.pauseWhileSet(opCtx);
 
-    auto [autoGetColl, rstl] =
-        std::move(_acquireExclusiveLockWithRSTLRetry(opCtx, replState.get()).getValue());
+    auto autoGetColl =
+        std::move(_autoGetCollectionExclusiveWithTimeout(opCtx, replState.get()).getValue());
 
     CollectionWriter collection(opCtx, replState->collectionUUID);
 
@@ -2630,13 +2619,8 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterNonShutdownFailure(
     // would prevent us from taking locks. Use a new OperationContext to abort the index build.
     runOnAlternateContext(opCtx, "self-abort", [this, replState](OperationContext* abortCtx) {
         ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
-        // Skip RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
-        // taking a strong collection lock. See SERVER-42621.
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        const auto kAutoGetCollectionOptionsWithSkipRSTL =
-            makeAutoGetCollectionOptions(/*skipRSTL=*/true);
-        AutoGetCollection autoGetColl(
-            abortCtx, dbAndUUID, MODE_X, kAutoGetCollectionOptionsWithSkipRSTL);
+        auto autoGetColl =
+            std::move(_autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
         AutoGetCollection indexBuildEntryColl(
             abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
         _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
@@ -2677,11 +2661,9 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
                     abortCtx->lockState());
 
-                // Take RSTL to observe and prevent replication state from changing. This is
-                // done with the release/reacquire strategy to avoid deadlock with prepared
-                // txns.
-                auto [autoGetColl, rstl] = std::move(
-                    _acquireExclusiveLockWithRSTLRetry(abortCtx, replState.get()).getValue());
+                // Take RSTL to observe and prevent replication state from changing.
+                auto autoGetcoll = std::move(
+                    _autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
 
                 const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
                 auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
@@ -3163,7 +3145,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // Need to return the collection lock back to exclusive mode to complete the index build.
     auto locksOrStatus =
-        _acquireExclusiveLockWithRSTLRetry(opCtx, replState.get(), /*retry=*/false);
+        _autoGetCollectionExclusiveWithTimeout(opCtx, replState.get(), /*retry=*/false);
     if (!locksOrStatus.isOK()) {
         return CommitResult::kLockTimeout;
     }

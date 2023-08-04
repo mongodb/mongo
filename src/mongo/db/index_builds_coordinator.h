@@ -598,21 +598,34 @@ private:
 
 protected:
     /**
-     * Acquire the collection MODE_X lock (and other locks up the hierarchy) as usual, with the
-     * exception of the RSTL. The RSTL will be acquired last, with a timeout. On timeout, all locks
-     * are released. If 'retry' is true, keeps until successful RSTL acquisition, and the returned
-     * StatusWith will always be OK and contain the locks. If false, it returns with the error after
-     * a single try.
+     * Acquire the collection MODE_X lock (and other locks up the hierarchy) as usual, with a
+     * timeout. On timeout, all locks are released. If 'retry' is true, keeps retrying until
+     * successful acquisition, and the returned StatusWith will always be OK and contain the locks.
+     * If false, it returns with the error after a single try. The timeout is intentionally low to
+     * avoid stalling replication state transitions for too long.
      *
-     * This is intended to avoid a three-way deadlock between prepared transactions, stepdown, and
-     * index build threads when trying to acquire an exclusive collection lock.
+     * Taking a collection exclusive lock from an operation which is not killed by step down can
+     * cause a 3-way deadlock with prepared transactions, which hold MODE_IX locks, and the step
+     * down thread trying to acquire the RSTL in MODE_X.
      *
-     * See SERVER-44722, SERVER-42621, and SERVER-71191.
+     * 1. Prepared transaction (Holds Coll MODE_IX)
+     * 2. Unkillable index builder (Holds RSTL MODE_IX, Blocked Coll MODE_X)
+     * 3. Step down thread (Blocked on RSTL MODE_X)
+     *
+     * If we don't time out all locks in the hierarchy, there is potential for a 4-way deadlock:
+     *
+     * 1. Prepared transaction (Holds Coll MODE_IX)
+     * 2. Unkillable index builder (Holds RSTL MODE_IX, Enqueues Coll MODE_X)
+     * 3. Regular op (not killed by stepdown) (Holds RSTL MODE_IX, Enqueues Coll MODE_IS)
+     * 4. Step down thread (Blocked on RSTL MODE_X due to stepdown not killing the op at 3 which
+     *    holds the global lock in MODE_IS)
+     *
+     * See SERVER-44722, SERVER-42621, SERVER-71191 and SERVER-78662.
+     *
+     * TODO(SERVER-75288): revert SERVER-78662.
      */
-    StatusWith<std::tuple<AutoGetCollection, repl::ReplicationStateTransitionLockGuard>>
-    _acquireExclusiveLockWithRSTLRetry(OperationContext* opCtx,
-                                       ReplIndexBuildState* replState,
-                                       bool retry = true);
+    StatusWith<AutoGetCollection> _autoGetCollectionExclusiveWithTimeout(
+        OperationContext* opCtx, ReplIndexBuildState* replState, bool retry = true);
 
     /**
      * Sets up the in-memory state of the index build. Validates index specs and filters out
