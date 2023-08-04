@@ -175,6 +175,11 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
     }
 }
 
+BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, DummyBenchmark)(benchmark::State& state) {
+    for (auto _ : state) {
+    }
+}
+
 #if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, kMaxThreads);
@@ -182,7 +187,7 @@ BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
     ->Range(1, kMaxChainSize)
     ->ThreadRange(1, kMaxThreads);
 #else
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, 1);
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, DummyBenchmark);
 #endif
 
 
