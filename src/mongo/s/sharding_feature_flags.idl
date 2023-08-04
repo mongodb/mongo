@@ -57,19 +57,17 @@ feature_flags:
     version: 7.1
     shouldBeFCVGated: true
   # TODO (SERVER-73632): Remove once 8.0 becomes last LTS.
-  featureFlagCohostedRouter:
+  featureFlagEmbeddedRouter:
     description: "Feature flag to enable shard to double as router"
-    cpp_varname: feature_flags::gCohostedRouter
+    cpp_varname: feature_flags::gEmbeddedRouter
     default: false
     shouldBeFCVGated: true
-  
   # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
   featureFlagTrackUnshardedCollectionsOnShardingCatalog:
     description: "Feature flag for enabling the tracking of user unsharded collection by turning them into a fixed-1-chunk sharded collections"
     cpp_varname: feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
     default: false
     shouldBeFCVGated: true
-
   featureFlagClusterFsyncLock:
     description: "Feature flag to enable locking of a cluster through mongos"
     cpp_varname: feature_flags::gClusterFsyncLock
@@ -80,4 +78,3 @@ feature_flags:
     cpp_varname: feature_flags::gAuthoritativeShardCollection
     default: false
     shouldBeFCVGated: true
-

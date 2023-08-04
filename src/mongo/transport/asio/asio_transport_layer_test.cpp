@@ -896,7 +896,7 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagCohostedRouter", true};
+    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagEmbeddedRouter", true};
     ScopedValueGuard<ClusterRole> _changeClusterRole{serverGlobalParams.clusterRole,
                                                      ClusterRole::RouterServer};
     std::shared_ptr<void> _disableTfo = tfo::setConfigForTest(0, 0, 0, 1024, Status::OK());

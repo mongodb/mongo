@@ -666,7 +666,7 @@ Status storeMongodOptions(const moe::Environment& params) {
                                       clusterRoleParam));
         }
 
-        if (feature_flags::gCohostedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+        if (feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
             params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
             serverGlobalParams.clusterRole += ClusterRole::RouterServer;
         }
