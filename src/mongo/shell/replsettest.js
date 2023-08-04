@@ -66,6 +66,9 @@
  *     seedRandomNumberGenerator {boolean}: Indicates whether the random number generator should
  *        be seeded when randomBinVersions is true. For ReplSetTests started by ShardingTest, the
  *        seed is generated as part of ShardingTest.
+ *
+ *     useAutoBootstrapProcedure {boolean} If true, follow the procedure for auto-bootstrapped
+ *        replica sets.
  *   }
  *
  * Member variables:
@@ -674,6 +677,11 @@ var ReplSetTest = function ReplSetTest(opts) {
         // Start up each node without waiting to connect. This allows startup of replica set nodes
         // to proceed in parallel.
         for (let n = 0; n < this.ports.length; n++) {
+            if (n == 0 && this.useAutoBootstrapProcedure) {
+                // Must wait for connect in order to extract the auto-generated replica set name.
+                options.waitForConnect = true;
+            }
+
             this.start(n, options, restart);
         }
         return this.nodes;
@@ -1410,7 +1418,23 @@ var ReplSetTest = function ReplSetTest(opts) {
         // stage while deducing isSelf(). This can fail with an InterruptedDueToReplStateChange
         // error when interrupted. We try several times, to reduce the chance of failing this way.
         const initiateStart = new Date();  // Measure the execution time of this section.
-        replSetCommandWithRetry(primary, cmd);
+
+        if (this.useAutoBootstrapProcedure) {
+            // Auto-bootstrap already initiates automatically on the first node, but if the
+            // requested initiate is not empty, we need to apply the requested settings using
+            // reconfig.
+            if (cmd[cmdKey] != {}) {
+                cmd["replSetReconfig"] = cmd[cmdKey];
+                delete cmd[cmdKey];
+
+                // We must increase the version of the new config for the reconfig
+                // to succeed. The initial default config will always have a version of 1.
+                cmd["replSetReconfig"].version = 2;
+                replSetCommandWithRetry(primary, cmd);
+            }
+        } else {
+            replSetCommandWithRetry(primary, cmd);
+        }
 
         // Blocks until there is a primary. We use a faster retry interval here since we expect the
         // primary to be ready very soon. We also turn the failpoint off once we have a primary.
@@ -3000,7 +3024,13 @@ var ReplSetTest = function ReplSetTest(opts) {
             dbpath: "$set-$node"
         };
 
-        if (this.serverless == null) {
+        if (this.useAutoBootstrapProcedure) {
+            if (n == 0) {
+                // No --replSet for the first node.
+            } else {
+                defaults.replSet = this.name;
+            }
+        } else if (this.serverless == null) {
             defaults.replSet = this.useSeedList ? this.getURL() : this.name;
         } else {
             defaults.serverless = true;
@@ -3166,7 +3196,17 @@ var ReplSetTest = function ReplSetTest(opts) {
             print("ReplSetTest start skip waiting for a connection to node " + n);
             return this.nodes[n];
         }
-        return this._waitForInitialConnection(n, waitForHealth);
+
+        const connection = this._waitForInitialConnection(n, waitForHealth);
+
+        if (n == 0 && this.useAutoBootstrapProcedure) {
+            const helloReply = connection.getDB('admin')._helloOrLegacyHello();
+            print('ReplSetTest start using auto generated replSet name ' + helloReply.setName +
+                  ' instead of ' + this.name);
+            this.name = helloReply.setName;
+        }
+
+        return connection;
     }));
 
     /**
@@ -3513,6 +3553,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         rst._causalConsistency = opts.causallyConsistent || false;
 
         rst._configSettings = opts.settings || false;
+        rst.useAutoBootstrapProcedure = opts.useAutoBootstrapProcedure || false;
 
         rst.nodeOptions = {};
 
