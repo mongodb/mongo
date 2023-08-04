@@ -318,4 +318,29 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
         }
     }
 }
+
+void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
+    invariant(builder);
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        reportDurationsForAllPhases<Seconds>(
+            kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
+    } else {
+        reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
+                                             getClockSource(),
+                                             builder,
+                                             Seconds{0});
+    }
+}
+
+void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {
+    donorCtx.setWritesDuringCriticalSection(getWritesDuringCriticalSection());
+}
+
+void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx) {
+    recipientCtx.setBytesCopied(getBytesWrittenCount());
+    recipientCtx.setOplogFetched(getOplogEntriesFetched());
+    recipientCtx.setOplogApplied(getOplogEntriesApplied());
+}
+
 }  // namespace mongo

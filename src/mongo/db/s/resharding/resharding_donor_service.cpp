@@ -93,6 +93,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_map.h"
@@ -385,6 +386,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
 
     return resharding::WithAutomaticRetry([this, executor] {
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                       serverGlobalParams.featureCompatibility)) {
+                   _metrics->fillDonorCtxOnCompletion(_donorCtx);
+               }
                return _updateCoordinator(opCtx.get(), executor);
            })
         .onTransientError([](const Status& status) {

@@ -95,6 +95,8 @@ public:
     int64_t getDocumentsProcessedCount() const;
     int64_t getBytesWrittenCount() const;
     int64_t getApproxBytesToScanCount() const;
+    int64_t getWritesDuringCriticalSection() const;
+
     void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);

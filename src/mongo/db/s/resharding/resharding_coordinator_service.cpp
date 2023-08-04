@@ -1923,6 +1923,10 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                _logStatsOnCompletion(status.isOK());
+            }
 
             // Destroy metrics early so its lifetime will not be tied to the lifetime of this
             // state machine. This is because we have future callbacks copy shared pointers to this
@@ -2744,6 +2748,42 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
                       logAttrs(nss),
                       "error"_attr = redact(ex.toStatus()));
     }
+}
+
+void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
+    BSONObjBuilder builder;
+    BSONObjBuilder statsBuilder;
+    builder.append("uuid", _coordinatorDoc.getReshardingUUID().toBSON());
+    builder.append("status", success ? "success" : "failed");
+    statsBuilder.append("ns", toStringForLogging(_coordinatorDoc.getSourceNss()));
+    statsBuilder.append("sourceUUID", _coordinatorDoc.getSourceUUID().toBSON());
+    statsBuilder.append("newUUID", _coordinatorDoc.getReshardingUUID().toBSON());
+    if (_coordinatorDoc.getSourceKey()) {
+        statsBuilder.append("oldShardKey", *_coordinatorDoc.getSourceKey());
+    }
+    statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toBSON());
+    if (_coordinatorDoc.getStartTime()) {
+        statsBuilder.append("startTime", *_coordinatorDoc.getStartTime());
+    }
+    statsBuilder.append("endTime", getCurrentTime());
+    _metrics->reportOnCompletion(&statsBuilder);
+
+    int64_t totalWritesDuringCriticalSection = 0;
+    for (auto shard : _coordinatorDoc.getDonorShards()) {
+        totalWritesDuringCriticalSection +=
+            shard.getMutableState().getWritesDuringCriticalSection().value_or(0);
+    }
+    statsBuilder.append("writesDuringCriticalSection", totalWritesDuringCriticalSection);
+
+    for (auto shard : _coordinatorDoc.getRecipientShards()) {
+        BSONObjBuilder shardBuilder;
+        shardBuilder.append("bytesCopied", shard.getMutableState().getBytesCopied().value_or(0));
+        shardBuilder.append("oplogFetched", shard.getMutableState().getOplogFetched().value_or(0));
+        shardBuilder.append("oplogApplied", shard.getMutableState().getOplogApplied().value_or(0));
+        statsBuilder.append(shard.getId(), shardBuilder.obj());
+    }
+    builder.append("statistics", statsBuilder.obj());
+    LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }
 
 }  // namespace mongo

@@ -180,6 +180,12 @@ public:
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
+    void reportOnCompletion(BSONObjBuilder* builder);
+
+    // Update donor and recipient related metrics in _recipientCtx so the coordinator can get them.
+    void fillDonorCtxOnCompletion(DonorShardContext& donorCtx);
+    void fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx);
+
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
     virtual StringData getStateString() const noexcept override;

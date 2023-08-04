@@ -173,6 +173,10 @@ structs:
                 description: "Number of documents on this donor shard in the collection being
                               resharded."
                 optional: true
+            writesDuringCriticalSection:
+                type: long
+                description: "Number of writes during critical section on this donor shard."
+                optional: true
                 
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
@@ -203,6 +207,18 @@ structs:
             state:
                 type: RecipientState
                 default: kUnused
+            bytesCopied:
+                type: long
+                description: "Number of bytes copied on this recipient shard."
+                optional: true
+            oplogFetched:
+                type: long
+                description: "Number of oplog entries fetched on this recipient shard."
+                optional: true
+            oplogApplied:
+                type: long
+                description: "Number of oplog entries applied on this recipient shard."
+                optional: true
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."

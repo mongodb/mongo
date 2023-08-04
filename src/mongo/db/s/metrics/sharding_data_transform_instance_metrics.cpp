@@ -243,6 +243,10 @@ int64_t ShardingDataTransformInstanceMetrics::getApproxBytesToScanCount() const 
     return _approxBytesToScan.load();
 }
 
+int64_t ShardingDataTransformInstanceMetrics::getWritesDuringCriticalSection() const {
+    return _writesDuringCriticalSection.load();
+}
+
 void ShardingDataTransformInstanceMetrics::restoreDocumentsProcessed(
     int64_t documentCount, int64_t totalDocumentsSizeBytes) {
     _documentsProcessed.store(documentCount);
