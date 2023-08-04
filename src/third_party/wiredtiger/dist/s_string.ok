@@ -569,6 +569,7 @@ colgroup
 colgroups
 collatorp
 comparator
+comparators
 comparep
 compat
 cond
@@ -1189,6 +1190,7 @@ sn
 snaplen
 snapsort
 snprintf
+sortable
 sp
 sparc
 spinlock

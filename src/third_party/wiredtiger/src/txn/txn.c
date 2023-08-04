@@ -1465,31 +1465,98 @@ err:
 }
 
 /*
+ * __txn_mod_sortable_key --
+ *     Given an operation return a boolean indicating if it has a sortable key.
+ */
+static inline bool
+__txn_mod_sortable_key(WT_SESSION_IMPL *session, WT_TXN_OP *opt)
+{
+    switch (opt->type) {
+    case (WT_TXN_OP_NONE):
+    case (WT_TXN_OP_REF_DELETE):
+    case (WT_TXN_OP_TRUNCATE_COL):
+    case (WT_TXN_OP_TRUNCATE_ROW):
+        return (false);
+    case (WT_TXN_OP_BASIC_COL):
+    case (WT_TXN_OP_BASIC_ROW):
+    case (WT_TXN_OP_INMEM_COL):
+    case (WT_TXN_OP_INMEM_ROW):
+        return (true);
+    }
+    WT_ASSERT_ALWAYS(session, false, "Unhandled op type encountered");
+    return (false);
+}
+
+/*
  * __txn_mod_compare --
- *     Qsort comparison routine for transaction modify list.
+ *     Qsort comparison routine for transaction modify list. Takes a session as a context argument.
+ *     This allows for the use of comparators.
  */
 static int WT_CDECL
-__txn_mod_compare(const void *a, const void *b)
+__txn_mod_compare(const void *a, const void *b, void *context)
 {
+    WT_SESSION_IMPL *session;
     WT_TXN_OP *aopt, *bopt;
+    int cmp;
+    bool a_has_sortable_key;
+    bool b_has_sortable_key;
 
     aopt = (WT_TXN_OP *)a;
     bopt = (WT_TXN_OP *)b;
-
-    /* If the files are different, order by ID. */
-    if (aopt->btree->id != bopt->btree->id)
-        return (aopt->btree->id < bopt->btree->id);
+    session = (WT_SESSION_IMPL *)context;
 
     /*
-     * If the files are the same, order by the key. Row-store collators require WT_SESSION pointers,
-     * and we don't have one. Compare the keys if there's no collator, otherwise return equality.
-     * Column-store is always easy.
+     * We want to sort on two things:
+     *  - B-tree ID
+     *  - Key
+     * However, there are a number of modification types that don't have a key to be sorted on. This
+     * requires us to add a stage between sorting on B-tree ID and key. At this intermediate stage,
+     * we sort on whether the modifications have a key.
+     *
+     * We need to uphold the contract that all modifications on the same key are contiguous in the
+     * final modification array. Technically they could be separated by non key modifications,
+     * but for simplicity's sake we sort them apart.
+     *
+     * Qsort comparators are expected to return -1 if the first argument is smaller than the second,
+     * 1 if the second argument is smaller than the first, and 0 if both arguments are equal.
      */
-    if (aopt->type == WT_TXN_OP_BASIC_ROW || aopt->type == WT_TXN_OP_INMEM_ROW)
-        return (aopt->btree->collator == NULL ?
-            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key) :
-            0);
-    return (aopt->u.op_col.recno < bopt->u.op_col.recno);
+
+    /* Order by b-tree ID. */
+    if (aopt->btree->id < bopt->btree->id)
+        return (-1);
+    if (aopt->btree->id > bopt->btree->id)
+        return (1);
+
+    /*
+     * Order by whether the given operation has a key. We don't want to call key compare incorrectly
+     * especially given that u is a union which would create undefined behavior.
+     */
+    a_has_sortable_key = __txn_mod_sortable_key(session, aopt);
+    b_has_sortable_key = __txn_mod_sortable_key(session, bopt);
+    if (a_has_sortable_key && !b_has_sortable_key)
+        return (-1);
+    if (!a_has_sortable_key && b_has_sortable_key)
+        return (1);
+    /*
+     * In the case where both arguments don't have a key they are considered to be equal, we don't
+     * care exactly how they get sorted.
+     */
+    if (!a_has_sortable_key && !b_has_sortable_key)
+        return (0);
+
+    /* Finally, order by key. Row-store requires a call to __wt_compare. */
+    if (aopt->btree->type == BTREE_ROW) {
+        WT_ASSERT_ALWAYS(session,
+          __wt_compare(
+            session, aopt->btree->collator, &aopt->u.op_row.key, &bopt->u.op_row.key, &cmp) == 0,
+          "Failed to sort transaction modifications during prepare commit/rollback");
+        return (cmp);
+    }
+    if (aopt->u.op_col.recno < bopt->u.op_col.recno)
+        return (-1);
+    if (aopt->u.op_col.recno > bopt->u.op_col.recno)
+        return (1);
+    return (0);
 }
 
 /*
@@ -1579,7 +1646,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort_r(
+          txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare, (void *)session);
 
     /* If we are logging, write a commit log record. */
     if (txn->logrec != NULL) {
@@ -2015,7 +2083,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort_r(
+          txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare, (void *)session);
 
     /* Rollback and free updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
