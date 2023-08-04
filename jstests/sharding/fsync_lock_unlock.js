@@ -24,6 +24,7 @@ const st = new ShardingTest({
     enableBalancer: true
 });
 const adminDB = st.s.getDB('admin');
+const distributed_txn_insert_count = 10;
 
 function waitUntilOpCountIs(opFilter, num, st) {
     assert.soon(() => {
@@ -40,6 +41,25 @@ function waitUntilOpCountIs(opFilter, num, st) {
         }
         return true;
     });
+}
+
+function runTransaction() {
+    load("jstests/libs/auto_retry_transaction_in_sharding.js");
+    // Start the transaction and insert a document.
+    const sessionOptions = {causalConsistency: false};
+    const session = db.getSiblingDB("test").getMongo().startSession(sessionOptions);
+    const sessionDb = session.getDatabase("test");
+    const sessionColl = sessionDb["collTest"];
+
+    session.endSession();
+
+    withTxnAndAutoRetryOnMongos(session, () => {
+        for (let i = 0; i < 10; i++) {
+            assert.commandWorked(sessionColl.insert({x: i}));
+        }
+    }, {});
+
+    jsTest.log("END txn in parallel shell");
 }
 
 let collectionCount = 1;
@@ -69,6 +89,21 @@ const performFsyncLockUnlockWithReadWriteOperations = function() {
     assert.commandWorked(coll.insert({x: 1}));
     collectionCount += 2;
     assert.eq(coll.count(), collectionCount);
+
+    // Ensure that distributed transactions are blocked when the cluster is locked
+    assert.commandWorked(st.s.adminCommand({fsync: 1, lock: true}));
+
+    let txnOpHandle = startParallelShell(runTransaction, st.s.port);
+
+    // Verify that txns are unsuccessful when cluster is locked.
+    assert.eq(collectionCount, st.s.getCollection(coll.getFullName()).countDocuments({}));
+    assert.commandWorked(st.s.adminCommand({fsyncUnlock: 1}));
+
+    txnOpHandle();
+    collectionCount += distributed_txn_insert_count;
+
+    // Verify that txns are successful after cluster is unlocked.
+    assert.eq(collectionCount, st.s.getCollection(coll.getFullName()).countDocuments({}));
 
     // Ensure that fsync (lock: false) still works by performing a write after invoking the command,
     // and checking the write is successful, showing the cluster does not need to be unlocked.
