@@ -95,25 +95,6 @@ namespace {
 // Unpacker for V1 uncompressed buckets
 class BucketUnpackerV1 : public BucketUnpacker::UnpackingImpl {
 public:
-    // A table that is useful for interpolations between the number of measurements in a bucket and
-    // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
-    // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
-    // timestamp BSONObj. The table is bounded by 16 MB (2 << 23 bytes) where the table entries are
-    // pairs of b_i and S_i for the lower bounds of the row key digit intervals [0, 9], [10, 99],
-    // [100, 999], [1000, 9999] and so on. The last entry in the table, S7, is the first entry to
-    // exceed the server BSON object limit of 16 MB.
-    static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
-        {{0, BSONObj::kMinBSONLength},
-         {10, 115},
-         {100, 1195},
-         {1000, 12895},
-         {10000, 138895},
-         {100000, 1488895},
-         {1000000, 15888895},
-         {10000000, 168888895}}};
-
-    static int computeElementCountFromTimestampObjSize(int targetTimestampObjSize);
-
     BucketUnpackerV1(const BSONElement& timeField);
 
     void addField(const BSONElement& field) override;
@@ -146,35 +127,6 @@ private:
     // phase according to the provided 'BucketSpec'.
     std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
 };
-
-// Calculates the number of measurements in a bucket given the 'targetTimestampObjSize' using the
-// 'BucketUnpacker::kTimestampObjSizeTable' table. If the 'targetTimestampObjSize' hits a record in
-// the table, this helper returns the measurement count corresponding to the table record.
-// Otherwise, the 'targetTimestampObjSize' is used to probe the table for the smallest {b_i, S_i}
-// pair such that 'targetTimestampObjSize' < S_i. Once the interval is found, the upper bound of the
-// pair for the interval is computed and then linear interpolation is used to compute the
-// measurement count corresponding to the 'targetTimestampObjSize' provided.
-int BucketUnpackerV1::computeElementCountFromTimestampObjSize(int targetTimestampObjSize) {
-    auto currentInterval =
-        std::find_if(std::begin(BucketUnpackerV1::kTimestampObjSizeTable),
-                     std::end(BucketUnpackerV1::kTimestampObjSizeTable),
-                     [&](const auto& entry) { return targetTimestampObjSize <= entry.second; });
-
-    if (currentInterval->second == targetTimestampObjSize) {
-        return currentInterval->first;
-    }
-    // This points to the first interval larger than the target 'targetTimestampObjSize', the actual
-    // interval that will cover the object size is the interval before the current one.
-    tassert(5422104,
-            "currentInterval should not point to the first table entry",
-            currentInterval > BucketUnpackerV1::kTimestampObjSizeTable.begin());
-    --currentInterval;
-
-    auto nDigitsInRowKey = 1 + (currentInterval - BucketUnpackerV1::kTimestampObjSizeTable.begin());
-
-    return currentInterval->first +
-        ((targetTimestampObjSize - currentInterval->second) / (10 + nDigitsInRowKey));
-}
 
 BucketUnpackerV1::BucketUnpackerV1(const BSONElement& timeField)
     : _timeFieldIter(BSONObjIterator{timeField.Obj()}) {}
@@ -659,41 +611,6 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     // Save the measurement count for the bucket.
     _numberOfMeasurements = _unpackingImpl->measurementCount(timeFieldElem);
     _hasNext = _numberOfMeasurements > 0;
-}
-
-int BucketUnpacker::computeMeasurementCount(const BSONObj& bucket, StringData timeField) {
-    auto&& controlField = bucket[timeseries::kBucketControlFieldName];
-    uassert(5857904,
-            "The $_internalUnpackBucket stage requires 'control' object to be present",
-            controlField && controlField.type() == BSONType::Object);
-
-    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
-    uassert(5857905,
-            "The $_internalUnpackBucket stage requires 'control.version' field to be present",
-            versionField && isNumericBSONType(versionField.type()));
-
-    auto&& dataField = bucket[timeseries::kBucketDataFieldName];
-    if (!dataField || dataField.type() != BSONType::Object)
-        return 0;
-
-    auto&& time = dataField.Obj()[timeField];
-    if (!time) {
-        return 0;
-    }
-
-    auto version = versionField.Number();
-    if (version == 1) {
-        return BucketUnpackerV1::computeElementCountFromTimestampObjSize(time.objsize());
-    } else if (version == 2) {
-        auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
-        if (countField && isNumericBSONType(countField.type())) {
-            return static_cast<int>(countField.Number());
-        }
-
-        return BSONColumn(time).size();
-    } else {
-        uasserted(5857901, "Invalid bucket version");
-    }
 }
 
 void BucketUnpacker::determineIncludeTimeField() {

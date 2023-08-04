@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <memory>
 
@@ -43,12 +44,10 @@ namespace mongo::sbe::value {
  * Note: Deblocked values are read-only and must not be modified.
  */
 struct DeblockedTagVals {
-    // 'tags' and 'vals' point to an array of 'count' elements.
+    // 'tags' and 'vals' point to an array of 'count' elements respectively.
     DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
         : count(count), tags(tags), vals(vals) {
-        tassert(7888701,
-                "Values must exist if _count > 0",
-                count == 0 || (tags != nullptr && vals != nullptr));
+        tassert(7888701, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
     }
 
     size_t count;
@@ -68,7 +67,9 @@ struct ValueBlock {
 
     /**
      * Returns the unowned deblocked values. The return value is only valid as long as the block
-     * remains alive.
+     * remains alive. The returned values must be dense, meaning that there are always same
+     * number of values as the count() of this block. The 'DeblockedTagVals.count' must always be
+     * equal to this block's count().
      */
     virtual DeblockedTagVals extract() = 0;
 
@@ -76,25 +77,46 @@ struct ValueBlock {
      * Returns a copy of this block.
      */
     virtual std::unique_ptr<ValueBlock> clone() const = 0;
+
+    /**
+     * Returns the number of values in this block in O(1) time, otherwise returns boost::none.
+     */
+    virtual boost::optional<size_t> tryCount() const = 0;
 };
 
 /**
- * A block that contains no values.
+ * A block that contains all same 'count' values.
  */
-class EmptyBlock final : public ValueBlock {
+class MonoBlock final : public ValueBlock {
 public:
-    EmptyBlock() : _deblockedTags(1, TypeTags::Nothing), _deblockedVals(1, Value(0)) {}
+    // Only store tag & val for the first value in vectors to avoid extracting all values upfront.
+    MonoBlock(size_t count, TypeTags tag, Value val)
+        : _count(count), _deblockedTags(1, tag), _deblockedVals(1, val) {
+        tassert(7962102, "The number of values must be > 0", count > 0);
+    }
 
     std::unique_ptr<ValueBlock> clone() const override {
-        return std::make_unique<EmptyBlock>();
+        return std::make_unique<MonoBlock>(_count, _deblockedTags[0], _deblockedVals[0]);
     }
 
     DeblockedTagVals extract() override {
-        return {1, &_deblockedTags[0], &_deblockedVals[0]};
+        if (_deblockedTags.size() != _count) {
+            _deblockedTags.resize(_count, _deblockedTags[0]);
+            _deblockedVals.resize(_count, _deblockedVals[0]);
+        }
+
+        return {_count, _deblockedTags.data(), _deblockedVals.data()};
+    }
+
+    boost::optional<size_t> tryCount() const override {
+        return _count;
     }
 
 private:
-    const std::vector<TypeTags> _deblockedTags;
-    const std::vector<Value> _deblockedVals;
+    // To lazily extract the values, we need to remember the number of values which is supposed to
+    // exist in this block.
+    size_t _count;
+    std::vector<TypeTags> _deblockedTags;
+    std::vector<Value> _deblockedVals;
 };
 }  // namespace mongo::sbe::value

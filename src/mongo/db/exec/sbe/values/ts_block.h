@@ -51,7 +51,9 @@ namespace mongo::sbe::value {
  */
 class TsBlock : public ValueBlock {
 public:
-    TsBlock(bool owned, TypeTags blockTag, Value blockVal);
+    // Note: This constructor is special and is only used by the TsCellBlock to create a TsBlock for
+    // a top-level field, where the 'ncells` is actually same as the number of values in this block.
+    TsBlock(size_t ncells, bool owned, TypeTags blockTag, Value blockVal);
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.
@@ -72,9 +74,16 @@ public:
         return {_deblockedTags.size(), &_deblockedTags[0], &_deblockedVals[0]};
     }
 
+    boost::optional<size_t> tryCount() const override {
+        return _count;
+    }
+
 private:
     void ensureDeblocked() {
         if (_deblockedTags.empty()) {
+            _deblockedTags.reserve(_count);
+            _deblockedVals.reserve(_count);
+
             if (_blockTag == TypeTags::bsonObject) {
                 deblockFromBsonObj();
             } else {
@@ -105,6 +114,9 @@ private:
     TypeTags _blockTag;
     Value _blockVal;
 
+    // The number of values in this block.
+    size_t _count;
+
     // Deblocked values may be examined on tags only for certain column operations, so we have two
     // separate vectors for tags and vals to facilitate such operations.
     std::vector<TypeTags> _deblockedTags;
@@ -131,7 +143,7 @@ public:
      * top-level), not for the value of paths "foo.a" or "foo.b". The top-level path does not
      * require path navigation.
      */
-    TsCellBlock(bool owned, TypeTags topLevelTag, Value topLevelVal);
+    TsCellBlock(size_t count, bool owned, TypeTags topLevelTag, Value topLevelVal);
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.

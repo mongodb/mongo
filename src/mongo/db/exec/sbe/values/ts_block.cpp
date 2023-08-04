@@ -42,8 +42,8 @@
 #include "mongo/util/itoa.h"
 
 namespace mongo::sbe::value {
-TsBlock::TsBlock(bool owned, TypeTags blockTag, Value blockVal)
-    : _blockOwned(owned), _blockTag(blockTag), _blockVal(blockVal) {
+TsBlock::TsBlock(size_t ncells, bool owned, TypeTags blockTag, Value blockVal)
+    : _blockOwned(owned), _blockTag(blockTag), _blockVal(blockVal), _count(ncells) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
 }
 
@@ -61,11 +61,12 @@ TsBlock::~TsBlock() {
 
 void TsBlock::deblockFromBsonObj() {
     ObjectEnumerator enumerator(TypeTags::bsonObject, _blockVal);
-    for (size_t i = 0; !enumerator.atEnd(); ++i) {
-        auto [tag, val] = [&]() -> std::pair<TypeTags, Value> {
-            if (ItoA(i) != enumerator.getFieldName()) {
-                // There's a missing index or a hole in the middle, so returns Nothing.
-                return {TypeTags::Nothing, Value(0)};
+    for (size_t i = 0; i < _count; ++i) {
+        auto [tag, val] = [&] {
+            if (enumerator.atEnd() || ItoA(i) != enumerator.getFieldName()) {
+                // There's a missing index or a hole in the middle or at the tail, so returns
+                // Nothing.
+                return std::make_pair(TypeTags::Nothing, Value(0));
             } else {
                 auto tagVal = enumerator.getViewOfValue();
                 enumerator.advance();
@@ -95,10 +96,13 @@ void TsBlock::deblockFromBsonColumn() {
         BSONBinData{value::getBSONBinData(TypeTags::bsonBinData, _blockVal),
                     static_cast<int>(value::getBSONBinDataSize(TypeTags::bsonBinData, _blockVal)),
                     BinDataType::Column});
-    for (auto& elem : blockColumn) {
+    auto it = blockColumn.begin();
+    for (size_t i = 0; i < _count; ++i) {
         // BSONColumn::Iterator decompresses values into its own buffer which is invalidated
         // whenever the iterator advances, so we need to copy them out.
-        auto [tag, val] = bson::convertFrom</*View*/ false>(elem);
+        auto [tag, val] = bson::convertFrom</*View*/ false>(*it);
+        ++it;
+
         ValueGuard guard(tag, val);
         _deblockedTags.push_back(tag);
         _deblockedVals.push_back(val);
@@ -110,7 +114,7 @@ std::unique_ptr<ValueBlock> TsBlock::clone() const {
     auto [cpyTag, cpyVal] = copyValue(_blockTag, _blockVal);
     ValueGuard guard(cpyTag, cpyVal);
     // The new copy must own the copied underlying buffer.
-    auto cpy = std::make_unique<TsBlock>(/*owned*/ true, cpyTag, cpyVal);
+    auto cpy = std::make_unique<TsBlock>(_count, /*owned*/ true, cpyTag, cpyVal);
     guard.reset();
 
     if (!_deblockedTags.empty()) {
@@ -136,8 +140,14 @@ const ValueBlock& TsCellBlock::getValueBlock() const {
 
 // The 'TsCellBlock' never owns the 'topLevelVal' and so it is always a view on the BSON provided
 // by the stage tree below.
-TsCellBlock::TsCellBlock(bool owned, TypeTags topLevelTag, Value topLevelVal)
-    : _blockTag(topLevelTag), _blockVal(topLevelVal), _tsBlock(owned, topLevelTag, topLevelVal) {
+TsCellBlock::TsCellBlock(size_t count, bool owned, TypeTags topLevelTag, Value topLevelVal)
+    : _blockTag(topLevelTag),
+      _blockVal(topLevelVal),
+      // The 'count' means the number of cells in this TsCellBlock and as of now, we only support
+      // top-level fields only, the number of values per cell is always 1 and the number of cells
+      // in this TsCellBlock is always the same as the number of values in '_tsBlock'. So, we pass
+      // 'count' to '_tsBlock' as the number of values in it.
+      _tsBlock(count, owned, topLevelTag, topLevelVal) {
     invariant(_blockTag == value::TypeTags::bsonObject ||
               _blockTag == value::TypeTags::bsonBinData);
 }

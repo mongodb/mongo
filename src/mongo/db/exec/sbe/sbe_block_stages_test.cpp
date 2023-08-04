@@ -349,7 +349,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithNoMeta) {
 }
 
 TEST_F(BlockStagesTest, UnpackBucketWithNoMeta_Yield) {
-    // The 'yieldAfter' == 1 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(bucketWithNoMeta),
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
@@ -365,7 +365,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta) {
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta_Yield) {
-    // The 'yieldAfter' == 0 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 0 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithNoMeta)),
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
@@ -389,6 +389,8 @@ const BSONObj bucketWithOneMissingField = fromjson(R"(
 		}
 	}
 })");
+// Note that the following test cases select only '_id" field and so, we will figure out the number
+// of measurements in a bucket from the time field.
 const auto cellPathsForBucketWithOneMissingField = std::vector<std::string>{{"_id"}};
 const auto tsOptionsForBucketWithOneMissingField =
     TimeseriesOptions::parse(IDLParserContext{"BlockStagesTest::UnpackBucketWithOneMissingField"},
@@ -407,7 +409,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithOneMissingField) {
 }
 
 TEST_F(BlockStagesTest, UnpackBucketWithOneMissingField_Yield) {
-    // The 'yieldAfter' == 0 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 0 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(bucketWithOneMissingField),
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
@@ -423,11 +425,59 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField) {
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField_Yield) {
-    // The 'yieldAfter' == 1 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingField)),
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
                         expectedDataForBucketWithOneMissingField,
+                        /*yieldAfter*/ 1);
+}
+
+// Note that this data has the 'control.count' field. It facilitates testing the case where we
+// extract the number of measurements in a bucket directly from it when the bucket is compressed.
+// To make sure that we are not relying on the 'time' field to figure out the number of measurements
+// in a bucket, we have set the 'time' field to 4 elements array which is actually invalid data.
+//
+// Stages under tests do not require 'control.min' and 'control.max' fields to be present though
+// they are mandatory fields. This data is not valid timeseries data.
+const BSONObj bucketWithOneMissingFieldAndCount = fromjson(R"(
+{
+	"_id" : ObjectId("64a33d9cdf56a62781061048"),
+	"control" : {"version" : 1, "count" : 3},
+	"meta" : "A",
+	"data" : {
+		"_id" : {"1" : 1},
+		"time" : {
+			"0" : {$date: "2023-06-30T21:29:00.568Z"},
+			"1" : {$date: "2023-06-30T21:29:09.968Z"},
+			"2" : {$date: "2023-06-30T21:29:15.088Z"},
+			"3" : {$date: "2023-06-30T21:29:19.088Z"}
+		}
+	}
+})");
+const auto cellPathsForBucketWithOneMissingFieldAndCount = std::vector<std::string>{{"_id"}};
+const auto tsOptionsForBucketWithOneMissingFieldAndCount = TimeseriesOptions::parse(
+    IDLParserContext{"BlockStagesTest::UnpackBucketWithOneMissingFieldAndCount"},
+    fromjson(R"({timeField: "time"})"));
+const auto expectedDataForBucketWithOneMissingFieldAndCount = std::vector{
+    fromjson(R"({})"),
+    fromjson(R"({"_id" : 1})"),
+    fromjson(R"({})"),
+};
+
+TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount) {
+    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
+                        cellPathsForBucketWithOneMissingFieldAndCount,
+                        tsOptionsForBucketWithOneMissingFieldAndCount,
+                        expectedDataForBucketWithOneMissingFieldAndCount);
+}
+
+TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount_Yield) {
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
+    runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithOneMissingFieldAndCount)),
+                        cellPathsForBucketWithOneMissingFieldAndCount,
+                        tsOptionsForBucketWithOneMissingFieldAndCount,
+                        expectedDataForBucketWithOneMissingFieldAndCount,
                         /*yieldAfter*/ 1);
 }
 
@@ -472,7 +522,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithMultipleMissingFields) {
 }
 
 TEST_F(BlockStagesTest, UnpackBucketWithMultipleMissingFields_Yield) {
-    // The 'yieldAfter' == 0 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 0 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(bucketWithMultipleMissingFields),
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
@@ -488,7 +538,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields) {
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields_Yield) {
-    // The 'yieldAfter' == 1 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithMultipleMissingFields)),
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
@@ -569,7 +619,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithArrayField) {
 }
 
 TEST_F(BlockStagesTest, UnpackBucketWithArrayField_Yield) {
-    // The 'yieldAfter' == 1 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(bucketWithArrayField),
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
@@ -585,7 +635,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField) {
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField_Yield) {
-    // The 'yieldAfter' == 0 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 0 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithArrayField)),
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
@@ -638,7 +688,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithObjectField) {
 }
 
 TEST_F(BlockStagesTest, UnpackBucketWithObjectField_Yield) {
-    // The 'yieldAfter' == 0 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 0 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(bucketWithObjectField),
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,
@@ -654,7 +704,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField) {
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField_Yield) {
-    // The 'yieldAfter' == 1 means that the execution plan will in the middle of the bucket.
+    // The 'yieldAfter' == 1 means that the execution plan will yield in the middle of the bucket.
     runUnpackBucketTest(BSON_ARRAY(compressBucket(bucketWithObjectField)),
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,

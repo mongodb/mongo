@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -36,17 +37,17 @@
 
 namespace mongo::sbe::value {
 /**
- * A cell block that contains no values.
+ * A cell block inside which no cells has an array and all cells are scalar.
  */
-class EmptyCellBlock : public CellBlock {
+class ScalarMonoCellBlock : public CellBlock {
 public:
-    EmptyCellBlock() = default;
+    ScalarMonoCellBlock(size_t count, TypeTags tag, Value val) : _block(count, tag, val) {}
 
     const ValueBlock& getValueBlock() const override {
         return _block;
     }
 
 private:
-    mutable EmptyBlock _block;
+    MonoBlock _block;
 };
 }  // namespace mongo::sbe::value

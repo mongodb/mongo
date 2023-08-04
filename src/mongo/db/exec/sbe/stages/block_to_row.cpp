@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo::sbe {
@@ -87,22 +88,16 @@ void BlockToRowStage::open(bool reOpen) {
 }
 
 PlanState BlockToRowStage::getNextFromDeblockedValues() {
-    bool allDone = true;
-    for (size_t i = 0; i < _blocks.size(); ++i) {
-        if (_curIdx >= _deblockedValueRuns[i].count) {
-            _valsOutAccessors[i].reset();
-            continue;
-        }
+    if (_curIdx >= _deblockedValueRuns[0].count) {
+        return PlanState::IS_EOF;
+    }
 
-        allDone = false;
+    for (size_t i = 0; i < _blocks.size(); ++i) {
         _valsOutAccessors[i].reset(_deblockedValueRuns[i].tags[_curIdx],
                                    _deblockedValueRuns[i].vals[_curIdx]);
     }
-    ++_curIdx;
 
-    if (allDone) {
-        return PlanState::IS_EOF;
-    }
+    ++_curIdx;
     return PlanState::ADVANCED;
 }
 
@@ -124,6 +119,13 @@ void BlockToRowStage::prepareDeblock() {
         // TODO SERVER-79629: Avoid cloning the block.
         _blocks.emplace_back(valueBlock->clone());
         _deblockedValueRuns.emplace_back(_blocks.back()->extract());
+        tassert(7962101, "Block's count must always be same as count of deblocked values", [&] {
+            if (auto optCnt = _blocks.back()->tryCount()) {
+                return *optCnt == _deblockedValueRuns.back().count;
+            } else {
+                return true;
+            }
+        }());
     }
 }
 

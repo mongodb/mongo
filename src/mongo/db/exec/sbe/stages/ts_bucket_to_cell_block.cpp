@@ -29,13 +29,19 @@
 
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 
+#include <cstddef>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/empty_cell_block.h"
+#include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -186,6 +192,9 @@ void TsBucketToCellBlockStage::initCellBlocks() {
     invariant(bucketTag == value::TypeTags::bsonObject);
 
     BSONObj bucketObj(value::getRawPointerView(bucketVal));
+    const int noOfMeasurements =
+        BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+    tassert(7962100, "1 or more measurements must exist", noOfMeasurements > 0);
 
     if (_metaOutSlotId && _hasMetaField) {
         auto metaElt = bucketObj[timeseries::kBucketMetaFieldName];
@@ -211,8 +220,8 @@ void TsBucketToCellBlockStage::initCellBlocks() {
 
                     // Up to this point, the stage tree below owns the underlying buffer for the
                     // bucket and the TsCellBlock must not own it.
-                    _tsCellBlocks[i] =
-                        std::make_unique<value::TsCellBlock>(/*owned*/ false, blockTag, blockVal);
+                    _tsCellBlocks[i] = std::make_unique<value::TsCellBlock>(
+                        noOfMeasurements, /*owned*/ false, blockTag, blockVal);
                 }
 
                 _blocksOutAccessor[i].reset(
@@ -223,13 +232,12 @@ void TsBucketToCellBlockStage::initCellBlocks() {
         }
     }
 
-    // Any block slots that are still Nothing get filled with an EmptyBlock. This way later stages
-    // do not have to deal with block slots being Nothing.
-    //
-    // Note: We may change this to a MonoBlock of Nothing values.
+    // Any block slots that are still Nothing get filled with an ScalarMonoCellBlock of Nothing.
+    // This way later stages do not have to deal with block slots being Nothing.
     for (size_t i = 0; i < _blocksOutAccessor.size(); ++i) {
         if (_blocksOutAccessor[i].getViewOfValue().first == value::TypeTags::Nothing) {
-            auto emptyBlock = std::make_unique<value::EmptyCellBlock>();
+            auto emptyBlock = std::make_unique<value::ScalarMonoCellBlock>(
+                noOfMeasurements, value::TypeTags::Nothing, value::Value(0));
             _blocksOutAccessor[i].reset(
                 true,
                 value::TypeTags::cellBlock,
