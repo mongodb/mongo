@@ -63,6 +63,7 @@
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
 
 
@@ -151,11 +152,6 @@ public:
             // TODO: consider rid?
             return;
         }
-        if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
-            // Cannot satisfy remove orphans. The enforcer for a group representing a scan will
-            // produce an alternative which performs shard filtering.
-            return;
-        }
 
         const auto& indexReq = getPropertyConst<IndexingRequirement>(_physProps);
         const IndexReqTarget indexReqTarget = indexReq.getIndexReqTarget();
@@ -211,26 +207,56 @@ public:
             }
         }
 
+        // If shard filtering is necessary, do up-front prep to push top-level fields down into the
+        // scan.
+        const bool mustRemoveOrphans =
+            getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove();
+        if (mustRemoveOrphans) {
+            const auto& topLevelFieldNames = _metadata._scanDefs.at(node.getScanDefName())
+                                                 .getDistributionAndPaths()
+                                                 ._topLevelShardKeyFieldNames;
+            for (auto& fieldName : topLevelFieldNames) {
+                if (!fieldProjectionMap._fieldProjections.contains(fieldName)) {
+                    auto projName = _prefixId.getNextId("shardKey");
+                    fieldProjectionMap._fieldProjections.insert({fieldName, projName});
+                }
+            }
+        }
+        PhysPlanBuilder builder;
+        // Construct the Seek or Scan Node
         if (indexReqTarget == IndexReqTarget::Seek) {
-            PhysPlanBuilder builder;
             // If optimizing a Seek, override CE to 1.0.
             builder.make<SeekNode>(
-                CEType{1.0}, ridProjName, std::move(fieldProjectionMap), node.getScanDefName());
+                CEType{1.0}, ridProjName, fieldProjectionMap, node.getScanDefName());
             builder.make<LimitSkipNode>(
                 CEType{1.0}, LimitSkipRequirement{1, 0}, std::move(builder._node));
-
-            optimizeChildrenNoAssert(_queue,
-                                     kDefaultPriority,
-                                     PhysicalRewriteType::Seek,
-                                     std::move(builder._node),
-                                     {},
-                                     std::move(builder._nodeCEMap));
         } else {
-            ABT physicalScan = make<PhysicalScanNode>(
-                std::move(fieldProjectionMap), node.getScanDefName(), canUseParallelScan);
-            optimizeChild<PhysicalScanNode, PhysicalRewriteType::PhysicalScan>(
-                _queue, kDefaultPriority, std::move(physicalScan));
+            builder.make<PhysicalScanNode>(
+                getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate(),
+                fieldProjectionMap,
+                node.getScanDefName(),
+                canUseParallelScan);
         }
+        // If needed, add EvaluationNodes to collect the shard key from dotted paths.
+        if (mustRemoveOrphans) {
+            handleScanNodeRemoveOrphansRequirement(
+                _metadata._scanDefs.at(node.getScanDefName()).getDistributionAndPaths()._paths,
+                builder,
+                fieldProjectionMap,
+                indexReqTarget,
+                getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate(),
+                _prefixId);
+        }
+
+        // Optimize the plan
+        optimizeChildrenNoAssert(_queue,
+                                 kDefaultPriority,
+                                 indexReqTarget == IndexReqTarget::Seek
+                                     ? PhysicalRewriteType::Seek
+                                     : PhysicalRewriteType::PhysicalScan,
+                                 std::move(builder._node),
+                                 {} /*childProps*/,
+                                 std::move(builder._nodeCEMap));
     }
 
     void operator()(const ABT& n, const ValueScanNode& node) {

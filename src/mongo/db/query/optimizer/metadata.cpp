@@ -45,11 +45,26 @@
 
 namespace mongo::optimizer {
 
+// Computes the top level field names and returns. Used to populate _topLevelShardKeyFieldNames
+// field.
+static std::vector<FieldNameType> computeTopLevelShardKeyFields(const ABTVector& paths) {
+    auto topLevelShardKeyFieldNames = std::vector<FieldNameType>{};
+    for (auto& path : paths) {
+        const PathGet* pathGet = path.cast<PathGet>();
+        tassert(7903401, "First component of shard key field was not a PathGet", pathGet);
+        const auto& fieldName = FieldNameType{pathGet->name().value().toString()};
+        topLevelShardKeyFieldNames.push_back(fieldName);
+    }
+    return topLevelShardKeyFieldNames;
+}
+
 DistributionAndPaths::DistributionAndPaths(DistributionType type)
     : DistributionAndPaths(type, {}) {}
 
 DistributionAndPaths::DistributionAndPaths(DistributionType type, ABTVector paths)
-    : _type(type), _paths(std::move(paths)) {
+    : _type(type),
+      _paths(std::move(paths)),
+      _topLevelShardKeyFieldNames(computeTopLevelShardKeyFields(_paths)) {
     uassert(6624080,
             "Invalid distribution type",
             _paths.empty() || _type == DistributionType::HashPartitioning ||

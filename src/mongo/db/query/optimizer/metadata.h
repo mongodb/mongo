@@ -40,6 +40,7 @@
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
@@ -71,8 +72,14 @@ struct DistributionAndPaths {
      * need any paths.
      */
     ABTVector _paths;
-};
 
+    /**
+     * In the event that we need shard filtering, the top level field name of each shard key path
+     * will pushed down into a Scan to prevent costly PathGet operations. This field is initialized
+     * in the constructor.
+     */
+    std::vector<FieldNameType> _topLevelShardKeyFieldNames;
+};
 
 /**
  * Structure to represent index field component and its associated collation. The _path field

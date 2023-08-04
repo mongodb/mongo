@@ -332,7 +332,7 @@ public:
         childPropsMap.emplace_back(childPtr, std::move(childProps));
 
         optimizeChildrenNoAssert(_queue,
-                                 kDefaultPriority,
+                                 999.0 /* large priority to discourage this rewrite */,
                                  PhysicalRewriteType::EnforceShardFilter,
                                  std::move(builder._node),
                                  std::move(childPropsMap),

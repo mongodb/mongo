@@ -491,4 +491,16 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 bool useSortedMerge);
 
 bool hasProperIntervals(const PSRExpr::Node& reqs);
+
+/**
+ * Builds the evaluation nodes necessary to retrieve all non-top-level fields from each shard key
+ * path, and the filter node needed to perform shard filtering. Determines the CE of the nodes
+ * according to the indexReqTarget.
+ */
+void handleScanNodeRemoveOrphansRequirement(const ABTVector& shardKeyPaths,
+                                            PhysPlanBuilder& builder,
+                                            FieldProjectionMap& fieldProjectionMap,
+                                            IndexReqTarget indexReqTarget,
+                                            CEType groupCE,
+                                            PrefixId& prefixId);
 }  // namespace mongo::optimizer
