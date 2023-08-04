@@ -714,7 +714,7 @@ __curtable_reserve(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update);
+    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, reserve);
 
     /*
      * We don't have to open the indices here, but it makes the code similar to other cursor

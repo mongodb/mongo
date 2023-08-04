@@ -427,7 +427,7 @@ __wt_curfile_insert_check(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     tret = 0;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update);
+    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, insert_check);
     WT_ERR(__cursor_copy_release(cursor));
     WT_ERR(__cursor_checkkey(cursor));
 

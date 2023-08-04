@@ -129,7 +129,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
     raw = F_MASK(cursor, WT_CURSTD_RAW);
-    CURSOR_API_CALL(cursor, session, get_value, btree);
+    CURSOR_API_CALL(cursor, session, next, btree);
     F_CLR(cursor, WT_CURSTD_RAW);
 
     if (!F_ISSET(cb, WT_CURBACKUP_INCR_INIT) &&

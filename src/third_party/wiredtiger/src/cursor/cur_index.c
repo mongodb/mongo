@@ -299,7 +299,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
 
     /*
      * We are searching using the application-specified key, which (usually) doesn't contain the
