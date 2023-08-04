@@ -48,6 +48,9 @@ selector:
   - jstests/core/txns/currentop_blocked_operations.js
   # Checks for collation at top level in profile
   - jstests/core/txns/transactions_profiling_with_drops.js
+  # The conditions of this test returns a different error for delete compared to the function bulkWrite uses.
+  # bulkWrite is consistent with the other CRUD operations here.
+  - jstests/core/txns/multi_statement_transaction_write_error.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

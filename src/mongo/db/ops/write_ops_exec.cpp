@@ -1700,11 +1700,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         }
     }
 
-    if (const auto& coll = collection.getCollectionPtr()) {
-        // Transactions are not allowed to operate on capped collections.
-        uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
-    }
-
     ParsedDelete parsedDelete(opCtx,
                               &request,
                               collection.getCollectionPtr(),

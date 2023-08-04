@@ -183,7 +183,7 @@ exerciseWriteInTxn({
 runInTxn({
     cmd: {delete: cappedCollName, deletes: [{q: {}, limit: 1}]},
     msg: `delete from ${cappedCollName}`,
-    code: ErrorCodes.OperationNotSupportedInTransaction,
+    code: ErrorCodes.IllegalOperation,
     nExpected: 0,
     expectedErrorIndex: 0
 });
