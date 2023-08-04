@@ -162,7 +162,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         hangBeforeDoingDeletion.pauseWhileSet(opCtx);
     }
 
-    int numDeleted = 0;
+    long long bytesDeleted = 0;
+    int numDocsDeleted = 0;
     do {
         BSONObj deletedObj;
 
@@ -199,12 +200,14 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
             break;
         }
 
+        bytesDeleted += deletedObj.objsize();
         invariant(PlanExecutor::ADVANCED == state);
-        ShardingStatistics::get(opCtx).countDocsDeletedByRangeDeleter.addAndFetch(1);
+    } while (++numDocsDeleted < numDocsToRemovePerBatch);
 
-    } while (++numDeleted < numDocsToRemovePerBatch);
+    ShardingStatistics::get(opCtx).countDocsDeletedByRangeDeleter.addAndFetch(numDocsDeleted);
+    ShardingStatistics::get(opCtx).countBytesDeletedByRangeDeleter.addAndFetch(bytesDeleted);
 
-    return numDeleted;
+    return numDocsDeleted;
 }
 
 void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,

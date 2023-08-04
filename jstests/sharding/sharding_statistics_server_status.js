@@ -13,20 +13,27 @@ load("jstests/libs/chunk_manipulation_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/wait_for_command.js");
 
+// Documents inserted in this test are in the shape {_id: int} so the size is 18 bytes
+const docSizeInBytes = 18;
+
 function ShardStat() {
     this.countDonorMoveChunkStarted = 0;
     this.countRecipientMoveChunkStarted = 0;
     this.countDocsClonedOnRecipient = 0;
     this.countDocsClonedOnDonor = 0;
     this.countDocsDeletedByRangeDeleter = 0;
+    this.countBytesDeletedByRangeDeleter = 0;
 }
 
-function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
+function incrementStatsAndCheckServerShardStats(db, donor, recipient, numDocs) {
     ++donor.countDonorMoveChunkStarted;
     donor.countDocsClonedOnDonor += numDocs;
     ++recipient.countRecipientMoveChunkStarted;
     recipient.countDocsClonedOnRecipient += numDocs;
     donor.countDocsDeletedByRangeDeleter += numDocs;
+    // The size of each document inserted in this test is 1 byte, so the number of bytes
+    // deleted must be exactly `numDocs`
+    donor.countBytesDeletedByRangeDeleter += numDocs * docSizeInBytes;
     const statsFromServerStatus = shardArr.map(function(shardVal) {
         return shardVal.getDB('admin').runCommand({serverStatus: 1}).shardingStatistics;
     });
@@ -47,6 +54,12 @@ function incrementStatsAndCheckServerShardStats(donor, recipient, numDocs) {
                   statsFromServerStatus[i].countDocsClonedOnRecipient);
         assert.eq(stats[i].countDocsClonedOnDonor, statsFromServerStatus[i].countDocsClonedOnDonor);
         assert.eq(stats[i].countDocsDeletedByRangeDeleter, countDocsDeleted);
+        const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '7.0') >=
+            0) {
+            assert.eq(stats[i].countBytesDeletedByRangeDeleter,
+                      statsFromServerStatus[i].countBytesDeletedByRangeDeleter);
+        }
         assert.eq(stats[i].countRecipientMoveChunkStarted,
                   statsFromServerStatus[i].countRecipientMoveChunkStarted);
     }
@@ -143,19 +156,16 @@ assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
 // Check the number of sharded collections.
 const testDB = st.rs0.getPrimary().getDB(dbName);
-const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '6.3') >= 0) {
-    st.shardColl(dbName + ".coll2", {_id: 1}, false);
-    st.shardColl(dbName + ".coll3", {_id: 1}, false);
-    const configCollections = mongos.getCollection("config.collections");
-    checkServerStatusNumShardedCollections(st.configRS.getPrimary(),
-                                           configCollections.countDocuments({}));
-}
+st.shardColl(dbName + ".coll2", {_id: 1}, false);
+st.shardColl(dbName + ".coll3", {_id: 1}, false);
+const configCollections = mongos.getCollection("config.collections");
+checkServerStatusNumShardedCollections(st.configRS.getPrimary(),
+                                       configCollections.countDocuments({}));
 
 // Move chunk from shard0 to shard1 without docs.
 assert.commandWorked(
     mongos.adminCommand({moveChunk: coll + '', find: {_id: 1}, to: st.shard1.shardName}));
-incrementStatsAndCheckServerShardStats(stats[0], stats[1], numDocsInserted);
+incrementStatsAndCheckServerShardStats(testDB, stats[0], stats[1], numDocsInserted);
 
 // Insert docs and then move chunk again from shard1 to shard0.
 for (let i = 0; i < numDocsToInsert; ++i) {
@@ -164,17 +174,17 @@ for (let i = 0; i < numDocsToInsert; ++i) {
 }
 assert.commandWorked(mongos.adminCommand(
     {moveChunk: coll + '', find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
-incrementStatsAndCheckServerShardStats(stats[1], stats[0], numDocsInserted);
+incrementStatsAndCheckServerShardStats(testDB, stats[1], stats[0], numDocsInserted);
 
 // Check that numbers are indeed cumulative. Move chunk from shard0 to shard1.
 assert.commandWorked(mongos.adminCommand(
     {moveChunk: coll + '', find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}));
-incrementStatsAndCheckServerShardStats(stats[0], stats[1], numDocsInserted);
+incrementStatsAndCheckServerShardStats(testDB, stats[0], stats[1], numDocsInserted);
 
 // Move chunk from shard1 to shard0.
 assert.commandWorked(mongos.adminCommand(
     {moveChunk: coll + '', find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
-incrementStatsAndCheckServerShardStats(stats[1], stats[0], numDocsInserted);
+incrementStatsAndCheckServerShardStats(testDB, stats[1], stats[0], numDocsInserted);
 
 //
 // Tests for the count of migrations aborting from lock timeouts.

@@ -91,6 +91,10 @@ struct ShardingStatistics {
     // rangeDeleter.
     AtomicWord<long long> countDocsDeletedByRangeDeleter{0};
 
+    // Cumulative, always-increasing counter of how many bytes have been deleted by the
+    // rangeDeleter.
+    AtomicWord<long long> countBytesDeletedByRangeDeleter{0};
+
     // Cumulative, always-increasing counter of how many chunks this node started to receive
     // (whether the receiving succeeded or not)
     AtomicWord<long long> countRecipientMoveChunkStarted{0};
