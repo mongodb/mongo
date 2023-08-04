@@ -10,6 +10,7 @@
 -r components/idl.req
 
 -r components/aws.req
+-r components/external_auth.req
 -r components/jiraclient.req
 
 -r components/platform.req
