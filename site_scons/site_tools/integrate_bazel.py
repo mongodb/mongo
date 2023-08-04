@@ -1,5 +1,7 @@
 import os
 import SCons
+import stat
+import urllib.request
 
 # Note: The /tmp location is, ironically, temporary. We expect to implement Bazilisk-installation
 # as a standard part of the Bazel solution soon.
@@ -36,10 +38,13 @@ def generate(env):
                                source=[])  # `source` is required, even though it is empty
 
     if env.get("BAZEL_BUILD_ENABLED"):
-        if not os.path.isfile(BAZELISK_PATH):
-            raise Exception(
-                f"Bazelisk installation is missing; please see docs/bazel.md for setup instructions"
-            )
+        if not os.path.exists("bazelisk"):
+            urllib.request.urlretrieve(
+                "https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64",
+                "bazelisk")
+            os.chmod("bazelisk", stat.S_IXUSR)
+
+        BAZELISK_PATH = os.path.abspath("bazelisk")
         env['BUILDERS']['BazelLibrary'] = bazel_library
     else:
         env['BUILDERS']['BazelLibrary'] = env['BUILDERS']['Library']

@@ -278,6 +278,7 @@ bazel-bin
 bazel-mongo*
 bazel-out
 bazel-testlogs
+bazelisk
 
 # generated configs for antithesis
 antithesis/antithesis_config
