@@ -107,7 +107,7 @@ export const $config = (function() {
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
         });
 
-        const logColl = db[data.logColl];
+        const logColl = db[this.logColl];
 
         const deletedSensors = logColl.distinct("sensorId");
         const nSensorsRemaining = data.nSensors - deletedSensors.length;
