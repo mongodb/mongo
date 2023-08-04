@@ -55,9 +55,6 @@
 namespace mongo::transport::grpc {
 namespace {
 
-/**
- * TODO SERVER-74021: add documentation for the test fixture.
- */
 class GRPCTransportLayerTest : public ServiceContextWithClockSourceMockTest {
 public:
     void setUp() override {
@@ -102,6 +99,11 @@ public:
         };
     }
 
+    /**
+     * Creates a GRPCTransportLayer using the provided RPCHandler and options, sets it up, starts
+     * it, and then passes it to the provided callback, automatically shutting it down after the
+     * callback completes.
+     */
     void runWithTL(CommandService::RPCHandler serverCb,
                    std::function<void(GRPCTransportLayer&)> cb,
                    GRPCTransportLayer::Options options) {
