@@ -275,8 +275,8 @@ StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
     }
 
     auto it = registry.bucketStates.find(bucketId);
-    invariant(it != registry.bucketStates.end() &&
-              stdx::holds_alternative<BucketState>(it->second));
+    invariant(it != registry.bucketStates.end());
+    invariant(stdx::holds_alternative<BucketState>(it->second));
     invariant(isBucketStatePrepared(it->second));
 
     auto bucketState = stdx::get<BucketState>(it->second);
@@ -331,8 +331,8 @@ void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId) 
     stdx::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
-    invariant(it != registry.bucketStates.end() &&
-              stdx::holds_alternative<DirectWriteCounter>(it->second));
+    invariant(it != registry.bucketStates.end());
+    invariant(stdx::holds_alternative<DirectWriteCounter>(it->second));
 
     bool removingFinalDirectWrite = true;
     auto directWriteCount = stdx::get<DirectWriteCounter>(it->second);
