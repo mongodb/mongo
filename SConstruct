@@ -925,7 +925,6 @@ def variable_tools_converter(val):
         "mongo_libfuzzer",
         "mongo_pretty_printer_tests",
         "textfile",
-        "mongo_workload_simulator",
     ]
 
 
