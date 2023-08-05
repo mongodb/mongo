@@ -457,40 +457,38 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 InMatchExpression::InMatchExpression(boost::optional<StringData> path,
                                      clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
-      _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator) {}
+      _equalities(std::make_shared<InListData>()) {}
+
+InMatchExpression::InMatchExpression(boost::optional<StringData> path,
+                                     clonable_ptr<ErrorAnnotation> annotation,
+                                     std::shared_ptr<InListData> equalities)
+    : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
+      _equalities(std::move(equalities)) {}
 
 std::unique_ptr<MatchExpression> InMatchExpression::clone() const {
-    auto next = std::make_unique<InMatchExpression>(path(), _errorAnnotation);
-    next->setCollator(_collator);
+    auto ime = std::make_unique<InMatchExpression>(path(), _errorAnnotation, _equalities->clone());
+
     if (getTag()) {
-        next->setTag(getTag()->clone());
+        ime->setTag(getTag()->clone());
     }
-    next->_hasNull = _hasNull;
-    next->_hasEmptyArray = _hasEmptyArray;
-    next->_hasEmptyObject = _hasEmptyObject;
-    next->_hasNonEmptyArrayOrObject = _hasNonEmptyArrayOrObject;
-    next->_equalitySet = _equalitySet;
-    next->_originalEqualityVector = _originalEqualityVector;
-    next->_equalityStorage = _equalityStorage;
+
     for (auto&& regex : _regexes) {
         std::unique_ptr<RegexMatchExpression> clonedRegex(
             static_cast<RegexMatchExpression*>(regex->clone().release()));
-        next->_regexes.push_back(std::move(clonedRegex));
+        ime->_regexes.push_back(std::move(clonedRegex));
     }
-    if (getInputParamId()) {
-        next->setInputParamId(*getInputParamId());
-    }
-    return next;
-}
 
-bool InMatchExpression::contains(const BSONElement& e) const {
-    return std::binary_search(_equalitySet.begin(), _equalitySet.end(), e, _eltCmp.makeLessThan());
+    if (getInputParamId()) {
+        ime->setInputParamId(*getInputParamId());
+    }
+
+    return ime;
 }
 
 bool InMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     // When an $in has a null, it adopts the same semantics as {$eq:null}. Namely, in addition to
     // matching literal null values, the $in should match missing and undefined.
-    if (_hasNull && (e.eoo() || e.type() == BSONType::Undefined)) {
+    if (hasNull() && (e.eoo() || e.type() == BSONType::Undefined)) {
         return true;
     }
     if (contains(e)) {
@@ -508,44 +506,32 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " $in ";
     debug << "[ ";
-    for (auto&& equality : _equalitySet) {
-        debug << equality.toString(false) << " ";
-    }
+
+    _equalities->writeToStream(debug);
+
     for (auto&& regex : _regexes) {
         regex->shortDebugString(debug);
         debug << " ";
     }
     debug << "]";
+
     _debugStringAttachTagInfo(&debug);
 }
 
-namespace {
-/**
- * Reduces the potentially large vector of elements to just the first of each "canonical" type.
- * Different types of numbers are not considered distinct.
- *
- * For example, collapses [2, 4, NumberInt(3), "string", "another", 3, 5] into just [2, "string"].
- */
-std::vector<Value> justFirstOfEachType(std::vector<BSONElement> elems) {
-    stdx::unordered_set<int> seenTypes;
-    std::vector<Value> result;
-    for (auto&& elem : elems) {
-        bool inserted = seenTypes.insert(canonicalizeBSONType(elem.type())).second;
-        if (inserted) {
-            // A new type.
-            result.emplace_back(elem);
-        }
-    }
-    return result;
-}
-}  // namespace
-
 void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
                                          const SerializationOptions& opts) const {
-    std::vector<Value> firstOfEachType = justFirstOfEachType(_equalitySet);
+    auto firstElementOfEachType =
+        _equalities->getFirstOfEachType(opts.inMatchExprSortAndDedupElements);
+
+    std::vector<Value> firstOfEachType;
+    for (auto&& elem : firstElementOfEachType) {
+        firstOfEachType.emplace_back(elem);
+    }
+
     if (hasRegex()) {
         firstOfEachType.emplace_back(BSONRegEx());
     }
+
     opts.appendLiteral(bob, "$in", std::move(firstOfEachType));
 }
 
@@ -557,118 +543,64 @@ void InMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
     }
 
     BSONArrayBuilder arrBob(bob->subarrayStart("$in"));
-    for (auto&& _equality : _equalitySet) {
-        arrBob.append(_equality);
-    }
-    for (auto&& _regex : _regexes) {
+
+    _equalities->appendElements(arrBob, opts.inMatchExprSortAndDedupElements);
+
+    for (auto&& regex : _regexes) {
         BSONObjBuilder regexBob;
-        _regex->serializeToBSONTypeRegex(&regexBob);
+        regex->serializeToBSONTypeRegex(&regexBob);
         arrBob.append(regexBob.obj().firstElement());
     }
+
     arrBob.doneFast();
 }
 
 bool InMatchExpression::equivalent(const MatchExpression* other) const {
+    constexpr BSONObj::ComparisonRulesSet kIgnoreFieldName = 0;
+
     if (matchType() != other->matchType()) {
         return false;
     }
-    const InMatchExpression* realOther = static_cast<const InMatchExpression*>(other);
-    if (path() != realOther->path()) {
+
+    const InMatchExpression* ime = static_cast<const InMatchExpression*>(other);
+    if (path() != ime->path() || _regexes.size() != ime->_regexes.size()) {
         return false;
     }
-    if (_hasNull != realOther->_hasNull) {
+
+    if (_equalities->getTypeMask() != ime->_equalities->getTypeMask() ||
+        !CollatorInterface::collatorsMatch(_equalities->getCollator(),
+                                           ime->_equalities->getCollator())) {
         return false;
     }
-    if (_regexes.size() != realOther->_regexes.size()) {
+
+    const auto& elems = _equalities->getElements();
+    const auto& otherElems = ime->_equalities->getElements();
+    if (elems.size() != otherElems.size()) {
         return false;
     }
+
+    auto coll = _equalities->getCollator();
+    auto thisEqIt = elems.begin();
+    auto thisEqEndIt = elems.end();
+    auto otherEqIt = otherElems.begin();
+    for (; thisEqIt != thisEqEndIt; ++thisEqIt, ++otherEqIt) {
+        if (thisEqIt->woCompare(*otherEqIt, kIgnoreFieldName, coll)) {
+            return false;
+        }
+    }
+
     for (size_t i = 0; i < _regexes.size(); ++i) {
-        if (!_regexes[i]->equivalent(realOther->_regexes[i].get())) {
+        if (!_regexes[i]->equivalent(ime->_regexes[i].get())) {
             return false;
         }
     }
-    if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
-        return false;
-    }
-    // We use an element-wise comparison to check equivalence of '_equalitySet'.  Unfortunately, we
-    // can't use BSONElementSet::operator==(), as it does not use the comparator object the set is
-    // initialized with (and as such, it is not collation-aware).
-    if (_equalitySet.size() != realOther->_equalitySet.size()) {
-        return false;
-    }
-    auto thisEqIt = _equalitySet.begin();
-    auto otherEqIt = realOther->_equalitySet.begin();
-    for (; thisEqIt != _equalitySet.end(); ++thisEqIt, ++otherEqIt) {
-        const bool considerFieldName = false;
-        if (thisEqIt->woCompare(*otherEqIt, considerFieldName, _collator)) {
-            return false;
-        }
-    }
-    invariant(otherEqIt == realOther->_equalitySet.end());
+
     return true;
 }
 
 void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
-    _collator = collator;
-    _eltCmp = BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, _collator);
-
-    if (!std::is_sorted(_originalEqualityVector.begin(),
-                        _originalEqualityVector.end(),
-                        _eltCmp.makeLessThan())) {
-        std::sort(
-            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeLessThan());
-    }
-
-    // We need to re-compute '_equalitySet', since our set comparator has changed.
-    _equalitySet.clear();
-    _equalitySet.reserve(_originalEqualityVector.size());
-    std::unique_copy(_originalEqualityVector.begin(),
-                     _originalEqualityVector.end(),
-                     std::back_inserter(_equalitySet),
-                     _eltCmp.makeEqualTo());
-}
-
-Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
-    for (auto&& equality : equalities) {
-        if (equality.type() == BSONType::RegEx) {
-            return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be a regex");
-        }
-        if (equality.type() == BSONType::Undefined) {
-            return Status(ErrorCodes::BadValue, "InMatchExpression equality cannot be undefined");
-        }
-
-        if (equality.type() == BSONType::jstNULL) {
-            _hasNull = true;
-        } else if (equality.type() == BSONType::Array && equality.Obj().isEmpty()) {
-            _hasEmptyArray = true;
-        } else if (equality.type() == BSONType::Object && equality.Obj().isEmpty()) {
-            _hasEmptyObject = true;
-        } else if (equality.type() == BSONType::Array || equality.type() == BSONType::Object) {
-            _hasNonEmptyArrayOrObject = true;
-        }
-    }
-
-    _originalEqualityVector = std::move(equalities);
-
-    if (!std::is_sorted(_originalEqualityVector.begin(),
-                        _originalEqualityVector.end(),
-                        _eltCmp.makeLessThan())) {
-        std::sort(
-            _originalEqualityVector.begin(), _originalEqualityVector.end(), _eltCmp.makeLessThan());
-    }
-
-    _equalitySet.clear();
-    _equalitySet.reserve(_originalEqualityVector.size());
-    std::unique_copy(_originalEqualityVector.begin(),
-                     _originalEqualityVector.end(),
-                     std::back_inserter(_equalitySet),
-                     _eltCmp.makeEqualTo());
-
-    return Status::OK();
-}
-
-void InMatchExpression::setBackingBSON(BSONObj equalityStorage) {
-    _equalityStorage = std::move(equalityStorage);
+    cloneEqualitiesBeforeWriteIfNeeded();
+    _equalities->setCollator(collator);
 }
 
 Status InMatchExpression::addRegex(std::unique_ptr<RegexMatchExpression> expr) {
@@ -680,13 +612,13 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
     return [](std::unique_ptr<MatchExpression> expression) -> std::unique_ptr<MatchExpression> {
         // NOTE: We do not recursively call optimize() on the RegexMatchExpression children in the
         // _regexes list. We assume that optimize() on a RegexMatchExpression is a no-op.
+        auto& ime = static_cast<InMatchExpression&>(*expression);
+        auto& regexes = ime._regexes;
+        auto collator = ime.getCollator();
 
-        auto& regexList = static_cast<InMatchExpression&>(*expression)._regexes;
-        auto& equalitySet = static_cast<InMatchExpression&>(*expression)._equalitySet;
-        auto collator = static_cast<InMatchExpression&>(*expression).getCollator();
-        if (regexList.size() == 1 && equalitySet.empty()) {
+        if (regexes.size() == 1 && ime._equalities->elementsIsEmpty()) {
             // Simplify IN of exactly one regex to be a regex match.
-            auto& childRe = regexList.front();
+            auto& childRe = regexes.front();
             invariant(!childRe->getTag());
 
             auto simplifiedExpression = std::make_unique<RegexMatchExpression>(
@@ -695,10 +627,10 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
                 simplifiedExpression->setTag(expression->getTag()->clone());
             }
             return simplifiedExpression;
-        } else if (equalitySet.size() == 1 && regexList.empty()) {
+        } else if (ime._equalities->hasSingleElement() && regexes.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
             auto simplifiedExpression = std::make_unique<EqualityMatchExpression>(
-                expression->path(), *(equalitySet.begin()));
+                expression->path(), *(ime._equalities->getElements().begin()));
             simplifiedExpression->setCollator(collator);
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());

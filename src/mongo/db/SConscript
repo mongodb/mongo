@@ -1720,6 +1720,7 @@ env.Library(
         'matcher/extensions_callback.cpp',
         'matcher/extensions_callback_noop.cpp',
         'matcher/implicit_validator.cpp',
+        'matcher/in_list_data.cpp',
         'matcher/match_details.cpp',
         'matcher/match_expression_dependencies.cpp',
         'matcher/match_expression_util.cpp',

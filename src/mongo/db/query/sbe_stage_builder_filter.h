@@ -72,19 +72,6 @@ EvalExpr generateFilter(StageBuilderState& state,
                         bool isFilterOverIxscan = false);
 
 /**
- * Converts the list of equalities inside the given $in expression ('expr') into an SBE array, which
- * is returned as a (typeTag, value) pair. The caller owns the resulting value.
- *
- * The returned tuple also includes three booleans, in this order:
- *  - 'hasArray': True if at least one of the values inside the $in equality list is an array.
- *  - 'hasObject': True if at least one of the values inside the $in equality list is an object.
- *  - 'hasNull': True if at least one of the values inside the $in equality list is a literal null
- * value.
- */
-std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
-    const InMatchExpression* expr, const CollatorInterface* coll);
-
-/**
  * Converts the list of bit positions inside of any of the bit-test match expressions
  * ($bitsAllClear, $bitsAllSet, $bitsAnyClear, and $bitsAnySet) to an SBE array, returned as a
  * (typeTag, value) pair. The caller owns the resulting value.

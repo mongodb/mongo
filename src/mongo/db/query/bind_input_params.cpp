@@ -121,17 +121,21 @@ public:
         // contains any regexes.
         tassert(6279503, "Unexpected parameter marker for $in with regexes", !expr->hasRegex());
 
-        auto coll = _data.staticData->queryCollator.get();
-        auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
-            stage_builder::convertInExpressionEqualities(expr, coll);
-        bindParam(*slotId, true /*owned*/, arrSetTag, arrSetVal);
+        // Prepare the inList. We also store a shared_ptr pointing to the InListData object inside
+        // 'data' to ensure the InListData object stays alive even if 'expr' gets mutated in the
+        // future and drops its reference to the InListData.
+        InListData* l = prepareInList(_data, expr->getInList());
+
+        auto listTag = sbe::value::TypeTags::inListData;
+        auto listVal = sbe::value::bitcastFrom<InListData*>(l);
+
+        bindParam(*slotId, false, listTag, listVal);
 
         // Auto-parameterization should not kick in if the $in's list of equalities includes any
-        // arrays, objects or null values. Asserted after bind to avoid leaking memory allocated in
-        // 'stage_builder::convertInExpressionEqualities()'.
-        tassert(6988502, "Should not auto-parameterize $in with an array value", !hasArray);
-        tassert(6988503, "Should not auto-parameterize $in with a null value", !hasNull);
-        tassert(6988504, "Should not auto-parameterize $in with an object value", !hasObject);
+        // arrays, objects or null values.
+        tassert(6988502, "Should not auto-parameterize $in with an array value", !l->hasArray());
+        tassert(6988503, "Should not auto-parameterize $in with a null value", !l->hasNull());
+        tassert(6988504, "Should not auto-parameterize $in with an object value", !l->hasObject());
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -342,6 +346,20 @@ private:
             return it->second;
         }
         return boost::none;
+    }
+
+    InListData* prepareInList(stage_builder::PlanStageData& data,
+                              const std::shared_ptr<InListData>& inList) const {
+        InListData* l = inList.get();
+        if (!l->isPrepared()) {
+            l->prepare();
+        }
+
+        if (data.inListsSet.insert(l).second) {
+            data.inLists.emplace_back(inList);
+        }
+
+        return l;
     }
 
     stage_builder::PlanStageData& _data;

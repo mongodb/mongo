@@ -111,14 +111,6 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> rhs,
                                                StageBuilderState& state);
 
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               std::unique_ptr<sbe::EExpression> collator = {});
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               StageBuilderState& state);
-
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
  */
@@ -594,6 +586,9 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
  * argument passing. Also contains a mapping of global variable ids to slot ids.
  */
 struct StageBuilderState {
+    using InListsSet = absl::flat_hash_set<InListData*>;
+    using CollatorsMap = absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>;
+
     StageBuilderState(OperationContext* opCtx,
                       Environment& env,
                       PlanStageStaticData* data,
@@ -601,11 +596,15 @@ struct StageBuilderState {
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
+                      InListsSet* inListsSet,
+                      CollatorsMap* collatorsMap,
                       bool needsMerge,
                       bool allowDiskUse)
         : slotIdGenerator{slotIdGenerator},
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
+          inListsSet{inListsSet},
+          collatorsMap{collatorsMap},
           opCtx{opCtx},
           env{env},
           data{data},
@@ -635,6 +634,20 @@ struct StageBuilderState {
     boost::optional<sbe::value::SlotId> getBuiltinVarSlot(Variables::Id id);
 
     /**
+     * Given a CollatorInterface, returns a copy of the CollatorInterface that is owned by the
+     * SBE plan currently being built. If 'coll' is already owned by the SBE plan being built,
+     * then this method will simply return 'coll'.
+     */
+    const CollatorInterface* makeCollatorOwned(const CollatorInterface* coll);
+
+    /**
+     * Given an InListData 'inList', this method makes inList's BSON owned, it makes the inList's
+     * Collator owned, it sorts and de-dups the inList's elements if needed, it initializes the
+     * inList's hash set if needed, and it marks the 'inList' as "prepared".
+     */
+    InListData* prepareOwnedInList(const std::shared_ptr<InListData>& inList);
+
+    /**
      * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
      * with 'paramId' and tracked in the 'InputParamToSlotMap' for auto-parameterization use. The
      * slot is set to 'Nothing' on registration and will be populated with the real value when
@@ -645,6 +658,9 @@ struct StageBuilderState {
     sbe::value::SlotIdGenerator* const slotIdGenerator;
     sbe::value::FrameIdGenerator* const frameIdGenerator;
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
+
+    absl::flat_hash_set<InListData*>* const inListsSet;
+    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>* const collatorsMap;
 
     OperationContext* const opCtx;
     Environment& env;

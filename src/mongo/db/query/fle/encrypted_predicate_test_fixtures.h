@@ -88,10 +88,8 @@ public:
     static std::unique_ptr<MatchExpression> makeInExpr(StringData fieldname,
                                                        BSONArray disjunctions) {
         auto inExpr = std::make_unique<InMatchExpression>(fieldname);
-        std::vector<BSONElement> elems;
-        disjunctions.elems(elems);
-        uassertStatusOK(inExpr->setEqualities(elems));
-        inExpr->setBackingBSON(std::move(disjunctions));
+        uassertStatusOK(inExpr->setEqualitiesArray(std::move(disjunctions)));
+
         return inExpr;
     }
 

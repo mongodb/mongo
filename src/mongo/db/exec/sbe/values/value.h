@@ -87,6 +87,8 @@ namespace KeyString {
 class Value;
 }
 
+class InListData;
+
 class TimeZoneDatabase;
 class TimeZone;
 
@@ -231,7 +233,7 @@ enum class TypeTags : uint8_t {
     // Pointer to a ShardFilterer for shard filtering.
     shardFilterer,
 
-    // Pointer to fts::FTSMatcher for full text search.
+    // Pointer to an fts::FTSMatcher object for full text search.
     ftsMatcher,
 
     // Pointer to a SortSpec object.
@@ -240,10 +242,13 @@ enum class TypeTags : uint8_t {
     // Pointer to a MakeObjSpec object.
     makeObjSpec,
 
-    // Pointer to a IndexBounds object.
+    // Pointer to an IndexBounds object.
     indexBounds,
 
-    // Special marker, must be last
+    // Pointer to an InListData object.
+    inListData,
+
+    // Special marker, must be last.
     TypeTagsMax,
 };
 
@@ -298,7 +303,7 @@ inline constexpr bool isStringOrSymbol(TypeTags tag) noexcept {
 }
 
 inline constexpr bool isCollatableType(TypeTags tag) noexcept {
-    return isString(tag) || isArray(tag) || isObject(tag);
+    return isStringOrSymbol(tag) || isArray(tag) || isObject(tag);
 }
 
 inline constexpr bool isShallowType(TypeTags tag) noexcept {
@@ -314,7 +319,7 @@ BSONType tagToType(TypeTags tag) noexcept;
  * For details on how sets of BSONTypes are represented as bitmasks, see mongo::getBSONTypeMask().
  */
 inline uint32_t getBSONTypeMask(value::TypeTags tag) noexcept {
-    BSONType t = tagToType(tag);
+    BSONType t = value::tagToType(tag);
     return getBSONTypeMask(t);
 }
 
@@ -1111,6 +1116,11 @@ inline size_t getStringLength(TypeTags tag, const Value& val) noexcept {
     MONGO_UNREACHABLE;
 }
 
+inline size_t getStringOrSymbolLength(TypeTags tag, const Value& val) noexcept {
+    tag = (tag == TypeTags::bsonSymbol) ? TypeTags::StringBig : tag;
+    return getStringLength(tag, val);
+}
+
 /*
  * Using MONGO_COMPILER_ALWAYS_INLINE on a free function does not always play well between
  * compilers because some require the 'inline' keyword be used while others prohibit it. To get
@@ -1330,6 +1340,10 @@ inline std::pair<TypeTags, Value> makeIntOrLong(int64_t longVal) {
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>((int32_t)longVal)};
     }
     return {TypeTags::NumberInt64, bitcastFrom<int64_t>(longVal)};
+}
+
+inline InListData* getInListDataView(Value val) noexcept {
+    return reinterpret_cast<InListData*>(val);
 }
 
 inline key_string::Value* getKeyStringView(Value val) noexcept {

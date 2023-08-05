@@ -704,12 +704,12 @@ enum class Builtin : uint8_t {
     // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
     aggConcatArraysCapped,
 
-    // Agg functions to compute the set union of two arrays, failing when the accumulator reaches a
-    // specified size.
+    // Agg functions to compute the set union of two arrays (no size cap).
+    aggSetUnion,
+    aggCollSetUnion,
+    // Agg functions to compute the set union of two arrays (with a size cap).
     aggSetUnionCapped,
     aggCollSetUnionCapped,
-    // Agg function for a simple set union (with no size cap or collation).
-    aggSetUnion,
 
     acos,
     acosh,
@@ -728,7 +728,6 @@ enum class Builtin : uint8_t {
     tanh,
     round,
     isMember,
-    collIsMember,
     indexOfBytes,
     indexOfCP,
     isDayOfWeek,
@@ -1337,17 +1336,6 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> genericRoundTrunc(
         std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity);
     std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
-    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
-                                                             value::Value lhsVal,
-                                                             value::TypeTags rhsTag,
-                                                             value::Value rhsVal,
-                                                             CollatorInterface* collator = nullptr);
-    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
-                                                             value::Value lhsVal,
-                                                             value::TypeTags rhsTag,
-                                                             value::Value rhsVal,
-                                                             value::TypeTags collTag,
-                                                             value::Value collVal);
 
     std::pair<value::TypeTags, value::Value> compare3way(
         value::TypeTags lhsTag,
@@ -1740,6 +1728,7 @@ private:
                                                                bool trimRight);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(
@@ -1748,7 +1737,6 @@ private:
         int32_t sizeCap,
         CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);

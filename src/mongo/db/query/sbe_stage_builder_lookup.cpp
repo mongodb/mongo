@@ -387,6 +387,7 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     std::unique_ptr<sbe::PlanStage> inputStage,
     SlotId recordSlot,
     const FieldPath& fp,
+    boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator,
     bool allowDiskUse) {
@@ -399,14 +400,22 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     // is bounded by the size of the record.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
     SlotId spillSlot = slotIdGenerator.generate();
+
+    auto addToSetExpr = collatorSlot
+        ? makeFunction("collAddToSet"_sd, makeVariable(*collatorSlot), makeVariable(keyValueSlot))
+        : makeFunction("addToSet"_sd, makeVariable(keyValueSlot));
+
+    auto aggSetUnionExpr = collatorSlot
+        ? makeFunction("aggCollSetUnion"_sd, makeVariable(*collatorSlot), makeVariable(spillSlot))
+        : makeFunction("aggSetUnion"_sd, makeVariable(spillSlot));
+
     EvalStage packedKeyValuesStage = makeHashAgg(
         EvalStage{std::move(keyValuesStage), SlotVector{}},
         makeSV(), /* groupBy slots - "none" means creating a single group */
-        makeAggExprVector(
-            keyValuesSetSlot, nullptr, makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
+        makeAggExprVector(keyValuesSetSlot, nullptr, std::move(addToSetExpr)),
         boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
         allowDiskUse,
-        makeSlotExprPairVec(spillSlot, makeFunction("aggSetUnion"_sd, makeVariable(spillSlot))),
+        makeSlotExprPairVec(spillSlot, std::move(aggSetUnionExpr)),
         nodeId);
 
     // The set in 'keyValuesSetSlot' might end up empty if the localField contained only missing and
@@ -552,19 +561,13 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
     std::unique_ptr<sbe::PlanStage> foreignStage,
     SlotId foreignRecordSlot,
     const FieldPath& foreignFieldName,
-    boost::optional<SlotId> collatorSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator,
     FrameIdGenerator& frameIdGenerator,
     bool allowDiskUse) {
     auto frameId = frameIdGenerator.generate();
     auto lambdaArg = makeVariable(frameId, 0);
-    auto filter = collatorSlot
-        ? makeFunction("collIsMember"_sd,
-                       makeVariable(*collatorSlot),
-                       lambdaArg->clone(),
-                       makeVariable(localKeySlot))
-        : makeFunction("isMember"_sd, lambdaArg->clone(), makeVariable(localKeySlot));
+    auto filter = makeFunction("isMember"_sd, lambdaArg->clone(), makeVariable(localKeySlot));
 
     // Recursively create traverseF expressions to iterate elements in 'foreignRecordSlot' with path
     // 'foreignFieldName', and check if key is in set 'localKeySlot'.
@@ -648,6 +651,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                       std::move(localStage),
                                                       localRecordSlot,
                                                       localFieldName,
+                                                      collatorSlot,
                                                       nodeId,
                                                       slotIdGenerator,
                                                       state.allowDiskUse);
@@ -659,7 +663,6 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                                     std::move(foreignStage),
                                                                     foreignRecordSlot,
                                                                     foreignFieldName,
-                                                                    collatorSlot,
                                                                     nodeId,
                                                                     slotIdGenerator,
                                                                     frameIdGenerator,
@@ -762,6 +765,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                              std::move(localStage),
                                                              localRecordSlot,
                                                              localFieldName,
+                                                             collatorSlot,
                                                              nodeId,
                                                              slotIdGenerator,
                                                              state.allowDiskUse);
@@ -981,7 +985,6 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                                      std::move(scanNljStage),
                                                                      foreignRecordSlot,
                                                                      foreignFieldName,
-                                                                     collatorSlot,
                                                                      nodeId,
                                                                      slotIdGenerator,
                                                                      frameIdGenerator,
@@ -1020,6 +1023,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
                                                       std::move(localStage),
                                                       localRecordSlot,
                                                       localFieldName,
+                                                      collatorSlot,
                                                       nodeId,
                                                       slotIdGenerator,
                                                       state.allowDiskUse);
@@ -1029,6 +1033,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
                                                          std::move(foreignStage),
                                                          foreignRecordSlot,
                                                          foreignFieldName,
+                                                         collatorSlot,
                                                          nodeId,
                                                          slotIdGenerator,
                                                          state.allowDiskUse);

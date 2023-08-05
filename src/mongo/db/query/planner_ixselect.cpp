@@ -90,10 +90,7 @@ bool isComparisonWithArrayPred(const MatchExpression* me) {
         return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
             BSONType::Array;
     } else if (type == MatchExpression::MATCH_IN) {
-        const auto& equalities = static_cast<const InMatchExpression*>(me)->getEqualities();
-        return std::any_of(equalities.begin(), equalities.end(), [](BSONElement elt) {
-            return elt.type() == BSONType::Array;
-        });
+        return static_cast<const InMatchExpression*>(me)->hasArray();
     }
     return false;
 }
@@ -200,16 +197,8 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
 }
 
 bool QueryPlannerIXSelect::canUseIndexForNin(const InMatchExpression* ime) {
-    const std::vector<BSONElement>& inList = ime->getEqualities();
-    auto containsNull = [](const BSONElement& elt) {
-        return elt.type() == jstNULL;
-    };
-    auto containsEmptyArray = [](const BSONElement& elt) {
-        return elt.type() == Array && elt.embeddedObject().isEmpty();
-    };
-    return !ime->hasRegex() && inList.size() == 2 &&
-        std::any_of(inList.begin(), inList.end(), containsNull) &&
-        std::any_of(inList.begin(), inList.end(), containsEmptyArray);
+    return !ime->hasRegex() && ime->getEqualities().size() == 2 && ime->hasNull() &&
+        ime->hasEmptyArray();
 }
 
 /**
@@ -748,10 +737,7 @@ bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression*
     } else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
         const auto* queryExprIn = static_cast<const InMatchExpression*>(queryExpr);
 
-        return std::all_of(
-            queryExprIn->getEqualities().begin(),
-            queryExprIn->getEqualities().end(),
-            [](const BSONElement& elt) { return canUseWildcardIndex(elt, MatchExpression::EQ); });
+        return !queryExprIn->hasNonEmptyArray() && !queryExprIn->hasNonEmptyObject();
     }
 
     return true;

@@ -94,7 +94,9 @@ const ExtendedTypeOps* getExtendedTypeOps(TypeTags tag) {
 }
 
 void registerExtendedTypeOps(TypeTags tag, const ExtendedTypeOps* typeOps) {
-    dassert(size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
+    tassert(7690414,
+            "Expected tag value to be within the range of extended types",
+            size_t(tag) > size_t(TypeTags::EndOfNativeTypeTags));
 
     size_t typeOpsIdx = size_t(tag) - (size_t(TypeTags::EndOfNativeTypeTags) + 1);
     gTypeOps[typeOpsIdx] = typeOps;
@@ -308,8 +310,6 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::EOO;
         case TypeTags::NumberInt32:
             return BSONType::NumberInt;
-        case TypeTags::RecordId:
-            return BSONType::EOO;
         case TypeTags::NumberInt64:
             return BSONType::NumberLong;
         case TypeTags::NumberDouble:
@@ -354,9 +354,6 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::BinData;
         case TypeTags::bsonUndefined:
             return BSONType::Undefined;
-        case TypeTags::ksValue:
-            // This is completely arbitrary.
-            return BSONType::EOO;
         case TypeTags::bsonRegex:
             return BSONType::RegEx;
         case TypeTags::bsonJavascript:
@@ -366,7 +363,7 @@ BSONType tagToType(TypeTags tag) noexcept {
         case TypeTags::bsonCodeWScope:
             return BSONType::CodeWScope;
         default:
-            MONGO_UNREACHABLE;
+            return BSONType::EOO;
     }
 }
 

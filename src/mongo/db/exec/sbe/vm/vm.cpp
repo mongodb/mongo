@@ -85,6 +85,7 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -4099,76 +4100,47 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysC
     return {ownArr, tagArr, valArr};
 }
 
-std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
-                                                                   value::Value lhsVal,
-                                                                   value::TypeTags rhsTag,
-                                                                   value::Value rhsVal,
-                                                                   CollatorInterface* collator) {
-    if (!value::isArray(rhsTag)) {
-        return {value::TypeTags::Nothing, 0};
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag_, inputVal_] = getFromStack(0);
+    auto [arrOwned, arrTag, arrVal] = getFromStack(1);
+
+    auto inputTag = inputTag_;
+    auto inputVal = inputVal_;
+
+    if (!value::isArray(arrTag) && arrTag != value::TypeTags::inListData) {
+        return {false, value::TypeTags::Nothing, 0};
     }
 
-    if (rhsTag == value::TypeTags::ArraySet) {
-        auto arrSet = value::getArraySetView(rhsVal);
-
-        if (CollatorInterface::collatorsMatch(collator, arrSet->getCollator())) {
-            auto& values = arrSet->values();
-            return {value::TypeTags::Boolean,
-                    value::bitcastFrom<bool>(values.find({lhsTag, lhsVal}) != values.end())};
+    if (arrTag == value::TypeTags::inListData) {
+        if (inputTag == value::TypeTags::Nothing) {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
         }
+
+        auto inListData = value::getInListDataView(arrVal);
+        const bool found = inListData->contains(inputTag, inputVal);
+
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+    } else if (arrTag == value::TypeTags::ArraySet) {
+        auto arrSet = value::getArraySetView(arrVal);
+        auto& values = arrSet->values();
+
+        const bool found = values.find({inputTag, inputVal}) != values.end();
+
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
     }
 
     const bool found =
-        value::arrayAny(rhsTag, rhsVal, [&](value::TypeTags rhsElemTag, value::Value rhsElemVal) {
-            auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsElemTag, rhsElemVal, collator);
+        value::arrayAny(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
+            auto [tag, val] = value::compareValue(inputTag, inputVal, elemTag, elemVal);
             if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
                 return true;
             }
             return false;
         });
 
-    if (found) {
-        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
-    }
-    return {value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-}
-
-std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
-                                                                   value::Value lhsVal,
-                                                                   value::TypeTags rhsTag,
-                                                                   value::Value rhsVal,
-                                                                   value::TypeTags collTag,
-                                                                   value::Value collVal) {
-    if (collTag != value::TypeTags::collator) {
-        return {value::TypeTags::Nothing, 0};
-    }
-
-    auto collator = value::getCollatorView(collVal);
-
-    return genericIsMember(lhsTag, lhsVal, rhsTag, rhsVal, collator);
-}
-
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
-    invariant(arity == 2);
-
-    auto [ownedInput, inputTag, inputVal] = getFromStack(0);
-    auto [ownedArr, arrTag, arrVal] = getFromStack(1);
-
-    auto [resultTag, resultVal] = genericIsMember(inputTag, inputVal, arrTag, arrVal);
-    return {false, resultTag, resultVal};
-}
-
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(ArityType arity) {
-    invariant(arity == 3);
-
-    auto [ownedColl, collTag, collVal] = getFromStack(0);
-    auto [ownedInput, inputTag, inputVal] = getFromStack(1);
-    auto [ownedArr, arrTag, arrVal] = getFromStack(2);
-
-    auto [resultTag, resultVal] =
-        genericIsMember(inputTag, inputVal, arrTag, arrVal, collTag, collVal);
-
-    return {false, resultTag, resultVal};
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(ArityType arity) {
@@ -4622,6 +4594,43 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggSetUnion(Arit
     auto acc = value::getArraySetView(valAcc);
 
     auto [tagNewSet, valNewSet] = moveOwnedFromStack(1);
+    value::ValueGuard guardNewSet{tagNewSet, valNewSet};
+    if (!value::isArray(tagNewSet)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    value::arrayForEach(tagNewSet, valNewSet, [&](value::TypeTags elTag, value::Value elVal) {
+        auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+        acc->push_back(copyTag, copyVal);
+    });
+
+    guardAcc.reset();
+    return {ownAcc, tagAcc, valAcc};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCollSetUnion(ArityType arity) {
+    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+
+    if (tagAcc == value::TypeTags::Nothing) {
+        auto [_, collatorTag, collatorVal] = getFromStack(1);
+        tassert(
+            7690402, "Expected value of type 'collator'", collatorTag == value::TypeTags::collator);
+        CollatorInterface* collator = value::getCollatorView(collatorVal);
+
+        // Initialize the accumulator.
+        ownAcc = true;
+        std::tie(tagAcc, valAcc) = value::makeNewArraySet(collator);
+    } else {
+        // Take ownership of the accumulator.
+        topStack(false, value::TypeTags::Nothing, 0);
+    }
+
+    tassert(7690403, "Accumulator must be owned", ownAcc);
+    value::ValueGuard guardAcc{tagAcc, valAcc};
+    tassert(7690404, "Accumulator must be of type ArraySet", tagAcc == value::TypeTags::ArraySet);
+    auto acc = value::getArraySetView(valAcc);
+
+    auto [tagNewSet, valNewSet] = moveOwnedFromStack(2);
     value::ValueGuard guardNewSet{tagNewSet, valNewSet};
     if (!value::isArray(tagNewSet)) {
         return {false, value::TypeTags::Nothing, 0};
@@ -7770,14 +7779,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggConcatArraysCapped(arity);
         case Builtin::aggSetUnion:
             return builtinAggSetUnion(arity);
+        case Builtin::aggCollSetUnion:
+            return builtinAggCollSetUnion(arity);
         case Builtin::aggSetUnionCapped:
             return builtinAggSetUnionCapped(arity);
         case Builtin::aggCollSetUnionCapped:
             return builtinAggCollSetUnionCapped(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
-        case Builtin::collIsMember:
-            return builtinCollIsMember(arity);
         case Builtin::indexOfBytes:
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
@@ -8089,6 +8098,8 @@ std::string builtinToString(Builtin b) {
             return "aggConcatArraysCapped";
         case Builtin::aggSetUnion:
             return "aggSetUnion";
+        case Builtin::aggCollSetUnion:
+            return "aggCollSetUnion";
         case Builtin::aggSetUnionCapped:
             return "aggSetUnionCapped";
         case Builtin::aggCollSetUnionCapped:
@@ -8127,8 +8138,6 @@ std::string builtinToString(Builtin b) {
             return "round";
         case Builtin::isMember:
             return "isMember";
-        case Builtin::collIsMember:
-            return "collIsMember";
         case Builtin::indexOfBytes:
             return "indexOfBytes";
         case Builtin::indexOfCP:

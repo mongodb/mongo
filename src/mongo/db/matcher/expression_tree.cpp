@@ -338,6 +338,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 auto nonEquivOrExpr =
                     (countNonEquivExpr > 0) ? std::make_unique<OrMatchExpression>() : nullptr;
                 BSONArrayBuilder bab;
+                size_t numInEqualities = 0;
 
                 for (auto& childExpression : children) {
                     if (*childPath != childExpression->path()) {
@@ -350,6 +351,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                             nonEquivOrExpr->add(std::move(eqExpressionPtr));
                         } else {
                             bab.append(eqExpressionPtr->getData());
+                            ++numInEqualities;
                         }
                     } else if (childExpression->matchType() == MatchExpression::REGEX) {
                         std::unique_ptr<RegexMatchExpression> regexExpressionPtr{
@@ -370,24 +372,21 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                         "Incorrect number of non-equivalent expressions",
                         !nonEquivOrExpr || nonEquivOrExpr->numChildren() == countNonEquivExpr);
 
-                auto backingArr = bab.arr();
-                std::vector<BSONElement> inEqualities;
-                backingArr.elems(inEqualities);
+                auto inEqualities = bab.obj();
                 tassert(3401205,
                         "Incorrect number of in-equivalent expressions",
                         !countEquivEqPaths ||
-                            (inEqualities.size() + inExpression->getRegexes().size()) ==
+                            (numInEqualities + inExpression->getRegexes().size()) ==
                                 countEquivEqPaths);
 
-                auto status = inExpression->setEqualities(std::move(inEqualities));
-                tassert(3401206,  // TODO SERVER-53380 convert to tassertStatusOK.
-                        "Conversion from OR to IN should always succeed",
-                        status == Status::OK());
-
-                inExpression->setBackingBSON(std::move(backingArr));
                 if (eqCollator) {
                     inExpression->setCollator(eqCollator);
                 }
+
+                auto status = inExpression->setEqualitiesArray(std::move(inEqualities));
+                tassert(3401206,  // TODO SERVER-53380 convert to tassertStatusOK.
+                        "Conversion from OR to IN should always succeed",
+                        status == Status::OK());
 
                 if (countNonEquivExpr > 0) {
                     auto parentOrExpr = std::make_unique<OrMatchExpression>();

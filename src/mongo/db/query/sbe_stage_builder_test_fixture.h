@@ -59,8 +59,8 @@ namespace mongo {
  * client would manually build a QuerySolution tree containing this VirtualScanNode and
  * then transform it to an sbe::PlanStage by calling buildPlanStage(). The buildPlanStage()
  * method will do the QuerySolution to sbe::PlanStage translation, and return a vector of result
- * slots, the prepared sub-tree and an sbe::PlanStageData that carries the sbe::CompileCtx needed to
- * prepare the sbe::PlanStage tree. The sbe::PlanStageData returned from buildPlanStage() must be
+ * slots, the prepared sub-tree and a PlanStageData that carries the sbe::CompileCtx needed to
+ * prepare the sbe::PlanStage tree. The PlanStageData returned from buildPlanStage() must be
  * kept alive across buildPlanStage(), prepareTree() and execution of the plan.
  */
 class SbeStageBuilderTestFixture : public sbe::PlanStageTestFixture {

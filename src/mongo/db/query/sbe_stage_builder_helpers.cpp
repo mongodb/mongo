@@ -132,25 +132,6 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
     return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
 }
 
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               std::unique_ptr<sbe::EExpression> collator) {
-    if (collator) {
-        return makeFunction("collIsMember", std::move(collator), std::move(input), std::move(arr));
-    } else {
-        return makeFunction("isMember", std::move(input), std::move(arr));
-    }
-}
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               StageBuilderState& state) {
-    auto collatorSlot = state.getCollatorSlot();
-    auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
-
-    return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
-}
-
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
@@ -703,6 +684,70 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
     return slotId;
 }
 
+const CollatorInterface* StageBuilderState::makeCollatorOwned(const CollatorInterface* coll) {
+    if (!coll) {
+        return nullptr;
+    }
+
+    auto queryColl = data->queryCollator.get();
+    if (coll == queryColl || CollatorInterface::collatorsMatch(coll, queryColl)) {
+        return queryColl;
+    }
+
+    if (auto it = collatorsMap->find(coll); it != collatorsMap->end()) {
+        return it->second;
+    }
+
+    data->collators.emplace_back(coll->clone());
+    auto clonedColl = data->collators.back().get();
+
+    (*collatorsMap)[coll] = clonedColl;
+    (*collatorsMap)[clonedColl] = clonedColl;
+    return clonedColl;
+}
+
+InListData* StageBuilderState::prepareOwnedInList(const std::shared_ptr<InListData>& inList) {
+    // If 'l' is already in 'inListsSet', then there's no further work to do and we can just
+    // use 'l' as-is.
+    InListData* l = inList.get();
+    if (inListsSet->count(l)) {
+        tassert(7690410,
+                "Expected InListData to be in the 'prepared' state and own its BSON data",
+                l->isPrepared() && l->isBSONOwned());
+        return l;
+    }
+
+    // If 'l' is already prepared and its BSON is saved and it doesn't have a collator, then we can
+    // just add it to 'inLists' and 'inListsSet' and use it as-is.
+    if (l->isPrepared() && l->isBSONOwned() && l->getCollator() == nullptr) {
+        data->inLists.emplace_back(inList);
+        inListsSet->emplace(l);
+        return l;
+    }
+
+    // Otherwise, make a copy of 'l' if needed, save l's BSON and collator, mark 'l' as "prepared",
+    // and then add 'l' to 'inLists' and 'inListsSet' and return it.
+    if (l->isPrepared()) {
+        auto inListCopy = l->clone();
+        l = inListCopy.get();
+        data->inLists.emplace_back(std::move(inListCopy));
+
+        tassert(7690411, "Expected InListData to not be in the 'prepared' state", !l->isPrepared());
+    } else {
+        data->inLists.emplace_back(inList);
+    }
+
+    inListsSet->emplace(l);
+    l->makeBSONOwned();
+    if (auto coll = l->getCollator()) {
+        l->setCollator(makeCollatorOwned(coll));
+    }
+
+    l->prepare();
+
+    return l;
+}
+
 /**
  * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
  * key is considered corrupt if it has no corresponding Record.
@@ -994,7 +1039,7 @@ boost::optional<sbe::value::SlotId> StageBuilderState::getBuiltinVarSlot(Variabl
     }
 
     auto it = Variables::kIdToBuiltinVarName.find(id);
-    tassert(1234567, "Expected 'id' to be in map", it != Variables::kIdToBuiltinVarName.end());
+    tassert(7690415, "Expected 'id' to be in map", it != Variables::kIdToBuiltinVarName.end());
 
     auto& name = it->second;
     auto slotId = env->getSlotIfExists(name);

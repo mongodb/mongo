@@ -135,6 +135,8 @@ public:
             &_slotIdGenerator,
             &_frameIdGenerator,
             &_spoolIdGenerator,
+            &_inListsSet,
+            &_collatorsMap,
             false /* needsMerge */,
             false /* allowDiskUse */
         };
@@ -193,6 +195,8 @@ private:
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
+    stage_builder::StageBuilderState::InListsSet _inListsSet;
+    stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
 
     sbe::value::SlotId _inputSlotId;
     std::unique_ptr<TimeZoneDatabase> _timeZoneDB;

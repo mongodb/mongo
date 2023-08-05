@@ -405,6 +405,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_slotIdGenerator,
              &_frameIdGenerator,
              &_spoolIdGenerator,
+             &_inListsSet,
+             &_collatorMap,
              _cq.getExpCtx()->needsMerge,
              _cq.getExpCtx()->allowDiskUse) {
     // Initialize '_data->queryCollator'.

@@ -226,10 +226,9 @@ struct SerializationOptions {
     // If set to false, serializes without including the path. For example {a: {$gt: 2}} would
     // serialize as just {$gt: 2}.
     //
-    // It is expected that most callers want to set 'includePath' to true to
-    // get a correct serialization. Internally, we may set this to false if we have a situation
-    // where an outer expression serializes a path and we don't want to repeat the path in the
-    // inner expression.
+    // It is expected that most callers want to set 'includePath' to true to get a correct
+    // serialization. Internally, we may set this to false if we have a situation where an outer
+    // expression serializes a path and we don't want to repeat the path in the inner expression.
     //
     // For example in {a: {$elemMatch: {$eq: 2}}} the "a" is serialized by the $elemMatch, and
     // should not be serialized by the EQ child.
@@ -239,6 +238,11 @@ struct SerializationOptions {
 
     // For aggregation indicate whether we should use the more verbose serialization format.
     boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
+
+    // If set to true, serializes InMatchExpresions by using the sorted and de-duped list of
+    // elements. Otherwise, serializes InMatchExpressions using the original (unsorted) list of
+    // elements. This flag has no effect on other types of MatchExpressions.
+    bool inMatchExprSortAndDedupElements = true;
 };
 
 }  // namespace mongo

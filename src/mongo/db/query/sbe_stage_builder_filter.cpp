@@ -718,16 +718,20 @@ std::tuple<std::unique_ptr<sbe::EExpression>, bool, bool, bool> _generateInExprI
     // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
     // $in if it contains null, regexes, or nested arrays or objects.
     if (exprIsParameterized) {
-        auto equalities = makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
-        return std::make_tuple(std::move(equalities), false, false, false);
+        auto listVar = makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
+        return std::make_tuple(std::move(listVar), false, false, false);
     }
 
-    auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
-        convertInExpressionEqualities(expr, state.data->queryCollator.get());
-    sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
-    auto equalities = sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal);
-    arrSetGuard.reset();
-    return std::make_tuple(std::move(equalities), hasArray, hasObject, hasNull);
+    InListData* l = state.prepareOwnedInList(expr->getInList());
+
+    auto listTag = sbe::value::TypeTags::inListData;
+    auto listVal = sbe::value::bitcastFrom<InListData*>(l);
+    bool listOwned = false;
+
+    auto listVar =
+        makeVariable(state.env->registerSlot(listTag, listVal, listOwned, state.slotIdGenerator));
+
+    return std::make_tuple(std::move(listVar), l->hasArray(), l->hasObject(), l->hasNull());
 }
 
 /**
@@ -907,8 +911,7 @@ public:
                           makeConstant(sbe::value::TypeTags::Null, 0),
                           inputExpr.getExpr(_context->state.slotVarMap, _context->state));
 
-                return makeIsMember(
-                    std::move(valueExpr), std::move(equalitiesExpr), _context->state);
+                return makeFunction("isMember", std::move(valueExpr), std::move(equalitiesExpr));
             };
 
             generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode, hasNull);
@@ -972,9 +975,9 @@ public:
                 }
 
                 resultExpr = makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                          makeIsMember(inputExpr.extractExpr(_context->state),
-                                                       std::move(equalitiesExpr),
-                                                       _context->state),
+                                          makeFunction("isMember",
+                                                       inputExpr.extractExpr(_context->state),
+                                                       std::move(equalitiesExpr)),
                                           std::move(resultExpr));
             }
 
@@ -1227,43 +1230,11 @@ EvalExpr generateFilter(StageBuilderState& state,
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
     MatchExpressionPostVisitor postVisitor{&context};
+
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, MatchExpression>(root, &walker);
 
     return context.done();
-}
-
-std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
-    const InMatchExpression* expr, const CollatorInterface* coll) {
-    auto& equalities = expr->getEqualities();
-    auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet(coll);
-    sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
-
-    auto arrSet = sbe::value::getArraySetView(arrSetVal);
-
-    auto hasArray = false;
-    auto hasObject = false;
-    auto hasNull = false;
-    if (equalities.size()) {
-        arrSet->reserve(equalities.size());
-        for (auto&& equality : equalities) {
-            auto [tagView, valView] =
-                sbe::bson::convertFrom<true>(equality.rawdata(),
-                                             equality.rawdata() + equality.size(),
-                                             equality.fieldNameSize() - 1);
-
-            hasNull |= tagView == sbe::value::TypeTags::Null;
-            hasArray |= sbe::value::isArray(tagView);
-            hasObject |= sbe::value::isObject(tagView);
-
-            // An ArraySet assumes ownership of it's values so we have to make a copy here.
-            auto [tag, val] = sbe::value::copyValue(tagView, valView);
-            arrSet->push_back(tag, val);
-        }
-    }
-
-    arrSetGuard.reset();
-    return {arrSetTag, arrSetVal, hasArray, hasObject, hasNull};
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
@@ -1393,7 +1364,7 @@ EvalExpr generateInExpr(StageBuilderState& state,
 
     auto [equalities, hasArray, hasObject, hasNull] = _generateInExprInternal(state, expr);
 
-    return makeIsMember(inputExpr.extractExpr(state), std::move(equalities), state);
+    return makeFunction("isMember", inputExpr.extractExpr(state), std::move(equalities));
 }
 
 EvalExpr generateBitTestExpr(StageBuilderState& state,
