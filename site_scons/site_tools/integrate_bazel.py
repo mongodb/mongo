@@ -1,4 +1,5 @@
 import os
+import platform
 import SCons
 import stat
 import urllib.request
@@ -38,6 +39,13 @@ def generate(env):
                                source=[])  # `source` is required, even though it is empty
 
     if env.get("BAZEL_BUILD_ENABLED"):
+        # Bail if current architecture not supported for Bazel:
+        current_architecture = platform.machine()
+        supported_architectures = ['aarch64']
+        if current_architecture not in supported_architectures:
+            raise Exception(
+                f'Bazel not supported on this architecture ({current_architecture}); supported architectures are: [{supported_architectures}]'
+            )
         if not os.path.exists("bazelisk"):
             urllib.request.urlretrieve(
                 "https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64",
