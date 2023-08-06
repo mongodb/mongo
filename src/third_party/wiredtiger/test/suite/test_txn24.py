@@ -31,6 +31,7 @@
 #   cache stuck issue.
 #
 
+import sys
 import wttest
 from wtscenario import make_scenarios
 
@@ -44,6 +45,11 @@ class test_txn24(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(table_params_values)
 
+    # The default (non-zero) value of rollbacks_allowed will retry up to that number of rollbacks before failing.
+    # However, for this test it is better to generate an error immediately for any rollback, so we disallow them
+    # by setting rollbacks_allowed to 0 here.
+    rollbacks_allowed = 0
+
     def conn_config(self):
         # We want to either eliminate or keep the application thread role in eviction to minimum.
         # This will ensure that the dedicated eviction threads are doing the heavy lifting.
@@ -52,6 +58,10 @@ class test_txn24(wttest.WiredTigerTestCase):
                 eviction=(threads_max=4)'
 
     def test_snapshot_isolation_and_eviction(self):
+        if sys.platform.startswith('darwin'):
+            # FIXME-WT-9575
+            # Skip this test on MacOS/Darwin as it causes WT_ROLLBACKs to occur frequently, and they generate errors.
+            self.skipTest('Skipping test of snapshot isolation and eviction on Darwin (MacOS)')
 
         # Create and populate a table.
         uri = "table:test_txn24"
