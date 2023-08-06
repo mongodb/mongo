@@ -1342,6 +1342,9 @@ methods = {
 'WT_SESSION.close' : Method([]),
 
 'WT_SESSION.compact' : Method([
+    Config('background', '', r'''
+        enable/disabled the background compaction server.''',
+        type='boolean'),
     Config('free_space_target', '20MB', r'''
         minimum amount of space recoverable for compaction to proceed''',
         min='1MB'),
