@@ -2196,17 +2196,18 @@ struct __wt_connection {
      * triggers eviction., an integer between \c 0 and \c 100; default \c 90.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, size of cached chunks., an integer between \c
      * 512KB and \c 100GB; default \c 1MB.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;device_path, the
-     * absolute path to the file system or a block device used as cache location., a string; default
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable chunk
+     * cache., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number
+     * of buckets in the hashtable that keeps track of objects., an integer between \c 64 and \c
+     * 1048576; default \c 1024.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;pinned, List of "table:" URIs
+     * exempt from cache eviction.  Capacity config overrides this\, tables exceeding capacity will
+     * not be fully retained.  Table names can appear in both this and the preload list\, but not in
+     * both this and the exclude list.  Duplicate names are allowed., a list of strings; default
      * empty.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable chunk cache., a boolean flag; default
-     * \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that
-     * keeps track of objects., an integer between \c 64 and \c 1048576; default \c 1024.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;pinned, List of "table:" URIs exempt from cache eviction.
-     * Capacity config overrides this\, tables exceeding capacity will not be fully retained.  Table
-     * names can appear in both this and the preload list\, but not in both this and the exclude
-     * list.  Duplicate names are allowed., a list of strings; default empty.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;storage_path, the absolute path to the file used as
+     * cache location., a string; default empty.}
      * @config{ ),,}
      * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
      * version requires that there are no active operations for the duration of the call., a set of
@@ -2952,17 +2953,15 @@ struct __wt_connection {
  * eviction., an integer between \c 0 and \c 100; default \c 90.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
  * chunk_size, size of cached chunks., an integer between \c 512KB and \c 100GB; default \c 1MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;device_path, the absolute path to the file system or a block
- * device used as cache location., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable chunk cache., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that keeps track of
+ * objects., an integer between \c 64 and \c 1048576; default \c 1024.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;pinned, List of "table:" URIs exempt from cache eviction.
+ * Capacity config overrides this\, tables exceeding capacity will not be fully retained.  Table
+ * names can appear in both this and the preload list\, but not in both this and the exclude list.
+ * Duplicate names are allowed., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * enabled, enable chunk cache., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * hashsize, number of buckets in the hashtable that keeps track of objects., an integer between \c
- * 64 and \c 1048576; default \c 1024.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;pinned, List of "table:"
- * URIs exempt from cache eviction.  Capacity config overrides this\, tables exceeding capacity will
- * not be fully retained.  Table names can appear in both this and the preload list\, but not in
- * both this and the exclude list.  Duplicate names are allowed., a list of strings; default empty.}
+ * storage_path, the absolute path to the file used as cache location., a string; default empty.}
  * @config{ ),,}
  * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
  * version requires that there are no active operations for the duration of the call., a set of
@@ -4628,14 +4627,15 @@ typedef enum {
 #define WT_FS_DURABLE       0x0
 #else
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_FS_OPEN_ACCESS_RAND  0x01u
-#define WT_FS_OPEN_ACCESS_SEQ   0x02u
-#define WT_FS_OPEN_CREATE   0x04u
-#define WT_FS_OPEN_DIRECTIO 0x08u
-#define WT_FS_OPEN_DURABLE  0x10u
-#define WT_FS_OPEN_EXCLUSIVE    0x20u
-#define WT_FS_OPEN_FIXED    0x40u   /* Path not home relative (internal) */
-#define WT_FS_OPEN_READONLY 0x80u
+#define WT_FS_OPEN_ACCESS_RAND  0x001u
+#define WT_FS_OPEN_ACCESS_SEQ   0x002u
+#define WT_FS_OPEN_CREATE   0x004u
+#define WT_FS_OPEN_DIRECTIO 0x008u
+#define WT_FS_OPEN_DURABLE  0x010u
+#define WT_FS_OPEN_EXCLUSIVE    0x020u
+#define WT_FS_OPEN_FIXED    0x040u   /* Path not home relative (internal) */
+#define WT_FS_OPEN_FORCE_MMAP 0x080u
+#define WT_FS_OPEN_READONLY 0x100u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */

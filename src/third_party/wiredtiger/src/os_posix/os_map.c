@@ -41,10 +41,12 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void **mapped_regionp
     WT_RET(fh->fh_size(fh, wt_session, &file_size));
     len = (size_t)file_size;
 
-    __wt_verbose(
-      session, WT_VERB_HANDLEOPS, "%s: memory-map: %" WT_SIZET_FMT " bytes", fh->name, len);
+    __wt_verbose(session, WT_VERB_HANDLEOPS,
+      "%s: memory-map: %" WT_SIZET_FMT " bytes, read=%s, write=%s", fh->name, len,
+      pfh->mmap_prot & PROT_READ ? "true" : "false",
+      pfh->mmap_prot & PROT_WRITE ? "true" : "false");
 
-    if ((map = mmap(NULL, len, PROT_READ,
+    if ((map = mmap(NULL, len, pfh->mmap_prot,
 #ifdef MAP_NOCORE
            MAP_NOCORE |
 #endif

@@ -401,6 +401,8 @@ extern int __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_chunkcache_teardown(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)

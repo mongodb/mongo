@@ -20,7 +20,7 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_
     WT_FILE_HANDLE_WIN *win_fh;
     WT_SESSION_IMPL *session;
     wt_off_t file_size;
-    DWORD windows_error;
+    DWORD desired_access, windows_error;
     size_t len;
     void *map, *mapped_cookie;
 
@@ -37,7 +37,10 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: memory-map: %" WT_SIZET_FMT " bytes",
       file_handle->name, len);
 
-    mapped_cookie = CreateFileMappingW(win_fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
+    desired_access = PAGE_READONLY;
+    if (FLD_ISSET(win_fh->desired_access, GENERIC_WRITE))
+        desired_access = PAGE_READWRITE;
+    mapped_cookie = CreateFileMappingW(win_fh->filehandle, NULL, desired_access, 0, 0, NULL);
     if (mapped_cookie == NULL) {
         windows_error = __wt_getlasterror();
         ret = __wt_map_windows_error(windows_error);
@@ -46,7 +49,10 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_
         return (ret);
     }
 
-    if ((map = MapViewOfFile(mapped_cookie, FILE_MAP_READ, 0, 0, len)) == NULL) {
+    desired_access = FILE_MAP_READ;
+    if (FLD_ISSET(win_fh->desired_access, GENERIC_WRITE))
+        desired_access = FILE_MAP_ALL_ACCESS; /* Only read/write, no execute. */
+    if ((map = MapViewOfFile(mapped_cookie, desired_access, 0, 0, len)) == NULL) {
         /* Retrieve the error before cleaning up. */
         windows_error = __wt_getlasterror();
         ret = __wt_map_windows_error(windows_error);

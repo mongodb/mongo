@@ -95,6 +95,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_statlog_destroy(session, true));
     WT_TRET(__wt_tiered_storage_destroy(session, false));
     WT_TRET(__wt_sweep_destroy(session));
+    WT_TRET(__wt_chunkcache_teardown(session));
 
     /* The eviction server is shut down last. */
     WT_TRET(__wt_evict_destroy(session));

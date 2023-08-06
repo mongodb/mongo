@@ -454,7 +454,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     WT_FILE_HANDLE_WIN *win_fh;
     WT_SESSION_IMPL *session;
     DWORD dwCreationDisposition, windows_error;
-    int desired_access, f;
+    int f;
 
     WT_UNUSED(file_system);
     session = (WT_SESSION_IMPL *)wt_session;
@@ -477,9 +477,9 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     if (file_type == WT_FS_OPEN_FILE_TYPE_DIRECTORY)
         goto directory_open;
 
-    desired_access = GENERIC_READ;
+    win_fh->desired_access = GENERIC_READ;
     if (!LF_ISSET(WT_FS_OPEN_READONLY))
-        desired_access |= GENERIC_WRITE;
+        win_fh->desired_access |= GENERIC_WRITE;
 
     /*
      * Security: The application may spawn a new process, and we don't want another process to have
@@ -518,11 +518,11 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
     if (file_type == WT_FS_OPEN_FILE_TYPE_DATA && LF_ISSET(WT_FS_OPEN_ACCESS_SEQ))
         f |= FILE_FLAG_SEQUENTIAL_SCAN;
 
-    win_fh->filehandle = CreateFileW(name_wide->data, desired_access,
+    win_fh->filehandle = CreateFileW(name_wide->data, win_fh->desired_access,
       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, dwCreationDisposition, f, NULL);
     if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
         if (LF_ISSET(WT_FS_OPEN_CREATE) && GetLastError() == ERROR_FILE_EXISTS)
-            win_fh->filehandle = CreateFileW(name_wide->data, desired_access,
+            win_fh->filehandle = CreateFileW(name_wide->data, win_fh->desired_access,
               FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, f, NULL);
         if (win_fh->filehandle == INVALID_HANDLE_VALUE) {
             windows_error = __wt_getlasterror();
@@ -542,7 +542,7 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char 
      * the file. Writes would also move the file pointer.
      */
     if (!LF_ISSET(WT_FS_OPEN_READONLY)) {
-        win_fh->filehandle_secondary = CreateFileW(name_wide->data, desired_access,
+        win_fh->filehandle_secondary = CreateFileW(name_wide->data, win_fh->desired_access,
           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, f, NULL);
         if (win_fh->filehandle_secondary == INVALID_HANDLE_VALUE) {
             windows_error = __wt_getlasterror();
