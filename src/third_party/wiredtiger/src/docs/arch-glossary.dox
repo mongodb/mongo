@@ -15,7 +15,6 @@ they are used in other settings.
 
 <table class="doxtable sortable">
 <tr><th>Term<th>Category<th>Definition
-<td><td>btcur<td>btree<td>a b-tree cursor.
 <tr><td>address cookie<td>block manager<td>an opaque set of bytes returned by the block manager to reference a block in a Btree file, it includes an offset, size, checksum, and object id.
 <tr><td>aggregate time window<td>durable history<td>an aggregation of all time-windows held on a page or subordinate pages.
 <tr><td>atomicity<td>transactions<td>a guarantee provided within the context of a transaction that all operations made within that transaction either succeed or fail.
@@ -24,6 +23,7 @@ they are used in other settings.
 <tr><td>block compression<td>btree<td>after pages of btrees are encoded to be written, they may be compressed according to a configured algorithm.  Compressors may be added to WiredTiger via the extension mechanism.
 <tr><td>block manager<td>block manager<td>an internal API that abstracts writing, reading and allocating blocks to and from files.  A block manager is associated with a Btree.
 <tr><td>Bloom filter<td>lsm<td>a data structure that identifies that a key cannot be present.  Used by LSM.
+<tr><td>btcur<td>btree<td>a b-tree cursor.
 <tr><td>btree<td>btree<td>a data structure on disk or in memory that stores keys, it with its associated value. In WiredTiger, all btrees are in fact B+trees, meaning that adjacent keys and values are grouped into pages.
 <tr><td>bulk insert<td>btree<td>the capability to rapidly insert a set of ordered key value pairs into a Btree. In WiredTiger, a Btree's dhandle must be obtained exclusively, guaranteeing that the inserts can be done single threaded.
 <tr><td>cell<td>file format<td>a key or value packed as it appears on disk for a Btree.
