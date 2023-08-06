@@ -107,14 +107,15 @@ __compact_server(void *arg)
             WT_ERR_NOTFOUND_OK(cursor->next(cursor), true);
         }
 
-        /* Always close the metadata cursor. */
-        WT_ERR(__wt_metadata_cursor_release(session, &cursor));
-
         /* All the keys with the specified prefix have been parsed. */
         if (ret == WT_NOTFOUND) {
+            WT_ERR(__wt_metadata_cursor_release(session, &cursor));
             full_iteration = true;
             continue;
         }
+
+        /* Always close the metadata cursor. */
+        WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
         /* Compact the file with the latest configuration. */
         __wt_free(session, config);
