@@ -699,8 +699,8 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig
           (void **)&chunkcache->memory, &mapped_size, NULL));
         if (mapped_size != chunkcache->capacity)
             WT_RET_MSG(session, EINVAL,
-              "Storage size mapping %lu does not equal capacity of chunk cache %lu", mapped_size,
-              chunkcache->capacity);
+              "Storage size mapping %lu does not equal capacity of chunk cache %" PRIu64,
+              mapped_size, chunkcache->capacity);
 
         WT_RET(__wt_calloc(session, 1, ((chunkcache->capacity / chunkcache->chunk_size) / 8),
           &chunkcache->free_bitmap));
