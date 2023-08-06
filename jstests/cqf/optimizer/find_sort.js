@@ -37,6 +37,6 @@ const res = coll.explain("executionStats")
                 .finish();
 assert.eq(numResults, res.executionStats.nReturned);
 
-const indexScanNode = navigateToPlanPath(res, "child.child.child.leftChild.child.child");
+const indexScanNode = navigateToPlanPath(res, "child.child.child.child.leftChild.child");
 assertValueOnPath("IndexScan", indexScanNode, "nodeType");
 assertValueOnPath(5, indexScanNode, "interval.highBound.bound.0.value");

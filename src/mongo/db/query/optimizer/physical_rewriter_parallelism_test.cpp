@@ -187,7 +187,7 @@ TEST(PhysRewriterParallel, IndexPartitioning0) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(60, 100, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(20, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pc}]\n"
@@ -273,7 +273,7 @@ TEST(PhysRewriterParallel, IndexPartitioning1) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(110, 160, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(80, 140, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& result = ExplainGenerator::explainBSONObj(optimized);
 

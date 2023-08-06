@@ -225,43 +225,7 @@ public:
         }
     }
 
-    void operator()(const PhysProperty&, const IndexingRequirement& prop) {
-        if (prop.getIndexReqTarget() != IndexReqTarget::Complete) {
-            return;
-        }
-
-        uassert(6624101,
-                "IndexingRequirement without indexing availability",
-                hasProperty<IndexingAvailability>(_logicalProps));
-        const IndexingAvailability& indexingAvailability =
-            getPropertyConst<IndexingAvailability>(_logicalProps);
-
-        // TODO: consider left outer joins. We can propagate rid from the outer side.
-        if (_metadata._scanDefs.at(indexingAvailability.getScanDefName()).getIndexDefs().empty()) {
-            // No indexes on the collection.
-            return;
-        }
-
-        const ProjectionNameOrderPreservingSet& requiredProjections =
-            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
-        const ProjectionName& scanProjection = indexingAvailability.getScanProjection();
-        const bool requiresScanProjection = requiredProjections.find(scanProjection).has_value();
-
-        if (!requiresScanProjection) {
-            // Try indexScanOnly (covered index) if we do not require scan projection.
-            PhysProps newProps = _physProps;
-            setPropertyOverwrite<IndexingRequirement>(newProps,
-                                                      {IndexReqTarget::Index,
-                                                       prop.getDedupRID(),
-                                                       prop.getSatisfiedPartialIndexesGroupId()});
-
-            optimizeUnderNewProperties<PhysicalRewriteType::AttemptCoveringQuery>(
-                _queue,
-                kDefaultPriority,
-                make<MemoLogicalDelegatorNode>(_groupId),
-                std::move(newProps));
-        }
-    }
+    void operator()(const PhysProperty&, const IndexingRequirement& prop) {}
 
     void operator()(const PhysProperty&, const RepetitionEstimate& prop) {
         // Noop. We do not currently enforce this property. It only affects costing.

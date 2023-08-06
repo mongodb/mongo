@@ -505,6 +505,10 @@ public:
                 if (candidateIndexes.empty()) {
                     return;
                 }
+
+                if (node.getTarget() == IndexReqTarget::Seek) {
+                    return;
+                }
                 [[fallthrough]];
 
             case IndexReqTarget::Seek:
@@ -864,6 +868,22 @@ public:
 
         const LogicalProps& leftLogicalProps = _memo.getLogicalProps(leftGroupId);
         const LogicalProps& rightLogicalProps = _memo.getLogicalProps(rightGroupId);
+
+        const bool hasScanChild = rightGroupId == indexingAvailability.getScanGroupId();
+
+        if (hasScanChild && !isIndex) {
+            // This is a special RIDIntersectNode that has the Scan as its right child and has all
+            // predicates in its left child. We should optimize only the left child to support
+            // covering queries.
+            PhysProps newProps = _physProps;
+            setPropertyOverwrite<IndexingRequirement>(
+                newProps,
+                {IndexReqTarget::Index,
+                 dedupRID,
+                 requirements.getSatisfiedPartialIndexesGroupId()});
+            optimizeUnderNewProperties<PhysicalRewriteType::AttemptCoveringQuery>(
+                _queue, kDefaultPriority, node.getLeftChild(), std::move(newProps));
+        }
 
         const bool hasProperIntervalLeft =
             getPropertyConst<IndexingAvailability>(leftLogicalProps).hasProperInterval();
