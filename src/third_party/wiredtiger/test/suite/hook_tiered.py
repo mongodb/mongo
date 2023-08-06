@@ -205,9 +205,12 @@ def session_compact_replace(orig_session_compact, session_self, uri, config):
     # Compact isn't implemented for tiered tables.  Only call it if this can't be the uri
     # of a tiered table.  Note this isn't a precise match for when we did/didn't create
     # a tiered table, but we don't have the create config around to check.
+    # Background compaction can be enabled or disabled, each compact call it issues should circle
+    # back here.
     # We want readonly connections to do the real call, see comment in testcase_is_readonly.
     ret = 0
-    if not uri.startswith("table:") or testcase_is_readonly():
+    background_compaction = not uri and config and "background=" in config
+    if background_compaction or not uri.startswith("table:") or testcase_is_readonly():
         ret = orig_session_compact(session_self, uri, config)
     return ret
 
