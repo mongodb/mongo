@@ -108,18 +108,22 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-
+        BSONObj fsyncCmdObj = cmdObj;
         if (cmdObj["lock"].trueValue() &&
             !feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
             errmsg = "can't do lock through mongos";
             return false;
+        }
+        if (cmdObj["lock"].trueValue()) {
+            auto forBackupField = BSON("forBackup" << true);
+            fsyncCmdObj = fsyncCmdObj.addFields(forBackupField);
         }
 
         auto shardResults = scatterGatherUnversionedTargetConfigServerAndShards(
             opCtx,
             dbname,
             applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(fsyncCmdObj)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
 
