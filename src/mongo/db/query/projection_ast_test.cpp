@@ -545,42 +545,36 @@ TEST_F(ProjectionASTTest, TestDebugLargeBSONWithLiteralValue) {
 
     Projection proj = parseWithDefaultPolicies(fromjson(joinFields(fields)));
 
-    {
-        // _id: true is implicit.
-        fields.push_back("_id: true");
-        compareProjectionAndFields(proj, fields);
-    }
+    // _id: true is implicit.
+    fields.push_back("_id: true");
+    compareProjectionAndFields(proj, fields);
 
-    {
-        // Test removal of fields.
-        proj.root()->removeChild("a150");
-        fields.erase(fields.begin() + 150);
-        compareProjectionAndFields(proj, fields);
+    // Test removal of fields.
+    proj.root()->removeChild("a150");
+    fields.erase(fields.begin() + 150);
+    compareProjectionAndFields(proj, fields);
 
-        proj.root()->removeChild("a0");
-        fields.erase(fields.begin());
-        compareProjectionAndFields(proj, fields);
+    proj.root()->removeChild("a0");
+    fields.erase(fields.begin());
+    compareProjectionAndFields(proj, fields);
 
-        proj.root()->removeChild("a" + std::to_string(numFields - 1));
-        // We use 997 because we've removed two children previously.
-        fields.erase(fields.begin() + numFields - 3);
-        compareProjectionAndFields(proj, fields);
+    proj.root()->removeChild("a" + std::to_string(numFields - 1));
+    // We use -2 because we've removed two children previously.
+    fields.erase(fields.end() - 2);
+    compareProjectionAndFields(proj, fields);
 
-        // Test removal of implicit _id.
-        proj.root()->removeChild("_id");
+    // Test removal of implicit _id.
+    proj.root()->removeChild("_id");
+    fields.pop_back();
+    compareProjectionAndFields(proj, fields);
+
+    // Remove enough fields so that we are below the map threshold (100). Test that we still get
+    // the expected output below this size.
+    for (size_t i = 0; i < projection_ast::ProjectionPathASTNode::kUseMapThreshold + 50; i++) {
+        auto lastFieldName = proj.root()->fieldNames().back();
+        proj.root()->removeChild(lastFieldName);
         fields.pop_back();
         compareProjectionAndFields(proj, fields);
-    }
-
-    {
-        // Remove enough fields so that we are below the map threshold (100). Test that we still get
-        // the expected output below this size.
-        for (size_t i = 0; i < projection_ast::ProjectionPathASTNode::kUseMapThreshold + 50; i++) {
-            auto lastFieldName = proj.root()->fieldNames().back();
-            proj.root()->removeChild(lastFieldName);
-            fields.pop_back();
-            compareProjectionAndFields(proj, fields);
-        }
     }
 }
 
