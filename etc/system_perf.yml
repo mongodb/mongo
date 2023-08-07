@@ -1271,6 +1271,24 @@ tasks:
         vars:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/InsertRemove.yml
+  - name: genny_query_TenMDocCollection_IntId
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_IntId.yml
+  - name: genny_query_TenMDocCollection_ObjectId
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_ObjectId.yml
+  - name: genny_query_TenMDocCollection_SubDocId
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_SubDocId.yml
   - name: query_read_commands
     commands:
       - func: f_run_dsi_workload
@@ -3625,6 +3643,11 @@ buildvariants:
     tasks:
     - name: fast_running_queries
     - name: fast_running_queries_large_dataset
+    - name: genny_query_TenMDocCollection_IntId
+    - name: genny_query_TenMDocCollection_ObjectId
+    - name: genny_query_TenMDocCollection_SubDocId
+    - name: views-aggregation
+    - name: views-query
   - <<: *linux-microbenchmarks-standalone-arm
     name: fast-query-microbenchmarks-query-stats.2023-06
     display_name: Fast Query Microbenchmarks (QueryStats)
@@ -3632,6 +3655,11 @@ buildvariants:
     tasks:
     - name: fast_running_queries
     - name: fast_running_queries_large_dataset
+    - name: genny_query_TenMDocCollection_IntId
+    - name: genny_query_TenMDocCollection_ObjectId
+    - name: genny_query_TenMDocCollection_SubDocId
+    - name: views-aggregation
+    - name: views-query
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats
@@ -3642,6 +3670,11 @@ buildvariants:
     tasks:
     - name: fast_running_queries
     - name: fast_running_queries_large_dataset
+    - name: genny_query_TenMDocCollection_IntId
+    - name: genny_query_TenMDocCollection_ObjectId
+    - name: genny_query_TenMDocCollection_SubDocId
+    - name: views-aggregation
+    - name: views-query
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
