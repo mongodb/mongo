@@ -97,6 +97,9 @@ struct ChildWriteOp {
 
     // filled when state == _Error or (optionally) when state == _Cancelled
     boost::optional<write_ops::WriteError> error;
+
+    // filled when state == _Complete and this is an op from a bulkWrite command.
+    boost::optional<BulkWriteReplyItem> bulkWriteReplyItem;
 };
 
 /**
@@ -146,6 +149,14 @@ public:
     const write_ops::WriteError& getOpError() const;
 
     /**
+     * Take's the op's underlying BulkWriteReplyItem. This method must only be called one time
+     * as the original value will be moved out when it is called.
+     *
+     * Can only be used in state _Complete and when this WriteOp is from the bulkWrite command.
+     */
+    BulkWriteReplyItem takeBulkWriteReplyItem();
+
+    /**
      * Creates TargetedWrite operations for every applicable shard, which contain the
      * information needed to send the child writes generated from this write item.
      *
@@ -172,12 +183,14 @@ public:
     void cancelWrites(const write_ops::WriteError* why);
 
     /**
-     * Marks the targeted write as finished for this write op.
+     * Marks the targeted write as finished for this write op. Optionally, if this write is part of
+     * a bulkWrite command and has per-statement replies, stores the associated BulkWriteReplyItem.
      *
      * One of noteWriteComplete or noteWriteError should be called exactly once for every
      * TargetedWrite.
      */
-    void noteWriteComplete(const TargetedWrite& targetedWrite);
+    void noteWriteComplete(const TargetedWrite& targetedWrite,
+                           boost::optional<const BulkWriteReplyItem&> reply = boost::none);
 
     /**
      * Stores the error response of a TargetedWrite for later use, marks the write as finished.
@@ -193,6 +206,13 @@ public:
      * Should only be used when in state _Ready.
      */
     void setOpError(const write_ops::WriteError& error);
+
+    /**
+     * Combines the pointed-to BulkWriteReplyItems into a single item. Used for merging the results
+     * of multiple ChildWriteOps into a single reply item.
+     */
+    boost::optional<BulkWriteReplyItem> combineBulkWriteReplyItems(
+        std::vector<BulkWriteReplyItem const*> replies);
 
 private:
     /**
@@ -211,6 +231,9 @@ private:
 
     // filled when state == _Error
     boost::optional<write_ops::WriteError> _error;
+
+    // filled when state == _Complete and this is an op from a bulkWrite command.
+    boost::optional<BulkWriteReplyItem> _bulkWriteReplyItem;
 
     // Whether this write is part of a transaction.
     const bool _inTxn;

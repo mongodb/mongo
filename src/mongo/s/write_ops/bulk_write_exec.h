@@ -51,15 +51,23 @@
 
 namespace mongo {
 namespace bulk_write_exec {
+
+/**
+ * Contains replies for individual bulk write ops along with a count of how many replies in the
+ * vector are errors.
+ */
+using BulkWriteReplyInfo = std::pair<std::vector<BulkWriteReplyItem>, int>;
+
 /**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
- * returns a vector of BulkWriteReplyItem (each of which is a reply for an individual op).
+ * returns a vector of BulkWriteReplyItem (each of which is a reply for an individual op) along
+ * with a count of how many of those replies are errors.
  *
  * This function does not throw, any errors are reported via the function return.
  */
-std::vector<BulkWriteReplyItem> execute(OperationContext* opCtx,
-                                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                                        const BulkWriteCommandRequest& clientRequest);
+BulkWriteReplyInfo execute(OperationContext* opCtx,
+                           const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                           const BulkWriteCommandRequest& clientRequest);
 
 /**
  * The BulkWriteOp class manages the lifecycle of a bulkWrite request received by mongos. Each op in
@@ -150,9 +158,9 @@ public:
 
     /**
      * Returns a vector of BulkWriteReplyItem based on the end state of each individual write in
-     * this bulkWrite operation.
+     * this bulkWrite operation, along with the number of error replies contained in the vector.
      */
-    std::vector<BulkWriteReplyItem> generateReplyItems() const;
+    BulkWriteReplyInfo generateReplyInfo();
 
     /**
      * Calculates an estimate of the size, in bytes, required to store the common fields that will

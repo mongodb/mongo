@@ -81,8 +81,8 @@ void write(OperationContext* opCtx,
         4817401, 2, {logv2::LogComponent::kShardMigrationPerf}, "Finished batch write");
 }
 
-std::vector<BulkWriteReplyItem> bulkWrite(OperationContext* opCtx,
-                                          const BulkWriteCommandRequest& request) {
+bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
+                                              const BulkWriteCommandRequest& request) {
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.reserve(request.getNsInfo().size());
     for (const auto& nsInfo : request.getNsInfo()) {
