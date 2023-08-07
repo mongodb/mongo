@@ -192,7 +192,6 @@ enum ResourceType {
  * IDs for usages of RESOURCE_GLOBAL.
  */
 enum class ResourceGlobalId : uint8_t {
-    kParallelBatchWriterMode,
     kFeatureCompatibilityVersion,
     kReplicationStateTransitionLock,
     kGlobal,
@@ -218,7 +217,6 @@ static const char* ResourceTypeNames[] = {"Invalid",
  * Maps the global resource id to a human-readable string.
  */
 static const char* ResourceGlobalIdNames[] = {
-    "ParallelBatchWriterMode",
     "FeatureCompatibilityVersion",
     "ReplicationStateTransition",
     "Global",
@@ -356,12 +354,6 @@ extern const ResourceId resourceIdAdminDB;
 // Global lock. Every server operation, which uses the Locker must acquire this lock at least
 // once. See comments in the header file (begin/endTransaction) for more information.
 extern const ResourceId resourceIdGlobal;
-
-// Hardcoded resource id for ParallelBatchWriterMode (PBWM). The lock will never be contended unless
-// the parallel batch writers must stop all other accesses globally. This resource must be locked
-// before all other resources (including resourceIdGlobal). Replication applier threads don't take
-// this lock.
-extern const ResourceId resourceIdParallelBatchWriterMode;
 
 // Hardcoded resource id for a full FCV transition from start -> upgrading -> upgraded (or
 // equivalent for downgrading). This lock is used as a barrier to prevent writes from spanning an

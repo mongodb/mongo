@@ -341,8 +341,6 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
               RecoveryUnit::ReadSource::kLastApplied);
     ASSERT_FALSE(
         client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp(client1.second.get()));
-    ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
-        resourceIdParallelBatchWriterMode, MODE_IS));
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
@@ -368,8 +366,6 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
 
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
-    ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
-        resourceIdParallelBatchWriterMode, MODE_IS));
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesLastAppliedOnSecondary) {

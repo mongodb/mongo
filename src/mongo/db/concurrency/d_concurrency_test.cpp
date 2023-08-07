@@ -2704,19 +2704,6 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     locker1.unlockGlobal();
 }
 
-TEST_F(DConcurrencyTestFixture, PBWMRespectsMaxTimeMS) {
-    auto clientOpCtxPairs = makeKClientsWithLockers(2);
-
-    auto opCtx1 = clientOpCtxPairs[0].second.get();
-    Lock::ResourceLock pbwm1(opCtx1, resourceIdParallelBatchWriterMode, MODE_X);
-
-    auto opCtx2 = clientOpCtxPairs[1].second.get();
-    opCtx2->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
-    ASSERT_THROWS_CODE(Lock::ResourceLock(opCtx2, resourceIdParallelBatchWriterMode, MODE_X),
-                       AssertionException,
-                       ErrorCodes::ExceededTimeLimit);
-}
-
 TEST_F(DConcurrencyTestFixture, DifferentTenantsTakeDBLockOnConflictingNamespaceOk) {
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();

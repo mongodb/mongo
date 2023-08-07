@@ -228,7 +228,6 @@ void assertGlobalAcquisitionStats(OperationContext* opCtx, ResourceId rid) {
 TEST_F(LockStatsTest, GlobalRetrievableSeparately) {
     auto opCtx = makeOperationContext();
     assertGlobalAcquisitionStats(opCtx.get(), resourceIdGlobal);
-    assertGlobalAcquisitionStats(opCtx.get(), resourceIdParallelBatchWriterMode);
     assertGlobalAcquisitionStats(opCtx.get(), resourceIdReplicationStateTransitionLock);
 }
 
@@ -246,11 +245,9 @@ TEST_F(LockStatsTest, ServerStatus) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), LockMode::MODE_IX);
-    locker.lock(resourceIdParallelBatchWriterMode, LockMode::MODE_IX);
     locker.lock(resourceIdReplicationStateTransitionLock, LockMode::MODE_IX);
 
     locker.unlock(resourceIdReplicationStateTransitionLock);
-    locker.unlock(resourceIdParallelBatchWriterMode);
     locker.unlockGlobal();
 
     // Now the MODE_IX lock acquisitions should be reported, separately for each lock type.
@@ -260,10 +257,6 @@ TEST_F(LockStatsTest, ServerStatus) {
     auto lockingStats = builder2.done();
     ASSERT_EQUALS(
         1, lockingStats.getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
-    ASSERT_EQUALS(1,
-                  lockingStats.getObjectField("ParallelBatchWriterMode")
-                      .getObjectField("acquireCount")
-                      .getIntField("w"));
     ASSERT_EQUALS(1,
                   lockingStats.getObjectField("ReplicationStateTransition")
                       .getObjectField("acquireCount")

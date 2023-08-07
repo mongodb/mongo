@@ -846,8 +846,7 @@ void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  resId == resourceIdParallelBatchWriterMode || RESOURCE_TENANT == resType ||
-                  resId == resourceIdFeatureCompatibilityVersion ||
+                  RESOURCE_TENANT == resType || resId == resourceIdFeatureCompatibilityVersion ||
                   resId == resourceIdReplicationStateTransitionLock);
 
         // And, stuff the info into the out parameter.
@@ -872,13 +871,6 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     getFlowControlTicket(opCtx, state.globalMode);
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
-    // If we locked the PBWM, it must be locked before the
-    // resourceIdFeatureCompatibilityVersion, resourceIdReplicationStateTransitionLock, and
-    // resourceIdGlobal resources.
-    if (it != state.locks.end() && it->resourceId == resourceIdParallelBatchWriterMode) {
-        lock(opCtx, it->resourceId, it->mode);
-        it++;
-    }
 
     // If we locked the FCV lock, it must be locked before the
     // resourceIdReplicationStateTransitionLock and resourceIdGlobal resources.
