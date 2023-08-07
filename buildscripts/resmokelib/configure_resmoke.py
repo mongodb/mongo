@@ -17,7 +17,6 @@ import pymongo.uri_parser
 import yaml
 
 from buildscripts.idl import gen_all_feature_flag_list
-from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
@@ -193,20 +192,14 @@ be invoked as either:
         _config.RUN_NO_FEATURE_FLAG_TESTS = config.pop("run_no_feature_flag_tests")
         _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
 
-        if _config.RUN_ALL_FEATURE_FLAG_TESTS:
-            print("Generating: ", ALL_FEATURE_FLAG_FILE)
-            gen_all_feature_flag_list.gen_all_feature_flags_file()
+        if values.command == "run":
+            print("Fetching feature flags...")
+            all_ff = gen_all_feature_flag_list.gen_all_feature_flags()
+            print("Fetched feature flags...")
+        else:
+            all_ff = []
 
-        all_ff = []
         enabled_feature_flags = []
-        try:
-            all_ff = process_feature_flag_file(ALL_FEATURE_FLAG_FILE)
-        except FileNotFoundError:
-            # If we ask resmoke to run with all feature flags, the feature flags file
-            # needs to exist.
-            if _config.RUN_ALL_FEATURE_FLAG_TESTS or _config.RUN_NO_FEATURE_FLAG_TESTS:
-                raise
-
         if _config.RUN_ALL_FEATURE_FLAG_TESTS:
             enabled_feature_flags = all_ff[:]
 

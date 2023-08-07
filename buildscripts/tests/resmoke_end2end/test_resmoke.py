@@ -17,8 +17,6 @@ from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import config, core, suitesconfig
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
-# pylint: disable=unsupported-membership-test
-
 
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod
@@ -149,7 +147,7 @@ class TestTimeout(_ResmokeSelftest):
             self.resmoke_process.stop()
         self.assertEqual(return_code, 0)
 
-    def execute_resmoke(self, resmoke_args, sleep_secs=30, **kwargs):  # pylint: disable=arguments-differ
+    def execute_resmoke(self, resmoke_args, sleep_secs=30, **kwargs):
         super(TestTimeout, self).execute_resmoke(resmoke_args, **kwargs)
 
         time.sleep(sleep_secs
@@ -216,7 +214,7 @@ class TestTimeout(_ResmokeSelftest):
             "jstests/resmoke_selftest/end2end/timeout/nested/top_level_timeout.js",
         ]
 
-        self.execute_resmoke(resmoke_args, sleep_secs=25)
+        self.execute_resmoke(resmoke_args, sleep_secs=35)
 
         archival_dirs_to_expect = 4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
@@ -643,3 +641,15 @@ class TestEvergreenYML(unittest.TestCase):
                 self.validate_jstestfuzz_selector(task.get_suite_name())
 
         self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")
+
+
+class TestMultiversionConfig(unittest.TestCase):
+    def test_valid_yaml(self):
+        process = subprocess.run([sys.executable, "buildscripts/resmoke.py", "multiversion-config"],
+                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertEqual(process.returncode, 0)
+        output = process.stdout
+        try:
+            yaml.safe_load(output)
+        except Exception:
+            self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")

@@ -79,7 +79,7 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
     return list(set(all_flags) - set(force_disabled_flags))
 
 
-def gen_all_feature_flags_file(filename: str = lib.ALL_FEATURE_FLAG_FILE):
+def gen_all_feature_flags_file(filename: str = "all_feature_flags.txt"):
     flags = gen_all_feature_flags()
     with open(filename, "w") as output_file:
         output_file.write("\n".join(flags))

@@ -33,10 +33,6 @@ from typing import Set, List
 from buildscripts.idl.idl import syntax, parser
 from buildscripts.idl.idl.compiler import CompilerImportResolver
 
-# List of feature flags that are disabled by default. The file name is repeated in
-# evergreen.yml
-ALL_FEATURE_FLAG_FILE = "all_feature_flags.txt"
-
 
 def list_idls(directory: str) -> Set[str]:
     """Find all IDL files in the current directory."""
