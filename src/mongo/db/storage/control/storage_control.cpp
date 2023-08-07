@@ -120,14 +120,6 @@ void stopStorageControls(ServiceContext* serviceContext, const Status& reason, b
     }
 }
 
-void waitForJournalFlush(OperationContext* opCtx) {
-    JournalFlusher::get(opCtx)->waitForJournalFlush();
-}
-
-void interruptJournalFlusherForReplStateChange(ServiceContext* serviceContext) {
-    JournalFlusher::get(serviceContext)->interruptJournalFlusherForReplStateChange();
-}
-
 }  // namespace StorageControl
 
 }  // namespace mongo
