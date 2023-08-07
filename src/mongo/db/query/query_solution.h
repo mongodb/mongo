@@ -1111,6 +1111,10 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
 
 struct SortNode : public QuerySolutionNodeWithSortSet {
     SortNode() : limit(0) {}
+    SortNode(std::unique_ptr<QuerySolutionNode> child, BSONObj pattern, size_t limit)
+        : QuerySolutionNodeWithSortSet(std::move(child)),
+          pattern(std::move(pattern)),
+          limit(limit) {}
 
     virtual ~SortNode() {}
 
@@ -1156,6 +1160,8 @@ private:
  * Represents sort algorithm that can handle any kind of input data.
  */
 struct SortNodeDefault final : public SortNode {
+    using SortNode::SortNode;
+
     virtual StageType getType() const {
         return STAGE_SORT_DEFAULT;
     }
@@ -1174,6 +1180,8 @@ struct SortNodeDefault final : public SortNode {
  *  - The record id can be discarded.
  */
 struct SortNodeSimple final : public SortNode {
+    using SortNode::SortNode;
+
     virtual StageType getType() const {
         return STAGE_SORT_SIMPLE;
     }

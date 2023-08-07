@@ -295,7 +295,6 @@ assertPipelineDoesNotUseAggregation({
     pipeline:
         [{$match: {$text: {$search: "abc"}}}, {$sort: {sortField: 1}}, {$project: {a: 1, b: 1}}],
     expectedStages: ["TEXT_MATCH", "SORT", "PROJECTION_SIMPLE"],
-    optimizedAwayStages: ["$match", "$sort", "$project"]
 });
 assert.commandWorked(coll.dropIndexes());
 
@@ -327,7 +326,6 @@ if (featureFlagSbeFull) {
     assertPipelineDoesNotUseAggregation({
         pipeline: [{$limit: 1}, {$match: {x: 20}}],
         expectedStages: ["COLLSCAN", "LIMIT"],
-        optimizedAwayStages: ["$limit"],
     });
 } else {
     // $limit followed by $match cannot be fully optimized away. The $limit is pushed down, but the
@@ -351,17 +349,26 @@ assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1, y: 1}}, {$limit: 1}],
     expectedStages: ["IXSCAN", "FETCH", "LIMIT", "PROJECTION_SIMPLE"],
     expectedResult: [{x: 20}],
-    optimizedAwayStages: ["$limit", "$project"],
 });
 
-// $match, $project, $limit, $sort cannot be optimized away because the $limit comes before the
-// $sort.
-assertPipelineUsesAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1}}, {$limit: 1}, {$sort: {x: 1}}],
-    expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
-    expectedResult: [{x: 20}],
-    optimizedAwayStages: ["$project", "$limit"],
-});
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline:
+            [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1}}, {$limit: 1}, {$sort: {x: 1}}],
+        expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "SORT"],
+        expectedResult: [{x: 20}],
+    });
+} else {
+    // $match, $project, $limit, $sort cannot be optimized away because the $limit comes before the
+    // $sort.
+    assertPipelineUsesAggregation({
+        pipeline:
+            [{$match: {x: {$gte: 20}}}, {$project: {_id: 0, x: 1}}, {$limit: 1}, {$sort: {x: 1}}],
+        expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
+        expectedResult: [{x: 20}],
+        optimizedAwayStages: ["$project", "$limit"],
+    });
+}
 
 // $match, $sort, $limit can be optimized away.
 assertPipelineDoesNotUseAggregation({
@@ -495,7 +502,6 @@ pipeline = [
 assertPipelineDoesNotUseAggregation({
     pipeline: pipeline,
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "SKIP"],
-    optimizedAwayStages: ["$match", "$limit", "$skip"],
 });
 explain = coll.explain().aggregate(pipeline);
 

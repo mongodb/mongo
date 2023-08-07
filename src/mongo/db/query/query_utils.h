@@ -45,6 +45,8 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
  */
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);
 
+bool isSortSbeCompatible(const SortPattern& sortPattern);
+
 /**
  * Checks if the given query can be executed with the SBE engine based on the canonical query.
  *

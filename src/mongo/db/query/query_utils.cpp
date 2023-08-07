@@ -75,6 +75,14 @@ bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery
         CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
 }
 
+bool isSortSbeCompatible(const SortPattern& sortPattern) {
+    // If the sort has meta or numeric path components, we cannot use SBE.
+    return std::all_of(sortPattern.begin(), sortPattern.end(), [](auto&& part) {
+        return part.fieldPath &&
+            !sbe::MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
+    });
+}
+
 bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq) {
     tassert(6071400,
             "Expected CanonicalQuery and Collection pointer to not be nullptr",
@@ -101,11 +109,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     }
 
     const auto& sortPattern = cq->getSortPattern();
-    // If the sort has meta or numeric path components, we cannot use SBE.
-    return !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
-        return part.fieldPath &&
-            !sbe::MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
-    });
+    return !sortPattern || isSortSbeCompatible(*sortPattern);
 }
 
 }  // namespace mongo

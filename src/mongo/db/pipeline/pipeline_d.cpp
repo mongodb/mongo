@@ -124,6 +124,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
@@ -212,6 +213,7 @@ struct CompatiblePipelineStages {
     bool transform : 1;
 
     bool match : 1;
+    bool sort : 1;
     bool search : 1;
 };
 
@@ -266,6 +268,14 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(matchStage, isLastSource));
         return true;
+    } else if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
+        if (!allowedStages.sort || !isSortSbeCompatible(sortStage->getSortKeyPattern())) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(sortStage, isLastSource));
+        return true;
     } else if (const auto& searchHelpers = getSearchHelpers(opCtx->getServiceContext());
                searchHelpers->isSearchStage(stage.get()) ||
                searchHelpers->isSearchMetaStage(stage.get())) {
@@ -273,7 +283,8 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
         return true;
     }
 
@@ -316,6 +327,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery* cq,
+    bool needsMerge,
     const Pipeline* pipeline) {
     // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
     // which requires stages to be wrapped in an interface.
@@ -365,6 +377,12 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // 'featureFlagSbeFull' to be enabled.
         .transform = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
         .match = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+
+        // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
+        // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
+        // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
+        // do not yet support metadata fields.
+        .sort = (SbeCompatibility::flagGuarded >= minRequiredCompatibility) && !needsMerge,
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
@@ -536,11 +554,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // call this lambda in two phases: 1) determine compatible stages and attach them to the
     // canonical query, and 2) finalize the push down and trim the pushed-down stages from the
     // original pipeline.
-    auto extractAndAttachPipelineStages = [&collections, &pipeline](auto* canonicalQuery,
-                                                                    bool attachOnly) {
+    auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
+                                              auto* canonicalQuery, bool attachOnly) {
         if (attachOnly) {
-            canonicalQuery->setPipeline(
-                findSbeCompatibleStagesForPushdown(collections, canonicalQuery, pipeline));
+            canonicalQuery->setPipeline(findSbeCompatibleStagesForPushdown(
+                collections, canonicalQuery, needsMerge, pipeline));
         } else {
             trimPipelineStages(pipeline, canonicalQuery->pipeline().size());
         }

@@ -1784,6 +1784,18 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
+        auto sortStage = dynamic_cast<DocumentSourceSort*>(innerStage->documentSource());
+        if (sortStage) {
+            auto pattern =
+                sortStage->getSortKeyPattern()
+                    .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+                    .toBson();
+            auto limit = sortStage->getLimit().get_value_or(0);
+            solnForAgg =
+                std::make_unique<SortNodeDefault>(std::move(solnForAgg), std::move(pattern), limit);
+            continue;
+        }
+
         auto isSearch = getSearchHelpers(query.getOpCtx()->getServiceContext())
                             ->isSearchStage(innerStage->documentSource());
         auto isSearchMeta = getSearchHelpers(query.getOpCtx()->getServiceContext())
