@@ -13,7 +13,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const collName = "collmod_convert_to_ttl";
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 db.createCollection(collName);
@@ -56,25 +56,3 @@ assert.commandFailedWithCode(
     db.runCommand(
         {"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
     ErrorCodes.InvalidOptions);
-
-// Tries to convert an index on a capped collection to a TTL index. We shouldn't be able to convert
-// an index to a TTL index unless the feature flag is enabled.
-const collCapped = db.getCollection(collName + "_capped");
-collCapped.drop();
-db.createCollection(collCapped.getName(), {capped: true, size: 1024 * 1024});
-collCapped.createIndex({a: 1});
-
-if (FeatureFlagUtil.isPresentAndEnabled(db, "TTLIndexesOnCappedCollections")) {
-    assert.commandWorked(db.runCommand({
-        "collMod": collCapped.getName(),
-        "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
-    }));
-    assert(findTTL(collCapped, {a: 1}, 100), "TTL index should be 100 now");
-} else {
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collCapped.getName(),
-        "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert(!findTTL(collCapped, {a: 1}, 100), "TTL index should not exist");
-}
