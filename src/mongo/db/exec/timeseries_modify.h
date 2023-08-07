@@ -180,7 +180,7 @@ protected:
     /**
      * Prepares returning the old or new measurement when requested so.
      */
-    void _prepareToReturnMeasurement(WorkingSetID& out);
+    void _prepareToReturnMeasurement(WorkingSetID& out, BSONObj measurement);
 
     /**
      * Gets the user-level shard key paths.
@@ -201,10 +201,6 @@ protected:
     TimeseriesModifyParams _params;
 
     TimeseriesModifyStats _specificStats{};
-
-    // Stores the old measurement that is modified or the new measurement after update/upsert when
-    // requested to return it for the deleteOne or updateOne.
-    boost::optional<BSONObj> _measurementToReturn = boost::none;
 
     // Original, untranslated and complete predicate.
     std::unique_ptr<MatchExpression> _originalPredicate;
@@ -237,10 +233,11 @@ private:
     /**
      * Writes the modifications to a bucket.
      *
-     * Returns the pair of (whether the write was successful, the stage state to propagate).
+     * Returns the tuple of (whether the write was successful, the stage state to propagate, the
+     * matched/modified measurement to return if the write was successful).
      */
     template <typename F>
-    std::pair<bool, PlanStage::StageState> _writeToTimeseriesBuckets(
+    std::tuple<bool, PlanStage::StageState, boost::optional<BSONObj>> _writeToTimeseriesBuckets(
         ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
         std::vector<BSONObj>&& unchangedMeasurements,

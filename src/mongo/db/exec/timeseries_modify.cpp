@@ -160,9 +160,9 @@ TimeseriesModifyStage::~TimeseriesModifyStage() {
 
 bool TimeseriesModifyStage::isEOF() {
     if (_isSingletonWrite() && _specificStats.nMeasurementsMatched > 0) {
-        // If we have a measurement to return, we should not return EOF so that we can get a chance
-        // to get called again and return the measurement.
-        return !_measurementToReturn;
+        // If we have matched any records and this is a singleton write, we can return as long as we
+        // don't have a bucket to retry.
+        return _retryBucketId == WorkingSet::INVALID_ID;
     }
     return child()->isEOF() && _retryBucketId == WorkingSet::INVALID_ID;
 }
@@ -453,15 +453,15 @@ void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& new
 }
 
 template <typename F>
-std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseriesBuckets(
-    ScopeGuard<F>& bucketFreer,
-    WorkingSetID bucketWsmId,
-    std::vector<BSONObj>&& unchangedMeasurements,
-    std::vector<BSONObj>&& matchedMeasurements,
-    bool bucketFromMigrate) {
+std::tuple<bool, PlanStage::StageState, boost::optional<BSONObj>>
+TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
+                                                 WorkingSetID bucketWsmId,
+                                                 std::vector<BSONObj>&& unchangedMeasurements,
+                                                 std::vector<BSONObj>&& matchedMeasurements,
+                                                 bool bucketFromMigrate) {
     // No measurements needed to be updated or deleted from the bucket document.
     if (matchedMeasurements.empty()) {
-        return {false, PlanStage::NEED_TIME};
+        return {false, PlanStage::NEED_TIME, boost::none};
     }
     _specificStats.nMeasurementsMatched += matchedMeasurements.size();
 
@@ -485,33 +485,34 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             matchedMeasurements[0]);
     }
 
-    ScopeGuard setMeasurementToReturnGuard([&] {
+    auto getMeasurementToReturn = [&] {
         // If asked to return the old or new measurement and the write was successful, we should
         // save the measurement so that we can return it later.
         if (_params.returnOld) {
-            _measurementToReturn = std::move(matchedMeasurements[0]);
+            return boost::optional<BSONObj>(std::move(matchedMeasurements[0]));
         } else if (_params.returnNew) {
             if (modifiedMeasurements.empty()) {
                 // If we are returning the new measurement, then we must have modified at least one
                 // measurement. If we did not, then we should return the old measurement instead.
-                _measurementToReturn = std::move(matchedMeasurements[0]);
+                return boost::optional<BSONObj>(std::move(matchedMeasurements[0]));
             } else {
-                _measurementToReturn = std::move(modifiedMeasurements[0]);
+                return boost::optional<BSONObj>(std::move(modifiedMeasurements[0]));
             }
         }
-    });
+        return boost::optional<BSONObj>();
+    };
 
     // After applying the updates, no measurements needed to be updated in the bucket document. This
     // case is still considered a successful write.
     if (modifiedMeasurements.empty()) {
-        return {true, PlanStage::NEED_TIME};
+        return {true, PlanStage::NEED_TIME, getMeasurementToReturn()};
     }
 
     // We don't actually write anything if we are in explain mode but we still need to update the
     // stats and let the caller think as if the write succeeded if there's any modified measurement.
     if (_params.isExplain) {
         _specificStats.nMeasurementsModified += modifiedMeasurements.size();
-        return {true, PlanStage::NEED_TIME};
+        return {true, PlanStage::NEED_TIME, getMeasurementToReturn()};
     }
 
     handlePlanStageYield(
@@ -559,8 +560,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
                 _retryBucket(bucketWsmId);
             });
         if (modificationRet != PlanStage::NEED_TIME) {
-            setMeasurementToReturnGuard.dismiss();
-            return {false, PlanStage::NEED_YIELD};
+            return {false, PlanStage::NEED_YIELD, boost::none};
         }
     } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
         if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&
@@ -572,9 +572,8 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
             // We need to retry the bucket, so we should not free the current bucket.
             bucketFreer.dismiss();
-            setMeasurementToReturnGuard.dismiss();
             _retryBucket(bucketWsmId);
-            return {false, PlanStage::NEED_YIELD};
+            return {false, PlanStage::NEED_YIELD, boost::none};
         }
         throw;
     }
@@ -604,9 +603,9 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             // document since we already have it in memory.
             [&] { /* noop */ });
 
-        return {true, status};
+        return {true, status, getMeasurementToReturn()};
     } else {
-        return {true, PlanStage::NEED_TIME};
+        return {true, PlanStage::NEED_TIME, getMeasurementToReturn()};
     }
 }
 
@@ -678,7 +677,7 @@ void TimeseriesModifyStage::_retryBucket(WorkingSetID bucketId) {
     _retryBucketId = bucketId;
 }
 
-void TimeseriesModifyStage::_prepareToReturnMeasurement(WorkingSetID& out) {
+void TimeseriesModifyStage::_prepareToReturnMeasurement(WorkingSetID& out, BSONObj measurement) {
     tassert(7314601,
             "Must be called only when need to return the old or new measurement",
             _params.returnOld || _params.returnNew);
@@ -687,22 +686,13 @@ void TimeseriesModifyStage::_prepareToReturnMeasurement(WorkingSetID& out) {
     auto member = _ws->get(out);
     // The measurement does not have record id.
     member->recordId = RecordId{};
-    member->doc.value() = Document{std::move(*_measurementToReturn)};
+    member->doc.value() = Document{std::move(measurement)};
     _ws->transitionToOwnedObj(out);
-    _measurementToReturn.reset();
 }
 
 PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
-    }
-
-    if (_measurementToReturn) {
-        // If we fall into this case, then we were asked to return the old or new measurement but we
-        // were not able to do so in the previous call to doWork() because we needed to yield. Now
-        // that we are back, we can return it.
-        _prepareToReturnMeasurement(*out);
-        return PlanStage::ADVANCED;
     }
 
     tassert(7495500,
@@ -760,7 +750,8 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     }
 
     auto isWriteSuccessful = false;
-    std::tie(isWriteSuccessful, status) =
+    boost::optional<BSONObj> measurementToReturn = boost::none;
+    std::tie(isWriteSuccessful, status, measurementToReturn) =
         _writeToTimeseriesBuckets(bucketFreer,
                                   id,
                                   std::move(unchangedMeasurements),
@@ -768,10 +759,10 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
                                   bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
-    } else if (isWriteSuccessful && _measurementToReturn) {
+    } else if (isWriteSuccessful && measurementToReturn) {
         // If the write was successful and if asked to return the old or new measurement, then
-        // '_measurementToReturn' must have been filled out and we can return it immediately.
-        _prepareToReturnMeasurement(*out);
+        // 'measurementToReturn' must have been filled out and we can return it immediately.
+        _prepareToReturnMeasurement(*out, std::move(*measurementToReturn));
         status = PlanStage::ADVANCED;
     }
 

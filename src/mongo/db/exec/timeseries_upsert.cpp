@@ -140,8 +140,7 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
     }
 
     // If we want to return the document we just inserted, create it as a WorkingSetMember.
-    _measurementToReturn = _specificStats.objInserted;
-    _prepareToReturnMeasurement(*out);
+    _prepareToReturnMeasurement(*out, _specificStats.objInserted);
     return PlanStage::ADVANCED;
 }
 
