@@ -2206,13 +2206,13 @@ buildvariants:
       - name: industry_benchmarks
 
   - name: linux-3-node-replSet-initialsync.2022-11
-    display_name: Linux 3-Node ReplSet Initial Sync  2022-11
+    display_name: Linux 2-Node ReplSet Initial Sync  2022-11
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
       mongodb_setup: replica-2node
       infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: replica
+      infrastructure_provisioning: replica-2node
       workload_setup: 2022-11
       platform: linux
       authentication: disabled
