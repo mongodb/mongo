@@ -29,13 +29,9 @@
 
 #include "mongo/db/pipeline/group_processor.h"
 
-#include <memory>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/stats/counters.h"
@@ -61,34 +57,8 @@ std::string nextFileName() {
 }  // namespace
 
 GroupProcessor::GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               boost::optional<size_t> maxMemoryUsageBytes)
-    : _expCtx(expCtx),
-      _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
-                     maxMemoryUsageBytes
-                         ? *maxMemoryUsageBytes
-                         : static_cast<size_t>(internalDocumentSourceGroupMaxMemoryBytes.load())},
-      _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
-
-void GroupProcessor::addAccumulationStatement(AccumulationStatement accumulationStatement) {
-    tassert(7801002, "Can't mutate accumulated fields after initialization", !_executionStarted);
-    _accumulatedFields.push_back(accumulationStatement);
-    _memoryTracker.set(accumulationStatement.fieldName, 0);
-}
-
-void GroupProcessor::freeMemory() {
-    for (auto& group : _groups) {
-        for (size_t i = 0; i < group.second.size(); ++i) {
-            // Subtract the current usage.
-            _memoryTracker.update(_accumulatedFields[i].fieldName,
-                                  -1 * group.second[i]->getMemUsage());
-
-            group.second[i]->reduceMemoryConsumptionIfAble();
-
-            // Update the memory usage for this AccumulationStatement.
-            _memoryTracker.update(_accumulatedFields[i].fieldName, group.second[i]->getMemUsage());
-        }
-    }
-}
+                               int64_t maxMemoryUsageBytes)
+    : GroupProcessorBase(expCtx, maxMemoryUsageBytes) {}
 
 boost::optional<Document> GroupProcessor::getNext() {
     if (_spilled) {
@@ -157,50 +127,9 @@ boost::optional<Document> GroupProcessor::getNextStandard() {
     return out;
 }
 
-void GroupProcessor::setIdExpression(const boost::intrusive_ptr<Expression> idExpression) {
-    tassert(7801001, "Can't mutate _id fields after initialization", !_executionStarted);
-    if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
-        auto& childExpressions = object->getChildExpressions();
-        invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
-                                               // constant expression.
-
-        // grouping on an "artificial" object. Rather than create the object for each input
-        // in initialize(), instead group on the output of the raw expressions. The artificial
-        // object will be created at the end in makeDocument() while outputting results.
-        for (auto&& childExpPair : childExpressions) {
-            _idFieldNames.push_back(childExpPair.first);
-            _idExpressions.push_back(childExpPair.second);
-        }
-    } else {
-        _idExpressions.push_back(idExpression);
-    }
-}
-
-boost::intrusive_ptr<Expression> GroupProcessor::getIdExpression() const {
-    // _idFieldNames is empty and _idExpressions has one element when the _id expression is not an
-    // object expression.
-    if (_idFieldNames.empty() && _idExpressions.size() == 1) {
-        return _idExpressions[0];
-    }
-
-    tassert(6586300,
-            "Field and its expression must be always paired in ExpressionObject",
-            _idFieldNames.size() > 0 && _idFieldNames.size() == _idExpressions.size());
-
-    // Each expression in '_idExpressions' may have been optimized and so, compose the object _id
-    // expression out of the optimized expressions.
-    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fieldsAndExprs;
-    for (size_t i = 0; i < _idExpressions.size(); ++i) {
-        fieldsAndExprs.emplace_back(_idFieldNames[i], _idExpressions[i]);
-    }
-
-    return ExpressionObject::create(_idExpressions[0]->getExpressionContext(),
-                                    std::move(fieldsAndExprs));
-}
-
 namespace {
 
-using GroupsMap = GroupProcessor::GroupsMap;
+using GroupsMap = GroupProcessorBase::GroupsMap;
 
 class SorterComparator {
 public:
@@ -228,47 +157,16 @@ private:
 
 }  // namespace
 
-void GroupProcessor::add(const Value& id, const Document& root) {
+void GroupProcessor::add(const Value& groupKey, const Document& root) {
+    auto [groupIter, inserted] = findOrCreateGroup(groupKey);
+
     const size_t numAccumulators = _accumulatedFields.size();
-
-    // Look for the _id value in the map. If it's not there, add a new entry with a blank
-    // accumulator. This is done in a somewhat odd way in order to avoid hashing 'id' and
-    // looking it up in '_groups' multiple times.
-    const size_t oldSize = _groups.size();
-    std::vector<boost::intrusive_ptr<AccumulatorState>>& group = _groups[id];
-    const bool inserted = _groups.size() != oldSize;
-
-    std::vector<uint64_t> oldAccumMemUsage(numAccumulators, 0);
-    if (inserted) {
-        _memoryTracker.set(_memoryTracker.currentMemoryBytes() + id.getApproximateSize());
-
-        // Initialize and add the accumulators
-        Value expandedId = expandId(id);
-        Document idDoc =
-            expandedId.getType() == BSONType::Object ? expandedId.getDocument() : Document();
-        group.reserve(numAccumulators);
-        for (auto& accumulatedField : _accumulatedFields) {
-            auto accum = accumulatedField.makeAccumulator();
-            Value initializerValue =
-                accumulatedField.expr.initializer->evaluate(idDoc, &_expCtx->variables);
-            accum->startNewGroup(initializerValue);
-            group.push_back(std::move(accum));
-        }
-    }
-
-    // Check that we have accumulated state for each of the accumulation statements.
-    dassert(numAccumulators == group.size());
-
+    auto& group = groupIter->second;
     for (size_t i = 0; i < numAccumulators; i++) {
         // Only process the input and update the memory footprint if the current accumulator
         // needs more input.
         if (group[i]->needsInput()) {
-            const auto prevMemUsage = inserted ? 0 : group[i]->getMemUsage();
-            group[i]->process(
-                _accumulatedFields[i].expr.argument->evaluate(root, &_expCtx->variables),
-                _doingMerge);
-            _memoryTracker.update(_accumulatedFields[i].fieldName,
-                                  group[i]->getMemUsage() - prevMemUsage);
+            accumulate(groupIter, i, computeAccumulatorArg(root, i));
         }
     }
 
@@ -291,7 +189,7 @@ void GroupProcessor::readyGroups() {
 
         // prepare current to accumulate data
         _currentAccumulators.reserve(_accumulatedFields.size());
-        for (auto&& accumulatedField : _accumulatedFields) {
+        for (const auto& accumulatedField : _accumulatedFields) {
             _currentAccumulators.push_back(accumulatedField.makeAccumulator());
         }
 
@@ -305,72 +203,12 @@ void GroupProcessor::readyGroups() {
 
 void GroupProcessor::reset() {
     // Free our resources.
-    _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
-    _memoryTracker.resetCurrent();
+    GroupProcessorBase::reset();
+
     _sorterIterator.reset();
     _sortedFiles.clear();
-
     // Make us look done.
     _groupsIterator = _groups.end();
-}
-
-Value GroupProcessor::computeId(const Document& root) const {
-    // If only one expression, return result directly
-    if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate(root, &_expCtx->variables);
-        return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
-    }
-
-    // Multiple expressions get results wrapped in a vector
-    std::vector<Value> vals;
-    vals.reserve(_idExpressions.size());
-    for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate(root, &_expCtx->variables));
-    }
-    return Value(std::move(vals));
-}
-
-Value GroupProcessor::expandId(const Value& val) {
-    // _id doesn't get wrapped in a document
-    if (_idFieldNames.empty())
-        return val;
-
-    // _id is a single-field document containing val
-    if (_idFieldNames.size() == 1)
-        return Value(DOC(_idFieldNames[0] << val));
-
-    // _id is a multi-field document containing the elements of val
-    const std::vector<Value>& vals = val.getArray();
-    invariant(_idFieldNames.size() == vals.size());
-    MutableDocument md(vals.size());
-    for (size_t i = 0; i < vals.size(); i++) {
-        md[_idFieldNames[i]] = vals[i];
-    }
-    return md.freezeToValue();
-}
-
-Document GroupProcessor::makeDocument(const Value& id,
-                                      const Accumulators& accums,
-                                      bool mergeableOutput) {
-    const size_t n = _accumulatedFields.size();
-    MutableDocument out(1 + n);
-
-    /* add the _id field */
-    out.addField("_id", expandId(id));
-
-    /* add the rest of the fields */
-    for (size_t i = 0; i < n; ++i) {
-        Value val = accums[i]->getValue(mergeableOutput);
-        if (val.missing()) {
-            // we return null in this case so return objects are predictable
-            out.addField(_accumulatedFields[i].fieldName, Value(BSONNULL));
-        } else {
-            out.addField(_accumulatedFields[i].fieldName, std::move(val));
-        }
-    }
-
-    _stats.totalOutputDataSizeBytes += out.getApproximateSize();
-    return out.freeze();
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
@@ -401,9 +239,10 @@ void GroupProcessor::spill() {
     _stats.numBytesSpilledEstimate += _memoryTracker.currentMemoryBytes();
     _stats.spilledRecords += _groups.size();
 
-    std::vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
+    std::vector<const GroupProcessorBase::GroupsMap::value_type*>
+        ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups.size());
-    for (GroupsMap::const_iterator it = _groups.begin(), end = _groups.end(); it != end; ++it) {
+    for (auto it = _groups.begin(), end = _groups.end(); it != end; ++it) {
         ptrs.push_back(&*it);
     }
 
@@ -445,10 +284,9 @@ void GroupProcessor::spill() {
     metricsCollector.incrementKeysSorted(ptrs.size());
     metricsCollector.incrementSorterSpills(1);
 
-    _groups.clear();
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.
-    _memoryTracker.resetCurrent();
+    GroupProcessorBase::reset();
 
     _sortedFiles.emplace_back(writer.done());
     if (_spillStats) {

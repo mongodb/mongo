@@ -174,7 +174,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, QueryShape) {
                 "setVariable": "HASH<$$SEARCH_META>",
                 "pipeline": [
                     {
-                        "mock": {}
+                        "$mock": {}
                     },
                     {
                         "$match": {

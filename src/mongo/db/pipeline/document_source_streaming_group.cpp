@@ -94,7 +94,7 @@ DocumentSource::GetNextResult DocumentSourceStreamingGroup::doGetNext() {
 
 DocumentSourceStreamingGroup::DocumentSourceStreamingGroup(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes)
+    boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _sourceDepleted(false) {}
 
 boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup::create(
@@ -102,7 +102,7 @@ boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup:
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<size_t> monotonicExpressionIndexes,
     std::vector<AccumulationStatement> accumulationStatements,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
     groupStage->_groupProcessor.setIdExpression(groupByExpression);
@@ -131,7 +131,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
 boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBsonWithMaxMemoryUsage(
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
     groupStage->initializeFromBson(elem);
@@ -211,15 +211,15 @@ DocumentSourceStreamingGroup::readyNextBatchInner(GetNextResult input) {
     // expression, which means all current groups are finalized.
     for (; input.isAdvanced(); input = pSource->getNext()) {
         auto root = input.releaseDocument();
-        Value id = _groupProcessor.computeId(root);
+        auto groupKey = _groupProcessor.computeGroupKey(root);
 
-        if (isBatchFinished(id)) {
+        if (isBatchFinished(groupKey)) {
             _firstDocumentOfNextBatch = std::move(root);
             _groupProcessor.readyGroups();
             return input;
         }
 
-        _groupProcessor.add(id, root);
+        _groupProcessor.add(groupKey, root);
     }
 
     switch (input.getStatus()) {

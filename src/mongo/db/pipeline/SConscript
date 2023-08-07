@@ -290,7 +290,6 @@ pipelineEnv.Library(
         'document_source_graph_lookup.cpp',
         'document_source_group.cpp',
         'document_source_group_base.cpp',
-        'group_processor.cpp',
         'document_source_index_stats.cpp',
         'document_source_internal_all_collection_stats.cpp',
         'document_source_internal_compute_geo_near_distance.cpp',
@@ -334,6 +333,8 @@ pipelineEnv.Library(
         'document_source_union_with.cpp',
         'document_source_unwind.cpp',
         'group_from_first_document_transformation.cpp',
+        'group_processor.cpp',
+        'group_processor_base.cpp',
         'match_processor.cpp',
         'merge_processor.cpp',
         'pipeline.cpp',
@@ -419,6 +420,20 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/analyze_shard_key_util',
+    ],
+)
+
+env.Benchmark(
+    target='document_source_group_bm',
+    source=[
+        'document_source_group_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'document_source_mock',
+        'pipeline',
     ],
 )
 

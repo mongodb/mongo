@@ -44,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -59,8 +58,13 @@ namespace mongo {
  * A mock DocumentSource which is useful for testing. In addition to re-spooling documents like
  * DocumentSourceQueue, it tracks some state about which methods have been called.
  */
-class DocumentSourceMock : public DocumentSourceQueue {
+class DocumentSourceMock : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$mock"_sd;
+
+    static boost::intrusive_ptr<DocumentSourceMock> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     static boost::intrusive_ptr<DocumentSourceMock> createForTest(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -127,26 +131,58 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
+    /**
+     * This stage does not depend on anything.
+     */
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        return DepsTracker::SEE_NEXT;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;
     }
 
-    bool isDisposed = false;
-    bool isDetachedFromOpCtx = false;
-    bool isOptimized = false;
-    StageConstraints mockConstraints;
-
-
-protected:
-    GetNextResult doGetNext() override {
-        invariant(!isDisposed);
-        invariant(!isDetachedFromOpCtx);
-        return DocumentSourceQueue::doGetNext();
-    }
+    void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
     void doDispose() override {
         isDisposed = true;
     }
+
+    /**
+     * Adds the given document to the internal queue of this stage.
+     *
+     * 'count' specifies the number of times the given document should be replicated in the output
+     * of this stage.
+     */
+    void emplace_back(Document doc, int32_t count = 1) {
+        _queue.push_back(QueueItem{GetNextResult(std::move(doc)), count});
+    }
+
+    /**
+     * Adds the given GetNextResult to the internal queue of this stage.
+     *
+     * 'count' specifies the number of times the given GetNextResult should be replicated in the
+     * output of this stage.
+     */
+    void push_back(GetNextResult&& result, int32_t count = 1) {
+        _queue.push_back(QueueItem{std::move(result), count});
+    }
+
+    GetNextResult doGetNext() override;
+
+    bool isDisposed{false};
+    bool isDetachedFromOpCtx{false};
+    bool isOptimized{false};
+    StageConstraints mockConstraints;
+
+private:
+    struct QueueItem {
+        GetNextResult next;
+        int32_t count{1};
+    };
+
+    // Return documents from front of queue.
+    std::deque<QueueItem> _queue;
 };
 
 }  // namespace mongo

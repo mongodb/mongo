@@ -66,7 +66,7 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceGroup> groupStage =
         new DocumentSourceGroup(expCtx, maxMemoryUsageBytes);
     groupStage->_groupProcessor.setIdExpression(groupByExpression);
@@ -78,7 +78,7 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 }
 
 DocumentSourceGroup::DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         boost::optional<size_t> maxMemoryUsageBytes)
+                                         boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _groupsReady(false) {}
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
@@ -171,7 +171,7 @@ bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterato
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBsonWithMaxMemoryUsage(
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceGroup> groupStage(
         new DocumentSourceGroup(expCtx, maxMemoryUsageBytes));
     groupStage->initializeFromBson(elem);
@@ -210,8 +210,8 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::perfo
         // We release the result document here so that it does not outlive the end of this loop
         // iteration. Not releasing could lead to an array copy when this group follows an unwind.
         auto rootDocument = input.releaseDocument();
-        Value id = _groupProcessor.computeId(rootDocument);
-        _groupProcessor.add(id, rootDocument);
+        Value groupKey = _groupProcessor.computeGroupKey(rootDocument);
+        _groupProcessor.add(groupKey, rootDocument);
     }
 
     switch (input.getStatus()) {

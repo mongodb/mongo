@@ -65,7 +65,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
-        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+        boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * Parses 'elem' into a $group stage, or throws a AssertionException if 'elem' was an invalid
@@ -76,7 +76,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBsonWithMaxMemoryUsage(
         BSONElement elem,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<size_t> maxMemoryUsageBytes);
+        boost::optional<int64_t> maxMemoryUsageBytes);
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
@@ -113,7 +113,7 @@ protected:
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+                                 boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * Before returning anything, this source must prepare itself. performBlockingGroup() exhausts

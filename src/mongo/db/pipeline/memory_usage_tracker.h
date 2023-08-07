@@ -91,7 +91,7 @@ public:
         long long _currentMemoryBytes = 0;
     };
 
-    MemoryUsageTracker(bool allowDiskUse = false, size_t maxMemoryUsageBytes = 0)
+    MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
         : _allowDiskUse(allowDiskUse), _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {}
 
     /**
@@ -166,11 +166,11 @@ public:
     }
 
     bool withinMemoryLimit() const {
-        return _memoryUsageBytes <= static_cast<long long>(_maxAllowedMemoryUsageBytes);
+        return _memoryUsageBytes <= _maxAllowedMemoryUsageBytes;
     }
 
     const bool _allowDiskUse;
-    const size_t _maxAllowedMemoryUsageBytes;
+    const int64_t _maxAllowedMemoryUsageBytes;
 
 private:
     static absl::string_view _key(StringData s) {
@@ -178,8 +178,8 @@ private:
     }
 
     // Tracks current memory used.
-    long long _memoryUsageBytes = 0;
-    long long _maxMemoryUsageBytes = 0;
+    int64_t _memoryUsageBytes = 0;
+    int64_t _maxMemoryUsageBytes = 0;
 
     // Tracks memory consumption per function using the output field name as a key.
     stdx::unordered_map<std::string, PerFunctionMemoryTracker> _functionMemoryTracker;

@@ -274,9 +274,11 @@ std::vector<AccumulationStatement>& DocumentSourceGroupBase::getMutableAccumulat
 DocumentSourceGroupBase::DocumentSourceGroupBase(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes)
+    boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSource(stageName, expCtx),
-      _groupProcessor(expCtx, maxMemoryUsageBytes),
+      _groupProcessor(expCtx,
+                      maxMemoryUsageBytes ? *maxMemoryUsageBytes
+                                          : internalDocumentSourceGroupMaxMemoryBytes.load()),
       _sbeCompatibility(SbeCompatibility::notCompatible) {}
 
 namespace {

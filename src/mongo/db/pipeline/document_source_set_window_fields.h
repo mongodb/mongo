@@ -143,7 +143,7 @@ public:
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
         const boost::optional<SortPattern>& sortBy,
         std::vector<WindowFunctionStatement> outputFields,
-        size_t maxMemoryBytes)
+        int64_t maxMemoryBytes)
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),

@@ -109,7 +109,6 @@ public:
     virtual const char* getOpName() const = 0;
 
     int getMemUsage() const {
-        dassert(_memUsageBytes != 0);  // This would mean subclass didn't set it
         return _memUsageBytes;
     }
 
