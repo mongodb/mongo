@@ -2547,15 +2547,17 @@ buildvariants:
       - name: mixed_workloads_genny_stepdowns
       - name: mixed_workloads_genny_rolling_restarts
 
+# On PERF-730 we changed the initial sync tests to use two nodes instead of three. To avoid
+# losing history, the name remains unchanged, but the display_name reflects the change to 2-Node.
   - name: linux-3-node-replSet-initialsync.2022-11
-    display_name: Linux 3-Node ReplSet Initial Sync 2022-11
+    display_name: Linux 2-Node ReplSet Initial Sync 2022-11
     cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
       mongodb_setup: replica-2node
       infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: replica
+      infrastructure_provisioning: replica-2node
       workload_setup: 2022-11
       platform: linux
       authentication: disabled
