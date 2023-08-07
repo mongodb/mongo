@@ -161,9 +161,16 @@ void RuntimeEnvironment::debugString(StringBuilder* builder) const {
         slotName[slot] = name;
     }
 
+    std::vector<value::SlotId> slots;
+    slots.reserve(_state->slots.size());
+    for (const auto& [slot, _] : _state->slots) {
+        slots.push_back(slot);
+    }
+    std::sort(slots.begin(), slots.end());
+
     *builder << "env: { ";
     bool first = true;
-    for (auto&& [slot, _] : _state->slots) {
+    for (auto slot : slots) {
         if (first) {
             first = false;
         } else {
