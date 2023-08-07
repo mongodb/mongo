@@ -287,61 +287,52 @@ int getRandomIndex(int max) {
     return dist(gen);
 }
 
-// Iterates through the shardStats vector starting from index until it finds an element that has > 0
-// chunks. It will wrap around at the end and stop at the starting index. If no shards have chunks,
-// it will return the original index value.
-int getNextShardWithChunks(const ShardStatisticsVector& shardStats,
-                           const DistributionStatus& distribution,
-                           int index) {
-    int retIndex = index;
+// Returns a randomly chosen pair of source -> destination shards for testing.
+boost::optional<MigrateInfo> chooseRandomMigration(stdx::unordered_set<ShardId>* availableShards,
+                                                   const DistributionStatus& distribution) {
 
-    while (distribution.numberOfChunksInShard(shardStats[retIndex].shardId) == 0) {
-        retIndex = (retIndex + 1) % shardStats.size();
-
-        if (retIndex == index)
-            return index;
+    if (availableShards->size() < 2) {
+        return boost::none;
     }
 
-    return retIndex;
-}
+    std::vector<ShardId> shards;
+    std::copy(availableShards->begin(), availableShards->end(), std::back_inserter(shards));
+    std::default_random_engine rng(time(nullptr));
+    std::shuffle(shards.begin(), shards.end(), rng);
 
-// Returns a randomly chosen pair of source -> destination shards for testing.
-// The random pair is chosen by the following algorithm:
-//  - create an array of indices with values [0, n)
-//  - select a random index from this set
-//  - advance the chosen index until we encounter a shard with chunks to move
-//  - remove the chosen index from the set by swapping it with the last element
-//  - select the destination index from the remaining indices
-MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
-                                  const DistributionStatus& distribution) {
-    std::vector<int> indices(shardStats.size());
+    // Get a random shard with chunks as the donor shard and another random shard as the recipient
+    boost::optional<ShardId> donorShard;
+    boost::optional<ShardId> recipientShard;
+    for (auto i = 0U; i < shards.size(); ++i) {
+        if (distribution.numberOfChunksInShard(shards[i]) != 0) {
+            donorShard = shards[i];
 
-    int i = 0;
-    std::generate(indices.begin(), indices.end(), [&i] { return i++; });
+            if (i == shards.size() - 1) {
+                recipientShard = shards[0];
+            } else {
+                recipientShard = shards[i + 1];
+            }
+            break;
+        }
+    }
 
-    int choice = getRandomIndex(indices.size());
-
-    const int sourceIndex = getNextShardWithChunks(shardStats, distribution, indices[choice]);
-    const auto& sourceShardId = shardStats[sourceIndex].shardId;
-    std::swap(indices[sourceIndex], indices[indices.size() - 1]);
-
-    choice = getRandomIndex(indices.size() - 1);
-    const int destIndex = indices[choice];
-    const auto& destShardId = shardStats[destIndex].shardId;
+    if (!donorShard) {
+        return boost::none;
+    }
+    invariant(recipientShard);
 
     LOGV2_DEBUG(21880,
                 1,
                 "balancerShouldReturnRandomMigrations: source: {fromShardId} dest: {toShardId}",
                 "balancerShouldReturnRandomMigrations",
-                "fromShardId"_attr = sourceShardId,
-                "toShardId"_attr = destShardId);
+                "fromShardId"_attr = donorShard.get(),
+                "toShardId"_attr = recipientShard.get());
 
-    const auto& chunks = distribution.getChunks(sourceShardId);
-
-    return {destShardId,
-            distribution.nss(),
-            chunks[getRandomIndex(chunks.size())],
-            ForceJumbo::kDoNotForce};
+    const auto& chunks = distribution.getChunks(donorShard.get());
+    return MigrateInfo{recipientShard.get(),
+                       distribution.nss(),
+                       chunks[getRandomIndex(chunks.size())],
+                       ForceJumbo::kDoNotForce};
 }
 
 MigrateInfosWithReason BalancerPolicy::balance(
@@ -357,11 +348,15 @@ MigrateInfosWithReason BalancerPolicy::balance(
         !distribution.nss().isConfigDB()) {
         LOGV2_DEBUG(21881, 1, "balancerShouldReturnRandomMigrations failpoint is set");
 
-        if (shardStats.size() < 2)
-            return std::make_pair(std::move(migrations), firstReason);
+        auto migration = chooseRandomMigration(availableShards, distribution);
 
-        migrations.push_back(chooseRandomMigration(shardStats, distribution));
-        firstReason = MigrationReason::chunksImbalance;
+        if (migration) {
+            migrations.push_back(migration.get());
+            firstReason = MigrationReason::chunksImbalance;
+
+            invariant(availableShards->erase(migration.get().from));
+            invariant(availableShards->erase(migration.get().to));
+        }
 
         return std::make_pair(std::move(migrations), firstReason);
     }
