@@ -48,9 +48,9 @@ namespace mongo::sbe {
  * The sliding window bound is determined by two boolean valued expressions 'lowBoundExpr' and
  * 'highBoundExpr', where both can be optional to indicated unbounded window. If any document is
  * evaluated to true for the current document, then that document is included in the window frame
- * of the current document. The 'lowBoundSlot', 'highBoundSlot' are used to save the current
- * document value for the lower and higher bound checking, while the 'boundTestingSlot' is for a
- * different document. The 'lowBoundSlot' and 'highBoundSlot' may be the same for different windows.
+ * of the current document. The 'boundSlot' and 'boundTestingSlot' are used to save the value for
+ * bound checking, where the former is for the current document, and the latter for a different
+ * document. The 'boundSlot' might be the same for different windows.
  *
  * Debug string representation:
  *
@@ -69,11 +69,9 @@ public:
         std::unique_ptr<EExpression> initExpr;
         std::unique_ptr<EExpression> addExpr;
         std::unique_ptr<EExpression> removeExpr;
-        boost::optional<value::SlotId> lowBoundSlot;
-        boost::optional<value::SlotId> lowBoundTestingSlot;
+        value::SlotId boundSlot;
+        value::SlotId boundTestingSlot;
         std::unique_ptr<EExpression> lowBoundExpr;
-        boost::optional<value::SlotId> highBoundSlot;
-        boost::optional<value::SlotId> highBoundTestingSlot;
         std::unique_ptr<EExpression> highBoundExpr;
     };
 
@@ -112,8 +110,7 @@ private:
     // List of bound slots for different windows after deduplication.
     value::SlotVector _boundSlots;
     // The index of bound slot for each window within the above vector.
-    std::vector<boost::optional<size_t>> _lowBoundSlotIndex;
-    std::vector<boost::optional<size_t>> _highBoundSlotIndex;
+    std::vector<size_t> _boundSlotIndex;
 
     using BufferedRowAccessor = value::MaterializedRowAccessor<std::deque<value::MaterializedRow>>;
     std::vector<value::SlotAccessor*> _inPartitionAccessors;
@@ -123,8 +120,7 @@ private:
     std::vector<std::unique_ptr<BufferedRowAccessor>> _outForwardAccessors;
     std::vector<std::unique_ptr<BufferedRowAccessor>> _outBoundAccessors;
     size_t _outRowIdx;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _lowBoundTestingAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _highBoundTestingAccessors;
+    std::vector<std::unique_ptr<BufferedRowAccessor>> _boundTestingAccessors;
     size_t _boundTestingRowIdx;
     std::vector<std::unique_ptr<value::OwnedValueAccessor>> _outWindowAccessors;
     value::SlotMap<value::SlotAccessor*> _outAccessorMap;

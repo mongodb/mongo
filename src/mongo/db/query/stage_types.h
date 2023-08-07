@@ -139,7 +139,6 @@ enum StageType {
     STAGE_GROUP,
     STAGE_EQ_LOOKUP,
     STAGE_SEARCH,
-    STAGE_WINDOW,
     STAGE_SENTINEL,
 };
 

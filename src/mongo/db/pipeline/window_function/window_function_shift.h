@@ -74,9 +74,7 @@ public:
                      std::move(output),
                      WindowBounds::documentBounds(offset, offset)),
           _defaultVal(std::move(defaultVal)),
-          _offset(offset) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+          _offset(offset) {}
 
     boost::optional<mongo::Value> defaultVal() const {
         return _defaultVal;

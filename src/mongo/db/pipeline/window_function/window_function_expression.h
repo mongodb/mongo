@@ -312,9 +312,7 @@ public:
                               std::string accumulatorName,
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 };
 
 /**
@@ -327,9 +325,7 @@ public:
                                               std::string accumulatorName,
                                               boost::intrusive_ptr<::mongo::Expression> input,
                                               WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
@@ -424,14 +420,7 @@ public:
                         std::string accumulatorName,
                         boost::intrusive_ptr<::mongo::Expression> input,
                         WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        if (_accumulatorName == "$sum") {
-            expCtx->sbeWindowCompatibility =
-                std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
-        } else {
-            expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-        }
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
         return NonRemovableType::create(_expCtx);
@@ -488,9 +477,7 @@ public:
                                   std::string accumulatorName,
                                   boost::intrusive_ptr<::mongo::Expression> input,
                                   WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
         return RankType::create(_expCtx);
@@ -525,9 +512,7 @@ public:
                            WindowBounds bounds,
                            long long nValue)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
-          _N(nValue) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+          _N(nValue) {}
 
     ExpressionExpMovingAvg(ExpressionContext* expCtx,
                            std::string accumulatorName,
@@ -535,9 +520,7 @@ public:
                            WindowBounds bounds,
                            Decimal128 alpha)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
-          _alpha(alpha) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+          _alpha(alpha) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
         if (_N) {
@@ -663,9 +646,7 @@ public:
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
                          boost::optional<TimeUnit> unit)
-        : ExpressionWithUnit(expCtx, "$derivative", std::move(input), std::move(bounds), unit) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionWithUnit(expCtx, "$derivative", std::move(input), std::move(bounds), unit) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -740,9 +721,7 @@ public:
                        boost::intrusive_ptr<::mongo::Expression> input,
                        WindowBounds bounds,
                        boost::optional<TimeUnit> unit)
-        : ExpressionWithUnit(expCtx, "$integral", std::move(input), std::move(bounds), unit) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionWithUnit(expCtx, "$integral", std::move(input), std::move(bounds), unit) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -817,9 +796,7 @@ public:
                          std::string accumulatorName,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
                                                   ExpressionContext* expCtx) {
@@ -903,9 +880,7 @@ public:
     ExpressionFirst(ExpressionContext* expCtx,
                     boost::intrusive_ptr<::mongo::Expression> input,
                     WindowBounds bounds)
-        : Expression(expCtx, "$first", std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, "$first", std::move(input), std::move(bounds)) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -927,9 +902,7 @@ public:
     ExpressionLast(ExpressionContext* expCtx,
                    boost::intrusive_ptr<::mongo::Expression> input,
                    WindowBounds bounds)
-        : Expression(expCtx, "$last", std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+        : Expression(expCtx, "$last", std::move(input), std::move(bounds)) {}
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -967,9 +940,7 @@ public:
                 boost::optional<SortPattern> sortPattern)
         : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
           nExpr(std::move(nExpr)),
-          sortPattern(std::move(sortPattern)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+          sortPattern(std::move(sortPattern)) {}
 
     Value serialize(const SerializationOptions& opts) const final;
 
@@ -1019,9 +990,7 @@ public:
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _ps(std::move(ps)),
           _method(method),
-          _intializeExpr(std::move(initializeExpr)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
-    }
+          _intializeExpr(std::move(initializeExpr)) {}
 
     Value serialize(const SerializationOptions& opts) const final;
 

@@ -105,7 +105,6 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/canonical_query.h"
@@ -1520,16 +1519,6 @@ bool shouldUseRegularSbe(const CanonicalQuery& cq) {
                     "Unexpected SBE compatibility value",
                     groupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
             if (groupStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
-                return false;
-            }
-        }
-        if (auto windowStage =
-                dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage->documentSource())) {
-            // Window stage wouldn't be pushed down if it's not supported in SBE.
-            tassert(7914600,
-                    "Unexpected SBE compatibility value",
-                    windowStage->sbeCompatibility() != SbeCompatibility::notCompatible);
-            if (windowStage->sbeCompatibility() != SbeCompatibility::fullyCompatible) {
                 return false;
             }
         }

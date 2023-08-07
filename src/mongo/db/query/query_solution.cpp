@@ -1828,47 +1828,4 @@ void SearchNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "isSearchMeta = " << isSearchMeta << '\n';
 }
-
-/**
- * WindowNode.
- */
-std::unique_ptr<QuerySolutionNode> WindowNode::clone() const {
-    return std::make_unique<WindowNode>(
-        children[0]->clone(), partitionBy, sortBy, outputFields, shouldProduceBson);
-}
-
-void WindowNode::appendToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent);
-    *ss << "WINDOW\n";
-    if (partitionBy) {
-        addIndent(ss, indent + 1);
-        *ss << "partitionBy = " << (*partitionBy)->serialize(SerializationOptions{}).toString()
-            << '\n';
-    }
-    if (sortBy) {
-        addIndent(ss, indent + 1);
-        *ss << "sortBy = "
-            << sortBy->serialize(SortPattern::SortKeySerialization::kForExplain).toBson().toString()
-            << '\n';
-    }
-    addIndent(ss, indent + 1);
-    *ss << "outputFields = [";
-    for (size_t idx = 0; idx < outputFields.size(); ++idx) {
-        if (idx > 0) {
-            *ss << ", ";
-        }
-        auto& outputField = outputFields[idx];
-        MutableDocument boundsDoc;
-        outputField.expr->bounds().serialize(boundsDoc, SerializationOptions{});
-        auto boundsBson = boundsDoc.freeze().toBson();
-        *ss << "{" << outputField.fieldName << ": {" << outputField.expr->getOpName() << ": "
-            << outputField.expr->input()->serialize(SerializationOptions{}).toString()
-            << "window: " << boundsBson.toString() << "}}";
-    }
-    *ss << "]" << '\n';
-    addCommon(ss, indent);
-    addIndent(ss, indent + 1);
-    *ss << "Child:" << '\n';
-    children[0]->appendToString(ss, indent + 2);
-}
 }  // namespace mongo

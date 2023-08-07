@@ -555,12 +555,6 @@ public:
     // reset for every $group stage we parse. Each $group stage has its own per-stage flag.
     SbeCompatibility sbeGroupCompatibility = SbeCompatibility::fullyCompatible;
 
-    // The lowest SBE compatibility level of all window functions in the $_internalSetWindowFields
-    // stage currently being parsed using this expression context. This value is transient and gets
-    // reset for every $_internalSetWindowFields stage we parse. Each $_internalSetWindowFields
-    // stage has its own per-stage flag.
-    SbeCompatibility sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
-
     // These fields can be used in a context when API version validations were not enforced during
     // parse time (Example creating a view or validator), but needs to be enforce while querying
     // later.
