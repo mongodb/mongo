@@ -72,4 +72,12 @@ public:
 private:
     AtomicWord<TickSource::Tick> _currentTicks{0};
 };
+
+template <typename Context, typename D = Milliseconds>
+TickSourceMock<D>* initTickSourceMock(Context* svcCtx) {
+    auto mockTickSource = std::make_unique<TickSourceMock<D>>();
+    auto tickSourcePtr = mockTickSource.get();
+    svcCtx->setTickSource(std::move(mockTickSource));
+    return tickSourcePtr;
+}
 }  // namespace mongo
