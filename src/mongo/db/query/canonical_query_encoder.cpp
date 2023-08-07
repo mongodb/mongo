@@ -77,6 +77,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
@@ -487,6 +488,11 @@ void encodePipeline(const OperationContext* opCtx,
                    getSearchHelpers(opCtx->getServiceContext())
                        ->isSearchMetaStage(stage->documentSource())) {
             // TODO: SERVER-78565 Support $search in SBE plan cache.
+        } else if (auto windowStage = dynamic_cast<DocumentSourceInternalSetWindowFields*>(
+                       stage->documentSource())) {
+            auto serializedWindow = windowStage->serialize();
+            const auto bson = serializedWindow.getDocument().toBson();
+            bufBuilder->appendBuf(bson.objdata(), bson.objsize());
         } else {
             tasserted(6443200,
                       str::stream() << "Pipeline stage cannot be encoded in plan cache key: "
