@@ -191,7 +191,7 @@ public:
      */
     const std::shared_ptr<const KeyGenerator> keyGenerator;
 };
-struct TelemetryPartitioner {
+struct QueryStatsPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
     std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
         return k % nPartitions;
@@ -206,7 +206,7 @@ struct QueryStatsStoreEntryBudgetor {
 using QueryStatsStore = PartitionedCache<std::size_t,
                                          std::shared_ptr<QueryStatsEntry>,
                                          QueryStatsStoreEntryBudgetor,
-                                         TelemetryPartitioner>;
+                                         QueryStatsPartitioner>;
 
 /**
  * Acquire a reference to the global queryStats store.

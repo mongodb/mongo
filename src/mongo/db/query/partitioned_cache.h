@@ -59,6 +59,38 @@ public:
 
     /**
      * Initialize plan cache with the total cache size in bytes and number of partitions.
+     *
+     * Important edge cases to consider include:
+     *
+     * 1. Adding an entry that is larger than the max partition size to a non-empty partition.
+     *
+     *     This will evict both entries. This is because entries are evicted from the partition in
+     * order of least recently used. Thus, the oldest, small entry will be evicted first but the
+     * partition will still be over budget with the new, too-large entry so it will be evicted as
+     * well.
+     *
+     *   2. Adding a queryStats store entry that is smaller than the overall cache size but larger
+     * than single partition max size.
+     *
+     *       It is not possible to write entries to the cache that are larger than a single
+     * partition's max size, even if it is smaller than the entire cache max size. This is because
+     * the cache's budget is configured/regulated on the partition level (cacheSize /
+     * numPartitions). This makes sense as each entry is written to a specific partition, but might
+     * not be immediately obvious so worthy to highlight.
+     *
+     *   3. Too few partitions can cause unnecessary evictions
+     *
+     *      Every class that implements the PartitionedCache template provides a partitioner() that
+     * returns the id of the partition to which to write the entry. In existing implementations,
+     * partitioner() returns the remainder after dividing the entry's key hash by numPartitions. In
+     * the case where we have only two partitions, every odd key hash will be written to the first
+     * partition (and vice versa). In this way, it can quickly be the case that one partition
+     * fills up completely but the partitioner() call keeps returning the already full partition and
+     * the cache evict old entries from it to put the new one in. At the end of all the write
+     * operations, the cache is below it's budget (as the second partition is only partially full)
+     * but we don't have all the entries we expect.  It is therefore important to have sufficient
+     * enough number of partitions so the entries can be more equally dispersed to avoid unnecessary
+     * evictions.
      */
     explicit PartitionedCache(size_t cacheSize, size_t numPartitions)
         : _numPartitions(numPartitions) {
