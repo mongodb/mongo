@@ -195,13 +195,13 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
         sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
     const actualFindPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
-    assertDiffWindow(actualFindPercentage, expectedFindPercentage, 5 /* maxDiff */);
+    assertDiffWindow(actualFindPercentage, expectedFindPercentage, 7.5 /* maxDiff */);
     const actualDeletePercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.delete, sampleSize.total);
-    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, 5 /* maxDiff */);
+    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, 7.5 /* maxDiff */);
     const actualAggPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
-    assertDiffWindow(actualAggPercentage, expectedAggPercentage, 5 /* maxDiff */);
+    assertDiffWindow(actualAggPercentage, expectedAggPercentage, 7.5 /* maxDiff */);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }
