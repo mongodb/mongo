@@ -3935,6 +3935,4 @@ buildvariants:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
       - name: tsbs_query_high_cardinality
