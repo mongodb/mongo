@@ -304,8 +304,6 @@ last-continuous:
     ticket: SERVER-61127
   - test_file: jstests/sharding/cluster_time_across_add_shard.js
     ticket: SERVER-60466
-  - test_file: jstests/change_streams/split_large_event.js
-    ticket: SERVER-67699
   - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
     ticket: SERVER-74954
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
@@ -681,8 +679,6 @@ last-lts:
     ticket: SERVER-78050
   - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
     ticket: SERVER-76489
-  - test_file: jstests/change_streams/split_large_event.js
-    ticket: SERVER-67699
   - test_file: jstests/sharding/transfer_mods_large_batches.js
     ticket: SERVER-78414
   - test_file: jstests/sharding/multi_writes_with_shard_version_ignored_dont_bubble_up_critical_section.js

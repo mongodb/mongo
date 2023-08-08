@@ -1,6 +1,6 @@
 /**
  * Tests that a change event which exceeds the 16MB limit will be split into multiple fragments.
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_60]
  */
 
 (function() {
