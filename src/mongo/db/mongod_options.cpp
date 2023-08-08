@@ -674,6 +674,15 @@ Status storeMongodOptions(const moe::Environment& params) {
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 
+    if (params.count("maintenanceMode") &&
+        gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        std::string value = params["maintenanceMode"].as<std::string>();
+        serverGlobalParams.maintenanceMode = (value == "replicaSet")
+            ? ServerGlobalParams::ReplicaSetMode
+            : ServerGlobalParams::StandaloneMode;
+        serverGlobalParams.clusterRole = ClusterRole::None;
+    }
+
     if (!params.count("net.port")) {
         if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
             serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
