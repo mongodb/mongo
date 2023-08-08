@@ -131,6 +131,7 @@ mongo_custom_check = env.SharedLibrary(
         "MongoTraceCheck.cpp",
         "MongoMutexCheck.cpp",
         "MongoAssertCheck.cpp",
+        "MongoNoUniqueAddressCheck.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',

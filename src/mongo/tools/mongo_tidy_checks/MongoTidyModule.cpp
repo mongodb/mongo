@@ -31,6 +31,7 @@
 #include "MongoCctypeCheck.h"
 #include "MongoHeaderBracketCheck.h"
 #include "MongoMutexCheck.h"
+#include "MongoNoUniqueAddressCheck.h"
 #include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
 #include "MongoTraceCheck.h"
@@ -58,6 +59,7 @@ public:
         CheckFactories.registerCheck<MongoStdAtomicCheck>("mongo-std-atomic-check");
         CheckFactories.registerCheck<MongoMutexCheck>("mongo-mutex-check");
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
+        CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
     }
 };
 

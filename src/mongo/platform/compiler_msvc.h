@@ -77,4 +77,6 @@
 
 #define MONGO_COMPILER_ALLOC_SIZE(varindex)
 
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+
 #define MONGO_GSL_POINTER

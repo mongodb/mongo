@@ -227,6 +227,20 @@ class MongoTidyTests(unittest.TestCase):
         ]
 
         self.run_clang_tidy()
+        
+    def test_MongoNoUniqueAddressCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-no-unique-address-check'
+                WarningsAsErrors: '*'
+                HeaderFilterRegex: '(mongo/.*)'
+                """))
+
+        self.expected_output = [
+            "Illegal use of [[no_unique_address]]",
+        ]
+
+        self.run_clang_tidy()
 
 if __name__ == '__main__':
 
