@@ -110,7 +110,6 @@ private:
                                             boost::optional<long long> limit);
 
     Status _insert(OperationContext* opCtx,
-                   const NamespaceString& nss,
                    const BSONObj& doc,
                    const WriteConcernOptions& writeConcern);
 
