@@ -229,6 +229,8 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             opCtx,
             nss,
             [&]() {
+                // This callback is either never invoked or invoked immediately within
+                // registerRequest, so use-after-move of parsedRequest isn't an issue.
                 BSONObj queryShape = query_shape::extractQueryShape(
                     *parsedRequest,
                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
