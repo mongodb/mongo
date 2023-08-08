@@ -99,6 +99,7 @@ Status Shard::CommandResponse::processBatchWriteResponse(
 }
 
 const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
+const Milliseconds Shard::kDefaultShardCommandTimeout = Seconds{60};
 
 bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
@@ -165,7 +166,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
-    return runCommand(opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+    return runCommand(opCtx, readPref, dbName, cmdObj, kDefaultShardCommandTimeout, retryPolicy);
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
@@ -205,7 +206,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     const BSONObj& cmdObj,
     RetryPolicy retryPolicy) {
     return runCommandWithFixedRetryAttempts(
-        opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+        opCtx, readPref, dbName, cmdObj, kDefaultShardCommandTimeout, retryPolicy);
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
