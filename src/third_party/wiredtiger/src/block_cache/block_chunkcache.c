@@ -280,6 +280,8 @@ __chunkcache_should_evict(WT_CHUNKCACHE_CHUNK *chunk)
     /* Do not evict chunks that are in the process of being added to the cache. */
     if (!chunk->valid)
         return (false);
+    if (F_ISSET(chunk, WT_CHUNK_PINNED))
+        return (false);
     if (--(chunk->access_count) == 0)
         return (true);
     return (false);
