@@ -1,6 +1,5 @@
 /**
  * Tests that a change event which exceeds the 16MB limit will be split into multiple fragments.
- * @tags: [requires_fcv_70]
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
