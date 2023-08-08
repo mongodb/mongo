@@ -41,14 +41,14 @@
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/periodic_runner.h"
+#include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
-namespace mongo::execution_control {
-namespace throughput_probing {
+namespace mongo::execution_control::throughput_probing {
 namespace {
 
 TEST(ThroughputProbingParameterTest, InitialConcurrency) {
@@ -71,63 +71,6 @@ TEST(ThroughputProbingParameterTest, MaxConcurrency) {
     ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency - 1, {}));
 }
 
-}  // namespace
-}  // namespace throughput_probing
-
-namespace {
-
-class MockPeriodicJob : public PeriodicRunner::ControllableJob {
-public:
-    explicit MockPeriodicJob(PeriodicRunner::PeriodicJob job) : _job(std::move(job)) {}
-
-    void start() override {}
-    void pause() override {}
-    void resume() override {}
-    void stop() override {}
-
-    Milliseconds getPeriod() const override {
-        return _job.interval;
-    }
-
-    void setPeriod(Milliseconds period) override {
-        _job.interval = period;
-    }
-
-    void run(Client* client) {
-        _job.job(client);
-    }
-
-private:
-    PeriodicRunner::PeriodicJob _job;
-};
-
-class MockPeriodicRunner : public PeriodicRunner {
-public:
-    JobAnchor makeJob(PeriodicJob job) override {
-        invariant(!_job);
-        auto mockJob = std::make_shared<MockPeriodicJob>(std::move(job));
-        _job = mockJob;
-        return JobAnchor{std::move(mockJob)};
-    }
-
-    void run(Client* client) {
-        invariant(_job);
-        _job->run(client);
-    }
-
-private:
-    std::shared_ptr<MockPeriodicJob> _job;
-};
-
-namespace {
-TickSourceMock<Microseconds>* initTickSource(ServiceContext* svcCtx) {
-    auto mockTickSource = std::make_unique<TickSourceMock<Microseconds>>();
-    auto tickSourcePtr = mockTickSource.get();
-    svcCtx->setTickSource(std::move(mockTickSource));
-    return tickSourcePtr;
-}
-}  // namespace
-
 class ThroughputProbingTest : public unittest::Test {
 protected:
     explicit ThroughputProbingTest(int32_t size = 64, double readWriteRatio = 0.5)
@@ -137,7 +80,7 @@ protected:
               svcCtx->setPeriodicRunner(std::move(runner));
               return runnerPtr;
           }()),
-          _tickSource(initTickSource(_svcCtx.get())),
+          _tickSource(initTickSourceMock<ServiceContext, Microseconds>(_svcCtx.get())),
           _throughputProbing([&]() -> ThroughputProbing {
               throughput_probing::gInitialConcurrency = size;
               throughput_probing::gReadWriteRatio.store(readWriteRatio);
@@ -168,8 +111,6 @@ protected:
     TickSourceMock<Microseconds>* _tickSource;
     ThroughputProbing _throughputProbing;
 };
-
-using namespace throughput_probing;
 
 class ThroughputProbingMaxConcurrencyTest : public ThroughputProbingTest {
 protected:
@@ -512,6 +453,5 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_LT(_writeTicketHolder.outof(), writes);
 }
 
-
 }  // namespace
-}  // namespace mongo::execution_control
+}  // namespace mongo::execution_control::throughput_probing
