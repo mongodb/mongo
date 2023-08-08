@@ -59,6 +59,27 @@ __chunkcache_bitmap_find_free(WT_SESSION_IMPL *session, size_t *bit_index)
 }
 
 /*
+ * __chunkcache_should_pin_chunk --
+ *     Return true if the chunk belongs to the object in pinned object array.
+ */
+static inline bool
+__chunkcache_should_pin_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
+{
+    WT_CHUNKCACHE *chunkcache;
+    bool found;
+
+    chunkcache = &S2C(session)->chunkcache;
+    found = false;
+
+    __wt_readlock(session, &chunkcache->pinned_objects.array_lock);
+    WT_BINARY_SEARCH_STRING(chunk->hash_id.objectname, chunkcache->pinned_objects.array,
+      chunkcache->pinned_objects.entries, found);
+    __wt_readunlock(session, &chunkcache->pinned_objects.array_lock);
+
+    return (found);
+}
+
+/*
  * __chunkcache_alloc --
  *     Allocate memory for the chunk in the cache.
  */
@@ -87,9 +108,16 @@ retry:
         /* Allocate the free memory in the chunk cache. */
         chunk->chunk_memory = chunkcache->memory + chunkcache->chunk_size * bit_index;
     }
+
+    /* Increment chunk's disk usage and update statistics. */
     __wt_atomic_add64(&chunkcache->bytes_used, chunk->chunk_size);
     WT_STAT_CONN_INCR(session, chunk_cache_chunks_inuse);
     WT_STAT_CONN_INCRV(session, chunk_cache_bytes_inuse, chunk->chunk_size);
+    if (__chunkcache_should_pin_chunk(session, chunk)) {
+        F_SET(chunk, WT_CHUNK_PINNED);
+        WT_STAT_CONN_INCR(session, chunk_cache_chunks_pinned);
+        WT_STAT_CONN_INCRV(session, chunk_cache_bytes_inuse_pinned, chunk->chunk_size);
+    }
 
     return (0);
 }
@@ -197,9 +225,14 @@ __chunkcache_free_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 
     chunkcache = &S2C(session)->chunkcache;
 
+    /* Decrement chunk's disk usage and update statistics. */
     (void)__wt_atomic_sub64(&chunkcache->bytes_used, chunk->chunk_size);
-    WT_STAT_CONN_DECRV(session, chunk_cache_bytes_inuse, chunk->chunk_size);
     WT_STAT_CONN_DECR(session, chunk_cache_chunks_inuse);
+    WT_STAT_CONN_DECRV(session, chunk_cache_bytes_inuse, chunk->chunk_size);
+    if (F_ISSET(chunk, WT_CHUNK_PINNED)) {
+        WT_STAT_CONN_DECR(session, chunk_cache_chunks_pinned);
+        WT_STAT_CONN_DECRV(session, chunk_cache_bytes_inuse_pinned, chunk->chunk_size);
+    }
 
     if (chunkcache->type == WT_CHUNKCACHE_IN_VOLATILE_MEMORY)
         __wt_free(session, chunk->chunk_memory);
@@ -285,27 +318,6 @@ __chunkcache_should_evict(WT_CHUNKCACHE_CHUNK *chunk)
     if (--(chunk->access_count) == 0)
         return (true);
     return (false);
-}
-
-/*
- * __chunkcache_should_pin_chunk --
- *     Return true if the chunk belongs to the object in pinned object array.
- */
-static inline bool
-__chunkcache_should_pin_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
-{
-    WT_CHUNKCACHE *chunkcache;
-    bool found;
-
-    chunkcache = &S2C(session)->chunkcache;
-    found = false;
-
-    __wt_readlock(session, &chunkcache->pinned_objects.array_lock);
-    WT_BINARY_SEARCH_STRING(chunk->hash_id.objectname, chunkcache->pinned_objects.array,
-      chunkcache->pinned_objects.entries, found);
-    __wt_readunlock(session, &chunkcache->pinned_objects.array_lock);
-
-    return (found);
 }
 
 /*
@@ -556,9 +568,6 @@ retry:
                 return (ret);
             }
 
-            if (__chunkcache_should_pin_chunk(session, chunk))
-                F_SET(chunk, WT_CHUNK_PINNED);
-
             /*
              * Mark chunk as valid. The only thread that could be executing this code is the thread
              * that won the race and inserted this (invalid) chunk into the hash table. This thread
@@ -694,10 +703,21 @@ __wt_chunkcache_reconfig(WT_SESSION_IMPL *session, const char **cfg)
         __wt_spin_lock(session, &chunkcache->hashtable[i].bucket_lock);
         TAILQ_FOREACH_SAFE(chunk, WT_BUCKET_CHUNKS(chunkcache, i), next_chunk, chunk_tmp)
         {
-            if (__chunkcache_should_pin_chunk(session, chunk))
+            if (__chunkcache_should_pin_chunk(session, chunk)) {
+                /* Increment the stat when a chunk that was initially unpinned becomes pinned. */
+                if (!F_ISSET(chunk, WT_CHUNK_PINNED)) {
+                    WT_STAT_CONN_INCR(session, chunk_cache_chunks_pinned);
+                    WT_STAT_CONN_INCRV(session, chunk_cache_bytes_inuse_pinned, chunk->chunk_size);
+                }
                 F_SET(chunk, WT_CHUNK_PINNED);
-            else
+            } else {
+                /* Decrement the stat when a chunk that was initially pinned becomes unpinned. */
+                if (F_ISSET(chunk, WT_CHUNK_PINNED)) {
+                    WT_STAT_CONN_DECR(session, chunk_cache_chunks_pinned);
+                    WT_STAT_CONN_DECRV(session, chunk_cache_bytes_inuse_pinned, chunk->chunk_size);
+                }
                 F_CLR(chunk, WT_CHUNK_PINNED);
+            }
         }
         __wt_spin_unlock(session, &chunkcache->hashtable[i].bucket_lock);
     }

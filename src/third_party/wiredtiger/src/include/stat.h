@@ -563,7 +563,9 @@ struct __wt_connection_stats {
     int64_t chunk_cache_retries;
     int64_t chunk_cache_toomany_retries;
     int64_t chunk_cache_bytes_inuse;
+    int64_t chunk_cache_bytes_inuse_pinned;
     int64_t chunk_cache_chunks_inuse;
+    int64_t chunk_cache_chunks_pinned;
     int64_t cond_auto_wait_reset;
     int64_t cond_auto_wait;
     int64_t cond_auto_wait_skipped;
