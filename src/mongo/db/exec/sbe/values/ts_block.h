@@ -57,7 +57,6 @@ public:
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.
-    // TODO SERVER-79439 Implement copy/move constructors and assignment operators.
     TsBlock(const TsBlock& other) = delete;
     TsBlock(TsBlock&& other) = delete;
     TsBlock& operator=(const TsBlock& other) = delete;
@@ -147,7 +146,6 @@ public:
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.
-    // TODO SERVER-79439 Implement copy/move constructors and assignment operators.
     TsCellBlock(const TsCellBlock& other) = delete;
     TsCellBlock(TsCellBlock&&) = delete;
     TsCellBlock& operator=(const TsCellBlock& other) = delete;
@@ -155,7 +153,9 @@ public:
 
     ~TsCellBlock() override = default;
 
-    const ValueBlock& getValueBlock() const override;
+    ValueBlock& getValueBlock() override;
+
+    std::unique_ptr<CellBlock> clone() const override;
 
 private:
     TypeTags _blockTag = TypeTags::Nothing;

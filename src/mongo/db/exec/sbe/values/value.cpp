@@ -179,6 +179,16 @@ std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
     return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
 }
 
+std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& b) {
+    auto cpy = b.clone();
+    return {TypeTags::valueBlock, bitcastFrom<ValueBlock*>(cpy.release())};
+}
+
+std::pair<TypeTags, Value> makeCopyCellBlock(const CellBlock& b) {
+    auto cpy = b.clone();
+    return {TypeTags::cellBlock, bitcastFrom<CellBlock*>(cpy.release())};
+}
+
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator) {
     auto collatorCopy = bitcastFrom<CollatorInterface*>(collator.clone().release());
     return {TypeTags::collator, collatorCopy};

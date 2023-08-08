@@ -1588,9 +1588,9 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::timeZone:
             return makeCopyTimeZone(*getTimeZoneView(val));
         case TypeTags::valueBlock:
-            [[fallthrough]];
+            return makeCopyValueBlock(*getValueBlock(val));
         case TypeTags::cellBlock:
-            tasserted(7888700, "Cannot copy a ValueBlock or CellBlock");
+            return makeCopyCellBlock(*getCellBlock(val));
         case TypeTags::pcreRegex:
         case TypeTags::jsFunction:
         case TypeTags::shardFilterer:
