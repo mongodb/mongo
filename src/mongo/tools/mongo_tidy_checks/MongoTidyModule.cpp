@@ -37,6 +37,7 @@
 #include "MongoHeaderBracketCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoMutexCheck.h"
+#include "MongoNoUniqueAddressCheck.h"
 #include "MongoPolyFillCheck.h"
 #include "MongoRandCheck.h"
 #include "MongoStdAtomicCheck.h"
@@ -79,6 +80,7 @@ public:
             "mongo-macro-definition-leaks-check");
         CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");
         CheckFactories.registerCheck<MongoPolyFillCheck>("mongo-polyfill-check");
+        CheckFactories.registerCheck<MongoNoUniqueAddressCheck>("mongo-no-unique-address-check");
     }
 };
 
