@@ -567,7 +567,7 @@ env.Library(
     LIBDEPS=[
         "document_sources_idl",
     ],
-    LIBDEPS_PRIVATE=[],
+    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/repl/oplog_entry"],
 )
 
 env.Library(

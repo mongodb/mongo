@@ -138,11 +138,12 @@ std::string TransactionCoordinatorWorkerCurOpInfo::toString(CoordinatorAction ac
             return "writingParticipantList";
         case CoordinatorAction::kWritingDecision:
             return "writingDecision";
+        case CoordinatorAction::kWritingEndOfTransaction:
+            return "writingEndOfTransaction";
         case CoordinatorAction::kDeletingCoordinatorDoc:
             return "deletingCoordinatorDoc";
-        default:
-            MONGO_UNREACHABLE
     }
+    MONGO_UNREACHABLE;
 }
 
 void TransactionCoordinatorWorkerCurOpInfo::reportState(BSONObjBuilder* parent) const {

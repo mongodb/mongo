@@ -140,11 +140,15 @@ export function assertNumChangeStreamDocsReturnedFromShard(
     assert.eq(lastStage.nReturned, expectedTotalReturned, stages);
 }
 
-// Verifies the number of oplog events read by a particular shard.
-export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
+export function getExecutionStatsForShard(stats, shardName) {
     assert(stats.shards.hasOwnProperty(shardName), stats);
     assert.eq(Object.keys(stats.shards[shardName].stages[0])[0], "$cursor", stats);
-    const executionStats = stats.shards[shardName].stages[0].$cursor.executionStats;
+    return stats.shards[shardName].stages[0].$cursor.executionStats;
+}
+
+// Verifies the number of oplog events read by a particular shard.
+export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
+    const executionStats = getExecutionStatsForShard(stats, shardName);
     assert.eq(executionStats.nReturned,
               expectedTotalReturned,
               () => `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +

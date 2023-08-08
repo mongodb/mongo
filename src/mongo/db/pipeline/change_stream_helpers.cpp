@@ -54,5 +54,42 @@ ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<Expression
               "Expected one of 'startAfter', 'resumeAfter' or 'startAtOperationTime' to be "
               "populated in $changeStream spec");
 }
+
+repl::MutableOplogEntry createEndOfTransactionOplogEntry(
+    const LogicalSessionId& lsid,
+    const TxnNumber& txnNumber,
+    const std::vector<NamespaceString>& affectedNamespaces,
+    Timestamp timestamp,
+    Date_t wallClock) {
+    static const BSONObj kNoopEndOfTransactionMsgObject =
+        BSON("msg" << BSON("endOfTransaction" << 1));
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+    oplogEntry.setObject(kNoopEndOfTransactionMsgObject);
+
+    oplogEntry.setSessionId(lsid);
+    oplogEntry.setTxnNumber(txnNumber);
+
+    BSONObjBuilder o2;
+    {
+        BSONArrayBuilder namespaces{o2.subarrayStart("endOfTransaction")};
+        for (const auto& nss : affectedNamespaces) {
+            namespaces.append(NamespaceStringUtil::serialize(nss));
+        }
+    }
+    {
+        BSONObjBuilder sessionId{o2.subobjStart(repl::OplogEntry::kSessionIdFieldName)};
+        lsid.serialize(&sessionId);
+    }
+    o2.append(repl::OplogEntry::kTxnNumberFieldName, static_cast<long long>(txnNumber));
+    oplogEntry.setObject2(o2.obj());
+
+    oplogEntry.setTimestamp(timestamp);
+    oplogEntry.setWallClockTime(wallClock);
+    return oplogEntry;
+}
+
 }  // namespace change_stream
 }  // namespace mongo

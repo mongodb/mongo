@@ -49,6 +49,7 @@ public:
         kWritingDecision,
         kSendingCommit,
         kSendingAbort,
+        kWritingEndOfTransaction,
         kDeletingCoordinatorDoc
     };
 

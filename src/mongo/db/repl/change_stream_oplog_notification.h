@@ -100,4 +100,12 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
 void notifyChangeStreamsOnReshardCollectionComplete(
     OperationContext* opCtx, const CollectionResharded& CollectionReshardedNotification);
 
+/**
+ * Writes a no-op oplog entry on the end of multi shard transaction.
+ **/
+void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
+                                          const LogicalSessionId& lsid,
+                                          const TxnNumber& txnNumber,
+                                          const std::vector<NamespaceString>& affectedNamespaces);
+
 }  // namespace mongo

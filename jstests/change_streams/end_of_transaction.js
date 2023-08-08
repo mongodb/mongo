@@ -7,13 +7,11 @@
  *   requires_majority_read_concern,
  *   requires_snapshot_read,
  *   featureFlagEndOfTransactionChangeEvent,
- *   assumes_against_mongod_not_mongos,
- *   # TODO SERVER-78273 Remove the tag after support for prepared transactions
  * ]
  */
 
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertEndOfTransaction, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -24,17 +22,6 @@ assertDropAndRecreateCollection(db, otherCollName);
 const otherDbName = "change_stream_end_of_transaction_db";
 const otherDbCollName = "someColl";
 assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
-
-// Insert a document that gets deleted as part of the transaction.
-const kDeletedDocumentId = 0;
-const insertRes = assert.commandWorked(coll.runCommand("insert", {
-    documents: [{_id: kDeletedDocumentId, a: "I was here before the transaction"}],
-    writeConcern: {w: "majority"}
-}));
-
-// Record the clusterTime of the insert, and increment it to give the test start time.
-const testStartTime = insertRes.$clusterTime.clusterTime;
-testStartTime.i++;
 
 let cst = new ChangeStreamTest(db);
 let collChangeStream = cst.startWatchingChanges({
@@ -166,9 +153,11 @@ function assertNextChangesEqual({cursor, expectedChanges, expectInvalidate}) {
         {cursor: cursor, expectedChanges: expectedChanges, expectInvalidate: expectInvalidate});
 }
 
-assertNextChangesEqual(
+const collChanges = assertNextChangesEqual(
     {cursor: collChangeStream, expectedChanges: expectedChangesColl, expectInvalidate: true});
-assertNextChangesEqual(
+assertEndOfTransaction(collChanges);
+const dbChanges = assertNextChangesEqual(
     {cursor: dbChangeStream, expectedChanges: expectedChangesDb, expectInvalidate: false});
+assertEndOfTransaction(dbChanges);
 
 cst.cleanUp();

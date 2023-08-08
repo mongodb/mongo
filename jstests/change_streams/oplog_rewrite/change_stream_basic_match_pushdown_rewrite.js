@@ -13,7 +13,9 @@ import {
     assertNumChangeStreamDocsReturnedFromShard,
     assertNumMatchingOplogEventsForShard,
     createShardedCollection,
+    getExecutionStatsForShard,
 } from "jstests/libs/change_stream_rewrite_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = "change_stream_match_pushdown_and_rewrite";
 const collName = "coll1";
@@ -153,7 +155,7 @@ assert.commandWorked(sessionColl.remove({_id: 2}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
 // This change stream targets transactions from this session but filters out the first transaction.
-const txnStatsAfterEvent1 = coll.explain("executionStats").aggregate([
+const txnStatsAfterEvent1 = () => coll.explain("executionStats").aggregate([
     {$changeStream: {resumeAfter: event1._id}},
     {$match: {operationType: "insert", lsid: event3.lsid, txnNumber: {$ne: event3.txnNumber}}}
 ]);
@@ -161,8 +163,28 @@ const txnStatsAfterEvent1 = coll.explain("executionStats").aggregate([
 // The "lsid" and "txnNumber" filters should get pushed all the way to the initial oplog query
 // in the $cursor stage, meaning that every oplog entry gets filtered out except the
 // 'commitTransaction' on each shard for the one transaction we select with our filter.
-assertNumMatchingOplogEventsForShard(txnStatsAfterEvent1, st.shard0.shardName, 1);
-assertNumMatchingOplogEventsForShard(txnStatsAfterEvent1, st.shard1.shardName, 1);
+if (!FeatureFlagUtil.isEnabled(db, "EndOfTransactionChangeEvent")) {
+    const stats = txnStatsAfterEvent1();
+    assertNumMatchingOplogEventsForShard(stats, st.shard0.shardName, 1);
+    assertNumMatchingOplogEventsForShard(stats, st.shard1.shardName, 1);
+} else {
+    // If endOfTransaction change event is enabled, then there is also endOfTransaction
+    // oplog entry on one of the shards that is written asynchronously.
+    assert.soon(
+        () => {
+            const stats = txnStatsAfterEvent1();
+            const oplogEventsOnShard0 =
+                getExecutionStatsForShard(stats, st.shard0.shardName).nReturned;
+            const oplogEventsOnShard1 =
+                getExecutionStatsForShard(stats, st.shard1.shardName).nReturned;
+            return oplogEventsOnShard0 > 0 && oplogEventsOnShard1 > 0 &&
+                oplogEventsOnShard0 + oplogEventsOnShard1 === 3;
+        },
+        () => `Expected 3 events in total on all shard. Execution stats:\nshard0:\n${
+            tojson(
+                getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard0.shardName))}\nshard1:\n${
+            tojson(getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard1.shardName))}`);
+}
 
 // Ensure that optimization does not attempt to create a filter that disregards the collation.
 const collationChangeStream = coll.aggregate(

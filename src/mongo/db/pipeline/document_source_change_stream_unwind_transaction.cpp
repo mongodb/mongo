@@ -51,6 +51,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -501,22 +502,23 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::
 void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
     // TODO SERVER-78670:  move namespace extraction to change_stream_helpers.cpp and make generic
+    const boost::optional<TenantId> tid = !doc["tid"].missing()
+        ? boost::make_optional<TenantId>(TenantId(doc["tid"].getOid()))
+        : boost::none;
     if (doc["op"].getStringData() != "c") {
-        _affectedNamespaces.emplace(doc["ns"].getStringData());
+        _affectedNamespaces.insert(
+            NamespaceStringUtil::deserialize(tid, doc["ns"].getStringData()));
         return;
     }
 
     static const std::vector<std::string> kCollectionField = {"create", "createIndexes"};
-
-    const boost::optional<TenantId> tid = !doc["tid"].missing()
-        ? boost::make_optional<TenantId>(TenantId(doc["tid"].getOid()))
-        : boost::none;
     const auto dbCmdNs = NamespaceStringUtil::deserialize(tid, doc["ns"].getString());
     const Document& object = doc["o"].getDocument();
     for (const auto& fieldName : kCollectionField) {
-        if (object[fieldName].getType() == BSONType::String) {
-            _affectedNamespaces.emplace(str::stream{} << dbCmdNs.db_deprecated() << "."
-                                                      << object[fieldName].getStringData());
+        const auto field = object[fieldName];
+        if (field.getType() == BSONType::String) {
+            _affectedNamespaces.insert(
+                NamespaceStringUtil::deserialize(dbCmdNs.dbName(), field.getStringData()));
             return;
         }
     }
@@ -535,28 +537,17 @@ boost::optional<Document> DocumentSourceChangeStreamUnwindTransaction::Transacti
     ++_txnOpIndex;
     _endOfTransactionReturned = true;
 
-    // TODO SERVER-78271: share this code in common between the oplog no-op and here.
-    MutableDocument newDoc;
-    newDoc.addField(repl::OplogEntry::kOpTypeFieldName,
-                    Value{repl::OpType_serializer(repl::OpTypeEnum::kNoop)});
-    newDoc.addField(repl::OplogEntry::kNssFieldName,
-                    Value{NamespaceString::kAdminCommandNamespace.ns()});
-    newDoc.setNestedField("o.msg.endOfTransaction", Value{1});
+    std::vector<NamespaceString> namespaces{_affectedNamespaces.begin(), _affectedNamespaces.end()};
+    auto lsid = LogicalSessionId::parse(IDLParserContext("LogicalSessionId"), _lsid->toBson());
+    repl::MutableOplogEntry oplogEntry = change_stream::createEndOfTransactionOplogEntry(
+        lsid, *_txnNumber, namespaces, _clusterTime, _wallTime);
 
-    MutableDocument o2;
-    std::vector<Value> namespaces{_affectedNamespaces.begin(), _affectedNamespaces.end()};
-    o2.addField("endOfTransaction", Value{std::move(namespaces)});
-    o2.addField(repl::OplogEntry::kSessionIdFieldName, Value(*_lsid));
-    o2.addField(repl::OplogEntry::kTxnNumberFieldName, Value(static_cast<long long>(*_txnNumber)));
-    newDoc.addField("o2", o2.freezeToValue());
-
+    MutableDocument newDoc(Document(oplogEntry.toBSON()));
     newDoc.addField(DocumentSourceChangeStream::kTxnOpIndexField,
                     Value(static_cast<long long>(txnOpIndex())));
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsIndexField,
                     Value(static_cast<long long>(applyOpsIndex())));
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsTsField, Value(applyOpsTs()));
-    newDoc.addField(repl::OplogEntry::kTimestampFieldName, Value(_clusterTime));
-    newDoc.addField(repl::OplogEntry::kWallClockTimeFieldName, Value(_wallTime));
 
     Document endOfTransaction = newDoc.freeze();
     return {_endOfTransactionExpression->matchesBSON(endOfTransaction.toBson()), endOfTransaction};

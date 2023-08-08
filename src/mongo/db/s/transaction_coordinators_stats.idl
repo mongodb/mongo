@@ -51,6 +51,9 @@ structs:
       waitingForDecisionAcks:
         type: long
         default: 0
+      writingEndOfTransaction:
+        type: long
+        default: 0
       deletingCoordinatorDoc:
         type: long
         default: 0

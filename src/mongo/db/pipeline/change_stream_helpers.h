@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
 
@@ -46,6 +47,16 @@ namespace change_stream {
  */
 ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec);
+
+/**
+ * Creates endOfTransaction no-op oplog entry
+ */
+repl::MutableOplogEntry createEndOfTransactionOplogEntry(
+    const LogicalSessionId& lsid,
+    const TxnNumber& txnNumber,
+    const std::vector<NamespaceString>& affectedNamespaces,
+    Timestamp timestamp,
+    Date_t wallClock);
 
 /**
  * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'

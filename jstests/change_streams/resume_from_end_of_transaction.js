@@ -6,8 +6,6 @@
  *   requires_majority_read_concern,
  *   requires_snapshot_read,
  *   featureFlagEndOfTransactionChangeEvent,
- *   assumes_against_mongod_not_mongos,
- *   # TODO SERVER-78273 Remove the tag after support for prepared transactions
  * ]
  */
 
@@ -15,8 +13,6 @@ import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_i
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_resume_from_end_of_transaction");
-const changeStreamIterator = coll.watch([], {showExpandedEvents: true});
-
 const sessionOptions = {
     causalConsistency: false
 };
@@ -32,19 +28,31 @@ const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(db.getName());
 const sessionColl = sessionDb[coll.getName()];
 
+const changeStreamCursor = coll.watch([], {showExpandedEvents: true});
+
 withTxnAndAutoRetryOnMongos(session, () => {
     assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
     assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 }, txnOptions);
-assert.commandWorked(coll.insert({_id: 3, a: 0}));
 
-const expectedOperationTypes = ["insert", "insert", "endOfTransaction", "insert"];
+const expectedOperationTypes = ["insert", "insert", "endOfTransaction"];
 const events = [];
-for (let operationType of expectedOperationTypes) {
-    const event = changeStreamIterator.next();
-    assert.eq(event.operationType, operationType);
+
+const getNextEventAndCheckType = function(expectedOperationType) {
+    assert.soon(() => changeStreamCursor.hasNext());
+    const event = changeStreamCursor.next();
+    assert.eq(event.operationType, expectedOperationType);
     events.push(event);
+};
+
+for (let operationType of expectedOperationTypes) {
+    getNextEventAndCheckType(operationType);
 }
+
+// Write one document after the transaction, so that later we can confirm that resuming after the
+// EOT event works.
+assert.commandWorked(coll.insert({_id: 3, a: 0}));
+getNextEventAndCheckType("insert");
 
 const getNextEvent = function(resumeToken) {
     const resumeCursor = coll.watch([], {resumeAfter: resumeToken, showExpandedEvents: true});
@@ -59,4 +67,4 @@ for (let i = 0; i + 1 < events.length; i += 1) {
     assert.eq(nextEvent, events[i + 1]);
 }
 
-changeStreamIterator.close();
+changeStreamCursor.close();

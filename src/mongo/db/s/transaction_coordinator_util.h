@@ -262,6 +262,11 @@ Future<void> sendDecisionToShard(
     const BSONObj& commandObj,
     OperationContextFn operationContextFn = [](OperationContext*) {});
 
+Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
+                                   const LogicalSessionId& lsid,
+                                   const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+                                   const std::vector<NamespaceString>& affectedNamespaces);
+
 /**
  * Returns a string representation of the transaction id represented by the given session id and
  * transaction number.

@@ -140,6 +140,21 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
     return waitForWC(std::move(opTime));
 }
 
+void setDecisionPromise(const txn::CoordinatorCommitDecision& decision,
+                        SharedPromise<txn::CommitDecision>& promise) {
+    switch (decision.getDecision()) {
+        case CommitDecision::kCommit: {
+            promise.emplaceValue(CommitDecision::kCommit);
+            return;
+        }
+        case CommitDecision::kAbort: {
+            promise.setError(*decision.getAbortStatus());
+            return;
+        }
+    };
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
 
 TransactionCoordinator::TransactionCoordinator(
@@ -216,7 +231,8 @@ TransactionCoordinator::TransactionCoordinator(
 
                 _step = Step::kWritingParticipantList;
 
-                _transactionCoordinatorMetricsObserver->onStartWritingParticipantList(
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kWritingParticipantList,
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
@@ -257,7 +273,8 @@ TransactionCoordinator::TransactionCoordinator(
 
                 _step = Step::kWaitingForVotes;
 
-                _transactionCoordinatorMetricsObserver->onStartWaitingForVotes(
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kWaitingForVotes,
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
@@ -325,7 +342,8 @@ TransactionCoordinator::TransactionCoordinator(
 
                 _step = Step::kWritingDecision;
 
-                _transactionCoordinatorMetricsObserver->onStartWritingDecision(
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kWritingDecision,
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
@@ -342,19 +360,7 @@ TransactionCoordinator::TransactionCoordinator(
                                         _affectedNamespaces);
         })
         .then([this](repl::OpTime opTime) {
-            switch (_decision->getDecision()) {
-                case CommitDecision::kCommit: {
-                    _decisionPromise.emplaceValue(CommitDecision::kCommit);
-                    break;
-                }
-                case CommitDecision::kAbort: {
-                    _decisionPromise.setError(*_decision->getAbortStatus());
-                    break;
-                }
-                default:
-                    MONGO_UNREACHABLE;
-            };
-
+            setDecisionPromise(*_decision, _decisionPromise);
             return waitForMajorityWithHangFailpoint(_serviceContext,
                                                     hangBeforeWaitingForDecisionWriteConcern,
                                                     "hangBeforeWaitingForDecisionWriteConcern",
@@ -378,7 +384,8 @@ TransactionCoordinator::TransactionCoordinator(
 
                 _step = Step::kWaitingForDecisionAcks;
 
-                _transactionCoordinatorMetricsObserver->onStartWaitingForDecisionAcks(
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kWaitingForDecisionAcks,
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
@@ -406,6 +413,28 @@ TransactionCoordinator::TransactionCoordinator(
                     MONGO_UNREACHABLE;
             };
         })
+        .then([this, apiParams] {
+            setDecisionPromise(*_decision, _decisionAcknowledgedPromise);
+
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+
+                _step = Step::kWritingEndOfTransaction;
+
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kWritingEndOfTransaction,
+                    ServerTransactionCoordinatorsMetrics::get(_serviceContext),
+                    _serviceContext->getTickSource(),
+                    _serviceContext->getPreciseClockSource()->now());
+            }
+
+            // If transaction was commited, write endOfTransaction oplog entries
+            if (_decision->getDecision() != CommitDecision::kCommit) {
+                return Future<void>::makeReady();
+            }
+            return txn::writeEndOfTransaction(
+                *_scheduler, _lsid, _txnNumberAndRetryCounter, _affectedNamespaces);
+        })
         .then([this] {
             // Do a best-effort attempt (i.e., writeConcern w:1) to delete the coordinator's durable
             // state.
@@ -414,7 +443,8 @@ TransactionCoordinator::TransactionCoordinator(
 
                 _step = Step::kDeletingCoordinatorDoc;
 
-                _transactionCoordinatorMetricsObserver->onStartDeletingCoordinatorDoc(
+                _transactionCoordinatorMetricsObserver->onStartStep(
+                    TransactionCoordinator::Step::kDeletingCoordinatorDoc,
                     ServerTransactionCoordinatorsMetrics::get(_serviceContext),
                     _serviceContext->getTickSource(),
                     _serviceContext->getPreciseClockSource()->now());
@@ -470,8 +500,12 @@ SharedSemiFuture<CommitDecision> TransactionCoordinator::getDecision() const {
     return _decisionPromise.getFuture();
 }
 
-SharedSemiFuture<txn::CommitDecision> TransactionCoordinator::onCompletion() {
+SharedSemiFuture<void> TransactionCoordinator::onCompletion() const {
     return _completionPromise.getFuture();
+}
+
+SharedSemiFuture<CommitDecision> TransactionCoordinator::onDecisionAcknowledged() const {
+    return _decisionAcknowledgedPromise.getFuture();
 }
 
 void TransactionCoordinator::cancelIfCommitNotYetStarted() {
@@ -534,12 +568,14 @@ void TransactionCoordinator::_done(Status status) {
     if (!_decisionPromise.getFuture().isReady()) {
         _decisionPromise.setError(status);
     }
+    if (!_decisionAcknowledgedPromise.getFuture().isReady()) {
+        _decisionAcknowledgedPromise.setError(status);
+    }
 
     if (!status.isOK()) {
         _completionPromise.setError(status);
     } else {
-        // If the status is OK, the decisionPromise must be set.
-        _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow());
+        _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow().getStatus());
     }
 }
 
@@ -580,26 +616,31 @@ void TransactionCoordinator::_logSlowTwoPhaseCommit(
         _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
 
     BSONObjBuilder stepDurations;
-    stepDurations.append("writingParticipantListMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getWritingParticipantListDuration(
-                                 tickSource, curTick)));
+    stepDurations.append(
+        "writingParticipantListMicros",
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kWritingParticipantList, tickSource, curTick)));
     stepDurations.append(
         "waitingForVotesMicros",
-        durationCount<Microseconds>(
-            singleTransactionCoordinatorStats.getWaitingForVotesDuration(tickSource, curTick)));
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kWaitingForVotes, tickSource, curTick)));
     stepDurations.append(
         "writingDecisionMicros",
-        durationCount<Microseconds>(
-            singleTransactionCoordinatorStats.getWritingDecisionDuration(tickSource, curTick)));
-    stepDurations.append("waitingForDecisionAcksMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getWaitingForDecisionAcksDuration(
-                                 tickSource, curTick)));
-    stepDurations.append("deletingCoordinatorDocMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getDeletingCoordinatorDocDuration(
-                                 tickSource, curTick)));
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kWritingDecision, tickSource, curTick)));
+    stepDurations.append(
+        "waitingForDecisionAcksMicros",
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kWaitingForDecisionAcks, tickSource, curTick)));
+    stepDurations.append(
+        "writingEndOfTransactionMicros",
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kWritingEndOfTransaction, tickSource, curTick)));
+    stepDurations.append(
+        "deletingCoordinatorDocMicros",
+        durationCount<Microseconds>(singleTransactionCoordinatorStats.getStepDuration(
+            Step::kDeletingCoordinatorDoc, tickSource, curTick)));
+
     attrs.add("stepDurations", stepDurations.obj());
 
     // Total duration of the commit coordination. Logged at the end of the line for consistency
@@ -611,77 +652,6 @@ void TransactionCoordinator::_logSlowTwoPhaseCommit(
             singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick)));
 
     LOGV2(51804, "two-phase commit", attrs);
-}
-
-std::string TransactionCoordinator::_twoPhaseCommitInfoForLog(
-    const txn::CoordinatorCommitDecision& decision) const {
-    StringBuilder s;
-
-    s << "two-phase commit";
-
-    BSONObjBuilder parametersBuilder;
-
-    BSONObjBuilder lsidBuilder(parametersBuilder.subobjStart("lsid"));
-    _lsid.serialize(&lsidBuilder);
-    lsidBuilder.doneFast();
-
-    parametersBuilder.append("txnNumber", _txnNumberAndRetryCounter.getTxnNumber());
-    parametersBuilder.append("txnRetryCounter", *_txnNumberAndRetryCounter.getTxnRetryCounter());
-
-    s << " parameters:" << parametersBuilder.obj().toString();
-
-    switch (decision.getDecision()) {
-        case txn::CommitDecision::kCommit:
-            s << ", terminationCause:committed";
-            s << ", commitTimestamp: " << decision.getCommitTimestamp()->toString();
-            break;
-        case txn::CommitDecision::kAbort:
-            s << ", terminationCause:aborted";
-            s << ", terminationDetails: " << *decision.getAbortStatus();
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    };
-
-    s << ", numParticipants:" << _participants->size();
-
-    auto tickSource = _serviceContext->getTickSource();
-    auto curTick = tickSource->getTicks();
-    const auto& singleTransactionCoordinatorStats =
-        _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
-
-    BSONObjBuilder stepDurations;
-    stepDurations.append("writingParticipantListMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getWritingParticipantListDuration(
-                                 tickSource, curTick)));
-    stepDurations.append(
-        "waitingForVotesMicros",
-        durationCount<Microseconds>(
-            singleTransactionCoordinatorStats.getWaitingForVotesDuration(tickSource, curTick)));
-    stepDurations.append(
-        "writingDecisionMicros",
-        durationCount<Microseconds>(
-            singleTransactionCoordinatorStats.getWritingDecisionDuration(tickSource, curTick)));
-    stepDurations.append("waitingForDecisionAcksMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getWaitingForDecisionAcksDuration(
-                                 tickSource, curTick)));
-    stepDurations.append("deletingCoordinatorDocMicros",
-                         durationCount<Microseconds>(
-                             singleTransactionCoordinatorStats.getDeletingCoordinatorDocDuration(
-                                 tickSource, curTick)));
-    s << ", stepDurations:" << stepDurations.obj();
-
-    // Total duration of the commit coordination. Logged at the end of the line for consistency with
-    // slow command logging.
-    // Note that this is reported in milliseconds while the step durations are reported in
-    // microseconds.
-    s << " "
-      << duration_cast<Milliseconds>(
-             singleTransactionCoordinatorStats.getTwoPhaseCommitDuration(tickSource, curTick));
-
-    return s.str();
 }
 
 TransactionCoordinator::Step TransactionCoordinator::getStep() const {
@@ -722,7 +692,7 @@ void TransactionCoordinator::reportState(BSONObjBuilder& parent) const {
     parent.append("twoPhaseCommitCoordinator", doc.obj());
 }
 
-std::string TransactionCoordinator::toString(Step step) const {
+std::string TransactionCoordinator::toString(Step step) {
     switch (step) {
         case Step::kInactive:
             return "inactive";
@@ -733,12 +703,13 @@ std::string TransactionCoordinator::toString(Step step) const {
         case Step::kWritingDecision:
             return "writingDecision";
         case Step::kWaitingForDecisionAcks:
-            return "waitingForDecisionAck";
+            return "waitingForDecisionAcks";
+        case Step::kWritingEndOfTransaction:
+            return "writingEndOfTransaction";
         case Step::kDeletingCoordinatorDoc:
             return "deletingCoordinatorDoc";
-        default:
-            MONGO_UNREACHABLE;
     }
+    MONGO_UNREACHABLE;
 }
 
 void TransactionCoordinator::_updateAssociatedClient(Client* client) {

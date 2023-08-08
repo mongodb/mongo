@@ -178,7 +178,7 @@ TransactionCoordinatorService::coordinateCommit(OperationContext* opCtx,
 
     return coordinateCommitReturnImmediatelyAfterPersistingDecision.load()
         ? coordinator->getDecision()
-        : coordinator->onCompletion();
+        : coordinator->onDecisionAcknowledged();
 }
 
 boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorService::recoverCommit(
@@ -199,7 +199,7 @@ boost::optional<SharedSemiFuture<txn::CommitDecision>> TransactionCoordinatorSer
 
     return coordinateCommitReturnImmediatelyAfterPersistingDecision.load()
         ? coordinator->getDecision()
-        : coordinator->onCompletion();
+        : coordinator->onDecisionAcknowledged();
 }
 
 void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,

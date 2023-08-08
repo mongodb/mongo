@@ -1484,6 +1484,40 @@ TEST_F(TransactionCoordinatorTest,
                        ErrorCodes::ReadConcernMajorityNotEnabled);
 }
 
+TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) {
+    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    TransactionCoordinator coordinator(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::max(),
+        _cancelToken);
+    coordinator.runCommit(operationContext(), kOneShardIdList);
+    assertPrepareSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    coordinator.onCompletion().get();
+
+    BSONArrayBuilder namespaces;
+    for (const auto& nss : kDummyAffectedNamespaces) {
+        namespaces.append(nss.ns_forTest());
+    }
+    BSONObj expectedO2 =
+        BSON("endOfTransaction" << namespaces.arr() << repl::OplogEntry::kSessionIdFieldName
+                                << _lsid.toBSON() << repl::OplogEntry::kTxnNumberFieldName
+                                << _txnNumberAndRetryCounter.getTxnNumber());
+
+    DBDirectClient dbClient(operationContext());
+    auto oplogEntry = dbClient.findOne(NamespaceString::kRsOplogNamespace,
+                                       BSON("op"
+                                            << "n"
+                                            << "o.msg.endOfTransaction" << 1));
+    auto o2 = oplogEntry.getField("o2");
+    ASSERT_EQ(o2.type(), BSONType::Object);
+    ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
+}
+
 class TransactionCoordinatorMetricsTest : public TransactionCoordinatorTestBase {
 protected:
     TransactionCoordinatorMetricsTest()
@@ -1508,99 +1542,49 @@ protected:
         return dynamic_cast<TickSourceMock<Microseconds>*>(getServiceContext()->getTickSource());
     }
 
-    struct Stats {
-        // Start times
-        boost::optional<Date_t> createTime;
-        boost::optional<Date_t> writingParticipantListStartTime;
-        boost::optional<Date_t> waitingForVotesStartTime;
-        boost::optional<Date_t> writingDecisionStartTime;
-        boost::optional<Date_t> waitingForDecisionAcksStartTime;
-        boost::optional<Date_t> deletingCoordinatorDocStartTime;
-        boost::optional<Date_t> endTime;
+    static constexpr size_t kStepCount =
+        static_cast<size_t>(TransactionCoordinator::Step::kLastStep) + 1;
 
-        // Durations
+    struct Stats {
+        boost::optional<Date_t> createTime;
+        boost::optional<Date_t> endTime;
+        std::vector<boost::optional<Date_t>> stepStartTimes{kStepCount, boost::none};
+
         boost::optional<Microseconds> totalDuration;
         boost::optional<Microseconds> twoPhaseCommitDuration;
-        boost::optional<Microseconds> writingParticipantListDuration;
-        boost::optional<Microseconds> waitingForVotesDuration;
-        boost::optional<Microseconds> writingDecisionDuration;
-        boost::optional<Microseconds> waitingForDecisionAcksDuration;
-        boost::optional<Microseconds> deletingCoordinatorDocDuration;
+        std::vector<boost::optional<Microseconds>> stepDurations{kStepCount, boost::none};
     };
 
     void checkStats(const SingleTransactionCoordinatorStats& stats, const Stats& expected) {
-
-        // Start times
-
         if (expected.createTime) {
             ASSERT_EQ(*expected.createTime, stats.getCreateTime());
         }
-
-        if (expected.writingParticipantListStartTime) {
-            ASSERT(*expected.writingParticipantListStartTime ==
-                   stats.getWritingParticipantListStartTime());
-        }
-
-        if (expected.waitingForVotesStartTime) {
-            ASSERT(*expected.waitingForVotesStartTime == stats.getWaitingForVotesStartTime());
-        }
-
-        if (expected.writingDecisionStartTime) {
-            ASSERT(*expected.writingDecisionStartTime == stats.getWritingDecisionStartTime());
-        }
-
-        if (expected.waitingForDecisionAcksStartTime) {
-            ASSERT(*expected.waitingForDecisionAcksStartTime ==
-                   stats.getWaitingForDecisionAcksStartTime());
-        }
-
-        if (expected.deletingCoordinatorDocStartTime) {
-            ASSERT(*expected.deletingCoordinatorDocStartTime ==
-                   stats.getDeletingCoordinatorDocStartTime());
-        }
-
         if (expected.endTime) {
-            ASSERT(*expected.endTime == stats.getEndTime());
+            ASSERT_EQ(*expected.endTime, stats.getEndTime());
         }
-
-        // Durations
-
         if (expected.totalDuration) {
             ASSERT_EQ(*expected.totalDuration,
                       stats.getDurationSinceCreation(tickSource(), tickSource()->getTicks()));
         }
-
         if (expected.twoPhaseCommitDuration) {
             ASSERT_EQ(*expected.twoPhaseCommitDuration,
                       stats.getTwoPhaseCommitDuration(tickSource(), tickSource()->getTicks()));
         }
 
-        if (expected.writingParticipantListDuration) {
-            ASSERT_EQ(
-                *expected.writingParticipantListDuration,
-                stats.getWritingParticipantListDuration(tickSource(), tickSource()->getTicks()));
-        }
-
-        if (expected.waitingForVotesDuration) {
-            ASSERT_EQ(*expected.waitingForVotesDuration,
-                      stats.getWaitingForVotesDuration(tickSource(), tickSource()->getTicks()));
-        }
-
-        if (expected.writingDecisionDuration) {
-            ASSERT_EQ(*expected.writingDecisionDuration,
-                      stats.getWritingDecisionDuration(tickSource(), tickSource()->getTicks()));
-        }
-
-        if (expected.waitingForDecisionAcksDuration) {
-            ASSERT_EQ(
-                *expected.waitingForDecisionAcksDuration,
-                stats.getWaitingForDecisionAcksDuration(tickSource(), tickSource()->getTicks()));
-        }
-
-        if (expected.deletingCoordinatorDocDuration) {
-            ASSERT_EQ(
-                *expected.deletingCoordinatorDocDuration,
-                stats.getDeletingCoordinatorDocDuration(tickSource(), tickSource()->getTicks()));
+        size_t startIndex =
+            static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+        size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+        for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+            auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+            if (expected.stepStartTimes[stepIndex]) {
+                ASSERT_EQ(*expected.stepStartTimes[stepIndex], stats.getStepStartTime(step))
+                    << "Step: " << TransactionCoordinator::toString(step);
+            }
+            if (expected.stepDurations[stepIndex]) {
+                ASSERT_EQ(*expected.stepDurations[stepIndex],
+                          stats.getStepDuration(step, tickSource(), tickSource()->getTicks()))
+                    << "Step: " << TransactionCoordinator::toString(step);
+            }
         }
     }
 
@@ -1612,11 +1596,7 @@ protected:
         std::int64_t totalCommittedTwoPhaseCommit{0};
 
         // Current in steps
-        std::int64_t currentWritingParticipantList{0};
-        std::int64_t currentWaitingForVotes{0};
-        std::int64_t currentWritingDecision{0};
-        std::int64_t currentWaitingForDecisionAcks{0};
-        std::int64_t currentDeletingCoordinatorDoc{0};
+        std::vector<std::int64_t> currentInSteps = std::vector<std::int64_t>(kStepCount, 0);
     };
 
     void checkMetrics(const Metrics& expectedMetrics) {
@@ -1630,14 +1610,13 @@ protected:
                   metrics()->getTotalSuccessfulTwoPhaseCommit());
 
         // Current in steps
-        ASSERT_EQ(expectedMetrics.currentWritingParticipantList,
-                  metrics()->getCurrentWritingParticipantList());
-        ASSERT_EQ(expectedMetrics.currentWaitingForVotes, metrics()->getCurrentWaitingForVotes());
-        ASSERT_EQ(expectedMetrics.currentWritingDecision, metrics()->getCurrentWritingDecision());
-        ASSERT_EQ(expectedMetrics.currentWaitingForDecisionAcks,
-                  metrics()->getCurrentWaitingForDecisionAcks());
-        ASSERT_EQ(expectedMetrics.currentDeletingCoordinatorDoc,
-                  metrics()->getCurrentDeletingCoordinatorDoc());
+        size_t startIndex =
+            static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+        size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+        for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+            auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+            ASSERT_EQ(expectedMetrics.currentInSteps[stepIndex], metrics()->getCurrentInStep(step));
+        }
     }
 
     void checkServerStatus() {
@@ -1647,19 +1626,17 @@ protected:
         ASSERT_EQ(metrics()->getTotalCreated(), serverStatusSection["totalCreated"].Long());
         ASSERT_EQ(metrics()->getTotalStartedTwoPhaseCommit(),
                   serverStatusSection["totalStartedTwoPhaseCommit"].Long());
-        ASSERT_EQ(
-            metrics()->getCurrentWritingParticipantList(),
-            serverStatusSection.getObjectField("currentInSteps")["writingParticipantList"].Long());
-        ASSERT_EQ(metrics()->getCurrentWaitingForVotes(),
-                  serverStatusSection.getObjectField("currentInSteps")["waitingForVotes"].Long());
-        ASSERT_EQ(metrics()->getCurrentWritingDecision(),
-                  serverStatusSection.getObjectField("currentInSteps")["writingDecision"].Long());
-        ASSERT_EQ(
-            metrics()->getCurrentWaitingForDecisionAcks(),
-            serverStatusSection.getObjectField("currentInSteps")["waitingForDecisionAcks"].Long());
-        ASSERT_EQ(
-            metrics()->getCurrentDeletingCoordinatorDoc(),
-            serverStatusSection.getObjectField("currentInSteps")["deletingCoordinatorDoc"].Long());
+
+        size_t startIndex =
+            static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+        size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+        for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+            auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+            std::string stepName = TransactionCoordinator::toString(step);
+            ASSERT_EQ(metrics()->getCurrentInStep(step),
+                      serverStatusSection.getObjectField("currentInSteps")[stepName].Long())
+                << "Step: " << stepName;
+        }
     }
 
     static void assertClientReportStateFields(BSONObj doc, std::string appName, int connectionId) {
@@ -1732,94 +1709,29 @@ TEST_F(TransactionCoordinatorMetricsTest, SingleCoordinatorStatsSimpleTwoPhaseCo
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     checkStats(stats, expectedStats);
 
-    // Stats are updated on onStartWritingParticipantList.
-
-    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
     expectedStats.twoPhaseCommitDuration = Microseconds(0);
-    expectedStats.writingParticipantListDuration = Microseconds(0);
-    coordinatorObserver.onStartWritingParticipantList(
-        metrics(), tickSource(), clockSource()->now());
-    checkStats(stats, expectedStats);
 
-    // Advancing the time causes the total duration, two-phase commit duration, and duration writing
-    // participant list to increase.
-    tickSource()->advance(Microseconds(100));
-    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.twoPhaseCommitDuration =
-        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.writingParticipantListDuration =
-        *expectedStats.writingParticipantListDuration + Microseconds(100);
-    checkStats(stats, expectedStats);
+    size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+        auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
 
-    // Stats are updated on onStartWaitingForVotes.
+        // Stats are updated on step start
+        expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
+        expectedStats.stepDurations[stepIndex] = Microseconds(0);
+        coordinatorObserver.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+        checkStats(stats, expectedStats);
 
-    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
-    expectedStats.waitingForVotesDuration = Microseconds(0);
-    coordinatorObserver.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
-    checkStats(stats, expectedStats);
-
-    // Advancing the time causes only the total duration, two-phase commit duration, and duration
-    // waiting for votes to increase.
-    tickSource()->advance(Microseconds(100));
-    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.twoPhaseCommitDuration =
-        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.waitingForVotesDuration =
-        *expectedStats.waitingForVotesDuration + Microseconds(100);
-    checkStats(stats, expectedStats);
-
-    // Stats are updated on onStartWritingDecision.
-
-    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
-    expectedStats.writingDecisionDuration = Microseconds(0);
-    coordinatorObserver.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
-    checkStats(stats, expectedStats);
-
-    // Advancing the time causes only the total duration, two-phase commit duration, and duration
-    // writing decision to increase.
-    tickSource()->advance(Microseconds(100));
-    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.twoPhaseCommitDuration =
-        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.writingDecisionDuration =
-        *expectedStats.writingDecisionDuration + Microseconds(100);
-    checkStats(stats, expectedStats);
-
-    // Stats are updated on onStartWaitingForDecisionAcks.
-
-    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
-    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
-    coordinatorObserver.onStartWaitingForDecisionAcks(
-        metrics(), tickSource(), clockSource()->now());
-    checkStats(stats, expectedStats);
-
-    // Advancing the time causes only the total duration, two-phase commit duration, and duration
-    // waiting for decision acks to increase.
-    tickSource()->advance(Microseconds(100));
-    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.twoPhaseCommitDuration =
-        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.waitingForDecisionAcksDuration =
-        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
-    checkStats(stats, expectedStats);
-
-    // Stats are updated on onStartDeletingCoordinatorDoc.
-
-    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
-    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
-    coordinatorObserver.onStartDeletingCoordinatorDoc(
-        metrics(), tickSource(), clockSource()->now());
-    checkStats(stats, expectedStats);
-
-    // Advancing the time causes only the total duration, two-phase commit duration, and duration
-    // deleting the coordinator doc to increase.
-    tickSource()->advance(Microseconds(100));
-    expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.twoPhaseCommitDuration =
-        *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.deletingCoordinatorDocDuration =
-        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
-    checkStats(stats, expectedStats);
+        // Advancing the time causes the total duration, two-phase commit duration, and duration
+        // of the current step to increase.
+        tickSource()->advance(Microseconds(100));
+        expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
+        expectedStats.twoPhaseCommitDuration =
+            *expectedStats.twoPhaseCommitDuration + Microseconds(100);
+        expectedStats.stepDurations[stepIndex] =
+            *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+        checkStats(stats, expectedStats);
+    }
 
     // Stats are updated on onEnd.
     expectedStats.endTime = advanceClockSourceAndReturnNewNow();
@@ -1845,41 +1757,22 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit)
     coordinatorObserver.onCreate(metrics(), tickSource(), clockSource()->now());
     checkMetrics(expectedMetrics);
 
-    // Metrics are updated on onStartWritingParticipantList.
+    // Metrics are updated on start of each step.
+    size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingParticipantList++;
-    coordinatorObserver.onStartWritingParticipantList(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    // Metrics are updated on onStartWaitingForVotes.
-    expectedMetrics.currentWritingParticipantList--;
-    expectedMetrics.currentWaitingForVotes++;
-    coordinatorObserver.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    // Metrics are updated on onStartWritingDecision.
-    expectedMetrics.currentWaitingForVotes--;
-    expectedMetrics.currentWritingDecision++;
-    coordinatorObserver.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    // Metrics are updated on onStartWaitingForDecisionAcks.
-    expectedMetrics.currentWritingDecision--;
-    expectedMetrics.currentWaitingForDecisionAcks++;
-    coordinatorObserver.onStartWaitingForDecisionAcks(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    // Metrics are updated on onStartDeletingCoordinatorDoc.
-    expectedMetrics.currentWaitingForDecisionAcks--;
-    expectedMetrics.currentDeletingCoordinatorDoc++;
-    coordinatorObserver.onStartDeletingCoordinatorDoc(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
+    for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+        auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+        expectedMetrics.currentInSteps[stepIndex]++;
+        if (stepIndex - 1 >= startIndex) {
+            expectedMetrics.currentInSteps[stepIndex - 1]--;
+        }
+        coordinatorObserver.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+        checkMetrics(expectedMetrics);
+    }
 
     // Metrics are updated on onEnd.
-    expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedMetrics.currentInSteps[lastIndex]--;
     expectedMetrics.totalAbortedTwoPhaseCommit++;
     coordinatorObserver.onEnd(metrics(),
                               tickSource(),
@@ -1890,94 +1783,44 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit)
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommitTwoCoordinators) {
-    TransactionCoordinatorMetricsObserver coordinatorObserver1;
-    TransactionCoordinatorMetricsObserver coordinatorObserver2;
+    std::vector<TransactionCoordinatorMetricsObserver> coordinatorObservers;
+    coordinatorObservers.resize(2);
     Metrics expectedMetrics;
     checkMetrics(expectedMetrics);
 
     // Increment each coordinator one step at a time.
+    for (auto& observer : coordinatorObservers) {
+        expectedMetrics.totalCreated++;
+        observer.onCreate(metrics(), tickSource(), clockSource()->now());
+        checkMetrics(expectedMetrics);
+    }
 
-    expectedMetrics.totalCreated++;
-    coordinatorObserver1.onCreate(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
+    size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+        auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+        for (auto& observer : coordinatorObservers) {
+            expectedMetrics.currentInSteps[stepIndex]++;
+            if (stepIndex - 1 >= startIndex) {
+                expectedMetrics.currentInSteps[stepIndex - 1]--;
+            } else {
+                expectedMetrics.totalStartedTwoPhaseCommit++;
+            }
+            observer.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+            checkMetrics(expectedMetrics);
+        }
+    }
 
-    expectedMetrics.totalCreated++;
-    coordinatorObserver2.onCreate(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingParticipantList++;
-    coordinatorObserver1.onStartWritingParticipantList(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingParticipantList++;
-    coordinatorObserver2.onStartWritingParticipantList(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWritingParticipantList--;
-    expectedMetrics.currentWaitingForVotes++;
-    coordinatorObserver1.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWritingParticipantList--;
-    expectedMetrics.currentWaitingForVotes++;
-    coordinatorObserver2.onStartWaitingForVotes(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWaitingForVotes--;
-    expectedMetrics.currentWritingDecision++;
-    coordinatorObserver1.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWaitingForVotes--;
-    expectedMetrics.currentWritingDecision++;
-    coordinatorObserver2.onStartWritingDecision(metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWritingDecision--;
-    expectedMetrics.currentWaitingForDecisionAcks++;
-    coordinatorObserver1.onStartWaitingForDecisionAcks(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWritingDecision--;
-    expectedMetrics.currentWaitingForDecisionAcks++;
-    coordinatorObserver2.onStartWaitingForDecisionAcks(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWaitingForDecisionAcks--;
-    expectedMetrics.currentDeletingCoordinatorDoc++;
-    coordinatorObserver1.onStartDeletingCoordinatorDoc(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentWaitingForDecisionAcks--;
-    expectedMetrics.currentDeletingCoordinatorDoc++;
-    coordinatorObserver2.onStartDeletingCoordinatorDoc(
-        metrics(), tickSource(), clockSource()->now());
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentDeletingCoordinatorDoc--;
-    expectedMetrics.totalAbortedTwoPhaseCommit++;
-    coordinatorObserver1.onEnd(metrics(),
-                               tickSource(),
-                               clockSource()->now(),
-                               TransactionCoordinator::Step::kDeletingCoordinatorDoc,
-                               CoordinatorCommitDecision(txn::CommitDecision::kAbort));
-    checkMetrics(expectedMetrics);
-
-    expectedMetrics.currentDeletingCoordinatorDoc--;
-    expectedMetrics.totalCommittedTwoPhaseCommit++;
-    coordinatorObserver2.onEnd(metrics(),
-                               tickSource(),
-                               clockSource()->now(),
-                               TransactionCoordinator::Step::kDeletingCoordinatorDoc,
-                               CoordinatorCommitDecision(txn::CommitDecision::kCommit));
-    checkMetrics(expectedMetrics);
+    for (auto& observer : coordinatorObservers) {
+        expectedMetrics.currentInSteps[lastIndex]--;
+        expectedMetrics.totalAbortedTwoPhaseCommit++;
+        observer.onEnd(metrics(),
+                       tickSource(),
+                       clockSource()->now(),
+                       TransactionCoordinator::Step::kDeletingCoordinatorDoc,
+                       CoordinatorCommitDecision(txn::CommitDecision::kAbort));
+        checkMetrics(expectedMetrics);
+    }
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
@@ -2011,13 +1854,14 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
           "Start two phase commit (allow the coordinator to progress to writing the participant "
           "list).");
 
-    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration = Microseconds(0);
-    expectedStats.writingParticipantListDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingParticipantList++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
                        BSON("mode"
@@ -2031,16 +1875,17 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
 
     LOGV2(22457, "Allow the coordinator to progress to waiting for votes.");
 
-    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
+    stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWaitingForVotes);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration =
         *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.writingParticipantListDuration =
-        *expectedStats.writingParticipantListDuration + Microseconds(100);
-    expectedStats.waitingForVotesDuration = Microseconds(0);
-    expectedMetrics.currentWritingParticipantList--;
-    expectedMetrics.currentWaitingForVotes++;
+    expectedStats.stepDurations[stepIndex - 1] =
+        *expectedStats.stepDurations[stepIndex - 1] + Microseconds(100);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
+    expectedMetrics.currentInSteps[stepIndex - 1]--;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForParticipantListWriteConcern",
                        BSON("mode"
@@ -2052,16 +1897,17 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
 
     LOGV2(22458, "Allow the coordinator to progress to writing the decision.");
 
-    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
+    stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingDecision);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration =
         *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.waitingForVotesDuration =
-        *expectedStats.waitingForVotesDuration + Microseconds(100);
-    expectedStats.writingDecisionDuration = Microseconds(0);
-    expectedMetrics.currentWaitingForVotes--;
-    expectedMetrics.currentWritingDecision++;
+    expectedStats.stepDurations[stepIndex - 1] =
+        *expectedStats.stepDurations[stepIndex - 1] + Microseconds(100);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
+    expectedMetrics.currentInSteps[stepIndex - 1]--;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
                        BSON("mode"
@@ -2078,16 +1924,17 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
 
     LOGV2(22459, "Allow the coordinator to progress to waiting for acks.");
 
-    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
+    stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWaitingForDecisionAcks);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration =
         *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.writingDecisionDuration =
-        *expectedStats.writingDecisionDuration + Microseconds(100);
-    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
-    expectedMetrics.currentWritingDecision--;
-    expectedMetrics.currentWaitingForDecisionAcks++;
+    expectedStats.stepDurations[stepIndex - 1] =
+        *expectedStats.stepDurations[stepIndex - 1] + Microseconds(100);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
+    expectedMetrics.currentInSteps[stepIndex - 1]--;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangBeforeWaitingForDecisionWriteConcern",
                        BSON("mode"
@@ -2102,16 +1949,18 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
 
     LOGV2(22460, "Allow the coordinator to progress to deleting the coordinator doc.");
 
-    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
+    size_t previousStepIndex = stepIndex;
+    stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration =
         *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.waitingForDecisionAcksDuration =
-        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
-    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
-    expectedMetrics.currentWaitingForDecisionAcks--;
-    expectedMetrics.currentDeletingCoordinatorDoc++;
+    expectedStats.stepDurations[previousStepIndex] =
+        *expectedStats.stepDurations[previousStepIndex] + Microseconds(100);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
+    expectedMetrics.currentInSteps[previousStepIndex]--;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
                        BSON("mode"
@@ -2133,16 +1982,16 @@ TEST_F(TransactionCoordinatorMetricsTest, SimpleTwoPhaseCommitRealCoordinator) {
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
     expectedStats.twoPhaseCommitDuration =
         *expectedStats.twoPhaseCommitDuration + Microseconds(100);
-    expectedStats.deletingCoordinatorDocDuration =
-        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
-    expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
     expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     setGlobalFailPoint("hangAfterDeletingCoordinatorDoc",
                        BSON("mode"
                             << "off"));
-    // The last thing the coordinator will do on the hijacked commit response thread is signal the
-    // coordinator's completion.
+    // The last thing the coordinator will do on the hijacked commit response thread is signal
+    // the coordinator's completion.
 
     future.timed_get(kLongFutureTimeout);
     coordinator.onCompletion().get();
@@ -2278,13 +2127,13 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkMetrics(expectedMetrics);
 
     // Wait until the coordinator is writing the participant list.
-
-    expectedStats.writingParticipantListStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.writingParticipantListDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingParticipantList++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     FailPointEnableBlock fp("hangBeforeWaitingForParticipantListWriteConcern");
     coordinator.runCommit(operationContext(), kTwoShardIdList);
@@ -2297,9 +2146,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.writingParticipantListDuration =
-        *expectedStats.writingParticipantListDuration + Microseconds(100);
-    expectedMetrics.currentWritingParticipantList--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
 
     killClientOpCtx(getServiceContext(), "hangBeforeWaitingForParticipantListWriteConcern");
     ASSERT_THROWS_CODE(
@@ -2344,13 +2193,13 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkMetrics(expectedMetrics);
 
     // Wait until the coordinator is waiting for votes.
-
-    expectedStats.waitingForVotesStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWaitingForVotes);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.waitingForVotesDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWaitingForVotes++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     waitUntilMessageSent();
@@ -2362,9 +2211,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.waitingForVotesDuration =
-        *expectedStats.waitingForVotesDuration + Microseconds(100);
-    expectedMetrics.currentWaitingForVotes--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
     network()->enterNetwork();
@@ -2413,12 +2262,13 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     // Wait until the coordinator is writing the decision.
 
-    expectedStats.writingDecisionStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingDecision);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.writingDecisionDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWritingDecision++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     FailPointEnableBlock fp("hangBeforeWaitingForDecisionWriteConcern");
 
@@ -2436,9 +2286,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.writingDecisionDuration =
-        *expectedStats.writingDecisionDuration + Microseconds(100);
-    expectedMetrics.currentWritingDecision--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
 
     killClientOpCtx(getServiceContext(), "hangBeforeWaitingForDecisionWriteConcern");
     ASSERT_THROWS_CODE(
@@ -2484,21 +2334,21 @@ TEST_F(TransactionCoordinatorMetricsTest,
     checkMetrics(expectedMetrics);
 
     // Wait until the coordinator is waiting for decision acks.
-
-    expectedStats.waitingForDecisionAcksStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWaitingForDecisionAcks);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.waitingForDecisionAcksDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentWaitingForDecisionAcks++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
     // Respond to the second prepare request in a separate thread, because the coordinator will
     // hijack that thread to run its continuation.
     assertPrepareSentAndRespondWithSuccess();
     auto future = launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); });
-    // The last thing the coordinator will do on the hijacked prepare response thread is schedule
-    // the commitTransaction network requests.
+    // The last thing the coordinator will do on the hijacked prepare response thread is
+    // schedule the commitTransaction network requests.
     future.timed_get(kLongFutureTimeout);
     waitUntilMessageSent();
 
@@ -2509,9 +2359,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
 
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.waitingForDecisionAcksDuration =
-        *expectedStats.waitingForDecisionAcksDuration + Microseconds(100);
-    expectedMetrics.currentWaitingForDecisionAcks--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
     expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
@@ -2559,13 +2409,13 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
     checkMetrics(expectedMetrics);
 
     // Wait until the coordinator is deleting the coordinator doc.
-
-    expectedStats.deletingCoordinatorDocStartTime = advanceClockSourceAndReturnNewNow();
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kDeletingCoordinatorDoc);
+    expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.deletingCoordinatorDocDuration = Microseconds(0);
+    expectedStats.stepDurations[stepIndex] = Microseconds(0);
     expectedMetrics.totalStartedTwoPhaseCommit++;
-    expectedMetrics.currentDeletingCoordinatorDoc++;
+    expectedMetrics.currentInSteps[stepIndex]++;
 
     FailPointEnableBlock fp("hangAfterDeletingCoordinatorDoc");
 
@@ -2591,9 +2441,9 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 
     tickSource()->advance(Microseconds(100));
     expectedStats.totalDuration = *expectedStats.totalDuration + Microseconds(100);
-    expectedStats.deletingCoordinatorDocDuration =
-        *expectedStats.deletingCoordinatorDocDuration + Microseconds(100);
-    expectedMetrics.currentDeletingCoordinatorDoc--;
+    expectedStats.stepDurations[stepIndex] =
+        *expectedStats.stepDurations[stepIndex] + Microseconds(100);
+    expectedMetrics.currentInSteps[stepIndex]--;
     expectedMetrics.totalCommittedTwoPhaseCommit++;
 
     awsPtr->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "dummy"});
@@ -2627,8 +2477,8 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionAtLogLevelZero) {
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThreshold) {
-    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
-    // slowMS setting.
+    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds
+    // the slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
     serverGlobalParams.slowMS.store(100);
@@ -2660,8 +2510,8 @@ TEST_F(TransactionCoordinatorMetricsTest, DoesNotLogTransactionsUnderSlowMSThres
 TEST_F(
     TransactionCoordinatorMetricsTest,
     DoesNotLogTransactionsUnderSlowMSThresholdEvenIfCoordinatorHasExistedForLongerThanSlowThreshold) {
-    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
-    // slowMS setting.
+    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds
+    // the slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
     serverGlobalParams.slowMS.store(100);
@@ -2691,8 +2541,8 @@ TEST_F(
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
-    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds the
-    // slowMS setting.
+    // Set the log level to 0 so that the slow logging is only done if the transaction exceeds
+    // the slowMS setting.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kTransaction,
                                                               logv2::LogSeverity::Log()};
     serverGlobalParams.slowMS.store(100);
@@ -2828,8 +2678,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         FailPointEnableBlock fp("hangBeforeWaitingForDecisionWriteConcern",
                                 BSON("useUninterruptibleSleep" << 1));
 
-        // Respond to the second prepare request in a separate thread, because the coordinator will
-        // hijack that thread to run its continuation.
+        // Respond to the second prepare request in a separate thread, because the coordinator
+        // will hijack that thread to run its continuation.
         assertPrepareSentAndRespondWithSuccess();
         futureOption.emplace(launchAsync([this] { assertPrepareSentAndRespondWithSuccess(); }));
         waitUntilCoordinatorDocHasDecision();
@@ -2838,8 +2688,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         tickSource()->advance(Milliseconds(100));
     }
 
-    // The last thing the coordinator will do on the hijacked prepare response thread is schedule
-    // the commitTransaction network requests.
+    // The last thing the coordinator will do on the hijacked prepare response thread is
+    // schedule the commitTransaction network requests.
     futureOption->timed_get(kLongFutureTimeout);
     waitUntilMessageSent();
 
@@ -2850,8 +2700,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         FailPointEnableBlock fp("hangAfterDeletingCoordinatorDoc",
                                 BSON("useUninterruptibleSleep" << 1));
 
-        // Respond to the second commit request in a separate thread, because the coordinator will
-        // hijack that thread to run its continuation.
+        // Respond to the second commit request in a separate thread, because the coordinator
+        // will hijack that thread to run its continuation.
         assertCommitSentAndRespondWithSuccess();
         futureOption.emplace(launchAsync([this] { assertCommitSentAndRespondWithSuccess(); }));
         waitUntilNoCoordinatorDocIsPresent();
@@ -2860,14 +2710,15 @@ TEST_F(TransactionCoordinatorMetricsTest, SlowLogLineIncludesStepDurationsAndTot
         tickSource()->advance(Milliseconds(100));
     }
 
-    // The last thing the coordinator will do on the hijacked commit response thread is signal the
-    // coordinator's completion.
+    // The last thing the coordinator will do on the hijacked commit response thread is signal
+    // the coordinator's completion.
     futureOption->timed_get(kLongFutureTimeout);
     coordinator.onCompletion().get();
 
     stopCapturingLogMessages();
 
-    // Note: The waiting for decision acks and deleting coordinator doc durations are not reported.
+    // Note: The waiting for decision acks and deleting coordinator doc durations are not
+    // reported.
 
     ASSERT_EQUALS(
         1,
@@ -2892,32 +2743,14 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesTotalStarte
     checkServerStatus();
 }
 
-TEST_F(TransactionCoordinatorMetricsTest,
-       ServerStatusSectionIncludesCurrentWritingParticipantList) {
-    metrics()->incrementCurrentWritingParticipantList();
-    checkServerStatus();
-}
-
-TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesCurrentWaitingForVotes) {
-    metrics()->incrementCurrentWaitingForVotes();
-    checkServerStatus();
-}
-
-TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesCurrentWritingDecision) {
-    metrics()->incrementCurrentWritingDecision();
-    checkServerStatus();
-}
-
-TEST_F(TransactionCoordinatorMetricsTest,
-       ServerStatusSectionIncludesCurrentWaitingForDecisionAcks) {
-    metrics()->incrementCurrentWaitingForDecisionAcks();
-    checkServerStatus();
-}
-
-TEST_F(TransactionCoordinatorMetricsTest,
-       ServerStatusSectionIncludesCurrentDeletingCoordinatorDoc) {
-    metrics()->incrementCurrentDeletingCoordinatorDoc();
-    checkServerStatus();
+TEST_F(TransactionCoordinatorMetricsTest, ServerStatusSectionIncludesAllSteps) {
+    size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
+        auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
+        metrics()->incrementCurrentInStep(step);
+        checkServerStatus();
+    }
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportState) {
