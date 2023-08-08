@@ -34,6 +34,7 @@
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -175,6 +176,9 @@ void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Docum
         case ResumableScanType::kOplogScan:
             _performResumableOplogScanAccounting();
             break;
+        case ResumableScanType::kNaturalOrderScan:
+            _performResumableNaturalOrderScanAccounting();
+            break;
         case ResumableScanType::kNone:
             break;
         default:
@@ -238,6 +242,15 @@ void PlanExecutorPipeline::_performResumableOplogScanAccounting() {
     _setSpeculativeReadTimestamp();
 }
 
+void PlanExecutorPipeline::_performResumableNaturalOrderScanAccounting() {
+    tassert(7979200,
+            "expected _resumableScanType == kNaturalOrderScan",
+            ResumableScanType::kNaturalOrderScan == _resumableScanType);
+
+    // Update value of postBatchResumeToken.
+    _postBatchResumeToken = PipelineD::getPostBatchResumeToken(_pipeline.get());
+}
+
 void PlanExecutorPipeline::_setSpeculativeReadTimestamp() {
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
         repl::SpeculativeMajorityReadInfo::get(_expCtx->opCtx);
@@ -263,6 +276,7 @@ void PlanExecutorPipeline::_initializeResumableScanState() {
             // batchSize 0, in which case the PBRT of the first batch would be empty.
             _performResumableOplogScanAccounting();
             break;
+        case ResumableScanType::kNaturalOrderScan:
         case ResumableScanType::kNone:
             break;
         default:

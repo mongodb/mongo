@@ -72,9 +72,11 @@ public:
      * Determines the type of resumable scan being run by the PlanExecutorPipeline.
      */
     enum class ResumableScanType {
-        kNone,          // No resuming. This is the default.
-        kChangeStream,  // For change stream pipelines.
-        kOplogScan      // For non-changestream resumable oplog scans.
+        kNone,              // No resuming. This is the default.
+        kChangeStream,      // For change stream pipelines.
+        kNaturalOrderScan,  // For pipelines requesting a record ID resume token from a natural
+                            // order non-oplog scan.
+        kOplogScan          // For non-changestream resumable oplog scans.
     };
 
     PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -247,6 +249,12 @@ private:
      * postBatchResumeToken value from the underlying pipeline.
      */
     void _performResumableOplogScanAccounting();
+
+    /**
+     * For a resumable natural order non-oplog scan, updates the postBatchResumeToken value from the
+     * underlying pipeline.
+     */
+    void _performResumableNaturalOrderScanAccounting();
 
     /**
      * Set the speculative majority read timestamp if we have scanned up to a certain oplog

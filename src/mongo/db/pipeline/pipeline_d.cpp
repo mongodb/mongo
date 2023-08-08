@@ -1782,14 +1782,21 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) ||
         (aggRequest && aggRequest->getRequestReshardingResumeToken());
 
-    auto attachExecutorCallback =
-        [cursorType, trackOplogTS](const MultipleCollectionAccessor& collections,
-                                   std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                                   Pipeline* pipeline) {
-            auto cursor = DocumentSourceCursor::create(
-                collections, std::move(exec), pipeline->getContext(), cursorType, trackOplogTS);
-            pipeline->addInitialSource(std::move(cursor));
-        };
+    auto resumeTrackingType = DocumentSourceCursor::ResumeTrackingType::kNone;
+    if (trackOplogTS) {
+        resumeTrackingType = DocumentSourceCursor::ResumeTrackingType::kOplog;
+    } else if (aggRequest && aggRequest->getRequestResumeToken()) {
+        resumeTrackingType = DocumentSourceCursor::ResumeTrackingType::kNonOplog;
+    }
+
+    auto attachExecutorCallback = [cursorType, resumeTrackingType](
+                                      const MultipleCollectionAccessor& collections,
+                                      std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                      Pipeline* pipeline) {
+        auto cursor = DocumentSourceCursor::create(
+            collections, std::move(exec), pipeline->getContext(), cursorType, resumeTrackingType);
+        pipeline->addInitialSource(std::move(cursor));
+    };
     return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
 }
 
