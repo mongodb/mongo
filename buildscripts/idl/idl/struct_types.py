@@ -588,8 +588,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
             'auto collectionName = ctxt.checkAndAssertCollectionName(%s, %s);' % (element,
                                                                                   allow_global))
         indented_writer.write_line(
-            '_nss = NamespaceStringUtil::parseNamespaceFromRequest(%s, collectionName);' %
-            (db_name))
+            '_nss = NamespaceStringUtil::deserialize(%s, collectionName);' % (db_name))
         indented_writer.write_line(
             'uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: "'
             ' << _nss.toStringForErrorMsg(), _nss.isValid());')
@@ -667,7 +666,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         indented_writer.write_line(
             'auto collOrUUID = ctxt.checkAndAssertCollectionNameOrUUID(%s);' % (element))
         indented_writer.write_line(
-            '_nssOrUUID = stdx::holds_alternative<StringData>(collOrUUID) ? NamespaceStringUtil::parseNamespaceFromRequest(%s, stdx::get<StringData>(collOrUUID)) : NamespaceStringOrUUID(%s, stdx::get<UUID>(collOrUUID));'
+            '_nssOrUUID = stdx::holds_alternative<StringData>(collOrUUID) ? NamespaceStringUtil::deserialize(%s, stdx::get<StringData>(collOrUUID)) : NamespaceStringOrUUID(%s, stdx::get<UUID>(collOrUUID));'
             % (db_name, db_name))
         indented_writer.write_line(
             'uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: "'

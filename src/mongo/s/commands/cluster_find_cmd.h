@@ -285,6 +285,7 @@ public:
             auto findCommand = query_request_helper::makeFromFindCommand(
                 std::move(cmdObj),
                 std::move(nss),
+                SerializationContext::stateDefault(),
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
             if (!findCommand->getReadConcern()) {
                 if (opCtx->isStartingMultiDocumentTransaction() ||

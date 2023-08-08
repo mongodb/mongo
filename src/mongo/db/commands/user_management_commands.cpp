@@ -301,7 +301,15 @@ Status insertAuthzDocument(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& document) try {
     DBDirectClient client(opCtx);
-    write_ops::checkWriteErrors(client.insert(write_ops::InsertCommandRequest(nss, {document})));
+
+    // The sc is used to control serialization behavior executed on the request in client.insert,
+    // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
+    // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
+
+    write_ops::checkWriteErrors(
+        client.insert(write_ops::InsertCommandRequest(nss, {document}, sc)));
     return Status::OK();
 } catch (const DBException& e) {
     return e.toStatus();
@@ -320,8 +328,15 @@ StatusWith<std::int64_t> updateAuthzDocuments(OperationContext* opCtx,
                                               bool upsert,
                                               bool multi) try {
     DBDirectClient client(opCtx);
+
+    // The sc is used to control serialization behavior executed on the request in client.update,
+    // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
+    // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
+
     auto result = client.update([&] {
-        write_ops::UpdateCommandRequest updateOp(nss);
+        write_ops::UpdateCommandRequest updateOp(nss, sc);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(query);
@@ -381,8 +396,15 @@ StatusWith<std::int64_t> removeAuthzDocuments(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const BSONObj& query) try {
     DBDirectClient client(opCtx);
+
+    // The sc is used to control serialization behavior executed on the request in client.remove,
+    // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
+    // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
+
     auto result = client.remove([&] {
-        write_ops::DeleteCommandRequest deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss, sc);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(query);
@@ -2379,7 +2401,14 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const BSONObj& projection,
                           const std::function<void(const BSONObj&)>& resultProcessor) try {
     DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{nss};
+
+    // The sc is used to control serialization behavior executed on the request in client.find, and
+    // tenantIds should not be prefixed on the $db field.  Indicating that the request received a
+    // tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
+
+    FindCommandRequest findRequest{nss, sc};
     findRequest.setFilter(query);
     findRequest.setProjection(projection);
     client.find(std::move(findRequest), resultProcessor);

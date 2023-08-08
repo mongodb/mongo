@@ -404,13 +404,9 @@ public:
             InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
             // Parse the command BSON to a FindCommandRequest.
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
-
-            // check validated tenantId and correct the serialization context object on the request
-            auto reqSerializationContext = findCommand->getSerializationContext();
-            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
-                                                      boost::none);
-            findCommand->setSerializationContext(reqSerializationContext);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, nss, _request);
+            auto respSc =
+                SerializationContext::stateCommandReply(findCommand->getSerializationContext());
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -479,13 +475,8 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(exec.get(),
-                                   collection,
-                                   verbosity,
-                                   BSONObj(),
-                                   SerializationContext::stateCommandReply(reqSerializationContext),
-                                   _request.body,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
         }
 
         /**
@@ -505,16 +496,10 @@ public:
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
 
-            // check validated tenantId and correct the serialization context object on the request
-            auto reqSerializationContext = findCommand->getSerializationContext();
-            reqSerializationContext.setTenantIdSource(_request.getValidatedTenantId() !=
-                                                      boost::none);
-            findCommand->setSerializationContext(reqSerializationContext);
-
-            auto respSerializationContext =
-                SerializationContext::stateCommandReply(reqSerializationContext);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, _request);
+            auto respSc =
+                SerializationContext::stateCommandReply(findCommand->getSerializationContext());
 
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
@@ -768,12 +753,8 @@ public:
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(cursorId,
-                                           nss,
-                                           BSONArray(),
-                                           boost::none,
-                                           &bodyBuilder,
-                                           respSerializationContext);
+                appendCursorResponseObject(
+                    cursorId, nss, BSONArray(), boost::none, &bodyBuilder, respSc);
                 return;
             }
 
@@ -902,14 +883,14 @@ public:
             }
 
             // Generate the response object to send to the client.
-            firstBatch.done(cursorId, nss, respSerializationContext);
+            firstBatch.done(cursorId, nss, respSc);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(toStringForLogging(nss), docUnitsReturned);
             query_request_helper::validateCursorResponse(
-                result->getBodyBuilder().asTempObj(), nss.tenantId(), respSerializationContext);
+                result->getBodyBuilder().asTempObj(), nss.tenantId(), respSc);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
@@ -944,10 +925,15 @@ public:
         // Parses the command object to a FindCommandRequest. If the client request did not specify
         // any runtime constants, make them available to the query here.
         std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
-            OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
+            OperationContext* opCtx, NamespaceString nss, const OpMsgRequest& request) {
+            // check validated tenantId and set the flag on the serialization context object
+            auto reqSc = SerializationContext::stateCommandRequest();
+            reqSc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
+
             auto findCommand = query_request_helper::makeFromFindCommand(
-                std::move(cmdObj),
+                request.body,
                 std::move(nss),
+                reqSc,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.

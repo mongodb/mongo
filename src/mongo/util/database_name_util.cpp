@@ -55,8 +55,7 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
     if (!gMultitenancySupport)
         dbName.toString();
 
-    if (context.getSource() == SerializationContext::Source::Command &&
-        context.getCallerType() == SerializationContext::CallerType::Reply)
+    if (context.getSource() == SerializationContext::Source::Command)
         return serializeForCommands(dbName, context);
 
     // if we're not serializing a Command Reply, use the default serializing rules
@@ -182,7 +181,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
     // this case, essentially letting the request dictate the state of the feature.
 
     // We received a tenantId from $tenant or the security token.
-    if (tenantId != boost::none) {
+    if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
                 // fallthrough

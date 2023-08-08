@@ -95,6 +95,7 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand);
  */
 std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
                                                         boost::optional<NamespaceString> nss,
+                                                        const SerializationContext& sc,
                                                         bool apiStrict);
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
