@@ -62,7 +62,7 @@
 
 namespace mongo::optimizer {
 
-void handleScanNodeRemoveOrphansRequirement(const ABTVector& shardKeyPaths,
+void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
                                             PhysPlanBuilder& builder,
                                             FieldProjectionMap& fieldProjectionMap,
                                             const IndexReqTarget indexReqTarget,
@@ -73,8 +73,8 @@ void handleScanNodeRemoveOrphansRequirement(const ABTVector& shardKeyPaths,
     // Use EvaluationNodes to get the projections needed to perform shard filtering. Note that
     // the appropriate top-level projection is used as the input.
     ABTVector shardKeyComponentProjections;
-    for (auto& path : shardKeyPaths) {
-        const PathGet* pathGet = path.cast<PathGet>();
+    for (auto& e : shardKey) {
+        const PathGet* pathGet = e._path.cast<PathGet>();
         const auto& fieldName = FieldNameType{pathGet->name().value().toString()};
         // The caller ensures that the top level path element of each component of the shard key is
         // pushed down as a projection produced by the PhysicalScan/Seek.

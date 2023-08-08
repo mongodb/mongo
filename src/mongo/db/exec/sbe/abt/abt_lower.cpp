@@ -289,8 +289,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             "The metadata must contain the scan definition specified by the "
             "IndexingAvailability property in order to perform shard filtering",
             _metadata->_scanDefs.contains(scanDefName));
-    const ABTVector& shardKeyPaths =
-        _metadata->_scanDefs.at(scanDefName).getDistributionAndPaths()._paths;
+    const auto& shardKeyPaths = _metadata->_scanDefs.at(scanDefName).shardingMetadata().shardKey();
 
     // Specify a BSONObj which will contain the shard key values.
     tassert(7814404,
@@ -301,7 +300,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     sbe::EExpression::Vector projectValues;
 
     for (auto& i : shardKeyPaths) {
-        projectFields.push_back(PathStringify::stringify(i));
+        projectFields.push_back(PathStringify::stringify(i._path));
     }
 
     // Fill out the values with SlotId variables. The specified slot will supply the values

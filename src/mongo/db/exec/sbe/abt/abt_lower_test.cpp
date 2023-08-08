@@ -59,6 +59,7 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/platform/decimal128.h"
@@ -77,6 +78,7 @@ namespace {
 unittest::GoldenTestConfig goldenTestConfig{"src/mongo/db/test_output/exec/sbe"};
 using GoldenTestContext = unittest::GoldenTestContext;
 using GoldenTestConfig = unittest::GoldenTestConfig;
+using namespace unit_test_abt_literals;
 class ABTPlanGeneration : public unittest::Test {
 protected:
     ProjectionName scanLabel = ProjectionName{"scan0"_sd};
@@ -175,7 +177,8 @@ protected:
 
     ScanDefinition buildScanDefinition(
         opt::unordered_map<std::string, IndexDefinition> indexDefs = {},
-        DistributionAndPaths dnp = DistributionAndPaths(DistributionType::Centralized)) {
+        DistributionAndPaths dnp = DistributionAndPaths(DistributionType::Centralized),
+        ShardingMetadata shardingMetadata = ShardingMetadata{}) {
         ScanDefOptions opts;
         opts.insert({"type", "mongod"});
         opts.insert({"database", "test"});
@@ -184,7 +187,7 @@ protected:
         MultikeynessTrie trie;
         bool exists = true;
         CEType ce{false};
-        return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce, ShardingMetadata{});
+        return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce, shardingMetadata);
     }
 
     // Does not add the node to the Node map, must be called inside '_node()'.
@@ -322,17 +325,15 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                              false,
                                              opt::unordered_set<std::string>()));
 
-        // Create the DistributionAndPaths pointing to the shard key fields.
-        // The path to each component of the shard key is stored/provided as an ABT.
-        auto makePathABT = [&](FieldNameType pathName) {
-            return make<PathGet>(pathName, make<PathIdentity>());
-        };
-        std::vector<ABT> shardKeyPaths{makePathABT("a"), makePathABT("b"), makePathABT("c")};
-        DistributionAndPaths dnp(DistributionType::RangePartitioning, shardKeyPaths);
-        ScanDefinition shardKeyScanDef =
-            buildScanDefinition(opt::unordered_map<std::string, IndexDefinition>(), dnp);
-        opt::unordered_map<std::string, ScanDefinition> scanDefs{
-            std::make_pair(shardKeyName, shardKeyScanDef)};
+        opt::unordered_map<std::string, ScanDefinition> scanDefs{std::make_pair(
+            shardKeyName,
+            buildScanDefinition(
+                {},
+                DistributionAndPaths{DistributionType::Centralized},
+                ShardingMetadata({IndexCollationEntry{_get("a", _id())._n, CollationOp::Ascending},
+                                  IndexCollationEntry{_get("b", _id())._n, CollationOp::Ascending},
+                                  IndexCollationEntry{_get("c", _id())._n, CollationOp::Ascending}},
+                                 true)))};
 
         // Create the ABT to be lowered, starting with the shardFilter FunctionCall.
         auto functionCallNode = make<FunctionCall>(
@@ -383,13 +384,13 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                              opt::unordered_set<std::string>()));
 
         // "a.b" is the shard Key in this variation of the test.
-        auto pathABT = make<PathGet>("a", make<PathGet>("b", make<PathIdentity>()));
-        std::vector<ABT> shardKeyPaths{pathABT};
-        DistributionAndPaths dnp(DistributionType::RangePartitioning, shardKeyPaths);
-        ScanDefinition shardKeyScanDef =
-            buildScanDefinition(opt::unordered_map<std::string, IndexDefinition>(), dnp);
-        opt::unordered_map<std::string, ScanDefinition> scanDefs{
-            std::make_pair(shardKeyName, shardKeyScanDef)};
+        auto pathABT = _get("a", _get("b", _id()))._n;
+        opt::unordered_map<std::string, ScanDefinition> scanDefs{std::make_pair(
+            shardKeyName,
+            buildScanDefinition(
+                {},
+                DistributionAndPaths{DistributionType::Centralized},
+                ShardingMetadata({IndexCollationEntry{pathABT, CollationOp::Ascending}}, true)))};
 
         auto evalPathABT =
             make<EvalPath>(std::move(pathABT), make<Variable>(ProjectionName("scan0")));
@@ -432,13 +433,14 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                              false,
                                              opt::unordered_set<std::string>()));
 
-        DistributionAndPaths dnp(
-            DistributionType::RangePartitioning,
-            {make<PathGet>("a", make<PathIdentity>()), make<PathGet>("b", make<PathIdentity>())});
-        ScanDefinition shardKeyScanDef =
-            buildScanDefinition(opt::unordered_map<std::string, IndexDefinition>(), dnp);
-        opt::unordered_map<std::string, ScanDefinition> scanDefs{
-            std::make_pair(shardKeyName, shardKeyScanDef)};
+        opt::unordered_map<std::string, ScanDefinition> scanDefs{std::make_pair(
+            shardKeyName,
+            buildScanDefinition(
+                {},
+                DistributionAndPaths{DistributionType::Centralized},
+                ShardingMetadata({IndexCollationEntry{_get("a", _id())._n, CollationOp::Ascending},
+                                  IndexCollationEntry{_get("b", _id())._n, CollationOp::Ascending}},
+                                 true)))};
 
         auto functionCallNode = make<FunctionCall>(
             "shardFilter",

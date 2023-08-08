@@ -677,30 +677,28 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     const size_t numberOfPartitions = internalQueryDefaultDOP.load();
 
     const bool isSharded = collection.isSharded_DEPRECATED();
-    ABTVector shardKey;
+    IndexCollationSpec shardKey;
     if (isSharded) {
         for (auto&& e : collection.getShardKeyPattern().getKeyPattern().toBSON()) {
-            shardKey.push_back(translateShardKeyField(e.fieldName()));
+            CollationOp collationOp{CollationOp::Ascending};
+            if (e.type() == BSONType::String && e.String() == IndexNames::HASHED) {
+                collationOp = CollationOp::Clustered;
+            }
+            shardKey.emplace_back(translateShardKeyField(e.fieldName()), collationOp);
         }
     }
 
-    DistributionType type{DistributionType::UnknownPartitioning};
-    if (isSharded) {
-        // TODO SERVER-78503: Handle hashed distribution
-        type = DistributionType::RangePartitioning;
-    } else if (numberOfPartitions == 1) {
-        type = DistributionType::Centralized;
-    }
-
     // For now handle only local parallelism (no over-the-network exchanges).
-    DistributionAndPaths distribution{type, shardKey};
+    DistributionAndPaths distribution{(numberOfPartitions == 1)
+                                          ? DistributionType::Centralized
+                                          : DistributionType::UnknownPartitioning};
 
     opt::unordered_map<std::string, ScanDefinition> scanDefs;
     boost::optional<CEType> numRecords;
     if (collectionExists) {
         numRecords = static_cast<double>(collection->numRecords(opCtx));
     }
-    ShardingMetadata shardingMetadata{.mayContainOrphans = isSharded};
+    ShardingMetadata shardingMetadata(shardKey, isSharded);
 
     scanDefs.emplace(scanDefName,
                      createScanDef({{"type", "mongod"},
@@ -750,7 +748,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 // Do not use indexes for sampling.
                 entry.second.getIndexDefs().clear();
                 // Do not perform shard filtering for sampling.
-                entry.second.shardingMetadata().mayContainOrphans = false;
+                entry.second.shardingMetadata().setMayContainOrphans(false);
             }
 
             // TODO: consider a limited rewrite set.
