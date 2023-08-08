@@ -148,6 +148,30 @@ def dump_disk(leaf_page):
     page_bytes = gdb.selected_inferior().read_memory(int(dsk.address) + wt_page_header_size + wt_block_header_size, int(dsk['mem_size'])).tobytes()
     print("Dsk:\n" + str(page_bytes))
 
+def dump_leaf_page(leaf_page):
+    dbg('leaf', leaf_page)
+    dump_disk(leaf_page)
+    dump_modified(leaf_page)
+
+def dump_int_page(int_page):
+    dbg('Internal page', int_page)
+    pindex = int_page['u']['intl']['__index'].dereference()
+    dbg('pindex', pindex)
+    num_entries = int(pindex['entries'])
+    for i in range(0, num_entries):
+        if not pindex['index'][i].dereference()['page']:
+            continue
+        page = pindex['index'][i].dereference()['page'].dereference()
+        dbg('page', page)
+        page_type = page['type']
+        dbg('page type', page_type)
+        # The page types WT_PAGE_COL_INT and WT_PAGE_ROW_INT are set for
+        # internal pages of the tree. These values are defined in btmem.h
+        if page_type == 3 or page_type == 6:
+            dump_int_page(page)
+        else:
+            dump_leaf_page(page)
+
 def dump_handle(dhandle):
     print("Dumping: " + dhandle['name'].string())
     btree = get_btree_handle(dhandle)
@@ -156,13 +180,5 @@ def dump_handle(dhandle):
     #dbg('btree', get_btree_handle(user))
     dbg('root', btree['root'])
     dbg('root page', root_page)
-    rpindex = root_page['u']['intl']['__index'].dereference()
-    dbg('rpindex', rpindex)
-    leaf_num_entries = int(rpindex['entries'])
-    #dbg('rp-pre-index', rpindex['index'].dereference().dereference())
-    for i in range(0, leaf_num_entries):
-        leaf_page = rpindex['index'][i].dereference()['page'].dereference()
-        dbg('leaf page', i)
-        dbg('leaf', leaf_page)
-        dump_disk(leaf_page)
-        dump_modified(leaf_page)
+    dump_int_page(root_page)
+
