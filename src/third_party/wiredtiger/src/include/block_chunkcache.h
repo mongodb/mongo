@@ -6,18 +6,7 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * WiredTiger's chunk cache. Locally caches chunks of remote objects.
- */
-
-#define WT_CHUNKCACHE_DEFAULT_HASHSIZE 32 * 1024
-#define WT_CHUNKCACHE_DEFAULT_CHUNKSIZE 1024 * 1024
-#define WT_CHUNKCACHE_FILE 1
-#define WT_CHUNKCACHE_IN_VOLATILE_MEMORY 0
-#define WT_CHUNKCACHE_MINHASHSIZE 64
-#define WT_CHUNKCACHE_MAXHASHSIZE 1024 * 1024
-#define WT_CHUNKCACHE_MAX_RETRIES 32 * 1024
-#define WT_CHUNKCACHE_UNCONFIGURED 0
+/* WiredTiger's chunk cache. Locally caches chunks of remote objects. */
 
 struct __wt_chunkcache_hashid {
     const char *objectname;
@@ -32,9 +21,7 @@ struct __wt_chunkcache_intermediate_hash {
     wt_off_t offset;
 };
 
-/*
- * The encapsulation of a cached chunk.
- */
+/* The encapsulation of a cached chunk. */
 struct __wt_chunkcache_chunk {
     TAILQ_ENTRY(__wt_chunkcache_chunk) next_chunk;
     TAILQ_ENTRY(__wt_chunkcache_chunk) next_lru_item;
@@ -59,6 +46,12 @@ struct __wt_chunkcache_bucket {
     WT_SPINLOCK bucket_lock;
 };
 
+struct __wt_chunkcache_pinned_list {
+    char **array;         /* list of objects we wish to pin in chunk cache */
+    uint32_t entries;     /* count of pinned objects */
+    WT_RWLOCK array_lock; /* Lock for pinned object array */
+};
+
 /*
  * WT_CHUNKCACHE --
  *     The chunk cache is a hash table of chunks. Each chunk list
@@ -66,16 +59,23 @@ struct __wt_chunkcache_bucket {
  *     If more than one chunk maps to the same hash bucket, the colliding
  *     chunks are placed into a linked list. There is a per-bucket spinlock.
  */
+#define WT_CHUNKCACHE_MAX_RETRIES 32 * 1024
 struct __wt_chunkcache {
     /* Cache-wide. */
-    bool configured;     /* Whether the chunk cache should be used */
-    int type;            /* Location of the chunk cache (volatile memory or file) */
+#define WT_CHUNKCACHE_FILE 1
+#define WT_CHUNKCACHE_IN_VOLATILE_MEMORY 2
+    uint8_t type;        /* Location of the chunk cache (volatile memory or file) */
     uint64_t bytes_used; /* Amount of data currently in cache */
     uint64_t capacity;   /* Maximum allowed capacity */
+
+#define WT_CHUNKCACHE_DEFAULT_CHUNKSIZE 1024 * 1024
     size_t chunk_size;
-    bool chunkcache_exiting;
 
     WT_CHUNKCACHE_BUCKET *hashtable;
+
+#define WT_CHUNKCACHE_DEFAULT_HASHSIZE 32 * 1024
+#define WT_CHUNKCACHE_MINHASHSIZE 64
+#define WT_CHUNKCACHE_MAXHASHSIZE 1024 * 1024
     unsigned int hashtable_size; /* The number of buckets */
 
     /* Backing storage (or memory). */
@@ -85,7 +85,13 @@ struct __wt_chunkcache {
     uint8_t *memory;      /* Memory location for the assigned chunk space */
 
     /* Content management. */
+    wt_thread_t evict_thread_tid;
     unsigned int evict_trigger; /* When this percent of cache is full, we trigger eviction. */
-    char **pinned_objects;      /* list of objects we wish to pin in chunk cache */
-    uint32_t pinned_entries;    /* count of pinned objects */
+    WT_CHUNKCACHE_PINNED_LIST pinned_objects;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_CHUNKCACHE_CONFIGURED 0x1u
+#define WT_CHUNK_CACHE_EXITING 0x2u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags;
 };

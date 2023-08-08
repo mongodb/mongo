@@ -2188,26 +2188,13 @@ struct __wt_connection {
      * creating checkpoints.  Default to none\, which means no additional work is done to find
      * obsolete content., a string\, chosen from the following options: \c "none"\, \c
      * "reclaim_space"; default \c none.}
-     * @config{chunk_cache = (, chunk cache configuration options., a set of related configuration
+     * @config{chunk_cache = (, chunk cache reconfiguration options., a set of related configuration
      * options defined as follows.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;capacity, maximum memory or
-     * storage to use for the chunk cache., an integer between \c 0 and \c 100TB; default \c 10GB.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_cache_evict_trigger, chunk cache percent full that
-     * triggers eviction., an integer between \c 0 and \c 100; default \c 90.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_size, size of cached chunks., an integer between \c
-     * 512KB and \c 100GB; default \c 1MB.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable chunk
-     * cache., a boolean flag; default \c false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number
-     * of buckets in the hashtable that keeps track of objects., an integer between \c 64 and \c
-     * 1048576; default \c 1024.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;pinned, List of "table:" URIs
      * exempt from cache eviction.  Capacity config overrides this\, tables exceeding capacity will
      * not be fully retained.  Table names can appear in both this and the preload list\, but not in
      * both this and the exclude list.  Duplicate names are allowed., a list of strings; default
      * empty.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;storage_path, the absolute path to the file used as
-     * cache location., a string; default empty.}
      * @config{ ),,}
      * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
      * version requires that there are no active operations for the duration of the call., a set of

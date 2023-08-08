@@ -56,15 +56,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_checkpoint_subconfigs[] = {
   {"log_size", "int", NULL, "min=0,max=2GB", NULL, 0},
   {"wait", "int", NULL, "min=0,max=100000", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
-static const WT_CONFIG_CHECK confchk_wiredtiger_open_chunk_cache_subconfigs[] = {
-  {"capacity", "int", NULL, "min=0,max=100TB", NULL, 0},
-  {"chunk_cache_evict_trigger", "int", NULL, "min=0,max=100", NULL, 0},
-  {"chunk_size", "int", NULL, "min=512KB,max=100GB", NULL, 0},
-  {"enabled", "boolean", NULL, NULL, NULL, 0},
-  {"hashsize", "int", NULL, "min=64,max=1048576", NULL, 0}, {"pinned", "list", NULL, NULL, NULL, 0},
-  {"storage_path", "string", NULL, NULL, NULL, 0},
-  {"type", "string", NULL, "choices=[\"FILE\",\"DRAM\"]", NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure_chunk_cache_subconfigs[] = {
+  {"pinned", "list", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure_compatibility_subconfigs[] = {
   {"release", "string", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -136,7 +129,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
   {"cache_stuck_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"checkpoint", "category", NULL, NULL, confchk_wiredtiger_open_checkpoint_subconfigs, 2},
   {"checkpoint_cleanup", "string", NULL, "choices=[\"none\",\"reclaim_space\"]", NULL, 0},
-  {"chunk_cache", "category", NULL, NULL, confchk_wiredtiger_open_chunk_cache_subconfigs, 8},
+  {"chunk_cache", "category", NULL, NULL, confchk_WT_CONNECTION_reconfigure_chunk_cache_subconfigs,
+    1},
   {"compatibility", "category", NULL, NULL,
     confchk_WT_CONNECTION_reconfigure_compatibility_subconfigs, 1},
   {"debug_mode", "category", NULL, NULL, confchk_wiredtiger_open_debug_mode_subconfigs, 14},
@@ -834,6 +828,16 @@ static const WT_CONFIG_CHECK confchk_tiered_meta[] = {
     NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
+static const WT_CONFIG_CHECK confchk_wiredtiger_open_chunk_cache_subconfigs[] = {
+  {"capacity", "int", NULL, "min=0,max=100TB", NULL, 0},
+  {"chunk_cache_evict_trigger", "int", NULL, "min=0,max=100", NULL, 0},
+  {"chunk_size", "int", NULL, "min=512KB,max=100GB", NULL, 0},
+  {"enabled", "boolean", NULL, NULL, NULL, 0},
+  {"hashsize", "int", NULL, "min=64,max=1048576", NULL, 0}, {"pinned", "list", NULL, NULL, NULL, 0},
+  {"storage_path", "string", NULL, NULL, NULL, 0},
+  {"type", "string", NULL, "choices=[\"FILE\",\"DRAM\"]", NULL, 0},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_compatibility_subconfigs[] = {
   {"release", "string", NULL, NULL, NULL, 0}, {"require_max", "string", NULL, NULL, NULL, 0},
   {"require_min", "string", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
@@ -1284,9 +1288,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "nvram_path=,percent_file_in_dram=50,size=0,system_ram=0,type=),"
     "cache_max_wait_ms=0,cache_overhead=8,cache_size=100MB,"
     "cache_stuck_timeout_ms=300000,checkpoint=(log_size=0,wait=0),"
-    "checkpoint_cleanup=none,chunk_cache=(capacity=10GB,"
-    "chunk_cache_evict_trigger=90,chunk_size=1MB,enabled=false,"
-    "hashsize=1024,pinned=,storage_path=,type=FILE),"
+    "checkpoint_cleanup=none,chunk_cache=(pinned=),"
     "compatibility=(release=),debug_mode=(checkpoint_retention=0,"
     "corruption_abort=true,cursor_copy=false,cursor_reposition=false,"
     "eviction=false,log_retention=0,realloc_exact=false,"
