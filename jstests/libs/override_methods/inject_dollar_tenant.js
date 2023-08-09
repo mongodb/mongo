@@ -13,6 +13,12 @@ const kTenantId = ObjectId(TestData.tenant);
 // Override the runCommand to inject $tenant.
 function runCommandWithDollarTenant(
     conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+    let expectPrefix = false;
+    if (TestData.expectPrefix) {
+        expectPrefix = TestData.expectPrefix;
+        cmdObj = Object.assign(cmdObj, {"expectPrefix": TestData.expectPrefix});
+    }
+
     // inject $tenant to cmdObj.
     const cmdToRun = Object.assign({}, cmdObj, {"$tenant": kTenantId});
     // Actually run the provided command.
@@ -20,7 +26,8 @@ function runCommandWithDollarTenant(
 
     const prefix = kTenantId + "_";
     const prefixedDbName = prefix + dbName;
-    assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res));
+
+    assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res), expectPrefix);
     removeTenantPrefixFromResponse(res, prefix);
     return res;
 }
