@@ -70,7 +70,7 @@ const {chunkNames} = await import(`${dataDir}${collData}.data`);
  * of queries against the 'base' collection, whose histograms include all values, and the 'sampled'
  * collection, whose histograms include only 10% of values.
  */
-runHistogramsTest(function testSampleHistogram() {
+await runHistogramsTest(async function testSampleHistogram() {
     const sampleDB = db.getSiblingDB("ce_sampled_histogram");
     const baseDB = db.getSiblingDB("ce_base_histogram");
 
@@ -90,7 +90,7 @@ runHistogramsTest(function testSampleHistogram() {
     ];
 
     // Initialize base collection.
-    loadJSONDataset(baseDB, chunkNames, dataDir, dbMetadata);
+    await loadJSONDataset(baseDB, chunkNames, dataDir, dbMetadata);
     const collSize = baseColl.count();
 
     // Select approximately 'sampleRate'*collSize documents from the base collection to insert

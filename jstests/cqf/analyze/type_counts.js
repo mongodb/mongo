@@ -15,7 +15,7 @@ import {
     navigateToPlanPath
 } from "jstests/libs/optimizer_utils.js";
 
-runHistogramsTest(function testTypeCounts() {
+await runHistogramsTest(function testTypeCounts() {
     const coll = db.type_counts;
 
     // Set up collection to test a simple field path.

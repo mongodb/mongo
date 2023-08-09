@@ -101,7 +101,7 @@ function testPredicate(predicate) {
     print("\nHeuristic explain: ", tojson(summarizeExplainForCE(heuExplain)));
 }
 
-runHistogramsTest(function() {
+await runHistogramsTest(function() {
     createHistogram(coll, "name", {numberBuckets});
     createHistogram(coll, "date", {numberBuckets});
     createHistogram(coll, "likesPizza", {numberBuckets});

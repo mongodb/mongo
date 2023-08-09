@@ -112,7 +112,7 @@ export function createAndValidateHistogram({coll, expectedHistogram, empty = fal
  * estimation. This ensures that the appropriate flags/query knobs are set and ensures the state of
  * relevant flags is restored after the test.
  */
-export function runHistogramsTest(test) {
+export async function runHistogramsTest(test) {
     if (!checkCascadesFeatureFlagEnabled(db)) {
         jsTestLog("Skipping test because the optimizer is not enabled");
         return;
@@ -129,7 +129,7 @@ export function runHistogramsTest(test) {
         internalQueryFrameworkControl}`);
 
     try {
-        test();
+        await test();
     } finally {
         // Reset query knobs to their original state.
         assert.commandWorked(db.adminCommand({

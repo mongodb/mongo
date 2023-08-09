@@ -249,7 +249,7 @@ function verifyCEForNDV(ndv) {
     }
 }
 
-runHistogramsTest(function testScalarHistograms() {
+await runHistogramsTest(function testScalarHistograms() {
     verifyCEForNDV(1);
     verifyCEForNDV(2);
     verifyCEForNDV(3);

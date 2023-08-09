@@ -57,12 +57,9 @@ export async function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
     for (const chunkName of dataSet) {
         let chunkFilePath = `${dataDir}${chunkName}`;
         print(`Loading chunk file: ${chunkFilePath}\n`);
-        await import(chunkFilePath);
-        // At this point there is a variable named as the value of chunkName.
-        let coll = eval(`db[${chunkName}.collName]`);
-        eval(`assert.commandWorked(coll.insertMany(${chunkName}.collData, {ordered: false}));`);
-        // Free the chunk memory after insertion into the DB
-        eval(`${chunkName} = null`);
+
+        const {chunk} = await import(chunkFilePath);
+        assert.commandWorked(db[chunk.collName].insertMany(chunk.collData, {ordered: false}));
     }
 
     // TODO: This is better done by the CE-testing script because it knows better what fields to
