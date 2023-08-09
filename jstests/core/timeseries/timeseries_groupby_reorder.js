@@ -19,11 +19,15 @@ coll.drop();
 // is better done in document_source_internal_unpack_bucket_test/group_reorder_test.cpp. For the
 // cases when the re-write isn't applicable, the used datasets should yield wrong result if the
 // re-write is applied.
-function runGroupRewriteTest(docs, pipeline, expectedResults) {
+function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
     coll.drop();
-    db.createCollection(coll.getName(), {timeseries: {metaField: "meta", timeField: "time"}});
+    if (excludeMeta) {
+        db.createCollection(coll.getName(), {timeseries: {timeField: "time"}});
+    } else {
+        db.createCollection(coll.getName(), {timeseries: {metaField: "meta", timeField: "time"}});
+    }
     coll.insertMany(docs);
-    assert.docEq(expectedResults, coll.aggregate(pipeline).toArray(), () => {
+    assert.sameMembers(expectedResults, coll.aggregate(pipeline).toArray(), () => {
         return `Pipeline: ${tojson(pipeline)}. Explain: ${
             tojson(coll.explain().aggregate(pipeline))}`;
     });
@@ -46,8 +50,7 @@ function runGroupRewriteTest(docs, pipeline, expectedResults) {
                         [{"_id": 1, "max": 5}]);
 })();
 
-// While a group with const group key can be re-written in terms of a group on the buckets, we don't
-// currently do it. However, when/if we start doing it, it should work.
+// Test with a constant group key. The $group rewrite applies.
 (function testConstGroupKey_NoFilter() {
     const t = new Date();
     const docs = [
@@ -61,7 +64,35 @@ function runGroupRewriteTest(docs, pipeline, expectedResults) {
         docs, [{$group: {_id: null, max: {$max: "$val"}}}], [{"_id": null, "max": 5}]);
 })();
 
-// With a filter on meta the group re-write would still apply if the group key is const.
+// Test with a group key that is optimized to a constant. The $group rewrite applies.
+(function testConstExprGroupKey_WithMinMaxAccumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(
+        docs,
+        [{$group: {_id: {$mod: [10, 5]}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [{_id: 0, min: 3, max: 5}]);
+})();
+
+// Test with a null group key and the collection has no metaField. The $group rewrite applies.
+(function testNullGroupKey_WithMinMaxAccumulator_NoMetaField() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: null, min: {$min: "$val"}, max: {$max: "$val"}}}],
+                        [{_id: null, min: 3, max: 5}],
+                        true /* excludeMeta */);
+})();
+
+// With a filter on meta the group re-write does apply if the group key is const.
 (function testConstGroupKey_WithFilterOnMeta() {
     const t = new Date();
     const docs = [
@@ -78,7 +109,7 @@ function runGroupRewriteTest(docs, pipeline, expectedResults) {
                         [{"_id": null, "max": 3}]);
 })();
 
-// In presense of a non-meta filter the group re-write doesn't apply even if the group key is const.
+// In presence of a non-meta filter the group re-write doesn't apply even if the group key is const.
 (function testConstGroupKey_WithFilterOnMeasurement() {
     const t = new Date();
     const docs = [
@@ -209,4 +240,60 @@ function runGroupRewriteTest(docs, pipeline, expectedResults) {
     runGroupRewriteTest(docs,
                         [{$group: {_id: "$meta", min: {$min: "$time"}}}],
                         [{_id: 1, min: ISODate("2023-07-20T23:16:47.683Z")}]);
+})();
+
+// Test a group key that is a list of fields that are just referencing the metaField. The $group
+// rewrite applies.
+(function testListMetaFields_WithMinMaxAccumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: {a: 2, b: 10}, val: 3},
+        {time: t, meta: {a: 3, b: 10}, val: 4},
+        {time: t, meta: {a: 2, b: 10}, val: 5},
+    ];
+    runGroupRewriteTest(
+        docs,
+        [{$group: {_id: {a: "$meta.a", b: "$meta.b"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [{_id: {a: 3, b: 10}, min: 4, max: 4}, {_id: {a: 2, b: 10}, min: 3, max: 5}]);
+})();
+
+// Test a group key that is a list of fields with some fields referencing the metaField and some
+// fields are not. The $group rewrite does not apply.
+(function testListMetaAndOtherFields_WithMinMaxAccumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: {a: 2, b: 10}, val: 3, string: "apple"},
+        {time: t, meta: {a: 3, b: 10}, val: 4, string: "pear"},
+        {time: t, meta: {a: 3, b: 10}, val: 6, string: "apple"},
+        {time: t, meta: {a: 2, b: 10}, val: 5, string: "apple"}
+    ];
+    runGroupRewriteTest(
+        docs,
+        [{$group: {_id: {a: "$meta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [
+            {_id: {a: 2, b: "apple"}, min: 3, max: 5},
+            {_id: {a: 3, b: "apple"}, min: 6, max: 6},
+            {_id: {a: 3, b: "pear"}, min: 4, max: 4}
+        ]);
+})();
+
+// Test a group key that is a list of fields and the collection does not have a metaField. The
+// rewrite does not apply, since no fields are referencing the metaField.
+(function testListOfOtherFields_NoMetaField() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: {a: 2, b: 10}, val: 3, string: "apple"},
+        {time: t, meta: {a: 3, b: 10}, val: 4, string: "pear"},
+        {time: t, meta: {a: 3, b: 10}, val: 6, string: "apple"},
+        {time: t, meta: {a: 2, b: 10}, val: 5, string: "apple"}
+    ];
+    runGroupRewriteTest(
+        docs,
+        [{$group: {_id: {a: "$meta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [
+            {_id: {a: 2, b: "apple"}, min: 3, max: 5},
+            {_id: {a: 3, b: "apple"}, min: 6, max: 6},
+            {_id: {a: 3, b: "pear"}, min: 4, max: 4}
+        ],
+        true /* excludeMeta */);
 })();

@@ -47,9 +47,31 @@ namespace {
 
 using InternalUnpackBucketGroupReorder = AggregationContextFixture;
 
+std::vector<BSONObj> makeAndOptimizePipeline(
+    boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
+    BSONObj groupSpec,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets) {
+    auto unpackSpecObj = BSON("$_internalUnpackBucket"
+                              << BSON("include" << BSON_ARRAY("a"
+                                                              << "b"
+                                                              << "c")
+                                                << "timeField"
+                                                << "t"
+                                                << "metaField"
+                                                << "meta1"
+                                                << "bucketMaxSpanSeconds" << bucketMaxSpanSeconds
+                                                << "fixedBuckets" << fixedBuckets));
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpec), expCtx);
+    pipeline->optimizePipeline();
+    return pipeline->serializeToBson();
+}
+
+// The following tests confirm the expected behavior for the $count aggregation stage rewrite.
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't', "
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
         "bucketMaxSpanSeconds: 3600}}");
     auto countSpecObj = fromjson("{$count: 'foo'}");
 
@@ -61,41 +83,33 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
     ASSERT_EQ(3, serialized.size());
 
     auto optimized = fromjson(
-        "{$_internalUnpackBucket: { include: [], timeField: 't', metaField: 'meta', "
+        "{$_internalUnpackBucket: { include: [], timeField: 't', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't', "
-        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj = fromjson("{$group: {_id: '$a', s: {$sum: '$b'}}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(2, serialized.size());
 
     // We do not get the reorder since we are grouping on a field.
     auto optimized = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
+// The following tests confirms the $group rewrite applies when the _id field is a field path
+// referencing the metaField, a constant expression, and/or for fixed buckets $dateTrunc expression
+// on the timeField
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
-        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj =
         fromjson("{$group: {_id: '$meta1.a.b', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(1, serialized.size());
 
     auto optimized = fromjson(
@@ -106,17 +120,12 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
 
 // Test SERVER-73822 fix: complex $min and $max (i.e. not just straight field refs) work correctly.
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxComplexGroupOnMetadata) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
-        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj = fromjson(
         "{$group: {_id: '$meta1.a.b', accmin: {$min: {$add: ['$b', {$const: 0}]}}, accmax: {$max: "
         "{$add: [{$const: 0}, '$c']}}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(2, serialized.size());
     // Order of fields may be different between original 'unpackSpecObj' and 'serialized[0]'.
     //   ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
@@ -124,49 +133,217 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxComplexGroupOnMetadata) {
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafield) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
-        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj = fromjson("{$group: {_id: '$meta1.a.b', accmin: {$min: '$meta1.f1'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(1, serialized.size());
 
     auto optimized = fromjson("{$group: {_id: '$meta.a.b', accmin: {$min: '$meta.f1'}}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafieldIdObj) {
+    auto groupSpecObj =
+        fromjson("{$group: {_id: { d: '$meta1.a.b' }, accmin: {$min: '$meta1.f1'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson("{$group: {_id: {d: '$meta.a.b'}, accmin: {$min: '$meta.f1'}}}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeField) {
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: 'day'}}}, accmin: {$min: '$a'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, true /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson(
+        "{$group: {_id: {time: {$dateTrunc: {date: '$control.min.t', unit: {$const: 'day'}}}}, "
+        "accmin: {$min: '$control.min.a'} }}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
+    // Test with a null group key.
+    {
+        auto groupSpecObj = fromjson("{$group: {_id: null, accmin: {$min: '$meta1.f1'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+        ASSERT_EQ(1, serialized.size());
+
+        auto optimized = fromjson("{$group: {_id: { $const: null }, accmin: {$min: '$meta.f1'}}}");
+        ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+    }
+    // Test with an int group key.
+    {
+        auto groupSpecObj = fromjson("{$group: {_id: 0, accmin: {$min: '$meta1.f1'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+        ASSERT_EQ(1, serialized.size());
+
+        auto optimized = fromjson("{$group: {_id:  {$const: 0}, accmin: {$min: '$meta.f1'}}}");
+        ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+    }
+    // Test with an expression that is optimized to a constant.
+    {
+        auto groupSpecObj =
+            fromjson("{$group: {_id: {$add: [2, 3]}, accmin: {$min: '$meta1.f1'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+        ASSERT_EQ(1, serialized.size());
+
+        auto optimized = fromjson("{$group: {_id:  {$const: 5}, accmin: {$min: '$meta.f1'}}}");
+        ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+    }
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFields) {
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: {m1: '$meta1.m1', m2: '$meta1.m2', m3: '$meta1' }, accmin: {$min: "
+        "'$meta1.f1'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson(
+        "{$group: {_id: {m1: '$meta.m1', m2: '$meta.m2', m3: '$meta' }, accmin: {$min: "
+        "'$meta.f1'}}}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsAndConst) {
+    auto groupSpecObj = fromjson(
+        "{$group: {_id: {m1: 'hello', m2: '$meta1.m1', m3: '$meta1' }, accmin: {$min: "
+        "'$meta1.f1'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson(
+        "{$group: {_id: {m1: {$const: 'hello'}, m2: '$meta.m1', m3: '$meta' }, accmin: {$min: "
+        "'$meta.f1'}}}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+// The following tests confirms the $group rewrite does not apply when some requirements are not
+// met.
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
-        "bucketMaxSpanSeconds: 3600}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$meta', accmin: {$min: '$b'}, s: {$sum: '$c'}}}");
+    // This rewrite does not apply because the $group stage uses the $sum accumulator.
+    auto groupSpecObj =
+        fromjson("{$group: {_id: '$meta1', accmin: {$min: '$b'}, s: {$sum: '$c'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(2, serialized.size());
 
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
-        "bucketMaxSpanSeconds: 3600}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$meta', accmin: {$min: '$t.a'}}}");
+    // This rewrite does not apply because the $min accumulator is on a nested field referencing the
+    // timeField.
+    auto groupSpecObj = fromjson("{$group: {_id: '$meta1', accmin: {$min: '$t.a'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
     ASSERT_EQ(2, serialized.size());
 
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxDateTruncTimeFieldNegative) {
+    // The rewrite does not apply because the buckets are not fixed.
+    {
+        auto groupSpecObj = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: 'day'}}}, accmin: {$min: "
+            "'$a'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+        ASSERT_EQ(2, serialized.size());
+
+        auto serializedGroup = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: {$const: 'day'}}}}, accmin: "
+            "{$min: "
+            "'$a'}}}");
+        auto unpackSpecObj = fromjson(
+            "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: "
+            "'meta1', bucketMaxSpanSeconds: 3600}}");
+        ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+        ASSERT_BSONOBJ_EQ(serializedGroup, serialized[1]);
+    }
+    // The rewrite does not apply because bucketMaxSpanSeconds is too large.
+    {
+        auto groupSpecObj = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: 'day'}}}, accmin: {$min: "
+            "'$a'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 604800 /* bucketMaxSpanSeconds */, true /* fixedBuckets */);
+        ASSERT_EQ(2, serialized.size());
+
+        auto unpackSpecObj = fromjson(
+            "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: "
+            "'meta1', bucketMaxSpanSeconds: 604800, fixedBuckets: true}}");
+        auto serializedGroupObj = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$t', unit: {$const: 'day'}}}}, accmin: "
+            "{$min: '$a'}}}");
+        ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+        ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
+    }
+    // The rewrite does not apply because $dateTrunc is not on the timeField.
+    {
+        auto groupSpecObj = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$c', unit: 'day'}}}, accmin: {$min: "
+            "'$a'}}}");
+
+        auto serialized = makeAndOptimizePipeline(
+            getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, true /* fixedBuckets */);
+        ASSERT_EQ(2, serialized.size());
+
+        auto unpackSpecObj = fromjson(
+            "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: "
+            "'meta1', bucketMaxSpanSeconds: 3600, fixedBuckets: true}}");
+        auto serializedGroupObj = fromjson(
+            "{$group: {_id: {time: {$dateTrunc: {date: '$c', unit: {$const: 'day'}}}}, accmin: "
+            "{$min: '$a'}}}");
+        ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+        ASSERT_BSONOBJ_EQ(serializedGroupObj, serialized[1]);
+    }
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsNegative) {
+    // The rewrite does not apply, because some fields in the group key are not referencing the
+    // metaField.
+    auto groupSpecObj =
+        fromjson("{$group: {_id: {m1: '$meta1.m1', m2: '$val' }, accmin: {$min: '$meta1.f1'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(2, serialized.size());
+
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'],  timeField: 't', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
 }

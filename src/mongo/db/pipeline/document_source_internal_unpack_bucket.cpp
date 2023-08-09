@@ -284,6 +284,166 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
     container->splice(itr, prefix);
 }
 
+boost::intrusive_ptr<Expression> handleDateTruncRewrite(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    boost::intrusive_ptr<Expression> expr,
+    const std::string& timeField,
+    int bucketMaxSpanSeconds) {
+    if (bucketMaxSpanSeconds > 86400 /* seconds in 1 day */) {
+        return {};
+    }
+    ExpressionDateTrunc* dateExpr = dynamic_cast<ExpressionDateTrunc*>(expr.get());
+    if (!dateExpr) {
+        return {};
+    }
+    const auto dateExprChildren = dateExpr->getChildren();
+    auto datePathExpr = dynamic_cast<ExpressionFieldPath*>(dateExprChildren[0].get());
+    if (!datePathExpr) {
+        return {};
+    }
+
+    // The path must be at the timeField for this re-write to be correct (and the zero
+    // component is always CURRENT).
+    const auto& datePath = datePathExpr->getFieldPath();
+    if (datePath.getPathLength() != 2 || datePath.getFieldName(1) != timeField) {
+        return {};
+    }
+
+    // Validate the bucket boundaries align with the date produced by $dateTrunc. We don't
+    // have access to any documents, so 'unit' and  'binSize' must be constants or can be
+    // optimized to a constant. The smallest possible value for 'bucketMaxSpanSeconds' is 1 second,
+    // and therefore if the 'unit' is a millisecond, the rewrite does not apply.
+    boost::optional<TimeUnit> unit = dateExpr->getOptimizedUnit();
+    if (!unit || unit == TimeUnit::millisecond) {
+        return {};
+    }
+    long long dateTruncUnitInSeconds = timeUnitValueInSeconds(*unit);
+    if (dateExpr->isBinSizeSpecified()) {
+        auto optBin = dateExpr->getOptimizedBinSize();
+        if (!optBin) {
+            return {};
+        }
+        dateTruncUnitInSeconds = dateTruncUnitInSeconds * optBin.value();
+    }
+
+    // Confirm that the 'binSize' and 'unit' provided is a multiple of 'bucketMaxSpanSeconds',
+    // to ensure the predicate aligns with the bucket boundaries.
+    if (dateTruncUnitInSeconds % bucketMaxSpanSeconds) {
+        return {};
+    }
+
+    if (dateExpr->isTimezoneSpecified()) {
+        boost::optional<TimeZone> timezone = dateExpr->getOptimizedTimeZone();
+        if (!timezone) {
+            return {};
+        }
+
+        // The rewrite will result in incorrect results, if the timezone doesn't align with
+        // the bucket boundaries. If the bucket's boundary is greater than one hour, measurements in
+        // the same bucket might be considered in different groups for different timezones. For
+        // example, two measurements might be on the same day for one timezone but on different days
+        // in another timezones. So, this rewrite is restricted to buckets spanning an hour or less
+        // if the timezone is specified.
+        if (bucketMaxSpanSeconds > 3600 /* seconds in 1 hour */ ||
+            timezone->utcOffset(Date_t::now()).count() % bucketMaxSpanSeconds) {
+            return {};
+        }
+    }
+
+    // If the bucket boundaries align, we should rewrite $dateTrunc to use the minimum
+    // timeField stored in the control field.
+    auto date = ExpressionFieldPath::createPathFromString(pExpCtx.get(),
+                                                          timeseries::kControlMinFieldNamePrefix +
+                                                              timeField,
+                                                          pExpCtx->variablesParseState);
+    return make_intrusive<ExpressionDateTrunc>(pExpCtx.get(),
+                                               date,
+                                               dateExprChildren[1 /*_kUnit */].get(),
+                                               dateExprChildren[2 /* _kBinSize */].get(),
+                                               dateExprChildren[3 /* _kTimeZone */].get(),
+                                               dateExprChildren[4 /* _kStartOfWeek */].get());
+}
+
+boost::intrusive_ptr<Expression> rewriteGroupByElement(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    boost::intrusive_ptr<Expression> expr,
+    const boost::optional<std::string>& metaField,
+    const std::string& timeField,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    bool usesExtendedRange) {
+    // We allow the $group stage to be rewritten if the _id field only consists of these 3 options:
+    // 1. If the _id field is constant.
+    // 2. If the _id field is a fieldPath on the meta field.
+    // 3. For fixed buckets collection, if the _id field is a $dateTrunc expressions on the
+    // timeField.
+    if (ExpressionConstant::isConstant(expr)) {
+        return expr;
+    }
+
+    // Option 2: The only field path supported is at or under the metaField.
+    const auto* exprIdPath = dynamic_cast<const ExpressionFieldPath*>(expr.get());
+    if (exprIdPath) {
+        // {The path must be at or under the metaField for this re-write to be correct (and
+        // the zero component is always CURRENT).}
+        const auto& idPath = exprIdPath->getFieldPath();
+        if (!metaField || idPath.getPathLength() < 2 ||
+            idPath.getFieldName(1) != metaField.value()) {
+            return {};
+        }
+
+        std::ostringstream os;
+        os << timeseries::kBucketMetaFieldName;
+        for (size_t index = 2; index < idPath.getPathLength(); index++) {
+            os << "." << idPath.getFieldName(index);
+        }
+        return ExpressionFieldPath::createPathFromString(
+            pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+    }
+
+    // Option 3: The only expression currently allowed is $dateTrunc on the timeField if the buckets
+    // are fixed and do not use an extended range.
+    if (fixedBuckets && !usesExtendedRange) {
+        return handleDateTruncRewrite(pExpCtx, expr, timeField, bucketMaxSpanSeconds);
+    }
+    return {};
+}
+
+boost::intrusive_ptr<Expression> rewriteGroupByField(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    const std::vector<boost::intrusive_ptr<Expression>>& idFieldExpressions,
+    const std::vector<std::string>& idFieldNames,
+    const boost::optional<std::string>& metaField,
+    const std::string& timeField,
+    int bucketMaxSpanSeconds,
+    bool fixedBuckets,
+    bool usesExtendedRange) {
+    tassert(7823400,
+            "idFieldNames must be empty or the same size as idFieldExpressions",
+            (idFieldNames.empty() && idFieldExpressions.size() == 1) ||
+                idFieldNames.size() == idFieldExpressions.size());
+
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fieldsAndExprs;
+    const bool isIdFieldAnExpr = idFieldNames.empty();
+    for (std::size_t i = 0; i < idFieldExpressions.size(); ++i) {
+        auto expr = rewriteGroupByElement(pExpCtx,
+                                          idFieldExpressions[i],
+                                          metaField,
+                                          timeField,
+                                          bucketMaxSpanSeconds,
+                                          fixedBuckets,
+                                          usesExtendedRange);
+        if (!expr) {
+            return {};
+        }
+        if (isIdFieldAnExpr) {
+            return expr;
+        }
+        fieldsAndExprs.emplace_back(idFieldNames[i], expr);
+    }
+    return ExpressionObject::create(pExpCtx.get(), std::move(fieldsAndExprs));
+}
+
 }  // namespace
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -825,32 +985,19 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
         return {};
     }
 
-    if (!_bucketUnpacker.bucketSpec().metaField()) {
-        return {};
-    }
-    const auto& metaField = *_bucketUnpacker.bucketSpec().metaField();
+    const auto& metaField = _bucketUnpacker.bucketSpec().metaField();
 
-    const auto& idFields = groupPtr->getIdFields();
-
-    // Currently, we only support simple group key. TODO: SERVER-68811. Allow rewrites of object
-    // group key if all its fields depend on the metaField only.
-    if (idFields.size() != 1) {
-        return {};
-    }
-
-    const auto& exprId = idFields.cbegin()->second;
-    const auto* exprIdPath = dynamic_cast<const ExpressionFieldPath*>(exprId.get());
-
-    // Currently, we only support group key expression of the form {_id : "<path>"}.
-    // TODO: SERVER-68811. Allow rewrites if expression is constant.
-    if (exprIdPath == nullptr) {
-        return {};
-    }
-
-    const auto& idPath = exprIdPath->getFieldPath();
-    // {The path must be at or under the metaField for this re-write to be correct (and the zero
-    // component is always CURRENT).}
-    if (idPath.getPathLength() < 2 || idPath.getFieldName(1) != metaField) {
+    const auto& idFieldExpressions = groupPtr->getIdExpressions();
+    const auto& idFieldNames = groupPtr->getIdFieldNames();
+    auto rewrittenIdExpression = rewriteGroupByField(pExpCtx,
+                                                     idFieldExpressions,
+                                                     idFieldNames,
+                                                     metaField,
+                                                     _bucketUnpacker.bucketSpec().timeField(),
+                                                     _bucketMaxSpanSeconds,
+                                                     _fixedBuckets,
+                                                     _usesExtendedRange);
+    if (!rewrittenIdExpression) {
         return {};
     }
 
@@ -891,7 +1038,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
 
         // Build the paths for the bucket-level fields.
         std::ostringstream os;
-        if (accFieldName == metaField) {
+        if (metaField && accFieldName == metaField.value()) {
             // Update aggregates to reference the meta field.
             os << timeseries::kBucketMetaFieldName;
 
@@ -926,19 +1073,11 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
         accumulationStatementsBucket.emplace_back(stmt.fieldName, std::move(accExpr));
     }
 
-    // Re-create the group key using the bucket-level path.
-    std::ostringstream os;
-    os << timeseries::kBucketMetaFieldName;
-    for (size_t index = 2; index < idPath.getPathLength(); index++) {
-        os << "." << idPath.getFieldName(index);
-    }
-    auto exprIdBucket = ExpressionFieldPath::createPathFromString(
-        pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
-
-    auto newGroup = DocumentSourceGroup::create(pExpCtx,
-                                                std::move(exprIdBucket),
-                                                std::move(accumulationStatementsBucket),
-                                                groupPtr->getMaxMemoryUsageBytes());
+    boost::intrusive_ptr<mongo::DocumentSourceGroup> newGroup =
+        DocumentSourceGroup::create(pExpCtx,
+                                    std::move(rewrittenIdExpression),
+                                    std::move(accumulationStatementsBucket),
+                                    groupPtr->getMaxMemoryUsageBytes());
 
     // Replace the current stage (DocumentSourceInternalUnpackBucket) and the following group stage
     // with the new group.

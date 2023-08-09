@@ -79,9 +79,11 @@ public:
               if (!unit)
                   return boost::none;
 
-              auto status = timeUnitTypicalMilliseconds(*unit);
-              tassert(status);
-              return status.getValue();
+              auto milliseconds = timeUnitTypicalMilliseconds(*unit);
+              tassert(7823403,
+                      "TimeUnit must be less than or equal to a 'week' ",
+                      milliseconds <= timeUnitTypicalMilliseconds(TimeUnit::week));
+              return milliseconds;
           }()) {}
 
     Value getNext() final;

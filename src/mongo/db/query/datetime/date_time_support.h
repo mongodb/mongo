@@ -657,16 +657,24 @@ long long dateDiff(Date_t startDate,
 Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone);
 
 /**
+ * Convert (approximately) a TimeUnit to a number of seconds. This function acts as a wrapper around
+ * 'timeUnitTypicalMilliseconds'.
+ */
+long long timeUnitValueInSeconds(TimeUnit unit);
+
+/**
  * Convert (approximately) a TimeUnit to a number of milliseconds.
  *
  * The answer is approximate because TimeUnit represents an amount of calendar time:
  * for example, some calendar days are 23 or 25 hours long due to daylight savings time.
  * This function assumes everything is "typical": days are 24 hours, minutes are 60 seconds.
  *
- * Large time units, 'month' or longer, are so variable that we don't try to pick a value: we
- * return a non-OK Status.
+ * For some callers, it is an error to call this function with units larger than 'week', since those
+ * TimeUnits are too variable to accurately estimate. It is the responsibility of the caller to
+ * validate the input to this function.
  */
-StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit);
+long long timeUnitTypicalMilliseconds(TimeUnit unit);
+
 
 /**
  * Returns the lower bound of a bin the 'date' falls into in the time axis, or, in other words,
