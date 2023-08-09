@@ -483,7 +483,7 @@ void BulkWriteOp::noteBatchResponse(
         // may be retargeted and retried.
         if (ordered && lastError) {
             invariant(index >= (int)replyItems.size());
-            writeOp.cancelWrites(&*lastError);
+            writeOp.cancelWrites();
             continue;
         }
 

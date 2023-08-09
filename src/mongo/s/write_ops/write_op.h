@@ -175,12 +175,12 @@ public:
 
     /**
      * Resets the state of this write op to _Ready and stops waiting for any outstanding
-     * TargetedWrites.  Optional error can be provided for reporting.
+     * TargetedWrites.
      *
      * Can only be called when state is _Pending, or is a no-op if called when the state
      * is still _Ready (and therefore no writes are pending).
      */
-    void cancelWrites(const write_ops::WriteError* why);
+    void cancelWrites();
 
     /**
      * Marks the targeted write as finished for this write op. Optionally, if this write is part of

@@ -221,11 +221,6 @@ private:
      */
     void _incBatchStats(const BatchedCommandResponse& response);
 
-    /**
-     * Helper function to cancel all the write ops of targeted batches in a map.
-     */
-    void _cancelBatches(const write_ops::WriteError& why, TargetedBatchMap&& batchMapToCancel);
-
     OperationContext* const _opCtx;
 
     // The incoming client request

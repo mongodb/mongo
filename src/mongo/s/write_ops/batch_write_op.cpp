@@ -292,13 +292,13 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         if (!targetStatus.isOK()) {
             write_ops::WriteError targetError(0, targetStatus);
 
-            auto cancelBatches = [&](const write_ops::WriteError& why) {
+            auto cancelBatches = [&]() {
                 for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end();) {
                     for (auto&& write : it->second->getWrites()) {
                         // NOTE: We may repeatedly cancel a write op here, but that's fast and we
                         // want to cancel before erasing the TargetedWrite* (which owns the
                         // cancelled targeting info) for reporting reasons.
-                        writeOps[write->writeOpRef.first].cancelWrites(&why);
+                        writeOps[write->writeOpRef.first].cancelWrites();
                     }
 
                     it = batchMap.erase(it);
@@ -311,12 +311,12 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
                 // Cleanup all the writes we have targetted in this call so far since we are going
                 // to abort the entire transaction.
-                cancelBatches(targetError);
+                cancelBatches();
 
                 return targetStatus;
             } else if (!recordTargetErrors) {
                 // Cancel current batch state with an error
-                cancelBatches(targetError);
+                cancelBatches();
                 return targetStatus;
             } else if (!ordered || batchMap.empty()) {
                 // Record an error for this batch
@@ -332,7 +332,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
                 // Send out what we have, but don't record an error yet, since there may be an error
                 // in the writes before this point.
-                writeOp.cancelWrites(&targetError);
+                writeOp.cancelWrites();
                 break;
             }
         }
@@ -342,7 +342,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
             if (isNewBatchRequiredOrdered(writes, batchMap)) {
-                writeOp.cancelWrites(nullptr);
+                writeOp.cancelWrites();
                 break;
             }
         }
@@ -351,7 +351,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
         if (wouldMakeBatchesTooBig(writes, estWriteSizeBytes, batchMap)) {
             invariant(!batchMap.empty());
-            writeOp.cancelWrites(nullptr);
+            writeOp.cancelWrites();
             break;
         }
 
@@ -359,7 +359,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         // the same shard with a different shardVersion.
         if (!ordered &&
             isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
-            writeOp.cancelWrites(nullptr);
+            writeOp.cancelWrites();
             break;
         }
 
@@ -388,7 +388,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             if (!isMultiWrite && useTwoPhaseWriteProtocol) {
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
-                    writeOp.cancelWrites(nullptr);
+                    writeOp.cancelWrites();
                     break;
                 } else {
                     writeType = WriteType::WithoutShardKeyOrId;
@@ -723,7 +723,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             } else {
                 // We didn't actually apply this write - cancel so we can retarget
                 dassert(writeOp.getNumTargeted() == 1u);
-                writeOp.cancelWrites(lastError);
+                writeOp.cancelWrites();
             }
         } else {
             writeOp.noteWriteError(*write, *writeError);
@@ -971,21 +971,6 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
 
     if (auto retriedStmtIds = response.getRetriedStmtIds(); !retriedStmtIds.empty()) {
         _retriedStmtIds.insert(_retriedStmtIds.end(), retriedStmtIds.begin(), retriedStmtIds.end());
-    }
-}
-
-void BatchWriteOp::_cancelBatches(const write_ops::WriteError& why,
-                                  TargetedBatchMap&& batchMapToCancel) {
-    // Collect all the writeOps that are currently targeted
-    for (TargetedBatchMap::iterator it = batchMapToCancel.begin(); it != batchMapToCancel.end();) {
-        for (auto&& write : it->second->getWrites()) {
-            // NOTE: We may repeatedly cancel a write op here, but that's fast and we want to cancel
-            // before erasing the TargetedWrite* (which owns the cancelled targeting info) for
-            // reporting reasons.
-            _writeOps[write->writeOpRef.first].cancelWrites(&why);
-        }
-
-        it = batchMapToCancel.erase(it);
     }
 }
 
