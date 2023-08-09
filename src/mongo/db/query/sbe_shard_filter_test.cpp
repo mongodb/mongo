@@ -37,6 +37,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -157,63 +159,6 @@ TEST_F(SbeShardFilterTest, AlwaysFailFilter) {
     runTest(docs, expected, makeAlwaysFailShardFiltererFactory(BSON("a" << 1)));
 }
 
-TEST_F(SbeShardFilterTest, ArrayAlongLeafShardKeyGetsFiltered) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
-                                       BSON_ARRAY(BSON("a" << 3 << "b" << BSON_ARRAY(1 << 2)))};
-
-    auto expected = BSON_ARRAY(BSON("a" << 1 << "b" << 2) << BSON("a" << 2 << "b" << 2));
-    runTest(docs, expected, makeAlwaysPassShardFiltererFactory(BSON("a" << 1 << "b" << 1)));
-}
-
-TEST_F(SbeShardFilterTest, TopLevelArrayShardKeyGetsFiltered) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << BSON("b" << 1))),
-        BSON_ARRAY(BSON("a" << BSON("b" << 2))),
-        BSON_ARRAY(BSON("a" << BSON_ARRAY(BSON("b" << 1) << BSON("b" << 2))))};
-
-    auto expected = BSON_ARRAY(BSON("a" << BSON("b" << 1)) << BSON("a" << BSON("b" << 2)));
-    runTest(docs, expected, makeAlwaysPassShardFiltererFactory(BSON("a.b" << 1)));
-}
-
-TEST_F(SbeShardFilterTest, ArrayAlongBiggerShardKeyGetsFiltered) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4)),
-        BSON_ARRAY(BSON("a" << 2 << "b" << 2 << "c" << 3 << "d" << 4)),
-        BSON_ARRAY(BSON("a" << BSON_ARRAY(1 << 2) << "b" << 2 << "c" << 3 << "d" << 4)),
-        BSON_ARRAY(BSON("a" << 3 << "b" << 2 << "c" << 3 << "d" << 4))};
-
-    auto expected = BSON_ARRAY(BSON("a" << 1 << "b" << 2 << "c" << 3 << "d" << 4)
-                               << BSON("a" << 2 << "b" << 2 << "c" << 3 << "d" << 4)
-                               << BSON("a" << 3 << "b" << 2 << "c" << 3 << "d" << 4));
-    runTest(
-        docs, expected, makeAlwaysPassShardFiltererFactory(BSON("a" << 1 << "b" << 1 << "c" << 1)));
-}
-
-TEST_F(SbeShardFilterTest, ArrayInDottedPathKeyGetsFiltered) {
-    auto docs =
-        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << BSON("b" << 1) << "c" << 2)),
-                               BSON_ARRAY(BSON("a" << BSON("b" << 2) << "c" << 2)),
-                               BSON_ARRAY(BSON("a" << BSON("b" << BSON_ARRAY(1 << 2)) << "c" << 2)),
-                               BSON_ARRAY(BSON("a" << BSON("b" << 3) << "c" << 2))};
-
-    auto expected = BSON_ARRAY(BSON("a" << BSON("b" << 1) << "c" << 2)
-                               << BSON("a" << BSON("b" << 2) << "c" << 2)
-                               << BSON("a" << BSON("b" << 3) << "c" << 2));
-    runTest(docs, expected, makeAlwaysPassShardFiltererFactory(BSON("a.b" << 1)));
-}
-
-TEST_F(SbeShardFilterTest, ArrayAlongDeepDottedPathGetsFiltered) {
-    auto docs = std::vector<BSONArray>{
-        BSON_ARRAY(BSON("a" << BSON("b" << BSON("c" << BSON("d" << BSON("e" << BSON("f" << 1))))))),
-        BSON_ARRAY(BSON(
-            "a" << BSON(
-                "b" << BSON("c" << BSON("d" << BSON("e" << BSON("f" << BSON_ARRAY(1 << 2))))))))};
-    auto expected =
-        BSON_ARRAY(BSON("a" << BSON("b" << BSON("c" << BSON("d" << BSON("e" << BSON("f" << 1)))))));
-    runTest(docs, expected, makeAlwaysPassShardFiltererFactory(BSON("a.b.c.d.e.f" << 1)));
-}
-
 TEST_F(SbeShardFilterTest, MissingFieldsAreFilledCorrectly) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1 << "c" << 2)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 2 << "c" << 2)),
@@ -277,6 +222,75 @@ TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
     runTest(std::move(projectNode),
             expected,
             makeAlwaysPassShardFiltererFactory(BSON("a" << 1 << "c" << 1 << "d" << 1)));
+}
+
+class SbeShardKeyExpressionTest : public sbe::EExpressionTestFixture {
+public:
+    void runShardKeyExpressionTest(BSONObj shardKeyPatternDefinition,
+                                   std::vector<BSONObj> documents) {
+        std::vector<sbe::MatchPath> shardKeyPaths;
+        std::vector<bool> shardKeyHashed;
+
+        stage_builder::PlanStageSlots slots;
+        std::vector<sbe::value::ViewOfValueAccessor> slotAccessors;
+        slotAccessors.reserve(shardKeyPatternDefinition.nFields());
+
+        for (const auto& shardKeyElt : shardKeyPatternDefinition) {
+            shardKeyPaths.emplace_back(shardKeyElt.fieldNameStringData());
+            shardKeyHashed.push_back(ShardKeyPattern::isHashedPatternEl(shardKeyElt));
+
+            slotAccessors.emplace_back();
+            slots.set(std::make_pair(stage_builder::PlanStageSlots::kField,
+                                     shardKeyPaths.back().getPart(0)),
+                      bindAccessor(&slotAccessors.back()));
+        }
+
+        auto shardKeyExpression = stage_builder::makeShardKeyFunctionForPersistedDocuments(
+            shardKeyPaths, shardKeyHashed, slots);
+        auto compiledShardKey = compileExpression(*shardKeyExpression);
+
+        ShardKeyPattern shardKeyPattern{shardKeyPatternDefinition};
+
+        for (const BSONObj& document : documents) {
+            for (size_t index = 0; index < shardKeyPaths.size(); ++index) {
+                auto path = shardKeyPaths[index].getPart(0);
+                BSONElement elem = document.getField(path);
+                const auto& [tag, val] = sbe::bson::convertFrom<true>(elem);
+                slotAccessors[index].reset(tag, val);
+            }
+            BSONObj classicShardKey = shardKeyPattern.extractShardKeyFromDoc(document);
+
+            const auto& [tag, val] = runCompiledExpression(compiledShardKey.get());
+            sbe::value::ValueGuard guard{tag, val};
+            ASSERT_EQ(sbe::value::TypeTags::bsonObject, tag);
+
+            BSONObj sbeShardKey{sbe::value::bitcastTo<const char*>(val)};
+            ASSERT_BSONOBJ_EQ(classicShardKey, sbeShardKey);
+        }
+    }
+};
+
+TEST_F(SbeShardKeyExpressionTest, SingleShardKeyPattern) {
+    runShardKeyExpressionTest(
+        BSON("a" << 1),
+        {BSON("a" << 10 << "b" << 20), BSON("b" << 20), BSON("a" << BSON("b" << 20))});
+}
+
+TEST_F(SbeShardKeyExpressionTest, NestedShardKeyPattern) {
+    runShardKeyExpressionTest(BSON("a.b" << 1 << "c" << 1),
+                              {BSON("a" << BSON("b" << 10) << "c" << 20),
+                               BSON("a" << BSON("b" << 10)),
+                               BSON("c" << 20),
+                               BSON("a" << 10 << "c" << 20),
+                               BSON("a" << BSON("b" << BSON("z" << 100)) << "c" << 20)});
+}
+
+TEST_F(SbeShardKeyExpressionTest, HashedShardKeyPattern) {
+    runShardKeyExpressionTest(BSON("a"
+                                   << "hashed"),
+                              {BSON("a" << 10 << "b" << 20),
+                               BSON("b" << 20),
+                               BSON("a" << BSON("b" << 20))});
 }
 
 }  // namespace mongo

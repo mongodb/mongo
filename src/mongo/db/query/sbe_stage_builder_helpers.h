@@ -350,23 +350,18 @@ std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fiel
                               std::forward<Ts>(fields)...);
 }
 
+std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> projectFields,
+                                                    sbe::EExpression::Vector projectValues);
+
 /**
- * Creates an expression to extract a shard key part from inputExpr. The generated expression is a
- * let binding that binds a getField expression to extract the shard key part value from the
- * inputExpr. If the binding is an array, the array is returned. This is done so caller can check
- * for array and generate an empty shard key. Here is an example expression generated from this
- * function for a shard key pattern {'a.b.c': 1}:
- *
- * let [l1.0 = getField (s1, "a") ?: null]
- *   if (isArray (l1.0), l1.0,
- *     let [l2.0 = getField (l1.0, "b") ?: null]
- *       if (isArray (l2.0), l2.0, getField (l2.0, "c") ?: null))
+ * Generates an expression that returns shard key that behaves similarly to
+ * ShardKeyPattern::extractShardKeyFromDoc. However, it will not check for arrays in shard key, as
+ * it is used only for documents that are already persisted in a sharded collection
  */
-std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
-    const sbe::MatchPath& keyPatternField,
-    sbe::value::FrameIdGenerator& frameIdGenerator,
-    std::unique_ptr<sbe::EExpression> inputExpr,
-    int level);
+std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
+    const std::vector<sbe::MatchPath>& shardKeyPaths,
+    const std::vector<bool>& shardKeyHashed,
+    const PlanStageSlots& slots);
 
 /**
  * If given 'EvalExpr' already contains a slot, simply returns it. Otherwise, allocates a new slot

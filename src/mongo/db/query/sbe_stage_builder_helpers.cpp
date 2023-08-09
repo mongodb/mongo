@@ -326,39 +326,61 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EE
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
-std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
-    const sbe::MatchPath& keyPatternField,
-    sbe::value::FrameIdGenerator& frameIdGenerator,
-    std::unique_ptr<sbe::EExpression> inputExpr,
-    int level) {
-    invariant(level >= 0);
-
-    auto makeGetFieldKeyPattern = [&](std::unique_ptr<sbe::EExpression> slot) {
-        return makeFillEmptyNull(makeFunction(
-            "getField"_sd, std::move(slot), sbe::makeE<sbe::EConstant>(keyPatternField[level])));
-    };
-
-    if (level == keyPatternField.numParts() - 1) {
-        auto frameId = frameIdGenerator.generate();
-        auto bindSlot = sbe::makeE<sbe::EVariable>(frameId, 0);
-        return makeGetFieldKeyPattern(std::move(inputExpr));
-    }
-
-    auto frameId = frameIdGenerator.generate();
-    auto nextSlot = sbe::makeE<sbe::EVariable>(frameId, 0);
-    auto shardKeyBinding =
-        generateShardKeyBinding(keyPatternField, frameIdGenerator, nextSlot->clone(), level + 1);
-
-    return sbe::makeE<sbe::ELocalBind>(
-        frameId,
-        sbe::makeEs(makeGetFieldKeyPattern(std::move(inputExpr))),
-        sbe::makeE<sbe::EIf>(makeFunction("isArray"_sd, nextSlot->clone()),
-                             nextSlot->clone(),
-                             std::move(shardKeyBinding)));
-}
-
 EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit) {
     return {makeLimitCoScanTree(planNodeId, limit), sbe::makeSV()};
+}
+
+std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> projectFields,
+                                                    sbe::EExpression::Vector projectValues) {
+    auto makeObjSpec = makeConstant(
+        sbe::value::TypeTags::makeObjSpec,
+        sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+            sbe::MakeObjSpec::FieldBehavior::drop, {} /* fields */, std::move(projectFields))));
+    auto makeObjRoot = makeConstant(sbe::value::TypeTags::Nothing, 0);
+    sbe::EExpression::Vector makeObjArgs;
+    makeObjArgs.reserve(2 + projectValues.size());
+    makeObjArgs.push_back(std::move(makeObjSpec));
+    makeObjArgs.push_back(std::move(makeObjRoot));
+    std::move(projectValues.begin(), projectValues.end(), std::back_inserter(makeObjArgs));
+
+    return sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));
+}
+
+std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
+    const std::vector<sbe::MatchPath>& shardKeyPaths,
+    const std::vector<bool>& shardKeyHashed,
+    const PlanStageSlots& slots) {
+    // Build an expression to extract the shard key from the document based on the shard key
+    // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'
+    // expressions. This will handle single-element paths, and dotted paths for each shard key part.
+    std::vector<std::string> projectFields;
+    sbe::EExpression::Vector projectValues;
+
+    projectFields.reserve(shardKeyPaths.size());
+    projectValues.reserve(shardKeyPaths.size());
+    for (size_t i = 0; i < shardKeyPaths.size(); ++i) {
+        const auto& fieldRef = shardKeyPaths[i];
+
+        auto shardKeyBinding = sbe::makeE<sbe::EVariable>(
+            slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0))));
+        if (fieldRef.numParts() > 1) {
+            for (size_t level = 1; level < fieldRef.numParts(); ++level) {
+                shardKeyBinding = makeFunction("getField",
+                                               std::move(shardKeyBinding),
+                                               sbe::makeE<sbe::EConstant>(fieldRef[level]));
+            }
+        }
+        shardKeyBinding = makeFillEmptyNull(std::move(shardKeyBinding));
+        // If this is a hashed shard key then compute the hash value.
+        if (shardKeyHashed[i]) {
+            shardKeyBinding = makeFunction("shardHash"_sd, std::move(shardKeyBinding));
+        }
+
+        projectFields.push_back(fieldRef.dottedField().toString());
+        projectValues.push_back(std::move(shardKeyBinding));
+    }
+
+    return makeNewBsonObject(std::move(projectFields), std::move(projectValues));
 }
 
 std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
