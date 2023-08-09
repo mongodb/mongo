@@ -171,8 +171,7 @@ public:
     }
 
     void visit(const WhereMatchExpression* expr) final {
-        hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getCode());
+        visitWhere(expr);
     }
 
     void visit(const AlwaysFalseMatchExpression* expr) final {
@@ -301,19 +300,16 @@ public:
         hashCombineTypeAndPath(expr);
     }
     void visit(const TextMatchExpression* expr) final {
-        hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getFTSQuery());
+        visitText(expr);
     }
     void visit(const TextNoOpMatchExpression* expr) final {
-        hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getFTSQuery());
+        visitText(expr);
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(7901820);
     }
     void visit(const WhereNoOpMatchExpression* expr) final {
-        hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->getCode());
+        visitWhere(expr);
     }
     void visit(const InternalEqHashedKey* expr) final {
         visitComparison(expr);
@@ -350,6 +346,16 @@ private:
         hashCombineTypeAndPath(expr);
         _hashState =
             H::combine(std::move(_hashState), eltCmp.hash(expr->getData()), expr->getCollator());
+    }
+
+    void visitText(const TextMatchExpressionBase* expr) {
+        hashCombineTypeAndPath(expr);
+        _hashState = H::combine(std::move(_hashState), expr->getFTSQuery());
+    }
+
+    void visitWhere(const WhereMatchExpressionBase* expr) {
+        hashCombineTypeAndPath(expr);
+        _hashState = H::combine(std::move(_hashState), expr->getCode());
     }
 
     H _hashState;
