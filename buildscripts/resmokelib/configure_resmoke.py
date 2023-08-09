@@ -193,9 +193,11 @@ be invoked as either:
         _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
 
         if values.command == "run":
-            print("Fetching feature flags...")
+            # These logging messages start with # becuase the output of this file must produce
+            # valid yaml. This comments out these print statements when the output is parsed.
+            print("# Fetching feature flags...")
             all_ff = gen_all_feature_flag_list.gen_all_feature_flags()
-            print("Fetched feature flags...")
+            print("# Fetched feature flags...")
         else:
             all_ff = []
 
