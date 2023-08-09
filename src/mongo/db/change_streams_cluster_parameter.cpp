@@ -41,19 +41,6 @@ namespace mongo {
 Status validateChangeStreamsClusterParameter(
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId) {
-    auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isStandalone = repl &&
-        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
-        serverGlobalParams.clusterRole.has(ClusterRole::None);
-    if (isStandalone) {
-        return {ErrorCodes::IllegalOperation,
-                "The 'changeStreams' parameter is unsupported in standalone."};
-    }
-    if (!change_stream_serverless_helpers::isServerlessEnvironment()) {
-        return Status(
-            ErrorCodes::CommandNotSupported,
-            "The 'changeStreams' cluster-wide parameter is only available in serverless.");
-    }
     if (clusterParameter.getExpireAfterSeconds() <= 0) {
         return Status(ErrorCodes::BadValue,
                       "Expected a positive integer for 'expireAfterSeconds' field");
