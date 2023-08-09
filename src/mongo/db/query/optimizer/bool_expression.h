@@ -189,11 +189,13 @@ struct BoolExpr {
 
     template <typename NodeType, typename Visitor>
     static size_t visitConjuncts(NodeType&& node, const Visitor& visitor) {
+        tassert(7979100, "Expected conjunction", node.template is<Conjunction>());
         return visitNodes<Conjunction>(node, visitor);
     }
 
     template <typename NodeType, typename Visitor>
     static size_t visitDisjuncts(NodeType&& node, const Visitor& visitor) {
+        tassert(7979101, "Expected disjunction", node.template is<Disjunction>());
         return visitNodes<Disjunction>(node, visitor);
     }
 
