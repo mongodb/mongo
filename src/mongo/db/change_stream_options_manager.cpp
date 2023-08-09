@@ -119,13 +119,6 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
 
 Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) const {
-    auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isStandalone = repl && !repl->getSettings().isReplSet() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::None);
-    if (isStandalone) {
-        return {ErrorCodes::IllegalOperation,
-                "The 'changeStreamOptions' parameter is unsupported in standalone."};
-    }
     try {
         BSONObj changeStreamOptionsObj = newValueElement.Obj();
         Status validateStatus = Status::OK();

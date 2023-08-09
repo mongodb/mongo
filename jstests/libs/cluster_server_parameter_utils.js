@@ -26,7 +26,7 @@ export const kNonTestOnlyClusterParameters = {
             {preAndPostImages: {expireAfterSeconds: 20}}
         ],
         featureFlag: '!ServerlessChangeStreams',
-        standaloneIncompatible: true,
+        standaloneIncompatible: false,
     },
     changeStreams: {
         default: {expireAfterSeconds: NumberLong(3600)},
@@ -34,7 +34,7 @@ export const kNonTestOnlyClusterParameters = {
         featureFlag: 'ServerlessChangeStreams',
         setParameters: {'multitenancySupport': true},
         serverless: true,
-        standaloneIncompatible: true,
+        standaloneIncompatible: false,
     },
 };
 
