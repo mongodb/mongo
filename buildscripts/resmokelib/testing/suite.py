@@ -427,6 +427,9 @@ class Suite(object):
     def is_matrix_suite(self):
         return "matrix_suite" in self.get_config()
 
+    def is_antithesis_suite(self):
+        return "antithesis" in self.get_config()
+
     def get_description(self):
         if "description" not in self.get_config():
             return None
