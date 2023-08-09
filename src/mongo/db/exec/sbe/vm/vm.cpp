@@ -2299,7 +2299,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
             case value::TypeTags::ArraySet: {
                 value::ArrayEnumerator enumerator{tag, val};
                 BSONArrayBuilder arrayBuilder;
-                bson::convertToBsonObj(arrayBuilder, enumerator);
+                bson::convertToBsonArr(arrayBuilder, enumerator);
                 if (collator) {
                     kb.appendArray(arrayBuilder.arr(), stringTransformFn);
                 } else {

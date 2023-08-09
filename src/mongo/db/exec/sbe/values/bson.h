@@ -62,7 +62,10 @@ inline const char* fieldNameRaw(const char* be) noexcept {
 }
 
 template <class ArrayBuilder>
-void convertToBsonObj(ArrayBuilder& builder, value::Array* arr);
+void convertToBsonArr(ArrayBuilder& builder, value::Array* arr);
+
+template <class ArrayBuilder>
+void appendValueToBsonArr(ArrayBuilder& builder, value::TypeTags tag, value::Value val);
 
 template <class ObjBuilder>
 void convertToBsonObj(ObjBuilder& builder, value::Object* obj);
@@ -74,7 +77,7 @@ void appendValueToBsonObj(ObjBuilder& builder,
                           value::Value val);
 
 template <class ArrayBuilder>
-void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr);
+void convertToBsonArr(ArrayBuilder& builder, value::ArrayEnumerator arr);
 
 }  // namespace bson
 }  // namespace sbe

@@ -477,7 +477,7 @@ static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, 
             // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
             // constructing a BSONArray.
             BSONArrayBuilder builder;
-            bson::convertToBsonObj(builder, value::ArrayEnumerator{tag, val});
+            bson::convertToBsonArr(builder, value::ArrayEnumerator{tag, val});
             buf.appendBool(true);
             buf.appendArray(BSONArray(builder.done()));
             break;

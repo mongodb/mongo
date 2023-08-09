@@ -256,7 +256,7 @@ BSONObj ScalarHistogram::serialize() const {
     // Construct bucket bounds BSON.
     auto bounds = getBounds();
     BSONArrayBuilder boundsBuilder(histogramBuilder.subarrayStart("bounds"));
-    sbe::bson::convertToBsonObj(boundsBuilder, &bounds);
+    sbe::bson::convertToBsonArr(boundsBuilder, &bounds);
     boundsBuilder.doneFast();
 
     histogramBuilder.doneFast();

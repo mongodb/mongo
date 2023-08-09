@@ -437,7 +437,7 @@ TEST(SBEVM, ConvertBinDataToBsonObj) {
     array.push_back(binDataTag, binDataVal);
 
     BSONArrayBuilder builder;
-    bson::convertToBsonObj(builder, &array);
+    bson::convertToBsonArr(builder, &array);
     auto convertedBinData = builder.done();
 
     ASSERT_EQ(originalBinData.woCompare(convertedBinData), 0);
