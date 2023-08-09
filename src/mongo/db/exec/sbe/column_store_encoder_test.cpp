@@ -43,8 +43,8 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/sbe/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/unittest/assert.h"
@@ -82,7 +82,7 @@ TEST(SBEColumnStoreEncoder, EncodeTest) {
     auto cellView = SplitCellView::parse(
         StringData{columnStoreCell.buf(), static_cast<size_t>(columnStoreCell.len())});
 
-    value::ColumnStoreEncoder encoder;
+    ColumnStoreEncoder encoder;
     auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     {
@@ -226,7 +226,7 @@ TEST(SBEColumnStoreEncoder, RoundTripConversionThroughSplitCellView) {
     auto cellView =
         SplitCellView::parse(StringData{cellBuffer.buf(), static_cast<size_t>(cellBuffer.len())});
 
-    value::ColumnStoreEncoder encoder;
+    ColumnStoreEncoder encoder;
     auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     auto referenceIt = referenceBson.begin();
@@ -387,7 +387,7 @@ TEST(SBEColumnStoreEncoder, ColumnsWithEmbeddedBSONElements) {
     // Test the 'ColumnStoreEncoder' by using it to iterate through the columnar values and
     // validating the translated outputs their respective comparison functions.
     //
-    value::ColumnStoreEncoder encoder;
+    ColumnStoreEncoder encoder;
     auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     for (const auto& comparison : testComparisons) {

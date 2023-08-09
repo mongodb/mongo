@@ -1421,12 +1421,14 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
         // try to refresh the targeters upon targeting errors.
         request.setOrdered(false);
-        auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+        auto [replyItems, numErrors] =
+            bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 2u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
         ASSERT_OK(replyItems[1].getStatus());
         ASSERT_EQUALS(targeter0->getNumRefreshes(), 1);
         ASSERT_EQUALS(targeter1->getNumRefreshes(), 1);
+        ASSERT_EQUALS(numErrors, 1);
     });
 
     // Mock a bulkWrite response to respond to the second op, which is valid.
@@ -1450,12 +1452,14 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // Test ordered operations. This is mostly the same as the test case above except that we
         // should only return the first error for ordered operations.
         request.setOrdered(true);
-        auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+        auto [replyItems, numErrors] =
+            bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 1u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
         // We should have another refresh attempt.
         ASSERT_EQUALS(targeter0->getNumRefreshes(), 2);
         ASSERT_EQUALS(targeter1->getNumRefreshes(), 2);
+        ASSERT_EQUALS(numErrors, 1);
     });
 
     future.default_timed_get();
@@ -1491,10 +1495,11 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 
     // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
     // exception which should abort the entire bulkWrite.
-    auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
+    auto [replyItems, numErrors] = bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 2u);
     ASSERT_EQUALS(replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
     ASSERT_EQUALS(replyItems[1].getStatus().code(), ErrorCodes::StaleEpoch);
+    ASSERT_EQUALS(numErrors, 2);
 }
 
 // TODO(SERVER-72790): Test refreshing targeters on stale config errors, including the case where

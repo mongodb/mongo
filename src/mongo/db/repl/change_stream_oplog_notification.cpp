@@ -42,6 +42,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -242,4 +243,18 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
         insertOplogEntry(opCtx, std::move(oplogEntry), "ReshardCollectionWritesOplog");
     }
 }
+
+void notifyChangeStreamOnEndOfTransaction(OperationContext* opCtx,
+                                          const LogicalSessionId& lsid,
+                                          const TxnNumber& txnNumber,
+                                          const std::vector<NamespaceString>& affectedNamespaces) {
+    repl::MutableOplogEntry oplogEntry = change_stream::createEndOfTransactionOplogEntry(
+        lsid,
+        txnNumber,
+        affectedNamespaces,
+        repl::OpTime().getTimestamp(),
+        opCtx->getServiceContext()->getFastClockSource()->now());
+    insertOplogEntry(opCtx, std::move(oplogEntry), "EndOfTransactionWritesOplog");
+}
+
 }  // namespace mongo

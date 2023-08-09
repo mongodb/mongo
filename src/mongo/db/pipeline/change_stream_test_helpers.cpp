@@ -55,6 +55,7 @@ LogicalSessionFromClient testLsid() {
     static const UUID* uuid = new UUID(UUID::gen());
     LogicalSessionFromClient lsid{};
     lsid.setId(*uuid);
+    lsid.setUid(SHA256Block{});
     return lsid;
 }
 

@@ -42,9 +42,14 @@ namespace mongo::sbe::value {
 class ScalarMonoCellBlock : public CellBlock {
 public:
     ScalarMonoCellBlock(size_t count, TypeTags tag, Value val) : _block(count, tag, val) {}
+    ScalarMonoCellBlock(MonoBlock b) : _block(std::move(b)) {}
 
-    const ValueBlock& getValueBlock() const override {
+    ValueBlock& getValueBlock() override {
         return _block;
+    }
+
+    std::unique_ptr<CellBlock> clone() const override {
+        return std::make_unique<ScalarMonoCellBlock>(_block);
     }
 
 private:

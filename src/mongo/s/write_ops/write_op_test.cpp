@@ -446,6 +446,72 @@ TEST_F(WriteOpTest, CancelSingle) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }
 
+// WriteOp makeWriteOp(BulkWriteCommandRequest& req, int32_t idx) {}
+
+BulkWriteReplyItem makeBulkWriteReplyItem(int32_t idx,
+                                          boost::optional<int32_t> n,
+                                          boost::optional<int32_t> nModified,
+                                          boost::optional<write_ops::Upserted> upserted) {
+    auto reply = BulkWriteReplyItem(idx);
+    reply.setN(n);
+    reply.setNModified(nModified);
+    reply.setUpserted(upserted);
+    return reply;
+}
+
+// Test that we correctly combine BulkWriteReplyItems when an op targets multiple shards.
+TEST_F(WriteOpTest, CombineBulkWriteReplyItems) {
+    BulkWriteCommandRequest dummyReq;
+    dummyReq.setOps({BulkWriteInsertOp(0, BSON("x" << 1))});
+    BatchItemRef dummyRef(&dummyReq, 0);
+    WriteOp op(dummyRef, false);
+
+    // No success results: we don't return anything.
+    ASSERT_EQ(op.combineBulkWriteReplyItems({}), boost::none);
+
+    const auto basicReply = makeBulkWriteReplyItem(5, 1, 1, boost::none);
+
+    // With only one item, we should just return the first item, with a corrected index.
+    auto combined = op.combineBulkWriteReplyItems({&basicReply});
+    ASSERT_EQ(combined->getN(), 1);
+    ASSERT_EQ(combined->getNModified(), 1);
+    ASSERT_EQ(combined->getUpserted(), boost::none);
+    ASSERT_EQ(combined->getIdx(), 0);
+
+    // We should sum the values of n and nModified.
+    combined = op.combineBulkWriteReplyItems({&basicReply, &basicReply});
+    ASSERT_EQ(combined->getN(), 2);
+    ASSERT_EQ(combined->getNModified(), 2);
+    ASSERT_EQ(combined->getUpserted(), boost::none);
+    ASSERT_EQ(combined->getIdx(), 0);
+
+    // We should correctly propagate the upserted value.
+    const auto dummyUpserted = write_ops::Upserted::parse(
+        IDLParserContext("CombineBulkWriteReplyItems"), BSON("index" << 0 << "_id" << 5));
+    const auto replyWithUpsert = makeBulkWriteReplyItem(5, 1, 0, dummyUpserted);
+    combined = op.combineBulkWriteReplyItems({&basicReply, &replyWithUpsert});
+    ASSERT_EQ(combined->getN(), 2);
+    ASSERT_EQ(combined->getNModified(), 1);
+    ASSERT_EQ(combined->getUpserted()->get_id().getElement().Int(),
+              dummyUpserted.get_id().getElement().Int());
+    ASSERT_EQ(combined->getIdx(), 0);
+
+    // We gracefully handle when the first reply is missing n/nModified.
+    const auto emptyReply = makeBulkWriteReplyItem(5, boost::none, boost::none, boost::none);
+    combined = op.combineBulkWriteReplyItems({&emptyReply, &basicReply});
+    ASSERT_EQ(combined->getN(), 1);
+    ASSERT_EQ(combined->getNModified(), 1);
+    ASSERT_EQ(combined->getUpserted(), boost::none);
+    ASSERT_EQ(combined->getIdx(), 0);
+
+    // We gracefully handle when a later reply is missing n/nModified.
+    combined = op.combineBulkWriteReplyItems({&basicReply, &emptyReply});
+    ASSERT_EQ(combined->getN(), 1);
+    ASSERT_EQ(combined->getNModified(), 1);
+    ASSERT_EQ(combined->getUpserted(), boost::none);
+    ASSERT_EQ(combined->getIdx(), 0);
+}
+
 //
 // Test retryable errors
 //

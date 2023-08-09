@@ -980,18 +980,6 @@ TEST(OpMsgRequestBuilder, WithTenantInDatabaseName) {
     ASSERT_EQ(msg.getDatabase(), "testDb");
 }
 
-TEST(OpMsgRequestBuilder, WithTenantInDatabaseName_FeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
-                                                                   false);
-    const TenantId tenantId(OID::gen());
-    auto const body = fromjson("{ping: 1}");
-    OpMsgRequest msg = OpMsgRequestBuilder::create(
-        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), body);
-    ASSERT(msg.body.getField("$tenant").eoo());
-    ASSERT_EQ(msg.getDatabase(), tenantId.toString() + "_testDb");
-}
-
 TEST(OpMsgRequestBuilder, WithSameTenantInBody) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",

@@ -170,7 +170,9 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
     awaitResult();
 
     // If deleting the coordinator doc was not robust to killOp, the document would still exist.
-    assert.eq(0, coordinator.getDB("config").getCollection("transaction_coordinators").count());
+    // Deletion is done asynchronously, so we might have to wait.
+    assert.soon(
+        () => coordinator.getDB("config").getCollection("transaction_coordinators").count() == 0);
 
     // Check that the transaction committed or aborted as expected.
     if (!shouldCommit) {

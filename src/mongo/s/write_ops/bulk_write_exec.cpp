@@ -210,9 +210,9 @@ void noteStaleResponses(
 
 }  // namespace
 
-std::vector<BulkWriteReplyItem> execute(OperationContext* opCtx,
-                                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                                        const BulkWriteCommandRequest& clientRequest) {
+BulkWriteReplyInfo execute(OperationContext* opCtx,
+                           const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                           const BulkWriteCommandRequest& clientRequest) {
     LOGV2_DEBUG(7263700,
                 4,
                 "Starting execution of a bulkWrite",
@@ -309,7 +309,7 @@ std::vector<BulkWriteReplyItem> execute(OperationContext* opCtx,
     }
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
-    return bulkWriteOp.generateReplyItems();
+    return bulkWriteOp.generateReplyInfo();
 }
 
 BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest)
@@ -409,6 +409,7 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     // internally between the mongos and the mongods.
     request.setOrdered(_clientRequest.getOrdered());
     request.setBypassDocumentValidation(_clientRequest.getBypassDocumentValidation());
+    request.setLet(_clientRequest.getLet());
 
     if (_isRetryableWrite) {
         request.setStmtIds(stmtIds);
@@ -511,7 +512,7 @@ void BulkWriteOp::noteBatchResponse(
 
         auto& reply = replyItems[index];
         if (reply.getStatus().isOK()) {
-            writeOp.noteWriteComplete(*write);
+            writeOp.noteWriteComplete(*write, reply);
         } else {
             lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
@@ -535,26 +536,38 @@ void BulkWriteOp::noteBatchResponse(
     }
 }
 
-std::vector<BulkWriteReplyItem> BulkWriteOp::generateReplyItems() const {
+BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
     dassert(isFinished());
     std::vector<BulkWriteReplyItem> replyItems;
+    int numErrors = 0;
     replyItems.reserve(_writeOps.size());
 
     const auto ordered = _clientRequest.getOrdered();
     for (auto& writeOp : _writeOps) {
         dassert(writeOp.getWriteState() != WriteOpState_Pending);
         if (writeOp.getWriteState() == WriteOpState_Completed) {
-            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex());
+            replyItems.push_back(writeOp.takeBulkWriteReplyItem());
         } else if (writeOp.getWriteState() == WriteOpState_Error) {
             replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(),
                                     writeOp.getOpError().getStatus());
+            // TODO SERVER-79510: Remove this. This is necessary right now because the nModified
+            //  field is lost in the BulkWriteReplyItem -> WriteError transformation but
+            // we want to return nModified for failed updates. However, this does not actually
+            // return a correct value for multi:true updates that partially succeed (i.e. succeed
+            // on one or more shard and fail on one or more shards). In SERVER-79510 we should
+            // return a correct nModified count by summing the success responses' nModified
+            // values.
+            if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update) {
+                replyItems.back().setNModified(0);
+            }
+            numErrors++;
             // Only return the first error if we are ordered.
             if (ordered)
                 break;
         }
     }
 
-    return replyItems;
+    return {replyItems, numErrors};
 }
 
 int BulkWriteOp::getBaseBatchCommandSizeEstimate() const {

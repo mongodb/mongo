@@ -100,6 +100,7 @@ namespace mongo::logv2 {
     X(kConnectionPool,         , "connectionPool"        , "CONNPOOL", kNetwork) \
     X(kTest,                   , "test"                  , "TEST"    , kDefault) \
     X(kResourceConsumption,    , "resourceConsumption"   , "RES_CONS", kDefault) \
+    X(kStreams,                , "streams"               , "STREAMS" , kDefault) \
     X(kNumLogComponents,       , "total"                 , "TOTAL"   , kNumLogComponents) \
     /**/
 // clang-format on

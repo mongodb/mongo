@@ -323,10 +323,8 @@ bool appendDollarTenant(BSONObjBuilder& builder,
     }
 
     if (gMultitenancySupport) {
-        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-            tenant.serializeToBSON("$tenant", &builder);
-            return true;
-        }
+        tenant.serializeToBSON("$tenant", &builder);
+        return true;
     }
     return false;
 }

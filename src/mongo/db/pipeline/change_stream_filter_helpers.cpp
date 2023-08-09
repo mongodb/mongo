@@ -251,6 +251,8 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
     BSONObjBuilder applyOpsBuilder;
 
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
+
     // "o.applyOps" stores the list of operations, so it must be an array.
     applyOpsBuilder.append("op", "c");
     applyOpsBuilder.append("o.applyOps",
@@ -264,7 +266,6 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
         {
             // Regexes for full-namespace, collection, and command-namespace matching.
-            auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
             auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
             auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
 
@@ -287,13 +288,15 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         }
     }
     auto applyOpsFilter = applyOpsBuilder.obj();
+    auto endOfTransactionFilter = BSON("op"
+                                       << "n"
+                                       << "o2.endOfTransaction" << BSONRegEx(nsRegex));
+    auto commitTransactionFilter = BSON("op"
+                                        << "c"
+                                        << "o.commitTransaction" << 1);
 
-    auto transactionFilter =
-        MatchExpressionParser::parseAndNormalize(BSON(OR(applyOpsFilter,
-                                                         BSON("op"
-                                                              << "c"
-                                                              << "o.commitTransaction" << 1))),
-                                                 expCtx);
+    auto transactionFilter = MatchExpressionParser::parseAndNormalize(
+        BSON(OR(applyOpsFilter, endOfTransactionFilter, commitTransactionFilter)), expCtx);
 
     // All events in a transaction share the same clusterTime, lsid, and txNumber values. If the
     // user wishes to filter out events based on these values, it is possible to rewrite these

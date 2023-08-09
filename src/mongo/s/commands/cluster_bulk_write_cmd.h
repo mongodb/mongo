@@ -181,7 +181,7 @@ public:
             OperationContext* opCtx,
             BulkWriteCommandRequest& bulkRequest,
             const OpMsgRequest& unparsedRequest,
-            std::vector<BulkWriteReplyItem> replyItems) const {
+            bulk_write_exec::BulkWriteReplyInfo replyInfo) const {
             const auto& req = bulkRequest;
             auto reqObj = unparsedRequest.body;
 
@@ -211,6 +211,7 @@ public:
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
+            auto& [replyItems, numErrors] = replyInfo;
             for (auto& replyItem : replyItems) {
                 queuedDataStage->queueResult(replyItem.toBSON());
             }
@@ -241,7 +242,7 @@ public:
                 return BulkWriteCommandReply(
                     BulkWriteCommandResponseCursor(
                         0, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
-                    0 /* TODO SERVER-76267: correctly populate numErrors */);
+                    numErrors);
             }
 
             ccc->detachFromOperationContext();
@@ -264,7 +265,7 @@ public:
             return BulkWriteCommandReply(
                 BulkWriteCommandResponseCursor(
                     cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
-                0 /* TODO SERVER-76267: correctly populate numErrors */);
+                numErrors);
         }
 
         bool runImpl(OperationContext* opCtx,
@@ -280,8 +281,8 @@ public:
 
             bulk_write_common::validateRequest(bulkRequest);
 
-            auto replyItems = cluster::bulkWrite(opCtx, bulkRequest);
-            response = _populateCursorReply(opCtx, bulkRequest, request, std::move(replyItems));
+            auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest);
+            response = _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
             result.appendElements(response.toBSON());
             return true;
         }

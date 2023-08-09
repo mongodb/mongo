@@ -31,7 +31,7 @@ __compact_server(void *arg)
     WT_SESSION *wt_session;
     WT_SESSION_IMPL *session;
     int exact;
-    const char *config, *key, *prefix;
+    const char *config, *key, *prefix, *uri;
     bool full_iteration, running, signalled;
 
     session = arg;
@@ -39,8 +39,10 @@ __compact_server(void *arg)
     wt_session = (WT_SESSION *)session;
     cursor = NULL;
     config = NULL;
+    key = NULL;
+    uri = NULL;
+    /* The compact operation is only applied on URIs with a specific prefix. */
     prefix = "file:";
-    key = prefix;
     exact = 0;
     full_iteration = running = signalled = false;
 
@@ -56,7 +58,8 @@ __compact_server(void *arg)
              * FIXME-WT-11409: Depending on the previous state, we may not want to clear out the
              * last key used. This could be useful if the server was paused to be resumed later.
              */
-            key = prefix;
+            __wt_free(session, uri);
+            WT_ERR(__wt_strndup(session, prefix, strlen(prefix), &uri));
             /* Check every 10 seconds in case the signal was missed. */
             __wt_cond_wait(
               session, conn->background_compact.cond, 10 * WT_MILLION, __compact_server_run_chk);
@@ -84,7 +87,7 @@ __compact_server(void *arg)
         /* Open a metadata cursor. */
         WT_ERR(__wt_metadata_cursor(session, &cursor));
 
-        cursor->set_key(cursor, key);
+        cursor->set_key(cursor, uri);
         WT_ERR(cursor->search_near(cursor, &exact));
 
         /* Make sure not to go backwards. */
@@ -114,29 +117,34 @@ __compact_server(void *arg)
             continue;
         }
 
+        /* Make a copy of the key as it can be freed once the cursor is released. */
+        __wt_free(session, uri);
+        WT_ERR(__wt_strndup(session, key, strlen(key), &uri));
+
         /* Always close the metadata cursor. */
         WT_ERR(__wt_metadata_cursor_release(session, &cursor));
 
         /* Compact the file with the latest configuration. */
-        __wt_free(session, config);
         __wt_spin_lock(session, &conn->background_compact.lock);
-        ret = __wt_strndup(session, conn->background_compact.config,
-          conn->background_compact.config == NULL ? 0 : strlen(conn->background_compact.config),
-          &config);
+        if (config == NULL || !WT_STREQ(config, conn->background_compact.config)) {
+            __wt_free(session, config);
+            ret = __wt_strndup(session, conn->background_compact.config,
+              strlen(conn->background_compact.config), &config);
+        }
         __wt_spin_unlock(session, &conn->background_compact.lock);
 
         WT_ERR(ret);
 
-        ret = wt_session->compact(wt_session, key, config);
+        ret = wt_session->compact(wt_session, uri, config);
 
         /* FIXME-WT-11343: compaction is done, update the data structure for this table. */
         /*
          * Compact may return:
-         * - EBUSY and WT_ROLLBACK for various reasons.
-         * - ETIMEDOUT if the timer has been configured and compaction took too long.
-         * - WT_NOTFOUND if the underlying file has been deleted.
+         * - EBUSY or WT_ROLLBACK for various reasons.
+         * - ETIMEDOUT if the configured timer has elapsed.
+         * - ENOENT if the underlying file does not exist.
          */
-        if (ret == EBUSY || ret == ETIMEDOUT || ret == WT_NOTFOUND || ret == WT_ROLLBACK)
+        if (ret == EBUSY || ret == ENOENT || ret == ETIMEDOUT || ret == WT_ROLLBACK)
             ret = 0;
         WT_ERR(ret);
     }
@@ -146,6 +154,7 @@ __compact_server(void *arg)
     WT_ERR(__wt_metadata_cursor_close(session));
     __wt_free(session, config);
     __wt_free(session, conn->background_compact.config);
+    __wt_free(session, uri);
 
     if (0) {
 err:

@@ -58,8 +58,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -2475,11 +2475,10 @@ public:
     void testCombinePartialAggsMultiAccumulatorWithSortPattern(std::string aggExpr,
                                                                BSONArray mergeState,
                                                                BSONArray inputState,
-                                                               sbe::value::SortSpec* sortSpec,
+                                                               sbe::SortSpec* sortSpec,
                                                                BSONArray expected) {
-        auto sortSpecConstant =
-            stage_builder::makeConstant(sbe::value::TypeTags::sortSpec,
-                                        sbe::value::bitcastFrom<sbe::value::SortSpec*>(sortSpec));
+        auto sortSpecConstant = stage_builder::makeConstant(
+            sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec));
 
         auto expr = stage_builder::makeFunction(aggExpr + "Merge",
                                                 stage_builder::makeVariable(_inputSlotId),
@@ -3039,7 +3038,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopN) {
                    << 0ll << 3ll << 0 << INT_MAX),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2))
                    << 0ll << 3ll << 0 << INT_MAX),
-        new sbe::value::SortSpec(BSON("x" << 1)),
+        new sbe::SortSpec(BSON("x" << 1)),
         BSON_ARRAY(1 << 2 << 3));
 }
 
@@ -3050,7 +3049,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsBottomN) {
                    << 0ll << 3ll << 0 << INT_MAX),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6))
                    << 0ll << 3ll << 0 << INT_MAX),
-        new sbe::value::SortSpec(BSON("x" << 1)),
+        new sbe::SortSpec(BSON("x" << 1)),
         BSON_ARRAY(4 << 5 << 6));
 }
 

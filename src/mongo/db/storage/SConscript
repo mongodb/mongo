@@ -243,7 +243,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        '$BUILD_DIR/mongo/util/periodic_runner',
+        '$BUILD_DIR/mongo/util/mock_periodic_runner',
         'concurrency_adjustment_parameters',
         'storage_engine_parameters',
     ],

@@ -123,7 +123,6 @@ write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& er
     return write_ops::WriteError(errOps.front()->error->getIndex(),
                                  Status(MultipleErrorsOccurredInfo(errB.arr()), msg.str()));
 }
-
 }  // namespace
 
 const BatchItemRef& WriteOp::getWriteItem() const {
@@ -137,6 +136,12 @@ WriteOpState WriteOp::getWriteState() const {
 const write_ops::WriteError& WriteOp::getOpError() const {
     dassert(_state == WriteOpState_Error);
     return *_error;
+}
+
+BulkWriteReplyItem WriteOp::takeBulkWriteReplyItem() {
+    invariant(_state == WriteOpState_Completed);
+    invariant(_bulkWriteReplyItem);
+    return std::move(_bulkWriteReplyItem.value());
 }
 
 void WriteOp::targetWrites(OperationContext* opCtx,
@@ -208,6 +213,7 @@ size_t WriteOp::getNumTargeted() {
  */
 void WriteOp::_updateOpState() {
     std::vector<ChildWriteOp const*> childErrors;
+    std::vector<BulkWriteReplyItem const*> childSuccesses;
 
     bool isRetryError = true;
     bool hasPendingChild = false;
@@ -230,6 +236,10 @@ void WriteOp::_updateOpState() {
                 isRetryError = false;
             }
         }
+
+        if (childOp.state == WriteOpState_Completed && childOp.bulkWriteReplyItem.has_value()) {
+            childSuccesses.push_back(&childOp.bulkWriteReplyItem.value());
+        }
     }
 
     if (!childErrors.empty() && isRetryError) {
@@ -242,6 +252,7 @@ void WriteOp::_updateOpState() {
         // but there are still ops that have not yet finished.
         return;
     } else {
+        _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
         _state = WriteOpState_Completed;
     }
 
@@ -255,13 +266,15 @@ void WriteOp::cancelWrites(const write_ops::WriteError* why) {
     _childOps.clear();
 }
 
-void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite) {
+void WriteOp::noteWriteComplete(const TargetedWrite& targetedWrite,
+                                boost::optional<const BulkWriteReplyItem&> bulkWriteReplyItem) {
     const WriteOpRef& ref = targetedWrite.writeOpRef;
     auto& childOp = _childOps[ref.second];
 
     _successfulShardSet.emplace(targetedWrite.endpoint.shardName);
     childOp.pendingWrite = nullptr;
     childOp.endpoint.reset(new ShardEndpoint(targetedWrite.endpoint));
+    childOp.bulkWriteReplyItem = bulkWriteReplyItem;
     childOp.state = WriteOpState_Completed;
     _updateOpState();
 }
@@ -286,6 +299,40 @@ void WriteOp::setOpError(const write_ops::WriteError& error) {
     _error->setIndex(_itemRef.getItemIndex());
     _state = WriteOpState_Error;
     // No need to updateOpState, set directly
+}
+
+boost::optional<BulkWriteReplyItem> WriteOp::combineBulkWriteReplyItems(
+    std::vector<BulkWriteReplyItem const*> replies) {
+    boost::optional<BulkWriteReplyItem> combinedReply;
+    for (auto reply : replies) {
+        if (!combinedReply) {
+            combinedReply = *reply;
+        } else {
+            if (auto n = reply->getN(); n.has_value()) {
+                combinedReply->setN(combinedReply->getN().get_value_or(0) + n.value());
+            }
+            if (auto nModified = reply->getNModified(); nModified.has_value()) {
+                combinedReply->setNModified(combinedReply->getNModified().get_value_or(0) +
+                                            nModified.value());
+            }
+
+            if (auto upserted = reply->getUpserted(); upserted.has_value()) {
+                tassert(7700400,
+                        "Unexpectedly got bulkWrite upserted replies from multiple shards for a "
+                        "single update operation",
+                        !combinedReply->getUpserted().has_value());
+                combinedReply->setUpserted(reply->getUpserted());
+            }
+        }
+    }
+    if (combinedReply) {
+        // The combined item will currently have its idx set to the idx the first reply item we
+        // processed had in the batch it was sent to a shard in. We need to correct it so the idx
+        // corresponds to the idx this write had in the client request.
+        combinedReply->setIdx(getWriteItem().getItemIndex());
+    }
+
+    return combinedReply;
 }
 
 void TargetedWriteBatch::addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize) {

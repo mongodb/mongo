@@ -113,6 +113,28 @@ export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModif
                ", Actual: " + tojsonMaybeTruncate(actualEvent));
 }
 
+/**
+ * Helper to check that there are no transaction operations past end of transaction event.
+ */
+export function assertEndOfTransaction(changes) {
+    const finishedTransactions = new Set();
+    for (const change of changes) {
+        assert.eq(change.hasOwnProperty("lsid"),
+                  change.hasOwnProperty("txnNumber"),
+                  "Found change eventy with inconsistent lsid and txnNumber: " + tojson(change));
+        if (change.hasOwnProperty("lsid")) {
+            const txnId = tojsononeline({lsid: change.lsid, txnNumber: change.txnNumber});
+            if (change.operationType == "endOfTransaction") {
+                finishedTransactions.add(txnId);
+            } else {
+                assert.eq(finishedTransactions.has(txnId),
+                          false,
+                          "Found change event past endOfTransaction: " + tojson(change));
+            }
+        }
+    }
+}
+
 export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.

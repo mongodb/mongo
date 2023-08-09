@@ -90,7 +90,8 @@ feature_flags:
     featureFlagVectorSearchPublicPreview:
       description: "Feature flag to enable vector search for public preview."
       cpp_varname: gFeatureFlagVectorSearchPublicPreview
-      default: false
+      default: true
+      version: 7.1
       # TODO SERVER-78294 Toggle this once we've backported the feature.
       shouldBeFCVGated: true
 

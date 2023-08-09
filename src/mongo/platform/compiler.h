@@ -179,6 +179,16 @@
  *    allocation function is a constant expression.
  *
  *
+ * MONGO_COMPILER_NO_UNIQUE_ADDRESS
+ *
+ *    Tells the compiler that this data member is permitted to be overlapped with other non-static
+ *    data members or base class subobjects of its class via subsituting in the
+ *    [[no_unique_address]] attribute. On Windows, the [[msvc::no_unique_address]] attribute is
+ *    substitued to prevent ABI-breaking changes and maintain backwards compatibility when
+ *    compiling with MSVC. Older versions of MSVC will not take action based on the attribute,
+ *    since the MSVC compiler ignores attributes it does not recognize.
+ *
+ *
  * MONGO_GSL_POINTER
  *
  *    Hints to the compiler that this type is a gsl::Pointer type,

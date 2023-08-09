@@ -295,6 +295,9 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
     if (request.getRequestReshardingResumeToken()) {
         return PlanExecutorPipeline::ResumableScanType::kOplogScan;
     }
+    if (request.getRequestResumeToken()) {
+        return PlanExecutorPipeline::ResumableScanType::kNaturalOrderScan;
+    }
     return PlanExecutorPipeline::ResumableScanType::kNone;
 }
 }  // namespace aggregation_request_helper

@@ -184,7 +184,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
     // this case, essentially letting the request dictate the state of the feature.
 
     // We received a tenantId from $tenant or the security token.
-    if (tenantId != boost::none) {
+    if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
                 // fallthrough

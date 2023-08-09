@@ -65,16 +65,17 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/column_store_encoder.h"
+#include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
+#include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
-#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
@@ -83,6 +84,7 @@
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -1383,9 +1385,8 @@ void ByteCode::traverseCsiCellValues(const CodeFragment* code, int64_t position)
     // If there are no doubly-nested arrays, we can avoid parsing the array info and use the simple
     // cursor over all values in the cell.
     if (!csiCell->splitCellView->hasDoubleNestedArrays) {
-        SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
-            csiCell->splitCellView->subcellValuesGenerator<value::ColumnStoreEncoder>(
-                csiCell->encoder);
+        SplitCellView::Cursor<ColumnStoreEncoder> cellCursor =
+            csiCell->splitCellView->subcellValuesGenerator<ColumnStoreEncoder>(csiCell->encoder);
 
         while (cellCursor.hasNext() && !isTrue) {
             const auto& val = cellCursor.nextValue();
@@ -1393,7 +1394,7 @@ void ByteCode::traverseCsiCellValues(const CodeFragment* code, int64_t position)
             isTrue = runLambdaPredicate(code, position);
         }
     } else {
-        SplitCellView::CursorWithArrayDepth<value::ColumnStoreEncoder> cellCursor{
+        SplitCellView::CursorWithArrayDepth<ColumnStoreEncoder> cellCursor{
             csiCell->pathDepth,
             csiCell->splitCellView->firstValuePtr,
             csiCell->splitCellView->arrInfo,
@@ -4926,7 +4927,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(Ari
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto [pcreTag, pcreValue] = value::makeNewPcreRegex(pattern, options);
+    auto [pcreTag, pcreValue] = makeNewPcreRegex(pattern, options);
     return {true, pcreTag, pcreValue};
 }
 
@@ -5240,7 +5241,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(Ar
     return {true, strType, strValue};
 }
 
-std::pair<value::SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityType arity) {
+std::pair<SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityType arity) {
     invariant(arity == 2 || arity == 3);
 
     auto [ssOwned, ssTag, ssVal] = getFromStack(0);
@@ -5641,7 +5642,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
         }
     }
 
-    auto cmp = value::SbePatternValueCmp(specTag, specVal, collator);
+    auto cmp = SbePatternValueCmp(specTag, specVal, collator);
 
     auto [resultTag, resultVal] = value::makeNewArray();
     auto resultView = value::getArrayView(resultVal);
@@ -6326,7 +6327,7 @@ int32_t aggTopBottomNAdd(value::Array* state,
                          size_t maxSize,
                          int32_t memUsage,
                          int32_t memLimit,
-                         const value::SortSpec* sortSpec,
+                         const SortSpec* sortSpec,
                          std::pair<value::TypeTags, value::Value> key,
                          std::pair<value::TypeTags, value::Value> output) {
     auto memAdded = [](std::pair<value::TypeTags, value::Value> key,

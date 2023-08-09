@@ -29,7 +29,7 @@ env.Library(
         'value_utils.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
+        '$BUILD_DIR/mongo/db/sbe_values',
     ],
 )
 

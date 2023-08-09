@@ -6,13 +6,14 @@
  *
  * The test runs commands that are not allowed with security token: bulkWrite.
  * @tags: [
- *   assumes_against_mongod_not_mongos,
  *   not_allowed_with_security_token,
  *   command_not_supported_in_serverless,
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
+ *   # TODO SERVER-79506 Remove this tag.
+ *   assumes_unsharded_collection,
  * ]
  */
 import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";

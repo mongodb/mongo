@@ -85,24 +85,35 @@ struct ValueBlock {
 };
 
 /**
- * A block that contains all same 'count' values.
+ * A block that is a run of repeated values.
  */
 class MonoBlock final : public ValueBlock {
 public:
-    // Only store tag & val for the first value in vectors to avoid extracting all values upfront.
-    MonoBlock(size_t count, TypeTags tag, Value val)
-        : _count(count), _deblockedTags(1, tag), _deblockedVals(1, val) {
+    MonoBlock(size_t count, TypeTags tag, Value val) : _count(count) {
         tassert(7962102, "The number of values must be > 0", count > 0);
+        std::tie(_tag, _val) = value::copyValue(tag, val);
+    }
+    MonoBlock(const MonoBlock& o) : _count(o._count) {
+        std::tie(_tag, _val) = value::copyValue(o._tag, o._val);
+    }
+    MonoBlock(MonoBlock&& o) : _tag(o._tag), _val(o._val), _count(o._count) {
+        o._tag = TypeTags::Nothing;
+        o._val = 0;
+    }
+    MonoBlock& operator=(const MonoBlock&) = delete;
+    MonoBlock& operator=(MonoBlock&&) = delete;
+    ~MonoBlock() {
+        releaseValue(_tag, _val);
     }
 
     std::unique_ptr<ValueBlock> clone() const override {
-        return std::make_unique<MonoBlock>(_count, _deblockedTags[0], _deblockedVals[0]);
+        return std::make_unique<MonoBlock>(*this);
     }
 
     DeblockedTagVals extract() override {
         if (_deblockedTags.size() != _count) {
-            _deblockedTags.resize(_count, _deblockedTags[0]);
-            _deblockedVals.resize(_count, _deblockedVals[0]);
+            _deblockedTags.resize(_count, _tag);
+            _deblockedVals.resize(_count, _val);
         }
 
         return {_count, _deblockedTags.data(), _deblockedVals.data()};
@@ -113,9 +124,16 @@ public:
     }
 
 private:
+    // Always owned.
+    TypeTags _tag;
+    Value _val;
+
     // To lazily extract the values, we need to remember the number of values which is supposed to
     // exist in this block.
     size_t _count;
+
+    // These are always a view onto '_tag' and '_val', materialized lazily if the caller requests
+    // it.
     std::vector<TypeTags> _deblockedTags;
     std::vector<Value> _deblockedVals;
 };

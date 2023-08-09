@@ -81,7 +81,10 @@ public:
         kWaitingForVotes,
         kWritingDecision,
         kWaitingForDecisionAcks,
+        kWritingEndOfTransaction,
         kDeletingCoordinatorDoc,
+
+        kLastStep = kDeletingCoordinatorDoc
     };
 
     /**
@@ -121,11 +124,17 @@ public:
     SharedSemiFuture<txn::CommitDecision> getDecision() const;
 
     /**
+     * Gets a Future that will contain the decision that the coordinator reaches. Note that this
+     * will never be signaled unless runCommit has been called.
+     */
+    SharedSemiFuture<txn::CommitDecision> onDecisionAcknowledged() const;
+
+    /**
      * Returns a future which can be listened on for when all the asynchronous activity spawned by
      * this coordinator has completed. It will always eventually be set and once set it is safe to
      * dispose of the TransactionCoordinator object.
      */
-    SharedSemiFuture<txn::CommitDecision> onCompletion();
+    SharedSemiFuture<void> onCompletion() const;
 
     /**
      * If runCommit has not yet been called, this will transition this coordinator object to
@@ -149,7 +158,7 @@ public:
     }
 
     void reportState(BSONObjBuilder& parent) const;
-    std::string toString(Step step) const;
+    static std::string toString(Step step);
 
     Step getStep() const;
 
@@ -167,11 +176,6 @@ private:
      * Logs the diagnostic string for a commit coordination.
      */
     void _logSlowTwoPhaseCommit(const txn::CoordinatorCommitDecision& decision);
-
-    /**
-     * Builds the diagnostic string for a commit coordination.
-     */
-    std::string _twoPhaseCommitInfoForLog(const txn::CoordinatorCommitDecision& decision) const;
 
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
@@ -221,9 +225,12 @@ private:
     bool _decisionDurable{false};
     SharedPromise<txn::CommitDecision> _decisionPromise;
 
-    // A list of all promises corresponding to futures that were returned to callers of
-    // onCompletion.
-    SharedPromise<txn::CommitDecision> _completionPromise;
+    // Set when the coordinator has received acks from all participants that they have successfully
+    // committed or aborted the transaction..
+    SharedPromise<txn::CommitDecision> _decisionAcknowledgedPromise;
+
+    // Set when the coordinator has finished all work and the object can be deleted.
+    SharedPromise<void> _completionPromise;
 
     // Store as unique_ptr to avoid a circular dependency between the TransactionCoordinator and
     // the TransactionCoordinatorMetricsObserver.

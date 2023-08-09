@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/framework.h"
 

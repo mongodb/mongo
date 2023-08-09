@@ -83,6 +83,13 @@ public:
     enum class CursorType { kRegular, kEmptyDocuments };
 
     /**
+     * Indicates whether we are tracking resume information from an oplog query (e.g. for
+     * change streams), from a non-oplog query (natural order scan using recordId information)
+     * or neither.
+     */
+    enum class ResumeTrackingType { kNone, kOplog, kNonOplog };
+
+    /**
      * Create a document source based on a passed-in PlanExecutor. 'exec' must be a yielding
      * PlanExecutor, and must be registered with the associated collection's CursorManager.
      *
@@ -95,7 +102,7 @@ public:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
-        bool trackOplogTimestamp = false);
+        ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
 
     const char* getSourceName() const override;
 
@@ -174,7 +181,7 @@ protected:
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          CursorType cursorType,
-                         bool trackOplogTimestamp = false);
+                         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
 
     GetNextResult doGetNext() final;
 
@@ -208,8 +215,10 @@ private:
 
         /**
          * Adds a new document to the batch.
+         * The resume token is used to track the resume token for this document for non-oplog
+         * queries.
          */
-        void enqueue(Document&& doc);
+        void enqueue(Document&& doc, boost::optional<BSONObj> resumeToken);
 
         /**
          * Removes the first document from the batch.
@@ -237,6 +246,11 @@ private:
             return _batchOfDocs.front();
         }
 
+        const BSONObj& peekFrontResumeToken() const {
+            invariant(_type == CursorType::kRegular);
+            return _resumeTokens.front();
+        }
+
     private:
         // If 'kEmptyDocuments', then dependency analysis has indicated that all we need to execute
         // the query is a count of the incoming documents.
@@ -244,6 +258,10 @@ private:
 
         // Used only if '_type' is 'kRegular'. A deque of the documents comprising the batch.
         std::deque<Document> _batchOfDocs;
+
+        // Used only if '_type' is 'kRegular' and this is a resumable query for a non-oplog
+        // collection
+        std::deque<BSONObj> _resumeTokens;
 
         // Used only if '_type' is 'kEmptyDocuments'. In this case, we don't need to keep the
         // documents themselves, only a count of the number of documents in the batch.
@@ -274,6 +292,12 @@ private:
      */
     void _updateOplogTimestamp();
 
+    /**
+     * If we are tracking resume tokens for non-oplog scans, this method updates our cached resume
+     * token.
+     */
+    void _updateNonOplogResumeToken();
+
     // Batches results returned from the underlying PlanExecutor.
     Batch _currentBatch;
 
@@ -293,12 +317,17 @@ private:
     // wipe out its own copy of the winning plan's statistics, so they need to be saved here.
     boost::optional<PlanExplainer::PlanStatsDetails> _winningPlanTrialStats;
 
-    // True if we are tracking the latest observed oplog timestamp, false otherwise.
-    bool _trackOplogTS = false;
+    // Whether we are tracking the latest observed oplog timestamp, the resume token from the
+    // (non-oplog) scan, or neither.
+    ResumeTrackingType _resumeTrackingType = ResumeTrackingType::kNone;
 
     // If we are tracking the latest observed oplog time, this is the latest timestamp seen in the
     // oplog. Otherwise, this is a null timestamp.
     Timestamp _latestOplogTimestamp;
+
+    // If we are tracking a non-oplog resume token, the resume token for the last document we
+    // returned, or the current resume token at EOF.
+    BSONObj _latestNonOplogResumeToken;
 
     // Specific stats for $cursor stage.
     DocumentSourceCursorStats _stats;

@@ -80,6 +80,17 @@ configs:
             a dedicated port (27017 by default) for routing requests.
         arg_vartype: Bool
         source: yaml
+    maintenanceMode:
+        description: >-
+            Allows this node to skip starting up sharding components or both replication and 
+            sharding components. This allows for performing maintenance on this node. To skip 
+            setting up just sharding components use --maintenanceMode=replicaSet. To skip setting 
+            up both sharding and replication components use --maintenanceMode=standalone.
+        arg_vartype: String 
+        source: [ cli, ini ]
+        conflicts: [configsvr, shardsvr, replSet]
+        validator:
+            callback: validateMaintenanceModeSetting
     'net.internalPort':
         source: [ cli, ini ]
         description: 'The port to accept connections from other servers, when acting as a router.'

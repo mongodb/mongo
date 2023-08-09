@@ -6,6 +6,7 @@ env.SConscript(
     dirs=[
         'mongobridge_tool',
         'mongo_tidy_checks',
+        'workload_simulation',
     ],
     exports=[
         'env',

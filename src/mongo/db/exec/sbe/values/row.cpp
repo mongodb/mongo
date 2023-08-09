@@ -47,9 +47,9 @@
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -724,9 +724,6 @@ int getApproximateSize(TypeTags tag, Value val) {
             // including the 'length' field itself.
             result += ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
-        case TypeTags::pcreRegex:
-            result += getPcreRegexView(val)->codeSize();
-            break;
         case TypeTags::timeZoneDB:
             // This type points to a block of memory that it doesn't own, so we don't acccount
             // for the size of this block of memory here.
@@ -736,27 +733,18 @@ int getApproximateSize(TypeTags tag, Value val) {
             // which it doesn't own, so we don't need to account for the timelib obj.
             result += sizeof(TimeZone);
             break;
-        case TypeTags::jsFunction:
-            result += getJsFunctionView(val)->getApproximateSize();
-            break;
-        case TypeTags::shardFilterer:
-            result += getShardFiltererView(val)->getApproximateSize();
-            break;
         case TypeTags::collator:
             // This type points to a block of memory that it doesn't own, so we don't acccount
             // for the size of this block of memory here.
             break;
+        case TypeTags::pcreRegex:
+        case TypeTags::jsFunction:
+        case TypeTags::shardFilterer:
         case TypeTags::ftsMatcher:
-            result += getFtsMatcherView(val)->getApproximateSize();
-            break;
         case TypeTags::sortSpec:
-            result += getSortSpecView(val)->getApproximateSize();
-            break;
         case TypeTags::makeObjSpec:
-            result += getMakeObjSpecView(val)->getApproximateSize();
-            break;
         case TypeTags::indexBounds:
-            result += size_estimator::estimate(*getIndexBoundsView(val));
+            result += getExtendedTypeOps(tag)->getApproximateSize(val);
             break;
         default:
             MONGO_UNREACHABLE;

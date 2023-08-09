@@ -230,7 +230,7 @@ let failPointStates = {
     },
     'hangBeforeSendingCommit': {
         'expectNumFailPoints': 2,
-        'expectedState': 'waitingForDecisionAck',
+        'expectedState': 'waitingForDecisionAcks',
         'expectedStepDurations': [
             'writingParticipantListMicros',
             'waitingForVotesMicros',

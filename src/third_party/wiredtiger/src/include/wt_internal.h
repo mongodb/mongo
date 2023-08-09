@@ -123,6 +123,8 @@ struct __wt_chunkcache_hashid;
 typedef struct __wt_chunkcache_hashid WT_CHUNKCACHE_HASHID;
 struct __wt_chunkcache_intermediate_hash;
 typedef struct __wt_chunkcache_intermediate_hash WT_CHUNKCACHE_INTERMEDIATE_HASH;
+struct __wt_chunkcache_pinned_list;
+typedef struct __wt_chunkcache_pinned_list WT_CHUNKCACHE_PINNED_LIST;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
 struct __wt_ckpt_snapshot;

@@ -47,4 +47,15 @@ inline Status validateShardingClusterRoleSetting(const std::string& value) {
     return Status::OK();
 }
 
+inline Status validateMaintenanceModeSetting(const std::string& value) {
+    constexpr auto kReplicaSet = "replicaSet"_sd;
+    constexpr auto kStandalone = "standalone"_sd;
+    if (kStandalone != value && kReplicaSet != value) {
+        return {ErrorCodes::BadValue,
+                "maintenanceMode must be one of 'replicaSet' or 'standalone'"};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+
+#include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"

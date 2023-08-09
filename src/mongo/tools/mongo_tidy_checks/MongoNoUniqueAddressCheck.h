@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,10 +26,27 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
-namespace mongo::sbe::value {
-const Object ColumnStoreEncoder::emptyObject{};
-const Array ColumnStoreEncoder::emptyArray{};
-}  // namespace mongo::sbe::value
+namespace mongo::tidy {
+
+/**
+ * MongoNoUniqueAddressCheck is a custom clang-tidy check for detecting the usage of
+ * [[no_unique_address]] in the source code.
+ *
+ * It extends ClangTidyCheck and overrides the registerMatchers and check functions. The
+ * registerMatches functions adds matchers to identify the usage of [[no_unique_address]], while
+ * the check function flags the matched occurrences for further analysis or modification.
+ */
+class MongoNoUniqueAddressCheck : public clang::tidy::ClangTidyCheck {
+
+public:
+    using ClangTidyCheck::ClangTidyCheck;
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+};
+
+}  // namespace mongo::tidy

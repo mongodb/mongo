@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,32 +29,37 @@
 
 #pragma once
 
-#include <utility>
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/tick_source_mock.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/collation/collator_interface.h"
+namespace mongo {
 
-namespace mongo::sbe::value {
-
-class SbePatternValueCmp {
+class MockPeriodicJob : public PeriodicRunner::ControllableJob {
 public:
-    SbePatternValueCmp();
+    explicit MockPeriodicJob(PeriodicRunner::PeriodicJob job);
 
-    /*
-    This constructor does not take ownership over 'specTag' and 'specVal', so it is the
-    responsibility of the caller to make sure that a given 'SbePatternValueCmp' does not outlive
-    the 'specTag' and the 'specVal'.
-    */
-    SbePatternValueCmp(TypeTags specTag, Value specVal, const CollatorInterface* collator);
+    void start() override;
+    void pause() override;
+    void resume() override;
+    void stop() override;
 
-    bool operator()(const std::pair<TypeTags, Value>& lhs,
-                    const std::pair<TypeTags, Value>& rhs) const;
+    Milliseconds getPeriod() const override;
+    void setPeriod(Milliseconds period) override;
 
-    BSONObj sortPattern;
-    bool useWholeValue = true;
-    const CollatorInterface* collator = nullptr;
-    bool reversed = false;
+    void run(Client* client);
+
+private:
+    PeriodicRunner::PeriodicJob _job;
 };
 
-}  // namespace mongo::sbe::value
+class MockPeriodicRunner : public PeriodicRunner {
+public:
+    JobAnchor makeJob(PeriodicJob job) override;
+
+    void run(Client* client);
+
+private:
+    std::shared_ptr<MockPeriodicJob> _job;
+};
+
+}  // namespace mongo

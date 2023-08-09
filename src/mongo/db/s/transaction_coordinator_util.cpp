@@ -61,6 +61,7 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
@@ -948,6 +949,23 @@ Future<void> sendDecisionToShard(ServiceContext* service,
                     // this node may have refreshed its ShardRegistry from a stale config secondary.
                     fassert(51068, false);
                 });
+        });
+}
+
+Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
+                                   const LogicalSessionId& lsid,
+                                   const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+                                   const std::vector<NamespaceString>& affectedNamespaces) {
+    if (!feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return Future<void>::makeReady();
+    }
+    return scheduler.scheduleWork(
+        [lsid, txnNumberAndRetryCounter, affectedNamespaces](OperationContext* opCtx) {
+            getTransactionCoordinatorWorkerCurOpRepository()->set(
+                opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingEndOfTransaction);
+            notifyChangeStreamOnEndOfTransaction(
+                opCtx, lsid, txnNumberAndRetryCounter.getTxnNumber(), affectedNamespaces);
         });
 }
 

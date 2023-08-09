@@ -110,11 +110,13 @@ export function RetryableInternalTransactionTest(collectionOptions = {}) {
                 remember: true,
                 startClean: false,
             });
+            st.rs0.waitForPrimary();
         } else if (mode == kTestMode.kFailover) {
             const oldPrimary = st.rs0.getPrimary();
             assert.commandWorked(
                 oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
             assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
+            st.rs0.waitForPrimary();
         }
     }
 

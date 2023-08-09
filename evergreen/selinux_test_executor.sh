@@ -47,7 +47,8 @@ function fail_and_exit_err() {
 function create_mongo_config() {
   echo "Writing /etc/mongod.conf for $k_test_path:"
   "$k_mongo" --nodb --norc --quiet --eval='
-        assert(load("'"$k_test_path"'"));
+        const {TestDefinition} = await import("'"$k_test_path"'");
+        assert(TestDefinition);
         const test = new TestDefinition();
         print(JSON.stringify(test.config, null, 2));
 
@@ -114,7 +115,8 @@ function exit_with_code() {
 
 function setup_test_definition() {
   "$k_mongo" --nodb --norc --quiet --eval='
-        assert(load("'"$k_test_path"'"));
+        const {TestDefinition} = await import("'"$k_test_path"'");
+        assert(TestDefinition);
         (() => {
             const test = new TestDefinition();
             print("Running setup() for '"$k_test_path"'");
@@ -125,7 +127,9 @@ function setup_test_definition() {
 
 function run_test() {
   "$k_mongo" --norc --gssapiServiceName=mockservice --eval='
-        assert(load("'"$k_test_path"'"));
+        const {TestDefinition} = await import("'"$k_test_path"'");
+        assert(TestDefinition);
+
         print("Running test '"$k_test_path"'");
 
         const test = new TestDefinition();

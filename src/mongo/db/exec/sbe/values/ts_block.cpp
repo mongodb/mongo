@@ -134,8 +134,16 @@ std::unique_ptr<ValueBlock> TsBlock::clone() const {
     return cpy;
 }
 
-const ValueBlock& TsCellBlock::getValueBlock() const {
-    return static_cast<const ValueBlock&>(_tsBlock);
+ValueBlock& TsCellBlock::getValueBlock() {
+    return _tsBlock;
+}
+
+std::unique_ptr<CellBlock> TsCellBlock::clone() const {
+    auto [cpyTag, cpyVal] = value::copyValue(_blockTag, _blockVal);
+    auto precomputedCount = _tsBlock.tryCount();
+    tassert(
+        7943900, "Assumes count() is available in O(1) time on TS Block type", precomputedCount);
+    return std::make_unique<TsCellBlock>(*precomputedCount, true /* owned */, cpyTag, cpyVal);
 }
 
 // The 'TsCellBlock' never owns the 'topLevelVal' and so it is always a view on the BSON provided

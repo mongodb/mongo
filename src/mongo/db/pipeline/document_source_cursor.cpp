@@ -87,12 +87,16 @@ bool DocumentSourceCursor::Batch::isEmpty() const {
     MONGO_UNREACHABLE;
 }
 
-void DocumentSourceCursor::Batch::enqueue(Document&& doc) {
+void DocumentSourceCursor::Batch::enqueue(Document&& doc, boost::optional<BSONObj> resumeToken) {
     switch (_type) {
         case CursorType::kRegular: {
             invariant(doc.isOwned());
             _batchOfDocs.push_back(std::move(doc));
             _memUsageBytes += _batchOfDocs.back().getApproximateSize();
+            if (resumeToken) {
+                _resumeTokens.push_back(*resumeToken);
+                dassert(_resumeTokens.size() == _batchOfDocs.size());
+            }
             break;
         }
         case CursorType::kEmptyDocuments: {
@@ -110,6 +114,10 @@ Document DocumentSourceCursor::Batch::dequeue() {
             _batchOfDocs.pop_front();
             if (_batchOfDocs.empty()) {
                 _memUsageBytes = 0;
+            }
+            if (!_resumeTokens.empty()) {
+                _resumeTokens.pop_front();
+                dassert(_resumeTokens.size() == _batchOfDocs.size());
             }
             return out;
         }
@@ -133,8 +141,10 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     }
 
     // If we are tracking the oplog timestamp, update our cached latest optime.
-    if (_trackOplogTS && _exec)
+    if (_resumeTrackingType == ResumeTrackingType::kOplog && _exec)
         _updateOplogTimestamp();
+    else if (_resumeTrackingType == ResumeTrackingType::kNonOplog && _exec)
+        _updateNonOplogResumeToken();
 
     if (_currentBatch.isEmpty())
         return GetNextResult::makeEOF();
@@ -179,7 +189,10 @@ void DocumentSourceCursor::loadBatch() {
         ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
 
         while ((state = _exec->getNextDocument(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
-            _currentBatch.enqueue(transformDoc(std::move(resultObj)));
+            boost::optional<BSONObj> resumeToken;
+            if (_resumeTrackingType == ResumeTrackingType::kNonOplog)
+                resumeToken = _exec->getPostBatchResumeToken();
+            _currentBatch.enqueue(transformDoc(std::move(resultObj)), std::move(resumeToken));
 
             // As long as we're waiting for inserts, we shouldn't do any batching at this level we
             // need the whole pipeline to see each document to see if we should stop waiting.
@@ -195,9 +208,10 @@ void DocumentSourceCursor::loadBatch() {
         invariant(state == PlanExecutor::IS_EOF);
 
         // Keep the inner PlanExecutor alive if the cursor is tailable, since more results may
-        // become available in the future, or if we are tracking the latest oplog timestamp, since
-        // we will need to retrieve the last timestamp the executor observed before hitting EOF.
-        if (_trackOplogTS || pExpCtx->isTailableAwaitData()) {
+        // become available in the future, or if we are tracking the latest oplog resume inforation,
+        // since we will need to retrieve the resume information the executor observed before
+        // hitting EOF.
+        if (_resumeTrackingType != ResumeTrackingType::kNone || pExpCtx->isTailableAwaitData()) {
             _exec->saveState();
             return;
         }
@@ -223,6 +237,17 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
 
     // If we have no more results to return, advance to the latest oplog timestamp.
     _latestOplogTimestamp = _exec->getLatestOplogTimestamp();
+}
+
+void DocumentSourceCursor::_updateNonOplogResumeToken() {
+    // If we are about to return a result, set our resume token to the one for that result.
+    if (!_currentBatch.isEmpty()) {
+        _latestNonOplogResumeToken = _currentBatch.peekFrontResumeToken();
+        return;
+    }
+
+    // If we have no more results to return, advance to the latest executor resume token.
+    _latestNonOplogResumeToken = _exec->getPostBatchResumeToken();
 }
 
 void DocumentSourceCursor::recordPlanSummaryStats() {
@@ -319,8 +344,10 @@ void DocumentSourceCursor::cleanupExecutor() {
 }
 
 BSONObj DocumentSourceCursor::getPostBatchResumeToken() const {
-    if (_trackOplogTS) {
+    if (_resumeTrackingType == ResumeTrackingType::kOplog) {
         return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
+    } else if (_resumeTrackingType == ResumeTrackingType::kNonOplog) {
+        return _latestNonOplogResumeToken;
     }
     return BSONObj{};
 }
@@ -338,14 +365,16 @@ DocumentSourceCursor::DocumentSourceCursor(
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
-    bool trackOplogTimestamp)
+    ResumeTrackingType resumeTrackingType)
     : DocumentSource(kStageName, pCtx),
       _currentBatch(cursorType),
       _exec(std::move(exec)),
-      _trackOplogTS(trackOplogTimestamp),
+      _resumeTrackingType(resumeTrackingType),
       _queryFramework(_exec->getQueryFramework()) {
-    // It is illegal for both 'kEmptyDocuments' and 'trackOplogTimestamp' to be set.
-    invariant(!(cursorType == CursorType::kEmptyDocuments && trackOplogTimestamp));
+    // It is illegal for both 'kEmptyDocuments' to be set and _resumeTrackingType to be other than
+    // 'kNone'.
+    invariant(cursorType != CursorType::kEmptyDocuments ||
+              resumeTrackingType == ResumeTrackingType::kNone);
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
@@ -378,9 +407,9 @@ intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,
-    bool trackOplogTimestamp) {
+    ResumeTrackingType resumeTrackingType) {
     intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(
-        collections, std::move(exec), pExpCtx, cursorType, trackOplogTimestamp));
+        collections, std::move(exec), pExpCtx, cursorType, resumeTrackingType));
     return source;
 }
 }  // namespace mongo

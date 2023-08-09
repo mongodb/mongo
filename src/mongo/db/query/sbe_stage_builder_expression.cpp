@@ -56,6 +56,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/util/pcre.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
@@ -4068,7 +4069,7 @@ private:
                 }
 
                 // Create the compiled Regex from constant pattern and options.
-                auto [regexTag, regexVal] = sbe::value::makeNewPcreRegex(*pattern, options);
+                auto [regexTag, regexVal] = sbe::makeNewPcreRegex(*pattern, options);
                 auto compiledRegex = makeABTConstant(regexTag, regexVal);
                 return makeRegexFunctionCall(std::move(compiledRegex));
             }

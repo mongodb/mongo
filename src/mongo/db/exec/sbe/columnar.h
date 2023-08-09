@@ -39,7 +39,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
+#include "mongo/db/exec/sbe/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/storage/column_store.h"
@@ -57,7 +57,7 @@ struct TranslatedCell {
     StringData arrInfo;
     PathView path;
 
-    SplitCellView::Cursor<value::ColumnStoreEncoder> cursor;
+    SplitCellView::Cursor<ColumnStoreEncoder> cursor;
 
     std::pair<value::TypeTags, value::Value> nextValue() {
         auto next = cursor.nextValue();
@@ -101,7 +101,7 @@ namespace value {
  */
 struct CsiCell {
     SplitCellView* splitCellView = nullptr;
-    sbe::value::ColumnStoreEncoder* encoder = nullptr;
+    sbe::ColumnStoreEncoder* encoder = nullptr;
     FieldIndex pathDepth = 0;
 };
 }  // namespace value

@@ -19,8 +19,6 @@ import buildscripts.resmokelib.parser as _parser
 
 _parser.set_run_options()
 
-# pylint: disable=protected-access
-
 
 def create_tests_by_task_mock(n_tasks, n_tests):
     return {
@@ -575,3 +573,19 @@ class TestYamlBurnInExecutor(unittest.TestCase):
         results = yaml.safe_load(yaml_raw)
         self.assertEqual(n_tasks, len(results["discovered_tasks"]))
         self.assertEqual(n_tests, len(results["discovered_tasks"][0]["test_list"]))
+
+
+class TestBurnInTestsOutput(unittest.TestCase):
+    def test_valid_yaml(self):
+        process = subprocess.run([
+            sys.executable, "buildscripts/burn_in_tests.py", "run", "--build-variant",
+            "enterprise-rhel-80-64-bit-dynamic-classic-engine", "--yaml", "--evg-project-file",
+            "etc/evergreen.yml"
+        ], text=True, capture_output=True)
+        output = process.stdout
+        self.assertEquals(0, process.returncode)
+
+        try:
+            yaml.safe_load(output)
+        except Exception:
+            self.fail(msg="burn_in_tests.py does not output valid yaml.")

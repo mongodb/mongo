@@ -197,6 +197,7 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
         auto findCommand = query_request_helper::makeFromFindCommand(
             toSend,
             static_cast<const NamespaceString&>(NamespaceString::kLogicalSessionsNamespace),
+            SerializationContext::stateDefault(),
             apiStrict);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;

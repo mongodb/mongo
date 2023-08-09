@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -407,7 +407,7 @@ std::pair<value::TypeTags, value::Value> createArray(Args... args) {
 
 TEST_F(SbeValueTest, SortSpecCompareSingleValueAsc) {
     auto sortSpecBson = BSON("x" << 1);
-    value::SortSpec sortSpec(sortSpecBson);
+    SortSpec sortSpec(sortSpecBson);
 
     auto [tag1, val1] = std::make_pair(value::TypeTags::NumberInt32, 1);
     auto [tag2, val2] = std::make_pair(value::TypeTags::NumberInt32, 2);
@@ -427,7 +427,7 @@ TEST_F(SbeValueTest, SortSpecCompareSingleValueAsc) {
 
 TEST_F(SbeValueTest, SortSpecCompareSingleValueDsc) {
     auto sortSpecBson = BSON("x" << -1);
-    value::SortSpec sortSpec(sortSpecBson);
+    SortSpec sortSpec(sortSpecBson);
 
     auto [tag1, val1] = std::make_pair(value::TypeTags::NumberInt32, 1);
     auto [tag2, val2] = std::make_pair(value::TypeTags::NumberInt32, 2);
@@ -447,7 +447,7 @@ TEST_F(SbeValueTest, SortSpecCompareSingleValueDsc) {
 
 TEST_F(SbeValueTest, SortSpecCompareCollation) {
     auto sortSpecBson = BSON("x" << 1);
-    value::SortSpec sortSpec(sortSpecBson);
+    SortSpec sortSpec(sortSpecBson);
 
     auto [tag1, val1] = value::makeBigString("12345678");
     value::ValueGuard guard1{tag1, val1};
@@ -472,7 +472,7 @@ TEST_F(SbeValueTest, SortSpecCompareCollation) {
 
 TEST_F(SbeValueTest, SortSpecCompareMultiValueMix) {
     auto sortSpecBson = BSON("x" << 1 << "y" << -1);
-    value::SortSpec sortSpec(sortSpecBson);
+    SortSpec sortSpec(sortSpecBson);
 
     auto [tag11, val11] =
         createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));
@@ -507,7 +507,7 @@ TEST_F(SbeValueTest, SortSpecCompareMultiValueMix) {
 
 TEST_F(SbeValueTest, SortSpecCompareInvalid) {
     auto sortSpecBson = BSON("x" << 1 << "y" << -1);
-    value::SortSpec sortSpec(sortSpecBson);
+    SortSpec sortSpec(sortSpecBson);
 
     auto [tag1, val1] =
         createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));

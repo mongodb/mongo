@@ -78,6 +78,8 @@ struct ServerGlobalParams {
 #endif
     };
 
+    enum MaintenanceMode { None, ReplicaSetMode, StandaloneMode };
+
     static std::string getPortSettingHelpText();
 
     std::vector<std::string> bind_ips;  // --bind_ip
@@ -89,6 +91,7 @@ struct ServerGlobalParams {
     AtomicWord<bool> quiet{false};  // --quiet
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
+    MaintenanceMode maintenanceMode;              // --maintenanceMode
 
     int internalPort = ShardServerPort;  // --internalPort
 
