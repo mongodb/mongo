@@ -234,17 +234,7 @@ void JournalFlusher::resume() {
 }
 
 void JournalFlusher::waitForJournalFlush() {
-    while (true) {
-        try {
-            _waitForJournalFlushNoRetry();
-            break;
-        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
-            // Do nothing and let the while-loop retry the operation.
-            LOGV2_DEBUG(4814901,
-                        3,
-                        "Retrying waiting for durability interrupted by replication state change");
-        }
-    }
+    _waitForJournalFlushNoRetry();
 }
 
 void JournalFlusher::interruptJournalFlusherForReplStateChange() {
