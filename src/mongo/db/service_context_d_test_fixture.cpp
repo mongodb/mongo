@@ -106,6 +106,14 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     auto const serviceContext = getServiceContext();
 
+    // Authorization manager override must occur before creating new threads like JournalFlusher
+    if (options._mockAuthzExternalState) {
+        _authzExternalState = options._mockAuthzExternalState.get();
+        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
+            serviceContext, std::move(options._mockAuthzExternalState));
+        AuthorizationManager::set(serviceContext, std::move(uniqueAuthzManager));
+    }
+
     if (options._useMockClock) {
         // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
         // ServiceContextMongoDTest uses the system clock. Tests moved from dbtests to unittests may
