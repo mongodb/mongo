@@ -343,7 +343,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         uassert(5342501,
                 str::stream() << "Collection uuid" << getSourceUuid()
                               << " already exists but does not belong to the same database",
-                collection->ns().db_deprecated() == _sourceNss.db_deprecated());
+                collection->ns().isEqualDb(_sourceNss));
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "Tenant '" << _tenantId << "': collection '"
                               << collection->ns().toStringForErrorMsg()

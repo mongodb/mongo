@@ -1301,8 +1301,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
         // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
         // that we can monitor for the addition of new shards inline with real events.
-        if (hasChangeStream &&
-            expCtx->ns.db_deprecated() != NamespaceString::kConfigsvrShardsNamespace.db()) {
+        if (hasChangeStream && !expCtx->ns.isEqualDb(NamespaceString::kConfigsvrShardsNamespace)) {
             cursors.emplace_back(openChangeStreamNewShardMonitor(expCtx, shardRegistryReloadTime));
         }
     }

@@ -1055,7 +1055,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // Support alternative $lookup from config.cache.chunks* namespaces.
     //
     // Do not include the tenantId in serialized 'from' namespace.
-    auto fromValue = (pExpCtx->ns.db_deprecated() == _fromNs.db_deprecated())
+    auto fromValue = pExpCtx->ns.isEqualDb(_fromNs)
         ? Value(opts.serializeIdentifier(_fromNs.coll()))
         : Value(Document{
               {"db",

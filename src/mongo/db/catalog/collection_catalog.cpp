@@ -714,7 +714,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
         return Status::OK();
     }
 
-    if (viewName.db_deprecated() != viewOn.db_deprecated())
+    if (!viewName.isEqualDb(viewOn))
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
@@ -757,7 +757,7 @@ Status CollectionCatalog::modifyView(
     invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
-    if (viewName.db_deprecated() != viewOn.db_deprecated())
+    if (!viewName.isEqualDb(viewOn))
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 

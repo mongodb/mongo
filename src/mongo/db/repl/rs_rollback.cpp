@@ -438,8 +438,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //            ns: "foo.x"
                 //        }
 
-                string ns = nss.db_deprecated().toString() + '.' + first.str();
-
                 string indexName;
                 auto status = bsonExtractStringField(obj, "index", &indexName);
                 if (!status.isOK()) {

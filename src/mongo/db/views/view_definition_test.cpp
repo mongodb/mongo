@@ -106,10 +106,9 @@ TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
                                              copiedView.defaultCollator()));
 }
 
-DEATH_TEST_REGEX(
-    ViewDefinitionTest,
-    SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
-    R"#(Invariant failure.*_viewNss.db_deprecated\(\) == viewOnNss.db_deprecated\(\))#") {
+DEATH_TEST_REGEX(ViewDefinitionTest,
+                 SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
+                 R"#(Invariant failure.*_viewNss.isEqualDb(viewOnNss)#") {
     ViewDefinition viewDef(
         viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     NamespaceString badViewOn =

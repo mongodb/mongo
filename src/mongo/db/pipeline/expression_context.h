@@ -220,8 +220,8 @@ public:
     /**
      * Returns true if this is a collectionless aggregation on the specified database.
      */
-    bool isDBAggregation(StringData dbName) const {
-        return ns.db_deprecated() == dbName && ns.isCollectionlessAggregateNS();
+    bool isDBAggregation(const NamespaceString& other) const {
+        return ns.isEqualDb(other) && ns.isCollectionlessAggregateNS();
     }
 
     /**

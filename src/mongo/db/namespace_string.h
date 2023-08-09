@@ -823,6 +823,13 @@ public:
             StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
+    /**
+     * Use to compare the TenantId and `db` part of a NamespaceString.
+     */
+    bool isEqualDb(const NamespaceString& other) const {
+        return tenantId() == other.tenantId() && db_deprecated() == other.db_deprecated();
+    }
+
     friend bool operator==(const NamespaceString& lhs, const NamespaceString& rhs) {
         return lhs._data == rhs._data;
     }
