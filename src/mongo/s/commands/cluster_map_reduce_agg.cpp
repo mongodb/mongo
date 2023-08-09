@@ -235,33 +235,16 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                involvedNamespaces,
                                                                false,   // hasChangeStream
                                                                false,   // startsWithDocuments
-                                                               true,    // allowedToPassthrough
+                                                               false,   // allowedToPassthrough
                                                                false);  // perShardCursor
     try {
         switch (targeter.policy) {
-            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
-                // For the passthrough case, the targeter will not build a pipeline since its not
-                // needed in the normal aggregation path. For this translation, though, we need to
-                // build the pipeline to serialize and send to the primary shard.
-                auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
-                uassertStatusOK(cluster_aggregation_planner::runPipelineOnPrimaryShard(
-                    expCtx,
-                    namespaces,
-                    targeter.cri->cm,
-                    verbosity,
-                    std::move(serialized),
-                    privileges,
-                    expCtx->eligibleForSampling(),
-                    &tempResults));
-                break;
-            }
-
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                 kMongosRequired: {
                 // Pipelines generated from mapReduce should never be required to run on mongos.
                 MONGO_UNREACHABLE_TASSERT(31291);
             }
-
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough:
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
                 if (verbosity) {
                     explain_common::generateServerInfo(&result);
