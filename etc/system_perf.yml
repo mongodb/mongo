@@ -78,7 +78,7 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
-    # - mongo
+    - mongo
     - dsi
     - genny
     - workloads
