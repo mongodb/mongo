@@ -552,7 +552,7 @@ public:
             // virtual collections in the new 'opCtx'.
             ExternalDataSourceScopeGuard::updateOperationContext(cursorPin.getCursor(), opCtx);
 
-            boost::optional<HandleTransactionResourcesFromCursor> txnResourcesHandler;
+            boost::optional<HandleTransactionResourcesFromStasher> txnResourcesHandler;
 
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] {

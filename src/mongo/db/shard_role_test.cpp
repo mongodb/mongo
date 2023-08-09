@@ -1787,7 +1787,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
         ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
     });
 
-    HandleTransactionResourcesFromCursor handler(opCtx(), cursorPin.getCursor());
+    HandleTransactionResourcesFromStasher handler(opCtx(), cursorPin.getCursor());
 
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));

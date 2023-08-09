@@ -147,7 +147,7 @@ struct ClientCursorParams {
  * caller as "no timeout", it will be automatically destroyed by its cursor manager after a period
  * of inactivity.
  */
-class ClientCursor : public Decorable<ClientCursor> {
+class ClientCursor : public Decorable<ClientCursor>, public TransactionResourcesStasher {
     ClientCursor(const ClientCursor&) = delete;
     ClientCursor& operator=(const ClientCursor&) = delete;
 
@@ -353,11 +353,11 @@ public:
     }
 
     // Releases the stashed TransactionResources to the caller.
-    StashedTransactionResources releaseStashedTransactionResources() {
+    StashedTransactionResources releaseStashedTransactionResources() override {
         return std::move(_transactionResources);
     }
 
-    void stashTransactionResources(StashedTransactionResources resources) {
+    void stashTransactionResources(StashedTransactionResources resources) override {
         _transactionResources = std::move(resources);
     }
 
