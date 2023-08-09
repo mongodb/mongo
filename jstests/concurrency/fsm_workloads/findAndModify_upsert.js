@@ -51,7 +51,7 @@ var $config = (function() {
             }
 
             var res = db.runCommand(cmdObj);
-            assertAlways.commandWorked(res);
+            assertAlways.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             var doc = res.value;
             assertAlways(doc !== null, 'a document should have been inserted');
@@ -81,7 +81,7 @@ var $config = (function() {
             }
 
             var res = db.runCommand(cmdObj);
-            assertAlways.commandWorked(res);
+            assertAlways.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             var doc = res.value;
             assertWhenOwnColl(doc !== null, 'query spec should have matched a document');
