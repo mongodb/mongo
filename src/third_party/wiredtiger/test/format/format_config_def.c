@@ -323,6 +323,8 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"stress.checkpoint_prepare", "stress checkpoint prepare", C_BOOL, 2, 0, 0,
     V_GLOBAL_STRESS_CHECKPOINT_PREPARE},
 
+  {"stress.compact_slow", "stress compact", C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_COMPACT_SLOW},
+
   {"stress.evict_reposition", "stress evict reposition", C_BOOL, 2, 0, 0,
     V_GLOBAL_STRESS_EVICT_REPOSITION},
 

@@ -299,6 +299,8 @@ CONFIG configuration_list[] = {
 
 {"stress.checkpoint_prepare", "stress checkpoint prepare", C_BOOL, 2, 0, 0}
 
+{"stress.compact_slow", "stress compact", C_BOOL, 2, 0, 0}
+
 {"stress.evict_reposition", "stress evict reposition", C_BOOL, 2, 0, 0}
 
 {"stress.failpoint_eviction_split", "stress failpoint eviction split", C_BOOL, 30, 0, 0}
