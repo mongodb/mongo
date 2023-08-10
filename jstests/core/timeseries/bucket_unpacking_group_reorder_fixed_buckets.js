@@ -17,6 +17,7 @@
  */
 
 import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 (function() {
 "use strict";
@@ -29,10 +30,13 @@ const accField = "b";
 const metaField = "mt";
 
 function checkResults({pipeline, rewriteOccur = true, expectedDocs, validateFullExplain}) {
-    if (rewriteOccur) {
-        checkExplainForRewrite(pipeline);
-    } else {
-        checkExplainForNoRewrite(pipeline, validateFullExplain);
+    // Only check the explain output if SBE is not enabled. SBE changes the explain output.
+    if (!checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"])) {
+        if (rewriteOccur) {
+            checkExplainForRewrite(pipeline);
+        } else {
+            checkExplainForNoRewrite(pipeline, validateFullExplain);
+        }
     }
     let results = coll.aggregate(pipeline).toArray();
     if (expectedDocs) {
