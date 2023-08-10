@@ -61,7 +61,6 @@ env.Library(
     target='server_base',
     source=[
         'basic_types.idl',
-        'catalog_shard_feature_flag.idl',
         'cluster_role.cpp',
         'feature_compatibility_version_document.idl',
         'feature_compatibility_version_parser.cpp',
