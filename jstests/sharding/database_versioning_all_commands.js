@@ -1,6 +1,19 @@
 /**
  * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
  * the commands match the specification.
+ *
+ * Each command must have exactly one corresponding test defined. Each defined test case must
+ * correspond to an existing command. The allowable fields for the test cases are as follows:
+ *
+ *      - 'run': This is the specified test case that will be executed for each command.
+ *      - 'skip': Use this field to skip the execution of the test case, along with a justification.
+ *      It's important to note that this field doesn't bypass command validation; it only skips the
+ *      actual run.
+ *      - 'explain': This field is optional and is used to test the explain command on the specified
+ *      test case.
+ *      - 'conditional': If you set this field to true, the test case will skip the validation that
+ *      ensures all test cases match existing commands. This is useful for commands that only exist
+ *      in enterprise modules, for instance.
  */
 import {
     commandsAddedToMongosSinceLastLTS,
@@ -403,7 +416,7 @@ let testCases = {
             },
         }
     },
-    createSearchIndexes: {skip: "executes locally on mongos"},
+    createSearchIndexes: {skip: "executes locally on mongos", conditional: true},
     createRole: {skip: "always targets the config server"},
     createUnsplittableCollection:
         {skip: "Test command that which functionality will be integrated into createCollection"},
@@ -470,7 +483,7 @@ let testCases = {
         }
     },
     dropRole: {skip: "always targets the config server"},
-    dropSearchIndex: {skip: "executes locally on mongos"},
+    dropSearchIndex: {skip: "executes locally on mongos", conditional: true},
     dropUser: {skip: "always targets the config server"},
     echo: {skip: "does not forward command to primary shard"},
     enableSharding: {skip: "does not forward command to primary shard"},
@@ -584,7 +597,7 @@ let testCases = {
             },
         }
     },
-    listSearchIndexes: {skip: "executes locally on mongos"},
+    listSearchIndexes: {skip: "executes locally on mongos", conditional: true},
     listShards: {skip: "does not forward command to primary shard"},
     logApplicationMessage: {skip: "not on a user database", conditional: true},
     logMessage: {skip: "not on a user database"},
@@ -631,8 +644,10 @@ let testCases = {
     moveRange: {skip: "does not forward command to primary shard"},
     multicast: {skip: "does not forward command to primary shard"},
     netstat: {skip: "executes locally on mongos (not sent to any remote node)"},
-    oidcListKeys: {skip: "executes locally on mongos (not sent to any remote node)"},
-    oidcRefreshKeys: {skip: "executes locally on mongos (not sent to any remote node)"},
+    oidcListKeys:
+        {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
+    oidcRefreshKeys:
+        {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
     ping: {skip: "executes locally on mongos (not sent to any remote node)"},
     planCacheClear: {
         run: {
@@ -769,7 +784,7 @@ let testCases = {
         }
     },
     updateRole: {skip: "always targets the config server"},
-    updateSearchIndex: {skip: "executes locally on mongos"},
+    updateSearchIndex: {skip: "executes locally on mongos", conditional: true},
     updateUser: {skip: "always targets the config server"},
     updateZoneKeyRange: {skip: "not on a user database"},
     usersInfo: {skip: "always targets the config server"},

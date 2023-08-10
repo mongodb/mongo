@@ -660,7 +660,6 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "getShardVersion",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
-        {commandName: "getnonce", skip: "removed in v6.3"},
         {
             commandName: "grantPrivilegesToRole",
             run: {

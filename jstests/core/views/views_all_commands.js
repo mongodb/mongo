@@ -330,7 +330,6 @@ let viewsCommandTests = {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         }
     },
-    createSearchIndex: {skip: "present in v6.3 but renamed to createSearchIndexes in v7.0"},
     createSearchIndexes: {skip: isUnrelated},
     createUnsplittableCollection: {skip: isUnrelated},
     createUser: {
@@ -471,7 +470,6 @@ let viewsCommandTests = {
         isAdminCommand: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
-    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: isAnInternalCommand},
     grantPrivilegesToRole: {skip: "tested in auth/commands_user_defined_roles.js"},
     grantRolesToRole: {skip: isUnrelated},

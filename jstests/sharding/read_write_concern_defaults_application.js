@@ -388,7 +388,6 @@ let testCases = {
         shardedTargetsConfigServer: true,
         useLogs: true,
     },
-    createSearchIndex: {skip: "present in v6.3 but renamed to createSearchIndexes in v7.0"},
     createSearchIndexes: {skip: "does not accept read or write concern"},
     createUnsplittableCollection: {skip: "does not accept read or write concern"},
     createUser: {
@@ -538,7 +537,6 @@ let testCases = {
     getQueryableEncryptionCountInfo: {skip: "not profiled or logged"},
     getShardMap: {skip: "internal command"},
     getShardVersion: {skip: "internal command"},
-    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {
         setUp: function(conn) {

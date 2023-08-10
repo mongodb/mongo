@@ -3,45 +3,15 @@
 // to run on same- and mixed-version suites, we allow these commands to have a test defined without
 // always existing on the servers being used.
 export const commandsRemovedFromMongodSinceLastLTS = [
-    "_configsvrCommitChunkMerge",
-    "_configsvrCreateCollection",
-    "_configsvrMoveChunk",
-    "_configsvrRepairShardedCollectionChunksHistory",
-    "_configsvrTransitionToCatalogShard",
     "_configsvrRenameCollectionMetadata",
     "_shardsvrDropCollectionIfUUIDNotMatching",
-    "mapreduce.shardedfinish",
-    "getLastError",
-    "driverOIDTest",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongod. We will allow these commands to have a
 // test defined without always existing on the mongod being used.
 export const commandsAddedToMongodSinceLastLTS = [
-    "clusterAbortTransaction",
-    "clusterAggregate",
     "clusterBulkWrite",
-    "clusterCommitTransaction",
-    "clusterCount",
-    "clusterDelete",
-    "clusterFind",
-    "clusterGetMore",
-    "clusterInsert",
-    "clusterUpdate",
-    "createSearchIndexes",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "dropSearchIndex",      // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "getChangeStreamState",
-    "getClusterParameter",
-    "listDatabasesForAllTenants",
-    "listSearchIndexes",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "oidcListKeys",
-    "oidcRefreshKeys",
-    "rotateCertificates",
-    "setChangeStreamState",
-    "setClusterParameter",
-    "setQuerySettings",     // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "removeQuerySettings",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
-    "setUserWriteBlockMode",
-    "updateSearchIndex",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
+    "setQuerySettings",
+    "removeQuerySettings",
 ];

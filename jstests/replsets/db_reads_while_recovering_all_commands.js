@@ -284,7 +284,6 @@ const allCommands = {
     getParameter: {skip: isNotAUserDataRead},
     getShardMap: {skip: isNotAUserDataRead},
     getShardVersion: {skip: isPrimaryOnly},
-    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: isAnInternalCommand},
     grantPrivilegesToRole: {skip: isPrimaryOnly},
     grantRolesToRole: {skip: isPrimaryOnly},
