@@ -1562,6 +1562,13 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         return;
     }
 
+    // At this point, the target collection and config.system.indexBuilds locks are acquired, no
+    // direct lock acquisitions are expected and there are no interrupt checkpoints. However,
+    // OpObservers may introduce lock acquisitions (i.e. sharding state locks) and cause an
+    // interruption during cleanup. For correctness, we must perform these final writes. Temporarily
+    // disable interrupts.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+
     CollectionWriter coll(opCtx, replState->collectionUUID);
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     auto nss = coll->ns();
