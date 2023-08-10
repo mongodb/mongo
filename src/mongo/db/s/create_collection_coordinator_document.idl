@@ -49,7 +49,11 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kAcquireCSOnCoordinator: "acquireCSOnCoordinator"
+            kTranslateRequest: "translateRequest"
+            kAcquireCSOnParticipants: "acquireCSOnParticipants"
             kCommit: "commit"
+            kReleaseAllCS: "releaseAllCS"
 
 structs:
     TranslatedRequestParams:
