@@ -2354,74 +2354,22 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
 }
 
 BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
-    // TODO: SERVER-73851 replace with commented code once mongocrypt supports v2 decryption
-    // auto crypt = createMongoCrypt();
+    auto crypt = createMongoCrypt();
 
-    // SymmetricKey& key = keyVault->getKMSLocalKey();
-    // auto binary = MongoCryptBinary::createFromCDR(ConstDataRange(key.getKey(),
-    // key.getKeySize())); uassert(7132217,
-    //         "mongocrypt_setopt_kms_provider_local failed",
-    //         mongocrypt_setopt_kms_provider_local(crypt.get(), binary));
+    SymmetricKey& key = keyVault->getKMSLocalKey();
+    auto binary = MongoCryptBinary::createFromCDR(ConstDataRange(key.getKey(), key.getKeySize()));
+    uassert(7132217,
+            "mongocrypt_setopt_kms_provider_local failed",
+            mongocrypt_setopt_kms_provider_local(crypt.get(), binary));
 
-    // uassert(7132218, "mongocrypt_init failed", mongocrypt_init(crypt.get()));
+    uassert(7132218, "mongocrypt_init failed", mongocrypt_init(crypt.get()));
 
-    // UniqueMongoCryptCtx ctx(mongocrypt_ctx_new(crypt.get()));
-    // auto input = MongoCryptBinary::createFromBSONObj(doc);
-    // mongocrypt_ctx_decrypt_init(ctx.get(), input);
-    // BSONObj obj = runStateMachineForDecryption(ctx.get(), keyVault);
+    UniqueMongoCryptCtx ctx(mongocrypt_ctx_new(crypt.get()));
+    auto input = MongoCryptBinary::createFromBSONObj(doc);
+    mongocrypt_ctx_decrypt_init(ctx.get(), input);
+    BSONObj obj = runStateMachineForDecryption(ctx.get(), keyVault);
 
-    // return obj;
-
-    BSONObjBuilder builder;
-
-    auto obj = transformBSON(
-        doc, [keyVault](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldPath) {
-            auto [encryptedType, subCdr] = fromEncryptedConstDataRange(cdr);
-            if (encryptedType == EncryptedBinDataType::kFLE2EqualityIndexedValueV2 ||
-                encryptedType == EncryptedBinDataType::kFLE2RangeIndexedValueV2) {
-                std::vector<uint8_t> userCipherText;
-                BSONType type;
-                if (encryptedType == EncryptedBinDataType::kFLE2EqualityIndexedValueV2) {
-                    auto indexKeyId =
-                        uassertStatusOK(FLE2IndexedEqualityEncryptedValueV2::readKeyId(subCdr));
-                    auto indexKey = keyVault->getIndexKeyById(indexKeyId);
-                    auto serverToken =
-                        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
-                            indexKey.key);
-                    userCipherText = uassertStatusOK(
-                        FLE2IndexedEqualityEncryptedValueV2::parseAndDecryptCiphertext(serverToken,
-                                                                                       subCdr));
-                    type =
-                        uassertStatusOK(FLE2IndexedEqualityEncryptedValueV2::readBsonType(subCdr));
-                } else {
-                    auto indexKeyId =
-                        uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::readKeyId(subCdr));
-                    auto indexKey = keyVault->getIndexKeyById(indexKeyId);
-                    auto serverToken =
-                        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
-                            indexKey.key);
-                    userCipherText =
-                        uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
-                            serverToken, subCdr));
-                    type = uassertStatusOK(FLE2IndexedRangeEncryptedValueV2::readBsonType(subCdr));
-                }
-
-                auto userKeyId = uassertStatusOK(KeyIdAndValue::readKeyId(userCipherText));
-                auto userKey = keyVault->getUserKeyById(userKeyId);
-                auto userData =
-                    uassertStatusOK(KeyIdAndValue::decrypt(userKey.key, userCipherText));
-                BSONObj obj = toBSON(type, userData);
-                builder->appendAs(obj.firstElement(), fieldPath);
-            } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValueV2) {
-                auto [type, userData] = FLE2UnindexedEncryptedValueV2::deserialize(keyVault, cdr);
-                BSONObj obj = toBSON(type, userData);
-                builder->appendAs(obj.firstElement(), fieldPath);
-            } else {
-                builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data());
-            }
-        });
-    builder.appendElements(obj);
-    return builder.obj();
+    return obj;
 }
 
 void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
