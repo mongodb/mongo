@@ -33,11 +33,8 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_id.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -78,25 +75,10 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    void unlockLockedShards(const std::set<ShardId> lockedShards,
-                            OperationContext* opCtx,
-                            const std::string& dbname) {
-        std::vector<AsyncRequestsSender::Request> requests;
+    void unlockLockedShards(OperationContext* opCtx, const std::string& dbname) {
 
-        for (const ShardId& shardId : lockedShards) {
-            requests.emplace_back(shardId, BSON("fsyncUnlock" << 1));
-        }
-        auto responses = gatherResponses(opCtx,
-                                         dbname,
-                                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                         Shard::RetryPolicy::kIdempotent,
-                                         requests);
-        std::string errmsg;
-        BSONObjBuilder rawResult;
-        const auto response = appendRawResponses(opCtx, &errmsg, &rawResult, responses);
-        if (!response.responseOK) {
-            LOGV2_WARNING(781491, "Unlocking of shards failed: {error}", "error"_attr = errmsg);
-        }
+        auto request = OpMsgRequest::fromDBAndBody(dbname, BSON("fsyncUnlock" << 1));
+        auto response = CommandHelpers::runCommandDirectly(opCtx, request);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -133,7 +115,7 @@ public:
         result.append("all", rawResult.obj());
         if (!response.responseOK) {
             if (cmdObj["lock"].trueValue()) {
-                unlockLockedShards(response.shardsWithSuccessResponses, opCtx, dbname);
+                unlockLockedShards(opCtx, dbname);
             }
             return false;
         }
