@@ -30,7 +30,7 @@ class ContinuousStepdown(interface.Hook):
     STOPS_FIXTURE = True
 
     def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-                 stepdown_interval_ms=8000, terminate=False, kill=False,
+                 stepdown_interval_ms=8000, terminate=False, kill=False, randomize_kill=False,
                  use_action_permitted_file=False, background_reconfig=False, auth_options=None,
                  should_downgrade=False):
         """Initialize the ContinuousStepdown.
@@ -43,6 +43,7 @@ class ContinuousStepdown(interface.Hook):
             stepdown_interval_ms: the number of milliseconds between stepdowns.
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
+            randomize_kill: With a 50% probability set kill=True, otherwise do normal stepdown.
             use_action_permitted_file: use a file to control if stepdown thread should do a stepdown.
             auth_options: dictionary of auth options.
             background_reconfig: whether to conduct reconfig in the background.
@@ -66,6 +67,9 @@ class ContinuousStepdown(interface.Hook):
         self._rs_fixtures = []
         self._mongos_fixtures = []
         self._stepdown_thread = None
+
+        if randomize_kill:
+            kill = random.choice([True, False])
 
         # kill implies terminate.
         self._terminate = terminate or kill
