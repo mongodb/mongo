@@ -17,31 +17,24 @@
 #ifndef MC_FLE2_FIND_EQUALITY_PAYLOAD_PRIVATE_H
 #define MC_FLE2_FIND_EQUALITY_PAYLOAD_PRIVATE_H
 
-#include "mongocrypt.h"
-#include "mongocrypt-private.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-private.h"
+#include "mongocrypt.h"
 
 typedef struct {
-   _mongocrypt_buffer_t edcDerivedToken;       // d
-   _mongocrypt_buffer_t escDerivedToken;       // s
-   _mongocrypt_buffer_t eccDerivedToken;       // c
-   _mongocrypt_buffer_t serverEncryptionToken; // e
-   int64_t maxContentionCounter;               // cm
+    _mongocrypt_buffer_t edcDerivedToken;       // d
+    _mongocrypt_buffer_t escDerivedToken;       // s
+    _mongocrypt_buffer_t eccDerivedToken;       // c
+    _mongocrypt_buffer_t serverEncryptionToken; // e
+    int64_t maxContentionCounter;               // cm
 } mc_FLE2FindEqualityPayload_t;
 
-void
-mc_FLE2FindEqualityPayload_init (mc_FLE2FindEqualityPayload_t *payload);
+void mc_FLE2FindEqualityPayload_init(mc_FLE2FindEqualityPayload_t *payload);
 
-bool
-mc_FLE2FindEqualityPayload_parse (mc_FLE2FindEqualityPayload_t *out,
-                                  const bson_t *in,
-                                  mongocrypt_status_t *status);
+bool mc_FLE2FindEqualityPayload_parse(mc_FLE2FindEqualityPayload_t *out, const bson_t *in, mongocrypt_status_t *status);
 
-bool
-mc_FLE2FindEqualityPayload_serialize (
-   const mc_FLE2FindEqualityPayload_t *payload, bson_t *out);
+bool mc_FLE2FindEqualityPayload_serialize(const mc_FLE2FindEqualityPayload_t *payload, bson_t *out);
 
-void
-mc_FLE2FindEqualityPayload_cleanup (mc_FLE2FindEqualityPayload_t *payload);
+void mc_FLE2FindEqualityPayload_cleanup(mc_FLE2FindEqualityPayload_t *payload);
 
 #endif /* MC_FLE2_FIND_EQUALITY_PAYLOAD_PRIVATE_H */

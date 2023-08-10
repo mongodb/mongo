@@ -19,19 +19,15 @@
 
 #include "mc-array-private.h"
 
+void _mc_array_init(mc_array_t *array, size_t element_size) {
+    BSON_ASSERT_PARAM(array);
+    BSON_ASSERT(element_size);
 
-void
-_mc_array_init (mc_array_t *array, size_t element_size)
-{
-   BSON_ASSERT_PARAM (array);
-   BSON_ASSERT (element_size);
-
-   array->len = 0;
-   array->element_size = element_size;
-   array->allocated = 128;
-   array->data = (void *) bson_malloc0 (array->allocated);
+    array->len = 0;
+    array->element_size = element_size;
+    array->allocated = 128;
+    array->data = (void *)bson_malloc0(array->allocated);
 }
-
 
 /*
  *--------------------------------------------------------------------------
@@ -49,54 +45,46 @@ _mc_array_init (mc_array_t *array, size_t element_size)
  *--------------------------------------------------------------------------
  */
 
-void
-_mc_array_copy (mc_array_t *dst, const mc_array_t *src)
-{
-   BSON_ASSERT_PARAM (dst);
-   BSON_ASSERT_PARAM (src);
+void _mc_array_copy(mc_array_t *dst, const mc_array_t *src) {
+    BSON_ASSERT_PARAM(dst);
+    BSON_ASSERT_PARAM(src);
 
-   _mc_array_destroy (dst);
+    _mc_array_destroy(dst);
 
-   dst->len = src->len;
-   dst->element_size = src->element_size;
-   dst->allocated = src->allocated;
-   dst->data = (void *) bson_malloc (dst->allocated);
-   memcpy (dst->data, src->data, dst->allocated);
+    dst->len = src->len;
+    dst->element_size = src->element_size;
+    dst->allocated = src->allocated;
+    dst->data = (void *)bson_malloc(dst->allocated);
+    memcpy(dst->data, src->data, dst->allocated);
 }
 
-
-void
-_mc_array_destroy (mc_array_t *array)
-{
-   if (array && array->data) {
-      bson_free (array->data);
-   }
+void _mc_array_destroy(mc_array_t *array) {
+    if (array && array->data) {
+        bson_free(array->data);
+    }
 }
 
+void _mc_array_append_vals(mc_array_t *array, const void *data, uint32_t n_elements) {
+    size_t len;
+    size_t off;
+    size_t next_size;
 
-void
-_mc_array_append_vals (mc_array_t *array, const void *data, uint32_t n_elements)
-{
-   size_t len;
-   size_t off;
-   size_t next_size;
+    BSON_ASSERT_PARAM(array);
+    BSON_ASSERT_PARAM(data);
 
-   BSON_ASSERT_PARAM (array);
-   BSON_ASSERT_PARAM (data);
+    BSON_ASSERT(array->len <= SIZE_MAX / array->element_size);
+    off = array->element_size * array->len;
+    BSON_ASSERT(n_elements <= SIZE_MAX / array->element_size);
+    len = (size_t)n_elements * array->element_size;
+    BSON_ASSERT(len <= SIZE_MAX - off);
+    if ((off + len) > array->allocated) {
+        next_size = bson_next_power_of_two(off + len);
+        array->data = (void *)bson_realloc(array->data, next_size);
+        array->allocated = next_size;
+    }
 
-   BSON_ASSERT (array->len <= SIZE_MAX / array->element_size);
-   off = array->element_size * array->len;
-   BSON_ASSERT (n_elements <= SIZE_MAX / array->element_size);
-   len = (size_t) n_elements * array->element_size;
-   BSON_ASSERT (len <= SIZE_MAX - off);
-   if ((off + len) > array->allocated) {
-      next_size = bson_next_power_of_two (off + len);
-      array->data = (void *) bson_realloc (array->data, next_size);
-      array->allocated = next_size;
-   }
+    memcpy((uint8_t *)array->data + off, data, len);
 
-   memcpy ((uint8_t *) array->data + off, data, len);
-
-   BSON_ASSERT (array->len <= SIZE_MAX - n_elements);
-   array->len += n_elements;
+    BSON_ASSERT(array->len <= SIZE_MAX - n_elements);
+    array->len += n_elements;
 }

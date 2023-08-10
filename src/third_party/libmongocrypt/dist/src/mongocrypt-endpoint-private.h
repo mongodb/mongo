@@ -20,45 +20,41 @@
 #include "mongocrypt-status-private.h"
 
 typedef struct {
-   /* e.g. https://kevin.keyvault.azure.net:443/path/path/?query=value */
-   char *original;
-   char *protocol;  /* e.g. https */
-   char *host;      /* e.g. kevin.keyvault.azure.net */
-   char *port;      /* e.g. 443 */
-   char *domain;    /* e.g. keyvault.azure.net */
-   char *subdomain; /* e.g. kevin */
-   char *path;      /* e.g. path/path */
-   char *query;     /* e.g. query=value */
-   /* host_and_port is the form that should be returned to drivers. */
-   char *host_and_port; /* e.g. kevin.keyvault.azure.net:443 */
+    /* e.g. https://kevin.keyvault.azure.net:443/path/path/?query=value */
+    char *original;
+    char *protocol;  /* e.g. https */
+    char *host;      /* e.g. kevin.keyvault.azure.net */
+    char *port;      /* e.g. 443 */
+    char *domain;    /* e.g. keyvault.azure.net */
+    char *subdomain; /* e.g. kevin */
+    char *path;      /* e.g. path/path */
+    char *query;     /* e.g. query=value */
+    /* host_and_port is the form that should be returned to drivers. */
+    char *host_and_port; /* e.g. kevin.keyvault.azure.net:443 */
 } _mongocrypt_endpoint_t;
 
-_mongocrypt_endpoint_t *
-_mongocrypt_endpoint_copy (_mongocrypt_endpoint_t *src);
+_mongocrypt_endpoint_t *_mongocrypt_endpoint_copy(_mongocrypt_endpoint_t *src);
 
-void
-_mongocrypt_endpoint_destroy (_mongocrypt_endpoint_t *endpoint);
+void _mongocrypt_endpoint_destroy(_mongocrypt_endpoint_t *endpoint);
 
 typedef struct {
-   /* allow_empty_subdomain does not require "host" to contain dot separators.
-    * If allow_empty_subdomain is true, then "localhost" is a valid endpoint. */
-   bool allow_empty_subdomain;
+    /* allow_empty_subdomain does not require "host" to contain dot separators.
+     * If allow_empty_subdomain is true, then "localhost" is a valid endpoint. */
+    bool allow_empty_subdomain;
 } _mongocrypt_endpoint_parse_opts_t;
 
 /* Parses a subset of URIs of the form:
  * [protocol://][host[:port]][path][?query]
  */
-_mongocrypt_endpoint_t *
-_mongocrypt_endpoint_new (const char *endpoint_raw,
-                          int32_t len,
-                          _mongocrypt_endpoint_parse_opts_t *opts,
-                          mongocrypt_status_t *status);
+_mongocrypt_endpoint_t *_mongocrypt_endpoint_new(const char *endpoint_raw,
+                                                 int32_t len,
+                                                 _mongocrypt_endpoint_parse_opts_t *opts,
+                                                 mongocrypt_status_t *status);
 
 /* _mongocrypt_apply_default_port checks if the endpoint string *endpoint_raw
  * contains a port. If *endpoint_raw does not contain a port, *endpoint_raw is
  * freed and overwritten to a copy of *endpoint_raw with ":<port>" appended.
  */
-void
-_mongocrypt_apply_default_port (char **endpoint_raw, char *port);
+void _mongocrypt_apply_default_port(char **endpoint_raw, char *port);
 
 #endif /* MONGOCRYPT_ENDPOINT_PRIVATE_H */

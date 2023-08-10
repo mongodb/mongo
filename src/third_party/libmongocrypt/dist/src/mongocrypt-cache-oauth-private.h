@@ -21,26 +21,20 @@
 #include "mongocrypt-status-private.h"
 
 typedef struct {
-   bson_t *entry;
-   char *access_token;
-   int64_t expiration_time_us;
-   mongocrypt_mutex_t mutex; /* global lock of cache. */
+    bson_t *entry;
+    char *access_token;
+    int64_t expiration_time_us;
+    mongocrypt_mutex_t mutex; /* global lock of cache. */
 } _mongocrypt_cache_oauth_t;
 
-_mongocrypt_cache_oauth_t *
-_mongocrypt_cache_oauth_new (void);
+_mongocrypt_cache_oauth_t *_mongocrypt_cache_oauth_new(void);
 
-void
-_mongocrypt_cache_oauth_destroy (_mongocrypt_cache_oauth_t *cache);
+void _mongocrypt_cache_oauth_destroy(_mongocrypt_cache_oauth_t *cache);
 
-bool
-_mongocrypt_cache_oauth_add (_mongocrypt_cache_oauth_t *cache,
-                             bson_t *oauth_response,
-                             mongocrypt_status_t *status);
+bool _mongocrypt_cache_oauth_add(_mongocrypt_cache_oauth_t *cache, bson_t *oauth_response, mongocrypt_status_t *status);
 
 /* Returns a copy of the base64 encoded oauth token, or NULL if nothing is
  * cached. */
-char *
-_mongocrypt_cache_oauth_get (_mongocrypt_cache_oauth_t *cache);
+char *_mongocrypt_cache_oauth_get(_mongocrypt_cache_oauth_t *cache);
 
 #endif /* MONGOCRYPT_CACHE_OAUTH_PRIVATE_H */

@@ -19,8 +19,8 @@
 /* Utilities for cross-platform and C89 compatibility */
 
 /* Copied from bson-compat.h from the C driver. */
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #ifdef MONGOCRYPT_HAVE_STDBOOL_H
 /*
  TODO - check for stdbool.h if we need to support older compilers and reconile
@@ -36,7 +36,7 @@ typedef signed char bool;
 #endif
 
 #ifdef __GNUC__
-#define MONGOCRYPT_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
+#define MONGOCRYPT_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 #else
 #define MONGOCRYPT_WARN_UNUSED_RESULT
 #endif

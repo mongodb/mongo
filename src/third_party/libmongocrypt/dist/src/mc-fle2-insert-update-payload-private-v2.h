@@ -20,9 +20,9 @@
 #include <bson/bson.h>
 
 #include "mc-array-private.h"
-#include "mongocrypt.h"
-#include "mongocrypt-private.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-private.h"
+#include "mongocrypt.h"
 
 /**
  * FLE2InsertUpdatePayloadV2 represents an FLE2 payload of an indexed field to
@@ -31,7 +31,7 @@
  * FLE2InsertUpdatePayloadV2 has the following data layout:
  *
  * struct {
- *   uint8_t fle_blob_subtype = 4;
+ *   uint8_t fle_blob_subtype = 11;
  *   uint8_t bson[];
  * } FLE2InsertUpdatePayloadV2;
  *
@@ -62,18 +62,18 @@
  */
 
 typedef struct {
-   _mongocrypt_buffer_t edcDerivedToken;            // d
-   _mongocrypt_buffer_t escDerivedToken;            // s
-   _mongocrypt_buffer_t encryptedTokens;            // p
-   _mongocrypt_buffer_t indexKeyId;                 // u
-   bson_type_t valueType;                           // t
-   _mongocrypt_buffer_t value;                      // v
-   _mongocrypt_buffer_t serverEncryptionToken;      // e
-   _mongocrypt_buffer_t serverDerivedFromDataToken; // l
-   int64_t contentionFactor;                        // k
-   mc_array_t edgeTokenSetArray;                    // g
-   _mongocrypt_buffer_t plaintext;
-   _mongocrypt_buffer_t userKeyId;
+    _mongocrypt_buffer_t edcDerivedToken;            // d
+    _mongocrypt_buffer_t escDerivedToken;            // s
+    _mongocrypt_buffer_t encryptedTokens;            // p
+    _mongocrypt_buffer_t indexKeyId;                 // u
+    bson_type_t valueType;                           // t
+    _mongocrypt_buffer_t value;                      // v
+    _mongocrypt_buffer_t serverEncryptionToken;      // e
+    _mongocrypt_buffer_t serverDerivedFromDataToken; // l
+    int64_t contentionFactor;                        // k
+    mc_array_t edgeTokenSetArray;                    // g
+    _mongocrypt_buffer_t plaintext;
+    _mongocrypt_buffer_t userKeyId;
 } mc_FLE2InsertUpdatePayloadV2_t;
 
 /**
@@ -88,38 +88,30 @@ typedef struct {
  * mc_FLE2InsertUpdatePayloadV2_cleanup.
  */
 typedef struct {
-   _mongocrypt_buffer_t edcDerivedToken;            // d
-   _mongocrypt_buffer_t escDerivedToken;            // s
-   _mongocrypt_buffer_t serverDerivedFromDataToken; // l
-   _mongocrypt_buffer_t encryptedTokens;            // p
+    _mongocrypt_buffer_t edcDerivedToken;            // d
+    _mongocrypt_buffer_t escDerivedToken;            // s
+    _mongocrypt_buffer_t serverDerivedFromDataToken; // l
+    _mongocrypt_buffer_t encryptedTokens;            // p
 } mc_EdgeTokenSetV2_t;
 
-void
-mc_FLE2InsertUpdatePayloadV2_init (mc_FLE2InsertUpdatePayloadV2_t *payload);
+void mc_FLE2InsertUpdatePayloadV2_init(mc_FLE2InsertUpdatePayloadV2_t *payload);
 
-bool
-mc_FLE2InsertUpdatePayloadV2_parse (mc_FLE2InsertUpdatePayloadV2_t *out,
-                                    const _mongocrypt_buffer_t *in,
-                                    mongocrypt_status_t *status);
+bool mc_FLE2InsertUpdatePayloadV2_parse(mc_FLE2InsertUpdatePayloadV2_t *out,
+                                        const _mongocrypt_buffer_t *in,
+                                        mongocrypt_status_t *status);
 
 /* mc_FLE2InsertUpdatePayloadV2_decrypt decrypts ciphertext.
  * Returns NULL and sets @status on error. It is an error to call before
  * mc_FLE2InsertUpdatePayloadV2_parse. */
-const _mongocrypt_buffer_t *
-mc_FLE2InsertUpdatePayloadV2_decrypt (_mongocrypt_crypto_t *crypto,
-                                      mc_FLE2InsertUpdatePayloadV2_t *iup,
-                                      const _mongocrypt_buffer_t *user_key,
-                                      mongocrypt_status_t *status);
+const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayloadV2_decrypt(_mongocrypt_crypto_t *crypto,
+                                                                 mc_FLE2InsertUpdatePayloadV2_t *iup,
+                                                                 const _mongocrypt_buffer_t *user_key,
+                                                                 mongocrypt_status_t *status);
 
-bool
-mc_FLE2InsertUpdatePayloadV2_serialize (
-   const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
+bool mc_FLE2InsertUpdatePayloadV2_serialize(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
-bool
-mc_FLE2InsertUpdatePayloadV2_serializeForRange (
-   const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
+bool mc_FLE2InsertUpdatePayloadV2_serializeForRange(const mc_FLE2InsertUpdatePayloadV2_t *payload, bson_t *out);
 
-void
-mc_FLE2InsertUpdatePayloadV2_cleanup (mc_FLE2InsertUpdatePayloadV2_t *payload);
+void mc_FLE2InsertUpdatePayloadV2_cleanup(mc_FLE2InsertUpdatePayloadV2_t *payload);
 
 #endif /* MC_FLE2_INSERT_UPDATE_PAYLOAD_PRIVATE_V2_H */

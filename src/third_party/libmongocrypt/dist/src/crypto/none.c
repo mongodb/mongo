@@ -23,75 +23,53 @@
 
 bool _native_crypto_initialized = false;
 
-void
-_native_crypto_init (void)
-{
-   _native_crypto_initialized = true;
+void _native_crypto_init(void) {
+    _native_crypto_initialized = true;
 }
 
-
-bool
-_native_crypto_aes_256_cbc_encrypt (aes_256_args_t args)
-{
-   mongocrypt_status_t *status = args.status;
-   CLIENT_ERR ("hook not set for aes_256_cbc_encrypt");
-   return false;
+bool _native_crypto_aes_256_cbc_encrypt(aes_256_args_t args) {
+    mongocrypt_status_t *status = args.status;
+    CLIENT_ERR("hook not set for aes_256_cbc_encrypt");
+    return false;
 }
 
-
-bool
-_native_crypto_aes_256_cbc_decrypt (aes_256_args_t args)
-{
-   mongocrypt_status_t *status = args.status;
-   CLIENT_ERR ("hook not set for aes_256_cbc_decrypt");
-   return false;
+bool _native_crypto_aes_256_cbc_decrypt(aes_256_args_t args) {
+    mongocrypt_status_t *status = args.status;
+    CLIENT_ERR("hook not set for aes_256_cbc_decrypt");
+    return false;
 }
 
-
-bool
-_native_crypto_hmac_sha_512 (const _mongocrypt_buffer_t *key,
-                             const _mongocrypt_buffer_t *in,
-                             _mongocrypt_buffer_t *out,
-                             mongocrypt_status_t *status)
-{
-   CLIENT_ERR ("hook not set for hmac_sha_512");
-   return false;
+bool _native_crypto_hmac_sha_512(const _mongocrypt_buffer_t *key,
+                                 const _mongocrypt_buffer_t *in,
+                                 _mongocrypt_buffer_t *out,
+                                 mongocrypt_status_t *status) {
+    CLIENT_ERR("hook not set for hmac_sha_512");
+    return false;
 }
 
-
-bool
-_native_crypto_random (_mongocrypt_buffer_t *out,
-                       uint32_t count,
-                       mongocrypt_status_t *status)
-{
-   CLIENT_ERR ("hook not set for random");
-   return false;
+bool _native_crypto_random(_mongocrypt_buffer_t *out, uint32_t count, mongocrypt_status_t *status) {
+    CLIENT_ERR("hook not set for random");
+    return false;
 }
 
-bool
-_native_crypto_aes_256_ctr_encrypt (aes_256_args_t args)
-{
-   mongocrypt_status_t *status = args.status;
-   CLIENT_ERR ("hook not set for _native_crypto_aes_256_ctr_encrypt");
-   return false;
+bool _native_crypto_aes_256_ctr_encrypt(aes_256_args_t args) {
+    mongocrypt_status_t *status = args.status;
+    CLIENT_ERR("hook not set for _native_crypto_aes_256_ctr_encrypt");
+    return false;
 }
 
-bool
-_native_crypto_aes_256_ctr_decrypt (aes_256_args_t args)
-{
-   mongocrypt_status_t *status = args.status;
-   CLIENT_ERR ("hook not set for _native_crypto_aes_256_ctr_decrypt");
-   return false;
+bool _native_crypto_aes_256_ctr_decrypt(aes_256_args_t args) {
+    mongocrypt_status_t *status = args.status;
+    CLIENT_ERR("hook not set for _native_crypto_aes_256_ctr_decrypt");
+    return false;
 }
 
-bool
-_native_crypto_hmac_sha_256 (const _mongocrypt_buffer_t *key,
-                             const _mongocrypt_buffer_t *in,
-                             _mongocrypt_buffer_t *out,
-                             mongocrypt_status_t *status)
-{
-   CLIENT_ERR ("hook not set for _native_crypto_hmac_sha_256");
-   return false;
+bool _native_crypto_hmac_sha_256(const _mongocrypt_buffer_t *key,
+                                 const _mongocrypt_buffer_t *in,
+                                 _mongocrypt_buffer_t *out,
+                                 mongocrypt_status_t *status) {
+    CLIENT_ERR("hook not set for _native_crypto_hmac_sha_256");
+    return false;
 }
 
 #endif /* MONGOCRYPT_ENABLE_CRYPTO */

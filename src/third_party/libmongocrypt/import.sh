@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=libmongocrypt
-REVISION=e656245b7ebc742df210c8156b9aac41bdd5d113
+REVISION=bb47b600efe6709180e6b125df6cb20d78b61ef2
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))

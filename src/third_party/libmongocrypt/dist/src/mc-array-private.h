@@ -22,33 +22,22 @@
 
 #include <bson/bson.h>
 
-
 typedef struct _mc_array_t mc_array_t;
 
-
 struct _mc_array_t {
-   size_t len;
-   size_t element_size;
-   size_t allocated;
-   void *data;
+    size_t len;
+    size_t element_size;
+    size_t allocated;
+    void *data;
 };
 
-
-#define _mc_array_append_val(a, v) _mc_array_append_vals (a, &v, 1)
-#define _mc_array_index(a, t, i) (((t *) (a)->data)[i])
+#define _mc_array_append_val(a, v) _mc_array_append_vals(a, &v, 1)
+#define _mc_array_index(a, t, i) (((t *)(a)->data)[i])
 #define _mc_array_clear(a) (a)->len = 0
 
-
-void
-_mc_array_init (mc_array_t *array, size_t element_size);
-void
-_mc_array_copy (mc_array_t *dst, const mc_array_t *src);
-void
-_mc_array_append_vals (mc_array_t *array,
-                       const void *data,
-                       uint32_t n_elements);
-void
-_mc_array_destroy (mc_array_t *array);
-
+void _mc_array_init(mc_array_t *array, size_t element_size);
+void _mc_array_copy(mc_array_t *dst, const mc_array_t *src);
+void _mc_array_append_vals(mc_array_t *array, const void *data, uint32_t n_elements);
+void _mc_array_destroy(mc_array_t *array);
 
 #endif /* MC_ARRAY_PRIVATE_H */

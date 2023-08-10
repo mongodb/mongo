@@ -23,7 +23,8 @@
 #include <stdint.h>
 
 static void
-copy_writer_buffer (kms_request_t *req, kmip_writer_t *writer) {
+copy_writer_buffer (kms_request_t *req, kmip_writer_t *writer)
+{
    const uint8_t *buf;
    size_t buflen;
 
@@ -54,11 +55,15 @@ kms_kmip_request_register_secretdata_new (void *reserved,
      <RequestPayload tag="0x420079" type="Structure">
       <ObjectType tag="0x420057" type="Enumeration" value="7"/>
       <TemplateAttribute tag="0x420091" type="Structure">
+       <Attribute tag="0x420008" type="Structure">
+        <AttributeName tag="0x42000a" type="TextString" value="Cryptographic
+   Usage Mask"/> <AttributeValue tag="0x42000b" type="Integer" value="0"/>
+       </Attribute>
       </TemplateAttribute>
       <SecretData tag="0x420085" type="Structure">
-       <SecretDataType tag="0x420086" type="Enumeration" value="1"/>
+       <SecretDataType tag="0x420086" type="Enumeration" value="2"/>
        <KeyBlock tag="0x420040" type="Structure">
-        <KeyFormatType tag="0x420042" type="Enumeration" value="1"/>
+        <KeyFormatType tag="0x420042" type="Enumeration" value="2"/>
         <KeyValue tag="0x420045" type="Structure">
          <KeyMaterial tag="0x420043" type="ByteString" value="..."/>
         </KeyValue>
@@ -101,15 +106,29 @@ kms_kmip_request_register_secretdata_new (void *reserved,
    /* 0x07 == SecretData */
    kmip_writer_write_enumeration (writer, KMIP_TAG_ObjectType, 0x07);
    kmip_writer_begin_struct (writer, KMIP_TAG_TemplateAttribute);
+   // Add required Cryptographic Usage Mask attribute.
+   {
+      kmip_writer_begin_struct (writer, KMIP_TAG_Attribute);
+      const char *cryptographicUsageMaskStr = "Cryptographic Usage Mask";
+      kmip_writer_write_string (writer,
+                                KMIP_TAG_AttributeName,
+                                cryptographicUsageMaskStr,
+                                strlen (cryptographicUsageMaskStr));
+      // Use 0 because the Secret Data object is not used in cryptographic
+      // operations on the KMIP server.
+      kmip_writer_write_integer (writer, KMIP_TAG_AttributeValue, 0);
+      kmip_writer_close_struct (writer);
+   }
    kmip_writer_close_struct (writer); /* KMIP_TAG_TemplateAttribute */
    kmip_writer_begin_struct (writer, KMIP_TAG_SecretData);
-   /* 0x01 = Password */
+   /* 0x02 = Seed */
    kmip_writer_write_enumeration (writer, KMIP_TAG_SecretDataType, 0x02);
    kmip_writer_begin_struct (writer, KMIP_TAG_KeyBlock);
-   /* 0x01 = Raw */
-   kmip_writer_write_enumeration (writer, KMIP_TAG_KeyFormatType, 0x01);
+   /* 0x02 = Opaque */
+   kmip_writer_write_enumeration (writer, KMIP_TAG_KeyFormatType, 0x02);
    kmip_writer_begin_struct (writer, KMIP_TAG_KeyValue);
-   kmip_writer_write_bytes (writer, KMIP_TAG_KeyMaterial, (const char *) data, len);
+   kmip_writer_write_bytes (
+      writer, KMIP_TAG_KeyMaterial, (const char *) data, len);
    kmip_writer_close_struct (writer); /* KMIP_TAG_KeyValue */
    kmip_writer_close_struct (writer); /* KMIP_TAG_KeyBlock */
    kmip_writer_close_struct (writer); /* KMIP_TAG_SecretData */

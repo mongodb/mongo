@@ -18,40 +18,32 @@
 
 #ifndef _WIN32
 
-void
-_mongocrypt_mutex_init (mongocrypt_mutex_t *mutex)
-{
-   int ret = pthread_mutex_init (mutex, NULL);
-   if (ret) {
-      abort ();
-   }
+void _mongocrypt_mutex_init(mongocrypt_mutex_t *mutex) {
+    int ret = pthread_mutex_init(mutex, NULL);
+    if (ret) {
+        abort();
+    }
 }
 
-void
-_mongocrypt_mutex_cleanup (mongocrypt_mutex_t *mutex)
-{
-   int ret = pthread_mutex_destroy (mutex);
-   if (ret) {
-      abort ();
-   }
+void _mongocrypt_mutex_cleanup(mongocrypt_mutex_t *mutex) {
+    int ret = pthread_mutex_destroy(mutex);
+    if (ret) {
+        abort();
+    }
 }
 
-void
-_mongocrypt_mutex_lock (mongocrypt_mutex_t *mutex)
-{
-   int ret = pthread_mutex_lock (mutex);
-   if (ret) {
-      abort ();
-   }
+void _mongocrypt_mutex_lock(mongocrypt_mutex_t *mutex) {
+    int ret = pthread_mutex_lock(mutex);
+    if (ret) {
+        abort();
+    }
 }
 
-void
-_mongocrypt_mutex_unlock (mongocrypt_mutex_t *mutex)
-{
-   int ret = pthread_mutex_unlock (mutex);
-   if (ret) {
-      abort ();
-   }
+void _mongocrypt_mutex_unlock(mongocrypt_mutex_t *mutex) {
+    int ret = pthread_mutex_unlock(mutex);
+    if (ret) {
+        abort();
+    }
 }
 
 #endif /* _WIN32 */
