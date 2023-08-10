@@ -45,10 +45,13 @@ namespace mongo {
  */
 class FSyncLockThread : public BackgroundJob {
 public:
-    FSyncLockThread(ServiceContext* serviceContext, bool allowFsyncFailure)
+    FSyncLockThread(ServiceContext* serviceContext,
+                    bool allowFsyncFailure,
+                    const Milliseconds deadline)
         : BackgroundJob(false),
           _serviceContext(serviceContext),
-          _allowFsyncFailure(allowFsyncFailure) {}
+          _allowFsyncFailure(allowFsyncFailure),
+          _deadline(deadline) {}
 
     std::string name() const override {
         return "FSyncLockThread";
@@ -64,6 +67,7 @@ public:
 private:
     ServiceContext* const _serviceContext;
     bool _allowFsyncFailure;
+    const Milliseconds _deadline;
 };
 
 /**
