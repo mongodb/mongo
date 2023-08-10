@@ -102,11 +102,9 @@ public:
                 uassertStatusOK(ShardingCatalogManager::get(opCtx)->commitMergeAllChunksOnShard(
                     opCtx, ns(), request().getShard(), request().getMaxNumberOfChunksToMerge()));
 
-            auto shardAndCollVers = response.first;
-            auto numMergedChunks = response.second;
-            auto res = MergeAllChunksOnShardResponse{shardAndCollVers.shardPlacementVersion};
-            res.setNumMergedChunks(numMergedChunks);
-            return res;
+            const auto& [shardAndCollVers, numMergedChunks] = response;
+            return MergeAllChunksOnShardResponse{shardAndCollVers.shardPlacementVersion,
+                                                 numMergedChunks};
         }
 
     private:

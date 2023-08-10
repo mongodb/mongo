@@ -258,16 +258,9 @@ SemiFuture<NumMergedChunks> BalancerCommandsSchedulerImpl::requestMergeAllChunks
                 return responseStatus;
             }
 
-            try {
-                return MergeAllChunksOnShardResponse::parse(
-                           IDLParserContext{"MergeAllChunksOnShardResponse"}, remoteResponse.data)
-                    .getNumMergedChunks();
-            } catch (const DBException&) {
-                // TODO SERVER-74573 remove try-catch once 7.0 branches out
-                // It may happen in multiversion scenarios for the command not to return a
-                // MergeAllChunksOnShardResponse (in v6.3 the reply was empty)
-                return 0;
-            }
+            return MergeAllChunksOnShardResponse::parse(
+                       IDLParserContext{"MergeAllChunksOnShardResponse"}, remoteResponse.data)
+                .getNumMergedChunks();
         })
         .semi();
 }

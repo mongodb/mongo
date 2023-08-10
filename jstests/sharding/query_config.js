@@ -108,15 +108,14 @@ var testListConfigChunksIndexes = function(st) {
     // This test depends on all the indexes in the configChunksIndexes being the exact indexes
     // in the config chunks collection.
     var configDB = st.s.getDB("config");
-    var expectedConfigChunksIndexes =
-        ["_id_", "uuid_1_lastmod_1", "uuid_1_min_1", "uuid_1_shard_1_min_1"];
+    var expectedConfigChunksIndexes = [
+        "_id_",
+        "uuid_1_lastmod_1",
+        "uuid_1_min_1",
+        "uuid_1_shard_1_min_1",
+        "uuid_1_shard_1_onCurrentShardSince_1"
+    ];
     const foundIndexesArray = getListIndexesCursor(configDB.chunks).toArray();
-    // TODO SERVER-74573 always consider new index once 7.0 branches out
-    if (foundIndexesArray.length == expectedConfigChunksIndexes.length + 1) {
-        // CSRS nodes in v7.0 create a new index on config.chunks. Since the creation is not
-        // FCV-gated, this code is handling mixed binaries scenarios
-        expectedConfigChunksIndexes.push("uuid_1_shard_1_onCurrentShardSince_1");
-    }
 
     assert.eq(foundIndexesArray.length, expectedConfigChunksIndexes.length);
     assert.eq(arrayGetNames(sortArrayByName(foundIndexesArray)), expectedConfigChunksIndexes);
