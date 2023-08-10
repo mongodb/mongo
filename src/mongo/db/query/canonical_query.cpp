@@ -190,8 +190,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     auto unavailableMetadata = validStatus.getValue();
     _root = MatchExpression::normalize(std::move(root));
 
-    // If caching is disabled, do not perform any autoparameterization.
-    if (!internalQueryDisablePlanCache.load()) {
+    // Perform auto-parameterization only if the query is SBE-compatible and caching is enabled.
+    if (expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
+        !internalQueryDisablePlanCache.load()) {
         const bool hasNoTextNodes =
             !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
         if (hasNoTextNodes) {
