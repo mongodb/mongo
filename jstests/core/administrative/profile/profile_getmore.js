@@ -5,8 +5,6 @@
 //   requires_getmore,
 //   requires_fcv_70,
 //   requires_profiling,
-//   # TODO: SERVER-70142 populate planSummary.
-//   cqf_experimental_incompatible,
 // ]
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.

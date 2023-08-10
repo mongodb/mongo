@@ -41,8 +41,8 @@ namespace mongo::optimizer {
 class AbstractABTPrinter {
 public:
     virtual ~AbstractABTPrinter() = default;
-
     virtual BSONObj explainBSON() const = 0;
+    virtual std::string getPlanSummary() const = 0;
 };
 
 };  // namespace mongo::optimizer

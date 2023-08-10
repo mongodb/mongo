@@ -464,7 +464,11 @@ const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
 }
 
 std::string PlanExplainerSBE::getPlanSummary() const {
-    return _debugInfo->planSummary;
+    if (_optimizerData) {
+        return _optimizerData->getPlanSummary();
+    } else {
+        return _debugInfo->planSummary;
+    }
 }
 
 void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {

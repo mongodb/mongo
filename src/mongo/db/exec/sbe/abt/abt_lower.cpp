@@ -77,6 +77,7 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -86,49 +87,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo::optimizer {
-
-/*
- * This class uses a visitor to convert an ABT representing a path (e.g. "a" or "a.b") into a
- * string representation of the path. The ABT supplied to PathStringify::stringify should only
- * contain the node types EvalPath, PathGet, and PathIdentity. Otherwise, the visitor will
- * tassert.
- */
-class PathStringify {
-public:
-    void walk(const PathGet& n, const ABT&) {
-        if (_firstElement) {
-            // Append without a leading dot for the first path component.
-            _builder << n.name().value().toString();
-            _firstElement = false;
-        } else {
-            _builder << "." << n.name().value().toString();
-        }
-        algebra::walk<false>(n.getPath(), *this);
-    }
-
-    void walk(const PathIdentity& n) {
-        // no-op
-    }
-
-    template <typename T, typename... Ts>
-    void walk(const T& n, Ts&&...) {
-        tasserted(7814405, "Expected ABT to be of PathGet, or PathIdentity types.");
-    }
-
-    std::string str() {
-        return _builder.str();
-    }
-
-    static std::string stringify(const ABT& n) {
-        PathStringify stringifier;
-        algebra::walk<false>(n, stringifier);
-        return stringifier.str();
-    }
-
-private:
-    std::stringstream _builder;
-    bool _firstElement{true};
-};
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {

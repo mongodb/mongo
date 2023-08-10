@@ -132,6 +132,52 @@ inline void maybeComposePaths(ABTVector& paths) {
         }
     }
 }
+/*
+ * This class uses a visitor to convert an ABT representing a path (e.g. "a" or "a.b") into a
+ * string representation of the path. The ABT supplied to PathStringify::stringify should only
+ * contain the node types EvalPath, PathGet, PathTraverse, and PathIdentity. Otherwise, the visitor
+ * will tassert.
+ */
+class PathStringify {
+public:
+    void walk(const PathTraverse& n, const ABT&) {
+        algebra::walk<false>(n.getPath(), *this);
+    }
+
+    void walk(const PathGet& n, const ABT&) {
+        if (_firstElement) {
+            // Append without a leading dot for the first path component.
+            _builder << n.name().value();
+            _firstElement = false;
+        } else {
+            _builder << "." << n.name().value();
+        }
+        algebra::walk<false>(n.getPath(), *this);
+    }
+    void walk(const PathIdentity& n) {
+        // no-op
+    }
+
+    template <typename T, typename... Ts>
+    void walk(const T& n, Ts&&...) {
+        tasserted(7814405, "Expected ABT to be of PathGet, PathTraverse, or PathIdentity types.");
+    }
+
+    std::string str() {
+        return _builder.str();
+    }
+
+    static std::string stringify(const ABT& n) {
+        PathStringify stringifier;
+        algebra::walk<false>(n, stringifier);
+        return stringifier.str();
+    }
+
+private:
+    std::stringstream _builder;
+    bool _firstElement{true};
+};
+
 
 /**
  * Appends a path to another path. Performs the append at PathIdentity elements.

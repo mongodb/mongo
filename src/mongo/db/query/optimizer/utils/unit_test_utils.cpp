@@ -159,7 +159,6 @@ OptPhaseManager makePhaseManager(
                            makeCostEstimator(costModel ? *costModel : getTestCostModel()),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
-                           true /*supportExplain*/,
                            std::move(debugInfo),
                            std::move(queryHints)};
 }
@@ -181,7 +180,6 @@ OptPhaseManager makePhaseManager(
                            makeCostEstimator(costModel ? *costModel : getTestCostModel()),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
-                           true /*supportExplain*/,
                            std::move(debugInfo),
                            std::move(queryHints)};
 }
@@ -201,7 +199,6 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                            makeCostEstimator(),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
-                           true /*supportExplain*/,
                            std::move(debugInfo),
                            std::move(queryHints)};
 }
