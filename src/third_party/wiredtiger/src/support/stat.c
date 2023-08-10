@@ -1288,6 +1288,12 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree queue hit maximum",
   "autocommit: retries for readonly operations",
   "autocommit: retries for update operations",
+  "background-compact: background compact failed calls",
+  "background-compact: background compact failed calls due to cache pressure",
+  "background-compact: background compact running",
+  "background-compact: background compact skipped as process would not reduce file size",
+  "background-compact: background compact successful calls",
+  "background-compact: background compact timeout",
   "block-cache: cached blocks updated",
   "block-cache: cached bytes updated",
   "block-cache: evicted blocks",
@@ -1760,7 +1766,6 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: split bytes currently awaiting free",
   "reconciliation: split objects currently awaiting free",
   "session: attempts to remove a local object and the object is in use",
-  "session: background compact running",
   "session: flush_tier failed calls",
   "session: flush_tier operation calls",
   "session: flush_tier tables skipped due to no checkpoint",
@@ -1954,6 +1959,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lsm_work_queue_max = 0;
     stats->autocommit_readonly_retry = 0;
     stats->autocommit_update_retry = 0;
+    stats->background_compact_fail = 0;
+    stats->background_compact_fail_cache_pressure = 0;
+    stats->background_compact_running = 0;
+    stats->background_compact_skipped = 0;
+    stats->background_compact_success = 0;
+    stats->background_compact_timeout = 0;
     stats->block_cache_blocks_update = 0;
     stats->block_cache_bytes_update = 0;
     stats->block_cache_blocks_evicted = 0;
@@ -2404,7 +2415,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing rec_split_stashed_bytes */
     /* not clearing rec_split_stashed_objects */
     stats->local_objects_inuse = 0;
-    /* not clearing session_background_compact_running */
     stats->flush_tier_fail = 0;
     stats->flush_tier = 0;
     stats->flush_tier_skipped = 0;
@@ -2568,6 +2578,13 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
     to->autocommit_readonly_retry += WT_STAT_READ(from, autocommit_readonly_retry);
     to->autocommit_update_retry += WT_STAT_READ(from, autocommit_update_retry);
+    to->background_compact_fail += WT_STAT_READ(from, background_compact_fail);
+    to->background_compact_fail_cache_pressure +=
+      WT_STAT_READ(from, background_compact_fail_cache_pressure);
+    to->background_compact_running += WT_STAT_READ(from, background_compact_running);
+    to->background_compact_skipped += WT_STAT_READ(from, background_compact_skipped);
+    to->background_compact_success += WT_STAT_READ(from, background_compact_success);
+    to->background_compact_timeout += WT_STAT_READ(from, background_compact_timeout);
     to->block_cache_blocks_update += WT_STAT_READ(from, block_cache_blocks_update);
     to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
     to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);
@@ -3068,8 +3085,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_split_stashed_bytes += WT_STAT_READ(from, rec_split_stashed_bytes);
     to->rec_split_stashed_objects += WT_STAT_READ(from, rec_split_stashed_objects);
     to->local_objects_inuse += WT_STAT_READ(from, local_objects_inuse);
-    to->session_background_compact_running +=
-      WT_STAT_READ(from, session_background_compact_running);
     to->flush_tier_fail += WT_STAT_READ(from, flush_tier_fail);
     to->flush_tier += WT_STAT_READ(from, flush_tier);
     to->flush_tier_skipped += WT_STAT_READ(from, flush_tier_skipped);

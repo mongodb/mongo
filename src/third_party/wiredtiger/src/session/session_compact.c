@@ -295,9 +295,11 @@ __compact_worker(WT_SESSION_IMPL *session)
              * work, skip this file in the future.
              */
             if (ret == 0) {
-                if (session->compact_state == WT_COMPACT_SUCCESS)
+                if (session->compact_state == WT_COMPACT_SUCCESS) {
+                    if (session == S2C(session)->background_compact.session)
+                        WT_STAT_CONN_INCR(session, background_compact_success);
                     another_pass = true;
-                else
+                } else
                     session->op_handle[i]->compact_skip = true;
                 continue;
             }
