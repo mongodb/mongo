@@ -245,6 +245,8 @@ typedef struct {
     TABLE *base_mirror;  /* First mirrored table */
     bool mirror_fix_var; /* Special case if mirroring both FIX and VAR tables */
 
+    bool background_compaction_running; /* Background compaction running */
+
     RWLOCK backup_lock; /* Backup running */
     uint64_t backup_id; /* Block incremental id */
 #define INCREMENTAL_BLOCK 1
@@ -423,6 +425,7 @@ typedef struct {
 extern TINFO **tinfo_list;
 
 WT_THREAD_RET alter(void *);
+WT_THREAD_RET background_compact(void *);
 WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);

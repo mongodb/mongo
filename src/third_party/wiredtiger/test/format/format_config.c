@@ -2259,8 +2259,32 @@ config_file_type(u_int type)
 static void
 config_compact(void)
 {
-    if (config_explicit(NULL, "compact.free_space_target"))
-        return;
+    /* FIXME-WT-11432: Background and foreground compaction should not be executed in parallel. */
+    if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT) &&
+      config_explicit(NULL, "ops.compaction") && GV(OPS_COMPACTION))
+        testutil_die(EINVAL,
+          "%s: Background and foreground compaction cannot be enabled at the same time", progname);
 
-    GV(COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
+    /*
+     * FIXME-WT-11432: If both are enabled, disable the one that is not explicitly set or choose one
+     * randomly.
+     */
+    if (GV(BACKGROUND_COMPACT) && GV(OPS_COMPACTION)) {
+        if (config_explicit(NULL, "background_compact"))
+            config_single(NULL, "ops.compaction=0", false);
+        else if (config_explicit(NULL, "ops.compaction"))
+            config_single(NULL, "background_compact=0", false);
+        else {
+            if (mmrand(&g.data_rnd, 1, 2) == 1)
+                config_single(NULL, "background_compact=0", false);
+            else
+                config_single(NULL, "ops.compaction=0", false);
+        }
+    }
+
+    /* Generate values if not explicit set. */
+    if (!config_explicit(NULL, "background_compact.free_space_target"))
+        GV(BACKGROUND_COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
+    if (!config_explicit(NULL, "compact.free_space_target"))
+        GV(COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
 }
