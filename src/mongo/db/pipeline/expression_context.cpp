@@ -148,8 +148,10 @@ ExpressionContext::ExpressionContext(
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
-      allowDiskUse(allowDiskUse &&
-                   !(opCtx && opCtx->readOnly())),  // Disallow disk use if in read-only mode.
+      allowDiskUse(allowDiskUse && ([&]() {
+                       tassert(7738401, "opCtx null check", opCtx);
+                       return !(opCtx->readOnly());
+                   }())),  // Disallow disk use if in read-only mode.
       bypassDocumentValidation(bypassDocumentValidation),
       ns(ns),
       serializationCtxt(serializationCtx),
