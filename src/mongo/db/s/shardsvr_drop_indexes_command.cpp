@@ -254,9 +254,10 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                                   retryState.shardSuccessResponses.end());
 
             std::string errmsg;
-            BSONObjBuilder output;
-            const auto aggregateResponse =
-                appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
+            BSONObjBuilder output, rawResBuilder;
+            bool isShardedCollection = isShardedColl(opCtx, resolvedNs);
+            const auto aggregateResponse = appendRawResponses(
+                opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection);
 
             // If we have a stale config error, update the success shards for the upcoming retry.
             if (!aggregateResponse.responseOK && aggregateResponse.firstStaleConfigError) {
@@ -264,6 +265,12 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                 uassertStatusOK(*aggregateResponse.firstStaleConfigError);
             }
 
+            if (!isShardedCollection && aggregateResponse.responseOK) {
+                CommandHelpers::filterCommandReplyForPassthrough(
+                    shardResponses[0].swResponse.getValue().data, &output);
+            }
+
+            output.appendElements(rawResBuilder.obj());
             CommandHelpers::appendSimpleCommandStatus(output, aggregateResponse.responseOK, errmsg);
             return Response(output.obj());
         });

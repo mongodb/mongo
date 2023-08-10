@@ -152,9 +152,19 @@ public:
             boost::none /*letParameters*/,
             boost::none /*runtimeConstants*/);
 
+        BSONObjBuilder rawResBuilder;
         std::string errmsg;
+        bool isShardedCollection = isShardedColl(opCtx, nss);
         const bool ok =
-            appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses)).responseOK;
+            appendRawResponses(opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection)
+                .responseOK;
+
+        if (!isShardedCollection && ok) {
+            CommandHelpers::filterCommandReplyForPassthrough(
+                shardResponses[0].swResponse.getValue().data, &output);
+        }
+
+        output.appendElements(rawResBuilder.obj());
         CommandHelpers::appendSimpleCommandStatus(output, ok, errmsg);
 
         if (ok) {

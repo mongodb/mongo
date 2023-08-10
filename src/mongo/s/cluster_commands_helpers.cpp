@@ -579,7 +579,8 @@ RawResponsesResult appendRawResponses(
     OperationContext* opCtx,
     std::string* errmsg,
     BSONObjBuilder* output,
-    const std::vector<AsyncRequestsSender::Response>& shardResponses) {
+    const std::vector<AsyncRequestsSender::Response>& shardResponses,
+    bool appendWriteConcernError) {
     std::vector<AsyncRequestsSender::Response> successARSResponses;
     std::vector<std::pair<ShardId, BSONObj>> successResponsesReceived;
     std::vector<std::pair<ShardId, Status>> shardNotFoundErrorsReceived;
@@ -675,7 +676,7 @@ RawResponsesResult appendRawResponses(
 
     // If there were no errors, report success (possibly with a writeConcern error).
     if (genericErrorsReceived.empty()) {
-        if (firstWriteConcernErrorReceived) {
+        if (firstWriteConcernErrorReceived && appendWriteConcernError) {
             appendWriteConcernErrorToCmdResponse(firstWriteConcernErrorReceived->first,
                                                  firstWriteConcernErrorReceived->second,
                                                  *output);
@@ -836,6 +837,16 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
         nss.db_forSharding().toString(),
         listIndexesCmd,
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
+}
+
+bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        return true;
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is not sharded or doesn't exist.
+        return false;
+    }
 }
 
 }  // namespace mongo

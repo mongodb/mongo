@@ -90,16 +90,6 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 
 namespace {
 
-bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-        return true;
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist.
-        return false;
-    }
-}
-
 bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     if (!request.getTimeseries().has_value()) {
         return false;
