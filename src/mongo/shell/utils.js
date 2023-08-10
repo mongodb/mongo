@@ -466,6 +466,8 @@ jsTestOptions = function() {
 
             evergreenTaskId: TestData.evergreenTaskId || null,
             configShard: TestData.configShard || false,
+
+            useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
         });
     }
     return _jsTestOptions;

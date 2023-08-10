@@ -86,6 +86,9 @@
  *         otherwise use localhost
  *       numReplicas {number}
  *
+ *       configShard {boolean}: Add the config server as a shard if true.
+ *       useAutoBootstrapProcedure {boolean}: Use the auto-bootstrapping procedure on every shard
+ *          and config server if set to true.
  *     }
  *   }
  *
@@ -1178,9 +1181,16 @@ var ShardingTest = function ShardingTest(params) {
         !otherParams.hasOwnProperty('config') || otherParams.config === undefined;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
 
+    let useAutoBootstrapProcedure = otherParams.hasOwnProperty('useAutoBootstrapProcedure')
+        ? otherParams.useAutoBootstrapProcedure
+        : false;
+    useAutoBootstrapProcedure =
+        useAutoBootstrapProcedure || jsTestOptions().useAutoBootstrapProcedure;
+
     let isConfigShardMode =
         otherParams.hasOwnProperty('configShard') ? otherParams.configShard : false;
-    isConfigShardMode = isConfigShardMode || jsTestOptions().configShard;
+    isConfigShardMode =
+        isConfigShardMode || jsTestOptions().configShard || useAutoBootstrapProcedure;
 
     if ("shardAsReplicaSet" in otherParams) {
         throw new Error("Use of deprecated option 'shardAsReplicaSet'");
@@ -1337,6 +1347,7 @@ var ShardingTest = function ShardingTest(params) {
             if (isConfigShardMode && i == 0) {
                 otherParams.configOptions = Object.merge(
                     otherParams.configOptions, {configsvr: "", storageEngine: "wiredTiger"});
+
                 rsDefaults = Object.merge(rsDefaults, otherParams.configOptions);
                 setIsConfigSvr = true;
             } else {
@@ -1419,6 +1430,7 @@ var ShardingTest = function ShardingTest(params) {
                 settings: rsSettings,
                 seedRandomNumberGenerator: !randomSeedAlreadySet,
                 isConfigServer: setIsConfigSvr,
+                useAutoBootstrapProcedure: useAutoBootstrapProcedure,
             });
 
             print("ShardingTest starting replica set for shard: " + setName);
@@ -1542,6 +1554,7 @@ var ShardingTest = function ShardingTest(params) {
                     keyFile: rst.keyFile ? rst.keyFile : this.keyFile,
                     host: otherParams.useHostname ? hostName : "localhost",
                     waitForKeys: false,
+                    useAutoBootstrapProcedure: useAutoBootstrapProcedure,
                 },
                 // Replica set configuration for initiating the replica set.
                 rstConfig,
@@ -1808,6 +1821,7 @@ var ShardingTest = function ShardingTest(params) {
                     var n = z.name || z.host || z;
 
                     var name;
+                    // TODO: SERVER-79108 Don't transition when auto-bootstrapping.
                     if (isConfigShardMode && idx == 0) {
                         name = "config";
 
