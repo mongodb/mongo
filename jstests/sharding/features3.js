@@ -8,7 +8,9 @@
 // @tags: [
 //   expects_explicit_underscore_id_index,
 // ]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+load('jstests/libs/feature_flag_util.js');
+
 (function() {
 'use strict';
 

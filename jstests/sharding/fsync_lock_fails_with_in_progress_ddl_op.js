@@ -7,7 +7,9 @@
  *   featureFlagClusterFsyncLock
  * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
+load('jstests/libs/fail_point_util.js');
+
 (function() {
 "use strict";
 const dbName = "test";

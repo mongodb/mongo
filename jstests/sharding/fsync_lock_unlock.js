@@ -7,7 +7,7 @@
  * ]
  */
 
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+load('jstests/libs/config_shard_util.js');
 
 (function() {
 "use strict";
