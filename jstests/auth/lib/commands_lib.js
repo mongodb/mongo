@@ -2300,6 +2300,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert']},
@@ -2317,6 +2320,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2341,6 +2347,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['update']},
@@ -2358,6 +2367,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2382,6 +2394,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['remove']},
@@ -2399,6 +2414,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2427,6 +2445,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert', 'update', 'remove']},
@@ -5023,6 +5044,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [
             {
               runOnDb: adminDbName,

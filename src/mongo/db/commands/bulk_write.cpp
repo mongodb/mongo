@@ -1037,7 +1037,20 @@ public:
 
     class Invocation final : public InvocationBaseGen {
     public:
-        using InvocationBaseGen::InvocationBaseGen;
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : InvocationBaseGen(opCtx, command, opMsgRequest) {
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+
+            bulk_write_common::validateRequest(request());
+
+            // Extract and store the first update op for building mirrored read request.
+            _extractFirstUpdateOp();
+        }
 
         bool supportsWriteConcern() const final {
             return true;
@@ -1058,15 +1071,50 @@ public:
             return result;
         }
 
+        bool supportsReadMirroring() const final {
+            // Only do mirrored read if there exists an update op in bulk write request.
+            return _firstUpdateOp;
+        }
+
+        std::string getDBForReadMirroring() const final {
+            const auto nsIdx = _firstUpdateOp->getUpdate();
+            const auto& nsInfo = request().getNsInfo().at(nsIdx);
+
+            return nsInfo.getNs().db_deprecated().toString();
+        }
+
+        void appendMirrorableRequest(BSONObjBuilder* bob) const final {
+            invariant(_firstUpdateOp);
+
+            const auto& req = request();
+            const auto nsIdx = _firstUpdateOp->getUpdate();
+            const auto& nsInfo = req.getNsInfo().at(nsIdx);
+
+            bob->append("find", nsInfo.getNs().coll());
+
+            if (!_firstUpdateOp->getFilter().isEmpty()) {
+                bob->append("filter", _firstUpdateOp->getFilter());
+            }
+            if (!_firstUpdateOp->getHint().isEmpty()) {
+                bob->append("hint", _firstUpdateOp->getHint());
+            }
+            if (_firstUpdateOp->getCollation()) {
+                bob->append("collation", *_firstUpdateOp->getCollation());
+            }
+
+            bob->append("batchSize", 1);
+            bob->append("singleBatch", true);
+
+            if (nsInfo.getShardVersion()) {
+                nsInfo.getShardVersion()->serialize("shardVersion", bob);
+            }
+            if (nsInfo.getDatabaseVersion()) {
+                bob->append("databaseVersion", nsInfo.getDatabaseVersion()->toBSON());
+            }
+        }
+
         Reply typedRun(OperationContext* opCtx) final {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
-
             auto& req = request();
-
-            bulk_write_common::validateRequest(req);
 
             // Apply all of the write operations.
             auto [replies, retriedStmtIds, numErrors] = bulk_write::performWrites(opCtx, req);
@@ -1160,7 +1208,7 @@ public:
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
 
-                setElectionIdandOpTime(opCtx, reply);
+                _setElectionIdAndOpTime(opCtx, reply);
 
                 return reply;
             }
@@ -1193,12 +1241,12 @@ public:
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
 
-            setElectionIdandOpTime(opCtx, reply);
+            _setElectionIdAndOpTime(opCtx, reply);
 
             return reply;
         }
 
-        void setElectionIdandOpTime(OperationContext* opCtx, BulkWriteCommandReply& reply) {
+        void _setElectionIdAndOpTime(OperationContext* opCtx, BulkWriteCommandReply& reply) {
             // Undocumented repl fields that mongos depends on.
             auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
             if (replCoord->getSettings().isReplSet()) {
@@ -1206,6 +1254,22 @@ public:
                 reply.setElectionId(replCoord->getElectionId());
             }
         }
+
+        void _extractFirstUpdateOp() {
+            const auto& ops = request().getOps();
+
+            auto it = std::find_if(ops.begin(), ops.end(), [](const auto& op) {
+                return BulkWriteCRUDOp(op).getType() == BulkWriteCRUDOp::kUpdate;
+            });
+
+            if (it != ops.end()) {
+                // Current design only uses the first update op for mirrored read.
+                _firstUpdateOp = BulkWriteCRUDOp(*it).getUpdate();
+                invariant(_firstUpdateOp);
+            }
+        }
+
+        const mongo::BulkWriteUpdateOp* _firstUpdateOp{nullptr};
     };
 
 } bulkWriteCmd;

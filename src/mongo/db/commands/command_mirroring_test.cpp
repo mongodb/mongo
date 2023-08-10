@@ -49,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -95,7 +96,7 @@ public:
         return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
     }
 
-    static constexpr auto kDB = "test"_sd;
+    static constexpr auto kDB = "testDB"_sd;
 
 private:
     BSONObj getMirroredCommand(OpMsgRequest& request) {
@@ -106,17 +107,22 @@ private:
         opCtx->setLogicalSessionId(_lsid);
 
         auto invocation = cmd->parse(opCtx.get(), request);
-        ASSERT(invocation->supportsReadMirroring());
+        if (!invocation->supportsReadMirroring()) {
+            uasserted(ErrorCodes::CommandNotSupported, "command does not support read mirroring");
+        }
+        ASSERT_EQ(invocation->getDBForReadMirroring(), kDB);
 
         BSONObjBuilder bob;
         invocation->appendMirrorableRequest(&bob);
+
         return bob.obj();
     }
 
     const LogicalSessionId _lsid;
 
 protected:
-    const std::string kCollection = "test";
+    const std::string kCollection = "testColl";
+    const std::string kNss = kDB + "." + kCollection;
 };
 
 class UpdateCommandTest : public CommandMirroringTest {
@@ -224,6 +230,140 @@ TEST_F(UpdateCommandTest, ValidateShardVersion) {
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
     }
+}
+
+class BulkWriteTest : public CommandMirroringTest {
+public:
+    std::string commandName() override {
+        return "bulkWrite";
+    }
+
+private:
+    RAIIServerParameterControllerForTest controller{"featureFlagBulkWriteCommand", true};
+};
+
+TEST_F(BulkWriteTest, NoUpdateOp) {
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                                 << BSON("delete" << 0 << "filter" << BSON("_id" << 2)))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
+
+    ASSERT_THROWS_CODE(createCommandAndGetMirrored("1", bulkWriteArgs),
+                       DBException,
+                       ErrorCodes::CommandNotSupported);
+}
+
+TEST_F(BulkWriteTest, NoQueryInUpdateOp) {
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                                 << BSON("update" << 0 << "filter" << BSONObj() << "updateMods"
+                                                  << BSON("$set" << BSON("_id" << 1))))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
+
+    auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
+
+    ASSERT_EQ(mirroredObj["find"].String(), kCollection);
+    ASSERT_FALSE(mirroredObj.hasField("filter"));
+    ASSERT_FALSE(mirroredObj.hasField("hint"));
+    ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
+    ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
+    ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+    ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
+}
+
+TEST_F(BulkWriteTest, SingleQueryInUpdateOp) {
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                                 << BSON("update"
+                                         << 0 << "filter" << BSON("qty" << BSON("$lt" << 50.0))
+                                         << "updateMods" << BSON("$inc" << BSON("qty" << 1))))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
+
+    auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
+
+    ASSERT_EQ(mirroredObj["find"].String(), kCollection);
+    ASSERT_EQ(mirroredObj["filter"].Obj().toString(), "{ qty: { $lt: 50.0 } }");
+    ASSERT_FALSE(mirroredObj.hasField("hint"));
+    ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
+    ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
+    ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+    ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
+}
+
+TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintAndCollation) {
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                                 << BSON("update"
+                                         << 0 << "filter" << BSON("price" << BSON("$gt" << 100))
+                                         << "updateMods" << BSON("$inc" << BSON("price" << 1))
+                                         << "hint" << BSON("price" << 1) << "collation"
+                                         << BSON("locale"
+                                                 << "fr")))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
+
+    auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
+
+    ASSERT_EQ(mirroredObj["find"].String(), kCollection);
+    ASSERT_EQ(mirroredObj["filter"].Obj().toString(), "{ price: { $gt: 100 } }");
+    ASSERT_EQ(mirroredObj["hint"].Obj().toString(), "{ price: 1 }");
+    ASSERT_EQ(mirroredObj["collation"].Obj().toString(), "{ locale: \"fr\" }");
+    ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
+    ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
+    ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+    ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
+}
+
+TEST_F(BulkWriteTest, MultipleUpdateOpsAndNamespaces) {
+    const std::string kCollection2 = "testColl2";
+    const std::string kNss2 = kDB + "." + kCollection2;
+
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(
+                 BSON("delete" << 0 << "filter" << BSON("_id" << 1))
+                 << BSON("update" << 1 << "filter" << BSON("_id" << BSON("$eq" << 1))
+                                  << "updateMods" << BSON("$inc" << BSON("qty" << 1)))
+                 << BSON("update" << 0 << "filter" << BSON("_id" << BSON("$eq" << 0))
+                                  << "updateMods" << BSON("$inc" << BSON("qty" << -1))))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss) << BSON("ns" << kNss2)))};
+
+    auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
+
+    ASSERT_EQ(mirroredObj["find"].String(), kCollection2);
+    ASSERT_EQ(mirroredObj["filter"].Obj().toString(), "{ _id: { $eq: 1 } }");
+    ASSERT_FALSE(mirroredObj.hasField("hint"));
+    ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
+    ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
+    ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+    ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
+}
+
+TEST_F(BulkWriteTest, ValidateShardVersionAndDatabaseVersion) {
+    const OID kEpoch = OID::gen();
+    const Timestamp kTimestamp(2, 2);
+    const Timestamp kMajorAndMinor(1, 2);
+    const int32_t kLastMod(123);
+    const auto shardVersion = BSON("e" << kEpoch << "t" << kTimestamp << "v" << kMajorAndMinor);
+    const auto databaseVersion = BSON("timestamp" << kTimestamp << "lastMod" << kLastMod);
+
+    auto bulkWriteArgs = {
+        BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
+                                 << BSON("update"
+                                         << 0 << "filter" << BSON("qty" << BSON("$lt" << 50.0))
+                                         << "updateMods" << BSON("$inc" << BSON("qty" << 1))))),
+        BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss << "shardVersion" << shardVersion
+                                              << "databaseVersion" << databaseVersion)))};
+
+    auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
+
+    ASSERT_EQ(mirroredObj["find"].String(), kCollection);
+    ASSERT_EQ(mirroredObj["filter"].Obj().toString(), "{ qty: { $lt: 50.0 } }");
+    ASSERT_FALSE(mirroredObj.hasField("hint"));
+    ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
+    ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
+    ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+    ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
+    ASSERT_BSONOBJ_EQ(mirroredObj["shardVersion"].Obj(), shardVersion);
+    ASSERT_BSONOBJ_EQ(mirroredObj["databaseVersion"].Obj(), databaseVersion);
 }
 
 class FindCommandTest : public CommandMirroringTest {
@@ -481,8 +621,6 @@ TEST_F(DistinctCommandTest, ValidateMirroredQuery) {
 }
 
 TEST_F(DistinctCommandTest, ValidateShardVersion) {
-    const auto kCollection = "test";
-
     std::vector<BSONObj> distinctArgs = {BSON("distinct" << BSONObj())};
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);

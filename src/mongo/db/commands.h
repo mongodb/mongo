@@ -817,14 +817,21 @@ public:
     }
 
     /**
-     * Return if this invocation can be mirrored to secondaries
+     * Returns if this invocation can be mirrored to secondaries
      */
     virtual bool supportsReadMirroring() const {
         return false;
     }
 
     /**
-     * Return a BSONObj that can be safely mirrored to secondaries for cache warming
+     * Returns the name of the database that should be targeted for the mirrored read.
+     */
+    virtual std::string getDBForReadMirroring() const {
+        return ns().db_deprecated().toString();
+    }
+
+    /**
+     * Returns a BSONObj that can be safely mirrored to secondaries for cache warming.
      */
     virtual void appendMirrorableRequest(BSONObjBuilder*) const {
         MONGO_UNREACHABLE;
@@ -1011,14 +1018,27 @@ public:
     }
 
     /**
-     * Return if the cmdObj can be mirrored to secondaries in some form
+     * Returns if the cmdObj can be mirrored to secondaries in some form.
      */
     virtual bool supportsReadMirroring(const BSONObj& cmdObj) const {
         return false;
     }
 
     /**
-     * Return a modified form of cmdObj that can be safely mirrored to secondaries for cache warming
+     * Returns the name of the database that should be targeted for the mirrored read.
+     */
+    virtual std::string getDBForReadMirroring(const BSONObj& cmdObj) const {
+        // Individual command should override this function if $db is
+        // not present instead of using this default implementation.
+        auto db = cmdObj["$db"];
+        invariant(db);
+
+        return db.String();
+    }
+
+    /**
+     * Returns a modified form of cmdObj that can be safely mirrored to secondaries for cache
+     * warming.
      */
     virtual void appendMirrorableRequest(BSONObjBuilder*, const BSONObj&) const {
         MONGO_UNREACHABLE;
