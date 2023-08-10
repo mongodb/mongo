@@ -139,6 +139,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(shardingCatalogManagerWithTransactionFailWCAfterCommit);
 MONGO_FAIL_POINT_DEFINE(shardingCatalogManagerSkipNotifyClusterOnNewDatabases);
+MONGO_FAIL_POINT_DEFINE(initializePlacementHistoryHangAfterSettingSnapshotReadConcern);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
@@ -1418,6 +1419,10 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
                                const boost::optional<BSONObj>& postBatchResumeToken) {
             return true;
         };
+
+        // Failpoint to hang the operation after setting the snapshot read concern and before
+        // running the aggregation.
+        initializePlacementHistoryHangAfterSettingSnapshotReadConcern.pauseWhileSet();
 
         Status status = _localConfigShard->runAggregation(altOpCtx.get(), aggRequest, noopCallback);
         uassertStatusOK(status);
