@@ -61,7 +61,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds.h"
@@ -1765,69 +1764,5 @@ struct SearchNode : public QuerySolutionNode {
      * True for $searchMeta, False for $search query.
      */
     bool isSearchMeta;
-};
-
-struct WindowNode : public QuerySolutionNode {
-    WindowNode(std::unique_ptr<QuerySolutionNode> child,
-               boost::optional<boost::intrusive_ptr<Expression>> partitionByArg,
-               boost::optional<SortPattern> sortByArg,
-               std::vector<WindowFunctionStatement> outputFieldsArg,
-               bool shouldProduceBson)
-        : QuerySolutionNode(std::move(child)),
-          partitionBy(std::move(partitionByArg)),
-          sortBy(std::move(sortByArg)),
-          outputFields(std::move(outputFieldsArg)),
-          shouldProduceBson(shouldProduceBson) {
-        DepsTracker partitionByDeps;
-        if (partitionBy) {
-            expression::addDependencies(partitionBy->get(), &partitionByDeps);
-        }
-        partitionByRequiredFields = std::move(partitionByDeps.fields);
-
-        DepsTracker sortByDeps;
-        if (sortBy) {
-            sortBy->addDependencies(&sortByDeps);
-        }
-        sortByRequiredFields = std::move(sortByDeps.fields);
-
-        DepsTracker outputDeps;
-        for (auto& outputField : outputFields) {
-            outputField.addDependencies(&outputDeps);
-        }
-        outputRequiredFields = std::move(outputDeps.fields);
-    }
-
-    StageType getType() const override {
-        return STAGE_WINDOW;
-    }
-
-    void appendToString(str::stream* ss, int indent) const override;
-
-    bool fetched() const {
-        return true;
-    }
-
-    FieldAvailability getFieldAvailability(const std::string& field) const {
-        return FieldAvailability::kFullyProvided;
-    }
-    bool sortedByDiskLoc() const override {
-        return false;
-    }
-
-    const ProvidedSortSet& providedSorts() const final {
-        return children.back()->providedSorts();
-    }
-
-    std::unique_ptr<QuerySolutionNode> clone() const final;
-
-    boost::optional<boost::intrusive_ptr<Expression>> partitionBy;
-    boost::optional<SortPattern> sortBy;
-    std::vector<WindowFunctionStatement> outputFields;
-
-    OrderedPathSet partitionByRequiredFields;
-    OrderedPathSet sortByRequiredFields;
-    OrderedPathSet outputRequiredFields;
-
-    bool shouldProduceBson;
 };
 }  // namespace mongo

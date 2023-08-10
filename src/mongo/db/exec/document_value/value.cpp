@@ -75,6 +75,57 @@ using std::stringstream;
 using std::vector;
 using namespace std::string_literals;
 
+void ValueStorage::verifyRefCountingIfShould() const {
+    switch (type) {
+        case MinKey:
+        case MaxKey:
+        case jstOID:
+        case Date:
+        case bsonTimestamp:
+        case EOO:
+        case jstNULL:
+        case Undefined:
+        case Bool:
+        case NumberInt:
+        case NumberLong:
+        case NumberDouble:
+            // the above types never reference external data
+            MONGO_verify(!refCounter);
+            break;
+
+        case String:
+        case RegEx:
+        case Code:
+        case Symbol:
+            // If this is using the short-string optimization, it must not have a ref-counted
+            // pointer.
+            invariant(!shortStr || !refCounter);
+
+            // If this is _not_ using the short string optimization, it must be storing a
+            // ref-counted pointer. One exception: in the BSONElement constructor of Value, it is
+            // possible for this ValueStorage to get constructed as a type but never initialized;
+            // the ValueStorage gets left as a nullptr and not marked as ref-counted, which is ok
+            // (SERVER-43205).
+            invariant(shortStr || (refCounter || !genericRCPtr));
+            break;
+
+        case NumberDecimal:
+        case BinData:  // TODO this should probably support short-string optimization
+        case Array:    // TODO this should probably support empty-is-NULL optimization
+        case DBRef:
+        case CodeWScope:
+            // the above types always reference external data.
+            invariant(refCounter);
+            invariant(bool(genericRCPtr));
+            break;
+
+        case Object:
+            // Objects either hold a NULL ptr or should be ref-counting
+            invariant(refCounter == bool(genericRCPtr));
+            break;
+    }
+}
+
 void ValueStorage::putString(StringData s) {
     // Note: this also stores data portion of BinData
     const size_t sizeNoNUL = s.size();
