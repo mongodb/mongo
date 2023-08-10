@@ -1,3 +1,11 @@
+/**
+ * Tests that an updateLookup change stream doesn't throw ChangeStreamFatalError or
+ * TooManyMatchingDocuments after fixing SERVER-44598.
+ *
+ * @tags: [
+ *   uses_change_streams,
+ * ]
+ */
 import "jstests/multiVersion/libs/multi_cluster.js";
 
 // The UUID consistency check can hit NotPrimaryNoSecondaryOk when it attempts to obtain a list of

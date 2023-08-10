@@ -1,3 +1,6 @@
+/**
+ * Tests initializing a mixed version replica set through the shell.
+ */
 import "jstests/multiVersion/libs/multi_rs.js";
 
 const lastLTSVersion = "last-lts";

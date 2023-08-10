@@ -1,3 +1,7 @@
+/**
+ * Test that variable-type fields are found correctly in upgraded timeseries collections with dirty
+ * data.
+ */
 import "jstests/multiVersion/libs/multi_rs.js";
 
 const timeFieldName = "time";

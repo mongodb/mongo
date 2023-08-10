@@ -1,3 +1,6 @@
+/**
+ * Basic test coverage for the $anyElementTrue expression.
+ */
 import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db.any_element_true;

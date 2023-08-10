@@ -1,3 +1,9 @@
+/**
+ * This test checks the upgrade path from noauth to keyFile.
+ *
+ * This test requires users to persist across a restart.
+ * @tags: [requires_persistence, requires_replication]
+ */
 import "jstests/multiVersion/libs/multi_rs.js";
 
 // We turn off gossiping the mongo shell's clusterTime because this test connects to replica sets

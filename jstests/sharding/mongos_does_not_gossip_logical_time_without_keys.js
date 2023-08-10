@@ -1,3 +1,7 @@
+/**
+ * Tests that mongos does not gossip cluster time metadata until at least one key is created on the
+ * config server, and that it does not block waiting for keys at startup.
+ */
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";
 

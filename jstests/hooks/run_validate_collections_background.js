@@ -1,3 +1,7 @@
+/**
+ * Runs the validate command with {background:true} against all nodes (replica set members and
+ * standalone nodes, not sharded clusters) concurrently with running tests.
+ */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 

@@ -1,3 +1,8 @@
+/**
+ * Tests ingress connection metrics.
+ *
+ * @tags: [requires_fcv_63]
+ */
 import {detectDefaultTLSProtocol, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Short circuits for system configurations that do not support this setParameter, (i.e. OpenSSL

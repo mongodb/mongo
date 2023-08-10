@@ -1,7 +1,27 @@
+//
+// MultiVersion utility functions for clusters
+//
+
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
+/**
+ * Restarts the specified binaries in options with the specified binVersion.
+ * Note: this does not perform any upgrade operations.
+ *
+ * @param binVersion {string}
+ * @param options {Object} format:
+ *
+ * {
+ *     upgradeShards: <bool>, // defaults to true
+ *     upgradeConfigs: <bool>, // defaults to true
+ *     upgradeMongos: <bool>, // defaults to true
+ *     waitUntilStable: <bool>, // defaults to false since it provides a more realistic
+ *                                 approximation of real-world upgrade behaviour, even though
+ *                                 certain tests will likely want a stable cluster after upgrading.
+ * }
+ */
 ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     options = options || {};
     if (options.upgradeShards == undefined)
