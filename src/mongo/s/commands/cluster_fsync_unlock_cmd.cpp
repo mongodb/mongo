@@ -33,7 +33,6 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -82,7 +81,7 @@ public:
 
             auto responses = scatterGatherUnversionedTargetConfigServerAndShards(
                 opCtx,
-                DatabaseName::kAdmin.db(),
+                NamespaceString::kAdminDb,
                 applyReadWriteConcern(
                     opCtx,
                     this,
