@@ -316,12 +316,12 @@ void PushNode::logUpdate(LogBuilderInterface* logBuilder,
                          boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
 
-    if (modifyResult == ModifyResult::kNormalUpdate) {
+    if (modifyResult.type == ModifyResult::kNormalUpdate) {
         uassertStatusOK(logBuilder->logUpdatedField(pathTaken, element));
-    } else if (modifyResult == ModifyResult::kCreated) {
+    } else if (modifyResult.type == ModifyResult::kCreated) {
         invariant(createdFieldIdx);
         uassertStatusOK(logBuilder->logCreatedField(pathTaken, *createdFieldIdx, element));
-    } else if (modifyResult == ModifyResult::kArrayAppendUpdate) {
+    } else if (modifyResult.type == ModifyResult::kArrayAppendUpdate) {
         // This update only modified the array by appending entries to the end. Rather than writing
         // out the entire contents of the array, we create oplog entries for the newly appended
         // elements.

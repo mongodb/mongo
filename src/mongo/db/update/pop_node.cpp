@@ -81,7 +81,7 @@ void PopNode::validateUpdate(mutablebson::ConstElement updatedElement,
                              ModifyResult modifyResult,
                              const bool validateForStorage,
                              bool* containsDotsAndDollarsField) const {
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
     // override validateUpdate to not validate storage constraints but we still want to know if

@@ -68,7 +68,7 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                ModifyResult modifyResult,
                                bool validateForStorage,
                                bool* containsDotsAndDollarsField) const {
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // We only need to check the left and right sibling to see if the removed element was part of a
     // now invalid DBRef.
@@ -102,7 +102,7 @@ void UnsetNode::logUpdate(LogBuilderInterface* logBuilder,
                           ModifyResult modifyResult,
                           boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
-    invariant(modifyResult == ModifyResult::kNormalUpdate);
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate);
     invariant(!createdFieldIdx);
 
     if (pathTaken.types().back() == RuntimeUpdatePath::ComponentType::kArrayIndex) {

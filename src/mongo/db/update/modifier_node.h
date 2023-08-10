@@ -71,21 +71,38 @@ public:
                       UpdateNodeApplyParams updateNodeApplyParams) const final;
 
 protected:
-    enum class ModifyResult {
-        // No log entry is necessary for no-op updates.
-        kNoOp,
+    struct ModifyResult {
+        enum class Type {
+            // No log entry is necessary for no-op updates.
+            kNoOp,
 
-        // The update can be logged as normal (usually with a $set on the entire element).
-        kNormalUpdate,
+            // The update can be logged as normal.
+            kNormalUpdate,
 
-        // The element is an array, and the update only appends new array items to the end. The
-        // update can be logged as a $set on each appended element, rather than including the entire
-        // array in the log entry.
-        kArrayAppendUpdate,
+            // The element is an array, and the update only appends new array items to the end.
+            kArrayAppendUpdate,
 
-        // The element did not exist, so it was created then populated with setValueForNewElement().
-        // The updateExistingElement() method should never return this value.
-        kCreated
+            // The element did not exist, so it was created then populated with
+            // setValueForNewElement().
+            // The updateExistingElement() method should never return this value.
+            kCreated
+        };
+        static const Type kNoOp = Type::kNoOp;
+        static const Type kNormalUpdate = Type::kNormalUpdate;
+        static const Type kArrayAppendUpdate = Type::kArrayAppendUpdate;
+        static const Type kCreated = Type::kCreated;
+
+        struct EmptyDescription {};
+        struct ArrayAppendUpdateDescription {
+            size_t inserted;
+        };
+
+        ModifyResult(){};
+        ModifyResult(ModifyResult::Type type) : type(type) {}
+
+        Type type;
+        std::variant<EmptyDescription, ArrayAppendUpdateDescription> description =
+            EmptyDescription{};
     };
 
     /**

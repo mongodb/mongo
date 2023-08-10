@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -71,6 +72,11 @@ protected:
     ModifyResult updateExistingElement(mutablebson::Element* element,
                                        const FieldRef& elementPath) const final;
     void setValueForNewElement(mutablebson::Element* element) const final;
+    void logUpdate(LogBuilderInterface* logBuilder,
+                   const RuntimeUpdatePath& pathTaken,
+                   mutablebson::Element element,
+                   ModifyResult modifyResult,
+                   boost::optional<int> createdFieldIdx) const final;
 
     bool allowCreation() const final {
         return true;

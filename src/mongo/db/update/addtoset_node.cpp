@@ -144,7 +144,9 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Elem
         invariant(element->pushBack(toAdd));
     }
 
-    return ModifyResult::kNormalUpdate;
+    ModifyResult result(ModifyResult::kArrayAppendUpdate);
+    result.description = ModifyResult::ArrayAppendUpdateDescription{elementsToAdd.size()};
+    return result;
 }
 
 void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
@@ -153,6 +155,54 @@ void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
     for (auto&& elem : _elements) {
         auto toAdd = element->getDocument().makeElement(elem);
         invariant(element->pushBack(toAdd));
+    }
+}
+
+
+void AddToSetNode::logUpdate(LogBuilderInterface* logBuilder,
+                             const RuntimeUpdatePath& pathTaken,
+                             mutablebson::Element element,
+                             ModifyResult modifyResult,
+                             boost::optional<int> createdFieldIdx) const {
+    invariant(logBuilder);
+
+    if (modifyResult.type == ModifyResult::kNormalUpdate ||
+        modifyResult.type == ModifyResult::kCreated) {
+        ModifierNode::logUpdate(logBuilder, pathTaken, element, modifyResult, createdFieldIdx);
+    } else if (modifyResult.type == ModifyResult::kArrayAppendUpdate) {
+        // This update only modified the array by appending entries to the end. Rather than writing
+        // out the entire contents of the array, we create oplog entries for the newly appended
+        // elements.
+        invariant(std::holds_alternative<ModifyResult::ArrayAppendUpdateDescription>(
+            modifyResult.description));
+        const auto numAppended =
+            std::get<ModifyResult::ArrayAppendUpdateDescription>(modifyResult.description).inserted;
+        const auto arraySize = countChildren(element);
+
+        std::vector<mutablebson::Element> added;
+        added.reserve(numAppended);
+        auto child = element.findNthChild(arraySize - numAppended);
+        for (size_t i = 0; i < numAppended; i++) {
+            added.push_back(child);
+            child = child.rightSibling();
+        }
+
+        // We have to copy the field ref provided in order to use RuntimeUpdatePathTempAppend.
+        RuntimeUpdatePath pathTakenCopy = pathTaken;
+        invariant(arraySize >= numAppended);
+        auto position = arraySize - numAppended;
+        for (const auto& elementToLog : added) {
+            const std::string positionAsString = std::to_string(position);
+
+            RuntimeUpdatePathTempAppend tempAppend(
+                pathTakenCopy, positionAsString, RuntimeUpdatePath::ComponentType::kArrayIndex);
+            uassertStatusOK(
+                logBuilder->logCreatedField(pathTakenCopy, pathTakenCopy.size() - 1, elementToLog));
+
+            ++position;
+        }
+    } else {
+        MONGO_UNREACHABLE;
     }
 }
 
