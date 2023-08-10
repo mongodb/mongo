@@ -1536,7 +1536,6 @@ env_vars.Add(
     default='c:/openssl/bin',
 )
 
-# TODO SERVER-42170 switch to PathIsDirCreate validator
 env_vars.Add(
     PathVariable(
         "LOCAL_TMPDIR",
@@ -1698,9 +1697,6 @@ if get_option('build-metrics'):
     env.AddBuildMetricsMetaData('evg_id', env.get("BUILD_METRICS_EVG_TASK_ID", "UNKNOWN"))
     env.AddBuildMetricsMetaData('variant', env.get("BUILD_METRICS_EVG_BUILD_VARIANT", "UNKNOWN"))
 
-# TODO SERVER-42170 We can remove this Execute call
-# when support for PathIsDirCreate can be used as a validator
-# to the Variable above.
 env.Execute(SCons.Defaults.Mkdir(env.Dir('$LOCAL_TMPDIR')))
 
 if get_option('cache-signature-mode') == 'validate':
