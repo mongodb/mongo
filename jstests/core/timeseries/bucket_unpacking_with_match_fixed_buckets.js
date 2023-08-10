@@ -14,7 +14,6 @@
  * ]
  */
 
-import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.bucket_unpack_with_match_fixed_buckets;
@@ -35,17 +34,13 @@ function checkResults({
 }
 
 function checkExplain(pipeline, eventFilter, wholeBucketFilter, fixedBuckets, expectUnpackStage) {
-    // Validate the clustered collection scan exists.
-    const fullExplain = coll.explain().aggregate(pipeline);
-    const clusteredStage = getAggPlanStages(fullExplain, "CLUSTERED_IXSCAN");
-    assert(clusteredStage, "Expected clustered collection scan, but received: " + clusteredStage);
-
-    // Validate that _eventFilter and wholeBucketFilter are correct.
-    const aggStages =
-        getExplainedPipelineFromAggregation(db, coll, pipeline, {inhibitOptimization: false});
-    const unpackStage = aggStages[0]["$_internalUnpackBucket"];
+    const explain = coll.explain().aggregate(pipeline);
+    const unpackStages = getAggPlanStages(explain, "$_internalUnpackBucket");
     if (expectUnpackStage) {
-        assert(unpackStage, "Expected an internalUnpackBucket stage but got: " + tojson(aggStages));
+        assert.eq(1, unpackStages.length, `Expected $_internalUnpackBucket in ${tojson(explain)}`);
+
+        // Validate that _eventFilter and wholeBucketFilter are correct.
+        const unpackStage = unpackStages[0]["$_internalUnpackBucket"];
         const actualEventFilter = unpackStage["eventFilter"];
         const actualWholeBucketFilter = unpackStage["wholeBucketFilter"];
 
@@ -57,8 +52,7 @@ function checkExplain(pipeline, eventFilter, wholeBucketFilter, fixedBuckets, ex
             assert(!unpackStage["fixedBuckets"], unpackStage);
         }
     } else {
-        assert(!unpackStage,
-               "Did not expect an internalUnpackBucket stage but got: " + tojson(aggStages));
+        assert.eq([], unpackStages, `Expected no unpack stage in the pipeline ${explain}`);
     }
 }
 

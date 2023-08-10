@@ -161,8 +161,8 @@ public:
         return boost::none;
     };
 
-    BucketUnpacker bucketUnpacker() const {
-        return _bucketUnpacker.copy();
+    const BucketUnpacker& bucketUnpacker() const {
+        return _bucketUnpacker;
     }
 
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,

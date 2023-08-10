@@ -16,6 +16,23 @@ export function getWinningPlan(queryPlanner) {
 }
 
 /**
+ * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
+ * into account that the plan may or may not have agg stages.
+ */
+export function getWinningPlanFromExplain(explain) {
+    if (explain.hasOwnProperty("shards")) {
+        for (const shardName in explain.shards) {
+            getWinningPlan(explain.shards[shardName].stages[0]["$cursor"].queryPlanner);
+        }
+    }
+
+    const queryPlanner = explain.hasOwnProperty("queryPlanner)")
+        ? explain.queryPlanner
+        : explain.stages[0].$cursor.queryPlanner;
+    return getWinningPlan(queryPlanner);
+}
+
+/**
  * Returns an element of explain output which represents a rejected candidate plan.
  */
 export function getRejectedPlan(rejectedPlan) {

@@ -12,7 +12,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
 
 const coll = db.window_functions_on_timeseries_coll;
 
@@ -92,23 +92,27 @@ assert.commandWorked(coll.insert([
  */
 function assertExplainBehaviorAndCorrectResults(pipeline, expectedOpts, expectedResults) {
     const explain = coll.explain().aggregate(pipeline);
-    const winningPlan = explain.stages[0].$cursor.queryPlanner.winningPlan;
+    const winningPlan = getWinningPlanFromExplain(explain);
     assert.neq(null, winningPlan);
     if (expectedOpts.bucketFilter) {
         assert.eq(expectedOpts.bucketFilter, winningPlan.filter);
     }
     if (expectedOpts.bucketSort) {
-        assert.eq("SORT", winningPlan.stage);
-        assert.eq(expectedOpts.bucketSort, winningPlan.sortPattern);
-        assert.eq(null, getAggPlanStage(explain, "$sort"));
+        assert.eq("SORT", winningPlan.stage, `Expected "SORT" in winning plan ${tojson(explain)}`);
+        assert.eq(expectedOpts.bucketSort,
+                  winningPlan.sortPattern,
+                  `Expected sort key ${tojson(explain)}`);
+        assert.eq(null,
+                  getAggPlanStage(explain, "$sort"),
+                  `Expected no $sort in agg layer ${tojson(explain)}`);
     } else if (expectedOpts.windowSort) {
         const sort = getAggPlanStage(explain, "$sort").$sort;
-        assert.neq(null, sort);
-        assert.eq(expectedOpts.windowSort, sort.sortKey);
+        assert.neq(null, sort, `Expected $sort in agg layer ${tojson(explain)}`);
+        assert.eq(expectedOpts.windowSort, sort.sortKey, `Expected sort key ${tojson(explain)}`);
     }
 
     const unpackBucket = getAggPlanStage(explain, "$_internalUnpackBucket").$_internalUnpackBucket;
-    assert.neq(null, unpackBucket);
+    assert.neq(null, unpackBucket, `Expected unpack in agg layer ${tojson(explain)}`);
     if (expectedOpts.inExcludeSpec.hasOwnProperty("include")) {
         assert.sameMembers(expectedOpts.inExcludeSpec.include, unpackBucket.include);
     } else {
