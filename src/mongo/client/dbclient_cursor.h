@@ -126,6 +126,10 @@ public:
         return tailable() && (opts & QueryOption_AwaitData);
     }
 
+    bool isExhaust() const {
+        return (opts & QueryOption_Exhaust) != 0;
+    }
+
     /** see ResultFlagType (constants.h) for flag values
         mostly these flags are for internal purposes -
         ResultFlag_ErrSet is the possible exception to that
