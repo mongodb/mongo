@@ -385,11 +385,6 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
         }
     }
 
-    // if unsplittable, the collection is always equivalent to a single chunk collection
-    if (isUnsplittable) {
-        return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
-    }
-
     // If 'presplitHashedZones' flag is set, we always use 'PresplitHashedZonesSplitPolicy', to make
     // sure we throw the correct assertion if further validation fails.
     if (presplitHashedZones) {
