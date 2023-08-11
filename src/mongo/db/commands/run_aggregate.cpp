@@ -682,7 +682,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         execs.emplace_back(std::move(attachExecutorCallback.second));
     } else {
         getSearchHelpers(expCtx->opCtx->getServiceContext())
-            ->injectSearchShardFiltererIfNeeded(pipeline.get());
+            ->prepareSearchForTopLevelPipeline(pipeline.get());
         // Complete creation of the initial $cursor stage, if needed.
         PipelineD::attachInnerQueryExecutorToPipeline(collections,
                                                       attachExecutorCallback.first,

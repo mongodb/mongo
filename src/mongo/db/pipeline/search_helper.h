@@ -61,11 +61,25 @@ public:
                                              ExpressionContext* expCtx);
 
     /**
-     * Injects shard filterer for $_internalSearchIdLookup stage on shard only. This method is not
-     * invoked for inner collection in $lookup, for instance, only when expanded pipeline is passed
-     * to the specific shard.
+     * This method works on preparation for $search in top level pipeline, or inner pipeline that is
+     * dispatched to shards. Nothing is done if first stage in the pipeline is not $search, and this
+     * method should only be invoked for the DocumentSource-based implementation.
+     * The preparation works includes:
+     * 1. Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup
+     * stages.
+     * 2. injects shard filterer for $_internalSearchIdLookup stage on shard only.
      */
-    virtual void injectSearchShardFiltererIfNeeded(Pipeline* pipeline){};
+    virtual void prepareSearchForTopLevelPipeline(Pipeline* pipeline) {}
+
+    /**
+     * This method works on preparation for $search in nested pipeline, e.g. sub-pipeline of
+     * $lookup, for local read. Nothing is done if first stage in the pipeline is not $search, and
+     * this method should only be invoked for the DocumentSource-based implementation.
+     * The preparation works includes:
+     * 1. Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup
+     * stages.
+     */
+    virtual void prepareSearchForNestedPipeline(Pipeline* pipeline) {}
 
     /**
      * Check to see if in the current environment an additional pipeline needs to be run by the

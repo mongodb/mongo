@@ -72,6 +72,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -474,6 +475,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     invariant(!firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
     if (firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
         // There's no need to attach a cursor here.
+        getSearchHelpers(expCtx->opCtx->getServiceContext())
+            ->prepareSearchForNestedPipeline(pipeline.get());
         return pipeline;
     }
 
