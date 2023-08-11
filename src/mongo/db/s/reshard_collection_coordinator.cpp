@@ -160,10 +160,17 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassert(ErrorCodes::InvalidOptions,
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !_doc.getReshardingUUID().has_value());
+                if (!resharding::gFeatureFlagMoveCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Move collection is not enabled, reject provenance parameter",
+                            !_doc.getProvenance().has_value());
+                }
             }
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
+            configsvrReshardCollection.setProvenance(_doc.getProvenance());
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

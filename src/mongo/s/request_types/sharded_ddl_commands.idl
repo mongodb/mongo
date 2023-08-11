@@ -258,6 +258,10 @@ structs:
                     "A user-provided identifier used to identify this resharding operation for
                     retryability purposes."
                 optional: true
+            provenance:
+                type: string
+                description: "The source operation that called this resharding operation."
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"

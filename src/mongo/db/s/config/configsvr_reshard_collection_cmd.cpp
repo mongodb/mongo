@@ -184,6 +184,12 @@ public:
                 uassert(ErrorCodes::InvalidOptions,
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !request().getReshardingUUID().has_value());
+                if (!resharding::gFeatureFlagMoveCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Move collection is not enabled, reject provenance parameter",
+                            !request().getProvenance().has_value());
+                }
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -234,6 +240,9 @@ public:
                         opCtx->getServiceContext()->getFastClockSource()->now());
                     if (request().getReshardingUUID()) {
                         commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
+                    }
+                    if (request().getProvenance()) {
+                        commonMetadata.setProvenance(*request().getProvenance());
                     }
 
                     coordinatorDoc.setSourceKey(cm.getShardKeyPattern().getKeyPattern().toBSON());
