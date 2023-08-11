@@ -176,6 +176,10 @@ public:
         return tailable() && (_opts & QueryOption_AwaitData);
     }
 
+    bool isExhaust() const {
+        return (_opts & QueryOption_Exhaust) != 0;
+    }
+
     /**
      * Changes the cursor's batchSize after construction. Can change after requesting first batch.
      */
