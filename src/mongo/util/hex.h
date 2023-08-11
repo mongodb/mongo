@@ -124,4 +124,29 @@ std::string unsignedHex(T val) {
     return format(FMT_STRING("{:X}"), std::make_unsigned_t<T>(val));
 }
 
+/**
+ * Wraps a buffer of known size so its hex dump can be written to a stream without dynamic
+ * allocation.
+ */
+class StreamableHexdump {
+public:
+    StreamableHexdump(const void* data, size_t size)
+        : _data{reinterpret_cast<const unsigned char*>(data)}, _size(size) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const StreamableHexdump& dump) {
+        return dump._streamTo(os);
+    }
+
+private:
+    std::ostream& _streamTo(std::ostream& os) const;
+
+    const unsigned char* _data;
+    size_t _size;
+};
+
+template <typename T>
+StreamableHexdump streamableHexdump(const T& data) {
+    return {&data, sizeof(data)};
+}
+
 }  // namespace mongo
