@@ -9,8 +9,38 @@
 - name: single_op_core_excluded_files
   value:
     exclude_files:
-    # TODO (SERVER-72804/SERVER-72805): When timeseries is supported on mongod enable these.
-    - jstests/core/timeseries/**/*.js
+    # TODO (SERVER-72804/SERVER-72805): When timeseries update/delete is supported on mongod enable these.
+    - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+    - jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
+    - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
+    - jstests/core/timeseries/clustered_index_crud.js
+    - jstests/core/timeseries/libs/timeseries.js
+    - jstests/core/timeseries/libs/timeseries_writes_util.js
+    - jstests/core/timeseries/timeseries_bucket_index.js
+    - jstests/core/timeseries/timeseries_bucket_manual_removal.js
+    - jstests/core/timeseries/timeseries_collmod.js
+    - jstests/core/timeseries/timeseries_delete_collation.js
+    - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
+    - jstests/core/timeseries/timeseries_delete_hint.js
+    - jstests/core/timeseries/timeseries_delete_multi.js
+    - jstests/core/timeseries/timeseries_delete_one.js
+    - jstests/core/timeseries/timeseries_delete_with_meta.js
+    - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
+    - jstests/core/timeseries/timeseries_explain_delete.js
+    - jstests/core/timeseries/timeseries_explain_update.js
+    - jstests/core/timeseries/timeseries_find_and_modify_remove.js
+    - jstests/core/timeseries/timeseries_find_and_modify_update.js
+    - jstests/core/timeseries/timeseries_id_range.js
+    - jstests/core/timeseries/timeseries_insert_after_delete.js
+    - jstests/core/timeseries/timeseries_insert_after_update.js
+    - jstests/core/timeseries/timeseries_predicates.js
+    - jstests/core/timeseries/timeseries_predicates_with_projections.js
+    - jstests/core/timeseries/timeseries_update.js
+    - jstests/core/timeseries/timeseries_update_compressed_buckets.js
+    - jstests/core/timeseries/timeseries_update_concurrent.js
+    - jstests/core/timeseries/timeseries_update_hint.js
+    - jstests/core/timeseries/timeseries_update_multi.js
+    - jstests/core/timeseries/timeseries_update_one.js
     # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
     # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
     # server parameter.
@@ -32,8 +62,6 @@
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/write/update/batch_write_command_update.js
     - jstests/core/write/delete/batch_write_command_delete.js
-    # TODO (SERVER-72767): Uses time series inserts.
-    - jstests/core/catalog/list_catalog.js
     # Requires specific commands to be run to trigger failpoint (i.e. requires insert, we run bulkWrite).
     - jstests/core/failcommand_failpoint.js
     # TODO (SERVER-71899): bulkWrite does not yet use stable API
@@ -44,9 +72,6 @@
 - name: single_op_txns_excluded_files
   value:
     exclude_files:
-    # TODO (SERVER-72804/SERVER-72805): When timeseries is supported on mongod enable these.
-    - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
-    - jstests/core/txns/timeseries_insert_in_txn.js
     # TODO (SERVER-71899): bulkWrite does not yet use stable API
     - jstests/core/txns/api_params_transaction.js
     # Checks for op names which bulkWrite will not show up as
