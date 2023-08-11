@@ -383,6 +383,12 @@ void KeyString::_appendAllElementsForIndexing(const BSONObj& obj,
 }
 
 void KeyString::appendRecordId(RecordId loc) {
+    loc.withFormat([](RecordId::Null n) { invariant(false); },
+                   [&](int64_t rid) { _appendRecordIdLong(rid); },
+                   [&](const char* str, int size) { _appendRecordIdStr(str, size); });
+}
+
+void KeyString::_appendRecordIdLong(int64_t val) {
     // The RecordId encoding must be able to determine the full length starting from the last
     // byte, without knowing where the first byte is since it is stored at the end of a
     // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
@@ -394,7 +400,7 @@ void KeyString::appendRecordId(RecordId loc) {
     // big-endian order. This does not encode negative RecordIds to give maximum space to
     // positive RecordIds which are the only ones that are allowed to be stored in an index.
 
-    int64_t raw = loc.repr();
+    int64_t raw = val;
     if (raw < 0) {
         // Note: we encode RecordId::min() and RecordId() the same which is ok, as they are
         // never stored so they will never be compared to each other.
@@ -426,6 +432,47 @@ void KeyString::appendRecordId(RecordId loc) {
                      false);
     }
     _append(lastByte, false);
+}
+void KeyString::_appendRecordIdStr(const char* str, int size) {
+    // Append the RecordId binary string as-is, then append the encoded binary string size.
+    // The binary string size is encoded in 7-bit increments over one or more size bytes.
+    // The 8th bit of a size byte is a continuation bit that is set on all size bytes except
+    // the leftmost (i.e. the last) one. This allows decoding the size right-to-left until there are
+    // no more size bytes remaining with continuation bits. See decodeRecordIdStrAtEnd for the
+    // decoding algorithm. This 7-bit size encoding ensures backward compatibility with 5.0, which
+    // supports RecordId binary strings up to 127 bytes, or what fits in 7 bits.
+
+    invariant(size > 0);
+    invariant(size <= RecordId::kBigStrMaxSize);
+
+    const bool invert = false;
+
+    // Encode size
+    uint8_t encodedSize[kRecordIdStrEncodedSizeMaxBytes] = {0};
+    int highestSizeByte = 0;
+    bool highestSizeByteSet = false;
+
+    for (int sizeBytes = kRecordIdStrEncodedSizeMaxBytes - 1; sizeBytes >= 0; sizeBytes--) {
+        encodedSize[sizeBytes] = (size >> (sizeBytes * 7)) & 0x7F;
+        if (encodedSize[sizeBytes] && highestSizeByteSet == false) {
+            highestSizeByteSet = true;
+            highestSizeByte = sizeBytes;
+        }
+    }
+    for (int i = highestSizeByte; i > 0; i--) {
+        encodedSize[i] |= 0x80;
+    }
+
+    const int encodedSizeLen = highestSizeByte + 1;
+
+    // Preallocate room for the RecordId binary string and its encoded size
+    // to reduce the number of potential reallocs
+    _buffer.reserveBytes(size + encodedSizeLen);
+    _buffer.claimReservedBytes(size + encodedSizeLen);
+
+    // Append RecordId and its encoded size
+    _appendBytes(str, size, invert);
+    _appendBytes(encodedSize, encodedSizeLen, invert);
 }
 
 void KeyString::appendTypeBits(const TypeBits& typeBits) {
@@ -1302,9 +1349,9 @@ void toBsonValue(uint8_t ctype,
             break;
         }
 
-        //
-        // Numerics
-        //
+            //
+            // Numerics
+            //
 
         case CType::kNumericNaN: {
             auto type = typeBits->readNumeric();
@@ -1417,7 +1464,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositiveSmallMagnitude: {
             const uint8_t originalType = typeBits->readNumeric();
@@ -1548,7 +1595,7 @@ void toBsonValue(uint8_t ctype,
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:
@@ -1784,9 +1831,9 @@ void filterKeyFromKeyString(uint8_t ctype,
             break;
         }
 
-        //
-        // Numerics
-        //
+            //
+            // Numerics
+            //
 
         case CType::kNumericNaN: {
             break;
@@ -1825,7 +1872,7 @@ void filterKeyFromKeyString(uint8_t ctype,
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositiveSmallMagnitude: {
             uint64_t encoded = readType<uint64_t>(reader, inverted);
@@ -1887,7 +1934,7 @@ void filterKeyFromKeyString(uint8_t ctype,
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
             isNegative = true;
-        // fallthrough (format is the same as positive, but inverted)
+            // fallthrough (format is the same as positive, but inverted)
 
         case CType::kNumericPositive1ByteInt:
         case CType::kNumericPositive2ByteInt:
@@ -2069,6 +2116,42 @@ BSONObj KeyString::toBson(const char* buffer,
 
 BSONObj KeyString::toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
     return toBson(data.rawData(), data.size(), ord, typeBits);
+}
+
+RecordId KeyString::decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
+    // See _appendRecordIdStr for the encoding scheme.
+    // The RecordId binary string size is decoded right-to-left, up to the size byte
+    // without continuation bit.
+
+    invariant(bufSize > 0);
+    const uint8_t* buffer = static_cast<const uint8_t*>(bufferRaw);
+
+    // Decode RecordId binary string size
+    size_t ridSize = 0;
+    uint8_t sizes[kRecordIdStrEncodedSizeMaxBytes] = {0};
+
+    // Continuation bytes
+    size_t sizeByteId = 0;
+    for (; buffer[bufSize - 1 - sizeByteId] & 0x80; sizeByteId++) {
+        invariant(bufSize >= sizeByteId + 1 /* non-cont byte */);
+        invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+        sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId] & 0x7F;
+    }
+    // Last (non-continuation) byte
+    invariant(sizeByteId < kRecordIdStrEncodedSizeMaxBytes);
+    sizes[sizeByteId] = buffer[bufSize - 1 - sizeByteId];
+
+    const size_t numSegments = sizeByteId + 1;
+
+    for (; sizeByteId > 0; sizeByteId--) {
+        ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
+    }
+    ridSize += static_cast<size_t>(sizes[sizeByteId]) << ((numSegments - sizeByteId - 1) * 7);
+
+    invariant(bufSize >= ridSize + numSegments);
+
+    return RecordId(reinterpret_cast<const char*>(buffer) + (bufSize - ridSize - numSegments),
+                    ridSize);
 }
 
 RecordId KeyString::decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {

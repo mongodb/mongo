@@ -73,6 +73,11 @@ enum class Format : int8_t {
  */
 class RecordId {
 public:
+    static constexpr int64_t kMaxRepr = LLONG_MAX;
+    static constexpr int64_t kNullRepr = 0;
+    static constexpr int64_t kMinRepr = LLONG_MIN;
+    static constexpr int64_t kSmallStrMaxSize = 22;
+    static constexpr int64_t kBigStrMaxSize = 8 * 1024 * 1024;
     /**
      * Constructs a Null RecordId.
      */
@@ -90,7 +95,8 @@ public:
             _format = Format::kSmallStr;
             // Must fit into the buffer minus 1 byte for size.
             _buffer[0] = static_cast<char>(size);
-            std::copy(data, data + size, _buffer.begin() + sizeof(char));
+            memcpy(_buffer.data() + 1, data, size);
+            // std::copy(data, data + size, _buffer.data()+1);
 
         } else if (size <= kBigStrMaxSize) {
             _format = Format::kBigStr;
@@ -303,11 +309,6 @@ private:
     }
 
 
-    static constexpr int64_t kMaxRepr = LLONG_MAX;
-    static constexpr int64_t kNullRepr = 0;
-    static constexpr int64_t kMinRepr = LLONG_MIN;
-    static constexpr int64_t kSmallStrMaxSize = 22;
-    static constexpr int64_t kBigStrMaxSize = 8 * 1024 * 1024;
     // int64_t _repr;
     Format _format = Format::kNull;
     std::array<char, kSmallStrMaxSize + 1> _buffer;
