@@ -122,14 +122,15 @@ void ThroughputProbing::_run(Client* client) {
         return;
     }
 
-    double elapsed = _timer.micros();
-    if (elapsed == 0) {
+    Microseconds elapsed = _timer.elapsed();
+    if (elapsed == Microseconds{0}) {
         // The clock used to sleep between iterations may not be reliable, and thus the timer may
         // report that no time has elapsed. If this occurs, just wait for the next iteration.
         return;
     }
 
-    auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) / elapsed;
+    auto throughput =
+        (numFinishedProcessing - _prevNumFinishedProcessing) / static_cast<double>(elapsed.count());
 
     switch (_state) {
         case ProbingState::kStable:
