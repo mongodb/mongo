@@ -184,7 +184,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
     return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
-        DatabaseName::kLocal.db(),
+        DatabaseName::kLocal,
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "limit" << 1 << "sort"
                     << BSON("$natural" << 1) << "projection"
                     << BSON(OplogEntryBase::kTimestampFieldName
@@ -209,7 +209,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
     return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
-        DatabaseName::kLocal.db(),
+        DatabaseName::kLocal,
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
@@ -416,7 +416,7 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
 
     invariant(_state == State::kRunning);
     auto handle = _taskExecutor->scheduleRemoteCommand(
-        {candidate, "admin", BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
+        {candidate, DatabaseName::kAdmin, BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
         [=, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
             _rbidRequestCallback(candidate, earliestOpTimeSeen, rbidReply);
         });

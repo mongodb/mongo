@@ -92,8 +92,10 @@ public:
 };
 
 TEST_F(NetworkInterfaceSSLFixture, Ping) {
-    assertCommandOK(
-        "admin", BSON("ping" << 1), RemoteCommandRequest::kNoTimeout, transport::kEnableSSL);
+    assertCommandOK(DatabaseName::kAdmin,
+                    BSON("ping" << 1),
+                    RemoteCommandRequest::kNoTimeout,
+                    transport::kEnableSSL);
 }
 
 }  // namespace

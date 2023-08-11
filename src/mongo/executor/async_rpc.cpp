@@ -77,7 +77,7 @@ public:
         auto proxyExec = std::make_shared<ProxyingExecutor>(baton, exec);
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
-            .then([dbName = DatabaseNameUtil::serializeForRemoteCmdRequest(dbName),
+            .then([dbName,
                    cmdBSON,
                    opCtx,
                    exec = std::move(exec),

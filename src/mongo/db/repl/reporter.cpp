@@ -202,7 +202,8 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeo
                 "commandRequest"_attr = commandRequest);
 
     auto scheduleResult = _executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr, netTimeout),
+        executor::RemoteCommandRequest(
+            _target, DatabaseName::kAdmin, commandRequest, nullptr, netTimeout),
         [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
             _processResponseCallback(rcbd);
         });

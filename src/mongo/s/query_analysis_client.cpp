@@ -124,8 +124,7 @@ BSONObj QueryAnalysisClient::_executeCommandOnPrimaryRemote(
     auto executor = getTaskExecutor(opCtx->getServiceContext());
     invariant(executor, "Failed to run command since the executor has not been initialized");
 
-    executor::RemoteCommandRequest request(
-        std::move(hostAndPort), DatabaseNameUtil::serialize(dbName), cmdObj, opCtx);
+    executor::RemoteCommandRequest request(std::move(hostAndPort), dbName, cmdObj, opCtx);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));

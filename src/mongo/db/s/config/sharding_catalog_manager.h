@@ -696,7 +696,7 @@ private:
      */
     StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* opCtx,
                                                               RemoteCommandTargeter* targeter,
-                                                              StringData dbName,
+                                                              const DatabaseName& dbName,
                                                               const BSONObj& cmdObj);
 
     /**

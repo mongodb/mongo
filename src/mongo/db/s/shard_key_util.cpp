@@ -380,7 +380,7 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
     auto indexesRes = _indexShard->runExhaustiveCursorCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        nss.db_forSharding().toString(),
+        nss.dbName(),
         appendShardVersion(BSON("listIndexes" << nss.coll()),
                            _cri.getShardVersion(_indexShard->getId())),
         Milliseconds(-1));
@@ -395,7 +395,7 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
     auto checkShardingIndexRes = uassertStatusOK(_indexShard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
+        DatabaseName::kAdmin,
         appendShardVersion(BSON(kCheckShardingIndexCmdName << NamespaceStringUtil::serialize(nss)
                                                            << kKeyPatternField << proposedKey),
                            _cri.getShardVersion(_indexShard->getId())),
@@ -495,7 +495,7 @@ void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
     auto checkShardingIndexRes = uassertStatusOK(shard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        "admin",
+        DatabaseName::kAdmin,
         appendShardVersion(BSON(kCheckShardingIndexCmdName << NamespaceStringUtil::serialize(nss)
                                                            << kKeyPatternField << proposedKey),
                            cri.getShardVersion(shard->getId())),

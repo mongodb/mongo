@@ -172,7 +172,7 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
 
 StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* opCtx,
                                                             const ReadPreferenceSetting& readPref,
-                                                            StringData dbName,
+                                                            const DatabaseName& dbName,
                                                             Milliseconds maxTimeMSOverride,
                                                             const BSONObj& cmdObj) {
     RemoteCommandResponse response =
@@ -237,7 +237,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    StringData dbName,
+    const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
     const auto host = _targeter->findHost(opCtx, readPref);
@@ -302,7 +302,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     Fetcher fetcher(executor.get(),
                     host.getValue(),
-                    dbName.toString(),
+                    dbName,
                     cmdObj,
                     fetcherCallback,
                     _appendMetadataForCommand(opCtx, readPref),
@@ -406,16 +406,13 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         findCommand.serialize(BSONObj(), &findCmdBuilder);
     }
 
-    return _runExhaustiveCursorCommand(opCtx,
-                                       readPrefWithConfigTime,
-                                       nss.db_forSharding().toString(),
-                                       maxTimeMS,
-                                       findCmdBuilder.done());
+    return _runExhaustiveCursorCommand(
+        opCtx, readPrefWithConfigTime, nss.dbName(), maxTimeMS, findCmdBuilder.done());
 }
 
 void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
                                           const ReadPreferenceSetting& readPref,
-                                          const std::string& dbName,
+                                          const DatabaseName& dbName,
                                           const BSONObj& cmdObj) {
     _scheduleCommand(opCtx,
                      readPref,
@@ -501,7 +498,7 @@ Status ShardRemote::runAggregation(
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     Fetcher fetcher(executor.get(),
                     host,
-                    aggRequest.getNamespace().db_forSharding().toString(),
+                    aggRequest.getNamespace().dbName(),
                     aggregation_request_helper::serializeToCommandObj(aggRequest),
                     fetcherCallback,
                     readPrefMetadata,
@@ -527,7 +524,7 @@ Status ShardRemote::runAggregation(
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    StringData dbName,
+    const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
@@ -545,7 +542,7 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
 
     const RemoteCommandRequest request(
         asyncHandle.hostTargetted,
-        dbName.toString(),
+        dbName,
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
         _appendMetadataForCommand(opCtx, readPref),
         opCtx,

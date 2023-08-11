@@ -86,7 +86,7 @@ public:
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(
                     configsvrSetUserWriteBlockModeCmd.toBSON({}), opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));

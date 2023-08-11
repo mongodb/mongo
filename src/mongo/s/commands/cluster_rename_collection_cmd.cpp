@@ -161,7 +161,7 @@ public:
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                fromNss.db_forSharding().toString(),
+                fromNss.dbName(),
                 CommandHelpers::appendMajorityWriteConcern(
                     appendDbVersionIfPresent(renameCollRequest.toBSON({}), dbInfo->getVersion())),
                 Shard::RetryPolicy::kNoRetry));

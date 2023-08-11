@@ -102,7 +102,7 @@ public:
             const auto commandResponse = uassertStatusOK(configShard->runCommand(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 configsvrRequest.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                              << opCtx->getWriteConcern().toBSON())),
                 Shard::RetryPolicy::kIdempotent));

@@ -277,7 +277,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
                         configShard->runCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                nss().db_forSharding().toString(),
+                                                nss().dbName(),
                                                 cmdObj,
                                                 Shard::RetryPolicy::kIdempotent)));
                 }

@@ -67,7 +67,11 @@ public:
     virtual void tearDown() override;
 
     RemoteCommandRequestOnAny kUnimportantRequest{
-        {testHost()}, "testDB", BSON("test" << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()},
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+        BSON("test" << 1),
+        rpc::makeEmptyMetadata(),
+        nullptr};
 
 private:
     NetworkInterfaceMock _net;

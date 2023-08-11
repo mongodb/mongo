@@ -156,7 +156,7 @@ public:
         // this test is not running on mongos.
         const auto cmdObj = BSON("listShards" << 1);
         RemoteCommandRequest request{getFixtureConnectionString().getServers().front(),
-                                     "admin",
+                                     DatabaseName::kAdmin,
                                      cmdObj,
                                      BSONObj(),
                                      nullptr,

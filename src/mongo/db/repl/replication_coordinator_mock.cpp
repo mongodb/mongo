@@ -808,7 +808,7 @@ void ReplicationCoordinatorMock::cancelCbkHandle(
 
 BSONObj ReplicationCoordinatorMock::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {

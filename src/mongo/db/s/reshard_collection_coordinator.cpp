@@ -177,7 +177,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(configsvrReshardCollection.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));

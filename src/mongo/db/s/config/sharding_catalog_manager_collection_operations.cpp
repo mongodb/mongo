@@ -146,7 +146,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
             // asynchronous '_flushRoutingTableCacheUpdates' request.
             shard->runFireAndForgetCommand(opCtx,
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           DatabaseName::kAdmin.toString(),
+                                           DatabaseName::kAdmin,
                                            BSON("_flushRoutingTableCacheUpdates"
                                                 << NamespaceStringUtil::serialize(coll.getNss())));
         }

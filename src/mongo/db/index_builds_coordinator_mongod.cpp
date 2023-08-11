@@ -186,8 +186,11 @@ void runVoteCommand(OperationContext* opCtx,
 
         BSONObj voteCmdResponse;
         try {
-            voteCmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
-                opCtx, "admin", voteCmdRequest, onRemoteCmdScheduled, onRemoteCmdComplete);
+            voteCmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(opCtx,
+                                                                         DatabaseName::kAdmin,
+                                                                         voteCmdRequest,
+                                                                         onRemoteCmdScheduled,
+                                                                         onRemoteCmdComplete);
         } catch (DBException& ex) {
             // All errors, including CallbackCanceled and network errors, should be retried.
             // If ErrorCodes::CallbackCanceled is due to shutdown, then checkForInterrupt() at the

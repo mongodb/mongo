@@ -70,7 +70,7 @@ public:
      * response and write concern error (if present).
      */
     StatusWith<Shard::CommandResponse> runCommandOnce(OperationContext* opCtx,
-                                                      StringData dbName,
+                                                      const DatabaseName& dbName,
                                                       const BSONObj& cmdObj);
 
     /**

@@ -126,7 +126,11 @@ void FetcherTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
     callbackHook = Fetcher::CallbackFn();
-    fetcher = std::make_unique<Fetcher>(&getExecutor(), source, "db", findCmdObj, makeCallback());
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        makeCallback());
     launchExecutorThread();
 }
 
@@ -218,32 +222,48 @@ TEST_F(FetcherTest, InvalidConstruction) {
     TaskExecutor& executor = getExecutor();
 
     // Null executor.
-    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(nullptr, source, "db", findCmdObj, unreachableCallback),
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(nullptr,
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        unreachableCallback),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "task executor cannot be null");
 
     // Empty source.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        Fetcher(&executor, HostAndPort(), "db", findCmdObj, unreachableCallback),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "source in remote command request cannot be empty");
-
-    // Empty database name.
-    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "", findCmdObj, unreachableCallback),
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor,
+                                        HostAndPort(),
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        unreachableCallback),
                                 AssertionException,
                                 ErrorCodes::BadValue,
-                                "database name in remote command request cannot be empty");
+                                "source in remote command request cannot be empty");
+
+    // Empty database name.
+    ASSERT_THROWS_CODE_AND_WHAT(
+        Fetcher(&executor, source, DatabaseName(), findCmdObj, unreachableCallback),
+        AssertionException,
+        ErrorCodes::BadValue,
+        "database name in remote command request cannot be empty");
 
     // Empty command object.
-    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", BSONObj(), unreachableCallback),
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor,
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        BSONObj(),
+                                        unreachableCallback),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "command object in remote command request cannot be empty");
 
     // Callback function cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor, source, "db", findCmdObj, Fetcher::CallbackFn()),
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor,
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        Fetcher::CallbackFn()),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "callback function cannot be null");
@@ -252,7 +272,7 @@ TEST_F(FetcherTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         Fetcher(&executor,
                 source,
-                "db",
+                DatabaseName::createDatabaseName_forTest(boost::none, "db"),
                 findCmdObj,
                 unreachableCallback,
                 rpc::makeEmptyMetadata(),
@@ -360,20 +380,33 @@ TEST_F(FetcherTest, NonFindCommand) {
 
     Fetcher f1(&executor,
                source,
-               "db",
+               DatabaseName::createDatabaseName_forTest(boost::none, "db"),
                BSON("listIndexes"
                     << "coll"),
                unreachableCallback);
-    Fetcher f2(&executor, source, "db", BSON("listCollections" << 1), unreachableCallback);
-    Fetcher f3(&executor, source, "db", BSON("a" << 1), unreachableCallback);
+    Fetcher f2(&executor,
+               source,
+               DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+               BSON("listCollections" << 1),
+               unreachableCallback);
+    Fetcher f3(&executor,
+               source,
+               DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+               BSON("a" << 1),
+               unreachableCallback);
 }
 
 TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToConstructor) {
     auto metadataObj = BSON("x" << 1);
     Milliseconds timeout(8000);
 
-    fetcher = std::make_unique<Fetcher>(
-        &getExecutor(), source, "db", findCmdObj, doNothingCallback, metadataObj, timeout);
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        doNothingCallback,
+                                        metadataObj,
+                                        timeout);
 
     ASSERT_EQUALS(source, fetcher->getSource());
     ASSERT_BSONOBJ_EQ(findCmdObj, fetcher->getCommandObject());
@@ -970,7 +1003,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
         request = noi->getRequest();
     }
 
-    ASSERT_EQUALS(nss.db_forTest(), request.dbname);
+    ASSERT_EQUALS(nss.dbName(), request.dbname);
     auto&& cmdObj = request.cmdObj;
     auto firstElement = cmdObj.firstElement();
     ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
@@ -1045,7 +1078,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
 
-        ASSERT_EQUALS(nss.db_forTest(), request.dbname);
+        ASSERT_EQUALS(nss.dbName(), request.dbname);
         auto&& cmdObj = request.cmdObj;
         auto firstElement = cmdObj.firstElement();
         ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
@@ -1150,7 +1183,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
 
     fetcher = std::make_unique<Fetcher>(&getExecutor(),
                                         source,
-                                        "db",
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
                                         findCmdObj,
                                         makeCallback(),
                                         rpc::makeEmptyMetadata(),
@@ -1206,7 +1239,7 @@ TEST_F(FetcherTest, FetcherResetsInternalFinishCallbackFunctionPointerAfterLastC
     fetcher = std::make_unique<Fetcher>(
         &getExecutor(),
         source,
-        "db",
+        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
         findCmdObj,
         [&callbackInvoked, sharedCallbackData](const StatusWith<Fetcher::QueryResponse>&,
                                                Fetcher::NextAction*,

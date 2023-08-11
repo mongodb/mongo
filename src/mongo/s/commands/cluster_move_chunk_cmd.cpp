@@ -234,7 +234,7 @@ public:
             auto commandResponse = configShard->runCommand(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON({})),
                 Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));

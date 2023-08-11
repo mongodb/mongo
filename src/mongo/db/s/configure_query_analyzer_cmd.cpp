@@ -259,7 +259,7 @@ public:
                     auto swResponse = configShard->runCommandWithFixedRetryAttempts(
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        DatabaseName::kConfig.toString(),
+                        DatabaseName::kConfig,
                         request.toBSON({}),
                         Shard::RetryPolicy::kIdempotent);
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swResponse));

@@ -181,7 +181,10 @@ std::vector<ResponseStatus> CallbackResponseSaver::getResponses() const {
 
 executor::RemoteCommandRequest makeRemoteCommandRequest() {
     return executor::RemoteCommandRequest{
-        HostAndPort("h1:12345"), "db1", BSON("ping" << 1), nullptr};
+        HostAndPort("h1:12345"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "db1"),
+        BSON("ping" << 1),
+        nullptr};
 }
 
 TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryPolicy) {
@@ -243,7 +246,8 @@ TEST_F(RemoteCommandRetrySchedulerTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(
         RemoteCommandRetryScheduler(
             &getExecutor(),
-            executor::RemoteCommandRequest(request.target, "", request.cmdObj, nullptr),
+            executor::RemoteCommandRequest(
+                request.target, DatabaseName::kEmpty, request.cmdObj, nullptr),
             callback,
             makeRetryPolicy()),
         AssertionException,

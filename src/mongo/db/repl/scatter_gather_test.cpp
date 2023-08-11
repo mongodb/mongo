@@ -79,8 +79,11 @@ public:
     std::vector<RemoteCommandRequest> getRequests() const override {
         std::vector<RemoteCommandRequest> requests;
         for (int i = 0; i < kTotalRequests; i++) {
-            requests.push_back(RemoteCommandRequest(
-                HostAndPort("hostname", i), "admin", BSONObj(), nullptr, Milliseconds(30 * 1000)));
+            requests.push_back(RemoteCommandRequest(HostAndPort("hostname", i),
+                                                    DatabaseName::kAdmin,
+                                                    BSONObj(),
+                                                    nullptr,
+                                                    Milliseconds(30 * 1000)));
         }
         return requests;
     }

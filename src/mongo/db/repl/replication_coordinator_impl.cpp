@@ -2582,7 +2582,7 @@ void ReplicationCoordinatorImpl::cancelCbkHandle(CallbackHandle activeHandle) {
 
 BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
@@ -3020,7 +3020,7 @@ void ReplicationCoordinatorImpl::_performElectionHandoff() {
 
     auto target = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
     executor::RemoteCommandRequest request(
-        target, "admin", BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
+        target, DatabaseName::kAdmin, BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
     LOGV2(
         21347, "Handing off election to {target}", "Handing off election", "target"_attr = target);
 

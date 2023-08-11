@@ -814,7 +814,8 @@ ExecutorFuture<void> remoteAdminCommand(TaskExecutorPtr executor,
                                         const HostAndPort remoteNode,
                                         const BSONObj& command) {
     return AsyncTry([executor, token, remoteNode, command] {
-               executor::RemoteCommandRequest request(remoteNode, "admin", command, nullptr);
+               executor::RemoteCommandRequest request(
+                   remoteNode, DatabaseName::kAdmin, command, nullptr);
                auto hasWriteConcern = command.hasField(WriteConcernOptions::kWriteConcernField);
 
                return executor->scheduleRemoteCommand(request, token)

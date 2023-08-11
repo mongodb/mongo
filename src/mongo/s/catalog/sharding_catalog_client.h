@@ -280,7 +280,7 @@ public:
      */
     virtual Status runUserManagementWriteCommand(OperationContext* opCtx,
                                                  StringData commandName,
-                                                 StringData dbname,
+                                                 const DatabaseName& dbname,
                                                  const BSONObj& cmdObj,
                                                  BSONObjBuilder* result) = 0;
 
@@ -288,7 +288,7 @@ public:
      * Runs a user management related read-only command on a config server.
      */
     virtual bool runUserManagementReadCommand(OperationContext* opCtx,
-                                              const std::string& dbname,
+                                              const DatabaseName& dbname,
                                               const BSONObj& cmdObj,
                                               BSONObjBuilder* result) = 0;
 

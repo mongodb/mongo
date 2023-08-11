@@ -156,7 +156,7 @@ public:
             auto status = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx,
                 Request::kCommandName,
-                DatabaseNameUtil::serialize(cmd.getDbName()),
+                cmd.getDbName(),
                 applyReadWriteConcern(
                     opCtx,
                     this,
@@ -257,7 +257,7 @@ public:
             BSONObjBuilder builder;
             const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
                 opCtx,
-                DatabaseNameUtil::serialize(cmd.getDbName()),
+                cmd.getDbName(),
                 applyReadWriteConcern(
                     opCtx,
                     this,

@@ -155,7 +155,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
 
     sharding_util::sendCommandToShards(
         opCtx,
-        userCollectionNss.db_forSharding(),
+        userCollectionNss.dbName(),
         CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
         shardIdsVec,
         executor);
@@ -167,7 +167,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     shardsvrBlockWritesRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     sharding_util::sendCommandToShards(
         opCtx,
-        userCollectionNss.db_forSharding(),
+        userCollectionNss.dbName(),
         CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
         shardIdsVec,
         executor);
@@ -211,7 +211,7 @@ void registerIndexCatalogEntry(OperationContext* opCtx,
 
             sharding_util::sendCommandToShards(
                 opCtx,
-                userCollectionNss.db_forSharding(),
+                userCollectionNss.dbName(),
                 CommandHelpers::appendMajorityWriteConcern(
                     shardsvrCommitIndexParticipantRequest.toBSON(osi.toBSON())),
                 shardIds,
@@ -228,7 +228,7 @@ void registerIndexCatalogEntry(OperationContext* opCtx,
                     ->runCommandWithFixedRetryAttempts(
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        "admin",
+                        DatabaseName::kAdmin,
                         CommandHelpers::appendMajorityWriteConcern(
                             configsvrCommitIndexRequest.toBSON(osi.toBSON())),
                         Shard::RetryPolicy::kIdempotent);
@@ -272,7 +272,7 @@ void unregisterIndexCatalogEntry(OperationContext* opCtx,
                     ->runCommandWithFixedRetryAttempts(
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        "admin",
+                        DatabaseName::kAdmin,
                         CommandHelpers::appendMajorityWriteConcern(
                             configsvrDropIndexCatalogRequest.toBSON(osi.toBSON())),
                         Shard::RetryPolicy::kIdempotent);
@@ -288,7 +288,7 @@ void unregisterIndexCatalogEntry(OperationContext* opCtx,
 
             sharding_util::sendCommandToShards(
                 opCtx,
-                DatabaseName::kAdmin.db(),
+                DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(
                     shardsvrDropIndexCatalogEntryRequest.toBSON(osi.toBSON())),
                 shardIdsVec,

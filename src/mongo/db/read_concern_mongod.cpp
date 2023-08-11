@@ -219,7 +219,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
                 };
                 auto appendOplogNoteResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                     opCtx,
-                    DatabaseName::kAdmin.toString(),
+                    DatabaseName::kAdmin,
                     BSON("appendOplogNote"
                          << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
                          << BSON("noop write for afterClusterTime read concern" << 1)

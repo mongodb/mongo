@@ -367,7 +367,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     auto cmdResponse = uassertStatusOK(primaryShardPtr->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
+        DatabaseName::kAdmin,
         BSON("_flushDatabaseCacheUpdates" << dbName),
         Shard::RetryPolicy::kIdempotent));
     uassertStatusOK(cmdResponse.commandStatus);

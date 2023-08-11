@@ -51,7 +51,7 @@ AsyncMulticaster::AsyncMulticaster(std::shared_ptr<executor::TaskExecutor> execu
 
 std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     const std::vector<HostAndPort> servers,
-    const std::string& theDbName,
+    const DatabaseName& theDbName,
     const BSONObj& theCmdObj,
     OperationContext* opCtx,
     Milliseconds timeoutMillis) {

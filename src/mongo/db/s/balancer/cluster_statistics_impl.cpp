@@ -92,7 +92,7 @@ StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, Shar
     auto commandResponse =
         shard->runCommandWithFixedRetryAttempts(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
+                                                DatabaseName::kAdmin,
                                                 BSON("serverStatus" << 1),
                                                 Shard::RetryPolicy::kIdempotent);
     if (!commandResponse.isOK()) {

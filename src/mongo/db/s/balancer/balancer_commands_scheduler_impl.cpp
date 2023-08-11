@@ -82,7 +82,7 @@ void waitForQuiescedCluster(OperationContext* opCtx) {
 
     const auto responses =
         sharding_util::sendCommandToShards(opCtx,
-                                           DatabaseName::kAdmin.toString(),
+                                           DatabaseName::kAdmin,
                                            joinShardOnMigrationsRequest.toBSON({}),
                                            unquiescedShardIds,
                                            executor,

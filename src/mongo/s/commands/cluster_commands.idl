@@ -58,8 +58,9 @@ structs:
     fields:
       multicast: object
       $db:
-        type: string
         cpp_name: db
+        type: database_name
+        description: The database name.
       concurrency:
         type: int
         optional: true

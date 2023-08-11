@@ -109,7 +109,7 @@ Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
     const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin.toString(),
+        DatabaseName::kAdmin,
         configsvrSetClusterParameter.toBSON({}),
         Shard::RetryPolicy::kIdempotent);
 

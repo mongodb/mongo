@@ -927,7 +927,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
         auto response = shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
+            DatabaseName::kAdmin,
             cmdObj,
             Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
@@ -1031,7 +1031,7 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
         // send cmd
         auto executor = Grid::get(altOpCtx)->getExecutorPool()->getFixedExecutor();
         auto responses = sharding_util::sendCommandToShards(altOpCtx,
-                                                            DatabaseName::kAdmin.db(),
+                                                            DatabaseName::kAdmin,
                                                             bob.obj(),
                                                             recipients,
                                                             executor,
@@ -1348,7 +1348,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
         uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            NamespaceString::kConfigsvrPlacementHistoryNamespace.db().toString(),
+            NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
             deleteOp.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                  << ShardingCatalogClient::kLocalWriteConcern.toBSON())),
             Shard::RetryPolicy::kNotIdempotent));
@@ -1535,7 +1535,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        NamespaceString::kConfigsvrPlacementHistoryNamespace.db().toString(),
+        NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
         deleteRequest.toBSON({}),
         Shard::RetryPolicy::kIdempotent));
 

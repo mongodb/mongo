@@ -69,7 +69,7 @@ void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter&
     const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin.toString(),
+        DatabaseName::kAdmin,
         configsvrSetClusterParameter.toBSON({}),
         Shard::RetryPolicy::kIdempotent));
 

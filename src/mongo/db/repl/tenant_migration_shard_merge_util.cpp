@@ -402,7 +402,7 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
                                        NamespaceString namespaceString) {
     executor::RemoteCommandRequest getMoreRequest(
         hostAndPort,
-        namespaceString.db_deprecated().toString(),
+        namespaceString.dbName(),
         std::move(BSON("getMore" << cursorId << "collection" << namespaceString.coll().toString())),
         nullptr);
     getMoreRequest.options.fireAndForget = true;

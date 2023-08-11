@@ -211,7 +211,7 @@ void sendWriteCommandToRecipient(OperationContext* opCtx,
     auto response = recipientShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseNameUtil::serialize(cmd.getDbName()),
+        cmd.getDbName(),
         cmdBSON,
         Shard::RetryPolicy::kIdempotent);
 
@@ -325,7 +325,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
+            DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequestBSON),
             Shard::RetryPolicy::kIdempotent);
     const auto ensureChunkVersionIsGreaterThanStatus =
@@ -522,7 +522,7 @@ long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
         uassertStatusOK(recipientShard->runExhaustiveCursorCommand(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            NamespaceString::kRangeDeletionNamespace.db().toString(),
+            NamespaceString::kRangeDeletionNamespace.dbName(),
             findCommand.toBSON(BSONObj()),
             Milliseconds(-1)));
     if (rangeDeletionResponse.docs.empty()) {
@@ -1018,7 +1018,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
                     const auto response = recipientShard->runCommandWithFixedRetryAttempts(
                         newOpCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        DatabaseName::kAdmin.toString(),
+                        DatabaseName::kAdmin,
                         commandObj,
                         Shard::RetryPolicy::kIdempotent);
 

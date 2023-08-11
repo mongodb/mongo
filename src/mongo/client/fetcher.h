@@ -144,7 +144,7 @@ public:
      */
     Fetcher(executor::TaskExecutor* executor,
             const HostAndPort& source,
-            StringData dbname,
+            const DatabaseName& dbname,
             const BSONObj& cmdObj,
             CallbackFn work,
             const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -270,7 +270,7 @@ private:
     executor::TaskExecutor* _executor;
 
     HostAndPort _source;
-    std::string _dbname;
+    DatabaseName _dbname;
     BSONObj _cmdObj;
     BSONObj _metadata;
     CallbackFn _work;

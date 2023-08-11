@@ -230,7 +230,7 @@ Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
         auto result = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "config",
+            DatabaseName::kConfig,
             createCmd,
             Shard::kDefaultConfigCommandTimeout,
             Shard::RetryPolicy::kIdempotent);

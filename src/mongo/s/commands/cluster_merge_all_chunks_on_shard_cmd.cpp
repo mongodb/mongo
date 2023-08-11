@@ -98,7 +98,7 @@ public:
             auto swCommandResponse = shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
+                DatabaseName::kAdmin,
                 shardSvrMergeAllChunksOnShard.toBSON({}),
                 Shard::RetryPolicy::kIdempotent);
 

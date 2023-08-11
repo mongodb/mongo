@@ -604,7 +604,7 @@ void ReplicationCoordinatorNoOp::cancelCbkHandle(
 
 BSONObj ReplicationCoordinatorNoOp::runCmdOnPrimaryAndAwaitResponse(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {

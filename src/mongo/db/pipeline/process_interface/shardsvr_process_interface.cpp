@@ -260,7 +260,7 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
         resultCollections = uassertStatusOK(
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nss.db_deprecated().toString(),
+                                              nss.dbName(),
                                               appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -316,7 +316,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
         indexes = uassertStatusOK(
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              ns.db_deprecated().toString(),
+                                              ns.dbName(),
                                               appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {

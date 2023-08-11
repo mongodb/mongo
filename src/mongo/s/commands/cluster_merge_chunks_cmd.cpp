@@ -195,7 +195,7 @@ public:
         auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
+            DatabaseName::kAdmin,
             remoteCmdObjB.obj(),
             Shard::RetryPolicy::kNotIdempotent));
         uassertStatusOK(response.commandStatus);

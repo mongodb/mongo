@@ -127,8 +127,11 @@ TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
 
     FailPointEnableBlock fp("asioTransportLayerShortOpportunisticReadWrite");
 
-    const executor::RemoteCommandRequest ecr{
-        server, "admin", BSON("echo" << std::string(1 << 10, 'x')), BSONObj(), nullptr};
+    const executor::RemoteCommandRequest ecr{server,
+                                             DatabaseName::kAdmin,
+                                             BSON("echo" << std::string(1 << 10, 'x')),
+                                             BSONObj(),
+                                             nullptr};
 
     assertOK(handle->runCommandRequest(ecr).get());
 
@@ -185,7 +188,7 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldReceiveMultipleReplies) {
     // the initial handshake.
     auto isMasterRequest = executor::RemoteCommandRequest{
         server,
-        "admin",
+        DatabaseName::kAdmin,
         BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                         << TopologyVersion(OID::max(), 0).toBSON()),
         BSONObj(),
@@ -275,7 +278,7 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
     auto configureFailPointRequest =
         executor::RemoteCommandRequest{
             server,
-            "admin",
+            DatabaseName::kAdmin,
             BSON("configureFailPoint"
                  << "failCommand"
                  << "mode"
@@ -289,7 +292,7 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
 
     ON_BLOCK_EXIT([&] {
         auto stopFpRequest = executor::RemoteCommandRequest{server,
-                                                            "admin",
+                                                            DatabaseName::kAdmin,
                                                             BSON("configureFailPoint"
                                                                  << "failCommand"
                                                                  << "mode"
@@ -303,7 +306,7 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
     // the initial handshake.
     auto isMasterRequest = executor::RemoteCommandRequest{
         server,
-        "admin",
+        DatabaseName::kAdmin,
         BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                         << TopologyVersion(OID::max(), 0).toBSON()),
         BSONObj(),

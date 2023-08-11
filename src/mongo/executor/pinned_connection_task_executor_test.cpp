@@ -70,7 +70,8 @@ namespace mongo::executor {
 namespace {
 
 RemoteCommandRequest makeRCR(HostAndPort remote, BSONObj extraFields) {
-    return RemoteCommandRequest(remote, "admin", BSON("hello" << 1), extraFields, nullptr);
+    return RemoteCommandRequest(
+        remote, DatabaseName::kAdmin, BSON("hello" << 1), extraFields, nullptr);
 };
 
 void assertMessageBodyCameFromRequest(Message m, RemoteCommandRequest rcr) {

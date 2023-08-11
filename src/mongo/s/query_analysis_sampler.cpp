@@ -114,7 +114,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
         auto swResponse = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             cmd.toBSON({}),
             Shard::RetryPolicy::kIdempotent);
         if (auto status = Shard::CommandResponse::getEffectiveStatus(swResponse); !status.isOK()) {

@@ -184,13 +184,8 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
     const auto reqObj = req.toBSON({});
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    const auto responsesFromShards =
-        sharding_util::sendCommandToShards(opCtx,
-                                           DatabaseName::kAdmin.toString(),
-                                           reqObj,
-                                           shardIds,
-                                           executor,
-                                           false /* throwOnError */);
+    const auto responsesFromShards = sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
 
     for (auto&& response : responsesFromShards) {
         try {

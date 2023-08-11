@@ -130,7 +130,7 @@ public:
         auto results =
             executor::AsyncMulticaster(executor, options)
                 .multicast(servers,
-                           args.getDb().toString(),
+                           args.getDb(),
                            args.getMulticast(),
                            opCtx,
                            (args.getTimeout() ? Milliseconds(*args.getTimeout())

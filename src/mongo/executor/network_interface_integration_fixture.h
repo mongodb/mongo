@@ -113,21 +113,21 @@ public:
 
     RemoteCommandResponse runCommandSync(RemoteCommandRequest& request);
 
-    void assertCommandOK(StringData db,
+    void assertCommandOK(const DatabaseName& db,
                          const BSONObj& cmd,
                          Milliseconds timeoutMillis = Minutes(5),
                          transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
-    void assertCommandFailsOnClient(StringData db,
+    void assertCommandFailsOnClient(const DatabaseName& db,
                                     const BSONObj& cmd,
                                     ErrorCodes::Error reason,
                                     Milliseconds timeoutMillis = Minutes(5));
 
-    void assertCommandFailsOnServer(StringData db,
+    void assertCommandFailsOnServer(const DatabaseName& db,
                                     const BSONObj& cmd,
                                     ErrorCodes::Error reason,
                                     Milliseconds timeoutMillis = Minutes(5));
 
-    void assertWriteError(StringData db,
+    void assertWriteError(const DatabaseName& db,
                           const BSONObj& cmd,
                           ErrorCodes::Error reason,
                           Milliseconds timeoutMillis = Minutes(5));

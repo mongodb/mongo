@@ -90,12 +90,13 @@ protected:
 
     void runDummyCommandOnShard(ShardId shardId) {
         auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
-        uassertStatusOK(shard->runCommand(operationContext(),
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          "unusedDb",
-                                          BSON("unused"
-                                               << "cmd"),
-                                          Shard::RetryPolicy::kNoRetry));
+        uassertStatusOK(
+            shard->runCommand(operationContext(),
+                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                              DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
+                              BSON("unused"
+                                   << "cmd"),
+                              Shard::RetryPolicy::kNoRetry));
     }
 };
 

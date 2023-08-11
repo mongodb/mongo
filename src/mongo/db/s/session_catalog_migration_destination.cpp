@@ -205,7 +205,7 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
     auto shard = shardStatus.getValue();
     auto responseStatus = shard->runCommand(opCtx,
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                            "admin",
+                                            DatabaseName::kAdmin,
                                             buildMigrateSessionCmd(migrationSessionId),
                                             Shard::RetryPolicy::kNoRetry);
 

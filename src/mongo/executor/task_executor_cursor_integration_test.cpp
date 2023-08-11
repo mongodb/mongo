@@ -108,7 +108,7 @@ public:
                                                        HostAndPort target,
                                                        BSONObj cmd) {
         LOGV2(6531702, "About to run a remote command", "cmd"_attr = cmd);
-        RemoteCommandRequest rcr(target, "admin", cmd, opCtx);
+        RemoteCommandRequest rcr(target, DatabaseName::kAdmin, cmd, opCtx);
         auto swHandle = executor()->scheduleRemoteCommand(
             std::move(rcr), [](const TaskExecutor::RemoteCommandCallbackArgs&) {});
         return uassertStatusOK(swHandle);
@@ -151,7 +151,7 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
 
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                             "test",
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                              BSON("find"
                                   << "test"
                                   << "batchSize" << 10),
@@ -179,7 +179,7 @@ TEST_F(TaskExecutorCursorFixture, BasicPinned) {
 
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                             "test",
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                              BSON("find"
                                   << "test"
                                   << "batchSize" << 10),
@@ -208,7 +208,7 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
 
     auto opCtx = makeOpCtx();
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                             "test",
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                              BSON("find"
                                   << "test"
                                   << "batchSize" << 10),
@@ -304,7 +304,7 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
         });
 
         RemoteCommandRequest rcr(target,
-                                 "test",
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                                  BSON("find"
                                       << "test"
                                       << "batchSize" << 10),

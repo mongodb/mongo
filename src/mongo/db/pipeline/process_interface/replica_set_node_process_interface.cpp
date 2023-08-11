@@ -228,8 +228,7 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
         return StatusWith<BSONObj>{ErrorCodes::PrimarySteppedDown, "No primary exists currently"};
     }
 
-    executor::RemoteCommandRequest request(
-        std::move(hostAndPort), ns.db_deprecated().toString(), cmd.obj(), opCtx);
+    executor::RemoteCommandRequest request(std::move(hostAndPort), ns.dbName(), cmd.obj(), opCtx);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));

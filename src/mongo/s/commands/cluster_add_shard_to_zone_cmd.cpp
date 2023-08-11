@@ -130,7 +130,7 @@ public:
         auto cmdResponseStatus = uassertStatusOK(
             configShard->runCommandWithFixedRetryAttempts(opCtx,
                                                           kPrimaryOnlyReadPreference,
-                                                          "admin",
+                                                          DatabaseName::kAdmin,
                                                           cmdBuilder.obj(),
                                                           Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);

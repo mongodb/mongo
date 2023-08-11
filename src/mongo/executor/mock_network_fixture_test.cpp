@@ -95,24 +95,25 @@ public:
     std::string kExampleCmdNameThree = kExampleCmdName + "_three";
     std::string kExampleCmdNameFour = kExampleCmdName + "_four";
 
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "testDB");
     RemoteCommandRequestOnAny kExampleRequest{
-        {testHost()}, "testDB", BSON(kExampleCmdName << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()}, dbName, BSON(kExampleCmdName << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandRequestOnAny kExampleRequestTwo{
-        {testHost()}, "testDB", BSON(kExampleCmdNameTwo << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()}, dbName, BSON(kExampleCmdNameTwo << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandRequestOnAny kExampleRequestThree{
-        {testHost()}, "testDB", BSON(kExampleCmdNameThree << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()}, dbName, BSON(kExampleCmdNameThree << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandRequestOnAny kExampleRequestFour{
-        {testHost()}, "testDB", BSON(kExampleCmdNameFour << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()}, dbName, BSON(kExampleCmdNameFour << 1), rpc::makeEmptyMetadata(), nullptr};
 
     BSONObj kExampleResponse = BSON("some"
                                     << "response");
 
     RemoteCommandRequestOnAny makeRequest(std::string cmdName) {
-        return {{testHost()}, "testDB", BSON(cmdName << 1), rpc::makeEmptyMetadata(), nullptr};
+        return {{testHost()}, dbName, BSON(cmdName << 1), rpc::makeEmptyMetadata(), nullptr};
     }
 
     RemoteCommandRequestOnAny makeRequest(BSONObj obj) {
-        return {{testHost()}, "testDB", obj, rpc::makeEmptyMetadata(), nullptr};
+        return {{testHost()}, dbName, obj, rpc::makeEmptyMetadata(), nullptr};
     }
 
 private:

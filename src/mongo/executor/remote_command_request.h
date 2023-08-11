@@ -75,7 +75,7 @@ struct RemoteCommandRequestBase {
 
     RemoteCommandRequestBase();
     RemoteCommandRequestBase(RequestId requestId,
-                             const std::string& theDbName,
+                             const DatabaseName& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
@@ -86,7 +86,7 @@ struct RemoteCommandRequestBase {
     // Internal id of this request. Not interpreted and used for tracing purposes only.
     RequestId id;
 
-    std::string dbname;
+    DatabaseName dbname;
     BSONObj metadata{rpc::makeEmptyMetadata()};
     BSONObj cmdObj;
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope;
@@ -152,7 +152,7 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
 
     RemoteCommandRequestImpl(RequestId requestId,
                              const Target& theTarget,
-                             const std::string& theDbName,
+                             const DatabaseName& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
@@ -161,7 +161,7 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
-                             const std::string& theDbName,
+                             const DatabaseName& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
@@ -170,7 +170,7 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
-                             const std::string& theDbName,
+                             const DatabaseName& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
@@ -187,7 +187,7 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
 
 
     RemoteCommandRequestImpl(const Target& theTarget,
-                             const std::string& theDbName,
+                             const DatabaseName& theDbName,
                              const BSONObj& theCmdObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,

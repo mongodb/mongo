@@ -376,7 +376,7 @@ void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
         options.fireAndForget = true;
         executor::RemoteCommandRequest request(
             host,
-            "admin",
+            DatabaseName::kAdmin,
             BSON("_killOperations" << 1 << "operationKeys" << opKeyArrayBuilder.arr()),
             opCtx.get(),
             executor::RemoteCommandRequestBase::kNoTimeout,
@@ -449,8 +449,7 @@ void killRemoteCursor(OperationContext* opCtx,
                       const NamespaceString& nss) {
     BSONObj cmdObj = KillCursorsCommandRequest(nss, {cursor.getCursorResponse().getCursorId()})
                          .toBSON(BSONObj{});
-    executor::RemoteCommandRequest request(
-        cursor.getHostAndPort(), nss.db_forSharding().toString(), cmdObj, opCtx);
+    executor::RemoteCommandRequest request(cursor.getHostAndPort(), nss.dbName(), cmdObj, opCtx);
 
     // We do not process the response to the killCursors request (we make a good-faith
     // attempt at cleaning up the cursors, but ignore any returned errors).
@@ -498,7 +497,7 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
     options.maxConcurrency = internalQueryAggMulticastMaxConcurrency;
     auto results = executor::AsyncMulticaster(executor, options)
                        .multicast(servers,
-                                  nss.db_forSharding().toString(),
+                                  nss.dbName(),
                                   cmd,
                                   opCtx,
                                   Milliseconds(internalQueryAggMulticastTimeoutMS));

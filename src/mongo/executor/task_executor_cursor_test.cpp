@@ -183,7 +183,10 @@ public:
                                   << "batchSize" << 2);
         const CursorId cursorId = 0;
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 findCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr);
 
@@ -207,7 +210,10 @@ public:
                                  << "pipeline"
                                  << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 aggCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr);
 
@@ -244,7 +250,10 @@ public:
                                  << "test"
                                  << "pipeline"
                                  << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 aggCmd,
+                                 opCtx.get());
         TaskExecutorCursor tec = makeTec(rcr);
         auto expected = BSON("aggregate"
                              << "test"
@@ -283,7 +292,10 @@ public:
                                  << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
 
         std::vector<size_t> cursorIds{1, 2};
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 aggCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr);
 
@@ -353,7 +365,10 @@ public:
                                   << "test"
                                   << "batchSize" << 2);
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 findCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr);
 
@@ -372,7 +387,10 @@ public:
                                   << "batchSize" << 2);
         CursorId cursorId = 1;
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 findCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
@@ -428,7 +446,10 @@ public:
                                                << "batchSize" << 3);
         const CursorId cursorId = 1;
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 findCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
@@ -468,7 +489,10 @@ public:
                                                << "batchSize" << 3);
         const CursorId cursorId = 1;
 
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 findCmd,
+                                 opCtx.get());
 
         TaskExecutorCursor tec = makeTec(rcr, [] {
             TaskExecutorCursor::Options opts;
@@ -519,7 +543,7 @@ public:
         unittest::threadAssertionMonitoredTest([&](auto& monitor) {
             CursorId cursorId = 1;
             RemoteCommandRequest rcr(HostAndPort("localhost"),
-                                     "test",
+                                     DatabaseName::createDatabaseName_forTest(boost::none, "test"),
                                      BSON("search"
                                           << "foo"),
                                      opCtx.get());
@@ -875,7 +899,10 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, EarlyReturnKillsCursor) {
                               << "batchSize" << 2);
     const CursorId cursorId = 1;
 
-    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             findCmd,
+                             opCtx.get());
 
     {
         TaskExecutorCursor tec = makeTec(rcr);
@@ -956,7 +983,10 @@ TEST_F(NonPinningTaskExecutorCursorTestFixture, LsidIsPassed) {
                               << "batchSize" << 1);
     const CursorId cursorId = 1;
 
-    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", findCmd, opCtx.get());
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             findCmd,
+                             opCtx.get());
 
     boost::optional<TaskExecutorCursor> tec;
     tec.emplace(makeTec(rcr, []() {

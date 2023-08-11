@@ -89,7 +89,7 @@ public:
         auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(
                 CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                 opCtx->getWriteConcern()),
@@ -177,7 +177,7 @@ public:
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 applyReadWriteConcern(opCtx, this, configsvrRequest.toBSON({})),
                 Shard::RetryPolicy::kIdempotent));
 

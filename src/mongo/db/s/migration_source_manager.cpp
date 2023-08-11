@@ -554,7 +554,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         Grid::get(_opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             _opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
+            DatabaseName::kAdmin,
             builder.obj(),
             Shard::RetryPolicy::kIdempotent);
 

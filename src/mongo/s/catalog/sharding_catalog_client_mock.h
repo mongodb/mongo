@@ -139,14 +139,14 @@ public:
 
     Status runUserManagementWriteCommand(OperationContext* opCtx,
                                          StringData commandName,
-                                         StringData dbname,
+                                         const DatabaseName& dbname,
                                          const BSONObj& cmdObj,
                                          BSONObjBuilder* result) override {
         return Status::OK();
     }
 
     bool runUserManagementReadCommand(OperationContext* opCtx,
-                                      const std::string& dbname,
+                                      const DatabaseName& dbname,
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 

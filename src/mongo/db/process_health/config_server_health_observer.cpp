@@ -271,16 +271,15 @@ void ConfigServerHealthObserver::_runSmokeReadShardsCommand(std::shared_ptr<Chec
     StatusWith<Shard::CommandResponse> findOneShardResponse{ErrorCodes::HostUnreachable,
                                                             "Config server read was not run"};
     try {
-        findOneShardResponse =
-            Grid::get(ctx->opCtx.get())
-                ->shardRegistry()
-                ->getConfigShard()
-                ->runCommand(ctx->opCtx.get(),
-                             readPref,
-                             NamespaceString::kConfigsvrShardsNamespace.db().toString(),
-                             findCmdBuilder.done(),
-                             kServerRequestTimeout,
-                             Shard::RetryPolicy::kNoRetry);
+        findOneShardResponse = Grid::get(ctx->opCtx.get())
+                                   ->shardRegistry()
+                                   ->getConfigShard()
+                                   ->runCommand(ctx->opCtx.get(),
+                                                readPref,
+                                                NamespaceString::kConfigsvrShardsNamespace.dbName(),
+                                                findCmdBuilder.done(),
+                                                kServerRequestTimeout,
+                                                Shard::RetryPolicy::kNoRetry);
     } catch (const DBException& exc) {
         findOneShardResponse = StatusWith<Shard::CommandResponse>(exc.toStatus());
     }
@@ -391,7 +390,8 @@ Future<void> ConfigServerHealthObserver::_runPing(HostAndPort server,
     Timer t;
     ctx->taskExecutor
         ->scheduleRemoteCommand(
-            {server, "admin", BSON("ping" << 1), nullptr, kServerRequestTimeout}, completionToken)
+            {server, DatabaseName::kAdmin, BSON("ping" << 1), nullptr, kServerRequestTimeout},
+            completionToken)
         .then([promise, server, t](const executor::RemoteCommandResponse& response) {
             if (!response.status.isOK()) {
                 promise->setError(response.status);

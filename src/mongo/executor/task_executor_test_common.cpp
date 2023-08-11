@@ -178,8 +178,9 @@ auto makeSetStatusOnRemoteCommandCompletionClosure(const RemoteCommandRequest* e
     return [=](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
         if (cbData.request != *expectedRequest) {
             auto desc = [](const RemoteCommandRequest& request) -> std::string {
-                return str::stream() << "Request(" << request.target.toString() << ", "
-                                     << request.dbname << ", " << request.cmdObj << ')';
+                return str::stream()
+                    << "Request(" << request.target.toString() << ", "
+                    << request.dbname.toString_forTest() << ", " << request.cmdObj << ')';
             };
             *outStatus = Status(ErrorCodes::BadValue,
                                 str::stream() << "Actual request: " << desc(cbData.request)
@@ -195,8 +196,9 @@ auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
     return [=](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
         if (cbData.request != *expectedRequest) {
             auto desc = [](const RemoteCommandRequest& request) -> std::string {
-                return str::stream() << "Request(" << request.target.toString() << ", "
-                                     << request.dbname << ", " << request.cmdObj << ')';
+                return str::stream()
+                    << "Request(" << request.target.toString() << ", "
+                    << request.dbname.toString_forTest() << ", " << request.cmdObj << ')';
             };
             *outStatus = Status(ErrorCodes::BadValue,
                                 str::stream() << "Actual request: " << desc(cbData.request)
@@ -209,7 +211,8 @@ auto makeSetStatusOnRemoteExhaustCommandCompletionClosure(
 }
 
 static inline const RemoteCommandRequest kDummyRequest{HostAndPort("localhost", 27017),
-                                                       "mydb",
+                                                       DatabaseName::createDatabaseName_forTest(
+                                                           boost::none, "mydb"),
                                                        BSON("whatsUp"
                                                             << "doc"),
                                                        nullptr};
@@ -726,8 +729,11 @@ COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     TaskExecutor& executor = getExecutor();
     Status status(ErrorCodes::InternalError, "");
     launchExecutorThread();
-    const RemoteCommandRequest request(
-        HostAndPort("lazy", 27017), "admin", BSON("sleep" << 1), nullptr, Milliseconds(1));
+    const RemoteCommandRequest request(HostAndPort("lazy", 27017),
+                                       DatabaseName::kAdmin,
+                                       BSON("sleep" << 1),
+                                       nullptr,
+                                       Milliseconds(1));
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
         request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status)));
     net->enterNetwork();
@@ -747,7 +753,7 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     auto status1 = getDetectableErrorStatus();
     auto status2 = getDetectableErrorStatus();
     const RemoteCommandRequest request(
-        HostAndPort("lazy", 27017), "admin", BSON("cmd" << 1), nullptr);
+        HostAndPort("lazy", 27017), DatabaseName::kAdmin, BSON("cmd" << 1), nullptr);
     TaskExecutor::CallbackHandle cbHandle1 = unittest::assertGet(executor.scheduleRemoteCommand(
         request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status1)));
     TaskExecutor::CallbackHandle cbHandle2 = unittest::assertGet(executor.scheduleRemoteCommand(

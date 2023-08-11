@@ -166,7 +166,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         .then([this, shardId, commandObj = commandObj.getOwned(), readPref](
                   HostAndShard hostAndShard) mutable {
             executor::RemoteCommandRequest request(hostAndShard.hostTargeted,
-                                                   DatabaseName::kAdmin.toString(),
+                                                   DatabaseName::kAdmin,
                                                    commandObj,
                                                    readPref.toContainingBSON(),
                                                    nullptr);

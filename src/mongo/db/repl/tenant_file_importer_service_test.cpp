@@ -111,7 +111,7 @@ public:
         auto serviceContext = getServiceContext();
         auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
         replCoord->setRunCmdOnPrimaryAndAwaitResponseFunction([this](OperationContext* opCtx,
-                                                                     const std::string& dbName,
+                                                                     const DatabaseName& dbName,
                                                                      const BSONObj& cmdObj,
                                                                      ReplicationCoordinator::
                                                                          OnRemoteCmdScheduledFn
@@ -145,7 +145,7 @@ public:
     }
 
     struct RunCmdOnPrimaryCall {
-        std::string dbName;
+        DatabaseName dbName;
         BSONObj cmdObj;
     };
     std::vector<RunCmdOnPrimaryCall> runCmdOnPrimaryAndAwaitResponseFnCalls;
@@ -456,7 +456,7 @@ TEST_F(TenantFileImporterServiceTest, ImportsFilesWhenAllFilenamesLearned) {
     // Verify whether the node has notified the primary about the import success.
     ASSERT_EQ(runCmdOnPrimaryAndAwaitResponseFnCalls.size(), 1);
     auto recipientVoteImportedFilesCmdCall = runCmdOnPrimaryAndAwaitResponseFnCalls.front();
-    ASSERT_EQ(recipientVoteImportedFilesCmdCall.dbName, DatabaseName::kAdmin.db().toString());
+    ASSERT_EQ(recipientVoteImportedFilesCmdCall.dbName, DatabaseName::kAdmin);
     ASSERT_BSONOBJ_EQ(recipientVoteImportedFilesCmdCall.cmdObj,
                       BSON("recipientVoteImportedFiles" << 1 << "migrationId" << migrationId
                                                         << "from"

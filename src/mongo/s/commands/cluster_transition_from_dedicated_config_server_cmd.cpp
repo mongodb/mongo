@@ -88,7 +88,7 @@ public:
             auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 kPrimaryOnlyReadPreference,
-                "admin",
+                DatabaseName::kAdmin,
                 CommandHelpers::appendMajorityWriteConcern(cmdToSend.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent);

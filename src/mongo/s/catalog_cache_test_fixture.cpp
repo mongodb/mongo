@@ -237,7 +237,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, "config");
+            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
             return makeCollectionAndIndexesAggregationResponse(CollectionType(collectionBSON),
                                                                globalIndexes);
         });
@@ -320,7 +320,7 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, "config");
+            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
             CollectionType collType(
                 nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
             if (indexVersion) {
@@ -385,7 +385,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, "config");
+            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
             return makeCollectionAndIndexesAggregationResponse(collType, {});
         });
     }

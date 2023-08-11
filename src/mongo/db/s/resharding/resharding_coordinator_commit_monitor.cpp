@@ -165,7 +165,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
     auto executor = _networkExecutor ? _networkExecutor : _executor;
     AsyncRequestsSender ars(opCtx.get(),
                             executor,
-                            "admin",
+                            DatabaseName::kAdmin,
                             requests,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             Shard::RetryPolicy::kIdempotent,

@@ -1326,7 +1326,7 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             configsvrRequest.toBSON({}),
             Shard::RetryPolicy::kIdempotent));
 

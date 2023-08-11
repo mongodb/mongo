@@ -68,10 +68,10 @@ bool ConfigShardWrapper::isRetriableError(ErrorCodes::Error code, RetryPolicy op
 
 void ConfigShardWrapper::runFireAndForgetCommand(OperationContext* opCtx,
                                                  const ReadPreferenceSetting& readPref,
-                                                 const std::string& dbName,
+                                                 const DatabaseName& dbName,
                                                  const BSONObj& cmdObj) {
-    const auto readPrefWithConfigTime = _attachConfigTimeToMinClusterTime(opCtx, readPref, dbName);
-    return _configShard->runFireAndForgetCommand(opCtx, readPrefWithConfigTime, dbName, cmdObj);
+    const auto readPrefWithConfigTime = _attachConfigTimeToMinClusterTime(opCtx, readPref);
+    _configShard->runFireAndForgetCommand(opCtx, readPrefWithConfigTime, dbName, cmdObj);
 }
 
 Status ConfigShardWrapper::runAggregation(
@@ -85,11 +85,10 @@ Status ConfigShardWrapper::runAggregation(
 StatusWith<Shard::CommandResponse> ConfigShardWrapper::_runCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    StringData dbName,
+    const DatabaseName& dbName,
     Milliseconds maxTimeMSOverrideUnused,
     const BSONObj& cmdObj) {
-    const auto readPrefWithConfigTime =
-        _attachConfigTimeToMinClusterTime(opCtx, readPref, dbName.toString());
+    const auto readPrefWithConfigTime = _attachConfigTimeToMinClusterTime(opCtx, readPref);
     return _configShard->_runCommand(
         opCtx, readPrefWithConfigTime, dbName, maxTimeMSOverrideUnused, cmdObj);
 }
@@ -97,7 +96,7 @@ StatusWith<Shard::CommandResponse> ConfigShardWrapper::_runCommand(
 StatusWith<Shard::QueryResponse> ConfigShardWrapper::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    StringData dbName,
+    const DatabaseName& dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
     return _configShard->_runExhaustiveCursorCommand(
@@ -118,7 +117,7 @@ StatusWith<Shard::QueryResponse> ConfigShardWrapper::_exhaustiveFindOnConfig(
 }
 
 ReadPreferenceSetting ConfigShardWrapper::_attachConfigTimeToMinClusterTime(
-    OperationContext* opCtx, const ReadPreferenceSetting& readPref, const StringData& dbName) {
+    OperationContext* opCtx, const ReadPreferenceSetting& readPref) {
     const auto vcTime = VectorClock::get(opCtx)->getTime();
     ReadPreferenceSetting readPrefToReturn{readPref};
     readPrefToReturn.minClusterTime = vcTime.configTime().asTimestamp();

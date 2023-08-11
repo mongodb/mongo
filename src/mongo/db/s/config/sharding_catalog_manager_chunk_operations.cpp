@@ -1748,7 +1748,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             Shard::CommandResponse::getEffectiveStatus(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
+                DatabaseName::kAdmin,
                 BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
                 Shard::RetryPolicy::kIdempotent)));
     }

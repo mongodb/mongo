@@ -121,7 +121,7 @@ public:
         auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting::get(opCtx),
-            DatabaseNameUtil::serialize(dbName),
+            dbName,
             cm.dbVersion().isFixed() ? filteredCmdObj : filteredCmdObjWithVersion,
             Shard::RetryPolicy::kIdempotent));
 

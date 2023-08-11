@@ -97,7 +97,10 @@ public:
     }
 
     void scheduleRemoteCommand(Promise<void>& promise) {
-        RemoteCommandRequest rcr(HostAndPort("localhost"), "test", BSONObj(), nullptr);
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 BSONObj(),
+                                 nullptr);
 
         isInline = true;
         ASSERT(getExecutor()

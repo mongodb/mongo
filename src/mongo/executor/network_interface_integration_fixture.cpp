@@ -227,12 +227,12 @@ RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
     return res;
 }
 
-void NetworkInterfaceIntegrationFixture::assertCommandOK(StringData db,
+void NetworkInterfaceIntegrationFixture::assertCommandOK(const DatabaseName& db,
                                                          const BSONObj& cmd,
                                                          Milliseconds timeoutMillis,
                                                          transport::ConnectSSLMode sslMode) {
     RemoteCommandRequest request{
-        fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        fixture().getServers()[0], db, cmd, BSONObj(), nullptr, timeoutMillis};
     request.sslMode = sslMode;
     auto res = runCommandSync(request);
     ASSERT_OK(res.status);
@@ -240,34 +240,34 @@ void NetworkInterfaceIntegrationFixture::assertCommandOK(StringData db,
     ASSERT(!res.data["writeErrors"]);
 }
 
-void NetworkInterfaceIntegrationFixture::assertCommandFailsOnClient(StringData db,
+void NetworkInterfaceIntegrationFixture::assertCommandFailsOnClient(const DatabaseName& db,
                                                                     const BSONObj& cmd,
                                                                     ErrorCodes::Error reason,
                                                                     Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
-        fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        fixture().getServers()[0], db, cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
     ASSERT_EQ(reason, res.status.code());
 }
 
-void NetworkInterfaceIntegrationFixture::assertCommandFailsOnServer(StringData db,
+void NetworkInterfaceIntegrationFixture::assertCommandFailsOnServer(const DatabaseName& db,
                                                                     const BSONObj& cmd,
                                                                     ErrorCodes::Error reason,
                                                                     Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
-        fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        fixture().getServers()[0], db, cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
     ASSERT_OK(res.status);
     auto serverStatus = getStatusFromCommandResult(res.data);
     ASSERT_EQ(reason, serverStatus);
 }
 
-void NetworkInterfaceIntegrationFixture::assertWriteError(StringData db,
+void NetworkInterfaceIntegrationFixture::assertWriteError(const DatabaseName& db,
                                                           const BSONObj& cmd,
                                                           ErrorCodes::Error reason,
                                                           Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
-        fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+        fixture().getServers()[0], db, cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
     ASSERT_OK(res.status);
     ASSERT_OK(getStatusFromCommandResult(res.data));

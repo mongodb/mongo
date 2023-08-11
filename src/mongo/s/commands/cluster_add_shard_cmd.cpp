@@ -103,7 +103,7 @@ public:
         auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             kPrimaryOnlyReadPreference,
-            "admin",
+            DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(
                 CommandHelpers::appendGenericCommandArgs(cmdObj,
                                                          parsedRequest.toCommandForConfig()),

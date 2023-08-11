@@ -834,7 +834,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
     return indexShard->runExhaustiveCursorCommand(
         opCtx,
         ReadPreferenceSetting::get(opCtx),
-        nss.db_forSharding().toString(),
+        nss.dbName(),
         listIndexesCmd,
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 }

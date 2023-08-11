@@ -197,7 +197,7 @@ std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx
     auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-        DatabaseName::kConfig.toString(),
+        DatabaseName::kConfig,
         distinctRequest.toBSON({rc}),
         Shard::RetryPolicy::kIdempotent));
 

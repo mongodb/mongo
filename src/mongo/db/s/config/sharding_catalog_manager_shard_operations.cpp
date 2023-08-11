@@ -223,7 +223,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx, Shard* con
 StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
     OperationContext* opCtx,
     RemoteCommandTargeter* targeter,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj) {
     auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!swHost.isOK()) {
@@ -232,7 +232,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
+        host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
 
     executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
@@ -410,8 +410,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     const std::string* shardProposedName,
     const ConnectionString& connectionString,
     bool isConfigShard) {
-    auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), DatabaseName::kAdmin.db(), BSON("hello" << 1));
+    auto swCommandResponse =
+        _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin, BSON("hello" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
         return swCommandResponse.getStatus().withReason(
             str::stream() << "Cannot add " << connectionString.toString()
@@ -616,7 +616,7 @@ Status ShardingCatalogManager::_dropSessionsCollection(
     }
 
     auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), NamespaceString::kLogicalSessionsNamespace.db(), builder.done());
+        opCtx, targeter.get(), NamespaceString::kLogicalSessionsNamespace.dbName(), builder.done());
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -635,7 +635,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFrom
     auto swCommandResponse =
         _runCommandForAddShard(opCtx,
                                targeter.get(),
-                               DatabaseName::kAdmin.db(),
+                               DatabaseName::kAdmin,
                                BSON("listDatabases" << 1 << "nameOnly" << true));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
@@ -789,7 +789,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Helper function that runs a command on the to-be shard and returns the status
     auto runCmdOnNewShard = [this, &opCtx, &targeter](const BSONObj& cmd) -> Status {
         auto swCommandResponse =
-            _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin.db(), cmd);
+            _runCommandForAddShard(opCtx, targeter.get(), DatabaseName::kAdmin, cmd);
         if (!swCommandResponse.isOK()) {
             return swCommandResponse.getStatus();
         }
@@ -844,7 +844,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             auto versionResponse = _runCommandForAddShard(
                 opCtx,
                 targeter.get(),
-                DatabaseName::kAdmin.db(),
+                DatabaseName::kAdmin,
                 setFcvCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                       << opCtx->getWriteConcern().toBSON())));
             if (!versionResponse.isOK()) {
@@ -1186,7 +1186,7 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     auto resultStatus =
         _localConfigShard->runCommandWithFixedRetryAttempts(opCtx,
                                                             kConfigReadSelector,
-                                                            nss.db_forSharding().toString(),
+                                                            nss.dbName(),
                                                             countBuilder.done(),
                                                             Shard::kDefaultConfigCommandTimeout,
                                                             Shard::RetryPolicy::kIdempotent);
@@ -1220,7 +1220,7 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
         const auto swCommandResponse =
             _runCommandForAddShard(opCtx,
                                    targeter,
-                                   NamespaceString::kUserWritesCriticalSectionsNamespace.db(),
+                                   NamespaceString::kUserWritesCriticalSectionsNamespace.dbName(),
                                    CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
         uassertStatusOK(swCommandResponse.getStatus());
         uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
@@ -1251,7 +1251,7 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
                 ShardsvrSetUserWriteBlockModePhaseEnum::kPrepare);
 
             const auto cmdResponse =
-                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin.db(), cmd);
+                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }
 
@@ -1261,7 +1261,7 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
                 ShardsvrSetUserWriteBlockModePhaseEnum::kComplete);
 
             const auto cmdResponse =
-                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin.db(), cmd);
+                _runCommandForAddShard(opCtx, targeter, DatabaseName::kAdmin, cmd);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }
 
@@ -1317,7 +1317,7 @@ std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
 
     return std::make_unique<Fetcher>(_executorForAddShard.get(),
                                      host,
-                                     DatabaseNameUtil::serialize(nss.dbName()),
+                                     nss.dbName(),
                                      findCommand.toBSON({}),
                                      fetcherCallback,
                                      BSONObj(), /* metadata tracking, only used for shards */
@@ -1460,7 +1460,7 @@ void ShardingCatalogManager::_removeAllClusterParametersFromShard(OperationConte
         const auto swCommandResponse =
             _runCommandForAddShard(opCtx,
                                    targeter.get(),
-                                   DatabaseNameUtil::serialize(nss.dbName()),
+                                   nss.dbName(),
                                    CommandHelpers::appendMajorityWriteConcern(deleteOp.toBSON({})));
         uassertStatusOK(swCommandResponse.getStatus());
         uassertStatusOK(getStatusFromWriteCommandReply(swCommandResponse.getValue().response));
@@ -1491,7 +1491,7 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
             const auto cmdResponse = _runCommandForAddShard(
                 opCtx,
                 targeter.get(),
-                DatabaseNameUtil::serialize(dbName),
+                dbName,
                 CommandHelpers::appendMajorityWriteConcern(setClusterParamsCmd.toBSON({})));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }

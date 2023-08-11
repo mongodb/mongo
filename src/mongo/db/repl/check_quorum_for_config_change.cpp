@@ -126,7 +126,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
             continue;
         }
         requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
-                                                "admin",
+                                                DatabaseName::kAdmin,
                                                 hbRequest,
                                                 BSON(rpc::kReplSetMetadataFieldName << 1),
                                                 nullptr,

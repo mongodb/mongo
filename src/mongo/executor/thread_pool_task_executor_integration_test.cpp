@@ -158,7 +158,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                             "admin",
+                             DatabaseName::kAdmin,
                              BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                                              << TopologyVersion(OID::max(), 0).toBSON()),
                              opCtx.get());
@@ -201,7 +201,7 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                             "admin",
+                             DatabaseName::kAdmin,
                              BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
                                              << TopologyVersion(OID::max(), 0).toBSON()),
                              opCtx.get());
@@ -244,7 +244,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
                                                           << "failCommands"
                                                           << BSON_ARRAY("isMaster")));
     RemoteCommandRequest failCmd(unittest::getFixtureConnectionString().getServers().front(),
-                                 "admin",
+                                 DatabaseName::kAdmin,
                                  configureFailpointCmd,
                                  opCtx.get());
     RequestHandlerUtil failCmdRequestHandler;
@@ -266,7 +266,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
                               << "off");
         RemoteCommandRequest stopFpRequest(
             unittest::getFixtureConnectionString().getServers().front(),
-            "admin",
+            DatabaseName::kAdmin,
             stopFpCmd,
             opCtx.get());
         auto swCbHandle = _executor->scheduleRemoteCommand(
@@ -285,7 +285,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
         auto opCtx = client->makeOperationContext();
 
         RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
-                                 "admin",
+                                 DatabaseName::kAdmin,
                                  BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000
                                                  << "topologyVersion"
                                                  << TopologyVersion(OID::max(), 0).toBSON()),

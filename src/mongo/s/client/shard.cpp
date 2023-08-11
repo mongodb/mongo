@@ -162,7 +162,7 @@ bool Shard::remoteIsRetriableError(ErrorCodes::Error code, RetryPolicy options) 
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbName,
+                                                     const DatabaseName& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
     return runCommand(opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
@@ -170,7 +170,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
-                                                     const std::string& dbName,
+                                                     const DatabaseName& dbName,
                                                      const BSONObj& cmdObj,
                                                      Milliseconds maxTimeMSOverride,
                                                      RetryPolicy retryPolicy) {
@@ -201,7 +201,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     RetryPolicy retryPolicy) {
     return runCommandWithFixedRetryAttempts(
@@ -211,7 +211,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride,
     RetryPolicy retryPolicy) {
@@ -239,7 +239,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
 StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride) {
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
@@ -259,7 +259,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
                                                    const Milliseconds maxTimeMS,
                                                    const BatchedCommandRequest& batchRequest,
                                                    RetryPolicy retryPolicy) {
-    const StringData dbname = batchRequest.getNS().db_forSharding();
+    const DatabaseName dbname = batchRequest.getNS().dbName();
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {

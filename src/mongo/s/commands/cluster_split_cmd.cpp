@@ -101,7 +101,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
     auto cmdResponse = uassertStatusOK(
         shard->runCommandWithFixedRetryAttempts(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
+                                                DatabaseName::kAdmin,
                                                 cmd.obj(),
                                                 Shard::RetryPolicy::kIdempotent));
 

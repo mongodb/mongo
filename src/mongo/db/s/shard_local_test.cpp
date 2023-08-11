@@ -138,7 +138,7 @@ StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(Na
     return _shardLocal->runCommandWithFixedRetryAttempts(
         _opCtx.get(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        nss.db_forTest().toString(),
+        nss.dbName(),
         findAndModifyRequest.toBSON({}),
         Shard::RetryPolicy::kNoRetry);
 }
@@ -147,7 +147,7 @@ StatusWith<std::vector<BSONObj>> ShardLocalTest::getIndexes(NamespaceString nss)
     auto response = _shardLocal->runCommandWithFixedRetryAttempts(
         _opCtx.get(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        nss.db_forTest().toString(),
+        nss.dbName(),
         BSON("listIndexes" << nss.coll().toString()),
         Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {

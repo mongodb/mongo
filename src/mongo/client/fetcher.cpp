@@ -178,7 +178,7 @@ Status parseCursorResponse(const BSONObj& obj,
 
 Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const HostAndPort& source,
-                 StringData dbname,
+                 const DatabaseName& dbname,
                  const BSONObj& findCmdObj,
                  CallbackFn work,
                  const BSONObj& metadata,
@@ -233,7 +233,7 @@ std::string Fetcher::getDiagnosticString() const {
     str::stream output;
     output << "Fetcher";
     output << " source: " << _source.toString();
-    output << " database: " << _dbname;
+    output << " database: " << toStringForLogging(_dbname);
     output << " query: " << _cmdObj;
     output << " query metadata: " << _metadata;
     output << " active: " << _isActive_inlock();

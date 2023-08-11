@@ -53,7 +53,7 @@ boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupMongoS(
     auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting(ReadPreference::Nearest),
-        DatabaseName::kAdmin.toString(),
+        DatabaseName::kAdmin,
         configsvrRequest.toBSON({}),
         Shard::RetryPolicy::kIdempotent));
 

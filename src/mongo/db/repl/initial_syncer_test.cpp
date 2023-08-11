@@ -723,7 +723,7 @@ void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vect
 }
 
 void assertFCVRequest(RemoteCommandRequest request) {
-    ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.db(), request.dbname)
+    ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.dbName(), request.dbname)
         << request.toString();
     ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.coll(),
                   request.cmdObj.getStringField("find"));
@@ -1228,7 +1228,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
-    ASSERT_EQUALS("admin", request.dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
     assertRemoteCommandNameEquals("replSetGetRBID", request);
     ASSERT_EQUALS(syncSource, request.target);
 }
@@ -1278,7 +1278,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsRollbackCheckerOnShutdown) {
         ASSERT_TRUE(net->hasReadyRequests());
         auto noi = net->getNextReadyRequest();
         const auto& request = assertRemoteCommandNameEquals("replSetGetRBID", noi->getRequest());
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_EQUALS(syncSource, request.target);
         net->blackHole(noi);
     }
@@ -1349,7 +1349,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughDefaultBeginFetchingOpTimeSc
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(DatabaseName::kLocal.db(), request.dbname);
+    ASSERT_EQUALS(DatabaseName::kLocal, request.dbname);
     assertRemoteCommandNameEquals("find", request);
 }
 
@@ -1438,7 +1438,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeSchedu
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(DatabaseName::kConfig.db(), request.dbname);
+    ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
     assertRemoteCommandNameEquals("find", request);
 }
 
@@ -1543,7 +1543,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.db(), request.dbname);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.dbName(), request.dbname);
     assertRemoteCommandNameEquals("find", request);
     ASSERT_BSONOBJ_EQ(BSON("$natural" << -1), request.cmdObj.getObjectField("sort"));
     ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));

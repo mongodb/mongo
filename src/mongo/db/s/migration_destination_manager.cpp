@@ -887,7 +887,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
+                                              nssOrUUID.dbName(),
                                               cmd,
                                               Milliseconds(-1)));
     for (auto&& spec : indexes.docs) {
@@ -932,7 +932,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     auto infosRes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              DatabaseNameUtil::serialize(nssOrUUID.dbName()),
+                                              nssOrUUID.dbName(),
                                               cmd,
                                               Milliseconds(-1)));
 
@@ -1488,7 +1488,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 auto commandResponse = uassertStatusOKWithContext(
                     fromShard->runCommand(opCtx,
                                           ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "admin",
+                                          DatabaseName::kAdmin,
                                           xferModsRequest,
                                           Shard::RetryPolicy::kNoRetry),
                     "_transferMods failed: ");
@@ -1608,7 +1608,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 auto res = uassertStatusOKWithContext(
                     fromShard->runCommand(opCtx,
                                           ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "admin",
+                                          DatabaseName::kAdmin,
                                           xferModsRequest,
                                           Shard::RetryPolicy::kNoRetry),
                     "_transferMods failed in STEADY STATE: ");

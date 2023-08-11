@@ -192,7 +192,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx
     auto insertResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db_forTest().toString(),
+        ns.dbName(),
         [&]() {
             write_ops::InsertCommandRequest insertOp(ns);
             insertOp.setDocuments({doc});
@@ -214,7 +214,7 @@ Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx
     auto updateResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db_forTest().toString(),
+        ns.dbName(),
         [&]() {
             write_ops::UpdateCommandRequest updateOp(ns);
             updateOp.setUpdates({[&] {
@@ -242,7 +242,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
     auto deleteResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db_forTest().toString(),
+        ns.dbName(),
         [&]() {
             write_ops::DeleteCommandRequest deleteOp(ns);
             deleteOp.setDeletes({[&] {
@@ -410,7 +410,7 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
 
     auto response = configShard->runCommand(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            ns.db_forTest().toString(),
+                                            ns.dbName(),
                                             BSON("listIndexes" << ns.coll().toString()),
                                             Shard::kDefaultConfigCommandTimeout,
                                             Shard::RetryPolicy::kIdempotent);

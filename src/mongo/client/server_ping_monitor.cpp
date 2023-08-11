@@ -167,8 +167,11 @@ void SingleServerPingMonitor::_doServerPing() {
     _nextPingStartDate = now() + _pingFrequency;
 
     // Ensure the ping request will timeout if it exceeds _pingFrequency time to complete.
-    auto request = executor::RemoteCommandRequest(
-        HostAndPort(_hostAndPort), "admin", BSON("ping" << 1), nullptr, _pingFrequency);
+    auto request = executor::RemoteCommandRequest(HostAndPort(_hostAndPort),
+                                                  DatabaseName::kAdmin,
+                                                  BSON("ping" << 1),
+                                                  nullptr,
+                                                  _pingFrequency);
     request.sslMode = _setUri.getSSLMode();
 
     auto remotePingHandle = _executor->scheduleRemoteCommand(

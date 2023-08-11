@@ -310,7 +310,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 void ShardingTestFixture::expectInserts(const NamespaceString& nss,
                                         const std::vector<BSONObj>& expected) {
     onCommand([&nss, &expected](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(nss.db_forTest(), request.dbname);
+        ASSERT_EQUALS(nss.dbName(), request.dbname);
 
         const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto insertOp = InsertOp::parse(opMsgRequest);
@@ -340,7 +340,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         ASSERT_EQUALS(expectedHost, request.target);
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
-        ASSERT_EQUALS(DatabaseName::kConfig.db(), request.dbname);
+        ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
 
         const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
@@ -405,7 +405,7 @@ void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configH
                                                       std::vector<BSONObj> obj) {
     onFindCommand([&, obj](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, configHost);
-        ASSERT_EQ(request.dbname, "config");
+        ASSERT_EQ(request.dbname, DatabaseName::kConfig);
         return obj;
     });
 }

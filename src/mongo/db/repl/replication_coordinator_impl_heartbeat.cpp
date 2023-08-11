@@ -159,8 +159,12 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     heartbeatObj = hbRequest.first.toBSON();
     timeout = hbRequest.second;
 
-    const RemoteCommandRequest request(
-        target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
+    const RemoteCommandRequest request(target,
+                                       DatabaseName::kAdmin,
+                                       heartbeatObj,
+                                       BSON(rpc::kReplSetMetadataFieldName << 1),
+                                       nullptr,
+                                       timeout);
     const executor::TaskExecutor::RemoteCommandCallbackFn callback =
         [=, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
             return _handleHeartbeatResponse(cbData, replSetName);

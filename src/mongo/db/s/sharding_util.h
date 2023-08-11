@@ -60,7 +60,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
  */
 std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<AsyncRequestsSender::Request>& requests,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -72,7 +72,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
  */
 std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -84,7 +84,7 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
  */
 std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,

@@ -359,7 +359,7 @@ void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
     const auto swRemoveChunksResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        DatabaseName::kAdmin.toString(),
+        DatabaseName::kAdmin,
         CommandHelpers::appendMajorityWriteConcern(configsvrRemoveChunksCmd.toBSON(osi.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 
@@ -1134,7 +1134,7 @@ boost::optional<CreateCollectionResponse> commit(
         shard->runFireAndForgetCommand(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)));
     }
 

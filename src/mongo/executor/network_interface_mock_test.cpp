@@ -75,7 +75,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     bool gotExpectedReply = false;
 
     RemoteCommandRequest expectedRequest{testHost(),
-                                         "test",
+                                         DatabaseName::createDatabaseName_forTest(boost::none,
+                                                                                  "test"),
                                          BSON("1" << 2),
                                          BSON("some"
                                               << "stuff"),
@@ -130,7 +131,11 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     bool gotCorrectCommandReply = false;
 
     RemoteCommandRequestOnAny actualCommandExpected{
-        {testHost()}, "testDB", BSON("test" << 1), rpc::makeEmptyMetadata(), nullptr};
+        {testHost()},
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+        BSON("test" << 1),
+        rpc::makeEmptyMetadata(),
+        nullptr};
     RemoteCommandOnAnyResponse actualResponseExpected{testHost(),
                                                       BSON("1212121212"
                                                            << "12121212121212"),

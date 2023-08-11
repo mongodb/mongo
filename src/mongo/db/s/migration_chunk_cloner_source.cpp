@@ -1016,7 +1016,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext*
 
     auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
     auto scheduleStatus = executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_recipientHost, "admin", cmdObj, nullptr),
+        executor::RemoteCommandRequest(_recipientHost, DatabaseName::kAdmin, cmdObj, nullptr),
         [&responseStatus](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
             responseStatus = args.response;
         });

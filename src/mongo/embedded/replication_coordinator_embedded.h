@@ -378,7 +378,7 @@ public:
     void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
 
     BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
-                                            const std::string& dbName,
+                                            const DatabaseName& dbName,
                                             const BSONObj& cmdObj,
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) final;

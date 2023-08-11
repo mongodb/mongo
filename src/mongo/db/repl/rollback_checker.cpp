@@ -146,7 +146,7 @@ bool RollbackChecker::_checkForRollback_inlock(int remoteRBID) {
 StatusWith<RollbackChecker::CallbackHandle> RollbackChecker::_scheduleGetRollbackId(
     const RemoteCommandCallbackFn& nextAction) {
     executor::RemoteCommandRequest getRollbackIDReq(
-        _syncSource, "admin", BSON("replSetGetRBID" << 1), nullptr);
+        _syncSource, DatabaseName::kAdmin, BSON("replSetGetRBID" << 1), nullptr);
     return _executor->scheduleRemoteCommand(getRollbackIDReq, nextAction);
 }
 

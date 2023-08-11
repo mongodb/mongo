@@ -149,7 +149,7 @@ public:
                 auto response = uassertStatusOK(
                     s->runCommandWithFixedRetryAttempts(opCtx,
                                                         ReadPreferenceSetting::get(opCtx),
-                                                        "admin",
+                                                        DatabaseName::kAdmin,
                                                         filteredCmd,
                                                         Shard::RetryPolicy::kIdempotent));
                 uassertStatusOK(response.commandStatus);

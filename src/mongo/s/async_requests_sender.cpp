@@ -76,14 +76,14 @@ MONGO_FAIL_POINT_DEFINE(hangBeforePollResponse);
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          std::shared_ptr<executor::TaskExecutor> executor,
-                                         StringData dbName,
+                                         const DatabaseName& dbName,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
                                          Shard::RetryPolicy retryPolicy,
                                          std::unique_ptr<ResourceYielder> resourceYielder,
                                          const ShardHostMap& designatedHostsMap)
     : _opCtx(opCtx),
-      _db(dbName.toString()),
+      _db(dbName),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy),
       _subExecutor(std::move(executor)),

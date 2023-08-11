@@ -106,7 +106,7 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     BSONObj getParameterCmd = BSON("getParameter" << 1 << "authSchemaVersion" << 1);
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, "admin", getParameterCmd, &builder);
+        opCtx, DatabaseName::kAdmin, getParameterCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -153,7 +153,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                                                 << "showCustomData" << false);
         BSONObjBuilder builder;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, "admin", usersInfoCmd, &builder);
+            opCtx, DatabaseName::kAdmin, usersInfoCmd, &builder);
         BSONObj cmdResult = builder.obj();
         if (!ok) {
             return getStatusFromCommandResult(cmdResult);
@@ -189,7 +189,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
 
         BSONObjBuilder cmdResultBuilder;
         const bool cmdOk = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, "admin", rolesInfoCmd, &cmdResultBuilder);
+            opCtx, DatabaseName::kAdmin, rolesInfoCmd, &cmdResultBuilder);
         BSONObj cmdResult = cmdResultBuilder.obj();
         if (!cmdOk || !cmdResult["userFragment"].ok()) {
             return Status(ErrorCodes::FailedToParse,
@@ -237,7 +237,7 @@ Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
 
     BSONObjBuilder resultBuilder;
     if (!Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, "admin", rolesInfoCmd.obj(), &resultBuilder)) {
+            opCtx, DatabaseName::kAdmin, rolesInfoCmd.obj(), &resultBuilder)) {
         return {ErrorCodes::OperationFailed, "Failed running rolesInfo command on mongod"};
     }
 
@@ -274,7 +274,7 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
     bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, "admin", usersInfoCmd, &userBuilder);
+        opCtx, DatabaseName::kAdmin, usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
         // it's best to assume that there _are_ privilege documents.  This might happen
@@ -292,7 +292,7 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
     BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
     BSONObjBuilder roleBuilder;
     ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, "admin", rolesInfoCmd, &roleBuilder);
+        opCtx, DatabaseName::kAdmin, rolesInfoCmd, &roleBuilder);
     if (!ok) {
         return true;
     }

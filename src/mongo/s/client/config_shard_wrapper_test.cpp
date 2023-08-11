@@ -84,7 +84,7 @@ public:
 
     void runFireAndForgetCommand(OperationContext* opCtx,
                                  const ReadPreferenceSetting& readPref,
-                                 const std::string& dbName,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) override {
         lastReadPref = readPref;
     }
@@ -101,7 +101,7 @@ public:
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,
-                                                   StringData dbName,
+                                                   const DatabaseName& dbName,
                                                    Milliseconds maxTimeMSOverride,
                                                    const BSONObj& cmdObj) final {
         lastReadPref = readPref;
@@ -111,7 +111,7 @@ private:
     StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        StringData dbName,
+        const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final {
         lastReadPref = readPref;
@@ -159,7 +159,7 @@ TEST_F(ConfigShardWrapperTest, RunCommandAttachesMinClusterTime) {
 
     auto result = _configShardWrapper->runCommand(operationContext(),
                                                   ReadPreferenceSetting{},
-                                                  DatabaseName::kConfig.db().toString(),
+                                                  DatabaseName::kConfig,
                                                   BSONObj{},
                                                   Shard::RetryPolicy::kNoRetry);
 
@@ -172,10 +172,8 @@ TEST_F(ConfigShardWrapperTest, RunFireAndForgetCommandAttachesMinClusterTime) {
     expectedMinClusterTime.addTicks(10);
     VectorClock::get(operationContext())->advanceConfigTime_forTest(expectedMinClusterTime);
 
-    _configShardWrapper->runFireAndForgetCommand(operationContext(),
-                                                 ReadPreferenceSetting{},
-                                                 DatabaseName::kConfig.db().toString(),
-                                                 BSONObj{});
+    _configShardWrapper->runFireAndForgetCommand(
+        operationContext(), ReadPreferenceSetting{}, DatabaseName::kConfig, BSONObj{});
 
     ASSERT_EQ(_mockConfigShard->lastReadPref.minClusterTime, expectedMinClusterTime.asTimestamp());
 }

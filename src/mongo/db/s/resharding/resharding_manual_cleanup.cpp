@@ -251,7 +251,7 @@ void ReshardingCoordinatorCleaner::_cleanOnParticipantShards(
     AsyncRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        DatabaseName::kAdmin.db(),
+        DatabaseName::kAdmin,
         createShardCleanupRequests(_originalCollectionNss, _reshardingUUID, doc),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kIdempotent,

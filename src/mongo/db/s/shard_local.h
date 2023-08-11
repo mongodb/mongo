@@ -80,7 +80,7 @@ public:
 
     void runFireAndForgetCommand(OperationContext* opCtx,
                                  const ReadPreferenceSetting& readPref,
-                                 const std::string& dbName,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) override;
 
     Status runAggregation(
@@ -92,14 +92,14 @@ public:
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
-                                                   StringData dbName,
+                                                   const DatabaseName& dbName,
                                                    Milliseconds maxTimeMSOverrideUnused,
                                                    const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        StringData dbName,
+        const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final;
 

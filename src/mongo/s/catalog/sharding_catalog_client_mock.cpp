@@ -143,7 +143,7 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::
 }
 
 bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* opCtx,
-                                                             const std::string& dbname,
+                                                             const DatabaseName& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
     return true;

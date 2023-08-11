@@ -79,7 +79,7 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
     try {
         BSONObjBuilder result;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx, "admin", BSON("_getUserCacheGeneration" << 1), &result);
+            opCtx, DatabaseName::kAdmin, BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return getStatusFromCommandResult(result.obj());
         }

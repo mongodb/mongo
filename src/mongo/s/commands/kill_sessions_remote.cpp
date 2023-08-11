@@ -101,9 +101,12 @@ SessionKiller::Result parallelExec(OperationContext* opCtx,
 
     executor::AsyncMulticaster::Options options;
     options.maxConcurrency = gKillSessionsMaxConcurrency;
-    auto results =
-        executor::AsyncMulticaster(executor, options)
-            .multicast(servers, "admin", cmd, opCtx, Milliseconds(gKillSessionsPerHostTimeoutMS));
+    auto results = executor::AsyncMulticaster(executor, options)
+                       .multicast(servers,
+                                  DatabaseName::kAdmin,
+                                  cmd,
+                                  opCtx,
+                                  Milliseconds(gKillSessionsPerHostTimeoutMS));
 
     for (const auto& result : results) {
         if (!std::get<1>(result).isOK()) {

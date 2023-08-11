@@ -444,10 +444,7 @@ public:
                                    auto opCtx = cc().makeOperationContext();
                                    executor::RemoteCommandRequest request(
                                        cursorHost,
-                                       cursor->getCursorResponse()
-                                           .getNSS()
-                                           .db_forSharding()
-                                           .toString(),
+                                       cursor->getCursorResponse().getNSS().dbName(),
                                        cmdObj,
                                        opCtx.get());
                                    return _executor

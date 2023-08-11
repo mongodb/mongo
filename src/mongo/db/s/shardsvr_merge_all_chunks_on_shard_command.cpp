@@ -109,7 +109,7 @@ public:
             auto swCommandResponse = config->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
+                DatabaseName::kAdmin,
                 configSvrCommitMergeAllChunksOnShard.toBSON(
                     BSON(WriteConcernOptions::kWriteConcernField
                          << ShardingCatalogClient::kMajorityWriteConcern.toBSON())),

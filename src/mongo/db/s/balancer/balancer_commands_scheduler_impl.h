@@ -119,8 +119,8 @@ public:
         return false;
     }
 
-    virtual std::string getTargetDb() const {
-        return DatabaseName::kAdmin.toString();
+    virtual DatabaseName getTargetDb() const {
+        return DatabaseName::kAdmin;
     }
 
     const ShardId& getTarget() const {
@@ -201,8 +201,8 @@ public:
         return cmdObj.obj();
     }
 
-    std::string getTargetDb() const override {
-        return DatabaseName::kConfig.toString();
+    DatabaseName getTargetDb() const override {
+        return DatabaseName::kConfig;
     }
 };
 

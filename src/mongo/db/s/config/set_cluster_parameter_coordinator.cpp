@@ -182,7 +182,7 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     request.setClusterParameterTime(*_doc.getClusterParameterTime());
     sharding_util::sendCommandToShards(
         opCtx,
-        DatabaseName::kAdmin.db(),
+        DatabaseName::kAdmin,
         CommandHelpers::appendMajorityWriteConcern(request.toBSON(session.toBSON())),
         shards,
         **executor);

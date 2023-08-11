@@ -112,14 +112,18 @@ bool pingCommandMissing(const RemoteCommandResponse& result) {
 
 TEST_F(NetworkInterfaceIntegrationFixture, Ping) {
     startNet();
-    assertCommandOK("admin", BSON("ping" << 1));
+    assertCommandOK(DatabaseName::kAdmin, BSON("ping" << 1));
 }
 
 TEST_F(NetworkInterfaceIntegrationFixture, PingWithoutStartup) {
     createNet();
 
-    RemoteCommandRequest request{
-        fixture().getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr, Minutes(5)};
+    RemoteCommandRequest request{fixture().getServers()[0],
+                                 DatabaseName::kAdmin,
+                                 BSON("ping" << 1),
+                                 BSONObj(),
+                                 nullptr,
+                                 Minutes(5)};
 
     auto fut = runCommand(makeCallbackHandle(), request);
     ASSERT_FALSE(fut.isReady());
@@ -138,7 +142,7 @@ class HangingHook : public executor::NetworkConnectionHook {
     StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
         const HostAndPort& remoteHost) final {
         return {boost::make_optional(RemoteCommandRequest(remoteHost,
-                                                          "admin",
+                                                          DatabaseName::kAdmin,
                                                           BSON("sleep" << 1 << "lock"
                                                                        << "none"
                                                                        << "secs" << 100000000),
@@ -170,8 +174,12 @@ TEST_F(NetworkInterfaceIntegrationFixture, HookHangs) {
      *  We assert here that the error code we get is in the error class of timeouts,
      *  which covers both NetworkInterfaceExceededTimeLimit and ExceededTimeLimit.
      */
-    RemoteCommandRequest request{
-        fixture().getServers()[0], "admin", BSON("ping" << 1), BSONObj(), nullptr, Seconds(1)};
+    RemoteCommandRequest request{fixture().getServers()[0],
+                                 DatabaseName::kAdmin,
+                                 BSON("ping" << 1),
+                                 BSONObj(),
+                                 nullptr,
+                                 Seconds(1)};
     auto res = runCommandSync(request);
     ASSERT(ErrorCodes::isExceededTimeLimitError(res.status.code()));
 }
@@ -218,7 +226,7 @@ public:
                                          RemoteCommandRequest::Options options = {}) {
         auto cs = fixture();
         return RemoteCommandRequest(cs.getServers().front(),
-                                    "admin",
+                                    DatabaseName::kAdmin,
                                     std::move(cmd),
                                     BSONObj(),
                                     opCtx,
@@ -246,7 +254,8 @@ public:
                              << "cursor" << BSONObj() << "$readPreference"
                              << BSON("mode"
                                      << "nearest"));
-        RemoteCommandRequest request{target, "admin", cmdObj, BSONObj(), nullptr, kNoTimeout};
+        RemoteCommandRequest request{
+            target, DatabaseName::kAdmin, cmdObj, BSONObj(), nullptr, kNoTimeout};
         auto res = runCommandSync(request);
         ASSERT_OK(res.status);
         ASSERT_OK(getStatusFromCommandResult(res.data));
@@ -390,7 +399,7 @@ TEST_F(NetworkInterfaceTest, CancelLocally) {
 
 TEST_F(NetworkInterfaceTest, CancelRemotely) {
     // Enable blockConnection for "echo".
-    assertCommandOK("admin",
+    assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint"
                          << "failCommand"
                          << "mode"
@@ -402,7 +411,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
 
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
-        assertCommandOK("admin",
+        assertCommandOK(DatabaseName::kAdmin,
                         BSON("configureFailPoint"
                              << "failCommand"
                              << "mode"
@@ -445,7 +454,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
 
 TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     // Enable blockConnection for "echo" and "_killOperations".
-    assertCommandOK("admin",
+    assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint"
                          << "failCommand"
                          << "mode"
@@ -459,7 +468,7 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
 
     ON_BLOCK_EXIT([&] {
         // Disable blockConnection.
-        assertCommandOK("admin",
+        assertCommandOK(DatabaseName::kAdmin,
                         BSON("configureFailPoint"
                              << "failCommand"
                              << "mode"
@@ -697,7 +706,7 @@ TEST_F(NetworkInterfaceTest, StartCommand) {
 }
 
 TEST_F(NetworkInterfaceTest, FireAndForget) {
-    assertCommandOK("admin",
+    assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint"
                          << "failCommand"
                          << "mode"
@@ -707,7 +716,7 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
                                              << BSON_ARRAY("echo"))));
 
     ON_BLOCK_EXIT([&] {
-        assertCommandOK("admin",
+        assertCommandOK(DatabaseName::kAdmin,
                         BSON("configureFailPoint"
                              << "failCommand"
                              << "mode"
@@ -759,7 +768,7 @@ TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
         options.hedgeOptions.hedgeCount = 1;
 
         return RemoteCommandRequestOnAny({cs.getServers()},
-                                         "admin",
+                                         DatabaseName::kAdmin,
                                          std::move(commandRequest),
                                          BSONObj(),
                                          nullptr,
@@ -814,7 +823,7 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
 
 TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     const auto opKey = UUID::gen();
-    assertCommandOK("admin",
+    assertCommandOK(DatabaseName::kAdmin,
                     BSON("configureFailPoint"
                          << "failIfOperationKeyMismatch"
                          << "mode"
@@ -823,7 +832,7 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
                     kNoTimeout);
 
     ON_BLOCK_EXIT([&] {
-        assertCommandOK("admin",
+        assertCommandOK(DatabaseName::kAdmin,
                         BSON("configureFailPoint"
                              << "failIfOperationKeyMismatch"
                              << "mode"
@@ -835,7 +844,7 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     rcrOptions.hedgeOptions.isHedgeEnabled = true;
     rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
     RemoteCommandRequestOnAny rcr(fixture().getServers(),
-                                  "admin",
+                                  DatabaseName::kAdmin,
                                   makeEchoCmdObj(),
                                   BSONObj(),
                                   nullptr,
@@ -889,7 +898,7 @@ public:
     }
 
 private:
-    void _runCommand(const HostAndPort& server, std::string db, BSONObj cmd) {
+    void _runCommand(const HostAndPort& server, const DatabaseName& db, BSONObj cmd) {
         RemoteCommandRequest request{server, db, cmd, BSONObj(), nullptr, kNoTimeout};
         request.sslMode = transport::kGlobalSSLMode;
         auto res = runCommandSync(request);
@@ -907,7 +916,7 @@ private:
         bob.append("mode", enable ? "alwaysOn" : "off");
         if (!data.isEmpty())
             bob.append("data", std::move(data));
-        _runCommand(server, "admin", bob.obj());
+        _runCommand(server, DatabaseName::kAdmin, bob.obj());
     }
 
     void _blockCommandsOnAllServers(BSONArray cmds) {
@@ -925,7 +934,7 @@ private:
         auto res = runCurrentOpForCommand(server, cmd);
         for (auto& op : res.data["cursor"]["firstBatch"].Array()) {
             auto opid = op.Obj()["opid"];
-            _runCommand(server, "admin", BSON("killOp" << 1 << "op" << opid));
+            _runCommand(server, DatabaseName::kAdmin, BSON("killOp" << 1 << "op" << opid));
         }
     }
 
@@ -947,7 +956,7 @@ private:
         rcrOptions.hedgeOptions.isHedgeEnabled = true;
         rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
         RemoteCommandRequestOnAny rcr(fixture().getServers(),
-                                      "admin",
+                                      DatabaseName::kAdmin,
                                       makeEchoCmdObj(),
                                       BSONObj(),
                                       nullptr,
@@ -1141,14 +1150,14 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
                                       << BSON("errorCode" << ErrorCodes::CommandFailed
                                                           << "failCommands"
                                                           << BSON_ARRAY("isMaster")));
-    assertCommandOK("admin", configureFailpointCmd);
+    assertCommandOK(DatabaseName::kAdmin, configureFailpointCmd);
 
     ON_BLOCK_EXIT([&] {
         auto stopFpRequest = BSON("configureFailPoint"
                                   << "failCommand"
                                   << "mode"
                                   << "off");
-        assertCommandOK("admin", stopFpRequest);
+        assertCommandOK(DatabaseName::kAdmin, stopFpRequest);
     });
 
     auto isMasterCmd = BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
@@ -1247,7 +1256,8 @@ TEST_F(NetworkInterfaceTest, RunCommandOnLeasedStream) {
     auto leasedStream = net().leaseStream(target, transport::kGlobalSSLMode, kNoTimeout).get();
     auto* client = leasedStream->getClient();
 
-    auto request = RemoteCommandRequest(target, "admin", makeEchoCmdObj(), nullptr, kNoTimeout);
+    auto request =
+        RemoteCommandRequest(target, DatabaseName::kAdmin, makeEchoCmdObj(), nullptr, kNoTimeout);
     auto deferred = client->runCommandRequest(request);
 
     auto res = deferred.get();

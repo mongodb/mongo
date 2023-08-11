@@ -1635,7 +1635,7 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
     return uassertStatusOK(recoveryShard->runCommandWithFixedRetryAttempts(
                                opCtx,
                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                               "admin",
+                               DatabaseName::kAdmin,
                                coordinateCommitCmd,
                                Shard::RetryPolicy::kIdempotent))
         .response;

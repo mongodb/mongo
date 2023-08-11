@@ -125,7 +125,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
+            DatabaseName::kAdmin,
             CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.writeConcernStatus);

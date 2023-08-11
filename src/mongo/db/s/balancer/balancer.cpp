@@ -989,7 +989,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
         auto result = uassertStatusOK(
             s->runCommandWithFixedRetryAttempts(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                "admin",
+                                                DatabaseName::kAdmin,
                                                 BSON("features" << 1),
                                                 Seconds(30),
                                                 Shard::RetryPolicy::kIdempotent));
@@ -1012,7 +1012,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                 result = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    "admin",
+                    DatabaseName::kAdmin,
                     BSON("features" << 1 << "oidReset" << 1),
                     Seconds(30),
                     Shard::RetryPolicy::kIdempotent));
@@ -1024,7 +1024,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
                         otherShardStatus.getValue()->runCommandWithFixedRetryAttempts(
                             opCtx,
                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            "admin",
+                            DatabaseName::kAdmin,
                             BSON("features" << 1 << "oidReset" << 1),
                             Seconds(30),
                             Shard::RetryPolicy::kIdempotent));

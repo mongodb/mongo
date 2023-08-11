@@ -170,7 +170,7 @@ public:
      */
     StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
-                                           const std::string& dbName,
+                                           const DatabaseName& dbName,
                                            const BSONObj& cmdObj,
                                            RetryPolicy retryPolicy);
 
@@ -181,7 +181,7 @@ public:
      */
     StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
-                                           const std::string& dbName,
+                                           const DatabaseName& dbName,
                                            const BSONObj& cmdObj,
                                            Milliseconds maxTimeMSOverride,
                                            RetryPolicy retryPolicy);
@@ -194,7 +194,7 @@ public:
     StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        const DatabaseName& dbName,
         const BSONObj& cmdObj,
         RetryPolicy retryPolicy);
 
@@ -206,7 +206,7 @@ public:
     StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        const DatabaseName& dbName,
         const BSONObj& cmdObj,
         Milliseconds maxTimeMSOverride,
         RetryPolicy retryPolicy);
@@ -217,7 +217,7 @@ public:
      */
     virtual void runFireAndForgetCommand(OperationContext* opCtx,
                                          const ReadPreferenceSetting& readPref,
-                                         const std::string& dbName,
+                                         const DatabaseName& dbName,
                                          const BSONObj& cmdObj) = 0;
 
     /**
@@ -226,7 +226,7 @@ public:
      */
     StatusWith<QueryResponse> runExhaustiveCursorCommand(OperationContext* opCtx,
                                                          const ReadPreferenceSetting& readPref,
-                                                         const std::string& dbName,
+                                                         const DatabaseName& dbName,
                                                          const BSONObj& cmdObj,
                                                          Milliseconds maxTimeMSOverride);
 
@@ -297,14 +297,14 @@ private:
      */
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* opCtx,
                                                     const ReadPreferenceSetting& readPref,
-                                                    StringData dbname,
+                                                    const DatabaseName& dbname,
                                                     Milliseconds maxTimeMSOverride,
                                                     const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        StringData dbName,
+        const DatabaseName& dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) = 0;
 

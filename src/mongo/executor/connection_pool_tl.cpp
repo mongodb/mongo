@@ -513,7 +513,7 @@ void TLConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     });
 
     _client
-        ->runCommandRequest({_peer, std::string("admin"), BSON("hello" << 1), BSONObj(), nullptr})
+        ->runCommandRequest({_peer, DatabaseName::kAdmin, BSON("hello" << 1), BSONObj(), nullptr})
         .then([](executor::RemoteCommandResponse response) {
             return Future<void>::makeReady(response.status);
         })

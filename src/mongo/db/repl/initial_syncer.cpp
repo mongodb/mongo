@@ -969,7 +969,7 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
     _beginFetchingOpTimeFetcher = std::make_unique<Fetcher>(
         *_attemptExec,
         _syncSource,
-        NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+        NamespaceString::kSessionTransactionsTableNamespace.dbName(),
         cmd.obj(),
         [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
                   mongo::Fetcher::NextAction*,
@@ -1097,7 +1097,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     _fCVFetcher = std::make_unique<Fetcher>(
         *_attemptExec,
         _syncSource,
-        NamespaceString::kServerConfigurationNamespace.db().toString(),
+        NamespaceString::kServerConfigurationNamespace.dbName(),
         queryBob.obj(),
         [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
                   mongo::Fetcher::NextAction*,
@@ -1941,7 +1941,7 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(
     _lastOplogEntryFetcher = std::make_unique<Fetcher>(
         *_attemptExec,
         _syncSource,
-        NamespaceString::kRsOplogNamespace.db().toString(),
+        NamespaceString::kRsOplogNamespace.dbName(),
         query,
         callback,
         ReadPreferenceSetting::secondaryPreferredMetadata(),

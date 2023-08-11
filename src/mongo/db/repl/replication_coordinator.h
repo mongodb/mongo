@@ -1174,7 +1174,7 @@ public:
      * - 'OnRemoteCmdComplete' will be called once the response for the remote command is received.
      */
     virtual BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
-                                                    const std::string& dbName,
+                                                    const DatabaseName& dbName,
                                                     const BSONObj& cmdObj,
                                                     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                                     OnRemoteCmdCompleteFn onRemoteCmdComplete) = 0;

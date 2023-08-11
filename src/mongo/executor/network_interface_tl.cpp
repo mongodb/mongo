@@ -1278,7 +1278,7 @@ Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill, size
     // Make a request state for _killOperations.
     executor::RemoteCommandRequest killOpRequest(
         target,
-        "admin",
+        DatabaseName::kAdmin,
         BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(operationKey)),
         nullptr,
         kCancelCommandTimeout);

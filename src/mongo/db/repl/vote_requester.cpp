@@ -113,7 +113,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
             target,
-            "admin",
+            DatabaseName::kAdmin,
             requestVotesCmd,
             nullptr,
             std::min(_rsConfig.getElectionTimeoutPeriod(), maximumVoteRequestTimeoutMS)));

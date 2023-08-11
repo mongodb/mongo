@@ -363,7 +363,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
+        DatabaseName::kAdmin,
         BSON("_flushDatabaseCacheUpdates" << dbName.toString()),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
@@ -1319,7 +1319,7 @@ ShardServerCatalogCacheLoader::_forcePrimaryCollectionRefreshAndWaitForReplicati
     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
+        DatabaseName::kAdmin,
         BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));

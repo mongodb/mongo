@@ -164,7 +164,7 @@ protected:
 
     RemoteCommandRequest requestFrom(std::string hostname) {
         return RemoteCommandRequest(HostAndPort(hostname),
-                                    "",  // fields do not matter in VoteRequester
+                                    DatabaseName::kEmpty,  // fields do not matter in VoteRequester
                                     BSONObj(),
                                     nullptr,
                                     Milliseconds(0));

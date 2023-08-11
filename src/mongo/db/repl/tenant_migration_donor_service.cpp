@@ -1242,7 +1242,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        auto fetcher = std::make_shared<Fetcher>(
                            _recipientCmdExecutor.get(),
                            host,
-                           nss.db().toString(),
+                           nss.dbName(),
                            cmdObj,
                            fetcherCallback,
                            kPrimaryOnlyReadPreference.toContainingBSON(),

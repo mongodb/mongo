@@ -148,7 +148,7 @@ public:
      */
     AsyncRequestsSender(OperationContext* opCtx,
                         std::shared_ptr<executor::TaskExecutor> executor,
-                        StringData dbName,
+                        const DatabaseName& dbName,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,
                         Shard::RetryPolicy retryPolicy,
@@ -289,7 +289,7 @@ private:
     BSONObj _metadataObj;
 
     // The database against which the commands are run.
-    const std::string _db;
+    const DatabaseName _db;
 
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;

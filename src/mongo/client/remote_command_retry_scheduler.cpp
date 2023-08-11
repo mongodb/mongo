@@ -59,7 +59,7 @@ RemoteCommandRetryScheduler::RemoteCommandRetryScheduler(
             !request.target.empty());
     uassert(ErrorCodes::BadValue,
             "database name in remote command request cannot be empty",
-            !request.dbname.empty());
+            !request.dbname.isEmpty());
     uassert(ErrorCodes::BadValue,
             "command object in remote command request cannot be empty",
             !request.cmdObj.isEmpty());

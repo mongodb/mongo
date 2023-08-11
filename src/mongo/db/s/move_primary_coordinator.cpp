@@ -478,7 +478,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         const auto listResponse = uassertStatusOK(
             toShard->runExhaustiveCursorCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                DatabaseNameUtil::serialize(_dbName),
+                                                _dbName,
                                                 listCommand,
                                                 Milliseconds(-1)));
 
@@ -523,7 +523,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
     const auto cloneResponse =
         toShard->runCommand(opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            DatabaseName::kAdmin.db().toString(),
+                            DatabaseName::kAdmin,
                             cloneCommand,
                             Shard::RetryPolicy::kNoRetry);
 
@@ -572,7 +572,7 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
     const auto commitResponse =
         config->runCommandWithFixedRetryAttempts(opCtx,
                                                  ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 DatabaseName::kAdmin.db().toString(),
+                                                 DatabaseName::kAdmin,
                                                  commitCommand,
                                                  Shard::RetryPolicy::kIdempotent);
 
@@ -713,7 +713,7 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
         return toShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             enterCriticalSectionCommand,
             Shard::RetryPolicy::kIdempotent);
     }();
@@ -743,7 +743,7 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
         return toShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            DatabaseName::kAdmin.toString(),
+            DatabaseName::kAdmin,
             exitCriticalSectionCommand,
             Shard::RetryPolicy::kIdempotent);
     }();

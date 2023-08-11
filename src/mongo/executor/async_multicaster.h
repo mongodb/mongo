@@ -73,7 +73,7 @@ public:
      *   timeoutMillis * (servers.size() / maxConcurrency) - if not
      */
     std::vector<Reply> multicast(std::vector<HostAndPort> servers,
-                                 const std::string& theDbName,
+                                 const DatabaseName& theDbName,
                                  const BSONObj& theCmdObj,
                                  OperationContext* opCtx,
                                  Milliseconds timeoutMillis);

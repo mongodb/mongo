@@ -277,7 +277,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
             kPrimaryOnlyReadPreference,
-            "admin",
+            DatabaseName::kAdmin,
             configCmdObj,
             Shard::RetryPolicy::kIdempotent);
 

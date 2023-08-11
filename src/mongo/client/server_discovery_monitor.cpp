@@ -273,8 +273,8 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     }
 
     const auto timeoutMS = _connectTimeout + kMaxAwaitTime;
-    auto request =
-        executor::RemoteCommandRequest(HostAndPort(_host), "admin", bob.obj(), nullptr, timeoutMS);
+    auto request = executor::RemoteCommandRequest(
+        HostAndPort(_host), DatabaseName::kAdmin, bob.obj(), nullptr, timeoutMS);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleExhaustRemoteCommand(
@@ -330,7 +330,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     }
 
     auto request = executor::RemoteCommandRequest(
-        HostAndPort(_host), "admin", bob.obj(), nullptr, _connectTimeout);
+        HostAndPort(_host), DatabaseName::kAdmin, bob.obj(), nullptr, _connectTimeout);
     request.sslMode = _setUri.getSSLMode();
 
     auto swCbHandle = _executor->scheduleRemoteCommand(

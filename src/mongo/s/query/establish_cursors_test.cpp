@@ -129,7 +129,7 @@ public:
     void expectKillOperations(size_t expected, std::vector<UUID> expectedOpKeys = {}) {
         for (size_t i = 0; i < expected; i++) {
             onCommand([&](const RemoteCommandRequest& request) {
-                ASSERT_EQ("admin", request.dbname) << request;
+                ASSERT_EQ(DatabaseName::kAdmin, request.dbname) << request;
                 ASSERT_TRUE(request.cmdObj.hasField("_killOperations")) << request;
 
                 ASSERT_TRUE(request.cmdObj.hasField("operationKeys")) << request;

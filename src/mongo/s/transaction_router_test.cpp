@@ -197,7 +197,7 @@ protected:
             onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
                 seenHostAndPorts.insert(request.target);
 
-                ASSERT_EQ(DatabaseName::kAdmin.db(), request.dbname);
+                ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
                 auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
                 ASSERT_EQ(cmdName, "abortTransaction");
@@ -602,7 +602,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, RecoveryShardDoesNotGetSetForRea
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), boost::none); });
     for (int i = 0; i < 2; i++) {
         onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "commitTransaction");
             return kOkReadOnlyFalseResponse;
@@ -1140,7 +1140,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
@@ -1177,7 +1177,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
@@ -1223,7 +1223,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         onCommand([&](const RemoteCommandRequest& request) {
             seenHostAndPorts.insert(request.target);
 
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "commitTransaction");
@@ -1266,7 +1266,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
@@ -1278,7 +1278,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort2, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
@@ -1317,7 +1317,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1507,7 +1507,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1533,7 +1533,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1575,7 +1575,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1617,7 +1617,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1677,7 +1677,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -1715,7 +1715,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(hostAndPort1, request.target);
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "coordinateCommitTransaction");
@@ -2272,7 +2272,7 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");
@@ -2313,7 +2313,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsAllReturnSuccess) {
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
             auto target = targets.find(request.target);
             ASSERT(target != targets.end());
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "abortTransaction");
@@ -2359,7 +2359,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNoSuchTransa
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
             auto target = targets.find(request.target);
             ASSERT(target != targets.end());
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "abortTransaction");
@@ -2408,7 +2408,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipantsSomeReturnNetworkError
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
             auto target = targets.find(request.target);
             ASSERT(target != targets.end());
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "abortTransaction");
@@ -2523,7 +2523,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");
@@ -2562,7 +2562,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
             auto target = targets.find(request.target);
             ASSERT(target != targets.end());
-            ASSERT_EQ("admin", request.dbname);
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
             auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
             ASSERT_EQ(cmdName, "abortTransaction");
@@ -2597,7 +2597,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(hostAndPort1, request.target);
-        ASSERT_EQ("admin", request.dbname);
+        ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");

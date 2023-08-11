@@ -117,7 +117,7 @@ void ShardingTestFixtureCommon::expectConfigCollectionCreate(const HostAndPort& 
                                                              const BSONObj& response) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
 
         BSONObj expectedCreateCmd =
             BSON("create" << collName << "capped" << true << "size" << cappedSize << "writeConcern"
@@ -139,7 +139,7 @@ void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& 
                                                              const BSONObj& detail) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(DatabaseName::kConfig.db(), request.dbname);
+        ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
 
         const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto batchRequest(BatchedCommandRequest::parseInsert(opMsg));

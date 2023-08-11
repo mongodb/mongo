@@ -289,7 +289,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -335,7 +335,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -392,7 +392,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -456,7 +456,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         ASSERT(seenHosts.insert(request.target).second)
@@ -530,7 +530,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWhenOtherNodesHaveHigherVersio
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -577,7 +577,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -637,7 +637,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -693,7 +693,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -745,7 +745,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsIfMinoritySetTimesOut) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();
@@ -791,7 +791,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckProcessesCallbackCanceledResponse) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
-        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
         ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
         ASSERT(seenHosts.insert(request.target).second)
             << "Already saw " << request.target.toString();

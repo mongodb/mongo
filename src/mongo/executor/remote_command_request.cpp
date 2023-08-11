@@ -66,7 +66,7 @@ AtomicWord<unsigned long long> requestIdCounter(0);
 constexpr Milliseconds RemoteCommandRequestBase::kNoTimeout;
 
 RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
-                                                   const std::string& theDbName,
+                                                   const DatabaseName& theDbName,
                                                    const BSONObj& theCmdObj,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
@@ -140,7 +140,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl() = default;
 template <typename T>
 RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                                       const T& theTarget,
-                                                      const std::string& theDbName,
+                                                      const DatabaseName& theDbName,
                                                       const BSONObj& theCmdObj,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
@@ -163,7 +163,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
 
 template <typename T>
 RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
-                                                      const std::string& theDbName,
+                                                      const DatabaseName& theDbName,
                                                       const BSONObj& theCmdObj,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
@@ -189,7 +189,7 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
     } else {
         out << "[{}]"_format(fmt::join(target, ", "));
     }
-    out << " db:" << dbname;
+    out << " db:" << toStringForLogging(dbname);
 
     if (dateScheduled && timeout != kNoTimeout) {
         out << " expDate:" << (*dateScheduled + timeout).toString();

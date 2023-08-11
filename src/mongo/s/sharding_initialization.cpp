@@ -165,7 +165,7 @@ void preWarmConnections(OperationContext* opCtx, std::vector<HostAndPort> allHos
     auto results =
         executor::AsyncMulticaster(*executor, options)
             .multicast(allHosts,
-                       "admin",
+                       DatabaseName::kAdmin,
                        BSON("ping" << 1),
                        opCtx,
                        Milliseconds(gWarmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS));

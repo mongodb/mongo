@@ -75,10 +75,6 @@ std::string DatabaseNameUtil::serializeForCatalog(const DatabaseName& dbName,
     return dbName.toStringWithTenantId();
 }
 
-std::string DatabaseNameUtil::serializeForRemoteCmdRequest(const DatabaseName& dbName) {
-    return dbName.toStringWithTenantId();
-}
-
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
     // tenantId came from either a $tenant field or security token.

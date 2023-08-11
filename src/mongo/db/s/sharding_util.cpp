@@ -87,12 +87,12 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
-    sendCommandToShards(opCtx, DatabaseName::kAdmin.db(), cmdObj, shardIds, executor);
+    sendCommandToShards(opCtx, DatabaseName::kAdmin, cmdObj, shardIds, executor);
 }
 
 std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<AsyncRequestsSender::Request>& requests,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -120,7 +120,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
 
             if (throwOnError) {
                 auto errorContext = "Failed command {} for database '{}' on shard '{}'"_format(
-                    command.toString(), dbName, StringData{response.shardId});
+                    command.toString(), dbName.toStringForErrorMsg(), StringData{response.shardId});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;
@@ -140,7 +140,7 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
 
 std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,
@@ -155,7 +155,7 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
 
 std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,

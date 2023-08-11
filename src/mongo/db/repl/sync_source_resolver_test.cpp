@@ -320,7 +320,7 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));
     ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.db(), request.dbname);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.dbName(), request.dbname);
     ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
     auto firstElement = request.cmdObj.firstElement();
     ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
@@ -375,7 +375,7 @@ void _scheduleRBIDResponse(executor::NetworkInterfaceMock* net,
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(reply);
     ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS("admin", request.dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, request.dbname);
     ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
     ASSERT_BSONOBJ_EQ(BSON("replSetGetRBID" << 1), request.cmdObj);
     net->runReadyNetworkOperations();
@@ -701,7 +701,7 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));
     ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.db(), request.dbname);
+    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace.dbName(), request.dbname);
     ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
     auto firstElement = request.cmdObj.firstElement();
     ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());

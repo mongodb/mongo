@@ -274,7 +274,7 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
-            ASSERT_EQ(request.dbname, "config");
+            ASSERT_EQ(request.dbname, DatabaseName::kConfig);
             return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
                 .toBSON(CursorResponse::ResponseType::InitialResponse);
         });

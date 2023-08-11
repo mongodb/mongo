@@ -93,7 +93,7 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const Shar
     auto listDatabasesStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        "admin",
+        DatabaseName::kAdmin,
         BSON("listDatabases" << 1),
         maxTimeMSOverride,
         Shard::RetryPolicy::kIdempotent);
@@ -129,7 +129,7 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
     auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        ns.db_forSharding().toString(),
+        ns.dbName(),
         cmdObj,
         maxTimeMSOverride,
         Shard::RetryPolicy::kIdempotent);
@@ -171,7 +171,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
     auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        nss.db_forSharding().toString(),
+        nss.dbName(),
         req.toBSON({}),
         Shard::RetryPolicy::kIdempotent);
 
@@ -248,7 +248,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
         auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
+            DatabaseName::kAdmin,
             cmdObj,
             Shard::RetryPolicy::kNotIdempotent);
         if (!cmdStatus.isOK()) {

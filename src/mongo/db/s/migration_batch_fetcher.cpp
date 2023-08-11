@@ -108,7 +108,7 @@ BSONObj MigrationBatchFetcher<Inserter>::_fetchBatch(OperationContext* opCtx) {
     auto commandResponse = uassertStatusOKWithContext(
         _fromShard->runCommand(opCtx,
                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                               "admin",
+                               DatabaseName::kAdmin,
                                _migrateCloneRequest,
                                Shard::RetryPolicy::kNoRetry),
         "_migrateClone failed: ");
