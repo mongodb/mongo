@@ -460,8 +460,7 @@ TEST_F(TenantFileImporterServiceTest, ImportsFilesWhenAllFilenamesLearned) {
     ASSERT_BSONOBJ_EQ(recipientVoteImportedFilesCmdCall.cmdObj,
                       BSON("recipientVoteImportedFiles" << 1 << "migrationId" << migrationId
                                                         << "from"
-                                                        << ":27017"
-                                                        << "success" << true));
+                                                        << ":27017"));
 }
 
 TEST_F(TenantFileImporterServiceTest, statsForInvalidMigrationID) {

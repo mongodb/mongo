@@ -275,18 +275,18 @@ public:
             LOGV2(6112805,
                   "Received RecipientVoteImportedFiles request",
                   "migrationId"_attr = cmd.getMigrationId(),
-                  "from"_attr = cmd.getFrom(),
-                  "success"_attr = cmd.getSuccess(),
-                  "reason"_attr = cmd.getReason());
-
+                  "from"_attr = cmd.getFrom());
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(
                         repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
             auto [instance, _] = repl::ShardMergeRecipientService::Instance::lookup(
                 opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
-            uassert(8423340, "Unknown migrationId", instance);
-            (*instance)->onMemberImportedFiles(cmd.getFrom(), cmd.getSuccess(), cmd.getReason());
+            uassert(ErrorCodes::NoSuchTenantMigration,
+                    str::stream() << "Could not find tenant migration with id "
+                                  << cmd.getMigrationId(),
+                    instance);
+            (*instance)->onMemberImportedFiles(cmd.getFrom());
         }
 
     private:

@@ -209,9 +209,7 @@ public:
         /**
          * Called when a replica set member (self, or a secondary) finishes importing donated files.
          */
-        void onMemberImportedFiles(const HostAndPort& host,
-                                   bool success,
-                                   const boost::optional<StringData>& reason = boost::none);
+        void onMemberImportedFiles(const HostAndPort& host);
 
         /**
          * Set the oplog creator functor, to allow use of a mock oplog fetcher.
@@ -249,7 +247,7 @@ public:
          */
         void setBackupCursorFetcherExecutor_forTest(
             std::shared_ptr<executor::TaskExecutor> taskExecutor) {
-            _backupCursorExecutor = taskExecutor;
+            _backupCursorExecutor = std::move(taskExecutor);
         }
 
         const NamespaceString _stateDocumentsNS = NamespaceString::kShardMergeRecipientsNamespace;
@@ -632,8 +630,9 @@ public:
         // Data shared by cloners. Follow TenantMigrationSharedData synchronization rules.
         std::unique_ptr<TenantMigrationSharedData> _sharedData;  // (S)
 
-        // Promise that is resolved when all recipient nodes have imported all donor files.
-        SharedPromise<void> _importedFilesPromise;  // (W)
+        // Promise that is resolved when all voting data-bearing recipient nodes have successfully
+        // imported all donor files.
+        SharedPromise<void> _importQuorumPromise;  // (W)
         // Whether we are waiting for members to import donor files.
         bool _waitingForMembersToImportFiles = true;
         // Which members have imported all donor files.

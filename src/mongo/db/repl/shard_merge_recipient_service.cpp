@@ -169,8 +169,7 @@ using namespace fmt;
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
 constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
-constexpr int kCheckpointTsBackupCursorErrorCode = 6929900;
-constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
+constexpr int kBackupCursorTooStaleErrorCode = 6929900;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString::makeGlobalConfigCollection(kOplogBufferPrefix +
@@ -569,6 +568,16 @@ boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentO
     bob.append("garbageCollectable", _forgetMigrationDurablePromise.getFuture().isReady());
 
     repl::TenantFileImporterService::get(getGlobalServiceContext())->getStats(bob, _migrationUuid);
+
+    auto importQuorumFuture = _importQuorumPromise.getFuture();
+    bob.append("importQuorumSatisfied",
+               importQuorumFuture.isReady() && importQuorumFuture.getNoThrow().isOK());
+    if (!_membersWhoHaveImportedFiles.empty()) {
+        BSONArrayBuilder arrayBuilder(bob.subarrayStart("ImportQuorumVoterList"));
+        for (const auto& item : (_membersWhoHaveImportedFiles)) {
+            arrayBuilder.append(item.toString());
+        }
+    }
 
     if (_stateDoc.getStartFetchingDonorOpTime())
         _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");
@@ -1005,8 +1014,8 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_killBackupCursor() {
                 nullptr);
             request.sslMode = _donorUri.getSSLMode();
 
-            const auto scheduleResult = _scheduleKillBackupCursorWithLock(
-                lk, _recipientService->getInstanceCleanupExecutor());
+            const auto scheduleResult =
+                _scheduleKillBackupCursorWithLock(lk, _backupCursorExecutor);
             if (!scheduleResult.isOK()) {
                 LOGV2_WARNING(7339725,
                               "Failed to run killCursors command on backup cursor",
@@ -1082,7 +1091,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
                     // oplog entries during the migration. We also have a check in the tenant oplog
                     // applier to detect such oplog entries. Adding a check here helps us to detect
                     // the problem earlier.
-                    uassert(kCheckpointTsBackupCursorErrorCode,
+                    uassert(kBackupCursorTooStaleErrorCode,
                             "backupCursorCheckpointTimestamp should be greater than or equal to "
                             "startMigrationDonorTimestamp",
                             checkpointTimestamp >= startMigrationDonorTimestamp);
@@ -1205,30 +1214,20 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursorWithRetr
     const CancellationToken& token) {
     return AsyncTry([this, self = shared_from_this(), token] { return _openBackupCursor(token); })
         .until([this, self = shared_from_this()](Status status) {
-            if (status == ErrorCodes::BackupCursorOpenConflictWithCheckpoint) {
+            // Fetcher closes backup cursor on post-opening errors, eliminating the need
+            // for explicit 'killCursors' with 'kBackupCursorTooStaleErrorCode' prior to retries.
+            if (status == ErrorCodes::BackupCursorOpenConflictWithCheckpoint ||
+                status.code() == kBackupCursorTooStaleErrorCode) {
                 LOGV2_INFO(7339733,
                            "Retrying backup cursor creation after transient error",
                            "migrationId"_attr = getMigrationUUID(),
-                           "status"_attr = status);
-
-                return false;
-            } else if (status.code() == kCheckpointTsBackupCursorErrorCode ||
-                       status.code() == kCloseCursorBeforeOpenErrorCode) {
-                LOGV2_INFO(7339734,
-                           "Closing backup cursor and retrying after getting retryable error",
-                           "migrationId"_attr = getMigrationUUID(),
-                           "status"_attr = status);
-
-                stdx::lock_guard lk(_mutex);
-                const auto scheduleResult =
-                    _scheduleKillBackupCursorWithLock(lk, _backupCursorExecutor);
-                uassertStatusOK(scheduleResult);
+                           "errorStatus"_attr = status);
 
                 return false;
             }
-
             return true;
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**_scopedExecutor, token)
         .semi();
 }
@@ -1923,42 +1922,42 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_enterConsistentState() {
         .semi();
 }
 
-void ShardMergeRecipientService::Instance::onMemberImportedFiles(
-    const HostAndPort& host, bool success, const boost::optional<StringData>& reason) {
+void ShardMergeRecipientService::Instance::onMemberImportedFiles(const HostAndPort& host) {
     stdx::lock_guard lk(_mutex);
-    if (!_waitingForMembersToImportFiles) {
-        LOGV2_WARNING(7339747,
-                      "Ignoring delayed recipientVoteImportedFiles",
-                      "host"_attr = host.toString(),
-                      "migrationId"_attr = _migrationUuid);
+    auto importQuorumFuture = _importQuorumPromise.getFuture();
+    if (importQuorumFuture.isReady()) {
+        LOGV2_INFO(7339747,
+                   "Ignoring delayed recipientVoteImportedFiles",
+                   "host"_attr = host.toString(),
+                   "migrationId"_attr = _migrationUuid,
+                   "importStatus"_attr = importQuorumFuture.getNoThrow());
         return;
     }
 
     auto state = _stateDoc.getState();
-    uassert(7339785,
-            "The migration is at the wrong stage for recipientVoteImportedFiles: {}"_format(
-                ShardMergeRecipientState_serializer(state)),
-            state == ShardMergeRecipientStateEnum::kLearnedFilenames);
-
-    if (!success) {
-        _importedFilesPromise.setError(
-            {ErrorCodes::OperationFailed,
-             "Migration failed on {}, error: {}"_format(host, reason.value_or("null"))});
-        _waitingForMembersToImportFiles = false;
-        return;
-    }
+    uassert(
+        7339785,
+        str::stream()
+            << "The migration is at the wrong stage for recipientVoteImportedFiles:: migrationId: "
+            << _migrationUuid << " state: " << ShardMergeRecipientState_serializer(state),
+        state == ShardMergeRecipientStateEnum::kLearnedFilenames);
 
     _membersWhoHaveImportedFiles.insert(host);
-    // Not reconfig-safe, we must not do a reconfig concurrent with a migration.
-    if (static_cast<int>(_membersWhoHaveImportedFiles.size()) ==
-        repl::ReplicationCoordinator::get(_serviceContext)
-            ->getConfig()
-            .getNumDataBearingMembers()) {
+
+    std::vector<HostAndPort> voterList;
+    voterList.reserve(_membersWhoHaveImportedFiles.size());
+    voterList.insert(
+        voterList.end(), _membersWhoHaveImportedFiles.begin(), _membersWhoHaveImportedFiles.end());
+
+    CommitQuorumOptions allVotingMembers(CommitQuorumOptions::kVotingMembers);
+    auto importQuorumSatisfied = repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                                     ->isCommitQuorumSatisfied(allVotingMembers, voterList);
+
+    if (importQuorumSatisfied) {
         LOGV2_INFO(7339748,
                    "All members finished importing donated files",
                    "migrationId"_attr = _migrationUuid);
-        _importedFilesPromise.emplaceValue();
-        _waitingForMembersToImportFiles = false;
+        setPromiseOkifNotReady(lk, _importQuorumPromise);
     }
 }
 
@@ -2047,6 +2046,7 @@ void ShardMergeRecipientService::Instance::_cleanupOnMigrationCompletion(Status 
         invariant(!status.isOK());
         setPromiseErrorifNotReady(lk, _dataConsistentPromise, status);
         setPromiseErrorifNotReady(lk, _migrationCompletionPromise, status);
+        setPromiseErrorifNotReady(lk, _importQuorumPromise, status);
 
         _oplogApplierReady = false;
         _oplogApplierReadyCondVar.notify_all();
@@ -2287,7 +2287,38 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_prepareForMigration(
 SemiFuture<void> ShardMergeRecipientService::Instance::_waitForAllNodesToFinishImport() {
     _stopOrHangOnFailPoint(&fpAfterStartingOplogFetcherMigrationRecipientInstance);
     LOGV2_INFO(7339751, "Waiting for all nodes to call recipientVoteImportedFiles");
-    return _importedFilesPromise.getFuture().semi();
+
+    CancellationSource cancelTimeoutSource;
+    // During failovers, the scoped task executor may shut down before the callback to cancel the
+    // sleep timeout source is executed. However, the scoped task executor shutdown will also
+    // cancel all pending tasks, including this sleep task. So, no concern about orphaned
+    // pending tasks after migration task completion.
+    auto deadlineReachedFuture =
+        (**_scopedExecutor)
+            ->sleepFor(Milliseconds(repl::importQuorumTimeoutSeconds.load()),
+                       cancelTimeoutSource.token());
+
+    return whenAny(std::move(deadlineReachedFuture),
+                   _importQuorumPromise.getFuture().thenRunOn(**_scopedExecutor),
+                   _interruptPromise.getFuture().thenRunOn(**_scopedExecutor))
+        .thenRunOn(**_scopedExecutor)
+        .then([this,
+               self = shared_from_this(),
+               cancelTimeoutSource = std::move(cancelTimeoutSource)](auto result) mutable {
+            const auto& [status, idx] = result;
+            if (idx == 0) {
+                LOGV2(7675003,
+                      "Wait for import vote quorum timeout expired",
+                      "migrationId"_attr = _migrationUuid,
+                      "timeoutMs"_attr = repl::importQuorumTimeoutSeconds.load());
+                uasserted(ErrorCodes::ExceededTimeLimit, "Import vote quoroum timeout expired");
+            } else {
+                // Cancel the sleep task.
+                cancelTimeoutSource.cancel();
+                uassertStatusOK(status);
+            }
+        })
+        .semi();
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_startMigrationIfSafeToRunwithCurrentFCV(

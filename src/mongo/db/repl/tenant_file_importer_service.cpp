@@ -70,6 +70,7 @@
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeFileImporterThreadExit);
 MONGO_FAIL_POINT_DEFINE(skipCloneFiles);
+MONGO_FAIL_POINT_DEFINE(hangBeforeVoteImportedFiles);
 
 namespace mongo::repl {
 
@@ -397,24 +398,45 @@ void TenantFileImporterService::_cloneFile(OperationContext* opCtx,
 
 void TenantFileImporterService::_voteImportedFiles(OperationContext* opCtx,
                                                    const UUID& migrationId) {
+    if (MONGO_unlikely(hangBeforeVoteImportedFiles.shouldFail())) {
+        LOGV2(7675000, "'hangBeforeVoteImportedFiles' failpoint enabled");
+        hangBeforeVoteImportedFiles.pauseWhileSet();
+    }
+
+    // Build the command request.
     auto replCoord = ReplicationCoordinator::get(getGlobalServiceContext());
+    RecipientVoteImportedFiles cmd(migrationId, replCoord->getMyHostAndPort());
 
-    RecipientVoteImportedFiles cmd(migrationId, replCoord->getMyHostAndPort(), true /* success */);
+    Backoff exponentialBackoff(Seconds(1), Milliseconds::max());
 
-    auto voteResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
-        opCtx,
-        DatabaseName::kAdmin.db().toString(),
-        cmd.toBSON({}),
-        [](executor::TaskExecutor::CallbackHandle handle) {},
-        [](executor::TaskExecutor::CallbackHandle handle) {});
+    while (true) {
 
-    auto voteStatus = getStatusFromCommandResult(voteResponse);
-    if (!voteStatus.isOK()) {
-        LOGV2_ERROR(6113403,
-                    "Failed to run recipientVoteImportedFiles command on primary",
-                    "migrationId"_attr = migrationId,
-                    "status"_attr = voteStatus);
-        // TODO SERVER-64192: handle this case, retry, and/or throw error, etc.
+        opCtx->checkForInterrupt();
+
+        try {
+            auto voteResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
+                opCtx,
+                DatabaseName::kAdmin.db().toString(),
+                cmd.toBSON({}),
+                [](executor::TaskExecutor::CallbackHandle handle) {},
+                [](executor::TaskExecutor::CallbackHandle handle) {});
+
+            uassertStatusOK(getStatusFromCommandResult(voteResponse));
+        } catch (DBException& ex) {
+            if (ErrorCodes::isNetworkError(ex)) {
+                LOGV2_INFO(7675001,
+                           "Retrying 'recipientVoteImportedFiles' command",
+                           "retryError"_attr = redact(ex));
+
+                // Don't hammer the network.
+                opCtx->sleepFor(exponentialBackoff.nextSleep());
+                continue;
+            }
+
+            ex.addContext("Failed to run 'recipientVoteImportedFiles' command");
+            throw;
+        }
+        break;
     }
 }
 

@@ -295,6 +295,11 @@ bool NetworkInterfaceMock::_hasReadyRequests_inlock() {
     return noi != _operations.end();
 }
 
+bool NetworkInterfaceMock::isNetworkOperationIteratorAtEnd(
+    const NetworkInterfaceMock::NetworkOperationIterator& itr) {
+    return itr == _operations.end();
+}
+
 NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNextReadyRequest() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
@@ -324,7 +329,6 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthUnsch
     size_t n) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
-    invariant(_hasReadyRequests_inlock());
 
     // Linear time, but it's just for testing so no big deal.
     auto noi = _operations.begin();

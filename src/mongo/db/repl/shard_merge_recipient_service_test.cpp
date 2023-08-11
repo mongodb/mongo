@@ -78,8 +78,10 @@
 #include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -90,11 +92,13 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log_component.h"
@@ -120,8 +124,18 @@ namespace mongo {
 namespace repl {
 
 namespace {
+using namespace mongo::test::mock;
+using namespace mongo::executor;
+
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
 const Timestamp kDefaultStartMigrationTimestamp(1, 1);
+static const UUID kMigrationUUID = UUID::gen();
+
+void advanceClock(NetworkInterfaceMock* net, Milliseconds duration) {
+    NetworkInterfaceMock::InNetworkGuard guard(net);
+    auto when = net->now() + duration;
+    ASSERT_EQ(when, net->runUntil(when));
+}
 
 OplogEntry makeOplogEntry(OpTime opTime,
                           OpTypeEnum opType,
@@ -151,6 +165,29 @@ OplogEntry makeOplogEntry(OpTime opTime,
 
 }  // namespace
 
+/**
+ * Mock OpObserver that tracks storage events.
+ */
+class ShardMergeRecipientServiceTestOpObserver final : public OpObserverNoop {
+public:
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator = nullptr) final {
+        if (shard_merge_utils::isDonatedFilesCollection(coll->ns())) {
+            for (auto it = first; it != last; it++) {
+                backupCursorFiles.emplace_back(it->doc.getOwned());
+            }
+            return;
+        }
+    }
+
+    std::vector<BSONObj> backupCursorFiles;
+};
+
 class ShardMergeRecipientServiceTest : public ServiceContextMongoDTest {
 public:
     class stopFailPointEnableBlock : public FailPointEnableBlock {
@@ -167,21 +204,9 @@ public:
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
 
-        // Fake replSet just for creating consistent URI for monitor
-        MockReplicaSet replSet("donorSet", 1, true /* hasPrimary */, true /* dollarPrefixHosts */);
-        _rsmMonitor.setup(replSet.getURI());
-
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
         WaitForMajorityService::get(serviceContext).startup(serviceContext);
-
-        // Automatically mark the state doc garbage collectable after data sync completion.
-        globalFailPointRegistry()
-            .find("autoRecipientForgetMigrationAbort")
-            ->setMode(FailPoint::alwaysOn,
-                      0,
-                      BSON("state"
-                           << "aborted"));
 
         {
             auto opCtx = cc().makeOperationContext();
@@ -213,6 +238,9 @@ public:
                 std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
             opObserverRegistry->addObserver(
                 std::make_unique<PrimaryOnlyServiceOpObserver>(serviceContext));
+            auto opObserver = std::make_unique<ShardMergeRecipientServiceTestOpObserver>();
+            _opObserver = opObserver.get();
+            opObserverRegistry->addObserver(std::move(opObserver));
 
             // Add OpObserver needed by subclasses.
             addOpObserver(opObserverRegistry);
@@ -222,12 +250,25 @@ public:
                 std::make_unique<ShardMergeRecipientService>(getServiceContext());
             _registry->registerService(std::move(service));
             _registry->onStartup(opCtx.get());
+
+            // Fake replSet just for creating consistent URI for monitor
+            MockReplicaSet replSet(
+                "donorSet", 1, true /* hasPrimary */, true /* dollarPrefixHosts */);
+            _rsmMonitor.setup(replSet.getURI());
         }
         stepUp();
 
         _service = _registry->lookupServiceByName(
             ShardMergeRecipientService::kShardMergeRecipientServiceName);
         ASSERT(_service);
+
+        // Automatically mark the state doc garbage collectable after data sync completion.
+        globalFailPointRegistry()
+            .find("autoRecipientForgetMigrationAbort")
+            ->setMode(FailPoint::alwaysOn,
+                      0,
+                      BSON("state"
+                           << "aborted"));
 
         // MockReplicaSet uses custom connection string which does not support auth.
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
@@ -253,23 +294,28 @@ public:
         fetchCommittedTransactionsFp->setMode(FailPoint::alwaysOn);
 
         // setup mock networking that will be use to mock the backup cursor traffic.
-        auto net = std::make_unique<executor::NetworkInterfaceMock>();
+        auto net = std::make_unique<NetworkInterfaceMock>();
         _net = net.get();
+        _mockNet = std::make_unique<MockNetwork>(_net);
 
-        executor::ThreadPoolMock::Options dbThreadPoolOptions;
+        ThreadPoolMock::Options dbThreadPoolOptions;
         dbThreadPoolOptions.onCreateThread = []() {
             Client::initThread("FetchMockTaskExecutor");
         };
+        _threadPoolExecutor = makeSharedThreadPoolTestExecutor(std::move(net), dbThreadPoolOptions);
+        _threadPoolExecutor->startup();
+        _threadPoolExecutorMock = std::make_shared<TaskExecutorMock>(_threadPoolExecutor.get());
 
-        auto pool = std::make_unique<executor::ThreadPoolMock>(_net, 1, dbThreadPoolOptions);
-        _threadpoolTaskExecutor =
-            std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
-        _threadpoolTaskExecutor->startup();
+        // Setup mock donor replica set.
+        _mockDonorRs = std::make_unique<MockReplicaSet>(
+            "donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+        getTopologyManager()->setTopologyDescription(_mockDonorRs->getTopologyDescription(clock()));
+        insertTopOfOplog(_mockDonorRs.get(), OpTime(Timestamp(1, 1), 1));
     }
 
     void tearDown() override {
-        _threadpoolTaskExecutor->shutdown();
-        _threadpoolTaskExecutor->join();
+        _threadPoolExecutorMock->shutdown();
+        _threadPoolExecutorMock->join();
 
         auto authFp = globalFailPointRegistry().find("skipTenantMigrationRecipientAuth");
         authFp->setMode(FailPoint::off);
@@ -343,6 +389,145 @@ protected:
                                          swPrivateKeyBlob.getValue().toString()};
     }();
 
+    struct cursorDataMock {
+        const UUID kBackupId =
+            UUID(uassertStatusOK(UUID::parse(("2b068e03-5961-4d8e-b47a-d1c8cbd4b835"))));
+        const Timestamp kCheckpointTimestamp = Timestamp(1, 1);
+        const CursorId kBackupCursorId = 3703253128214665235ll;
+        const NamespaceString kNss =
+            NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
+        const std::vector<std::vector<std::string>> backupCursorFiles{
+            {"/data/db/job0/mongorunner/test-1/WiredTiger",
+             "/data/db/job0/mongorunner/test-1/WiredTiger.backup",
+             "/data/db/job0/mongorunner/test-1/sizeStorer.wt",
+             "/data/db/job0/mongorunner/test-1/index-1--3853645825680686061.wt",
+             "/data/db/job0/mongorunner/test-1/collection-0--3853645825680686061.wt",
+             "/data/db/job0/mongorunner/test-1/_mdb_catalog.wt",
+             "/data/db/job0/mongorunner/test-1/WiredTigerHS.wt",
+             "/data/db/job0/mongorunner/test-1/journal/WiredTigerLog.0000000001"},
+            {"/data/db/job0/mongorunner/test-1/journal/WiredTigerLog.0000000002",
+             "/data/db/job0/mongorunner/test-1/journal/WiredTigerLog.0000000003"}};
+        const std::vector<std::vector<int>> backupCursorFileSizes{
+            {47, 77050, 20480, 20480, 20480, 36864, 4096, 104857600}, {104857600, 104857600}};
+        const StringData remoteDbPath = "/data/db/job0/mongorunner/test-1";
+
+        BSONObj getBackupCursorBatches(
+            int batchId, boost::optional<const Timestamp&> checkpointTs = boost::none) {
+            // Empty last batch.
+            if (batchId == -1) {
+                return BSON("cursor" << BSON("nextBatch" << BSONArray() << "id" << kBackupCursorId
+                                                         << "ns" << kNss.ns_forTest())
+                                     << "ok" << 1.0);
+            }
+
+            BSONObjBuilder cursor;
+            BSONArrayBuilder batch(
+                cursor.subarrayStart((batchId == 0) ? "firstBatch" : "nextBatch"));
+
+            // First batch.
+            if (batchId == 0) {
+                auto metaData =
+                    BSON("backupId" << kBackupId << "checkpointTimestamp"
+                                    << (checkpointTs ? *checkpointTs : kCheckpointTimestamp)
+                                    << "dbpath" << remoteDbPath);
+                batch.append(BSON("metadata" << metaData));
+            }
+            for (int i = 0; i < int(backupCursorFiles[batchId].size()); i++) {
+                batch.append(BSON("filename" << backupCursorFiles[batchId][i] << "fileSize"
+                                             << backupCursorFileSizes[batchId][i]));
+            }
+            batch.done();
+            cursor.append("id", kBackupCursorId);
+            cursor.append("ns", kNss.ns_forTest());
+            BSONObjBuilder backupCursorReply;
+            backupCursorReply.append("cursor", cursor.obj());
+            backupCursorReply.append("ok", 1.0);
+            return backupCursorReply.obj();
+        }
+
+        BSONObj getkillBackupCursorReply() {
+            return BSON("ok" << 1.0 << "cursorsKilled" << BSON_ARRAY(kBackupCursorId));
+        }
+
+    } cursorDataMock;
+
+    const BSONObj backupCursorRequest =
+        BSON("aggregate" << 1 << "pipeline" << BSON_ARRAY(BSON("$backupCursor" << BSONObj())));
+    const BSONObj getMoreRequest = BSON("getMore" << cursorDataMock.kBackupCursorId << "collection"
+                                                  << cursorDataMock.kNss.coll());
+    const BSONObj killBackupCursorRequest =
+        BSON("killCursors" << cursorDataMock.kNss.coll() << "cursors"
+                           << BSON_ARRAY(cursorDataMock.kBackupCursorId));
+
+    void expectSuccessfulBackupCursorCall() {
+        {
+            MockNetwork::InSequence seq(*_mockNet);
+            _mockNet
+                ->expect(backupCursorRequest,
+                         RemoteCommandResponse(
+                             {cursorDataMock.getBackupCursorBatches(0), Milliseconds()}))
+                .times(1);
+            _mockNet
+                ->expect(getMoreRequest,
+                         RemoteCommandResponse(
+                             {cursorDataMock.getBackupCursorBatches(1), Milliseconds()}))
+                .times(1);
+
+            _mockNet
+                ->expect(getMoreRequest,
+                         RemoteCommandResponse(
+                             {cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+                .times(1);
+        }
+
+        _mockNet->runUntilExpectationsSatisfied();
+    }
+
+    void expectSuccessfulKillBackupCursorCall() {
+        _mockNet
+            ->expect(
+                killBackupCursorRequest,
+                RemoteCommandResponse({cursorDataMock.getkillBackupCursorReply(), Milliseconds()}))
+            .times(1);
+        _mockNet->runUntilExpectationsSatisfied();
+    }
+
+    void expectSuccessfulBackupCursorEmptyGetMore() {
+        _mockNet
+            ->expect(
+                getMoreRequest,
+                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+            .times(1);
+        _mockNet->runUntilExpectationsSatisfied();
+    }
+
+    bool verifyCursorFiles() {
+        int numOfFiles = 0;
+
+        StringSet returnedFilenames;
+        std::for_each(_opObserver->backupCursorFiles.begin(),
+                      _opObserver->backupCursorFiles.end(),
+                      [this, &returnedFilenames](const BSONObj& metadata) {
+                          auto migrationId = uassertStatusOK(
+                              UUID::parse(metadata[shard_merge_utils::kMigrationIdFieldName]));
+                          ASSERT(migrationId == kMigrationUUID);
+                          auto backupId = uassertStatusOK(
+                              UUID::parse(metadata[shard_merge_utils::kBackupIdFieldName]));
+                          ASSERT(backupId == cursorDataMock.kBackupId);
+                          returnedFilenames.insert(metadata["filename"].str());
+                      });
+
+        for (int batchId = 0; batchId < int(cursorDataMock.backupCursorFiles.size()); batchId++) {
+            for (const auto& file : cursorDataMock.backupCursorFiles[batchId]) {
+                numOfFiles++;
+                if (!returnedFilenames.contains(file)) {
+                    return false;
+                }
+            }
+        }
+        return numOfFiles == (int)returnedFilenames.size();
+    }
+
     void checkStateDocPersisted(OperationContext* opCtx,
                                 const ShardMergeRecipientService::Instance* instance) {
         auto memoryStateDoc = getStateDoc(instance);
@@ -399,6 +584,10 @@ protected:
                       targetHosts);
     }
 
+    int64_t countLogLinesWithId(int32_t id) {
+        return countBSONFormatLogLinesIsSubset(BSON("id" << id));
+    }
+
     // Accessors to class private members
     DBClientConnection* getClient(const ShardMergeRecipientService::Instance* instance) const {
         return instance->_client.get();
@@ -417,22 +606,33 @@ protected:
         return &_clkSource;
     }
 
-    executor::NetworkInterfaceMock* getNet() {
+    NetworkInterfaceMock* getNet() {
         return _net;
     }
 
-    executor::NetworkInterfaceMock* _net = nullptr;
-    std::shared_ptr<executor::TaskExecutor> _threadpoolTaskExecutor;
+    const MockReplicaSet* getDonorRs() {
+        return _mockDonorRs.get();
+    }
+
+    MockNetwork* getMockNet() {
+        return _mockNet.get();
+    }
 
     void setInstanceBackupCursorFetcherExecutor(
         std::shared_ptr<ShardMergeRecipientService::Instance> instance) {
-        instance->setBackupCursorFetcherExecutor_forTest(_threadpoolTaskExecutor);
+        instance->setBackupCursorFetcherExecutor_forTest(_threadPoolExecutorMock);
     }
 
 private:
     virtual void addOpObserver(OpObserverRegistry* opObserverRegistry){};
 
     ClockSourceMock _clkSource;
+    std::shared_ptr<ThreadPoolTaskExecutor> _threadPoolExecutor;
+    std::shared_ptr<TaskExecutorMock> _threadPoolExecutorMock;
+    std::unique_ptr<MockNetwork> _mockNet;
+    std::unique_ptr<MockReplicaSet> _mockDonorRs;
+    NetworkInterfaceMock* _net = nullptr;
+    ShardMergeRecipientServiceTestOpObserver* _opObserver = nullptr;
 
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};
@@ -444,58 +644,6 @@ private:
 };
 
 #ifdef MONGO_CONFIG_SSL
-
-void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
-    while (!net->hasReadyRequests()) {
-        net->advanceTime(net->now() + Milliseconds{1});
-    }
-}
-
-BSONObj createEmptyCursorResponse(const NamespaceString& nss, CursorId backupCursorId) {
-    return BSON("cursor" << BSON("nextBatch" << BSONArray() << "id" << backupCursorId << "ns"
-                                             << nss.ns_forTest())
-                         << "ok" << 1.0);
-}
-
-BSONObj createBackupCursorResponse(const Timestamp& checkpointTimestamp,
-                                   const NamespaceString& nss,
-                                   CursorId backupCursorId) {
-    const UUID backupId =
-        UUID(uassertStatusOK(UUID::parse(("2b068e03-5961-4d8e-b47a-d1c8cbd4b835"))));
-    StringData remoteDbPath = "/data/db/job0/mongorunner/test-1";
-    BSONObjBuilder cursor;
-    BSONArrayBuilder batch(cursor.subarrayStart("firstBatch"));
-    auto metaData = BSON("backupId" << backupId << "checkpointTimestamp" << checkpointTimestamp
-                                    << "dbpath" << remoteDbPath);
-    batch.append(BSON("metadata" << metaData));
-
-    batch.done();
-    cursor.append("id", backupCursorId);
-    cursor.append("ns", nss.ns_forTest());
-    BSONObjBuilder backupCursorReply;
-    backupCursorReply.append("cursor", cursor.obj());
-    backupCursorReply.append("ok", 1.0);
-    return backupCursorReply.obj();
-}
-
-void sendReponseToExpectedRequest(const BSONObj& backupCursorResponse,
-                                  const std::string& expectedRequestFieldName,
-                                  executor::NetworkInterfaceMock* net) {
-    auto noi = net->getNextReadyRequest();
-    auto request = noi->getRequest();
-    ASSERT_EQUALS(expectedRequestFieldName, request.cmdObj.firstElementFieldNameStringData());
-    net->scheduleSuccessfulResponse(
-        noi, executor::RemoteCommandResponse(backupCursorResponse, Milliseconds()));
-    net->runReadyNetworkOperations();
-}
-
-BSONObj createServerAggregateReply() {
-    return CursorResponse(NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin),
-                          0 /* cursorId */,
-                          {BSON("byteOffset" << 0 << "endOfFile" << true << "data"
-                                             << BSONBinData(0, 0, BinDataGeneral))})
-        .toBSONAsInitialResponse();
-}
 
 /**
  * This class adds the TenantMigrationRecipientOpObserver to the main test fixture class. The
@@ -517,20 +665,10 @@ private:
 
 TEST_F(ShardMergeRecipientServiceTestInsert, TestBlockersAreInsertedWhenInsertingStateDocument) {
     stopFailPointEnableBlock fp("fpBeforeFetchingDonorClusterTimeKeys");
-    const UUID migrationUUID = UUID::gen();
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
-
-    // Mock the aggregate response from the donor.
-    MockRemoteDBServer* const _donorServer =
-        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
-    _donorServer->setCommandReply("aggregate", createServerAggregateReply());
 
     ShardMergeRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
@@ -539,17 +677,14 @@ TEST_F(ShardMergeRecipientServiceTestInsert, TestBlockersAreInsertedWhenInsertin
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
     {
-        auto fp = globalFailPointRegistry().find(
-            "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
-        auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,
-                                               0,
-                                               BSON("action"
-                                                    << "hang"));
+        FailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                                BSON("action"
+                                     << "hang"));
         instance = ShardMergeRecipientService::Instance::getOrCreate(
             opCtx.get(), _service, initialStateDocument.toBSON());
         ASSERT(instance.get());
 
-        fp->waitForTimesEntered(initialTimesEntered + 1);
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
 
         // Test that access blocker exists.
         for (const auto& tenantId : _tenants) {
@@ -558,7 +693,6 @@ TEST_F(ShardMergeRecipientServiceTestInsert, TestBlockersAreInsertedWhenInsertin
                                    tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
             ASSERT(!!blocker);
         }
-        fp->setMode(FailPoint::off);
     }
 
     ASSERT_EQ(stopFailPointErrorCode, instance->getMigrationCompletionFuture().getNoThrow().code());
@@ -567,26 +701,10 @@ TEST_F(ShardMergeRecipientServiceTestInsert, TestBlockersAreInsertedWhenInsertin
 
 TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorSuccessfully) {
     stopFailPointEnableBlock fp("fpBeforeAdvancingStableTimestamp");
-    const UUID migrationUUID = UUID::gen();
-    const CursorId backupCursorId = 12345;
-    const NamespaceString aggregateNs =
-        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
-
-    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
-
-    // Mock the aggregate response from the donor.
-    MockRemoteDBServer* const _donorServer =
-        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
-    _donorServer->setCommandReply("aggregate", createServerAggregateReply());
 
     ShardMergeRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
@@ -595,66 +713,29 @@ TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorSuccessfully) {
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
     {
-        auto fp = globalFailPointRegistry().find("pauseBeforeRunTenantMigrationRecipientInstance");
-        auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
         instance = ShardMergeRecipientService::Instance::getOrCreate(
             opCtx.get(), _service, initialStateDocument.toBSON());
         ASSERT(instance.get());
-        fp->waitForTimesEntered(initialTimesEntered + 1);
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
         setInstanceBackupCursorFetcherExecutor(instance);
         instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
-        fp->setMode(FailPoint::off);
     }
 
-    {
-        auto net = getNet();
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        waitForReadyRequest(net);
-        // Mocking the aggregate command network response of the backup cursor in order to have
-        // data to parse.
-        sendReponseToExpectedRequest(createBackupCursorResponse(kDefaultStartMigrationTimestamp,
-                                                                aggregateNs,
-                                                                backupCursorId),
-                                     "aggregate",
-                                     net);
-        sendReponseToExpectedRequest(
-            createEmptyCursorResponse(aggregateNs, backupCursorId), "getMore", net);
-        sendReponseToExpectedRequest(
-            createEmptyCursorResponse(aggregateNs, backupCursorId), "getMore", net);
-    }
-
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
-
-    checkStateDocPersisted(opCtx.get(), instance.get());
-
-    taskFp->setMode(FailPoint::off);
+    expectSuccessfulBackupCursorCall();
 
     ASSERT_EQ(stopFailPointErrorCode, instance->getMigrationCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+
+    verifyCursorFiles();
 }
 
-TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorAndRetriesDueToTs) {
+TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorRetriesIfBackupCursorIsTooStale) {
     stopFailPointEnableBlock fp("fpBeforeAdvancingStableTimestamp");
-    const UUID migrationUUID = UUID::gen();
-    const CursorId backupCursorId = 12345;
-    const NamespaceString aggregateNs =
-        NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
-
-    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
-    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
-
-    // Mock the aggregate response from the donor.
-    MockRemoteDBServer* const _donorServer =
-        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
-    _donorServer->setCommandReply("aggregate", createServerAggregateReply());
 
     ShardMergeRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
@@ -663,69 +744,214 @@ TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorAndRetriesDueToTs) {
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
     {
-        auto fp = globalFailPointRegistry().find("pauseBeforeRunTenantMigrationRecipientInstance");
-        auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
         instance = ShardMergeRecipientService::Instance::getOrCreate(
             opCtx.get(), _service, initialStateDocument.toBSON());
         ASSERT(instance.get());
-        fp->waitForTimesEntered(initialTimesEntered + 1);
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
         setInstanceBackupCursorFetcherExecutor(instance);
         instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
-        fp->setMode(FailPoint::off);
     }
+
+    startCapturingLogMessages();
+
+    const auto TSOlderThanCursorDataMockCheckpointTS = Timestamp(0, 1);
 
     {
-        auto net = getNet();
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        waitForReadyRequest(net);
+        MockNetwork::InSequence seq(*getMockNet());
+        getMockNet()
+            ->expect(backupCursorRequest,
+                     RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(
+                                                0, TSOlderThanCursorDataMockCheckpointTS),
+                                            Milliseconds()}))
+            .times(1);
+        getMockNet()
+            ->expect(
+                killBackupCursorRequest,
+                RemoteCommandResponse({cursorDataMock.getkillBackupCursorReply(), Milliseconds()}))
+            .times(1);
+        getMockNet()
+            ->expect(
+                backupCursorRequest,
+                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(0), Milliseconds()}))
+            .times(1);
+        getMockNet()
+            ->expect(
+                getMoreRequest,
+                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(1), Milliseconds()}))
+            .times(1);
+        getMockNet()
+            ->expect(
+                getMoreRequest,
+                RemoteCommandResponse({cursorDataMock.getBackupCursorBatches(-1), Milliseconds()}))
+            .times(1);
+    }
+    getMockNet()->runUntilExpectationsSatisfied();
 
-        // Mocking the aggregate command network response of the backup cursor in order to have data
-        // to parse. In this case we pass a timestamp that is inferior to the
-        // startMigrationTimestamp which will cause a retry. We then provide a correct timestamp in
-        // the next response and succeed.
-        sendReponseToExpectedRequest(
-            createBackupCursorResponse(Timestamp(0, 0), aggregateNs, backupCursorId),
-            "aggregate",
-            net);
-        sendReponseToExpectedRequest(createBackupCursorResponse(kDefaultStartMigrationTimestamp,
-                                                                aggregateNs,
-                                                                backupCursorId),
-                                     "killCursors",
-                                     net);
-        sendReponseToExpectedRequest(
-            createEmptyCursorResponse(aggregateNs, backupCursorId), "killCursors", net);
-        sendReponseToExpectedRequest(createBackupCursorResponse(kDefaultStartMigrationTimestamp,
-                                                                aggregateNs,
-                                                                backupCursorId),
-                                     "aggregate",
-                                     net);
-        sendReponseToExpectedRequest(
-            createEmptyCursorResponse(aggregateNs, backupCursorId), "getMore", net);
-        sendReponseToExpectedRequest(
-            createEmptyCursorResponse(aggregateNs, backupCursorId), "getMore", net);
+    ASSERT_EQ(stopFailPointErrorCode, instance->getMigrationCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1, countLogLinesWithId(7339733));
+
+    verifyCursorFiles();
+}
+
+TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorIsAlreadyActiveOnDonor) {
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
     }
 
-    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    auto backupCursorConflictErrorCode = 50886;
+    getMockNet()
+        ->expect(backupCursorRequest,
+                 RemoteCommandResponse(
+                     ErrorCodes::Error(backupCursorConflictErrorCode),
+                     "The existing backup cursor must be closed before $backupCursor can succeed.",
+                     Milliseconds()))
+        .times(1);
+    getMockNet()->runUntilExpectationsSatisfied();
 
-    checkStateDocPersisted(opCtx.get(), instance.get());
+    ASSERT_EQ(backupCursorConflictErrorCode,
+              instance->getMigrationCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
 
-    taskFp->setMode(FailPoint::off);
+TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfDonorIsFsyncLocked) {
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    auto backupCursorConflictWithFsyncErrorCode = 50887;
+    getMockNet()
+        ->expect(backupCursorRequest,
+                 RemoteCommandResponse(ErrorCodes::Error(backupCursorConflictWithFsyncErrorCode),
+                                       "The node is currently fsyncLocked.",
+                                       Milliseconds()))
+        .times(1);
+    getMockNet()->runUntilExpectationsSatisfied();
+
+    ASSERT_EQ(backupCursorConflictWithFsyncErrorCode,
+              instance->getMigrationCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorNotSupportedOnDonor) {
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    auto backupCursorNotSupportedErrorCode = 40324;
+    getMockNet()
+        ->expect(backupCursorRequest,
+                 RemoteCommandResponse(ErrorCodes::Error(backupCursorNotSupportedErrorCode),
+                                       "Unrecognized pipeline stage name: '$backupCursor'",
+                                       Milliseconds()))
+        .times(1);
+    getMockNet()->runUntilExpectationsSatisfied();
+
+    ASSERT_EQ(backupCursorNotSupportedErrorCode,
+              instance->getMigrationCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, KeepingBackupCursorAlive) {
+    stopFailPointEnableBlock stopFp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
+    auto fp =
+        globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    expectSuccessfulBackupCursorCall();
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Verify that backup cursor alive signal is sent every kBackupCursorKeepAliveIntervalMillis.
+    for (int i = 0; i < 5; i++) {
+        expectSuccessfulBackupCursorEmptyGetMore();
+        advanceClock(getNet(),
+                     Milliseconds(shard_merge_utils::kBackupCursorKeepAliveIntervalMillis));
+    }
+
+    fp->setMode(FailPoint::off);
     ASSERT_EQ(stopFailPointErrorCode, instance->getMigrationCompletionFuture().getNoThrow().code());
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(ShardMergeRecipientServiceTest, TestGarbageCollectionStarted) {
-    const UUID migrationUUID = UUID::gen();
-
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-
     auto fp = globalFailPointRegistry().find("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
     auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
 
     ShardMergeRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
@@ -756,8 +982,6 @@ TEST_F(ShardMergeRecipientServiceTest, TestGarbageCollectionStarted) {
 }
 
 TEST_F(ShardMergeRecipientServiceTest, TestForgetMigrationAborted) {
-    const UUID migrationUUID = UUID::gen();
-
     auto deletionFp =
         globalFailPointRegistry().find("pauseTenantMigrationRecipientBeforeDeletingStateDoc");
     auto deletionFpTimesEntered = deletionFp->setMode(FailPoint::alwaysOn);
@@ -769,14 +993,9 @@ TEST_F(ShardMergeRecipientServiceTest, TestForgetMigrationAborted) {
                                            BSON("action"
                                                 << "hang"));
 
-    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
-    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
-    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
-
-
     ShardMergeRecipientDocument initialStateDocument(
-        migrationUUID,
-        replSet.getConnectionString(),
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
@@ -803,6 +1022,150 @@ TEST_F(ShardMergeRecipientServiceTest, TestForgetMigrationAborted) {
     deletionFp->setMode(FailPoint::off);
 
     ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow().code());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByForgetMigrationCmd) {
+    auto hangBeforeImportQuorumWait =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    auto initialTimesEntered = hangBeforeImportQuorumWait->setMode(FailPoint::alwaysOn,
+                                                                   0,
+                                                                   BSON("action"
+                                                                        << "hang"));
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+    expectSuccessfulBackupCursorCall();
+
+    hangBeforeImportQuorumWait->waitForTimesEntered(initialTimesEntered + 1);
+    instance->onReceiveRecipientForgetMigration(opCtx.get(), MigrationDecisionEnum::kAborted);
+    hangBeforeImportQuorumWait->setMode(FailPoint::off);
+
+    ASSERT_EQ(ErrorCodes::TenantMigrationForgotten,
+              instance->getMigrationCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByFailover) {
+    auto hangBeforeImportQuorumWait =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    auto initialTimesEntered = hangBeforeImportQuorumWait->setMode(FailPoint::alwaysOn,
+                                                                   0,
+                                                                   BSON("action"
+                                                                        << "hang"));
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+    expectSuccessfulBackupCursorCall();
+
+    hangBeforeImportQuorumWait->waitForTimesEntered(initialTimesEntered + 1);
+    instance->interrupt(Status(ErrorCodes::InterruptedDueToReplStateChange,
+                               "PrimaryOnlyService interrupted due to stepdown"));
+    hangBeforeImportQuorumWait->setMode(FailPoint::off);
+
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
+              instance->getMigrationCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
+              instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByWaitTimeoutExpired) {
+    RAIIServerParameterControllerForTest voteImportTimeoutSecs{"importQuorumTimeoutSeconds", 1};
+
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+    expectSuccessfulBackupCursorCall();
+
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, instance->getMigrationCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedOnQuorumSatisfied) {
+    stopFailPointEnableBlock fp("fpBeforeMarkingCloneSuccess");
+
+    auto hangBeforeImportQuorumWait =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    auto initialTimesEntered = hangBeforeImportQuorumWait->setMode(FailPoint::alwaysOn,
+                                                                   0,
+                                                                   BSON("action"
+                                                                        << "hang"));
+    ShardMergeRecipientDocument initialStateDocument(
+        kMigrationUUID,
+        getDonorRs()->getConnectionString(),
+        _tenants,
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<ShardMergeRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        instance = ShardMergeRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+        setInstanceBackupCursorFetcherExecutor(instance);
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+    expectSuccessfulBackupCursorCall();
+
+    hangBeforeImportQuorumWait->waitForTimesEntered(initialTimesEntered + 1);
+    instance->onMemberImportedFiles(HostAndPort("localhost:12345"));
+    hangBeforeImportQuorumWait->setMode(FailPoint::off);
+
+    expectSuccessfulKillBackupCursorCall();
+
+    ASSERT_EQ(stopFailPointErrorCode, instance->getMigrationCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 #endif

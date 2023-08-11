@@ -41,6 +41,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -65,6 +66,10 @@ inline constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
 inline constexpr StringData kBackupIdFieldName = "backupId"_sd;
 inline constexpr StringData kDonorHostNameFieldName = "donorHostName"_sd;
 inline constexpr StringData kDonorDbPathFieldName = "dbpath"_sd;
+
+// Keep the backup cursor alive by pinging twice as often as the donor's default
+// cursor timeout.
+constexpr int kBackupCursorKeepAliveIntervalMillis = mongo::kCursorTimeoutMillisDefault / 2;
 
 inline bool isDonatedFilesCollection(const NamespaceString& ns) {
     return ns.isConfigDB() && ns.coll().startsWith(kDonatedFilesPrefix);
