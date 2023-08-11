@@ -10,7 +10,6 @@
  *   requires_fcv_61,
  * ]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.timeseries_groupby_reorder;
 coll.drop();
@@ -192,19 +191,6 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
                         [{"_id": 1, "max": 21}]);
 })();
 
-// Test with meta group key and a non-min/max accumulator that doesn't use any fields. The buckets
-// still have to be unpacked because we don't know the number of events in uncompressed buckets.
-(function testMetaGroupKey_WithAccumulatorNotUsingAnyFields() {
-    const t = new Date();
-    const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
-    ];
-    runGroupRewriteTest(
-        docs, [{$group: {_id: "$meta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
-})();
-
 // Test with meta group key and a non-min/max accumulator that uses only the meta field. This query
 // is _not_ eligible for the re-write w/o bucket unpacking because while it doesn't depend on any
 // fields of the individual events it still depends on the number of events in a bucket.
@@ -231,15 +217,26 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
         docs, [{$match: {include: true}}, {$group: {_id: "$meta", x: {$min: "$meta"}}}], []);
 })();
 
-// Test min/max on the time field (cannot rewrite $min because the control.time.min is rounded
+// Test min on the time field (cannot rewrite $min because the control.time.min is rounded
 // down).
-(function testMetaGroupKey_WithMinMaxOnTime() {
+(function testMetaGroupKey_WithMinOnTime() {
     const docs = [
         {time: ISODate("2023-07-20T23:16:47.683Z"), meta: 1},
     ];
     runGroupRewriteTest(docs,
                         [{$group: {_id: "$meta", min: {$min: "$time"}}}],
                         [{_id: 1, min: ISODate("2023-07-20T23:16:47.683Z")}]);
+})();
+
+// Test max on the time field (can rewrite $max because the control.time.max is not rounded
+// down).
+(function testMetaGroupKey_WithMaxOnTime() {
+    const docs = [
+        {time: ISODate("2023-07-20T23:16:47.683Z"), meta: 1},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: "$meta", max: {$max: "$time"}}}],
+                        [{_id: 1, max: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
 
 // Test a group key that is a list of fields that are just referencing the metaField. The $group
@@ -296,4 +293,83 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
             {_id: {a: 3, b: "pear"}, min: 4, max: 4}
         ],
         true /* excludeMeta */);
+})();
+
+//
+// The following tests validate the behavior of the $group rewrite with the $count accumulator.
+//
+
+// Test with a meta group key, and the $count accumulator. The rewrite should apply.
+(function testMetaGroupKey_WithCountMinMaxAccumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(
+        docs,
+        [
+            {$group: {_id: "$meta", x: {$count: {}}, y: {$min: "$val"}, z: {$max: "$val"}}},
+            {$match: {_id: 1}}
+        ],
+        [{"_id": 1, "x": 2, "y": 3, "z": 5}]);
+})();
+
+// Test with a meta group key, and {$sum: 1}. Since $count desugars to {$sum:1}, the rewrite should
+// apply.
+(function testMetaGroupKey_WithSum1Accumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(
+        docs, [{$group: {_id: "$meta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
+})();
+
+// Test with a constant group key with the $count accumulator when there is no metaField. The
+// rewrite should apply.
+(function testConstGroupKey_WithCountAccumulator_NoMetaField() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: null, x: {$sum: 1}}}],
+                        [{"_id": null, "x": 3}],
+                        true /* excludeMeta */);
+})();
+
+// Test with a meta group key with the $sum accumulator. Even though the rewrite applies for $count
+// which desugars to {$sum: 1}, for accumulators like {$sum: "$fieldPath"} the rewrite does not
+// apply.
+(function testMetaGroupKey_WithSumFieldPath() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: "$meta", x: {$sum: "$val"}}}],
+                        [{"_id": 1, "x": 8}, {"_id": 3, "x": 4}]);
+})();
+
+// Test the $count aggregation stage. Since this stage is rewritten to a $group and $project, the
+// rewrite will apply.
+(function testMetaGroupKey_WithCountStage() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: null, min: {$min: "$val"}}}, {$count: "groupCount"}],
+                        [{"groupCount": 1}],
+                        true /* excludeMeta */);
 })();

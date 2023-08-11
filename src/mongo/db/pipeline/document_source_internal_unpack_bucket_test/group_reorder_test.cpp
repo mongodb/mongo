@@ -69,7 +69,7 @@ std::vector<BSONObj> makeAndOptimizePipeline(
 }
 
 // The following tests confirm the expected behavior for the $count aggregation stage rewrite.
-TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
+TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountAggStage) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
         "bucketMaxSpanSeconds: 3600}}");
@@ -77,15 +77,29 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
     pipeline->optimizePipeline();
-
     auto serialized = pipeline->serializeToBson();
-    // $count gets rewritten to $group + $project.
-    ASSERT_EQ(3, serialized.size());
 
-    auto optimized = fromjson(
-        "{$_internalUnpackBucket: { include: [], timeField: 't', metaField: 'meta1', "
-        "bucketMaxSpanSeconds: 3600}}");
-    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+    // $count gets rewritten to $group + $project without the $unpack stage.
+    ASSERT_EQ(2, serialized.size());
+    auto groupOptimized = fromjson(
+        "{ $group : { _id : {$const: null }, foo : { $sum : { $cond: [{$gte : [ "
+        "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
+        "['$data.t']} ] } ] } } } }");
+    ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountInGroup) {
+    auto groupSpecObj = fromjson("{$group: {_id: '$meta1.a.b', acccount: {$count: {} }}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto groupOptimized = fromjson(
+        "{ $group : { _id : '$meta.a.b', acccount : { $sum : { $cond: [{$gte : [ "
+        "'$control.version', {$const : 2} ]}, '$control.count', {$size : [ {$objectToArray : "
+        "['$data.t']} ] } ] } } } }");
+    ASSERT_BSONOBJ_EQ(groupOptimized, serialized[0]);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
@@ -233,6 +247,19 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMultipleMetaFieldsAndConst
     auto optimized = fromjson(
         "{$group: {_id: {m1: {$const: 'hello'}, m2: '$meta.m1', m3: '$meta' }, accmin: {$min: "
         "'$meta.f1'}}}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MaxGroupRewriteTimeField) {
+    // Validate $max can be rewritten if on the timeField to use control.max.time, since
+    // control.max.time is not rounded, like control.min.time.
+    auto groupSpecObj = fromjson("{$group: {_id:'$meta1.m1', accmax: {$max: '$t'}}}");
+
+    auto serialized = makeAndOptimizePipeline(
+        getExpCtx(), groupSpecObj, 3600 /* bucketMaxSpanSeconds */, false /* fixedBuckets */);
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson("{$group: {_id: '$meta.m1', accmax: {$max: '$control.max.t'}}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 

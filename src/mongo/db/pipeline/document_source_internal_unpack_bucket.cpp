@@ -409,6 +409,119 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     return {};
 }
 
+std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
+    ExpressionContext* pExpCtx,
+    const mongo::AccumulationStatement& stmt,
+    const std::string& timeField) {
+    // We rewrite {$sum: 1} to use the bucket level field names and account for
+    // compressed/uncompressed buckets. The resulting MQL will look like:
+    //$sum : {
+    //  $cond: [
+    //    {$gte : [ "$control.version", 2 ]},
+    //    "$control.count",
+    //    {$size : {$objectToArray : "$data.t"}}]}}
+    // We expect most buckets to be compressed, and should just reference $control.count.
+    auto exprArg = dynamic_cast<ExpressionConstant*>(stmt.expr.argument.get());
+    if (!exprArg || ValueComparator::kInstance.evaluate(exprArg->getValue() != Value(1))) {
+        return {};
+    }
+
+    std::string controlCountField = timeseries::kControlFieldNamePrefix.toString() +
+        timeseries::kBucketControlCountFieldName.toString();
+
+    auto ifExpr = ExpressionCompare::create(
+        pExpCtx,
+        ExpressionCompare::CmpOp::GTE,
+        ExpressionFieldPath::createPathFromString(
+            pExpCtx,
+            timeseries::kControlFieldNamePrefix.toString() +
+                timeseries::kBucketControlVersionFieldName.toString(),
+            pExpCtx->variablesParseState),
+        ExpressionConstant::create(pExpCtx,
+                                   Value(timeseries::kTimeseriesControlCompressedVersion)));
+
+    auto thenExpr = ExpressionFieldPath::createPathFromString(
+        pExpCtx, controlCountField, pExpCtx->variablesParseState);
+
+    auto elseExpr = BSON("$size" << BSON("$objectToArray"
+                                         << "$" + timeseries::kDataFieldNamePrefix + timeField));
+    auto argument = ExpressionCond::create(
+        pExpCtx,
+        std::move(ifExpr),
+        std::move(thenExpr),
+        ExpressionSize::parse(pExpCtx, elseExpr.firstElement(), pExpCtx->variablesParseState));
+
+    auto initializer = ExpressionConstant::create(pExpCtx, Value(BSONNULL));
+    return std::make_unique<AccumulationExpression>(
+        initializer,
+        argument,
+        [pExpCtx]() { return AccumulatorSum::create(pExpCtx); },
+        AccumulatorSum::kName);
+}
+
+std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    const mongo::AccumulationStatement& stmt,
+    const boost::optional<std::string>& metaField,
+    const std::string& timeField) {
+    const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(stmt.expr.argument.get());
+
+    // This is either a const or a compound expression. While some such expressions (e.g: {$min:
+    // {$add: ['$a', 2]}}) could be re-written in terms of the min/max on the control fields, in
+    // general we cannot do it (e.g. {$min: {$add: ['$a', '$b']}}), so we block the re-write.
+    if (!exprArgPath) {
+        return {};
+    }
+
+    // Path can have a single component if it's using $$CURRENT or a similar variable. We don't
+    // support these.
+    const auto& path = exprArgPath->getFieldPath();
+    if (path.getPathLength() <= 1) {
+        return {};
+    }
+    const auto& accFieldName = path.getFieldName(1);
+
+    // Build the paths for the bucket-level fields.
+    std::ostringstream os;
+    if (metaField && accFieldName == metaField.value()) {
+        // Update aggregates to reference the meta field.
+        os << timeseries::kBucketMetaFieldName;
+
+        for (size_t index = 2; index < path.getPathLength(); index++) {
+            os << "." << path.getFieldName(index);
+        }
+    } else {
+        // Update aggregates to reference the control field.
+        const auto op = stmt.expr.name;
+        if (op == "$min") {
+            // Rewrite not valid for the timeField because control.min.time contains a rounded-down
+            // time and not the actual min time of events in the bucket.
+            if (accFieldName == timeField) {
+                return {};
+            }
+            os << timeseries::kControlMinFieldNamePrefix;
+        } else if (op == "$max") {
+            os << timeseries::kControlMaxFieldNamePrefix;
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
+        for (size_t index = 1; index < path.getPathLength(); index++) {
+            if (index > 1) {
+                os << ".";
+            }
+            os << path.getFieldName(index);
+        }
+    }
+
+    // Re-create the accumulator using the bucket-level paths.
+    const auto& newExpr = ExpressionFieldPath::createPathFromString(
+        pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+    AccumulationExpression accExpr = stmt.expr;
+    accExpr.argument = newExpr;
+    return std::make_unique<AccumulationExpression>(std::move(accExpr));
+}
+
 boost::intrusive_ptr<Expression> rewriteGroupByField(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     const std::vector<boost::intrusive_ptr<Expression>>& idFieldExpressions,
@@ -969,8 +1082,8 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
 }
 
 std::pair<bool, Pipeline::SourceContainer::iterator>
-DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContainer::iterator itr,
-                                                         Pipeline::SourceContainer* container) {
+DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer::iterator itr,
+                                                      Pipeline::SourceContainer* container) {
     // The computed min/max for each bucket uses the default collation. If the collation of the
     // query doesn't match the default we cannot rely on the computed values as they might differ
     // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
@@ -986,6 +1099,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     }
 
     const auto& metaField = _bucketUnpacker.bucketSpec().metaField();
+    const auto& timeField = _bucketUnpacker.bucketSpec().timeField();
 
     const auto& idFieldExpressions = groupPtr->getIdExpressions();
     const auto& idFieldNames = groupPtr->getIdFieldNames();
@@ -993,7 +1107,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
                                                      idFieldExpressions,
                                                      idFieldNames,
                                                      metaField,
-                                                     _bucketUnpacker.bucketSpec().timeField(),
+                                                     timeField,
                                                      _bucketMaxSpanSeconds,
                                                      _fixedBuckets,
                                                      _usesExtendedRange);
@@ -1004,73 +1118,24 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     std::vector<AccumulationStatement> accumulationStatementsBucket;
     for (const AccumulationStatement& stmt : groupPtr->getAccumulationStatements()) {
         const auto& op = stmt.expr.name;
-        // If _any_ of the accumulators aren't $min/$max we won't perform the re-write (some other
-        // accs might be re-writable in terms of the bucket controls, we just haven't invested into
-        // implementing them).
-        if (op != "$min" && op != "$max") {
-            return {};
-        }
-
-        const auto* exprArgPath =
-            dynamic_cast<const ExpressionFieldPath*>(stmt.expr.argument.get());
-
-        // This is either a const or a compound expression. While some such expressions (e.g: {$min:
-        // {$add:
-        // ['$a', 2]}}) could be re-written in terms of the min/max on the control fields, in
-        // general we cannot do it (e.g. {$min: {$add: ['$a', '$b']}}), so we block the re-write.
-        if (!exprArgPath) {
-            return {};
-        }
-
-        // Path can have a single component if it's using $$CURRENT or a similar variable. We don't
-        // support these.
-        const auto& path = exprArgPath->getFieldPath();
-        if (path.getPathLength() <= 1) {
-            return {};
-        }
-        const auto& accFieldName = path.getFieldName(1);
-
-        // Rewrite not valid for the timeField because control.min.time contains a rounded-down time
-        // and not the actual min time of events in the bucket.
-        if (accFieldName == _bucketUnpacker.bucketSpec().timeField()) {
-            return {};
-        }
-
-        // Build the paths for the bucket-level fields.
-        std::ostringstream os;
-        if (metaField && accFieldName == metaField.value()) {
-            // Update aggregates to reference the meta field.
-            os << timeseries::kBucketMetaFieldName;
-
-            for (size_t index = 2; index < path.getPathLength(); index++) {
-                os << "." << path.getFieldName(index);
+        // If _any_ of the accumulators aren't $min/$max/$count we won't perform the re-write (some
+        // other accs might be re-writable in terms of the bucket controls, we just haven't invested
+        // into implementing them). $count is desugared to {$sum: 1}.
+        std::unique_ptr<AccumulationExpression> accExpr;
+        if (op == "$min" || op == "$max") {
+            accExpr = rewriteMinMaxGroupAccm(pExpCtx, stmt, metaField, timeField);
+            if (!accExpr) {
+                return {};
+            }
+        } else if (op == "$sum") {
+            accExpr = rewriteCountGroupAccm(pExpCtx.get(), stmt, timeField);
+            if (!accExpr) {
+                return {};
             }
         } else {
-            // Update aggregates to reference the control field.
-            const auto op = stmt.expr.name;
-            if (op == "$min") {
-                os << timeseries::kControlMinFieldNamePrefix;
-            } else if (op == "$max") {
-                os << timeseries::kControlMaxFieldNamePrefix;
-            } else {
-                MONGO_UNREACHABLE;
-            }
-
-            for (size_t index = 1; index < path.getPathLength(); index++) {
-                if (index > 1) {
-                    os << ".";
-                }
-                os << path.getFieldName(index);
-            }
+            return {};
         }
-
-        // Re-create the accumulator using the bucket-level paths.
-        const auto& newExpr = ExpressionFieldPath::createPathFromString(
-            pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
-
-        AccumulationExpression accExpr = stmt.expr;
-        accExpr.argument = newExpr;
-        accumulationStatementsBucket.emplace_back(stmt.fieldName, std::move(accExpr));
+        accumulationStatementsBucket.emplace_back(stmt.fieldName, std::move(*accExpr));
     }
 
     boost::intrusive_ptr<mongo::DocumentSourceGroup> newGroup =
@@ -1557,8 +1622,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     if (!_eventFilter) {
-        // Check if we can avoid unpacking if we have a group stage with min/max aggregates.
-        auto [success, result] = rewriteGroupByMinMax(itr, container);
+        // Check if we can avoid unpacking if we have a group stage with min/max/count aggregates.
+        auto [success, result] = rewriteGroupStage(itr, container);
         if (success) {
             return result;
         }

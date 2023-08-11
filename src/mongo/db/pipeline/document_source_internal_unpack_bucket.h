@@ -247,11 +247,11 @@ public:
     std::pair<BSONObj, bool> extractProjectForPushDown(DocumentSource* src) const;
 
     /**
-     * Helper method which checks if we can avoid unpacking if we have a group stage with min/max
-     * aggregates. If the rewrite is possible, 'container' is modified, bool in the return pair is
-     * set to 'true' and the iterator is set to point to the new group.
+     * Helper method which checks if we can avoid unpacking if we have a group stage with
+     * min/max/count aggregates. If the rewrite is possible, 'container' is modified, bool in the
+     * return pair is set to 'true' and the iterator is set to point to the new group.
      */
-    std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
+    std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupStage(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
     /**

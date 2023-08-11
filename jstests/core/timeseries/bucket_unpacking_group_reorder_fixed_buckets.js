@@ -29,12 +29,13 @@ const controlMin = "control.min";
 const accField = "b";
 const metaField = "mt";
 
-function checkResults({pipeline, rewriteOccur = true, expectedDocs, validateFullExplain}) {
+function checkResults(
+    {pipeline, checkExplain = true, rewriteOccur = true, expectedDocs, validateFullExplain}) {
     // Only check the explain output if SBE is not enabled. SBE changes the explain output.
     if (!checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"])) {
-        if (rewriteOccur) {
+        if (rewriteOccur && checkExplain) {
             checkExplainForRewrite(pipeline);
-        } else {
+        } else if (checkExplain) {
             checkExplainForNoRewrite(pipeline, validateFullExplain);
         }
     }
@@ -65,6 +66,11 @@ function checkExplainForRewrite(pipeline) {
     // Validate the accumulators were rewritten.
     assert.eq(groupStage["accmin"]["$min"], `$${controlMin}.${accField}`);
     assert.eq(groupStage["accmax"]["$max"], `$${controlMax}.${accField}`);
+    // The unit test validates the entire rewrite of the $count accumulator, we will just validate
+    // part of the rewrite (that a $cond expression exists).
+    if (groupStage["count"]) {
+        assert(groupStage["count"]["$sum"]["$cond"]);
+    }
 }
 
 function checkExplainForNoRewrite(pipeline, validateFullExplain) {
@@ -224,6 +230,21 @@ checkResults({
     expectedDocs: [{_id: {t: ISODate("2022-01-01T00:00:00Z")}, accmin: 1, accmax: 7}],
 });
 
+// Validate the rewrite occurs with the $count accumulator.
+checkResults({
+    pipeline: [{
+        $group: {
+            _id: {c: "string", t: {$dateTrunc: {date: `$${timeField}`, unit: "month"}}},
+            accmin: {$min: `$${accField}`},
+            accmax: {$max: `$${accField}`},
+            count: {$count: {}},
+        }
+    }],
+    expectedDocs: [
+        {_id: {"c": "string", t: ISODate("2022-09-01T00:00:00Z")}, accmin: 1, accmax: 7, count: 7}
+    ],
+});
+
 ///
 // These tests will validate the optimization did not occur.
 ///
@@ -379,7 +400,7 @@ checkResults({
                     accmax: {$max: `$${accField}`}
                 }
             }],
-            rewriteOccur: false
+            checkExplain: false,
         });
     });
 })();
