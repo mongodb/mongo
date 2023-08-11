@@ -173,6 +173,7 @@ public:
                               std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
                               std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
                               std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
+                              std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor,
                               TrustedInitTag);
 
     SemiFuture<void> runUntilStrictlyConsistent(
@@ -239,6 +240,8 @@ private:
         const std::vector<NamespaceString>& stashCollections,
         const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers);
 
+    static std::shared_ptr<executor::TaskExecutor> _makeCollectionClonerExecutor(size_t numDonors);
+
     SharedSemiFuture<void> _runCollectionCloner(
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
@@ -273,6 +276,8 @@ private:
     const std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
 
     const std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
+
+    const std::shared_ptr<executor::TaskExecutor> _collectionClonerExecutor;
 
     // Promise fulfilled by startOplogApplication() to signal that oplog application can begin.
     SharedPromise<void> _startOplogApplication;

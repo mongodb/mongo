@@ -77,6 +77,17 @@ server_parameters:
         validator:
             gte: 1
 
+    reshardingCollectionClonerWriteThreadCount:
+        description: >-
+            Number of writer threads used by ReshardingCollectionCloner.
+        set_at: runtime
+        cpp_vartype: int
+        cpp_varname: gReshardingCollectionClonerWriteThreadCount
+        default:
+            expr: 2
+        validator:
+            gte: 1
+
     reshardingTxnClonerProgressBatchSize:
         description: >-
             Number of config.transactions records from a donor shard to process before recording the

@@ -48,6 +48,7 @@
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
@@ -57,6 +58,8 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -83,7 +86,15 @@ public:
             // the thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to
             // how the recipient's primary-only service is set up.
             ThreadPool::Options threadPoolOptions;
-            threadPoolOptions.maxThreads = 1;
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                // With reshardingImprovements, we need a larger executor.
+                auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
+                threadPoolOptions.maxThreads =
+                    1 + 2 * donorShards + resharding::gReshardingCollectionClonerWriteThreadCount;
+            } else {
+                threadPoolOptions.maxThreads = 1;
+            }
             threadPoolOptions.threadNamePrefix = "TestReshardCloneCollection-";
             threadPoolOptions.poolName = "TestReshardCloneCollectionThreadPool";
             threadPoolOptions.onCreateThread = [](const std::string& threadName) {

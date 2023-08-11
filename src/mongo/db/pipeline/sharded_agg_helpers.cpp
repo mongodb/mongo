@@ -253,6 +253,7 @@ std::vector<RemoteCursor> establishShardCursors(
     const boost::optional<analyze_shard_key::TargetedSampleId>& sampleId,
     const ReadPreferenceSetting& readPref,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
     bool targetEveryShardServer) {
     LOGV2_DEBUG(20904,
                 1,
@@ -267,6 +268,9 @@ std::vector<RemoteCursor> establishShardCursors(
     if (targetEveryShardServer) {
         // If we are running on all shard servers we should never designate a particular server.
         invariant(designatedHostsMap.empty());
+        // Resume tokens are particular to a host, so it will never make sense to use them when
+        // running on all shard servers.
+        invariant(resumeTokenMap.empty());
         if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
             LOGV2(
                 7355704,
@@ -314,6 +318,20 @@ std::vector<RemoteCursor> establishShardCursors(
         }
 
         requests.emplace_back(cri->cm.dbPrimary(), std::move(versionedCmdObj));
+    }
+
+    // If we have resume data, use it.
+    if (!resumeTokenMap.empty()) {
+        for (auto& requestPair : requests) {
+            const auto& shardId = requestPair.first;
+            auto& request = requestPair.second;
+            auto resumeTokenIter = resumeTokenMap.find(shardId);
+            if (resumeTokenIter != resumeTokenMap.end()) {
+                request = request.addField(
+                    BSON(AggregateCommandRequest::kResumeAfterFieldName << resumeTokenIter->second)
+                        .firstElement());
+            }
+        }
     }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
@@ -1111,7 +1129,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
     boost::optional<ExplainOptions::Verbosity> explain,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
-    AsyncRequestsSender::ShardHostMap designatedHostsMap) {
+    AsyncRequestsSender::ShardHostMap designatedHostsMap,
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
     auto expCtx = pipeline->getContext();
 
     // The process is as follows:
@@ -1280,6 +1299,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                             targetedSampleId,
                                             ReadPreferenceSetting::get(opCtx),
                                             designatedHostsMap,
+                                            resumeTokenMap,
                                             targetEveryShardServer);
 
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {

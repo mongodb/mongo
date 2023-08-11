@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -146,8 +147,8 @@ int insertBatchTransactionally(OperationContext* opCtx,
                                TxnNumber& txnNumber,
                                std::vector<InsertStatement>& batch,
                                const UUID& reshardingUUID,
-                               ShardId donorShard,
-                               HostAndPort donorHost,
+                               const ShardId& donorShard,
+                               const HostAndPort& donorHost,
                                const BSONObj& resumeToken);
 
 /**
@@ -204,6 +205,12 @@ void updateSessionRecord(OperationContext* opCtx,
                          std::vector<StmtId> stmtIds,
                          boost::optional<repl::OpTime> preImageOpTime,
                          boost::optional<repl::OpTime> postImageOpTime);
+
+/**
+ * Retrieves the resume data natural order scans for all donor shards.
+ */
+std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationContext* opCtx,
+                                                                  const UUID& reshardingUUID);
 
 /**
  * Calls and returns the value from the supplied lambda function.

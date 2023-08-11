@@ -41,6 +41,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
@@ -58,6 +59,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -184,6 +186,32 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
     return executor;
 }
 
+std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollectionClonerExecutor(
+    size_t numDonors) {
+    ThreadPool::Limits threadPoolLimits;
+    // We may transiently use 2 threads per reader while passing things around within the task
+    // executor.  Each writer uses a dedicated thread, plus 1 thread for waiting on the rest.
+    threadPoolLimits.maxThreads =
+        2 * numDonors + resharding::gReshardingCollectionClonerWriteThreadCount + 1;
+    ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
+
+    auto prefix = "ReshardingCollectionCloner"_sd;
+    threadPoolOptions.threadNamePrefix = prefix + "-";
+    threadPoolOptions.poolName = prefix + "ThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+        auto* client = Client::getCurrent();
+        AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+    };
+
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+        executor::makeNetworkInterface(prefix + "Network"));
+
+    executor->startup();
+    return executor;
+}
+
 std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::_makeOplogAppliers(
     OperationContext* opCtx,
     ReshardingApplierMetricsMap* applierMetricsMap,
@@ -239,13 +267,16 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     std::unique_ptr<ReshardingCollectionCloner> collectionCloner;
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
 
+    std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor;
     if (!cloningDone) {
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility))
+                serverGlobalParams.featureCompatibility)) {
             resharding::data_copy::ensureCollectionExists(
                 opCtx,
                 NamespaceString::kRecipientReshardingResumeDataNamespace,
                 CollectionOptions{});
+            collectionClonerExecutor = _makeCollectionClonerExecutor(donorShards.size());
+        }
         collectionCloner = _makeCollectionCloner(metrics, metadata, myShardId, cloneTimestamp);
         txnCloners = _makeTxnCloners(metadata, donorShards);
     }
@@ -269,6 +300,7 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
                                                        std::move(oplogFetchers),
                                                        std::move(oplogFetcherExecutor),
                                                        std::move(oplogAppliers),
+                                                       std::move(collectionClonerExecutor),
                                                        TrustedInitTag{});
 }
 
@@ -278,12 +310,14 @@ ReshardingDataReplication::ReshardingDataReplication(
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
     std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
     std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
+    std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor,
     TrustedInitTag)
     : _collectionCloner{std::move(collectionCloner)},
       _txnCloners{std::move(txnCloners)},
       _oplogFetchers{std::move(oplogFetchers)},
       _oplogFetcherExecutor{std::move(oplogFetcherExecutor)},
-      _oplogAppliers{std::move(oplogAppliers)} {}
+      _oplogAppliers{std::move(oplogAppliers)},
+      _collectionClonerExecutor{std::move(collectionClonerExecutor)} {}
 
 void ReshardingDataReplication::startOplogApplication() {
     ensureFulfilledPromise(_startOplogApplication);
@@ -308,7 +342,10 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     auto oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token(), opCtxFactory);
 
     auto collectionClonerFuture =
-        _runCollectionCloner(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
+        _runCollectionCloner(_collectionClonerExecutor ? _collectionClonerExecutor : executor,
+                             cleanupExecutor,
+                             errorSource.token(),
+                             opCtxFactory);
 
     auto txnClonerFutures = _runTxnCloners(
         executor, cleanupExecutor, errorSource.token(), opCtxFactory, startConfigTxnCloneTime);
