@@ -329,15 +329,30 @@ bool appendDollarTenant(BSONObjBuilder& builder,
     return false;
 }
 
-void appendDollarDbAndTenant(BSONObjBuilder& builder,
-                             const DatabaseName& dbName,
-                             boost::optional<TenantId> existingDollarTenant = boost::none) {
-    if (!dbName.tenantId() ||
-        appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant)) {
-        builder.append("$db", dbName.serializeWithoutTenantPrefix_UNSAFE());
+BSONObj appendDollarDbAndTenant(const DatabaseName& dbName,
+                                BSONObj body,
+                                const BSONObj& extraFields,
+                                const SerializationContext& sc) {
+    auto existingDollarTenant = parseDollarTenant(body);
+    BSONObjBuilder builder(std::move(body));
+    builder.appendElements(extraFields);
+
+    if (sc != SerializationContext::stateDefault()) {
+        // Recreate each of the fields according to the sc when copying the body from an existing
+        // request.
+        if (sc.receivedNonPrefixedTenantId() && dbName.tenantId())
+            appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
+        builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
+        if (sc.getPrefix() != SerializationContext::Prefix::Default)
+            builder.append("expectPrefix",
+                           sc.getPrefix() == SerializationContext::Prefix::IncludePrefix);
     } else {
-        builder.append("$db", DatabaseNameUtil::serialize(dbName));
+        if (dbName.tenantId())
+            appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
+        builder.append("$db", dbName.serializeWithoutTenantPrefix_UNSAFE());
     }
+
+    return builder.obj();
 }
 
 void OpMsgRequest::setDollarTenant(const TenantId& tenant) {
@@ -356,23 +371,11 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
     const DatabaseName& dbName,
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
     BSONObj body,
-    const BSONObj& extraFields) {
-    auto dollarTenant = parseDollarTenant(body);
+    const BSONObj& extraFields,
+    const SerializationContext& sc) {
     OpMsgRequest request;
-    request.body = ([&] {
-        BSONObjBuilder bodyBuilder(std::move(body));
-        bodyBuilder.appendElements(extraFields);
-        if (dollarTenant) {
-            appendDollarDbAndTenant(bodyBuilder, dbName, dollarTenant);
-        } else if (validatedTenancyScope && !validatedTenancyScope->hasAuthenticatedUser()) {
-            // Add $tenant into the body if the validated tenant id comes from $tenant.
-            appendDollarDbAndTenant(bodyBuilder, dbName);
-        } else {
-            bodyBuilder.append("$db", DatabaseNameUtil::serialize(dbName));
-        }
-        return bodyBuilder.obj();
-    }());
 
+    request.body = appendDollarDbAndTenant(dbName, std::move(body), extraFields, sc);
     request.validatedTenancyScope = validatedTenancyScope;
     return request;
 }
@@ -387,7 +390,8 @@ std::string compactStr(const std::string& input) {
 
 OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
                                          BSONObj body,
-                                         const BSONObj& extraFields) {
+                                         const BSONObj& extraFields,
+                                         const SerializationContext& sc) {
     int bodySize = body.objsize();
     int extraFieldsSize = extraFields.objsize();
 
@@ -404,16 +408,11 @@ OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
             "body"_attr = compactStr(body.toString()),
             "db"_attr = dbName.toStringForErrorMsg(),
             "extraFields"_attr = compactStr(extraFields.toString()));
-    }
-
-    auto dollarTenant = parseDollarTenant(body);
-    BSONObjBuilder bodyBuilder(std::move(body));
-    bodyBuilder.appendElements(extraFields);
-
-    appendDollarDbAndTenant(bodyBuilder, dbName, dollarTenant);
+    };
 
     OpMsgRequest request;
-    request.body = bodyBuilder.obj();
+
+    request.body = appendDollarDbAndTenant(dbName, std::move(body), extraFields, sc);
     return request;
 }
 

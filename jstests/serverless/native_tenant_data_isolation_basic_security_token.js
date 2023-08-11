@@ -157,10 +157,9 @@ const tokenDB = tokenConn.getDB(kDbName);
 
     // Test explain command with find
     {
-        // TODO SERVER-78904: Renable to test explain fix
-        // const cmdRes = tokenDB.runCommand({explain: {find: kCollName, filter: {a: 1}}});
-        // assert.eq(1, cmdRes.executionStats.nReturned, tojson(cmdRes));
-        // checkNsSerializedCorrectly(kDbName, kCollName, cmdRes.queryPlanner.namespace);
+        const cmdRes = tokenDB.runCommand({explain: {find: kCollName, filter: {a: 1}}});
+        assert.eq(1, cmdRes.executionStats.nReturned, tojson(cmdRes));
+        checkNsSerializedCorrectly(kDbName, kCollName, cmdRes.queryPlanner.namespace);
     }
 
     // Test count and distinct command.
@@ -516,10 +515,9 @@ const tokenDB = tokenConn.getDB(kDbName);
         assert.commandWorked(tokenDB2.runCommand({find: kCollName, filter: {a: 1}}));
     assert.eq(findOtherUser.cursor.firstBatch.length, 0, tojson(findOtherUser));
 
-    // TODO SERVER-78904: Renable to test explain fix
-    // const explainOtherUser =
-    //     assert.commandWorked(tokenDB2.runCommand({explain: {find: kCollName, filter: {a: 1}}}));
-    // assert.eq(explainOtherUser.executionStats.nReturned, 0, tojson(explainOtherUser));
+    const explainOtherUser =
+        assert.commandWorked(tokenDB2.runCommand({explain: {find: kCollName, filter: {a: 1}}}));
+    assert.eq(explainOtherUser.executionStats.nReturned, 0, tojson(explainOtherUser));
 
     const fadOtherUser = assert.commandWorked(
         tokenDB2.runCommand({findAndModify: kCollName, query: {b: 1}, update: {$inc: {b: 10}}}));

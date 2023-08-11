@@ -198,8 +198,8 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     }
 
     if (auto innerDb = explainedObj["$db"]) {
-        auto innerDbName =
-            DatabaseNameUtil::deserialize(dbName.tenantId(), innerDb.checkAndGetStringData());
+        auto innerDbName = DatabaseNameUtil::deserialize(
+            dbName.tenantId(), innerDb.checkAndGetStringData(), cmdObj.getSerializationContext());
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Mismatched $db in explain command. Expected "
                               << dbName.toStringForErrorMsg() << " but got "
@@ -211,9 +211,12 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
             str::stream() << "Explain failed due to unknown command: "
                           << explainedObj.firstElementFieldName(),
             explainedCommand);
-    auto innerRequest =
-        std::make_unique<OpMsgRequest>(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            dbName, request.validatedTenancyScope, explainedObj));
+    auto innerRequest = std::make_unique<OpMsgRequest>(
+        OpMsgRequestBuilder::createWithValidatedTenancyScope(dbName,
+                                                             request.validatedTenancyScope,
+                                                             explainedObj,
+                                                             {},
+                                                             cmdObj.getSerializationContext()));
     auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));

@@ -189,17 +189,15 @@ const testColl = testDb.getCollection(kCollName);
     assert.eq(kOtherTenantDocs[0], aggRes2.cursor.firstBatch[0], tojson(aggRes2.cursor.firstBatch));
 
     // Test that explain works correctly.
-    // TODO SERVER-78904: Renable to test explain fix
-    // const kTenantExplainRes = assert.commandWorked(testDb.runCommand(
-    //     {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kTenant}));
-    // assert.eq(
-    //     kTenantDocs.length, kTenantExplainRes.executionStats.nReturned,
-    //     tojson(kTenantExplainRes));
-    // const kOtherTenantExplainRes = assert.commandWorked(testDb.runCommand(
-    //     {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kOtherTenant}));
-    // assert.eq(kOtherTenantDocs.length,
-    //           kOtherTenantExplainRes.executionStats.nReturned,
-    //           tojson(kOtherTenantExplainRes));
+    const kTenantExplainRes = assert.commandWorked(testDb.runCommand(
+        {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kTenant}));
+    assert.eq(
+        kTenantDocs.length, kTenantExplainRes.executionStats.nReturned, tojson(kTenantExplainRes));
+    const kOtherTenantExplainRes = assert.commandWorked(testDb.runCommand(
+        {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kOtherTenant}));
+    assert.eq(kOtherTenantDocs.length,
+              kOtherTenantExplainRes.executionStats.nReturned,
+              tojson(kOtherTenantExplainRes));
 }
 
 // Test insert and findAndModify command.

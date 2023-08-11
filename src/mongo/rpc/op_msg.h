@@ -48,12 +48,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
@@ -454,9 +454,11 @@ public:
      * CommandHelpers::runCommandDirectly). This function does not set a ValidatedTenancyScope on
      * the request itself, which will lead to the request being parsed incorrectly.
      */
-    static OpMsgRequest create(const DatabaseName& dbName,
-                               BSONObj body,
-                               const BSONObj& extraFields = {});
+    static OpMsgRequest create(
+        const DatabaseName& dbName,
+        BSONObj body,
+        const BSONObj& extraFields = {},
+        const SerializationContext& sc = SerializationContext::stateDefault());
 
     /**
      * Creates an OpMsgRequest object and directly sets a validated tenancy scope on it.
@@ -465,7 +467,8 @@ public:
         const DatabaseName& dbName,
         boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
         BSONObj body,
-        const BSONObj& extraFields = {});
+        const BSONObj& extraFields = {},
+        const SerializationContext& sc = SerializationContext::stateDefault());
 };
 
 }  // namespace mongo
