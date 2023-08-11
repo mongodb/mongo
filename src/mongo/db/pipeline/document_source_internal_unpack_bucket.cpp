@@ -1144,6 +1144,12 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
                                     std::move(accumulationStatementsBucket),
                                     groupPtr->getMaxMemoryUsageBytes());
 
+    // As far as the $min and $max accumulators are concerned, the new group is compatible with SBE,
+    // but we might add more accumulators later, and there is also a setting that might block group
+    // lowering so, rather than setting this group to be fully compatible, let's take the state from
+    // the original group.
+    newGroup->setSbeCompatibility(groupPtr->sbeCompatibility());
+
     // Replace the current stage (DocumentSourceInternalUnpackBucket) and the following group stage
     // with the new group.
     container->erase(std::next(itr));
