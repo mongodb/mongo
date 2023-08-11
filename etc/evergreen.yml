@@ -693,9 +693,7 @@ buildvariants:
     # run too long and hit execution timeouts.
     # burn_in_task_name: jsCore
   tasks:
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
+  - name: .cqf
   - name: query_golden_classic
   # - name: burn_in_tasks_gen
   #   depends_on:
@@ -1200,9 +1198,6 @@ buildvariants:
     omit_generated_tasks: true
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
   - name: query_golden_classic
   - name: lint_fuzzer_sanity_patch
   # TODO (SERVER-79361): Re-enable the IDL compatibility checker once the
@@ -1990,9 +1985,7 @@ buildvariants:
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
+  - name: .cqf
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns
@@ -2233,9 +2226,7 @@ buildvariants:
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
+  - name: .cqf
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
@@ -2349,6 +2340,9 @@ buildvariants:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_parallel
+  - name: query_golden_cqf
+  - name: cqf_experimental_jscore_passthrough
+  - name: cqf_experimental_aggregation_passthrough
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
