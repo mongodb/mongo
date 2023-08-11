@@ -82,7 +82,8 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_TIMESERIES_MODIFY, "TIMESERIES_MODIFY"_sd},
         {STAGE_TRIAL, "TRIAL"_sd},
         {STAGE_UNKNOWN, "UNKNOWN"_sd},
-        {STAGE_UNPACK_TIMESERIES_BUCKET, "UNPACK_TIMESERIES_BUCKET"_sd},
+        {STAGE_UNPACK_SAMPLED_TS_BUCKET, "UNPACK_SAMPLED_TS_BUCKET"_sd},
+        {STAGE_UNPACK_TS_BUCKET, "UNPACK_TS_BUCKET"_sd},
         {STAGE_UPDATE, "UPDATE"_sd},
     };
     if (auto it = kStageTypesMap.find(stageType); it != kStageTypesMap.end()) {

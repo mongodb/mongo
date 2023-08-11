@@ -52,6 +52,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/timeseries/bucket_spec.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -1764,5 +1765,71 @@ struct SearchNode : public QuerySolutionNode {
      * True for $searchMeta, False for $search query.
      */
     bool isSearchMeta;
+};
+
+/**
+ * Represents a node to unpack time-series buckets into measurements. Currently we only support
+ * unpacking buckets with a statically known set of fields in SBE.
+ */
+struct UnpackTsBucketNode : public QuerySolutionNode {
+    UnpackTsBucketNode(std::unique_ptr<QuerySolutionNode> child,
+                       const BucketSpec& spec,
+                       std::unique_ptr<MatchExpression> eventFilter,
+                       std::unique_ptr<MatchExpression> wholeBucketFilter,
+                       bool includeMeta)
+        : QuerySolutionNode(std::move(child)),
+          bucketSpec(spec),
+          eventFilter(std::move(eventFilter)),
+          wholeBucketFilter(std::move(wholeBucketFilter)),
+          includeMeta(includeMeta) {
+        tassert(7969700,
+                "Only support unpacking with a statically known set of fields.",
+                bucketSpec.behavior() == BucketSpec::Behavior::kInclude);
+    }
+
+    StageType getType() const override {
+        return STAGE_UNPACK_TS_BUCKET;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override {
+        *ss << "UNPACK_TS_BUCKET\n";
+    }
+
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        if (bucketSpec.fieldSet().contains(field)) {
+            // The 'bucketSpec' has a statically known set of fields which include the computed meta
+            // projections and so, are fully provided.
+            return FieldAvailability::kFullyProvided;
+        } else {
+            return FieldAvailability::kNotProvided;
+        }
+    }
+
+    bool sortedByDiskLoc() const override {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    // TODO SERVER-79699 & SERVER-79700: Return the sort set which should be translated from the
+    // child's sort set.
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final {
+        return std::make_unique<UnpackTsBucketNode>(children[0]->clone(),
+                                                    bucketSpec,
+                                                    eventFilter->clone(),
+                                                    wholeBucketFilter->clone(),
+                                                    includeMeta);
+    }
+
+    BucketSpec bucketSpec;
+    std::unique_ptr<MatchExpression> eventFilter = nullptr;
+    std::unique_ptr<MatchExpression> wholeBucketFilter = nullptr;
+    bool includeMeta = false;
 };
 }  // namespace mongo

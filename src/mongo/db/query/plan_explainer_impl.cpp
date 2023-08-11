@@ -521,7 +521,7 @@ void statsToBSON(const PlanStageStats& stats,
                                   static_cast<long long>(spec->nMeasurementsModified));
             }
         }
-    } else if (STAGE_UNPACK_TIMESERIES_BUCKET == stats.stageType) {
+    } else if (STAGE_UNPACK_SAMPLED_TS_BUCKET == stats.stageType) {
         UnpackTimeseriesBucketStats* spec =
             static_cast<UnpackTimeseriesBucketStats*>(stats.specific.get());
 
