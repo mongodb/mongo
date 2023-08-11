@@ -173,6 +173,10 @@ public:
         return tailable() && _findRequest->getAwaitData();
     }
 
+    bool isExhaust() const {
+        return _isExhaust;
+    }
+
     /**
      * Changes the cursor's batchSize after construction. Can change after requesting first batch.
      */
