@@ -20,8 +20,6 @@
 (function() {
 'use strict';
 
-load("jstests/sharding/libs/bin_version_util.js");
-
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
 // (used for testing *multi* removes to a *specific* shard key).
 function resetCollection() {
@@ -134,34 +132,16 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
         assert.writeError(res);
     }
 
-    if (isLatestBinVersion(staleMongos, "6.0")) {
-        doRemove(emptyQuery, single, makeMongosStaleFunc);
-    } else {
-        // Not possible because single remove requires equality match on shard key if the mongos is
-        // not on the latest bin version.
-        checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
-    }
+    doRemove(emptyQuery, single, makeMongosStaleFunc);
     doRemove(emptyQuery, multi, makeMongosStaleFunc);
 
     doRemove(pointQuery, single, makeMongosStaleFunc);
     doRemove(pointQuery, multi, makeMongosStaleFunc);
 
-    if (isLatestBinVersion(staleMongos, "6.0")) {
-        doRemove(rangeQuery, single, makeMongosStaleFunc);
-    } else {
-        // Not possible because can't do range query on a single remove if the mongos is not on the
-        // latest bin version.
-        checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
-    }
+    doRemove(rangeQuery, single, makeMongosStaleFunc);
     doRemove(rangeQuery, multi, makeMongosStaleFunc);
 
-    if (isLatestBinVersion(staleMongos, "6.0")) {
-        doRemove(multiPointQuery, single, makeMongosStaleFunc);
-    } else {
-        // Not possible because single remove must contain _id or shard key at top level
-        // (not within $or) if the mongos is not on the latest bin version.
-        checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
-    }
+    doRemove(multiPointQuery, single, makeMongosStaleFunc);
     doRemove(multiPointQuery, multi, makeMongosStaleFunc);
 }
 

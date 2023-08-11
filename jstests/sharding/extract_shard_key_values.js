@@ -10,8 +10,6 @@
 (function() {
 'use strict';
 
-load("jstests/sharding/libs/bin_version_util.js");
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
 const primaryShard = st.shard0.shardName;
@@ -172,14 +170,5 @@ assert.writeErrorWithCode(
     mongos.getCollection(kNsName).update({b: 1}, {$set: {c: 2}}, {upsert: true}),
     ErrorCodes.ShardKeyNotFound);
 
-if (!isLatestBinVersion(st.s, "6.0")) {
-    // Find and modify will not treat missing shard key values as null and require the full shard
-    // key to be specified.
-    assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-    assert.commandFailedWithCode(
-        sessionDB.runCommand(
-            {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}),
-        ErrorCodes.ShardKeyNotFound);
-}
 st.stop();
 })();
