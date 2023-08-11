@@ -753,8 +753,21 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             auto lastCommittedWithCurrentTerm =
                 _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
             if (lastCommittedWithCurrentTerm.value != OpTime::kUninitializedTerm) {
-                _cursor->setCurrentTermAndLastCommittedOpTime(lastCommittedWithCurrentTerm.value,
-                                                              lastCommittedWithCurrentTerm.opTime);
+                if (!_cursor->isExhaust() && lastCommittedWithCurrentTerm.opTime.isNull()) {
+                    // For non-exhaust cursors, only set the lastKnownCommittedOpTime when it is not
+                    // a null opTime. This is to avoid sending null opTime again and again and
+                    // triggering oplog empty batches every single time in case we can't advance our
+                    // commit point (e.g. during initial sync).
+                    _cursor->setCurrentTermAndLastCommittedOpTime(
+                        lastCommittedWithCurrentTerm.value, boost::none);
+                } else {
+                    // For exhaust cursors, it is safe to set a null lastKnownCommittedOpTime in the
+                    // initial getMore because the sync source will update the exhaust cursor's
+                    // lastKnownCommittedOpTime to the commit point sent in the last response after
+                    // each oplog batch.
+                    _cursor->setCurrentTermAndLastCommittedOpTime(
+                        lastCommittedWithCurrentTerm.value, lastCommittedWithCurrentTerm.opTime);
+                }
             }
             _cursor->more();
         }

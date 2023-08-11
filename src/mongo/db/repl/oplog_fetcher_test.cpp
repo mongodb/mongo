@@ -238,16 +238,21 @@ void validateGetMoreCommand(Message m,
     ASSERT_EQ(cursorId, msg.body.getIntField("getMore"));
     ASSERT_EQUALS(timeout, msg.body.getIntField("maxTimeMS"));
 
-    // In unittests, lastCommittedWithCurrentTerm should always be default to valid and non-null.
+    // In unittests, lastCommittedWithCurrentTerm.value should always be a valid term.
     // The case when currentTerm is kUninitializedTerm is tested separately in
     // GetMoreQueryDoesNotContainTermIfGetCurrentTermAndLastCommittedOpTimeReturnsUninitializedTerm.
     invariant(lastCommittedWithCurrentTerm.value != OpTime::kUninitializedTerm);
-    invariant(!lastCommittedWithCurrentTerm.opTime.isNull());
     ASSERT_EQUALS(lastCommittedWithCurrentTerm.value, msg.body["term"].numberLong());
-    ASSERT_EQUALS(lastCommittedWithCurrentTerm.opTime.getTimestamp(),
-                  msg.body["lastKnownCommittedOpTime"]["ts"].timestamp());
-    ASSERT_EQUALS(lastCommittedWithCurrentTerm.opTime.getTerm(),
-                  msg.body["lastKnownCommittedOpTime"]["t"].numberLong());
+    if (!exhaustSupported && lastCommittedWithCurrentTerm.opTime.isNull()) {
+        // Test that we don't attach the lastKnownCommittedOpTime field for non-exhaust cursors when
+        // the lastCommittedOpTime is null.
+        ASSERT_FALSE(msg.body.hasField("lastKnownCommittedOpTime"));
+    } else {
+        ASSERT_EQUALS(lastCommittedWithCurrentTerm.opTime.getTimestamp(),
+                      msg.body["lastKnownCommittedOpTime"]["ts"].timestamp());
+        ASSERT_EQUALS(lastCommittedWithCurrentTerm.opTime.getTerm(),
+                      msg.body["lastKnownCommittedOpTime"]["t"].numberLong());
+    }
 
     if (exhaustSupported) {
         ASSERT_TRUE(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
@@ -1635,6 +1640,14 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     // Update lastFetched before it is updated by getting the next batch.
     lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
 
+    // Set a null lastCommittedOpTime to test that non-exhaust cursors don't attach a null
+    // lastKnownCommittedOpTime. This must be done before we issue the response to the find request
+    // so that the first getMore request (made immediately after processSingleRequestResponse) can
+    // pick this up.
+    dataReplicatorExternalState->lastCommittedOpTime = OpTime();
+    auto firstGetMoreTermAndLastCommittedOpTime =
+        dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
+
     // Creating the cursor will succeed. After this, the cursor will be blocked on call() for the
     // getMore command.
     auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
@@ -1654,6 +1667,15 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     auto fourthEntry = makeNoopOplogEntry({{Seconds(458), 0}, lastFetched.getTerm()});
     auto secondBatch = {thirdEntry, fourthEntry};
 
+
+    // Reset the lastCommittedOpTime to non-null. This must be done before we issue the response to
+    // the first getMore request so that the second getMore request (made immediately after
+    // processSingleRequestResponse) can pick this up.
+    dataReplicatorExternalState->lastCommittedOpTime = {{9999, 0},
+                                                        dataReplicatorExternalState->currentTerm};
+    auto secondGetMoreTermAndLastCommittedOpTime =
+        dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
+
     // moreToCome would be set to false if oplogFetcherUsesExhaust was set to false. After this,
     // the cursor will be blocked on call() for the next getMore command.
     m = processSingleRequestResponse(
@@ -1664,7 +1686,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     validateGetMoreCommand(m,
                            cursorId,
                            durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
-                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           firstGetMoreTermAndLastCommittedOpTime,
                            false /* exhaustSupported */);
 
     // Update lastFetched since it should have been updated after getting the last batch.
@@ -1684,7 +1706,7 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     validateGetMoreCommand(m,
                            cursorId,
                            durationCount<Milliseconds>(oplogFetcher->getAwaitDataTimeout_forTest()),
-                           dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime(),
+                           secondGetMoreTermAndLastCommittedOpTime,
                            false /* exhaustSupported */);
 
     // Update lastFetched since it should have been updated after getting the last batch.
