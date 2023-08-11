@@ -92,7 +92,19 @@ public:
         AtomicWord<int64_t> timeElapsedMillis;
 
         /**
-         * Maximum wall time from the first document of each pre-image collection.
+         * TODO SERVER-70591: Update the definition to only refer to truncate semantics.
+         *
+         * Semantics change depending on whether truncates or collection scan deletes are used.
+         *
+         * Truncation enabled: The wall time of the pre-image with the highest 'operationTime' which
+         * has been truncated.
+         *
+         * Truncation disabled (collection scans for deletion): The highest wall time of the oldest
+         * pre-image across nsUUIDs in the pre-images collection(s) seen by the purgingJob.
+         *      Example: nsUUID0 [ts(100), ts(101), ts(102)], nsUUID1 [ts(101), ts(103)]
+         *      'maxStartWallTime' := ts(101)
+         *      **  Since the purgingJob only runs on the primary, this value may be zero or stale
+         *          for secondaries.
          */
         AtomicWord<Date_t> maxStartWallTime;
 
