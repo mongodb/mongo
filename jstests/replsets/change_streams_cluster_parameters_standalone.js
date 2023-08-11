@@ -6,6 +6,7 @@
  *  does_not_support_stepdowns,
  *  multiversion_incompatible,
  *  requires_replication,
+ *  requires_persistence,
  * ]
  */
 
