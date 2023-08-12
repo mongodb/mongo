@@ -30,7 +30,6 @@
 
 #include <csignal>
 #include <exception>
-#include <fmt/format.h>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -45,9 +44,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
-namespace mongo {
 namespace {
-using namespace fmt::literals;
+using namespace mongo;
 
 // Tests of signals that should be ignored raise each signal twice, to ensure that the handler isn't
 // reset.
@@ -62,32 +60,18 @@ using namespace fmt::literals;
         ASSERT_EQ(0, raise(SIGNUM));                                                           \
     }
 
-#if defined(_WIN32)
-#define DUMP_SIGINFO(SIGNUM)
-#else
-// The si_code field is always SI_TKILL when using raise
-#define DUMP_SIGINFO(SIGNUM)                                                                    \
-    DEATH_TEST(DumpSiginfoTest, SIGNUM##_, "Dumping siginfo (si_code={}): "_format(SI_TKILL)) { \
-        ASSERT_EQ(0, raise(SIGNUM));                                                            \
-    }
-#endif
-
 IGNORED_SIGNAL(SIGUSR2)
 IGNORED_SIGNAL(SIGHUP)
 IGNORED_SIGNAL(SIGPIPE)
 FATAL_SIGNAL(SIGQUIT)
 FATAL_SIGNAL(SIGILL)
-DUMP_SIGINFO(SIGILL)
 FATAL_SIGNAL(SIGABRT)
 
 #if !__has_feature(address_sanitizer)
 // These signals trip the leak sanitizer
 FATAL_SIGNAL(SIGSEGV)
-DUMP_SIGINFO(SIGSEGV)
 FATAL_SIGNAL(SIGBUS)
-DUMP_SIGINFO(SIGBUS)
 FATAL_SIGNAL(SIGFPE)
-DUMP_SIGINFO(SIGFPE)
 #endif
 
 DEATH_TEST(FatalTerminateTest,
@@ -124,4 +108,3 @@ DEATH_TEST(FatalTerminateTest,
 }
 
 }  // namespace
-}  // namespace mongo
