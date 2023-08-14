@@ -18,11 +18,15 @@ export class ReshardCollectionCmdTest {
         this._numInitialDocs = testConfig.numInitialDocs;
 
         this._shardToRSMap = {};
-        this._shardToRSMap[this._st.shard0.shardName] = this._st.rs0;
-        this._shardToRSMap[this._st.shard1.shardName] = this._st.rs1;
         this._shardIdToShardMap = {};
-        this._shardIdToShardMap[this._st.shard0.shardName] = this._st.shard0;
-        this._shardIdToShardMap[this._st.shard1.shardName] = this._st.shard1;
+
+        // Build the mapping for all shards assuming the shard number is continuously increasing.
+        let i = 0;
+        while (this._st["shard" + i]) {
+            this._shardToRSMap[this._st["shard" + i].shardName] = this._st["rs" + i];
+            this._shardIdToShardMap[this._st["shard" + i].shardName] = this._st["shard" + i];
+            i++;
+        }
     }
 
     _getUUIDFromCollectionInfo(dbName, collName, collInfo) {
