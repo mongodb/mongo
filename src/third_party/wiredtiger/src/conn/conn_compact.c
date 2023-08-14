@@ -53,13 +53,18 @@ __compact_server(void *arg)
         /* When the entire metadata file has been parsed, take a break or wait until signalled. */
         if (full_iteration || !running) {
 
-            full_iteration = false;
             /*
-             * FIXME-WT-11409: Depending on the previous state, we may not want to clear out the
-             * last key used. This could be useful if the server was paused to be resumed later.
+             * In order to always try to parse all the candidates present in the metadata file even
+             * though the compaction server may be stopped at random times, only set the URI to the
+             * prefix for the very first iteration and when all the candidates in the metadata file
+             * have been parsed.
              */
-            __wt_free(session, uri);
-            WT_ERR(__wt_strndup(session, prefix, strlen(prefix), &uri));
+            if (uri == NULL || full_iteration) {
+                full_iteration = false;
+                __wt_free(session, uri);
+                WT_ERR(__wt_strndup(session, prefix, strlen(prefix), &uri));
+            }
+
             /* Check every 10 seconds in case the signal was missed. */
             __wt_cond_wait(
               session, conn->background_compact.cond, 10 * WT_MILLION, __compact_server_run_chk);
