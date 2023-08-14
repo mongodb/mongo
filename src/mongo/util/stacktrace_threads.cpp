@@ -326,6 +326,7 @@ class State {
 public:
     void printStacks(StackTraceSink& sink);
     void printStacks();
+    void printAllThreadStacksBlocking();
 
     /**
      * We need signals for two purpposes in the stack tracing system.
@@ -384,6 +385,7 @@ private:
     int _signal = 0;
     std::atomic<int> _processingTid = -1;                               // NOLINT
     std::atomic<StackCollectionOperation*> _stackCollection = nullptr;  // NOLINT
+    PrintAllStacksSession _printAllStacksSession;
 
     MONGO_STATIC_ASSERT(decltype(_processingTid)::is_always_lock_free);
     MONGO_STATIC_ASSERT(decltype(_stackCollection)::is_always_lock_free);
@@ -525,10 +527,16 @@ void State::printStacks() {
             LOGV2(31426, "===== multithread stacktrace session end =====");
         }
     };
+
     LogEmitter emitter;
+    auto notifier = _printAllStacksSession.notifier();
     printToEmitter(emitter);
 }
 
+void State::printAllThreadStacksBlocking() {
+    auto waiter = _printAllStacksSession.waiter();
+    kill(getpid(), _signal);  // The SignalHandler thread calls printAllThreadStacks.
+}
 
 void State::printToEmitter(AbstractEmitter& emitter) {
     std::vector<ThreadBacktrace> messageStorage;
@@ -668,6 +676,7 @@ void initialize(int signal) {
 }
 
 }  // namespace
+
 }  // namespace stack_trace_detail
 
 
@@ -677,6 +686,10 @@ void printAllThreadStacks(StackTraceSink& sink) {
 
 void printAllThreadStacks() {
     stack_trace_detail::stateSingleton->printStacks();
+}
+
+void printAllThreadStacksBlocking() {
+    stack_trace_detail::stateSingleton->printAllThreadStacksBlocking();
 }
 
 void setupStackTraceSignalAction(int signal) {
