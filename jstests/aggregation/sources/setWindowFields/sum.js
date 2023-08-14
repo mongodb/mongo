@@ -6,6 +6,7 @@ import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -108,6 +109,41 @@ verifyResults(result, function(num, baseObj) {
     return baseObj;
 });
 
+// Test with unbounded and left shifted window
+result = coll.aggregate([
+                 sortStage,
+                 {
+                     $setWindowFields: {
+                         sortBy: {one: 1},
+                         output: {out: {$sum: "$one", window: {documents: ["unbounded", -2]}}}
+                     }
+                 }
+             ])
+             .toArray();
+verifyResults(result, function(num, baseObj) {
+    baseObj.out = firstSum(Math.max(num - 2, 0));
+    return baseObj;
+});
+
+// Test with additional expression on window function
+result =
+    coll.aggregate([
+            sortStage,
+            {
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output:
+                        {out: {$sum: {$abs: "$one"},
+                               window: {documents: ["unbounded", "current"]}}}
+                }
+            }
+        ])
+        .toArray();
+verifyResults(result, function(num, baseObj) {
+    baseObj.out = firstSum(num);
+    return baseObj;
+});
+
 // Test that we can overwrite an existing field.
 result =
     coll.aggregate([
@@ -125,98 +161,106 @@ verifyResults(result, function(num, baseObj) {
     return baseObj;
 });
 
-// Test that we can set a sub-field in each document in an array.
-result =
-    coll.aggregate([
-            sortStage,
-            {
-                $setWindowFields: {
-                    sortBy: {one: 1},
-                    output:
-                        {"docArr.a":
-                             {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
-                }
-            }
-        ])
-        .toArray();
-verifyResults(result, function(num, baseObj) {
-    baseObj.docArr =
-        [{first: baseObj.docArr[0].first, a: firstSum(num)}, {second: 0, a: firstSum(num)}];
-    return baseObj;
-});
-
-// Test that we can set multiple numeric sub-fields in each element in an array.
-result =
-    coll.aggregate([
-            sortStage,
-            {
-                $setWindowFields: {
-                    sortBy: {one: 1},
-                    output: {
-                        "docArr.1": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
-                        "docArr.2": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
-                        "simpleArr.1":
-                            {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+// TODO SERVER-79563: Allow nested fields in SBE
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    // Test that we can set a sub-field in each document in an array.
+    result =
+        coll.aggregate([
+                sortStage,
+                {
+                    $setWindowFields: {
+                        sortBy: {one: 1},
+                        output: {
+                            "docArr.a":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+                        }
                     }
                 }
-            }
-        ])
-        .toArray();
-verifyResults(result, function(num, baseObj) {
-    const newObj = {1: firstSum(num)};
-    baseObj.docArr = [
-        {first: baseObj.docArr[0].first, 1: firstSum(num), 2: firstSum(num)},
-        {second: baseObj.docArr[1].second, 1: firstSum(num), 2: firstSum(num)}
-    ];
-    baseObj.simpleArr = Array.apply(null, Array(baseObj.simpleArr.length)).map(_ => newObj);
-    return baseObj;
-});
+            ])
+            .toArray();
+    verifyResults(result, function(num, baseObj) {
+        baseObj.docArr =
+            [{first: baseObj.docArr[0].first, a: firstSum(num)}, {second: 0, a: firstSum(num)}];
+        return baseObj;
+    });
 
-// Test that we can set a nested field.
-result =
-    coll.aggregate([
-            sortStage,
-            {
-                $setWindowFields: {
-                    sortBy: {one: 1},
-                    output:
-                        {"a.b": {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
-                }
-            }
-        ])
-        .toArray();
-verifyResults(result, function(num, baseObj) {
-    baseObj.a = {b: firstSum(num)};
-    return baseObj;
-});
-
-// Test that we can set multiple fields/sub-fields of different types at once.
-result =
-    coll.aggregate([
-            sortStage,
-            {
-                $setWindowFields: {
-                    sortBy: {one: 1},
-                    output: {
-                        "a": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
-                        "newField.a": {$sum: "$two", window: {documents: ["unbounded", "current"]}},
-                        "simpleArr.0.b":
-                            {$sum: "$one", window: {documents: ["unbounded", "current"]}},
-                        "nestedDoc.1.2.a":
-                            {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+    // Test that we can set multiple numeric sub-fields in each element in an array.
+    result =
+        coll.aggregate([
+                sortStage,
+                {
+                    $setWindowFields: {
+                        sortBy: {one: 1},
+                        output: {
+                            "docArr.1":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                            "docArr.2":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                            "simpleArr.1":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+                        }
                     }
                 }
-            }
-        ])
-        .toArray();
-verifyResults(result, function(num, baseObj) {
-    const newObj = {0: {b: firstSum(num)}};
-    baseObj.a = firstSum(num);
-    baseObj.newField = {a: secondSum(num)};
-    baseObj.simpleArr = Array.apply(null, Array(baseObj.simpleArr.length)).map(_ => newObj);
-    baseObj.nestedDoc = {1: {2: {3: 1, a: firstSum(num)}}};
-    return baseObj;
-});
+            ])
+            .toArray();
+    verifyResults(result, function(num, baseObj) {
+        const newObj = {1: firstSum(num)};
+        baseObj.docArr = [
+            {first: baseObj.docArr[0].first, 1: firstSum(num), 2: firstSum(num)},
+            {second: baseObj.docArr[1].second, 1: firstSum(num), 2: firstSum(num)}
+        ];
+        baseObj.simpleArr = Array.apply(null, Array(baseObj.simpleArr.length)).map(_ => newObj);
+        return baseObj;
+    });
+
+    // Test that we can set a nested field.
+    result =
+        coll.aggregate([
+                sortStage,
+                {
+                    $setWindowFields: {
+                        sortBy: {one: 1},
+                        output: {
+                            "a.b": {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+                        }
+                    }
+                }
+            ])
+            .toArray();
+    verifyResults(result, function(num, baseObj) {
+        baseObj.a = {b: firstSum(num)};
+        return baseObj;
+    });
+
+    // Test that we can set multiple fields/sub-fields of different types at once.
+    result =
+        coll.aggregate([
+                sortStage,
+                {
+                    $setWindowFields: {
+                        sortBy: {one: 1},
+                        output: {
+                            "a": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                            "newField.a":
+                                {$sum: "$two", window: {documents: ["unbounded", "current"]}},
+                            "simpleArr.0.b":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                            "nestedDoc.1.2.a":
+                                {$sum: "$one", window: {documents: ["unbounded", "current"]}}
+                        }
+                    }
+                }
+            ])
+            .toArray();
+    verifyResults(result, function(num, baseObj) {
+        const newObj = {0: {b: firstSum(num)}};
+        baseObj.a = firstSum(num);
+        baseObj.newField = {a: secondSum(num)};
+        baseObj.simpleArr = Array.apply(null, Array(baseObj.simpleArr.length)).map(_ => newObj);
+        baseObj.nestedDoc = {1: {2: {3: 1, a: firstSum(num)}}};
+        return baseObj;
+    });
+}
 
 // Test $sum over a non-removable lookahead window.
 result = coll.aggregate([

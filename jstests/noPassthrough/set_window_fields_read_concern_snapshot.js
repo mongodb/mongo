@@ -10,6 +10,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});
@@ -76,7 +77,10 @@ function resetProfiler() {
 // Run outside of a transaction.
 resetProfiler();
 let commandResult = assert.commandWorked(testDB.runCommand(aggregationCommand));
-checkProfilerForDiskWrite(testDB);
+// TODO SERVER-78709: Implement spilling
+if (!checkSBEEnabled(testDB, ["featureFlagSbeFull"])) {
+    checkProfilerForDiskWrite(testDB);
+}
 let arrayResult = commandResult.cursor.firstBatch;
 let expected = [];
 

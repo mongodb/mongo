@@ -114,6 +114,32 @@ REGISTER_DOCUMENT_SOURCE(_internalSetWindowFields,
                          DocumentSourceInternalSetWindowFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
+// TODO SERVER-79565: Implement time range pushdown in SBE
+bool hasTimeUnit(const std::vector<WindowFunctionStatement>& outputFields) {
+    for (const auto& outputField : outputFields) {
+        auto found =
+            stdx::visit(OverloadedVisitor{[](const WindowBounds::DocumentBased&) { return false; },
+                                          [](const WindowBounds::RangeBased& range) {
+                                              return range.unit.has_value();
+                                          }},
+                        outputField.expr->bounds().bounds);
+        if (found) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// TODO SERVER-79563: Allow nested field to be projected for window function results
+bool hasNestedField(const std::vector<WindowFunctionStatement>& outputFields) {
+    for (const auto& outputField : outputFields) {
+        if (FieldPath{outputField.fieldName}.getPathLength() > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,
@@ -140,6 +166,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
+    expCtx->sbeWindowCompatibility = SbeCompatibility::flagGuarded;
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -151,32 +178,24 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
                 fieldSet.insert(&backingRefs.back(), &conflict));
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
+    auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    if (hasTimeUnit(outputFields) || hasNestedField(outputFields)) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
-    return create(
-        std::move(expCtx), std::move(partitionBy), std::move(sortBy), std::move(outputFields));
-}
-
-WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
-                                                       const boost::optional<SortPattern>& sortBy,
-                                                       ExpressionContext* expCtx) {
-    // 'elem' is a statement like 'v: {$sum: {...}}', whereas the expression is '$sum: {...}'.
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The field '" << elem.fieldName() << "' must be an object",
-            elem.type() == BSONType::Object);
-    return WindowFunctionStatement(
-        elem.fieldName(),
-        window_function::Expression::parse(elem.embeddedObject(), sortBy, expCtx));
-}
-void WindowFunctionStatement::serialize(MutableDocument& outputFields,
-                                        const SerializationOptions& opts) const {
-    outputFields[opts.serializeFieldPathFromString(fieldName)] = expr->serialize(opts);
+    return create(std::move(expCtx),
+                  std::move(partitionBy),
+                  std::move(sortBy),
+                  std::move(outputFields),
+                  sbeCompatibility);
 }
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     optional<intrusive_ptr<Expression>> partitionBy,
     const optional<SortPattern>& sortBy,
-    std::vector<WindowFunctionStatement> outputFields) {
+    std::vector<WindowFunctionStatement> outputFields,
+    SbeCompatibility sbeCompatibility) {
 
     // Starting with an input like this:
     //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, output: {...}}}
@@ -298,7 +317,8 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         simplePartitionByExpr,
         sortBy,
         outputFields,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()));
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        sbeCompatibility));
 
     // $unset
     if (complexPartitionBy) {
@@ -312,9 +332,21 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     // The _partitionBy is already optimized in create(), along with _iterator which initializes
     // with it. The _executableOutputs will be constructed using the expressions from the
     // '_outputFields' on the first call to doGetNext(). As a result, only expressions in the
-    // '_outputFeilds' are optimized here.
-    for (auto&& outputField : _outputFields) {
-        outputField.expr->optimize();
+    // '_outputFields' are optimized here.
+    if (_outputFields.size() > 0) {
+        // Calculate the new expression SBE compatibility after optimization without overwriting
+        // the previous SBE compatibility value. See the optimize() function for $group for a more
+        // detailed explanation.
+        auto expCtx = _outputFields[0].expr->expCtx();
+        auto origSbeCompatibility = expCtx->sbeCompatibility;
+        expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+
+        for (auto&& outputField : _outputFields) {
+            outputField.expr->optimize();
+        }
+
+        _sbeCompatibility = std::min(_sbeCompatibility, expCtx->sbeCompatibility);
+        expCtx->sbeCompatibility = origSbeCompatibility;
     }
     return this;
 }
@@ -378,9 +410,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
+    expCtx->sbeWindowCompatibility = SbeCompatibility::flagGuarded;
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
+    }
+    auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    if (hasTimeUnit(outputFields) || hasNestedField(outputFields)) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
@@ -388,7 +425,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         partitionBy,
         sortBy,
         outputFields,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
+        sbeCompatibility);
 }
 
 void DocumentSourceInternalSetWindowFields::initialize() {

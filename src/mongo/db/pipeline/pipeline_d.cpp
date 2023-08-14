@@ -98,6 +98,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
@@ -215,6 +216,8 @@ struct CompatiblePipelineStages {
     bool match : 1;
     bool sort : 1;
     bool search : 1;
+
+    bool window : 1;
 };
 
 // Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list as
@@ -285,6 +288,14 @@ bool pushDownPipelineStageIfCompatible(
 
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
+        return true;
+    } else if (auto windowStage =
+                   dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage.get())) {
+        if (!allowedStages.window || windowStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(windowStage, isLastSource));
         return true;
     }
 
@@ -389,6 +400,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // (Ignore FCV check): As with 'featureFlagSbeFull' (above), the effects of
         // 'featureFlagSearchInSbe' are local to this node, making it safe to ignore the FCV.
         .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
+
+        .window = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility),
     };
 
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {

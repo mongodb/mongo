@@ -77,6 +77,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/search_helper.h"

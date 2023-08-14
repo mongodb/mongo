@@ -53,17 +53,23 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
 
     // Dedupe the list of window bound slots and remember the index for each window.
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
-        auto boundSlot = _windows[windowIdx].boundSlot;
-        for (size_t boundIdx = 0; boundIdx < _boundSlots.size(); boundIdx++) {
-            if (boundSlot == _boundSlots[boundIdx]) {
-                _boundSlotIndex.push_back(boundIdx);
-                break;
+        auto dedupeBoundSlot = [&](value::SlotId boundSlot) {
+            for (size_t boundIdx = 0; boundIdx < _boundSlots.size(); boundIdx++) {
+                if (boundSlot == _boundSlots[boundIdx]) {
+                    return boundIdx;
+                }
             }
-        }
-        // If we didn't find this bound slot previously.
-        if (_boundSlotIndex.size() <= windowIdx) {
+            // If we didn't find this bound slot previously.
             _boundSlots.push_back(boundSlot);
-            _boundSlotIndex.push_back(_boundSlots.size() - 1);
+            return _boundSlots.size() - 1;
+        };
+        _lowBoundSlotIndex.push_back(boost::none);
+        if (_windows[windowIdx].lowBoundSlot) {
+            _lowBoundSlotIndex[windowIdx] = dedupeBoundSlot(*_windows[windowIdx].lowBoundSlot);
+        }
+        _highBoundSlotIndex.push_back(boost::none);
+        if (_windows[windowIdx].highBoundSlot) {
+            _highBoundSlotIndex[windowIdx] = dedupeBoundSlot(*_windows[windowIdx].highBoundSlot);
         }
     }
 }
@@ -73,8 +79,10 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
     newWindows.resize(_windows.size());
     for (size_t idx = 0; idx < _windows.size(); idx++) {
         newWindows[idx].windowSlot = _windows[idx].windowSlot;
-        newWindows[idx].boundSlot = _windows[idx].boundSlot;
-        newWindows[idx].boundTestingSlot = _windows[idx].boundTestingSlot;
+        newWindows[idx].lowBoundSlot = _windows[idx].lowBoundSlot;
+        newWindows[idx].highBoundSlot = _windows[idx].highBoundSlot;
+        newWindows[idx].lowBoundTestingSlot = _windows[idx].lowBoundTestingSlot;
+        newWindows[idx].highBoundTestingSlot = _windows[idx].highBoundTestingSlot;
         newWindows[idx].lowBoundExpr =
             _windows[idx].lowBoundExpr ? _windows[idx].lowBoundExpr->clone() : nullptr;
         newWindows[idx].highBoundExpr =
@@ -212,11 +220,23 @@ void WindowStage::prepare(CompileCtx& ctx) {
         _outWindowAccessors.push_back(std::make_unique<value::OwnedValueAccessor>());
         _outAccessorMap.emplace(window.windowSlot, _outWindowAccessors.back().get());
 
-        slotIdx = _partitionSlots.size() + _forwardSlots.size() + _boundSlotIndex[windowIdx];
-        _boundTestingAccessors.push_back(
-            std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx));
-        _boundTestingAccessorMap.emplace(window.boundTestingSlot,
-                                         _boundTestingAccessors.back().get());
+        if (window.lowBoundExpr) {
+            slotIdx =
+                _partitionSlots.size() + _forwardSlots.size() + *_lowBoundSlotIndex[windowIdx];
+            _lowBoundTestingAccessors.push_back(
+                std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx));
+            _boundTestingAccessorMap.emplace(*window.lowBoundTestingSlot,
+                                             _lowBoundTestingAccessors.back().get());
+        }
+
+        if (window.highBoundExpr) {
+            slotIdx =
+                _partitionSlots.size() + _forwardSlots.size() + *_highBoundSlotIndex[windowIdx];
+            _highBoundTestingAccessors.push_back(
+                std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx));
+            _boundTestingAccessorMap.emplace(*window.highBoundTestingSlot,
+                                             _highBoundTestingAccessors.back().get());
+        }
 
         ctx.root = this;
         _windowLowBoundCodes.push_back(window.lowBoundExpr ? window.lowBoundExpr->compile(ctx)
@@ -360,6 +380,10 @@ PlanState WindowStage::getNext() {
     // Free documents from cache if not needed.
     size_t requiredIdLow = _currId;
     for (size_t windowIndex = 0; windowIndex < _windows.size(); windowIndex++) {
+        // We can't free past what hasn't been added to idRange.
+        // Additionally, if lower bound is not unbounded, we can't free anything that has been added
+        // to the range, since its needed to be removed later.
+        requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].second + 1);
         if (_windows[windowIndex].lowBoundExpr) {
             requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].first);
         }
@@ -405,6 +429,7 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); ++windowIdx) {
         const auto& window = _windows[windowIdx];
         if (windowIdx) {
+            DebugPrinter::addNewLine(ret);
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
         DebugPrinter::addIdentifier(ret, window.windowSlot);
