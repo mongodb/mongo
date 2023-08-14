@@ -103,8 +103,12 @@ protected:
 
     std::vector<stdx::thread> _readWorkers;
     std::vector<stdx::thread> _writeWorkers;
-    std::vector<AtomicWord<bool>> _readStopping;
-    std::vector<AtomicWord<bool>> _writeStopping;
+
+    // The values stored in each of these variables refers to the maximum index of the respective
+    // type of worker that should be active and running at the moment. I.e. a value of -1 means no
+    // active workers, while 4 means 5 active workers.
+    AtomicWord<int32_t> _readRunning{-1};
+    AtomicWord<int32_t> _writeRunning{-1};
 };
 
 }  // namespace mongo::workload_simulation

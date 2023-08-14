@@ -29,6 +29,7 @@
 
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 
+#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/execution_control/throughput_probing.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
@@ -42,32 +43,30 @@
 
 namespace mongo::workload_simulation {
 
-ThroughputProbing::ThroughputProbing(
-    StringData workloadName, int32_t min, int32_t initial, int32_t max, Milliseconds interval)
-    : Simulation("ThroughputProbing", workloadName),
-      _minTickets{min},
-      _initialTickets{initial},
-      _maxTickets{max},
-      _probingInterval{interval} {}
+ThroughputProbing::ThroughputProbing(StringData workloadName)
+    : Simulation("ThroughputProbing", workloadName) {}
 
 void ThroughputProbing::setup() {
     Simulation::setup();
+
+    const auto initialTickets = execution_control::throughput_probing::gInitialConcurrency;
+    Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
 #ifdef __linux__
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
             .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
         _readTicketHolder = std::make_unique<PriorityTicketHolder>(
-            _initialTickets, lowPriorityBypassThreshold, svcCtx());
+            initialTickets, lowPriorityBypassThreshold, svcCtx());
         _writeTicketHolder = std::make_unique<PriorityTicketHolder>(
-            _initialTickets, lowPriorityBypassThreshold, svcCtx());
+            initialTickets, lowPriorityBypassThreshold, svcCtx());
     } else {
-        _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(_initialTickets, svcCtx());
-        _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(_initialTickets, svcCtx());
+        _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
+        _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
     }
 #else
-    _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(_initialTickets, svcCtx());
-    _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(_initialTickets, svcCtx());
+    _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
+    _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
 #endif
 
     _runner = [svcCtx = svcCtx()] {
@@ -77,16 +76,13 @@ void ThroughputProbing::setup() {
         return runnerPtr;
     }();
 
-    execution_control::throughput_probing::gMinConcurrency = _minTickets;
-    execution_control::throughput_probing::gInitialConcurrency = _initialTickets;
-    execution_control::throughput_probing::gMaxConcurrency.store(_maxTickets);
     _throughputProbing = std::make_unique<execution_control::ThroughputProbing>(
-        svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get(), _probingInterval);
+        svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get(), probingInterval);
 
-    _probingThread = stdx::thread([this]() {
+    _probingThread = stdx::thread([this, probingInterval]() {
         _probing.store(true);
         while (_probing.load()) {
-            if (queue().wait_for(_probingInterval, EventQueue::WaitType::Observer)) {
+            if (queue().wait_for(probingInterval, EventQueue::WaitType::Observer)) {
                 _runner->run(client());
             }
         }

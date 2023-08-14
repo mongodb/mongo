@@ -58,10 +58,12 @@ void TicketedWorkloadDriver::start(ServiceContext* svcCtx,
     _numWriters = numWriters;
 
     for (int32_t i = 0; i < _numReaders; ++i) {
+        _readRunning.fetchAndAdd(1);
         _readWorkers.emplace_back([this, i]() { _read(i); });
     }
 
     for (int32_t i = 0; i < _numWriters; ++i) {
+        _writeRunning.fetchAndAdd(1);
         _writeWorkers.emplace_back([this, i]() { _write(i); });
     }
 }
@@ -73,27 +75,27 @@ void TicketedWorkloadDriver::resize(int32_t numReaders, int32_t numWriters) {
     invariant(numWriters > 0);
 
     if (numReaders > _numReaders) {
-        for (int32_t i = _numReaders; i < _numReaders; ++i) {
+        for (int32_t i = _numReaders; i < numReaders; ++i) {
+            _readRunning.fetchAndAdd(1);
             _readWorkers.emplace_back([this, i]() { _read(i); });
         }
     } else if (numReaders < _numReaders) {
         for (int32_t i = _numReaders - 1; i >= numReaders; --i) {
-            _readStopping[i].store(true);
+            _readRunning.fetchAndSubtract(1);
             _readWorkers[i].join();
-            _readStopping.pop_back();
             _readWorkers.pop_back();
         }
     }
 
     if (numWriters > _numWriters) {
-        for (int32_t i = _numWriters; i < _numWriters; ++i) {
-            _writeWorkers.emplace_back([this, i]() { _read(i); });
+        for (int32_t i = _numWriters; i < numWriters; ++i) {
+            _writeRunning.fetchAndAdd(1);
+            _writeWorkers.emplace_back([this, i]() { _write(i); });
         }
     } else if (numWriters < _numWriters) {
         for (int32_t i = _numWriters - 1; i >= numWriters; --i) {
-            _writeStopping[i].store(true);
+            _writeRunning.fetchAndSubtract(1);
             _writeWorkers[i].join();
-            _writeStopping.pop_back();
             _writeWorkers.pop_back();
         }
     }
@@ -107,12 +109,8 @@ void TicketedWorkloadDriver::stop() {
     stdx::lock_guard lk{_mutex};
 
     // Request all threads stop asynchronously
-    for (auto&& stopping : _readStopping) {
-        stopping.store(true);
-    }
-    for (auto&& stopping : _writeStopping) {
-        stopping.store(true);
-    }
+    _readRunning.store(-1);
+    _writeRunning.store(-1);
 
     // Join threads
     for (auto&& worker : _readWorkers) {
@@ -122,9 +120,7 @@ void TicketedWorkloadDriver::stop() {
         worker.join();
     }
 
-    _readStopping.clear();
     _readWorkers.clear();
-    _writeStopping.clear();
     _writeWorkers.clear();
 
     _numReaders = 0;
@@ -135,18 +131,21 @@ void TicketedWorkloadDriver::stop() {
 }
 
 BSONObj TicketedWorkloadDriver::metrics() const {
+    stdx::lock_guard lk{_mutex};
     BSONObjBuilder builder;
 
     {
         BSONObjBuilder read{builder.subobjStart("read")};
         read.appendNumber("optimal", _characteristics->optimal().read);
         read.appendNumber("allocated", _readTicketHolder->outof());
+        read.appendNumber("provided", static_cast<int32_t>(_readWorkers.size()));
     }
 
     {
         BSONObjBuilder write{builder.subobjStart("write")};
         write.appendNumber("optimal", _characteristics->optimal().write);
         write.appendNumber("allocated", _writeTicketHolder->outof());
+        write.appendNumber("provided", static_cast<int32_t>(_writeWorkers.size()));
     }
 
     return builder.obj();
@@ -158,7 +157,7 @@ void TicketedWorkloadDriver::_read(int32_t i) {
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
-    while (!_readStopping[i].load()) {
+    while (_readRunning.load() >= i) {
         Ticket ticket = _readTicketHolder->waitForTicket(opCtx.get(), &admCtx);
         _doRead(opCtx.get(), &admCtx);
     }
@@ -170,7 +169,7 @@ void TicketedWorkloadDriver::_write(int32_t i) {
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
-    while (!_writeStopping[i].load()) {
+    while (_writeRunning.load() >= i) {
         Ticket ticket = _writeTicketHolder->waitForTicket(opCtx.get(), &admCtx);
         _doWrite(opCtx.get(), &admCtx);
     }
