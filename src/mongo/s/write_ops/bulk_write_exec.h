@@ -39,6 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -57,6 +58,15 @@ namespace bulk_write_exec {
  * vector are errors.
  */
 using BulkWriteReplyInfo = std::pair<std::vector<BulkWriteReplyItem>, int>;
+
+/**
+ * Attempt to run the bulkWriteCommandRequest through Queryable Encryption code path.
+ * Returns kNotProcessed if falling back to the regular bulk write code path is needed instead.
+ *
+ * This function does not throw, any errors are reported via the function return.
+ */
+std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
+    OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);
 
 /**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and

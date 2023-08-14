@@ -448,13 +448,9 @@ write_ops::InsertCommandRequest getConsecutiveInsertRequest(const BulkWriteComma
         stmtIds.push_back(bulk_write_common::getStatementId(req, idx));
     }
 
-    write_ops::InsertCommandRequest request(nsEntry.getNs(), documents);
-    request.setDollarTenant(req.getDollarTenant());
-    request.setExpectPrefix(req.getExpectPrefix());
+    write_ops::InsertCommandRequest request =
+        bulk_write_common::makeInsertCommandRequestForFLE(documents, req, nsEntry);
     auto& requestBase = request.getWriteCommandRequestBase();
-    requestBase.setEncryptionInformation(nsEntry.getEncryptionInformation());
-    requestBase.setOrdered(req.getOrdered());
-    requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
     requestBase.setStmtIds(stmtIds);
 
     return request;
@@ -767,30 +763,8 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    write_ops::UpdateOpEntry update;
-    update.setQ(op->getFilter());
-    update.setMulti(op->getMulti());
-    update.setC(op->getConstants());
-    update.setU(op->getUpdateMods());
-    update.setHint(op->getHint());
-    if (op->getCollation()) {
-        update.setCollation(op->getCollation().value());
-    }
-    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-    update.setUpsert(op->getUpsert());
-
-    std::vector<write_ops::UpdateOpEntry> updates{update};
-    write_ops::UpdateCommandRequest updateCommand(nsInfoEntry.getNs(), updates);
-    updateCommand.setDollarTenant(req.getDollarTenant());
-    updateCommand.setExpectPrefix(req.getExpectPrefix());
-    updateCommand.setLet(req.getLet());
-    updateCommand.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-
-    updateCommand.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
-    updateCommand.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
-
+    write_ops::UpdateCommandRequest updateCommand =
+        bulk_write_common::makeUpdateCommandRequestForFLE(opCtx, op, req, nsInfoEntry);
     write_ops::UpdateCommandReply updateReply = processFLEUpdate(opCtx, updateCommand);
 
     if (updateReply.getWriteErrors()) {
@@ -830,30 +804,10 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite delete with Queryable Encryption does not support sort.",
-            !op->getSort());
-
-    write_ops::DeleteOpEntry deleteEntry;
-    if (op->getCollation()) {
-        deleteEntry.setCollation(op->getCollation());
-    }
-    deleteEntry.setHint(op->getHint());
-    deleteEntry.setMulti(op->getMulti());
-    deleteEntry.setQ(op->getFilter());
-
-    std::vector<write_ops::DeleteOpEntry> deletes{deleteEntry};
-    write_ops::DeleteCommandRequest deleteRequest(nsInfoEntry.getNs(), deletes);
-    deleteRequest.setDollarTenant(req.getDollarTenant());
-    deleteRequest.setExpectPrefix(req.getExpectPrefix());
-    deleteRequest.setLet(req.getLet());
-    deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
-    deleteRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
-
+    write_ops::DeleteCommandRequest deleteRequest =
+        bulk_write_common::makeDeleteCommandRequestForFLE(opCtx, op, req, nsInfoEntry);
     write_ops::DeleteCommandReply deleteReply = processFLEDelete(opCtx, deleteRequest);
+
     if (deleteReply.getWriteErrors()) {
         const auto& errors = deleteReply.getWriteErrors().get();
         invariant(errors.size() == 1);
