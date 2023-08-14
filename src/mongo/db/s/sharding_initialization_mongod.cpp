@@ -304,9 +304,6 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
     if (!shardingState->enabled())
         return;
 
-    auto const grid = Grid::get(opCtx);
-    grid->shardRegistry()->shutdown();
-
     _replicaSetChangeListener.reset();
 }
 
