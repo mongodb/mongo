@@ -521,16 +521,16 @@ TEST_F(TenantFileImporterServiceTest, statsForValidMigrationID) {
     ASSERT_EQ(stats["remainingReceiveEstimatedMillis"].safeNumberLong(), 0ll);
 
     {
-        FailPointEnableBlock fpTenantFileClonerHangAfterHandlingBatchResponse(
-            "TenantFileClonerHangAfterHandlingBatchResponse");
+        FailPointEnableBlock fpTenantFileClonerHangDuringFileCloneBackup(
+            "TenantFileClonerHangDuringFileCloneBackup");
 
         _importerService->learnedFilename(
             migrationId, makefileMetaDoc(migrationId, file1Name, file1Data.size()));
         _importerService->learnedFilename(
             migrationId, makefileMetaDoc(migrationId, file2Name, file2Data.size()));
 
-        fpTenantFileClonerHangAfterHandlingBatchResponse->waitForTimesEntered(
-            fpTenantFileClonerHangAfterHandlingBatchResponse.initialTimesEntered() + 1);
+        fpTenantFileClonerHangDuringFileCloneBackup->waitForTimesEntered(
+            fpTenantFileClonerHangDuringFileCloneBackup.initialTimesEntered() + 1);
         stats = _importerService->getStats(migrationId);
         ASSERT(!stats.isEmpty());
         ASSERT(stats.hasField("approxTotalDataSize"));
