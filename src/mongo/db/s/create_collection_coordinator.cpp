@@ -1312,49 +1312,29 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                           *_request.getShardKey(),
                                           _request.getUnique().value_or(false));
 
-                if (_splitPolicy->isOptimized()) {
-                    _initialChunks =
-                        createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
+                _initialChunks =
+                    createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
 
-                    // Block reads/writes from here on if we need to create the collection on other
-                    // shards, this way we prevent reads/writes that should be redirected to another
-                    // shard
-                    promoteCriticalSectionsOnCoordinatorToBlockReads(
-                        opCtx, _critSecReason, originalNss());
+                // Block reads/writes from here on if we need to create the collection on other
+                // shards, this way we prevent reads/writes that should be redirected to another
+                // shard
+                promoteCriticalSectionsOnCoordinatorToBlockReads(
+                    opCtx, _critSecReason, originalNss());
 
-                    createCollectionOnNonPrimaryShards(
-                        opCtx, getNewSession(opCtx), _collectionUUID, _initialChunks, nss());
+                createCollectionOnNonPrimaryShards(
+                    opCtx, getNewSession(opCtx), _collectionUUID, _initialChunks, nss());
 
-                    _result =
-                        commit(opCtx,
-                               **executor,
-                               _request,
-                               _initialChunks,
-                               _collectionUUID,
-                               nss(),
-                               _doc.getTranslatedRequestParams(),
-                               [this](OperationContext* opCtx) { return getNewSession(opCtx); });
-                }
+                _result = commit(opCtx,
+                                 **executor,
+                                 _request,
+                                 _initialChunks,
+                                 _collectionUUID,
+                                 nss(),
+                                 _doc.getTranslatedRequestParams(),
+                                 [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
                 // End of the critical section, from now on, read and writes are permitted.
                 releaseCriticalSectionsOnCoordinator(opCtx, true, _critSecReason, originalNss());
-
-                // Slow path. Create chunks (which might incur in an index scan) and commit must be
-                // done outside of the critical section to prevent writes from stalling in unsharded
-                // collections.
-                if (!_splitPolicy->isOptimized()) {
-                    _initialChunks =
-                        createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
-                    _result =
-                        commit(opCtx,
-                               **executor,
-                               _request,
-                               _initialChunks,
-                               _collectionUUID,
-                               nss(),
-                               _doc.getTranslatedRequestParams(),
-                               [this](OperationContext* opCtx) { return getNewSession(opCtx); });
-                }
             }))
         .then([this] {
             auto opCtxHolder = cc().makeOperationContext();
@@ -1541,49 +1521,28 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                           *_request.getShardKey(),
                                           _request.getUnique().value_or(false));
 
-                if (_splitPolicy->isOptimized()) {
-                    _initialChunks =
-                        createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
+                _initialChunks =
+                    createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
 
-                    // Block reads/writes from here on if we need to create the collection on other
-                    // shards, this way we prevent reads/writes that should be redirected to another
-                    // shard
-                    promoteCriticalSectionsOnCoordinatorToBlockReads(
-                        opCtx, _critSecReason, originalNss());
+                // Block reads/writes from here on if we need to create the collection on other
+                // shards, this way we prevent reads/writes that should be redirected to another
+                // shard
+                promoteCriticalSectionsOnCoordinatorToBlockReads(
+                    opCtx, _critSecReason, originalNss());
 
-                    createCollectionOnNonPrimaryShards(
-                        opCtx, getNewSession(opCtx), _collectionUUID, _initialChunks, nss());
+                createCollectionOnNonPrimaryShards(
+                    opCtx, getNewSession(opCtx), _collectionUUID, _initialChunks, nss());
 
-                    _result =
-                        commit(opCtx,
-                               **executor,
-                               _request,
-                               _initialChunks,
-                               _collectionUUID,
-                               nss(),
-                               _doc.getTranslatedRequestParams(),
-                               [this](OperationContext* opCtx) { return getNewSession(opCtx); });
-                }
+                _result = commit(opCtx,
+                                 **executor,
+                                 _request,
+                                 _initialChunks,
+                                 _collectionUUID,
+                                 nss(),
+                                 _doc.getTranslatedRequestParams(),
+                                 [this](OperationContext* opCtx) { return getNewSession(opCtx); });
 
-                // Slow path. Create chunks (which might incur in an index scan) and commit must be
-                // done outside of the critical section to prevent writes from stalling in unsharded
-                // collections.
-                if (!_splitPolicy->isOptimized()) {
-                    _initialChunks =
-                        createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
-                    _result =
-                        commit(opCtx,
-                               **executor,
-                               _request,
-                               _initialChunks,
-                               _collectionUUID,
-                               nss(),
-                               _doc.getTranslatedRequestParams(),
-                               [this](OperationContext* opCtx) { return getNewSession(opCtx); });
-                }
-
-
-                LOGV2_DEBUG(4, 1, "Phase 4: Commit");
+                LOGV2_DEBUG(7949111, 2, "Phase 4: Commit");
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseAllCS,
