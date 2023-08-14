@@ -76,7 +76,10 @@ protected:
         auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
         bucket_catalog::ExecutionStatsController stats(collectionStats, globalStats);
         return std::make_shared<bucket_catalog::WriteBatch>(
-            bucket_catalog::BucketHandle{bucketId, stripe}, opId, stats);
+            bucket_catalog::BucketHandle{bucketId, stripe},
+            opId,
+            stats,
+            kTimeseriesOptions.getTimeField());
     }
 };
 

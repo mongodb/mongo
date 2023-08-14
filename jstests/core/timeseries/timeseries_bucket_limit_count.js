@@ -10,7 +10,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_bucket_limit_count_';
@@ -68,11 +67,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketMaxCount - 1,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs));
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            assert.eq(1,
-                      bucketDocs[0].control.version,
-                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-        } else {
+        // TODO SERVER-77347: Update this when updates on compressed buckets are supported.
+        if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            // Version 2 indicates the bucket is compressed.
             assert.eq(2,
                       bucketDocs[0].control.version,
                       'unexpected control.version in first bucket: ' + tojson(bucketDocs));
@@ -93,9 +90,13 @@ TimeseriesTest.run((insert) => {
         assert.eq(numDocs - 1,
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
-        assert.eq(1,
-                  bucketDocs[1].control.version,
-                  'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+        // TODO SERVER-77347: Update this when updates on compressed buckets are supported.
+        if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            // Version 1 indicates the bucket is uncompressed.
+            assert.eq(1,
+                      bucketDocs[1].control.version,
+                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+        }
         assert(!bucketDocs[1].control.hasOwnProperty("closed"),
                'unexpected control.closed in second bucket: ' + tojson(bucketDocs));
     };

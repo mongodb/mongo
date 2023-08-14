@@ -9,8 +9,6 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
     setParameter: {
@@ -22,7 +20,7 @@ const conn = MongoRunner.runMongod({
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 const alwaysUseCompressedBuckets =
-    FeatureFlagUtil.isEnabled(testDB, "TimeseriesAlwaysUseCompressedBuckets");
+    TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB);
 const isTimeseriesScalabilityImprovementsEnabled =
     TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB);
 

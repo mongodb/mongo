@@ -368,8 +368,13 @@ BSONObj makeNewCompressedDocumentForWrite(std::shared_ptr<bucket_catalog::WriteB
     auto compressed =
         timeseries::compressBucket(uncompressedDoc, timeField, nss, validateCompression);
     if (compressed.compressedBucket) {
+        batch->decompressed = DecompressionResult{compressed.compressedBucket->getOwned(),
+                                                  uncompressedDoc.getOwned()};
         return *compressed.compressedBucket;
     }
+
+    tasserted(7745400,
+              fmt::format("Couldn't compress time-series bucket {}", uncompressedDoc.toString()));
 
     // Return the uncompressed document if compression has failed.
     return uncompressedDoc;
@@ -480,7 +485,13 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    write_ops::InsertCommandRequest op{bucketsNs, {makeNewDocumentForWrite(batch, metadata)}};
+    write_ops::InsertCommandRequest op{
+        bucketsNs,
+        {feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+             serverGlobalParams.featureCompatibility)
+             ? makeNewCompressedDocumentForWrite(
+                   batch, metadata, bucketsNs.getTimeseriesViewNamespace(), batch->timeField)
+             : makeNewDocumentForWrite(batch, metadata)}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
 }

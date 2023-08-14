@@ -12,7 +12,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const defaultBucketMaxSize = 128000;                                           //  125 KB
 const minWiredTigerCacheSizeGB = 0.256;                                        //  256 MB
@@ -31,8 +30,7 @@ replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
 
-const alwaysUseCompressedBuckets =
-    FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets");
+const alwaysUseCompressedBuckets = TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db);
 
 let coll = db.getCollection('t');
 coll.drop();

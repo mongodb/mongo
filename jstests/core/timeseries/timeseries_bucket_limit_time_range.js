@@ -6,6 +6,9 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a
+ *   # time-series collection.
+ *   requires_fcv_71,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -114,9 +117,17 @@ TimeseriesTest.run((insert) => {
             docTimes[numDocs - 1],
             bucketDocs[1].control.max[timeFieldName],
             'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(1,
-                  bucketDocs[1].control.version,
-                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            // Version 2 indicates the bucket is compressed.
+            assert.eq(2,
+                      bucketDocs[1].control.version,
+                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+        } else {
+            // Version 1 indicates the bucket is uncompressed.
+            assert.eq(1,
+                      bucketDocs[1].control.version,
+                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+        }
     };
 
     runTest(1);

@@ -2,7 +2,7 @@
  * Tests that the server can detect when timeseries bucket compression is not decompressible without
  * data loss. Bucket should remain uncompressed and we log that this happened.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -10,8 +10,11 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 const coll = db.getCollection('t');
 
-// TODO SERVER-77454: Investigate re-enabling this.
-if (FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+// TODO SERVER-77347: Re-enable.
+// Currently, this test cannot be enabled because the server does not set time-series collection
+// stats until write_ops_exec::tryPerformTimeseriesBucketCompression() is called. This function will
+// not be called because updates will decompress a bucket.
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     jsTestLog("Skipping test as the always use compressed buckets feature is enabled");
     MongoRunner.stopMongod(conn);
     quit();

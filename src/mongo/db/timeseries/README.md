@@ -27,13 +27,13 @@ certain properties:
 
 ## Bucket Collection Schema
 
+Uncompressed bucket (version 1):
 ```
 {
     _id: <Object ID with time component equal to control.min.<time field>>,
     control: {
-        // <Some statistics on the measurements such min/max values of data fields>
-        version: 1,  // Version of bucket schema. Currently fixed at 1 since this is the
-                     // first iteration of time-series collections.
+        // <Some statistics on the measurements such as min/max values of data fields>
+        version: 1,  // Version of bucket schema, version 1 indicates the bucket is uncompressed.
         min: {
             <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
             <field0>: <minimum value of 'field0' across all measurements>,
@@ -67,6 +67,40 @@ certain properties:
             '1', <value of 'field1' in second measurement>,
             ...
         },
+        ...
+    }
+}
+```
+
+Compressed bucket (version 2):
+```
+{
+    _id: <Object ID with time component equal to control.min.<time field>>,
+    control: {
+        // <Some statistics on the measurements such as min/max values of data fields>
+        version: 2,  // Version of bucket schema, version 2 indicates the bucket is compressed.
+        min: {
+            <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
+            <field0>: <minimum value of 'field0' across all measurements>,
+            <field1>: <maximum value of 'field1' across all measurements>,
+            ...
+        },
+        max: {
+            <time field>: <time of last measurement in this bucket>,
+            <field0>: <maximum value of 'field0' across all measurements>,
+            <field1>: <maximum value of 'field1' across all measurements>,
+            ...
+        },
+        closed: <bool>, // Optional, signals the database that this document will not receive any
+                        // additional measurements.
+        count: <int>    // The number of measurements contained in this bucket. Only present in 
+                        // compressed buckets.
+    },
+    meta: <meta-data field (if specified at creation) value common to all measurements in this bucket>,
+    data: {
+        <time field>: BinData(7, ...), // BinDataType 7 represents BSONColumn.
+        <field0>:     BinData(7, ...),
+        <field1>:     BinData(7, ...),
         ...
     }
 }

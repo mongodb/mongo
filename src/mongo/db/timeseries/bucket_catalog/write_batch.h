@@ -70,13 +70,18 @@ struct CommitInfo {
  */
 struct WriteBatch {
     WriteBatch() = delete;
-    WriteBatch(const BucketHandle& bucketHandle, OperationId opId, ExecutionStatsController& stats);
+    WriteBatch(const BucketHandle& bucketHandle,
+               OperationId opId,
+               ExecutionStatsController& stats,
+               StringData timeField);
 
     BSONObj toBSON() const;
 
     const BucketHandle bucketHandle;
     const OperationId opId;
     ExecutionStatsController stats;
+    StringData timeField;  // Necessary so we can compress on writes, since the compression
+                           // algorithm sorts on the timeField. See compressBucket().
 
     // Number of measurements we can hold in a batch without needing to allocate memory.
     static constexpr std::size_t kNumStaticBatchMeasurements = 10;

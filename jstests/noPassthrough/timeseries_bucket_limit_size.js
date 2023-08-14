@@ -8,7 +8,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMinCount: 1}});
 
@@ -16,11 +15,6 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
 TimeseriesTest.run((insert) => {
-    const alwaysUseCompressedBuckets =
-        FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets");
-    const areTimeseriesScalabilityImprovementsEnabled =
-        TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
-
     const collNamePrefix = 'timeseries_bucket_limit_size_';
 
     const timeFieldName = 'time';
@@ -81,9 +75,18 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(alwaysUseCompressedBuckets ? 1 : 2,
-                  bucketDocs[0].control.version,
-                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        if (numDocsPerInsert == 1) {
+            // Version 1 indicates the bucket is uncompressed, and version 2 indicates the bucket is
+            // compressed.
+            assert.eq(TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db) ? 1 : 2,
+                      bucketDocs[0].control.version,
+                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        } else {
+            // Version 2 indicates the bucket is compressed.
+            assert.eq(2,
+                      bucketDocs[0].control.version,
+                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        }
 
         assert(!bucketDocs[0].control.hasOwnProperty("closed"),
                'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
@@ -101,7 +104,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
-        assert.eq(1,
+        // Version 1 indicates the bucket is uncompressed, and version 2 indicates the bucket is
+        // compressed.
+        assert.eq(TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db) ? 2 : 1,
                   bucketDocs[1].control.version,
                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
 

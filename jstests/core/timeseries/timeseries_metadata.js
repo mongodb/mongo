@@ -7,6 +7,9 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to a
+ *   # time-series collection.
+ *   requires_fcv_71,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -52,7 +55,13 @@ TimeseriesTest.run((insert) => {
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.
-        // First bucket should contain documents specified in 'bucketA'.
+        // First bucket should contain documents specified in 'bucketA'. If the feature flag is
+        // enabled, the insert will have compressed the buckets. In order to verify that the buckets
+        // contain the correct documents, we need to decompress the buckets.
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            TimeseriesTest.decompressBucket(bucketDocs[0]);
+            TimeseriesTest.decompressBucket(bucketDocs[1]);
+        }
         assert.eq(docsBucketA.length,
                   Object.keys(bucketDocs[0].data[timeFieldName]).length,
                   'invalid number of measurements in first bucket: ' + tojson(bucketDocs[0]));
