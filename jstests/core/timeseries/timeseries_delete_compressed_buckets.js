@@ -73,6 +73,8 @@ function prepareCompressedBucket() {
 // Delete many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.deleteMany({str: "even"}));
+// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket deletion if the
+// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(numDocs / 2, result.deletedCount);
 assert.eq(
     coll.countDocuments({str: "even"}), 0, "Expected records matching the filter to be deleted.");
@@ -84,6 +86,8 @@ assert.eq(coll.countDocuments({str: "odd"}),
 prepareCompressedBucket();
 if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
     result = assert.commandWorked(coll.deleteOne({f: {$lt: 100}}));
+    // TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket deletion if
+    // the AlwaysUseCompressedBuckets feature flag is enabled.
     assert.eq(1, result.deletedCount);
     assert.eq(coll.countDocuments({f: {$lt: 100}}),
               100 - 1,

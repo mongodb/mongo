@@ -73,6 +73,8 @@ function prepareCompressedBucket() {
 // Update many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.updateMany({str: "even"}, {$inc: {updated: 1}}));
+// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket update if the
+// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(numDocs / 2, result.modifiedCount);
 assert.eq(coll.countDocuments({updated: 1, str: "even"}),
           numDocs / 2,
@@ -84,6 +86,8 @@ assert.eq(coll.countDocuments({updated: 1, str: "odd"}),
 // Update one record from the compressed bucket.
 prepareCompressedBucket();
 result = assert.commandWorked(coll.updateOne({str: "even", f: {$lt: 100}}, {$inc: {updated: 1}}));
+// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket update if the
+// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(1, result.modifiedCount);
 assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
           1,

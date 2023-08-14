@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
 #include <absl/container/flat_hash_map.h>
@@ -403,6 +405,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
 
 stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
     const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
+    // A bucket will be fully deleted if no measurements are passed in.
     if (measurements.empty()) {
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
         write_ops::DeleteCommandRequest op(coll->ns(), {deleteEntry});
@@ -420,6 +423,28 @@ stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> 
     }();
     auto replaceBucket = makeNewDocumentForWrite(
         bucketId, measurements, metadata, timeseriesOptions, coll->getDefaultCollator());
+
+    // An update or partial deletion to the bucket document will replace the bucket with an
+    // uncompressed bucket. We attempt to compress this bucket.
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        const bool validateCompression = gValidateTimeseriesCompression.load();
+        auto compressed = timeseries::compressBucket(replaceBucket,
+                                                     timeseriesOptions->getTimeField(),
+                                                     coll->ns().getTimeseriesViewNamespace(),
+                                                     validateCompression);
+
+        // If compression fails, we fall back to writing the uncompressed document.
+        if (compressed.compressedBucket) {
+            replaceBucket = std::move(*compressed.compressedBucket);
+        } else {
+            LOGV2_DEBUG(7743300,
+                        1,
+                        "Bucket compression failed during update or delete",
+                        logAttrs(coll->ns()),
+                        "bucket"_attr = redact(replaceBucket));
+        }
+    }
 
     write_ops::UpdateModification u(replaceBucket);
     write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
