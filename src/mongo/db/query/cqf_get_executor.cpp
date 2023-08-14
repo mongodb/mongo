@@ -174,6 +174,9 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
+    const bool queryHasNaturalHint = indexHint && !indexHint->isEmpty() &&
+        indexHint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
         const IndexDescriptor& descriptor = *catalogEntry.descriptor();
@@ -184,10 +187,23 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
-        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+        // If there is a $natural hint, we should not assert here as we will not use the index.
+        // TODO SERVER-78502: Remove the second part of the if statement's guard below regarding the
+        // presence of a hashed index.
+        const bool isSpecialIndex =
+            descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
             descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-            !descriptor.collation().isEmpty()) {
+            !descriptor.collation().isEmpty();
+        if ((!queryHasNaturalHint && isSpecialIndex) ||
+            descriptor.getIndexType() == IndexType::INDEX_HASHED) {
             uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
+        }
+
+        // We do not want to try to build index metadata for a special index (since we do not
+        // support those yet in CQF) but we should allow the query to go through CQF if there is a
+        // $natural hint.
+        if (queryHasNaturalHint && isSpecialIndex) {
+            continue;
         }
 
         if (indexHint) {

@@ -165,3 +165,32 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_index_hints_, indexDefName: a_1, i
     const actualStr = removeUUIDsFromExplain(db, res);
     assert.eq(expectedStr, actualStr);
 }
+
+// Hint collection scan to disable indexes. Check that multikeyness info from a partial index
+// (currently unsupported) does not eliminate PathTraverse.
+{
+    t.hideIndex({a: 1});
+    t.hideIndex({b: 1});
+    t.createIndex({b: 1}, {partialFilterExpression: {a: 2}});
+
+    const res = runWithParams(
+        [
+            {key: 'internalCascadesOptimizerExplainVersion', value: "v2"},
+            {key: "internalCascadesOptimizerUseDescriptiveVarNames", value: true}
+        ],
+        () => t.explain("executionStats").find({b: 2}).hint({$natural: -1}).finish());
+
+    const expectedStr =
+        `Root [{scan_0}]
+Filter []
+|   EvalFilter []
+|   |   Variable [evalTemp_0]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   Const [2]
+PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_]
+`;
+
+    const actualStr = removeUUIDsFromExplain(db, res);
+    assert.eq(expectedStr, actualStr);
+}
