@@ -71,6 +71,9 @@
 
 namespace mongo {
 
+extern const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
+    historicalIDTrackerAllowsMixedModeWrites;
+
 class CollectionCatalog {
     friend class iterator;
     using OrderedCollectionMap =

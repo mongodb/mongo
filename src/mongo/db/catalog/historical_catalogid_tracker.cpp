@@ -164,10 +164,11 @@ HistoricalCatalogIdTracker::LookupResult HistoricalCatalogIdTracker::lookup(
 void HistoricalCatalogIdTracker::create(const NamespaceString& nss,
                                         const UUID& uuid,
                                         const RecordId& catalogId,
-                                        boost::optional<Timestamp> ts) {
+                                        boost::optional<Timestamp> ts,
+                                        bool allowMixedModeWrites) {
 
     if (!ts) {
-        _createNoTimestamp(nss, uuid, catalogId);
+        _createNoTimestamp(nss, uuid, catalogId, allowMixedModeWrites);
         return;
     }
 
@@ -551,15 +552,20 @@ void HistoricalCatalogIdTracker::_createTimestamp(const NamespaceString& nss,
 
 void HistoricalCatalogIdTracker::_createNoTimestamp(const NamespaceString& nss,
                                                     const UUID& uuid,
-                                                    const RecordId& catalogId) {
+                                                    const RecordId& catalogId,
+                                                    bool allowMixedModeWrites) {
     // Make sure untimestamped writes have a single entry in mapping. If we're mixing
     // timestamped with untimestamped (such as repair). Ignore the untimestamped writes
     // as an untimestamped deregister will correspond with an untimestamped register. We
     // should leave the mapping as-is in this case.
 
-    auto doCreate = [&catalogId](auto& idsContainer, auto& changesContainer, const auto& key) {
+    auto doCreate = [&catalogId, allowMixedModeWrites](
+                        auto& idsContainer, auto& changesContainer, const auto& key) {
         const std::vector<TimestampedCatalogId>* ids = idsContainer.find(key);
-        if (!ids) {
+        if (!ids || allowMixedModeWrites) {
+            // Ensure that the last entry in the history chain was a timestamped drop.
+            invariant(!ids || !ids->back().ts.isNull());
+
             // This namespace or UUID was added due to an untimestamped write, add an entry
             // with min timestamp
             idsContainer = idsContainer.set(key, {{catalogId, Timestamp::min()}});

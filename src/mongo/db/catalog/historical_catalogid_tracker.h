@@ -91,11 +91,13 @@ public:
      * Register that a namespace/uuid was created with given 'catalogId' at timestamp 'ts'.
      *
      * Timestamp 'none' indicates that the namespace was created without a timestamp.
+     * Setting 'allowMixedModeWrites' to true will clear historical data for nss/uuid, if any.
      */
     void create(const NamespaceString& nss,
                 const UUID& uuid,
                 const RecordId& catalogId,
-                boost::optional<Timestamp> ts);
+                boost::optional<Timestamp> ts,
+                bool allowMixedModeWrites = false);
 
     /**
      * Register that a namespace/uuid was dropped at timestamp 'ts'.
@@ -159,7 +161,8 @@ private:
                           Timestamp ts);
     void _createNoTimestamp(const NamespaceString& nss,
                             const UUID& uuid,
-                            const RecordId& catalogId);
+                            const RecordId& catalogId,
+                            bool allowMixedModeWrites);
     void _dropTimestamp(const NamespaceString& nss, const UUID& uuid, Timestamp ts);
     void _dropNoTimestamp(const NamespaceString& nss, const UUID& uuid);
     void _renameTimestamp(const NamespaceString& from, const NamespaceString& to, Timestamp ts);
