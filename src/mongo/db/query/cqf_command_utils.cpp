@@ -1095,6 +1095,11 @@ bool isEligibleCommon(const RequestType& request,
     if (!collection)
         return true;
 
+    // TODO SERVER-78502: Allow hashed shard keys.
+    if (collection.isSharded_DEPRECATED() && collection.getShardKeyPattern().isHashedPattern()) {
+        return false;
+    }
+
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
