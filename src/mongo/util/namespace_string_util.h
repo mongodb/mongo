@@ -66,12 +66,14 @@ public:
      *
      * Do not use this function when serializing a NamespaceString object for catalog.
      */
-    static std::string serialize(const NamespaceString& ns,
-                                 const SerializationContext& context = SerializationContext());
+    static std::string serialize(
+        const NamespaceString& ns,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
-    static std::string serialize(const NamespaceString& ns,
-                                 const SerializationOptions& options,
-                                 const SerializationContext& context = SerializationContext());
+    static std::string serialize(
+        const NamespaceString& ns,
+        const SerializationOptions& options,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Serializes a NamespaceString object for catalog.
@@ -91,7 +93,8 @@ public:
      * proper NamespaceStringUtil serialize method..
      */
     static std::string serializeForAuth(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+        const NamespaceString& ns,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Deserializes StringData ns to a NamespaceString object.
@@ -120,7 +123,7 @@ public:
     static NamespaceString deserialize(
         boost::optional<TenantId> tenantId,
         StringData ns,
-        const SerializationContext& context = SerializationContext());
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Deserializes dbname and coll to a NamespaceString object.
@@ -129,26 +132,11 @@ public:
      */
     static NamespaceString deserialize(const DatabaseName& dbName, StringData coll);
 
-
-    static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
-                                                     StringData ns);
-
-    static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
-                                                     StringData db,
-                                                     StringData coll);
-
-    static NamespaceString parseNamespaceFromRequest(const DatabaseName& dbName, StringData coll);
-
-    static NamespaceString parseNamespaceFromDoc(const boost::optional<TenantId>& tenantId,
-                                                 StringData ns);
-
-    static NamespaceString parseNamespaceFromDoc(const boost::optional<TenantId>& tenantId,
-                                                 StringData db,
-                                                 StringData coll);
-
-    static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
-
-    static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
+    static NamespaceString deserialize(
+        const boost::optional<TenantId>& tenantId,
+        StringData db,
+        StringData coll,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
@@ -166,20 +154,22 @@ public:
 
 private:
     static std::string serializeForStorage(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+        const NamespaceString& ns,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static std::string serializeForCommands(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+        const NamespaceString& ns,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static NamespaceString deserializeForStorage(
         boost::optional<TenantId> tenantId,
         StringData ns,
-        const SerializationContext& context = SerializationContext());
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static NamespaceString deserializeForCommands(
         boost::optional<TenantId> tenantId,
         StringData ns,
-        const SerializationContext& context = SerializationContext());
+        const SerializationContext& context = SerializationContext::stateDefault());
 };
 
 }  // namespace mongo

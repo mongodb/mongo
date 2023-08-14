@@ -191,8 +191,7 @@ public:
         NamespaceString ns() const override {
             const auto& cmd = request();
             if constexpr (hasGetCmdParamStringData<RequestT>) {
-                return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
-                                                                      cmd.getCommandParameter());
+                return NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCommandParameter());
             } else {
                 return NamespaceString(cmd.getDbName());
             }

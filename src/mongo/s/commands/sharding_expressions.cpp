@@ -413,14 +413,15 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     }
 
     // Retrieve the values from the incoming document.
-    NamespaceString ns(NamespaceStringUtil::parseNamespaceFromDoc(
-        getExpressionContext()->ns.tenantId(), input["ns"_sd].getStringData()));
+    auto expCtx = getExpressionContext();
+    NamespaceString ns(NamespaceStringUtil::deserialize(
+        expCtx->ns.tenantId(), input["ns"_sd].getStringData(), expCtx->serializationCtxt));
     const auto shardVersionObj = input["shardVersion"_sd].getDocument().toBson();
     const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
     const auto shardKeyVal = input["shardKeyVal"_sd].getDocument().toBson();
 
     // Get the 'chunkManager' from the catalog cache.
-    auto opCtx = getExpressionContext()->opCtx;
+    auto opCtx = expCtx->opCtx;
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
     uassert(6868602,
             "$_internalOwningShard expression only makes sense in sharded environment",

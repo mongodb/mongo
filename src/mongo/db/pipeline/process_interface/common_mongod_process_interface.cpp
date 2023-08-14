@@ -322,8 +322,8 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
 
                 NamespaceString ns(NamespaceStringUtil::deserialize(svns.nss().tenantId(),
                                                                     obj.getStringField("_id")));
-                NamespaceString viewOnNs(NamespaceStringUtil::parseNamespaceFromDoc(
-                    ns.dbName(), obj.getStringField("viewOn")));
+                NamespaceString viewOnNs(
+                    NamespaceStringUtil::deserialize(ns.dbName(), obj.getStringField("viewOn")));
 
                 BSONObjBuilder builder;
                 builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));

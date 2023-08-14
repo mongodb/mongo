@@ -158,7 +158,7 @@ public:
 
                 if (validateCmdRequest.getCollection()) {
                     if (!_validateNamespace(opCtx,
-                                            NamespaceStringUtil::parseNamespaceFromRequest(
+                                            NamespaceStringUtil::deserialize(
                                                 dbName, *validateCmdRequest.getCollection()))) {
                         return;
                     }

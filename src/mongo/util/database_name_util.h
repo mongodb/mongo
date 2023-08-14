@@ -61,15 +61,17 @@ public:
      * If multitenancySupport is disabled, the tenantID is not set in the DatabaseName Object.
      * eg. serialize(DatabaseName(boost::none, "foo")) -> "foo"
      */
-    static std::string serialize(const DatabaseName& dbName,
-                                 const SerializationContext& context = SerializationContext());
+    static std::string serialize(
+        const DatabaseName& dbName,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * To be used only for durable catalog. We always include the tenantId as prefixed in a
      * databasename for the catalog.
      */
     static std::string serializeForCatalog(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+        const DatabaseName& dbName,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Deserializes StringData dbName to a DatabaseName object.
@@ -95,15 +97,16 @@ public:
      * and DatabaseName is constructed without the tenantID.
      * eg. deserialize(boost::none, "foo") -> DatabaseName(boost::none, "foo")
      */
-    static DatabaseName deserialize(boost::optional<TenantId> tenantId,
-                                    StringData db,
-                                    const SerializationContext& context = SerializationContext());
+    static DatabaseName deserialize(
+        boost::optional<TenantId> tenantId,
+        StringData db,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * To be used only by the storage catalog.
      */
     static DatabaseName deserializeForCatalog(
-        StringData db, const SerializationContext& context = SerializationContext());
+        StringData db, const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * To be used only for deserializing a DatabaseName object from a db string in error messages.
@@ -114,20 +117,22 @@ private:
     static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 
     static std::string serializeForStorage(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+        const DatabaseName& dbName,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static std::string serializeForCommands(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+        const DatabaseName& dbName,
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static DatabaseName deserializeForStorage(
         boost::optional<TenantId> tenantId,
         StringData db,
-        const SerializationContext& context = SerializationContext());
+        const SerializationContext& context = SerializationContext::stateDefault());
 
     static DatabaseName deserializeForCommands(
         boost::optional<TenantId> tenantId,
         StringData db,
-        const SerializationContext& context = SerializationContext());
+        const SerializationContext& context = SerializationContext::stateDefault());
 };
 
 }  // namespace mongo

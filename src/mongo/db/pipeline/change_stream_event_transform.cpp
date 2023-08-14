@@ -286,8 +286,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
                 // The "o.drop" field will contain the actual collection name.
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
             } else if (auto nssField = oField.getField("renameCollection"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
 
@@ -317,34 +316,29 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 nss = NamespaceString(nss.dbName());
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateOpType;
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
             } else if (auto nssField = oField.getField("dropIndexes"); !nssField.missing()) {
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
                 operationType = DocumentSourceChangeStream::kDropIndexesOpType;
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with createIndexes
                 // and commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(o2Field, {"dropIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("collMod"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kModifyOpType;
-                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
-                                                                 nssField.getStringData());
+                nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"collMod"_sd}));
 
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();

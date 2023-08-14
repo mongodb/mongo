@@ -139,8 +139,10 @@ NamespaceString DocumentSourceOut::makeBucketNsIfTimeseries(const NamespaceStrin
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
     auto outSpec = parseOutSpecAndResolveTargetNamespace(spec, nss.dbName());
-    NamespaceString targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
-        nss.dbName().tenantId(), outSpec.getDb(), outSpec.getColl());
+    NamespaceString targetNss = NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
+                                                                 outSpec.getDb(),
+                                                                 outSpec.getColl(),
+                                                                 outSpec.getSerializationContext());
 
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.toStringForErrorMsg()),
@@ -338,8 +340,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto outSpec = parseOutSpecAndResolveTargetNamespace(elem, expCtx->ns.dbName());
-    NamespaceString targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
-        expCtx->ns.dbName().tenantId(), outSpec.getDb(), outSpec.getColl());
+    NamespaceString targetNss = NamespaceStringUtil::deserialize(expCtx->ns.dbName().tenantId(),
+                                                                 outSpec.getDb(),
+                                                                 outSpec.getColl(),
+                                                                 outSpec.getSerializationContext());
     return create(std::move(targetNss), expCtx, std::move(outSpec.getTimeseries()));
 }
 

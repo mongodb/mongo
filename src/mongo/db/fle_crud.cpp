@@ -702,8 +702,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         return;
     }
 
-    const NamespaceString nssEsc = NamespaceStringUtil::parseNamespaceFromRequest(
-        edcNss.dbName(), efc.getEscCollection().value());
+    const NamespaceString nssEsc =
+        NamespaceStringUtil::deserialize(edcNss.dbName(), efc.getEscCollection().value());
 
     uint32_t totalTokens = 0;
 
@@ -765,8 +765,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         uassertStatusOK(queryImpl->insertDocuments(nssEsc, escDocuments, pStmtId, true));
     checkWriteErrors(escInsertReply);
 
-    NamespaceString nssEcoc = NamespaceStringUtil::parseNamespaceFromRequest(
-        edcNss.dbName(), efc.getEcocCollection().value());
+    NamespaceString nssEcoc =
+        NamespaceStringUtil::deserialize(edcNss.dbName(), efc.getEcocCollection().value());
     std::vector<BSONObj> ecocDocuments;
     ecocDocuments.reserve(totalTokens);
 

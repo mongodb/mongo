@@ -9,20 +9,37 @@ const kTenant = ObjectId();
 const kTestDb = 'testDb0';
 const kCollName = 'myColl0';
 
-function checkNsSerializedCorrectly(
-    kDbName, kCollectionName, nsField, tenantId = "", prefixed = false) {
+function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField, options) {
+    options = options || {};
+    const prefixed = options.prefixed || false;
+    const tenantId = options.tenantId || "";
+
     const targetNss = (prefixed ? tenantId + "_" : "") + kDbName +
         (kCollectionName == "" ? "" : "." + kCollectionName);
     assert.eq(nsField, targetNss);
 }
 
-function checkFindCommandPasses(request, targetDb, targetDoc, prefixed = false) {
-    let findRes = assert.commandWorked(targetDb.runCommand(request));
+function checkFindCommandPasses(request, targetDb, targetDoc, options) {
+    options = options || {};
+    const prefixed = options.prefixed || false;
+
+    const findRes = assert.commandWorked(targetDb.runCommand(request));
     assert(arrayEq([targetDoc], findRes.cursor.firstBatch), tojson(findRes));
-    checkNsSerializedCorrectly(kTestDb, kCollName, findRes.cursor.ns, kTenant, prefixed);
+    checkNsSerializedCorrectly(
+        kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: prefixed});
 }
 
-function checkDbStatsCommand(request, targetDb, targetPass) {
+function checkFindCommandFails(request, targetDb, options) {
+    options = options || {};
+    const prefixed = options.prefixed || false;
+
+    const findRes = assert.commandWorked(targetDb.runCommand(request));
+    assert(arrayEq([], findRes.cursor.firstBatch), tojson(findRes));
+    checkNsSerializedCorrectly(
+        kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: prefixed});
+}
+
+function checkDbStatsCommand(request, targetDb, {targetPass}) {
     let statsRes = assert.commandWorked(targetDb.runCommand(request));
     assert.eq(statsRes.collections, targetPass ? 1 : 0, tojson(statsRes));
 }
@@ -79,7 +96,7 @@ function runTestWithSecurityTokenFlag() {
         {insert: kCollName, documents: [testDocs], 'expectPrefix': true}));
 
     // Run a sanity check to locate the collection
-    checkDbStatsCommand({dbStats: 1, 'expectPrefix': true}, prefixedTokenDb, true /*targetPass*/);
+    checkDbStatsCommand({dbStats: 1, 'expectPrefix': true}, prefixedTokenDb, {targetPass: true});
 
     // find with security token using expectPrefix.
     {
@@ -104,31 +121,20 @@ function runTestWithSecurityTokenFlag() {
         // database name, rendering it unresolvable. In this scenario, dbStats will return no
         // locatable collections.
         // Baseline sanity check.
-        checkDbStatsCommand(requestDbStats, prefixedTokenDb, false /*targetPass*/);
+        checkDbStatsCommand(requestDbStats, prefixedTokenDb, {targetPass: false});
 
-        requestDbStats = Object.assign(requestDbStats, {'expectPrefix': false});
-        checkDbStatsCommand(requestDbStats, prefixedTokenDb, false /*targetPass*/);
-
-        requestDbStats = Object.assign(requestDbStats, {'expectPrefix': true});
-        checkDbStatsCommand(requestDbStats, prefixedTokenDb, true /*targetPass*/);
-
-        // TODO SERVER-78486: the following tests have dependencies on SERVER-78486, but may require
-        // additional work to ensure they fail in a predicable manner.  If we choose to use the
-        // following commands for consistency, we should remove the preceding ones.
         let request = {find: kCollName, filter: {a: 1}};
+        checkFindCommandFails(request, prefixedTokenDb, {prefixed: true});
 
-        // assert.commandFailedWithCode(prefixedTokenDb.runCommand(request),
-        // ErrorCodes.NamespaceNotFound);
-
-        // request = Object.assign(request, {'expectPrefix' : false});
-        // assert.commandFailedWithCode(prefixedTokenDb.runCommand(request),
-        // ErrorCodes.NamespaceNotFound);
+        request = Object.assign(request, {'expectPrefix': false});
+        checkFindCommandFails(request, prefixedTokenDb, {prefixed: true});
 
         request = Object.assign(request, {'expectPrefix': true});
         let findRes = assert.commandWorked(prefixedTokenDb.runCommand(request));
 
         assert(arrayEq([testDocs], findRes.cursor.firstBatch), tojson(findRes));
-        checkNsSerializedCorrectly(kTestDb, kCollName, findRes.cursor.ns, kTenant, true);
+        checkNsSerializedCorrectly(
+            kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: true});
     }
 
     // Using both the security token and a $tenant field is not supported by the server.
@@ -169,7 +175,7 @@ function runTestWithoutSecurityToken() {
 
     // Run a sanity check to locate the collection
     checkDbStatsCommand(
-        {dbStats: 1, '$tenant': kTenant, 'expectPrefix': true}, prefixedDb, true /*targetPass*/);
+        {dbStats: 1, '$tenant': kTenant, 'expectPrefix': true}, prefixedDb, {targetPass: true});
 
     // find with $tenant using expectPrefix.
     {
@@ -194,31 +200,20 @@ function runTestWithoutSecurityToken() {
         // database name, rendering it unresolvable. In this scenario, dbStats will return no
         // locatable collections.
         // Baseline sanity check.
-        checkDbStatsCommand(requestDbStats, prefixedDb, false /*targetPass*/);
+        checkDbStatsCommand(requestDbStats, prefixedDb, {targetPass: false});
 
-        requestDbStats = Object.assign(requestDbStats, {'expectPrefix': false});
-        checkDbStatsCommand(requestDbStats, prefixedDb, false /*targetPass*/);
-
-        requestDbStats = Object.assign(requestDbStats, {'expectPrefix': true});
-        checkDbStatsCommand(requestDbStats, prefixedDb, true /*targetPass*/);
-
-        // TODO SERVER-78486: the following tests have dependencies on SERVER-78486, but may require
-        // additional work to ensure they fail in a predicable manner.  If we choose to use the
-        // following commands for consistency, we should remove the preceding ones.
         let request = {find: kCollName, filter: {a: 1}, '$tenant': kTenant};
+        checkFindCommandFails(request, prefixedDb, {prefixed: true});
 
-        // assert.commandFailedWithCode(prefixedDb.runCommand(request),
-        // ErrorCodes.NamespaceNotFound);
-
-        // request = Object.assign(request, {'expectPrefix' : false});
-        // assert.commandFailedWithCode(prefixedDb.runCommand(request),
-        // ErrorCodes.NamespaceNotFound);
+        request = Object.assign(request, {'expectPrefix': false});
+        checkFindCommandFails(request, prefixedDb, {prefixed: true});
 
         request = Object.assign(request, {'expectPrefix': true});
         let findRes = assert.commandWorked(prefixedDb.runCommand(request));
 
         assert(arrayEq([testDocs], findRes.cursor.firstBatch), tojson(findRes));
-        checkNsSerializedCorrectly(kTestDb, kCollName, findRes.cursor.ns, kTenant, true);
+        checkNsSerializedCorrectly(
+            kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: true});
     }
 
     // find prefixed DB only (expectPrefix is ignored in parsing).
@@ -226,13 +221,13 @@ function runTestWithoutSecurityToken() {
         let request = {find: kCollName, filter: {a: 1}};
 
         // Baseline sanity check.
-        checkFindCommandPasses(request, prefixedDb, testDocs, true /*prefixed*/);
+        checkFindCommandPasses(request, prefixedDb, testDocs, {prefixed: true});
 
         request = Object.assign(request, {'expectPrefix': false});
         checkFindCommandPasses(request, prefixedDb, testDocs);
 
         request = Object.assign(request, {'expectPrefix': true});
-        checkFindCommandPasses(request, prefixedDb, testDocs, true /*prefixed*/);
+        checkFindCommandPasses(request, prefixedDb, testDocs, {prefixed: true});
     }
 
     rst.stopSet();

@@ -86,7 +86,7 @@ public:
                 "'toCollection' must be of type String",
                 nssElt.type() == BSONType::String);
         const NamespaceString nss(
-            NamespaceStringUtil::parseNamespaceFromRequest(dbName, nssElt.valueStringData()));
+            NamespaceStringUtil::deserialize(dbName, nssElt.valueStringData()));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid target namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
@@ -129,8 +129,8 @@ public:
 
         uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
 
-        NamespaceString fromNs(NamespaceStringUtil::parseNamespaceFromRequest(dbName, from));
-        NamespaceString toNs(NamespaceStringUtil::parseNamespaceFromRequest(dbName, to));
+        NamespaceString fromNs(NamespaceStringUtil::deserialize(dbName, from));
+        NamespaceString toNs(NamespaceStringUtil::deserialize(dbName, to));
 
         AutoGetCollection autoColl(opCtx, fromNs, MODE_X);
         Lock::CollectionLock collLock(opCtx, toNs, MODE_X);

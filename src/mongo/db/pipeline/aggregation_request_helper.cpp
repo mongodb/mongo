@@ -162,7 +162,7 @@ NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
                 firstElement.type() == BSONType::String);
 
         NamespaceString nss(
-            NamespaceStringUtil::parseNamespaceFromRequest(dbName, firstElement.valueStringData()));
+            NamespaceStringUtil::deserialize(dbName, firstElement.valueStringData()));
 
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()

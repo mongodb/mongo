@@ -95,7 +95,7 @@ Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest&
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
     const auto outNss = outOptions.getDatabaseName()
-        ? NamespaceStringUtil::parseNamespaceFromRequest(
+        ? NamespaceStringUtil::deserialize(
               parsedMr.getDollarTenant(), *outOptions.getDatabaseName(), ""_sd)
         : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
                                            outOptions.getCollectionName());
@@ -337,7 +337,7 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
             outputOptions.outDB = o["db"].String();
             uassert(ErrorCodes::CommandNotSupported,
                     "cannot target internal database as output",
-                    !(NamespaceStringUtil::parseNamespaceFromRequest(
+                    !(NamespaceStringUtil::deserialize(
                           boost::none, outputOptions.outDB, outputOptions.collectionName)
                           .isOnInternalDb()));
         }
@@ -355,8 +355,8 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
 
     if (outputOptions.outType != OutputType::InMemory) {
         const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
-        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, outDb, outputOptions.collectionName);
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none, outDb, outputOptions.collectionName);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid 'out' namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
@@ -431,7 +431,7 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
-    const auto outNss = NamespaceStringUtil::parseNamespaceFromRequest(
+    const auto outNss = NamespaceStringUtil::deserialize(
         parsedMr.getDollarTenant(),
         (parsedMr.getOutOptions().getDatabaseName() ? *parsedMr.getOutOptions().getDatabaseName()
                                                     : parsedMr.getNamespace().db_deprecated()),

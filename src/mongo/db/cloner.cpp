@@ -376,8 +376,8 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
             return status;
         }
 
-        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, fromDBName, collectionName.c_str());
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none, fromDBName, collectionName.c_str());
         if (nss.isSystem()) {
             if (!nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 LOGV2_DEBUG(20419, 2, "\t\t not cloning because system collection");
@@ -410,8 +410,8 @@ Status DefaultClonerImpl::_createCollectionsForDb(
         BSONObjBuilder optionsBuilder;
         optionsBuilder.appendElements(params.collectionInfo["options"].Obj());
 
-        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, dbName, params.collectionName);
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none, dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(opCtx, nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
@@ -576,8 +576,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
             params.idIndexSpec = idIndex.Obj();
         }
 
-        const auto ns = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, dBName, params.collectionName);
+        const auto ns =
+            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
         if (std::find(shardedColls.begin(), shardedColls.end(), ns) != shardedColls.end()) {
             params.shardedColl = true;
         }
@@ -587,8 +587,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     // Get index specs for each collection.
     std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
     for (auto&& params : createCollectionParams) {
-        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, dBName, params.collectionName);
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
         const bool includeBuildUUIDs = false;
         const int options = 0;
         auto indexSpecs = getConn()->getIndexSpecs(nss, includeBuildUUIDs, options);
@@ -630,8 +630,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                   "Copying indexes",
                   "collectionInfo"_attr = params.collectionInfo);
 
-            const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-                boost::none, dBName, params.collectionName);
+            const auto nss =
+                NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
 
 
             _copyIndexes(opCtx,
@@ -652,8 +652,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                     "  really will clone: {params_collectionInfo}",
                     "params_collectionInfo"_attr = params.collectionInfo);
 
-        const auto nss = NamespaceStringUtil::parseNamespaceFromRequest(
-            boost::none, dBName, params.collectionName);
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
 
         clonedColls->insert(NamespaceStringUtil::serialize(nss));
 

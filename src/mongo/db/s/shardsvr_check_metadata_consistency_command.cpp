@@ -212,8 +212,8 @@ public:
             // Need to retrieve a list of databases which this shard is primary for and run the
             // command on each of them.
             for (const auto& db : getDatabasesThisShardIsPrimaryFor(opCtx)) {
-                const auto dbNss = NamespaceStringUtil::parseNamespaceFromRequest(
-                    boost::none, db.getName(), nss.coll());
+                const auto dbNss =
+                    NamespaceStringUtil::deserialize(boost::none, db.getName(), nss.coll());
                 ScopedSetShardRole scopedSetShardRole(opCtx,
                                                       dbNss,
                                                       boost::none /* shardVersion */,

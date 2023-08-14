@@ -177,7 +177,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
                     .reason());
         }
         const auto collectionNamespace =
-            NamespaceStringUtil::parseNamespaceFromRequest(boost::none, _dbName, result.getName());
+            NamespaceStringUtil::deserialize(boost::none, _dbName, result.getName());
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(4881602,
                         1,
@@ -244,7 +244,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
                     .reason());
         }
         const auto collectionNamespace =
-            NamespaceStringUtil::parseNamespaceFromRequest(boost::none, _dbName, result.getName());
+            NamespaceStringUtil::deserialize(boost::none, _dbName, result.getName());
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(5271600,
                         1,

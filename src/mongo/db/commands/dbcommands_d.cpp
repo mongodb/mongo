@@ -223,7 +223,7 @@ public:
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
-        return NamespaceStringUtil::parseNamespaceFromRequest(dbName, collectionName);
+        return NamespaceStringUtil::deserialize(dbName, collectionName);
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

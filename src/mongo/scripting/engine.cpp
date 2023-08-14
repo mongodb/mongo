@@ -268,8 +268,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_loadedVersion == lastVersion)
         return;
 
-    const auto collNss =
-        NamespaceStringUtil::parseNamespaceFromRequest(boost::none, _localDBName, "system.js");
+    const auto collNss = NamespaceStringUtil::deserialize(boost::none, _localDBName, "system.js");
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 

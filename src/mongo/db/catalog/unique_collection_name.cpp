@@ -99,7 +99,7 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                        collectionName.begin(),
                        replacePercentSign);
 
-        NamespaceString nss(NamespaceStringUtil::parseNamespaceFromDoc(dbName, collectionName));
+        NamespaceString nss(NamespaceStringUtil::deserialize(dbName, collectionName));
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return nss;
         }

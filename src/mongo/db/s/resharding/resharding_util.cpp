@@ -150,7 +150,7 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
 }
 
 NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
-    return NamespaceStringUtil::parseNamespaceFromRequest(
+    return NamespaceStringUtil::deserialize(
         boost::none,
         db,
         fmt::format(

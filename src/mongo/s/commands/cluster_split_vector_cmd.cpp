@@ -74,8 +74,8 @@ public:
     }
 
     NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceStringUtil::parseNamespaceFromRequest(
-            dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
+        return NamespaceStringUtil::deserialize(dbName.tenantId(),
+                                                CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

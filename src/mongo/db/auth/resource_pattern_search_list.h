@@ -114,7 +114,7 @@ public:
                 // But with a fixed "system.buckets." prefix to the collection name.
                 StringData coll = nss.coll().substr(kSystemBucketsPrefix.size());
                 _list[_size++] = ResourcePattern::forExactSystemBucketsCollection(
-                    NamespaceStringUtil::parseNamespaceFromRequest(nss.dbName(), coll));
+                    NamespaceStringUtil::deserialize(nss.dbName(), coll));
                 _list[_size++] = ResourcePattern::forAnySystemBuckets(target.tenantId());
                 _list[_size++] = ResourcePattern::forAnySystemBucketsInDatabase(nss.dbName());
                 _list[_size++] =

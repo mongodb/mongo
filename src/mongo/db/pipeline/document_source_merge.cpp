@@ -112,8 +112,7 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
     // database name using the shortcut syntax (to match the semantics of the $out stage), the
     // target database will use the default name provided.
     if (spec.type() == BSONType::String) {
-        targetNss =
-            NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, spec.valueStringData());
+        targetNss = NamespaceStringUtil::deserialize(defaultDb, spec.valueStringData());
     } else {
         mergeSpec = DocumentSourceMergeSpec::parse(
             IDLParserContext(kStageName, false /* apiStrict */, defaultDb.tenantId()),
@@ -126,11 +125,11 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
             // from the NamespaceString semantics which treats it as a database name. So, if the
             // target namespace collection is empty, we'll use the default database name as a target
             // database, and the provided namespace value as a collection name.
-            targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
+            targetNss = NamespaceStringUtil::deserialize(
                 defaultDb, targetNss.serializeWithoutTenantPrefix_UNSAFE());
         } else if (targetNss.dbSize() == 0) {
             // Use the default database name if it wasn't specified explicilty.
-            targetNss = NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, targetNss.coll());
+            targetNss = NamespaceStringUtil::deserialize(defaultDb, targetNss.coll());
         }
     }
 

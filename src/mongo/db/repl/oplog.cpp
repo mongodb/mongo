@@ -792,7 +792,7 @@ NamespaceString extractNs(DatabaseName dbName, const BSONObj& cmdObj) {
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     StringData coll = first.valueStringData();
     uassert(28635, "no collection name specified", !coll.empty());
-    return NamespaceStringUtil::parseNamespaceFromDoc(dbName, coll);
+    return NamespaceStringUtil::deserialize(dbName, coll);
 }
 
 NamespaceString extractNsFromUUID(OperationContext* opCtx, const UUID& uuid) {

@@ -38,7 +38,7 @@ namespace mongo {
 namespace global_index {
 
 NamespaceString skipIdNss(const NamespaceString& nss, StringData indexName) {
-    return NamespaceStringUtil::parseNamespaceFromRequest(
+    return NamespaceStringUtil::deserialize(
         nss.tenantId(),
         nss.db_forSharding(),
         ("{}.globalIndex.{}.skipList"_format(nss.coll(), indexName.toString())));

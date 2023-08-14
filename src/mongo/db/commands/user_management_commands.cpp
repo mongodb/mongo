@@ -1059,8 +1059,7 @@ public:
         NamespaceString ns() const final {
             const auto& cmd = request();
             if constexpr (hasGetCmdParamStringData<RequestT>) {
-                return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
-                                                                      cmd.getCommandParameter());
+                return NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCommandParameter());
             }
             return NamespaceString(cmd.getDbName());
         }

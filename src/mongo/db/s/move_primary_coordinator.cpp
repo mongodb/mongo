@@ -428,8 +428,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
             std::string collName;
             uassertStatusOK(bsonExtractStringField(collInfo, "name", &collName));
 
-            const NamespaceString nss(
-                NamespaceStringUtil::parseNamespaceFromDoc(_dbName, collName));
+            const NamespaceString nss(NamespaceStringUtil::deserialize(_dbName, collName));
             if (!nss.isSystem() ||
                 nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 colls.push_back(nss);
@@ -486,7 +485,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
         for (const auto& bsonColl : listResponse.docs) {
             std::string collName;
             uassertStatusOK(bsonExtractStringField(bsonColl, "name", &collName));
-            colls.push_back(NamespaceStringUtil::parseNamespaceFromResponse(_dbName, collName));
+            colls.push_back(NamespaceStringUtil::deserialize(_dbName, collName));
         }
 
         std::sort(colls.begin(), colls.end());

@@ -264,8 +264,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                     !invocation.getSkipLookupForExtraKeys());
         }
     }
-    NamespaceString nss(
-        NamespaceStringUtil::parseNamespaceFromRequest(dbName, invocation.getColl()));
+    NamespaceString nss(NamespaceStringUtil::deserialize(dbName, invocation.getColl()));
 
     boost::optional<UUID> uuid;
     try {

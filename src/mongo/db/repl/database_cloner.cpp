@@ -107,7 +107,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         }
 
         NamespaceString collectionNamespace(
-            NamespaceStringUtil::parseNamespaceFromResponse(_dbName, result.getName()));
+            NamespaceStringUtil::deserialize(_dbName, result.getName()));
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(21146,
                         1,

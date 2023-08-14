@@ -80,8 +80,7 @@ public:
         // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
         NamespaceString ns() const override {
             const auto& cmd = request();
-            return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
-                                                                  cmd.getCommandParameter());
+            return NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCommandParameter());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

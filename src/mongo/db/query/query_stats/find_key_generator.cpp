@@ -66,8 +66,8 @@ std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* 
     }
 
     auto cmdObj = cmdBuilder.obj();
-    return std::make_unique<FindCommandRequest>(
-        FindCommandRequest::parse(IDLParserContext("Query Stats Key"), cmdObj));
+    return std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
+        IDLParserContext("Query Stats Key", false /* apiStrict */, boost::none), cmdObj));
 }
 
 BSONObj FindKeyGenerator::generate(

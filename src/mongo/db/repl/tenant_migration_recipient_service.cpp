@@ -1141,8 +1141,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
 
-    const auto tenantNss =
-        NamespaceStringUtil::parseNamespaceFromRequest(boost::none, getTenantId() + "_");
+    const auto tenantNss = NamespaceStringUtil::deserialize(boost::none, getTenantId() + "_");
     noopEntry.setNss(tenantNss);
 
     // Write a fake applyOps with the tenantId as the namespace so that this will be picked

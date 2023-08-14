@@ -82,8 +82,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return NamespaceStringUtil::parseNamespaceFromRequest(_cmd.getDbName(),
-                                                                  _cmd.getCollection());
+            return NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection());
         }
 
         bool supportsWriteConcern() const override {

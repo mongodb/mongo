@@ -229,7 +229,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     //
     if (!opCtx->inMultiDocumentTransaction()) {
         NamespaceString nssEsc(
-            NamespaceStringUtil::parseNamespaceFromRequest(sharedBlock->dbName, sharedBlock->esc));
+            NamespaceStringUtil::deserialize(sharedBlock->dbName, sharedBlock->esc));
         FLETagNoTXNQuery queryInterface(opCtx);
 
         sharedBlock->doRewrite(&queryInterface, nssEsc);
@@ -239,8 +239,8 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto txn = getTxn(opCtx);
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
-            NamespaceString nssEsc(NamespaceStringUtil::parseNamespaceFromRequest(
-                sharedBlock->dbName, sharedBlock->esc));
+            NamespaceString nssEsc(
+                NamespaceStringUtil::deserialize(sharedBlock->dbName, sharedBlock->esc));
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
@@ -264,7 +264,7 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
     NamespaceString nssEsc(
-        NamespaceStringUtil::parseNamespaceFromRequest(dbName, efc.getEscCollection().value()));
+        NamespaceStringUtil::deserialize(dbName, efc.getEscCollection().value()));
 
     return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, mode);
 }

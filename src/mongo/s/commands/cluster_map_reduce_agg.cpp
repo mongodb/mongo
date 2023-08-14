@@ -113,11 +113,11 @@ auto makeExpressionContext(OperationContext* opCtx,
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
         auto outNss = NamespaceString();
         if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
-            outNss = NamespaceStringUtil::parseNamespaceFromRequest(
+            outNss = NamespaceStringUtil::deserialize(
                 boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
         } else {
-            outNss = NamespaceStringUtil::parseNamespaceFromRequest(
-                parsedMr.getNamespace().dbName(), parsedMr.getOutOptions().getCollectionName());
+            outNss = NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
+                                                      parsedMr.getOutOptions().getCollectionName());
         }
         resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
     }
@@ -192,10 +192,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
     auto resolvedOutNss = NamespaceString();
     if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
-        resolvedOutNss = NamespaceStringUtil::parseNamespaceFromRequest(
+        resolvedOutNss = NamespaceStringUtil::deserialize(
             boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
     } else {
-        resolvedOutNss = NamespaceStringUtil::parseNamespaceFromRequest(
+        resolvedOutNss = NamespaceStringUtil::deserialize(
             parsedMr.getNamespace().dbName(), parsedMr.getOutOptions().getCollectionName());
     }
 
