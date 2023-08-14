@@ -405,7 +405,7 @@ functions:
               cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
               print("NOTE: run_validate_collections.js will skip the oplog!");
               TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
-              load('jstests/hooks/run_validate_collections.actual.js');
+              await import("jstests/hooks/run_validate_collections.actual.js");
           EOF
             fi
             tar czf mongodb${compile_variant|}.tar.gz mongodb

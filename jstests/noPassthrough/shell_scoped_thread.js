@@ -150,9 +150,11 @@ tests.push(function testUncaughtExceptionInNativeCode() {
 
 tests.push(function testUncaughtExceptionFromNestedThreads() {
     const thread = new Thread(function myFunction1() {
+        /* eslint-disable-next-line no-restricted-syntax */
         load("jstests/libs/legacyThreadSupport.js");
 
         const thread = new Thread(function myFunction2() {
+            /* eslint-disable-next-line no-restricted-syntax */
             load("jstests/libs/legacyThreadSupport.js");
 
             const thread = new Thread(function myFunction3() {

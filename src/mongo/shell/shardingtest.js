@@ -128,6 +128,7 @@ var ShardingTest = function ShardingTest(params) {
         }
 
         try {
+            /* eslint-disable-next-line no-restricted-syntax */
             load("jstests/libs/legacyThreadSupport.js");  // For Thread.
             return true;
         } catch (e) {

@@ -8,11 +8,7 @@ runs an fsyncLock which should fail and timeout as the global S lock cannot be t
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-
-(function() {
-'use strict';
-
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -92,8 +88,5 @@ sleep(100);
 writeDecisionFp.off();
 
 fsyncLockThread.join();
-
 txnThread.join();
-
 st.stop();
-})();

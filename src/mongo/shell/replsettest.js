@@ -104,6 +104,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         }
 
         try {
+            /* eslint-disable-next-line no-restricted-syntax */
             load("jstests/libs/legacyThreadSupport.js");  // For Thread.
             return true;
         } catch (e) {
@@ -3440,7 +3441,6 @@ var ReplSetTest = function ReplSetTest(opts) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
         } else if (parallelValidate) {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
-            print(`   FOR PORTS: [${tojson(this.ports)}]`);
             this._validateNodes(this.ports);
         }
 
