@@ -3024,9 +3024,6 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
-  - name: query_stats_passthrough
-  - name: query_stats_passthrough_writeonly
-  - name: query_stats_mongos_passthrough
 
 ### QO & QE Patch-Specific Build Variants ###
 
