@@ -3452,16 +3452,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     "Range window should have a single sort component",
                     windowNode->sortBy && windowNode->sortBy->size() == 1);
             const auto& part = windowNode->sortBy->front();
-            auto topLevelFieldSlot = outputs.get(
-                std::make_pair(PlanStageSlots::kField, part.fieldPath->getFieldName(0)));
-            auto rootSlot = outputs.get(kResult);
-            auto sortExpr = generateSortTraverse(sbe::EVariable{rootSlot},
-                                                 part.isAscending,
-                                                 boost::none,
-                                                 *part.fieldPath,
-                                                 0,
-                                                 &_frameIdGenerator,
-                                                 topLevelFieldSlot);
+            auto expCtx = _cq.getExpCtxRaw();
+            auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
+                expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
+            auto sortExpr = generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, &outputs)
+                                .extractExpr(_state);
             stage = makeProjectStage(
                 std::move(stage), windowNode->nodeId(), *rangeBoundSlot, std::move(sortExpr));
             forwardSlots.push_back(*rangeBoundSlot);
