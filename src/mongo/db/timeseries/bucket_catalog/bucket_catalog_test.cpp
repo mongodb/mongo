@@ -34,6 +34,7 @@
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -92,6 +93,8 @@ protected:
     };
 
     void setUp() override;
+    virtual void preSetUp();
+    virtual std::vector<NamespaceString> getNamespaceStrings();
 
     std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
     _makeOperationContext();
@@ -137,10 +140,11 @@ protected:
 
 class BucketCatalogInMultitenancyEnv : public BucketCatalogTest {
 protected:
-    void setUp() override;
+    void preSetUp() override;
+    std::vector<NamespaceString> getNamespaceStrings() override;
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> __multitenancyController;
+    boost::optional<RAIIServerParameterControllerForTest> _multitenancyController;
 
 protected:
     NamespaceString _tenant1Ns1 =
@@ -149,13 +153,21 @@ protected:
         NamespaceString::createNamespaceString_forTest({TenantId(OID::gen())}, "db1", "coll1");
 };
 
+void BucketCatalogTest::preSetUp() {}
+
+std::vector<NamespaceString> BucketCatalogTest::getNamespaceStrings() {
+    return {_ns1, _ns2, _ns3};
+}
+
 void BucketCatalogTest::setUp() {
+    preSetUp();
     CatalogTestFixture::setUp();
 
     _opCtx = operationContext();
     _bucketCatalog = &BucketCatalog::get(_opCtx);
 
-    for (const auto& ns : {_ns1, _ns2, _ns3}) {
+    const auto namespaceStrings = getNamespaceStrings();
+    for (const auto& ns : namespaceStrings) {
         ASSERT_OK(createCollection(
             _opCtx,
             ns.dbName(),
@@ -163,19 +175,12 @@ void BucketCatalogTest::setUp() {
     }
 }
 
-void BucketCatalogInMultitenancyEnv::setUp() {
-    __multitenancyController.emplace("multitenancySupport", true);
-    CatalogTestFixture::setUp();
+void BucketCatalogInMultitenancyEnv::preSetUp() {
+    _multitenancyController.emplace("multitenancySupport", true);
+}
 
-    _opCtx = operationContext();
-    _bucketCatalog = &BucketCatalog::get(_opCtx);
-
-    for (const auto& ns : {_tenant1Ns1, _tenant2Ns1}) {
-        ASSERT_OK(createCollection(
-            _opCtx,
-            ns.dbName(),
-            BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
-    }
+std::vector<NamespaceString> BucketCatalogInMultitenancyEnv::getNamespaceStrings() {
+    return {_tenant1Ns1, _tenant2Ns1};
 }
 
 BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::RunBackgroundTaskAndWaitForFailpoint(

@@ -303,34 +303,17 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
     setGlobalReplSettings(originalRs);
 }
 
-class CollectionShardingRuntimeTestWithMockedLoader : public ShardServerTestFixture {
+class CollectionShardingRuntimeTestWithMockedLoader
+    : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID kCollUUID = UUID::gen();
     const std::string kShardKey = "x";
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
-    const std::vector<ShardType> kShardList = {ShardType("shard0", "Host0:12345")};
+    const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
 
     void setUp() override {
-        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache
-        // loader.
-        ShardingMongodTestFixture::setUp();
-
-        replicationCoordinator()->alwaysAllowWrites(true);
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        _clusterId = OID::gen();
-        ShardingState::get(getServiceContext())
-            ->setInitialized(kShardList[0].getName(), _clusterId);
-
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
-        _mockCatalogCacheLoader = mockLoader.get();
-        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
-
-        uassertStatusOK(
-            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
-
-        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
@@ -347,7 +330,7 @@ public:
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
-        ShardServerTestFixture::tearDown();
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
@@ -398,9 +381,6 @@ public:
 
         return {chunk1, chunk2};
     }
-
-protected:
-    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
 };
 
 /**

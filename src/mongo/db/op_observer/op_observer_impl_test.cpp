@@ -1226,18 +1226,18 @@ DEATH_TEST_REGEX_F(OpObserverTest,
 
 class OpObserverTxnParticipantTest : public OpObserverTest {
 public:
-    void setUp() override {
-        _opCtx = cc().makeOperationContext();
-        _opObserver.emplace(std::make_unique<OplogWriterImpl>());
-        _times.emplace(opCtx());
-    }
-
     void tearDown() override {
         _sessionCheckout.reset();
         _times.reset();
         _opCtx.reset();
 
         OpObserverTest::tearDown();
+    }
+
+    void setUpObserverContext() {
+        _opCtx = cc().makeOperationContext();
+        _opObserver.emplace(std::make_unique<OplogWriterImpl>());
+        _times.emplace(opCtx());
     }
 
     void setUpRetryableWrite() {
@@ -1333,8 +1333,8 @@ private:
 class OpObserverTransactionTest : public OpObserverTxnParticipantTest {
 protected:
     void setUp() override {
-        OpObserverTest::setUp();
         OpObserverTxnParticipantTest::setUp();
+        setUpObserverContext();
         OpObserverTxnParticipantTest::setUpNonRetryableTransaction();
     }
 
@@ -2375,8 +2375,8 @@ class OpObserverRetryableFindAndModifyOutsideTransactionTest
 public:
     void setUp() override {
         OpObserverRetryableFindAndModifyTest::setUp();
-        OpObserverTxnParticipantTest::setUp();
-        OpObserverTxnParticipantTest::setUpRetryableWrite();
+        setUpObserverContext();
+        setUpRetryableWrite();
     }
 
 protected:
@@ -2410,8 +2410,8 @@ class OpObserverRetryableFindAndModifyInsideUnpreparedRetryableInternalTransacti
 public:
     void setUp() override {
         OpObserverRetryableFindAndModifyTest::setUp();
-        OpObserverTxnParticipantTest::setUp();
-        OpObserverTxnParticipantTest::setUpRetryableInternalTransaction();
+        setUpObserverContext();
+        setUpRetryableInternalTransaction();
     }
 
 protected:
@@ -2447,8 +2447,8 @@ class OpObserverRetryableFindAndModifyInsidePreparedRetryableInternalTransaction
 public:
     void setUp() override {
         OpObserverRetryableFindAndModifyTest::setUp();
-        OpObserverTxnParticipantTest::setUp();
-        OpObserverTxnParticipantTest::setUpRetryableInternalTransaction();
+        setUpObserverContext();
+        setUpRetryableInternalTransaction();
     }
 
 protected:

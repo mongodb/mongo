@@ -140,34 +140,19 @@
 namespace mongo {
 namespace {
 
-class ReshardingTxnClonerTest : public ShardServerTestFixture {
+class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
     void setUp() {
-        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache loader.
-        ShardingMongodTestFixture::setUp();
-
-        replicationCoordinator()->alwaysAllowWrites(true);
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        _clusterId = OID::gen();
-        ShardingState::get(getServiceContext())->setInitialized(kTwoShardIdList[0], _clusterId);
-
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         // The config database's primary shard is always config, and it is always sharded.
-        mockLoader->setDatabaseRefreshReturnValue(DatabaseType{DatabaseName::kConfig.toString(),
-                                                               ShardId::kConfigServerId,
-                                                               DatabaseVersion::makeFixed()});
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType{DatabaseName::kConfig.toString(),
+                         ShardId::kConfigServerId,
+                         DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.
-        mockLoader->setCollectionRefreshReturnValue(
+        getCatalogCacheLoaderMock()->setCollectionRefreshReturnValue(
             {ErrorCodes::NamespaceNotFound, "collection not found"});
-
-        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
-
-        uassertStatusOK(
-            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
-
-        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
 
         for (const auto& shardId : kTwoShardIdList) {
             auto shardTargeter = RemoteCommandTargeterMock::get(
@@ -188,7 +173,7 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
 
     void tearDown() {
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        ShardServerTestFixture::tearDown();
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
 
     /**

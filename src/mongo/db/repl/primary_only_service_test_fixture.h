@@ -88,6 +88,8 @@ protected:
      */
     virtual void setUpPersistence(OperationContext* opCtx){};
 
+    virtual void shutdownHook();
+
     OpObserverRegistry* _opObserverRegistry = nullptr;
     repl::PrimaryOnlyServiceRegistry* _registry = nullptr;
     repl::PrimaryOnlyService* _service = nullptr;

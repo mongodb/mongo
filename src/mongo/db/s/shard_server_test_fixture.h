@@ -85,6 +85,17 @@ protected:
     void setUp() override;
     virtual std::unique_ptr<CatalogCache> makeCatalogCache() override;
     CatalogCacheMock* getCatalogCacheMock();
+    CatalogCacheLoaderMock* getCatalogCacheLoaderMock();
+
+private:
+    CatalogCacheLoaderMock* _cacheLoaderMock;
+};
+
+class ShardServerTestFixtureWithCatalogCacheLoaderMock : public ShardServerTestFixture {
+protected:
+    void setUp() override;
+    CatalogCacheMock* getCatalogCacheMock();
+    CatalogCacheLoaderMock* getCatalogCacheLoaderMock();
 
 private:
     CatalogCacheLoaderMock* _cacheLoaderMock;

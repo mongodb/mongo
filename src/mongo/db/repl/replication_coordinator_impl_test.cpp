@@ -1577,6 +1577,21 @@ protected:
         std::shared_ptr<OperationContext> opCtx;
     };
 
+    virtual void initAndStart() {
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(BSON("_id"
+                                << "mySet"
+                                << "version" << 1 << "members"
+                                << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                         << "test1:1234")
+                                              << BSON("_id" << 1 << "host"
+                                                            << "test2:1234")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "test3:1234"))),
+                           HostAndPort("test1", 1234));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    }
+
     std::pair<SharedClientAndOperation, stdx::future<boost::optional<Status>>> stepDown_nonBlocking(
         bool force, Milliseconds waitTime, Milliseconds stepDownTime) {
         using PromisedClientAndOperation = stdx::promise<SharedClientAndOperation>;
@@ -1647,18 +1662,7 @@ protected:
 private:
     virtual void setUp() {
         ReplCoordTest::setUp();
-        init("mySet/test1:1234,test2:1234,test3:1234");
-        assertStartSuccess(BSON("_id"
-                                << "mySet"
-                                << "version" << 1 << "members"
-                                << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                         << "test1:1234")
-                                              << BSON("_id" << 1 << "host"
-                                                            << "test2:1234")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "test3:1234"))),
-                           HostAndPort("test1", 1234));
-        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        initAndStart();
     }
 };
 
@@ -2077,9 +2081,8 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 }
 
 class StepDownTestWithUnelectableNode : public StepDownTest {
-private:
-    void setUp() override {
-        ReplCoordTest::setUp();
+protected:
+    void initAndStart() override {
         init("mySet/test1:1234,test2:1234,test3:1234");
         assertStartSuccess(BSON("_id"
                                 << "mySet"
@@ -2291,11 +2294,8 @@ protected:
         }
     }
 
-private:
-    virtual void setUp() {
-        ReplCoordTest::setUp();
+    void initAndStart() override {
         init("mySet/test1:1234,test2:1234,test3:1234,test4:1234,test5:1234");
-
         assertStartSuccess(BSON("_id"
                                 << "mySet"
                                 << "version" << 1 << "members"

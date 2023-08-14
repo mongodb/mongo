@@ -73,33 +73,16 @@
 namespace mongo {
 namespace {
 
-class DatabaseShardingStateTestWithMockedLoader : public ShardServerTestFixture {
+class DatabaseShardingStateTestWithMockedLoader
+    : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
     const StringData kDbName{"test"};
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
-    const std::vector<ShardType> kShardList = {ShardType("shard0", "Host0:12345")};
+    const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
 
     void setUp() override {
-        // Don't call ShardServerTestFixture::setUp so we can install a mock catalog cache
-        // loader.
-        ShardingMongodTestFixture::setUp();
-
-        replicationCoordinator()->alwaysAllowWrites(true);
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        _clusterId = OID::gen();
-        ShardingState::get(getServiceContext())
-            ->setInitialized(kShardList[0].getName(), _clusterId);
-
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
-        _mockCatalogCacheLoader = mockLoader.get();
-        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
-
-        uassertStatusOK(
-            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
-
-        configTargeterMock()->setFindHostReturnValue(kConfigHostAndPort);
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
@@ -116,7 +99,7 @@ public:
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
-        ShardServerTestFixture::tearDown();
+        ShardServerTestFixtureWithCatalogCacheLoaderMock::tearDown();
     }
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
@@ -152,9 +135,6 @@ public:
         return DatabaseType(
             kDbName.toString(), kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
     }
-
-protected:
-    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
 };
 
 TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
@@ -173,7 +153,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
             return scopedDss->getDbVersion(opCtx);
         };
 
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(newDb);
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, newDbVersion));
 
         auto activeDbVersion = getActiveDbVersion();
@@ -198,7 +178,7 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
 
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(newDb);
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, boost::none));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {

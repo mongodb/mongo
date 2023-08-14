@@ -185,16 +185,9 @@ public:
         ASSERT(_service);
     }
 
-    void tearDown() override {
-        // Ensure that even on test failures all failpoint state gets reset.
-        globalFailPointRegistry().disableAllFailpoints();
-
-        WaitForMajorityService::get(getServiceContext()).shutDown();
-
+    void shutdownHook() override {
         _registry->onShutdown();
         _service = nullptr;
-
-        ServiceContextMongoDTest::tearDown();
     }
 
     void stepUp() {
