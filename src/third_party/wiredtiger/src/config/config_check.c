@@ -8,7 +8,8 @@
 
 #include "wt_internal.h"
 
-static int config_check(WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, u_int, const char *, size_t);
+static int __config_check(
+  WT_SESSION_IMPL *, const WT_CONFIG_CHECK *, u_int, const uint8_t *, const char *, size_t);
 
 /*
  * __wt_config_check --
@@ -24,19 +25,42 @@ __wt_config_check(
      */
     return (config == NULL || entry->checks == NULL ?
         0 :
-        config_check(session, entry->checks, entry->checks_entries, config, config_len));
+        __config_check(
+          session, entry->checks, entry->checks_entries, entry->checks_jump, config, config_len));
 }
 
 /*
- * config_check_search --
+ * __config_check_compare --
+ *     Compare function used for binary search.
+ */
+static int WT_CDECL
+__config_check_compare(const void *keyvoid, const void *checkvoid)
+{
+    const WT_CONFIG_CHECK *check;
+    const WT_CONFIG_ITEM *key;
+    int cmp;
+
+    key = keyvoid;
+    check = checkvoid;
+    cmp = strncmp(key->str, check->name, key->len);
+    if (cmp == 0) {
+        if (check->name[key->len] == '\0')
+            return (0);
+        cmp = -1;
+    }
+    return (cmp);
+}
+
+/*
+ * __config_check_search --
  *     Search a set of checks for a matching name.
  */
 static inline int
-config_check_search(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int entries,
-  const char *str, size_t len, int *ip)
+__config_check_search(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int entries,
+  const WT_CONFIG_ITEM *item, const uint8_t *check_jump, const WT_CONFIG_CHECK **resultp)
 {
-    u_int base, indx, limit;
-    int cmp;
+    u_int check_count, indx;
+    int ch;
 
     /*
      * For standard sets of configuration information, we know how many entries and that they're
@@ -44,40 +68,84 @@ config_check_search(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_i
      */
     if (entries == 0) {
         for (indx = 0; checks[indx].name != NULL; indx++)
-            if (WT_STRING_MATCH(checks[indx].name, str, len)) {
-                *ip = (int)indx;
+            if (WT_STRING_MATCH(checks[indx].name, item->str, item->len)) {
+                *resultp = &checks[indx];
                 return (0);
             }
-    } else
-        for (base = 0, limit = entries; limit != 0; limit >>= 1) {
-            indx = base + (limit >> 1);
-            cmp = strncmp(checks[indx].name, str, len);
-            if (cmp == 0 && checks[indx].name[len] == '\0') {
-                *ip = (int)indx;
-                return (0);
-            }
-            if (cmp < 0) {
-                base = indx + 1;
-                --limit;
-            }
+        *resultp = NULL;
+    } else {
+        check_count = entries;
+        /*
+         * The jump table generated at build time has an entry for each ASCII character,
+         * showing the offset in a sorted list where that character first appears as the
+         * first letter. If it doesn't appear it will be the next sorted entry.
+         *
+         * For example, given [ "ant", "cat", "deer", "dog", "giraffe" ], the jump table
+         * for the ASCII set looks like:
+         *   [ 0, 0, 0, ...., 0, 1, 1, 2, 4, 4, 4, 5, 5, 5, ....]
+         *
+         *   For position 'a', we have 0 (offset of "ant"),
+         *   position 'b' is 1 (offset of "cat"),
+         *   position 'c' is 1 (offset of "cat"),
+         *   position 'd' is 2 (offset of "deer"),
+         *   'e' and 'f' are 4 (offset of "giraffe"),
+         *   'g' is 4 (offset of "giraffe"),
+         *   'h' and beyond is 5 (not found).
+         *
+         * To set the bounds of a binary search of the table, we'll get the offset of the
+         * first character in the string, and then the offset of its successor.
+         * If the first character is one less than size of the jump table, e.g. 0x7F,
+         * then we'll go past the end of the table. That character is ASCII delete,
+         * which we know can't match anything in our configuration tables.
+         */
+        if (item->len == 0 || ((ch = item->str[0]) + 1 >= WT_CONFIG_JUMP_TABLE_SIZE))
+            indx = check_count;
+        else {
+            indx = check_jump[ch];
+            check_count = check_jump[ch + 1];
         }
+        *resultp = (const WT_CONFIG_CHECK *)bsearch(
+          item, &checks[indx], check_count - indx, sizeof(WT_CONFIG_CHECK), __config_check_compare);
+        if (*resultp != NULL)
+            return (0);
+    }
 
-    WT_RET_MSG(session, EINVAL, "unknown configuration key: '%.*s'", (int)len, str);
+    WT_RET_MSG(session, EINVAL, "unknown configuration key '%.*s'", (int)item->len, item->str);
 }
 
 /*
- * config_check --
+ * __config_get_choice --
+ *     Walk through list of legal choices looking for an item.
+ */
+static bool
+__config_get_choice(const char **choices, WT_CONFIG_ITEM *item)
+{
+    const char **choice;
+    bool found;
+
+    found = false;
+    for (choice = choices; *choice != NULL; ++choice)
+        if (WT_STRING_MATCH(*choice, item->str, item->len)) {
+            found = true;
+            break;
+        }
+    return (found);
+}
+
+/*
+ * __config_check --
  *     Check the keys in an application-supplied config string match what is specified in an array
  *     of check strings.
  */
 static int
-config_check(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int checks_entries,
-  const char *config, size_t config_len)
+__config_check(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int checks_entries,
+  const uint8_t *check_jump, const char *config, size_t config_len)
 {
-    WT_CONFIG parser, cparser, sparser;
-    WT_CONFIG_ITEM k, v, ck, cv, dummy;
+    WT_CONFIG parser, sparser;
+    const WT_CONFIG_CHECK *check;
+    WT_CONFIG_ITEM k, v, dummy;
     WT_DECL_RET;
-    int i;
+    const char **choices;
     bool badtype, found;
 
     /*
@@ -94,80 +162,70 @@ config_check(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int chec
               session, EINVAL, "Invalid configuration key found: '%.*s'", (int)k.len, k.str);
 
         /* Search for a matching entry. */
-        WT_RET(config_check_search(session, checks, checks_entries, k.str, k.len, &i));
+        WT_RET(__config_check_search(session, checks, checks_entries, &k, check_jump, &check));
 
-        if (strcmp(checks[i].type, "boolean") == 0) {
+        badtype = false;
+        switch (check->compiled_type) {
+        case WT_CONFIG_COMPILED_TYPE_BOOLEAN:
             badtype = v.type != WT_CONFIG_ITEM_BOOL &&
               (v.type != WT_CONFIG_ITEM_NUM || (v.val != 0 && v.val != 1));
-        } else if (strcmp(checks[i].type, "category") == 0) {
+            break;
+        case WT_CONFIG_COMPILED_TYPE_CATEGORY:
             /* Deal with categories of the form: XXX=(XXX=blah). */
-            ret = config_check(session, checks[i].subconfigs, checks[i].subconfigs_entries,
-              k.str + strlen(checks[i].name) + 1, v.len);
-            if (ret != EINVAL)
-                badtype = false;
-            else
-                badtype = true;
-        } else if (strcmp(checks[i].type, "format") == 0) {
-            badtype = false;
-        } else if (strcmp(checks[i].type, "int") == 0) {
-            badtype = v.type != WT_CONFIG_ITEM_NUM;
-        } else if (strcmp(checks[i].type, "list") == 0) {
-            badtype = v.len > 0 && v.type != WT_CONFIG_ITEM_STRUCT;
-        } else if (strcmp(checks[i].type, "string") == 0) {
-            badtype = false;
-        } else
-            WT_RET_MSG(session, EINVAL, "unknown configuration type: '%s'", checks[i].type);
-
+            ret = __config_check(session, check->subconfigs, check->subconfigs_entries,
+              check->subconfigs_jump, k.str + strlen(check->name) + 1, v.len);
+            badtype = (ret == EINVAL);
+            break;
+        case WT_CONFIG_COMPILED_TYPE_FORMAT:
+            break;
+        case WT_CONFIG_COMPILED_TYPE_INT:
+            badtype = (v.type != WT_CONFIG_ITEM_NUM);
+            break;
+        case WT_CONFIG_COMPILED_TYPE_LIST:
+            badtype = (v.len > 0 && v.type != WT_CONFIG_ITEM_STRUCT);
+            break;
+        case WT_CONFIG_COMPILED_TYPE_STRING:
+            break;
+        default:
+            WT_RET_MSG(session, EINVAL, "unknown configuration type: '%s'", check->type);
+        }
         if (badtype)
             WT_RET_MSG(session, EINVAL, "Invalid value for key '%.*s': expected a %s", (int)k.len,
-              k.str, checks[i].type);
+              k.str, check->type);
 
-        if (checks[i].checkf != NULL)
-            WT_RET(checks[i].checkf(session, &v));
+        if (check->checkf != NULL)
+            WT_RET(check->checkf(session, &v));
 
-        if (checks[i].checks == NULL)
+        /* If the checks string is empty, there are no additional checks we need to make. */
+        if (check->checks == NULL)
             continue;
 
-        /* Setup an iterator for the check string. */
-        __wt_config_init(session, &cparser, checks[i].checks);
-        while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-            if (WT_STRING_MATCH("min", ck.str, ck.len)) {
-                if (v.val < cv.val)
-                    WT_RET_MSG(session, EINVAL,
-                      "Value too small for key '%.*s' the minimum is %.*s", (int)k.len, k.str,
-                      (int)cv.len, cv.str);
-            } else if (WT_STRING_MATCH("max", ck.str, ck.len)) {
-                if (v.val > cv.val)
-                    WT_RET_MSG(session, EINVAL,
-                      "Value too large for key '%.*s' the maximum is %.*s", (int)k.len, k.str,
-                      (int)cv.len, cv.str);
-            } else if (WT_STRING_MATCH("choices", ck.str, ck.len)) {
-                if (v.len == 0)
-                    WT_RET_MSG(session, EINVAL, "Key '%.*s' requires a value", (int)k.len, k.str);
-                if (v.type == WT_CONFIG_ITEM_STRUCT) {
-                    /*
-                     * Handle the 'verbose' case of a list containing restricted choices.
-                     */
-                    __wt_config_subinit(session, &sparser, &v);
-                    found = true;
-                    while (found && (ret = __wt_config_next(&sparser, &v, &dummy)) == 0) {
-                        ret = __wt_config_subgetraw(session, &cv, &v, &dummy);
-                        found = ret == 0;
-                    }
-                } else {
-                    ret = __wt_config_subgetraw(session, &cv, &v, &dummy);
-                    found = ret == 0;
-                }
+        /* The checks string itself is not needed for checking. */
+        if (v.val < check->min_value)
+            WT_RET_MSG(session, EINVAL, "Value too small for key '%.*s' the minimum is %" PRIi64,
+              (int)k.len, k.str, check->min_value);
 
-                if (ret != 0 && ret != WT_NOTFOUND)
-                    return (ret);
-                if (!found)
-                    WT_RET_MSG(session, EINVAL,
-                      "Value '%.*s' not a permitted choice for key '%.*s'", (int)v.len, v.str,
-                      (int)k.len, k.str);
+        if (v.val > check->max_value)
+            WT_RET_MSG(session, EINVAL, "Value too large for key '%.*s' the maximum is %" PRIi64,
+              (int)k.len, k.str, check->max_value);
+
+        if ((choices = check->choices) != NULL) {
+            if (v.len == 0)
+                WT_RET_MSG(session, EINVAL, "Key '%.*s' requires a value", (int)k.len, k.str);
+            if (v.type == WT_CONFIG_ITEM_STRUCT) {
+                /*
+                 * Handle the 'verbose' case of a list containing restricted choices.
+                 */
+                __wt_config_subinit(session, &sparser, &v);
+                found = true;
+                while (found && (ret = __wt_config_next(&sparser, &v, &dummy)) == 0)
+                    found = __config_get_choice(choices, &v);
             } else
-                WT_RET_MSG(session, EINVAL, "unexpected configuration description keyword %.*s",
-                  (int)ck.len, ck.str);
+                found = __config_get_choice(choices, &v);
+
+            if (!found)
+                WT_RET_MSG(session, EINVAL, "Value '%.*s' not a permitted choice for key '%.*s'",
+                  (int)v.len, v.str, (int)k.len, k.str);
         }
     }
 

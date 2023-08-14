@@ -2443,6 +2443,16 @@ tasks:
         vars:
           test_name: wt10897_compact_quick_interrupt
 
+  - name: csuite-wt11440-config-check-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt11440_config_check
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
