@@ -42,6 +42,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/future.h"
+#include "mongo/util/synchronized_value.h"
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
@@ -185,6 +187,64 @@ private:
 };
 
 void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanReadable);
+
+/**
+ * Multiple waiters can register their interest in the next stack trace,
+ * by calling `waiter()` and obtaining a waiter object, which will block
+ * in its destructor until the next stack trace completes.
+ * On the "producer side", each stack trace collection calls `notifier()`
+ * to become that next stack trace. It will signal the end of the collection
+ * by destroying the notifier object returned by that `notifier` call.
+ */
+class PrintAllStacksSession {
+public:
+    /** Notifies observers on its destruction. */
+    class Notifier {
+    public:
+        explicit Notifier(std::unique_ptr<SharedPromise<void>> prom) : _prom{std::move(prom)} {}
+        ~Notifier() {
+            if (_prom)
+                _prom->emplaceValue();
+        }
+
+        Notifier(Notifier&&) = default;
+        Notifier& operator=(Notifier&&) = default;
+
+    private:
+        std::unique_ptr<SharedPromise<void>> _prom;
+    };
+
+    /** Blocks in its destructor waiting for a session to complete. */
+    class Waiter {
+    public:
+        explicit Waiter(SharedSemiFuture<void> fut) : _fut{std::move(fut)} {}
+        ~Waiter() {
+            if (_fut.valid())
+                _fut.get();
+        }
+
+        Waiter(Waiter&&) = default;
+        Waiter& operator=(Waiter&&) = default;
+
+    private:
+        SharedSemiFuture<void> _fut;
+    };
+
+    Notifier notifier() {
+        // Consume and retain the current SharedPromise from _promise.
+        return Notifier{std::exchange(**_promise, {})};
+    }
+
+    Waiter waiter() {
+        auto updateGuard = _promise.synchronize();
+        if (!*updateGuard)
+            *updateGuard = std::make_unique<SharedPromise<void>>();
+        return Waiter{(*updateGuard)->getFuture()};
+    }
+
+private:
+    synchronized_value<std::unique_ptr<SharedPromise<void>>> _promise;
+};
 
 }  // namespace stack_trace_detail
 
@@ -346,6 +406,9 @@ void markAsStackTraceProcessingThread();
  */
 void printAllThreadStacks();
 void printAllThreadStacks(StackTraceSink& sink);
+
+/** Calls `printAllThreadStacks` and blocks until it is completed. */
+void printAllThreadStacksBlocking();
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 

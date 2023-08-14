@@ -71,7 +71,9 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
@@ -669,6 +671,66 @@ TEST_F(PrintAllThreadStacksTest, Go_20_Threads) {
 }
 TEST_F(PrintAllThreadStacksTest, Go_200_Threads) {
     doPrintAllThreadStacks(200);
+}
+
+TEST_F(PrintAllThreadStacksTest, SessionBasic) {
+    stack_trace_detail::PrintAllStacksSession session;
+
+    auto waiter = boost::make_optional(session.waiter());
+    stdx::thread producer{[&] {
+        auto notifier = session.notifier();
+    }};
+    waiter = {};
+    producer.join();
+}
+
+TEST_F(PrintAllThreadStacksTest, SessionProducerConsumers) {
+    synchronized_value<std::string> values;
+    stack_trace_detail::PrintAllStacksSession session;
+
+    struct PromiseFuture {
+        SharedPromise<void> promise;
+        SharedSemiFuture<void> future;
+    };
+
+    std::vector<PromiseFuture> promisesFutures(2);
+
+    for (auto& pf : promisesFutures) {
+        pf.future = pf.promise.getFuture();
+    }
+
+    std::vector<stdx::thread> consumers;
+    for (auto& pf : promisesFutures) {
+        consumers.emplace_back([&, p = &pf.promise] {
+            auto waiter = boost::make_optional(session.waiter());
+            p->emplaceValue();
+            waiter = {};
+            values->push_back('3');
+        });
+    }
+
+    // This does not enforce ordering between push_back('3') above and the push_back calls below if
+    // PrintAllStacksSession::waiter/notifier don't.
+    for (auto& pf : promisesFutures) {
+        pf.future.wait();
+    }
+
+    stdx::thread producer{[&] {
+        values->push_back('1');
+        auto notifier = boost::make_optional(session.notifier());
+        values->push_back('2');
+        notifier = {};
+        values->push_back('3');
+    }};
+
+    for (auto& consumer : consumers) {
+        consumer.join();
+    }
+
+    producer.join();
+
+    auto guard = values.synchronize();
+    ASSERT(*guard == "12333") << *guard;
 }
 
 #endif  // defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
