@@ -283,9 +283,6 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
 
     DistLockManager::get(opCtx)->shutDown(opCtx);
 
-    auto const grid = Grid::get(opCtx);
-    grid->shardRegistry()->shutdown();
-
     _replicaSetChangeListener.reset();
 }
 
