@@ -347,11 +347,6 @@ public:
         const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) = 0;
 
-    ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const CancellationToken& token,
-        const BatonHandle& baton = nullptr);
-
 
     /**
      * Schedules "cb" to be run by the executor on each reply received from executing the exhaust

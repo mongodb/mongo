@@ -83,6 +83,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(refreshConnectionAfterEveryCommand);
 MONGO_FAIL_POINT_DEFINE(forceExecutorConnectionPoolTimeout);
+MONGO_FAIL_POINT_DEFINE(connectionPoolReturnsErrorOnGet);
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
@@ -815,6 +816,10 @@ size_t ConnectionPool::SpecificPool::requestsPending() const {
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
     Milliseconds timeout, bool lease, ErrorCodes::Error timeoutCode) {
+    if (MONGO_unlikely(connectionPoolReturnsErrorOnGet.shouldFail())) {
+        return Future<ConnectionPool::ConnectionHandle>::makeReady(
+            Status(ErrorCodes::SocketException, "test"));
+    }
 
     // Reset our activity timestamp
     auto now = _parent->_factory->now();

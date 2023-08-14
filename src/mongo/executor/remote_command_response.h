@@ -105,6 +105,18 @@ struct RemoteCommandResponse : RemoteCommandResponseBase {
  *
  * For the moment, it is only returned by scheduleRemoteCommandOnAny, and should be thought of as a
  * different return type for that rpc api, rather than a higher-information RemoteCommandResponse.
+ *
+ * The target member may be used by callers to associate a HostAndPort with the remote or
+ * local error that the RemoteCommandOnAnyResponse holds. The "status" member will be populated
+ * with possible local errors, while the "data" member may hold any remote errors. For local
+ * errors that are not caused by the remote (for example, local shutdown), the target member will
+ * not be filled.
+ *
+ * For local errors, the response is associated (by the network interface) with a remote
+ * HostAndPort for these cases:
+ *   1. When acquiring a connection to the remote from the pool.
+ *   2. When using the connection to the remote.
+ *   3. Enforcing a timeout (propagated or internal) while using the connection to the remote.
  */
 struct RemoteCommandOnAnyResponse : RemoteCommandResponseBase {
     RemoteCommandOnAnyResponse() = default;

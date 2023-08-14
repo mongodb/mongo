@@ -1049,7 +1049,9 @@ TEST_F(HedgedAsyncRPCTest, AttemptedTargetsPropogatedWithLocalErrors) {
     ASSERT(info->isLocal());
 
     auto eitherHostMatcher = m::AnyOf(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1]));
-    ASSERT_THAT(info->getTargetsAttempted(), m::ElementsAre(eitherHostMatcher, eitherHostMatcher));
+    auto targetAttempted = info->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_THAT(*targetAttempted, eitherHostMatcher);
 }
 
 TEST_F(HedgedAsyncRPCTest, NoAttemptedTargetIfTargetingFails) {
@@ -1068,8 +1070,8 @@ TEST_F(HedgedAsyncRPCTest, NoAttemptedTargetIfTargetingFails) {
     ASSERT(extraInfo);
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), resolveErr);
-    auto targetsAttempted = extraInfo->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 0);
+    auto targetAttempted = extraInfo->getTargetAttempted();
+    ASSERT_FALSE(targetAttempted);
 }
 
 TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
@@ -1101,7 +1103,9 @@ TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
     auto remoteErr = info->asRemote();
 
     auto eitherHostMatcher = m::AnyOf(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1]));
-    ASSERT_THAT(info->getTargetsAttempted(), m::ElementsAre(eitherHostMatcher, eitherHostMatcher));
+    auto targetAttempted = info->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_THAT(*targetAttempted, eitherHostMatcher);
 
     // Ensure that the actual host from the remote error is one of the attempted ones.
     ASSERT_THAT(remoteErr.getTargetUsed(), eitherHostMatcher);

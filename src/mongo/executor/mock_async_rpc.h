@@ -143,7 +143,6 @@ public:
         BatonHandle,
         boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
-        auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
             .thenRunOn(exec)
             .onError([](Status s) -> StatusWith<std::vector<HostAndPort>> {
@@ -152,20 +151,18 @@ public:
             .then([=, this, f = std::move(f), p = std::move(p), dbName = dbName.toString_forTest()](
                       auto&& targets) mutable {
                 stdx::lock_guard lg{_m};
-                *targetsAttempted = targets;
                 _requests.emplace_back(cmdBSON, dbName, targets[0], std::move(p));
                 _hasRequestsCV.notify_one();
-                return std::move(f).onCompletion([targetUsed = targets[0],
-                                                  targetsAttempted](StatusWith<BSONObj> resp) {
+                return std::move(f).onCompletion([targetUsed =
+                                                      targets[0]](StatusWith<BSONObj> resp) {
                     if (!resp.isOK()) {
-                        uassertStatusOK(
-                            Status{AsyncRPCErrorInfo(resp.getStatus(), *targetsAttempted),
-                                   "Remote command execution failed"});
+                        uassertStatusOK(Status{AsyncRPCErrorInfo(resp.getStatus(), targetUsed),
+                                               "Remote command execution failed"});
                     }
                     Status maybeError(
                         detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
                                                       targetUsed, resp.getValue(), Microseconds(1)),
-                                                  *targetsAttempted));
+                                                  targetUsed));
                     uassertStatusOK(maybeError);
                     return detail::AsyncRPCInternalResponse{resp.getValue(), targetUsed};
                 });
@@ -259,40 +256,37 @@ public:
         boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
         auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
-        return targeter->resolve(token).thenRunOn(exec).then([this,
-                                                              p = std::move(p),
-                                                              cmdBSON,
-                                                              dbName = dbName.toString_forTest(),
-                                                              targetsAttempted](auto&& targets) {
-            *targetsAttempted = targets;
-            stdx::lock_guard lg(_m);
-            Request req{dbName, cmdBSON, targets[0]};
-            auto expectation =
-                std::find_if(_expectations.begin(), _expectations.end(), [&](const Expectation& e) {
-                    return e.matcher(req) && !e.met;
-                });
-            if (expectation == _expectations.end()) {
-                // This request was not expected. We record it and return a generic error
-                // response.
-                _unexpectedRequests.push_back(req);
-                uassertStatusOK(
-                    Status{AsyncRPCErrorInfo(
-                               Status(ErrorCodes::InternalErrorNotSupported, "Unexpected request")),
-                           "Remote command execution failed"});
-            }
-            auto ans = expectation->response;
-            expectation->promise.emplaceValue();
-            expectation->met = true;
-            if (!ans.isOK()) {
-                uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus(), *targetsAttempted),
-                                       "Remote command execution failed"});
-            }
-            Status maybeError(detail::makeErrorIfNeeded(
-                executor::RemoteCommandOnAnyResponse(targets[0], ans.getValue(), Microseconds(1)),
-                *targetsAttempted));
-            uassertStatusOK(maybeError);
-            return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
-        });
+        return targeter->resolve(token).thenRunOn(exec).then(
+            [this, p = std::move(p), cmdBSON, dbName = dbName.toString_forTest()](auto&& targets) {
+                stdx::lock_guard lg(_m);
+                Request req{dbName, cmdBSON, targets[0]};
+                auto expectation =
+                    std::find_if(_expectations.begin(),
+                                 _expectations.end(),
+                                 [&](const Expectation& e) { return e.matcher(req) && !e.met; });
+                if (expectation == _expectations.end()) {
+                    // This request was not expected. We record it and return a generic error
+                    // response.
+                    _unexpectedRequests.push_back(req);
+                    uassertStatusOK(
+                        Status{AsyncRPCErrorInfo(Status(ErrorCodes::InternalErrorNotSupported,
+                                                        "Unexpected request")),
+                               "Remote command execution failed"});
+                }
+                auto ans = expectation->response;
+                expectation->promise.emplaceValue();
+                expectation->met = true;
+                if (!ans.isOK()) {
+                    uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus(), targets[0]),
+                                           "Remote command execution failed"});
+                }
+                Status maybeError(
+                    detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
+                                                  targets[0], ans.getValue(), Microseconds(1)),
+                                              targets[0]));
+                uassertStatusOK(maybeError);
+                return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
+            });
     }
 
     using RequestMatcher = std::function<bool(const Request&)>;

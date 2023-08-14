@@ -155,10 +155,10 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteError) {
         ASSERT_EQ(remoteError.getRemoteCommandResult().code(), exampleErrCode);
         ASSERT_EQ(remoteError.getRemoteCommandResult().reason(), exampleErrMsg);
 
-        // Ensure the targetsAttempted/used portions of the error is populated correctly.
-        auto targetsAttempted = extraInfo->getTargetsAttempted();
-        ASSERT_EQ(targetsAttempted.size(), 1);
-        ASSERT_EQ(targetsAttempted[0], getLocalHost());
+        // Ensure the targetAttempted/used portions of the error is populated correctly.
+        auto targetAttempted = extraInfo->getTargetAttempted();
+        ASSERT(targetAttempted);
+        ASSERT_EQ(*targetAttempted, getLocalHost());
         ASSERT_EQ(remoteError.getTargetUsed(), getLocalHost());
     };
     // Ensure we fail to parse the reply due to the unknown fields.
@@ -181,10 +181,10 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, LocalError) {
     // local error (which is just a Status) is the one we provided.
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
-    // Ensure the targetsAttempted portion of the error is populated correctly.
-    auto targetsAttempted = extraInfo->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 1);
-    ASSERT_EQ(targetsAttempted[0], getLocalHost());
+    // Ensure the targetAttempted portion of the error is populated correctly.
+    auto targetAttempted = extraInfo->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_EQ(*targetAttempted, getLocalHost());
 }
 
 TEST_F(SyncMockAsyncRPCRunnerTestFixture, MultipleResponses) {
@@ -328,10 +328,10 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectLocalError) {
     auto info = err.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(info->isLocal());
     ASSERT_EQ(info->asLocal(), exampleLocalErr);
-    // Ensure the targetsAttempted portion of the error is populated correctly.
-    auto targetsAttempted = info->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 1);
-    ASSERT_EQ(targetsAttempted[0], getLocalHost());
+    // Ensure the targetAttempted portion of the error is populated correctly.
+    auto targetAttempted = info->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_EQ(*targetAttempted, getLocalHost());
 }
 
 TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
@@ -364,10 +364,10 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
     ASSERT(info->isRemote());
     auto remoteErr = info->asRemote();
     ASSERT_BSONOBJ_EQ(remoteErr.getResponseObj(), errorReply.toBSON());
-    // Ensure the targetsAttempted portion of the error is populated correctly.
-    auto targetsAttempted = info->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 1);
-    ASSERT_EQ(targetsAttempted[0], getLocalHost());
+    // Ensure the targetAttempted portion of the error is populated correctly.
+    auto targetAttempted = info->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_EQ(*targetAttempted, getLocalHost());
     ASSERT_EQ(remoteErr.getTargetUsed(), getLocalHost());
 }
 

@@ -461,7 +461,7 @@ AsyncDBClient* NetworkInterfaceTL::RequestState::getClient(const ConnectionHandl
     return checked_cast<connection_pool_tl::TLConnection*>(conn.get())->client();
 }
 
-void NetworkInterfaceTL::CommandStateBase::setTimer() {
+void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState> requestState) {
     auto nowVal = interface->now();
 
     triggerSendRequestNetworkTimeout.executeIf(
@@ -500,7 +500,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
 
     // TODO reform with SERVER-41459
     timer->waitUntil(deadline, baton)
-        .getAsync([this, anchor = shared_from_this(), timeoutCode](Status status) {
+        .getAsync([this, anchor = shared_from_this(), timeoutCode, requestState](Status status) {
             if (!status.isOK()) {
                 return;
             }
@@ -520,7 +520,8 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                         "requestId"_attr = requestOnAny.id,
                         "deadline"_attr = deadline,
                         "request"_attr = requestOnAny);
-            fulfillFinalPromise(Status(timeoutCode, message));
+            fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(RemoteCommandOnAnyResponse(
+                requestState->host, Status(timeoutCode, message), stopwatch.elapsed())));
         });
 }
 
@@ -728,7 +729,7 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
 Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
     std::shared_ptr<RequestState> requestState) {
     return makeReadyFutureWith([this, requestState] {
-               setTimer();
+               setTimer(requestState);
                const auto connAcquiredTimer =
                    checked_cast<connection_pool_tl::TLConnection*>(requestState->conn.get())
                        ->getConnAcquiredTimer();
@@ -868,13 +869,17 @@ void NetworkInterfaceTL::RequestManager::trySend(
             }
 
             auto& reactor = cmdState->interface->_reactor;
+            boost::optional<HostAndPort> target = cmdState->requestOnAny.target[idx];
             if (reactor->onReactorThread()) {
-                cmdState->fulfillFinalPromise(std::move(swConn.getStatus()));
+                cmdState->fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(
+                    RemoteCommandOnAnyResponse(target, std::move(swConn.getStatus()))));
             } else {
                 ExecutorFuture<void>(reactor, swConn.getStatus())
-                    .getAsync([this, anchor = cmdState->shared_from_this()](Status status) {
-                        cmdState->fulfillFinalPromise(std::move(status));
-                    });
+                    .getAsync(
+                        [this, anchor = cmdState->shared_from_this(), idx, target](Status status) {
+                            cmdState->fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(
+                                RemoteCommandOnAnyResponse(target, std::move(status))));
+                        });
             }
         }
         return;
@@ -1100,7 +1105,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
     finalResponsePromise = std::move(promise);
 
-    setTimer();
+    setTimer(requestState);
     requestState->getClient(requestState->conn)
         ->beginExhaustCommandRequest(*requestState->request, baton)
         .thenRunOn(requestState->interface()->_reactor)
@@ -1170,7 +1175,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         deadline = stopwatch.start() + requestOnAny.timeout;
     }
 
-    if (!catchingInvoke([&] { setTimer(); },
+    if (!catchingInvoke([&] { setTimer(requestState); },
                         [&](Status& err) { finalResponsePromise.setError(err); },
                         "Exhaust command setTimer"))
         return;

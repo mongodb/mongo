@@ -39,6 +39,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -53,6 +54,9 @@ namespace detail {
 namespace {
 const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<AsyncRPCRunner>>();
 }  // namespace
+
+MONGO_FAIL_POINT_DEFINE(pauseAsyncRPCAfterNetworkResponse);
+MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
 
 class AsyncRPCRunnerImpl : public AsyncRPCRunner {
 public:
@@ -71,7 +75,6 @@ public:
         BatonHandle baton,
         boost::optional<UUID> clientOperationKey) final {
         auto proxyExec = std::make_shared<ProxyingExecutor>(baton, exec);
-        auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
             .then([dbName = DatabaseNameUtil::serializeForRemoteCmdRequest(dbName),
@@ -80,11 +83,9 @@ public:
                    exec = std::move(exec),
                    token,
                    baton = std::move(baton),
-                   targetsUsed,
                    clientOperationKey](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
-                *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
                     targets,
                     dbName,
@@ -94,25 +95,49 @@ public:
                     executor::RemoteCommandRequest::kNoTimeout,
                     {},
                     clientOperationKey);
-                return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
-            })
-            .onError(
-                [targetsUsed, targeter](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
-                    if (targetsUsed->size()) {
-                        // TODO SERVER-78148 Mirrors AsyncRequestsSender in that the first target is
-                        // used. The assumption that the first target triggers the error is wrong
-                        // and will be changed as part of the TODO.
-                        targeter->onRemoteCommandError((*targetsUsed)[0], s).get();
+
+                // Fail point to make this method to wait until the token is canceled.
+                if (!token.isCanceled()) {
+                    try {
+                        pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
+                            Interruptible::notInterruptible(), token);
+                    } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
+                        // Swallow the interrupted exception that arrives from canceling a
+                        // failpoint.
                     }
-                    // If there was a scheduling error or other local error before the
-                    // command was accepted by the executor.
-                    return Status{AsyncRPCErrorInfo(s, *targetsUsed),
-                                  "Remote command execution failed"};
-                })
-            .then([targetsUsed, targeter](TaskExecutor::ResponseOnAnyStatus r) {
-                auto s = makeErrorIfNeeded(r, *targetsUsed);
+                }
+
+                auto [p, f] = makePromiseFuture<TaskExecutor::RemoteCommandOnAnyCallbackArgs>();
+                auto swCallbackHandle = exec->scheduleRemoteCommandOnAny(
+                    executorRequest,
+                    [p = std::make_shared<Promise<TaskExecutor::RemoteCommandOnAnyCallbackArgs>>(
+                         std::move(p))](
+                        const TaskExecutor::RemoteCommandOnAnyCallbackArgs& cbData) {
+                        pauseAsyncRPCAfterNetworkResponse.pauseWhileSet();
+                        p->emplaceValue(cbData);
+                    },
+                    std::move(baton));
+                uassertStatusOK(swCallbackHandle);
+                token.onCancel()
+                    .unsafeToInlineFuture()
+                    .then(
+                        [exec, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
+                            exec->cancel(callbackHandle);
+                        })
+                    .getAsync([](auto) {});
+                return std::move(f);
+            })
+            .onError([](Status s)
+                         -> StatusWith<TaskExecutor::TaskExecutor::RemoteCommandOnAnyCallbackArgs> {
+                // If there was a scheduling error or other local error before the
+                // command was accepted by the executor.
+                return Status{AsyncRPCErrorInfo(s, {}), "Remote command execution failed"};
+            })
+            .then([targeter](TaskExecutor::RemoteCommandOnAnyCallbackArgs cbargs) {
+                auto r = cbargs.response;
+                auto s = makeErrorIfNeeded(r, r.target);
                 // Update targeter for errors.
-                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError) {
+                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError && r.target) {
                     auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
                     if (extraInfo->isLocal()) {
                         targeter->onRemoteCommandError(*(r.target), extraInfo->asLocal()).get();

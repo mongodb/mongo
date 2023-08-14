@@ -46,7 +46,11 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/async_remote_command_targeter_adapter.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -1176,9 +1180,9 @@ TEST_F(AsyncRPCTestFixture, AttemptedTargetCorrectlyPropogatedWithLocalError) {
     auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
     ASSERT(extraInfo);
     ASSERT(extraInfo->isLocal());
-    auto targetsAttempted = extraInfo->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 1);
-    ASSERT_EQ(targetsAttempted[0], target);
+    auto targetAttempted = extraInfo->getTargetAttempted();
+    ASSERT(targetAttempted);
+    ASSERT_EQ(*targetAttempted, target);
 }
 
 TEST_F(AsyncRPCTestFixture, NoAttemptedTargetIfTargetingFails) {
@@ -1199,8 +1203,8 @@ TEST_F(AsyncRPCTestFixture, NoAttemptedTargetIfTargetingFails) {
     ASSERT(extraInfo);
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), resolveErr);
-    auto targetsAttempted = extraInfo->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 0);
+    auto targetAttempted = extraInfo->getTargetAttempted();
+    ASSERT_FALSE(targetAttempted);
 }
 
 TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
@@ -1227,9 +1231,8 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
     ASSERT(extraInfo->isRemote());
 
     auto remoteErr = extraInfo->asRemote();
-    auto targetsAttempted = extraInfo->getTargetsAttempted();
-    ASSERT_EQ(targetsAttempted.size(), 1);
-    auto targetAttempted = targetsAttempted[0];
+    auto targetAttempted = extraInfo->getTargetAttempted();
+    ASSERT(targetAttempted);
     auto targetHeardFrom = remoteErr.getTargetUsed();
     ASSERT_EQ(targetAttempted, targetHeardFrom);
     ASSERT_EQ(target, targetHeardFrom);
@@ -1296,7 +1299,7 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
  */
 TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     auto pauseAfterNetworkResponseFailPoint =
-        globalFailPointRegistry().find("pauseTaskExecutorAfterReceivesNetworkRespones");
+        globalFailPointRegistry().find("pauseAsyncRPCAfterNetworkResponse");
     pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
@@ -1329,6 +1332,55 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
 
     worker.join();
+}
+
+/**
+ * Tests that targeter->onRemoteCommandError is called for errors attributed to a remote
+ * host.
+ */
+TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
+    const HostAndPort testHost = HostAndPort("Host1", 1);
+    const std::vector<HostAndPort> hosts{testHost};
+    auto factory = RemoteCommandTargeterFactoryMock();
+    std::shared_ptr<RemoteCommandTargeter> t;
+    t = factory.create(ConnectionString::forStandalones(hosts));
+    auto targeterMock = RemoteCommandTargeterMock::get(t);
+    targeterMock->setFindHostsReturnValue(hosts);
+
+    ReadPreferenceSetting readPref;
+    std::unique_ptr<Targeter> targeter =
+        std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), CancellationToken::uncancelable());
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    onCommand([&](const auto& request) {
+        return createErrorResponse(Status(ErrorCodes::ShutdownInProgress, "test"));
+    });
+
+    future.wait();
+
+    // Check for call to onRemoteCommandError.
+    auto downHosts = targeterMock->getAndClearMarkedDownHosts();
+    ASSERT_TRUE(downHosts.find(testHost) != downHosts.end());
+
+    // Run another command, but this time, simulate a local error and check that targeter does
+    // not update with the testHost.
+    targeter = std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
+    options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), CancellationToken::uncancelable());
+    future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    getExecutorPtr()->shutdown();
+    future.wait();
+
+    // onRemoteCommandError not called, error not from remote host.
+    downHosts = targeterMock->getAndClearMarkedDownHosts();
+    ASSERT_FALSE(downHosts.find(testHost) != downHosts.end());
 }
 
 }  // namespace
