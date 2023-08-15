@@ -137,4 +137,75 @@ private:
     std::vector<TypeTags> _deblockedTags;
     std::vector<Value> _deblockedVals;
 };
+
+/**
+ * The most general type of block that can hold any assortment of tags/values with no commonality.
+ */
+struct HeterogeneousBlock : public ValueBlock {
+    HeterogeneousBlock() = default;
+    HeterogeneousBlock(std::vector<sbe::value::TypeTags> tag, std::vector<sbe::value::Value> val)
+        : _vals(std::move(val)), _tags(std::move(tag)) {}
+
+    ~HeterogeneousBlock() {
+        release();
+    }
+
+    void clear() noexcept {
+        release();
+        _tags.clear();
+        _vals.clear();
+    }
+
+    void reserve(size_t n) {
+        _vals.reserve(n);
+        _tags.reserve(n);
+    }
+
+    size_t size() const {
+        return _tags.size();
+    }
+
+    void push_back(TypeTags t, Value v) {
+        ValueGuard guard(t, v);
+        if (_tags.capacity() == _tags.size()) {
+            auto newSize = std::max(size_t{1}, _tags.size() * 2);
+            reserve(newSize);
+        }
+        _tags.push_back(t);
+        _vals.push_back(v);
+        guard.reset();
+    }
+
+    boost::optional<size_t> tryCount() const override {
+        return _vals.size();
+    }
+
+
+    DeblockedTagVals extract() override {
+        return {_vals.size(), _tags.data(), _vals.data()};
+    }
+
+    std::unique_ptr<ValueBlock> clone() const override {
+        std::vector<Value> newVals(_vals.size(), 0);
+        std::vector<TypeTags> newTags(_vals.size(), value::TypeTags::Nothing);
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            auto [cpyTag, cpyVal] = value::copyValue(_tags[i], _vals[i]);
+            newTags[i] = cpyTag;
+            newVals[i] = cpyVal;
+        }
+        return std::make_unique<HeterogeneousBlock>(std::move(newTags), std::move(newVals));
+    }
+
+private:
+    void release() noexcept {
+        invariant(_tags.size() == _vals.size());
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            releaseValue(_tags[i], _vals[i]);
+        }
+    }
+
+    // All values are owned.
+    std::vector<Value> _vals;
+    std::vector<TypeTags> _tags;
+};
 }  // namespace mongo::sbe::value

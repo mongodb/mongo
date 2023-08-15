@@ -98,5 +98,41 @@ struct CellBlock {
      * Makes a fully independent clone of this CellBlock.
      */
     virtual std::unique_ptr<CellBlock> clone() const = 0;
+
+    /**
+     * Returns an vector of true/false values with a 1 in the position for every new document. E.g.
+     * {a: [1,2,3,4]}
+     * {a: 5}
+     * {XYZ: 999}
+     * {a: [6,7]}
+     *
+     * Values for the 'a' CellBlock:
+     * [1,2,3,4,5,Nothing,6,7]
+     *
+     * Filter position info (the return value of this function):
+     * [1,0,0,0,1,1       1,0]
+     *
+     * A '1' indicates that this value is the beginning of the next document. A '0' indicates this
+     * value is part of the same document as the previous entry.
+     *
+     * An empty vector represents a trivial position info, ie, there are no arrays at all.
+     */
+    virtual const std::vector<char>& filterPositionInfo() = 0;
+};
+
+/*
+ * Represents a single path through a block of objects. Stores all of the values found at
+ * the given path with eagerly materialized projection and filter position info.
+ */
+struct MaterializedCellBlock : public CellBlock {
+    ValueBlock& getValueBlock() override;
+    std::unique_ptr<CellBlock> clone() const override;
+
+    const std::vector<char>& filterPositionInfo() override {
+        return _filterPosInfo;
+    }
+
+    std::unique_ptr<ValueBlock> _deblocked;
+    std::vector<char> _filterPosInfo;
 };
 }  // namespace mongo::sbe::value

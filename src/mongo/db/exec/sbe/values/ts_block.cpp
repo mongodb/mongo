@@ -36,6 +36,7 @@
 
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/util.h"
@@ -45,18 +46,50 @@
 
 namespace mongo::sbe::value {
 
+TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest> pathReqs,
+                                             StringData timeField)
+    : _pathReqs(std::move(pathReqs)), _timeField(timeField) {
+
+    size_t idx = 0;
+    for (auto& req : _pathReqs) {
+        tassert(7796405,
+                "Path must start with a Get operation",
+                std::holds_alternative<CellBlock::Get>(req.path[0]));
+
+        StringData field = std::get<CellBlock::Get>(req.path[0]).field;
+        _topLevelFieldToIdxes[field].push_back(idx);
+
+        if (req.path.size() > 2) {
+            _topLevelFieldsWithSubfieldAccess.insert(field.toString());
+            _nonTopLevelPathReqs.push_back(req);
+            _nonTopLevelPathIdxes.push_back(idx);
+        }
+
+        ++idx;
+    }
+}
+
 std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks(
     const BSONObj& bucketObj) {
-    const int noOfMeasurements =
-        BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
 
     BSONElement bucketControl = bucketObj[timeseries::kBucketControlFieldName];
     invariant(!bucketControl.eoo());
+
+
+    const int noOfMeasurements = [&]() {
+        if (auto ct = bucketControl.Obj()[timeseries::kBucketControlCountFieldName]) {
+            return static_cast<int>(ct.numberLong());
+        }
+        return BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+    }();
+
     BSONElement data = bucketObj[timeseries::kBucketDataFieldName];
     invariant(!data.eoo());
     invariant(data.type() == BSONType::Object);
 
-    std::vector<std::unique_ptr<CellBlock>> out(_paths.size());
+    std::vector<BSONElement> idxToTopLevelField(_pathReqs.size());
+
+    std::vector<std::unique_ptr<CellBlock>> out(_pathReqs.size());
     for (auto elt : data.embeddedObject()) {
         auto it = _topLevelFieldToIdxes.find(elt.fieldNameStringData());
         if (it != _topLevelFieldToIdxes.end()) {
@@ -69,19 +102,55 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
             for (auto idx : it->second) {
                 out[idx] = std::make_unique<value::TsCellBlock>(
                     noOfMeasurements, /*owned*/ false, blockTag, blockVal);
+
+                idxToTopLevelField[idx] = elt;
             }
         }
     }
 
-    // TODO: Dotted path support! For any dotted path, we'll have to materialize the top-level
-    // path and then walk the result to create the subfield's CellBlock.
+    // For the non-top fields we materialize everything. Eventually this code should not be
+    // necessary once PM-3402 allows us to read subfields directly.
+    // TODO: In the short term we may want to optimize this to avoid repeated allocations and
+    // that kind of thing.
+    std::vector<BSONObjBuilder> bsonBuilders(noOfMeasurements);
+    std::vector<BSONObj> bsons(noOfMeasurements);
+    for (size_t i = 0; i < _nonTopLevelPathReqs.size(); ++i) {
+        auto bucketElt = idxToTopLevelField[_nonTopLevelPathIdxes[i]];
 
+        {
+            BSONColumn column(bucketElt);
+            size_t columnIdx = 0;
+            for (auto columnElt : column) {
+                if (columnElt) {
+                    bsonBuilders[columnIdx].appendAs(columnElt, bucketElt.fieldNameStringData());
+                }
+
+                ++columnIdx;
+            }
+        }
+
+        for (size_t i = 0; i < bsons.size(); ++i) {
+            bsons[i] = bsonBuilders[i].asTempObj();
+        }
+
+        auto cellsForNestedFields = value::extractCellBlocksFromBsons(
+            std::vector<CellBlock::PathRequest>{_nonTopLevelPathReqs[i]}, bsons);
+
+        out[_nonTopLevelPathIdxes[i]] = std::move(cellsForNestedFields[0]);
+
+        for (auto& bob : bsonBuilders) {
+            bob.resetToEmpty();
+        }
+    }
+
+    size_t idx = 0;
     for (auto& cellBlock : out) {
         if (!cellBlock) {
             auto emptyBlock = std::make_unique<value::ScalarMonoCellBlock>(
                 noOfMeasurements, value::TypeTags::Nothing, value::Value(0));
             cellBlock = std::move(emptyBlock);
         }
+        ++idx;
     }
 
     return out;
@@ -203,5 +272,7 @@ TsCellBlock::TsCellBlock(size_t count, bool owned, TypeTags topLevelTag, Value t
       _tsBlock(count, owned, topLevelTag, topLevelVal) {
     invariant(_blockTag == value::TypeTags::bsonObject ||
               _blockTag == value::TypeTags::bsonBinData);
+
+    _positionInfo.resize(count, char(1));
 }
 }  // namespace mongo::sbe::value

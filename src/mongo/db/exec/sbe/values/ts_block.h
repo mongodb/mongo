@@ -57,18 +57,7 @@ namespace mongo::sbe::value {
  */
 class TsBucketPathExtractor {
 public:
-    TsBucketPathExtractor(std::vector<CellBlock::PathRequest> reqs, StringData timeField)
-        : _paths(std::move(reqs)), _timeField(timeField) {
-        size_t idx = 0;
-        for (auto& req : _paths) {
-            tassert(7796405,
-                    "Paths must start with Get",
-                    req.path.size() > 0 && std::holds_alternative<CellBlock::Get>(req.path[0]));
-
-            _topLevelFieldToIdxes[(std::get<CellBlock::Get>(req.path[0]).field)].push_back(idx);
-            ++idx;
-        }
-    }
+    TsBucketPathExtractor(std::vector<CellBlock::PathRequest> reqs, StringData timeField);
 
     /*
      * Returns one CellBlock per path given in the constructor. A CellBlock represents all of the
@@ -77,16 +66,29 @@ public:
     std::vector<std::unique_ptr<CellBlock>> extractCellBlocks(const BSONObj& bucket);
 
 private:
-    std::vector<CellBlock::PathRequest> _paths;
+    std::vector<CellBlock::PathRequest> _pathReqs;
+
+    // Logically a pair of [path, idx] for the paths that are not top level. Each path appears in
+    // '_paths' vector.
+    std::vector<CellBlock::PathRequest> _nonTopLevelPathReqs;
+    std::vector<size_t> _nonTopLevelPathIdxes;
+
+
     StringData _timeField;
 
-    // maps [top-level field -> [index into '_paths' which start with this field]]
+    // This maps [top-level field -> [index into '_paths' which start with this field]]
+    //
+    // A vector is needed in case multiple fields with the same prefix (e.g. a.b and a.c) are
+    // requested.
     StringDataMap<std::vector<size_t>> _topLevelFieldToIdxes;
+
+    // The top level fields which have subsequent subfield access.
+    StringSet _topLevelFieldsWithSubfieldAccess;
 };
 
 /**
  * This class implements a block of data in the time series format which is either a BSON object
- * or a binary BSON column.
+ * or a binary BSON column. This class is only used for top-level fields.
  */
 class TsBlock : public ValueBlock {
 public:
@@ -162,7 +164,8 @@ private:
 };
 
 /**
- * Implements CellBlock interface for timeseries buckets.
+ * Implements CellBlock interface for timeseries buckets. Currently this class is only used for top
+ * level fields. Subfields use a materialized cell block.
  */
 class TsCellBlock : public CellBlock {
 public:
@@ -196,10 +199,17 @@ public:
 
     std::unique_ptr<CellBlock> clone() const override;
 
+    const std::vector<char>& filterPositionInfo() override {
+        return _positionInfo;
+    }
+
 private:
     TypeTags _blockTag = TypeTags::Nothing;
     Value _blockVal = Value(0);
 
     TsBlock _tsBlock;
+
+    // For now this is always empty since only top-level fields are supported.
+    std::vector<char> _positionInfo;
 };
 }  // namespace mongo::sbe::value

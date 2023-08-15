@@ -29,35 +29,16 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 
 namespace mongo::sbe::value {
 /**
- * A cell block inside which no cells has an array and all cells are scalar.
+ * Given a vector of PathRequests and BSON objects, produces one CellBlock
+ * per path request, with data from the BSON Obj.
+ *
+ * All returned data is fully owned by the CellBlocks.
  */
-class ScalarMonoCellBlock : public CellBlock {
-public:
-    ScalarMonoCellBlock(size_t count, TypeTags tag, Value val) : _block(count, tag, val) {}
-    ScalarMonoCellBlock(MonoBlock b) : _block(std::move(b)) {}
-
-    ValueBlock& getValueBlock() override {
-        return _block;
-    }
-
-    std::unique_ptr<CellBlock> clone() const override {
-        return std::make_unique<ScalarMonoCellBlock>(_block);
-    }
-
-    const std::vector<char>& filterPositionInfo() override {
-        return emptyPositionInfo;
-    }
-
-private:
-    MonoBlock _block;
-    std::vector<char> emptyPositionInfo;
-};
+std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
+    const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons);
 }  // namespace mongo::sbe::value

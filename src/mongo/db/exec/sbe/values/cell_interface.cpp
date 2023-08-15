@@ -28,12 +28,26 @@
  */
 
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include <memory>
+
+#include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
+ValueBlock& MaterializedCellBlock::getValueBlock() {
+    return *_deblocked;
+}
+std::unique_ptr<CellBlock> MaterializedCellBlock::clone() const {
+    auto ret = std::make_unique<MaterializedCellBlock>();
+    ret->_deblocked = _deblocked->clone();
+    ret->_filterPosInfo = _filterPosInfo;
+    return ret;
+}
+
 namespace {
-std::string pathToString(const CellBlock::Path& path) {
+std::string pathToString(const CellBlock::Path& p) {
     std::string out;
-    for (auto& component : path) {
+    for (auto& component : p) {
         if (std::holds_alternative<CellBlock::Id>(component)) {
             out += "Id";
         } else if (std::holds_alternative<CellBlock::Get>(component)) {
