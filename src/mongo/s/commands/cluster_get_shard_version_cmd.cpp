@@ -108,9 +108,10 @@ public:
                     cachedCollInfo.cm());
             const auto cm = cachedCollInfo.cm();
 
-            for (const auto& chunk : cm->chunks()) {
+            cm->forEachChunk([&](const auto& chunk) {
                 log() << redact(chunk.toString());
-            }
+                return true;
+            });
 
             cm->getVersion().appendLegacyWithField(&result, "version");
         }

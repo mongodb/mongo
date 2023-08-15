@@ -47,6 +47,10 @@ class Ordering {
 public:
     static constexpr size_t kMaxCompoundIndexKeys = size_t{32};
 
+    static Ordering allAscending() {
+        return {0};
+    }
+
     Ordering(const Ordering& r) : bits(r.bits) {}
     void operator=(const Ordering& r) {
         bits = r.bits;

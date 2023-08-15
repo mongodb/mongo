@@ -435,19 +435,19 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
     // Move and commit each "big chunk" to a different shard.
     auto nextShardId = [&, indx = 0]() mutable { return shardIds[indx++ % shardIds.size()]; };
 
-    for (auto chunk : chunkManager->chunks()) {
+    chunkManager->forEachChunk([&](const auto& chunk) {
         const auto shardId = nextShardId();
 
         const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
         if (!toStatus.isOK()) {
-            continue;
+            return true;
         }
 
         const auto to = toStatus.getValue();
 
         // Can't move chunk to shard it's already on
         if (to->getId() == chunk.getShardId()) {
-            continue;
+            return true;
         }
 
         ChunkType chunkType;
@@ -468,7 +468,8 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             warning() << "couldn't move chunk " << redact(chunk.toString()) << " to shard " << *to
                       << " while sharding collection " << nss.ns() << causedBy(redact(moveStatus));
         }
-    }
+        return true;
+    });
 
     if (finalSplitPoints.empty()) {
         return;

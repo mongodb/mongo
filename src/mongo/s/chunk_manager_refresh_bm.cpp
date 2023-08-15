@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <benchmark/benchmark.h>
+#include <random>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/inline_decls.h"
@@ -42,17 +43,19 @@
 namespace mongo {
 namespace {
 
+const NamespaceString kNss("test", "foo");
+
+ShardId getShardId(int i) {
+    return {std::string(str::stream() << "shard_" << i)};
+}
+
 ChunkRange getRangeForChunk(int i, int nChunks) {
     invariant(i >= 0);
     invariant(nChunks > 0);
     invariant(i < nChunks);
-    if (i == 0) {
-        return {BSON("_id" << MINKEY), BSON("_id" << 0)};
-    }
-    if (i + 1 == nChunks) {
-        return {BSON("_id" << (i - 1) * 100), BSON("_id" << MAXKEY)};
-    }
-    return {BSON("_id" << (i - 1) * 100), BSON("_id" << i * 100)};
+    auto min = (i == 0) ? BSON("_id" << MINKEY) : BSON("_id" << (i - 1) * 100);
+    auto max = (i == nChunks - 1) ? BSON("_id" << MAXKEY) : BSON("_id" << i * 100);
+    return {std::move(min), std::move(max)};
 }
 
 template <typename ShardSelectorFn>
@@ -73,17 +76,17 @@ auto makeChunkManagerWithShardSelector(int nShards, uint32_t nChunks, ShardSelec
     auto routingTableHistory = RoutingTableHistory::makeNew(
         collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
     auto chunkManager = std::make_shared<ChunkManager>(routingTableHistory, boost::none);
-    return std::make_unique<CollectionMetadata>(std::move(chunkManager), ShardId("shard0"));
+    return std::make_unique<CollectionMetadata>(std::move(chunkManager), getShardId(0));
 }
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
-    return ShardId(str::stream() << "shard" << (i % nShards));
+    return getShardId(i % nShards);
 }
 
 ShardId optimalShardSelector(int i, int nShards, int nChunks) {
     invariant(nShards <= nChunks);
     const auto shardNum = (int64_t(i) * nShards / nChunks) % nShards;
-    return ShardId(str::stream() << "shard" << shardNum);
+    return getShardId(shardNum);
 }
 
 NOINLINE_DECL auto makeChunkManagerWithPessimalBalancedDistribution(int nShards, uint32_t nChunks) {
@@ -98,8 +101,31 @@ NOINLINE_DECL auto runIncrementalUpdate(const CollectionMetadata& cm,
                                         const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(newChunks);
     return std::make_unique<CollectionMetadata>(std::make_shared<ChunkManager>(rt, boost::none),
-                                                ShardId("shard0"));
+                                                getShardId(0));
 }
+
+void BM_IncrementalRefreshWithNoChange(benchmark::State& state) {
+    const int nShards = state.range(0);
+    const int nChunks = state.range(1);
+    auto cm = makeChunkManagerWithOptimalBalancedDistribution(nShards, nChunks);
+
+    auto postMoveVersion = cm->getChunkManager()->getVersion();
+    const auto collName = NamespaceString(cm->getChunkManager()->getns());
+    std::vector<ChunkType> newChunks;
+    newChunks.emplace_back(collName, getRangeForChunk(0, nChunks), postMoveVersion, getShardId(0));
+
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+    }
+}
+
+BENCHMARK(BM_IncrementalRefreshWithNoChange)
+    ->Args({1, 1})
+    ->Args({4, 10})
+    ->Args({4, 100})
+    ->Args({4, 1000})
+    ->Args({4, 10000})
+    ->Args({4, 100000});
 
 void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state) {
     const int nShards = state.range(0);
@@ -110,18 +136,135 @@ void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state
     const auto collName = NamespaceString(cm->getChunkManager()->getns());
     std::vector<ChunkType> newChunks;
     postMoveVersion.incMajor();
-    newChunks.emplace_back(
-        collName, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
+    newChunks.emplace_back(collName, getRangeForChunk(1, nChunks), postMoveVersion, getShardId(0));
     postMoveVersion.incMajor();
-    newChunks.emplace_back(
-        collName, getRangeForChunk(3, nChunks), postMoveVersion, ShardId("shard1"));
+    newChunks.emplace_back(collName, getRangeForChunk(3, nChunks), postMoveVersion, getShardId(1));
 
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
     }
 }
 
-BENCHMARK(BM_IncrementalRefreshOfPessimalBalancedDistribution)->Args({2, 50000});
+/*
+ * Simulate a refresh of the ChunkManager where a number of chunks is migrated from one shard to
+ * another.
+ *
+ * The chunks modified in the routing table are equally spaced.
+ */
+void BM_IncrementalSpacedRefreshMoveChunks(benchmark::State& state) {
+    const int nShards = state.range(0);
+    const int nChunks = state.range(1);
+    const int nUpdates = state.range(2);
+    auto cm = makeChunkManagerWithPessimalBalancedDistribution(nShards, nChunks);
+
+    auto lastVersion = cm->getChunkManager()->getVersion();
+
+    std::vector<ChunkType> newChunks;
+    newChunks.reserve(nUpdates);
+    const auto updateSpacing = nChunks / nUpdates;
+    for (int i = 0; i < nUpdates; i++) {
+        const auto idx = i * updateSpacing;
+        lastVersion.incMajor();
+        newChunks.emplace_back(kNss,
+                               getRangeForChunk(idx, nChunks),
+                               lastVersion,
+                               pessimalShardSelector(idx, nShards, nChunks));
+    }
+
+    std::mt19937 g;
+    g.seed(456);
+    std::shuffle(newChunks.begin(), newChunks.end(), g);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+    }
+}
+
+BENCHMARK(BM_IncrementalSpacedRefreshMoveChunks)
+    ->Args({4, 1, 1})
+    ->Args({4, 10, 1})
+    ->Args({4, 100, 1})
+    ->Args({4, 1000, 1})
+    ->Args({4, 10000, 1})
+    ->Args({4, 100000, 1})
+    ->Args({4, 10000, 10})
+    ->Args({4, 10000, 100})
+    ->Args({4, 10000, 1000})
+    ->Args({4, 10000, 10000});
+
+/*
+ * Simulate a refresh of the ChunkManager where a number of chunks is merged together.
+ */
+void BM_IncrementalSpacedRefreshMergeChunks(benchmark::State& state) {
+    const int nShards = state.range(0);
+    const int nChunks = state.range(1);
+    const int nUpdates = state.range(2);
+    auto cm = makeChunkManagerWithOptimalBalancedDistribution(nShards, nChunks);
+
+    auto lastVersion = cm->getChunkManager()->getVersion();
+
+    std::vector<ChunkType> newChunks;
+    newChunks.reserve(nUpdates);
+    invariant(nUpdates <= nShards);
+    const auto shardSpacing = nShards / (nUpdates + 1);
+    std::set<ShardId> shardsToMerge;
+    for (int i = 0; i < nUpdates; i++) {
+        invariant(i * shardSpacing <= nShards);
+        shardsToMerge.emplace(getShardId(i * shardSpacing));
+    }
+
+    ShardId shardId;
+    std::vector<ChunkRange> rangesToMerge;
+
+    const auto flushRanges = [&] {
+        if (rangesToMerge.empty()) {
+            return;
+        }
+
+        lastVersion.incMajor();
+        newChunks.emplace_back(
+            kNss,
+            ChunkRange(rangesToMerge.front().getMin(), rangesToMerge.back().getMax()),
+            lastVersion,
+            shardId);
+        rangesToMerge.clear();
+    };
+
+    for (int i = 0; i < nChunks; i++) {
+        auto nextShardId = pessimalShardSelector(i, nShards, nChunks);
+        if (nextShardId != shardId) {
+            flushRanges();
+            shardId = nextShardId;
+        }
+        if (shardsToMerge.count(shardId) == 1) {
+            rangesToMerge.emplace_back(getRangeForChunk(i, nChunks));
+        }
+    }
+    flushRanges();
+
+    std::mt19937 g;
+    g.seed(456);
+    std::shuffle(newChunks.begin(), newChunks.end(), g);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+    }
+}
+
+/*
+ * Simulate chunks merge on a routing table of 10000 chunks partitioned among 4 shards.
+ *
+ * [   0, 2500)  -> shard0
+ * [2500, 5000)  -> shard1
+ * [5000, 7500)  -> shard2
+ * [7500, 10000) -> shard3
+ */
+
+BENCHMARK(BM_IncrementalSpacedRefreshMergeChunks)
+    ->Args({4, 10000, 1})   // merge all chunks on shard2
+    ->Args({4, 10000, 2})   // merge all chunks on shard2 and shard3
+    ->Args({4, 10000, 3})   // merge all chunks on shard1, shard2 and shard3
+    ->Args({4, 10000, 4});  // merge all chunks on shard1, shard2, shard3 and shard4
 
 template <typename ShardSelectorFn>
 auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectShard) {
@@ -145,7 +288,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
         auto routingTableHistory = RoutingTableHistory::makeNew(
             collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
         auto chunkManager = std::make_shared<ChunkManager>(routingTableHistory, boost::none);
-        benchmark::DoNotOptimize(CollectionMetadata(std::move(chunkManager), ShardId("shard0")));
+        benchmark::DoNotOptimize(CollectionMetadata(std::move(chunkManager), getShardId(0)));
     }
 }
 
@@ -367,11 +510,14 @@ MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
     };
 
     for (auto bmCase : bmCases) {
-        bmCase->Args({2, 50000})
-            ->Args({10, 50000})
-            ->Args({100, 50000})
-            ->Args({1000, 50000})
-            ->Args({2, 2});
+        bmCase->Args({2, 2})
+            ->Args({1, 10000})
+            ->Args({10, 10000})
+            ->Args({100, 10000})
+            ->Args({1000, 10000})
+            ->Args({10, 10})
+            ->Args({10, 100})
+            ->Args({10, 1000});
     }
 
     return Status::OK();

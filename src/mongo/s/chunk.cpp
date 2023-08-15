@@ -41,6 +41,7 @@ namespace mongo {
 
 ChunkInfo::ChunkInfo(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
+      _maxKeyString(ShardKeyPattern::toKeyString(from.getMax())),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _history(from.getHistory()),
@@ -96,8 +97,11 @@ bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
 }
 
 std::string ChunkInfo::toString() const {
+    auto writtenBytesStr =
+        _writesTracker ? std::to_string(_writesTracker->getBytesWritten()) : "null";
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
-                         << ": " << _lastmod.toString() << ", " << _range.toString();
+                         << ": " << _lastmod.toString() << ", range: " << _range.toString()
+                         << ", writtenBytes: " << writtenBytesStr;
 }
 
 void ChunkInfo::markAsJumbo() {

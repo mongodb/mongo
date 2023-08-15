@@ -1847,11 +1847,12 @@ public:
                 // one big $or query, but then the sorting would not be efficient.
                 const auto shardId = ShardingState::get(opCtx)->shardId();
 
-                for (const auto& chunk : cm->chunks()) {
+                cm->forEachChunk([&](const auto& chunk) {
                     if (chunk.getShardId() == shardId) {
                         chunks.push_back(chunk);
                     }
-                }
+                    return true;
+                });
             }
         }
 

@@ -86,6 +86,7 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'shard_key_pattern.cpp',
+        env.Idlc('chunk_manager_parameters.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -411,7 +412,9 @@ env.CppUnitTest(
         'catalog_cache_refresh_test.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
+        'chunk_map_test.cpp',
         'chunk_test.cpp',
+        'chunks_test_util.cpp',
         'routing_table_history_test.cpp',
         'shard_key_pattern_test.cpp',
     ],

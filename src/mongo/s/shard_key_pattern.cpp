@@ -39,6 +39,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -222,6 +223,16 @@ const BSONObj& ShardKeyPattern::toBSON() const {
 
 std::string ShardKeyPattern::toString() const {
     return toBSON().toString();
+}
+
+std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
+    BSONObjBuilder strippedKeyValue;
+    for (const auto& elem : shardKey) {
+        strippedKeyValue.appendAs(elem, ""_sd);
+    }
+
+    KeyString ks(KeyString::Version::V1, strippedKeyValue.done(), Ordering::allAscending());
+    return {ks.getBuffer(), ks.getSize()};
 }
 
 bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {

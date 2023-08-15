@@ -203,6 +203,10 @@ public:
         return this->_combined < otherVersion._combined;
     }
 
+    bool operator<=(const ChunkVersion& otherVersion) const {
+        return this->_combined <= otherVersion._combined;
+    }
+
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
         return epoch() == other.epoch() && majorVersion() == other.majorVersion();
