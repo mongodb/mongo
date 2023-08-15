@@ -5831,9 +5831,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTypeMatch(ArityT
     auto [inputOwn, inputTag, inputVal] = getFromStack(0);
     auto [typeMaskOwn, typeMaskTag, typeMaskVal] = getFromStack(1);
 
-    if (inputTag != value::TypeTags::Nothing && typeMaskTag == value::TypeTags::NumberInt64) {
-        bool matches =
-            static_cast<bool>(getBSONTypeMask(inputTag) & value::bitcastTo<int64_t>(typeMaskVal));
+    if (inputTag != value::TypeTags::Nothing && typeMaskTag == value::TypeTags::NumberInt32) {
+        auto typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
+        bool matches = static_cast<bool>(getBSONTypeMask(inputTag) & typeMask);
+
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
     }
 

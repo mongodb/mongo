@@ -425,7 +425,7 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         if (op.nodes()[1].is<optimizer::Constant>()) {
             auto [tagMask, valMask] = op.nodes()[1].cast<optimizer::Constant>()->get();
             if (tagMask == sbe::value::TypeTags::NumberInt32) {
-                int32_t bsonMask = sbe::value::bitcastTo<int32_t>(valMask);
+                auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
                 if (!kNothingType.isSubset(argSignature)) {
                     // See if we can answer the typeMatch call only using type inference. The type
                     // of the argument must be either completely inside or outside of the requested

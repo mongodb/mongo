@@ -834,7 +834,7 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
             const MatcherTypeSet& ts = tme->typeSet();
 
             return makeFunction(
-                "typeMatch", expr.extractExpr(state), makeInt64Constant(ts.getBSONTypeMask()));
+                "typeMatch", expr.extractExpr(state), makeInt32Constant(ts.getBSONTypeMask()));
         }
 
         default:

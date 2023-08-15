@@ -391,8 +391,8 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
             "typeMatch",
             sbe::makeEs(std::move(args.at(0)),
                         sbe::makeE<sbe::EConstant>(
-                            sbe::value::TypeTags::NumberInt64,
-                            sbe::value::bitcastFrom<int64_t>(constPtr->getValueInt32()))));
+                            sbe::value::TypeTags::NumberInt32,
+                            sbe::value::bitcastFrom<int32_t>(constPtr->getValueInt32()))));
     }
 
     if (name == "shardFilter") {

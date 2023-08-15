@@ -591,7 +591,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
                     return sbe::makeE<sbe::EIf>(
                         makeFunction("typeMatch"_sd,
                                      var.clone(),
-                                     makeInt64Constant(getBSONTypeMask(BSONType::Array) |
+                                     makeInt32Constant(getBSONTypeMask(BSONType::Array) |
                                                        getBSONTypeMask(BSONType::Object))),
                         var.clone(),
                         makeNothingConstant());

@@ -3648,7 +3648,7 @@ private:
                                                           StringData expressionName,
                                                           StringData parameterName) {
         return {
-            makeNot(makeFunction("typeMatch", dateRef.clone(), makeInt64Constant(dateTypeMask()))),
+            makeNot(makeFunction("typeMatch", dateRef.clone(), makeInt32Constant(dateTypeMask()))),
             sbe::makeE<sbe::EFail>(errorCode,
                                    str::stream()
                                        << expressionName << " parameter '" << parameterName

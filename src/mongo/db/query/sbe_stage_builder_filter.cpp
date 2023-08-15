@@ -329,7 +329,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
         traverseFExpr = sbe::makeE<sbe::EIf>(
             makeFillEmptyFalse(makeFunction("typeMatch",
                                             fieldExpr->clone(),
-                                            makeInt64Constant(getBSONTypeMask(BSONType::Array) |
+                                            makeInt32Constant(getBSONTypeMask(BSONType::Array) |
                                                               getBSONTypeMask(BSONType::Object)))),
             std::move(traverseFExpr),
             !inputExpr.isNull() ? makeNot(makeFillEmptyFalse(makeFunction(
@@ -779,7 +779,7 @@ public:
             makeBinaryOp(sbe::EPrimBinary::logicAnd,
                          makeFunction("typeMatch",
                                       std::move(lambdaParam),
-                                      makeInt64Constant(getBSONTypeMask(BSONType::Array) |
+                                      makeInt32Constant(getBSONTypeMask(BSONType::Array) |
                                                         getBSONTypeMask(BSONType::Object))),
                          _context->topFrame().popExpr());
 
@@ -1114,7 +1114,7 @@ public:
             const MatcherTypeSet& ts = expr->typeSet();
             return makeFillEmptyFalse(makeFunction("typeMatch",
                                                    inputExpr.extractExpr(context->state),
-                                                   makeInt64Constant(ts.getBSONTypeMask())));
+                                                   makeInt32Constant(ts.getBSONTypeMask())));
         };
 
         generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode);
@@ -1398,7 +1398,7 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
     auto numericBitTestInputExpr = sbe::makeE<sbe::EIf>(
         makeFunction("typeMatch",
                      inputExpr.getExpr(state),
-                     makeInt64Constant(getBSONTypeMask(sbe::value::TypeTags::NumberDecimal))),
+                     makeInt32Constant(getBSONTypeMask(sbe::value::TypeTags::NumberDecimal))),
         makeFunction("round"_sd, inputExpr.getExpr(state)),
         inputExpr.getExpr(state));
 

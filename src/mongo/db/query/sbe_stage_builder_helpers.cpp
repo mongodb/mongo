@@ -136,7 +136,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpressi
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
                                      expr.clone(),
-                                     makeInt64Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
                                                        getBSONTypeMask(BSONType::Undefined))),
                         makeBoolConstant(true));
 }
@@ -173,7 +173,7 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
         sbe::EPrimBinary::logicAnd,
         makeFunction("typeMatch",
                      var.clone(),
-                     makeInt64Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
+                     makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
         makeBinaryOp(sbe::EPrimBinary::eq,
                      var.clone(),
                      makeInt64Constant(std::numeric_limits<int64_t>::min())));

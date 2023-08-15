@@ -197,13 +197,9 @@ public:
             return;
         }
 
-        // The bitmask representing the set of types is a 32-bit unsigned integer. In order to avoid
-        // converting a 32-bit unsigned number that is larger than INT_MAX to a 32-bit signed
-        // number, we use NumberInt64 rather than NumberInt32 as the destination SBE type.
-        auto value = sbe::value::bitcastFrom<int64_t>(expr->typeSet().getBSONTypeMask());
-        tassert(
-            6279506, "type mask cannot be negative", sbe::value::bitcastTo<int64_t>(value) >= 0);
-        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+        auto value = sbe::value::bitcastFrom<int32_t>(expr->typeSet().getBSONTypeMask());
+
+        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const WhereMatchExpression* expr) final {

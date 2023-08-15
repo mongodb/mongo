@@ -445,7 +445,7 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
         } else {
             auto [tagMask, valMask] = args[1].cast<optimizer::Constant>()->get();
             if (tagMask == sbe::value::TypeTags::NumberInt32) {
-                int32_t bsonMask = sbe::value::bitcastTo<int32_t>(valMask);
+                auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
                 swapAndUpdate(n,
                               optimizer::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
             }

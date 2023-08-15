@@ -1124,11 +1124,8 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
         // specialized variants.
         if (_name == "typeMatch" && _nodes[1]->as<EConstant>()) {
             auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
-            if (tag == value::TypeTags::NumberInt64) {
-                auto mask = value::bitcastTo<int64_t>(val);
-                uassert(6996901,
-                        "Second argument to typeMatch() must be a 32-bit integer constant",
-                        mask >> 32 == 0 || mask >> 32 == -1);
+            if (tag == value::TypeTags::NumberInt32) {
+                auto mask = static_cast<uint32_t>(value::bitcastTo<int32_t>(val));
                 auto param = appendParameter(code, ctx, _nodes[0].get());
                 code.appendTypeMatch(param, mask);
 
