@@ -102,6 +102,10 @@ globals:
   isString: true
   _createSecurityToken: true
   _isAddressSanitizerActive: true
+  _isLeakSanitizerActive: true
+  _isThreadSanitizerActive: true
+  _isUndefinedBehaviorSanitizerActive: true
+  _optimizationsEnabled: true
   allocatePort: true
   allocatePorts: true
   resetAllocatedPorts: true

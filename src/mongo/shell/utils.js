@@ -319,6 +319,11 @@ if (typeof TestData == "undefined") {
     TestData = undefined;
 }
 
+function _optimizationsEnabled(flags) {
+    const sanitizeMatch = /(\s|^)-O2(\s|$)/.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
+    return Boolean(sanitizeMatch);
+}
+
 function __sanitizeMatch(flag) {
     var sanitizeMatch = /-fsanitize=([^\s]+) /.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
     if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
