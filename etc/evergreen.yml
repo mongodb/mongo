@@ -1212,7 +1212,7 @@ buildvariants:
   #     variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.cqf_only
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -1346,7 +1346,7 @@ buildvariants:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
   tasks:
-  - name: .aggfuzzer !.sbe_only
+  - name: .aggfuzzer !.sbe_only !.cqf_only
   - name: .aggregation !.sbe_only
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -1970,7 +1970,7 @@ buildvariants:
   # - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.cqf_only
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -2939,7 +2939,7 @@ buildvariants:
   # - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.cqf_only
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
   - name: audit
