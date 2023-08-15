@@ -15,3 +15,15 @@ f5a6c794a0af1a5d57db2617c2e9464eaad9f221
 
 # SERVER-18579: Clang-Format - reformat code
 9c2ed42daa8fbbef4a919c21ec564e2db55e8d60
+
+# SERVER-79735 Convert jstest corpus to use es modules
+a4f458fe4d7a44eba056f5c150753e73067c8e4d
+
+# SERVER-78551 Migrate analyze_plan library to module
+1e98a0f23d62eb1f149658d190f0285879d91db5
+
+# SERVER-78419 Convert FSM to load workloads as modules
+1ce8128b8b286c2500ed8fdf6f7f18382b2cdd14
+
+# SERVER-74787 Prepare jstest corpus for implicit strict mode
+43b87324302209cbfa240d6c6b520007669e4ea6
