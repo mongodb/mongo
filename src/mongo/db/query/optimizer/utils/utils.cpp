@@ -90,7 +90,12 @@ void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
                 make<EvalPath>(pathGet->getPath(), make<Variable>(parentProjName)),
                 std::move(builder._node));
         }
-        shardKeyComponentProjections.push_back(make<Variable>(projName));
+        ABT shardKeyComponentProj = make<Variable>(std::move(projName));
+        if (e._op == CollationOp::Clustered) {
+            shardKeyComponentProj =
+                make<FunctionCall>("shardHash", makeSeq(std::move(shardKeyComponentProj)));
+        }
+        shardKeyComponentProjections.push_back(std::move(shardKeyComponentProj));
     }
     // Make the FunctionCall and FilterNode.
     auto functionCallNode =

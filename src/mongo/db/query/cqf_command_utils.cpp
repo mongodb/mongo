@@ -1096,11 +1096,6 @@ bool isEligibleCommon(const RequestType& request,
     if (!collection)
         return true;
 
-    // TODO SERVER-78502: Allow hashed shard keys.
-    if (collection.isSharded_DEPRECATED() && collection.getShardKeyPattern().isHashedPattern()) {
-        return false;
-    }
-
     const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
@@ -1116,34 +1111,30 @@ bool isEligibleCommon(const RequestType& request,
         }
     }();
 
-    while (indexIterator->more()) {
-        const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
-        if (descriptor.hidden()) {
-            // An index that is hidden will not be considered by the optimizer, so we don't need
-            // to check its eligibility further.
-            continue;
-        }
+    // If the query has a hint specifying $natural, then there is no need to inspect the index
+    // catalog since we know we will generate a collection scan plan.
+    if (!queryHasNaturalHint) {
+        while (indexIterator->more()) {
+            const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
+            if (descriptor.hidden()) {
+                // An index that is hidden will not be considered by the optimizer, so we don't need
+                // to check its eligibility further.
+                continue;
+            }
 
-        // TODO SERVER-78502: Remove this if. Can also simplify the code by not
-        // executing this loop if queryHaNaturalHint is true and remove !queryHasNaturalHint from
-        // both guards below.
-        if (descriptor.getIndexType() == IndexType::INDEX_HASHED) {
-            return false;
-        }
+            // In M2, we should fall back on any non-hidden, non-_id index on a query with no
+            // $natural hint.
+            if (!descriptor.isIdIndex() &&
+                frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+                return false;
+            }
 
-        // In M2, we should fall back on any non-hidden, non-_id index on a query with no
-        // $natural hint.
-        if (!descriptor.isIdIndex() && frameworkControl == QueryFrameworkControlEnum::kTryBonsai &&
-            !queryHasNaturalHint) {
-            return false;
-        }
-
-        if ((descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
-             descriptor.isPartial() || descriptor.isSparse() ||
-             descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-             !descriptor.collation().isEmpty()) &&
-            !queryHasNaturalHint) {
-            return false;
+            if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+                descriptor.isPartial() || descriptor.isSparse() ||
+                descriptor.getIndexType() != IndexType::INDEX_BTREE ||
+                !descriptor.collation().isEmpty()) {
+                return false;
+            }
         }
     }
 

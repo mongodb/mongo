@@ -278,7 +278,12 @@ public:
                                          projName,
                                          make<EvalPath>(fieldSpec._path, make<Variable>(scanProj)),
                                          std::move(builder._node));
-            shardKeyFieldVars.push_back(make<Variable>(projName));
+            ABT shardKeyFieldVar = make<Variable>(std::move(projName));
+            if (fieldSpec._op == CollationOp::Clustered) {
+                shardKeyFieldVar =
+                    make<FunctionCall>("shardHash", makeSeq(std::move(shardKeyFieldVar)));
+            }
+            shardKeyFieldVars.push_back(std::move(shardKeyFieldVar));
             if (childPtr == nullptr) {
                 childPtr = &builder._node.cast<EvaluationNode>()->getChild();
             }

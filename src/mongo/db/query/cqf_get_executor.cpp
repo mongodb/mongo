@@ -188,14 +188,11 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
         }
 
         // If there is a $natural hint, we should not assert here as we will not use the index.
-        // TODO SERVER-78502: Remove the second part of the if statement's guard below regarding the
-        // presence of a hashed index.
         const bool isSpecialIndex =
             descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
             descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
             !descriptor.collation().isEmpty();
-        if ((!queryHasNaturalHint && isSpecialIndex) ||
-            descriptor.getIndexType() == IndexType::INDEX_HASHED) {
+        if (!queryHasNaturalHint && isSpecialIndex) {
             uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
         }
 

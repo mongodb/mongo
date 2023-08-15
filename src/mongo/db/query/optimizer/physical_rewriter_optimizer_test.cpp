@@ -6187,5 +6187,23 @@ TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
     }
 }
 
+TEST(PhysRewriter, HashedShardKey) {
+    ABT rootNode = NodeBuilder{}.root("root").finish(_scan("root", "c1"));
+    // Sharded on {a: "hashed", b: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Clustered},
+                         {_get("b", _id())._n, CollationOp::Ascending}},
+                        true);
+    ABT optimized = optimizeABTWithShardingMetadataNoIndexes(rootNode, sm);
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   |   Variable [shardKey_3]\n"
+        "|   FunctionCall [shardHash]\n"
+        "|   Variable [shardKey_2]\n"
+        "PhysicalScan [{'<root>': root, 'a': shardKey_2, 'b': shardKey_3}, c1]\n",
+        optimized);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

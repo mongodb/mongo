@@ -460,16 +460,14 @@ assert.commandWorked(coll.createIndex({"_id": "hashed"}));
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
 
-// Query with $natural on a collection with a hashed index on _id (unsupported) is not eligible for
-// CQF.
-// TODO SERVER-78502: Change these tests to use assertSupportedByBonsaiFully and change the comment
-// above.
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}, hint: {$natural: 1}}, false);
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}, hint: {$natural: -1}}, false);
-assertNotSupportedByBonsai(
-    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: 1}}, false);
-assertNotSupportedByBonsai(
-    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}}, false);
+// Query with $natural on a collection with a hashed index on _id is only eligible for CQF with a
+// $natural hint.
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: -1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}});
 
 // Unsupported collection types. Note that a query against the user-facing timeseries collection
 // will fail due to the unsupported $unpackBucket stage.
