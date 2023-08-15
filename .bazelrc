@@ -1,1 +1,5 @@
 # Reference docs: https://bazel.build/run/bazelrc
+
+# This makes builds more hermetic
+# this will help prevent environment variables leaking into the execution of rules
+build --incompatible_strict_action_env=true
