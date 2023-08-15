@@ -30,6 +30,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <mutex>
 
 #include "mongo/config.h"  // IWYU pragma: keep
