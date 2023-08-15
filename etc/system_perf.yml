@@ -1324,6 +1324,13 @@ tasks:
         vars:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_SubDocId.yml
+  - name: genny_resharding_withIndexes
+    exec_timeout_secs: 172800 # 2 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/sharding/ReshardCollectionWithIndexes.yml
   - name: query_read_commands
     commands:
       - func: f_run_dsi_workload
@@ -3971,3 +3978,26 @@ buildvariants:
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
       - name: tsbs_query_high_cardinality
+
+  - name: linux-arm-3-shard-resharding.2023-08
+    display_name: Linux 3-Shard Resharding
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: resharding-3shard.2023-08
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: resharding-3shard.2023-08
+      workload_setup: 2022-11
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: genny_resharding_withIndexes
