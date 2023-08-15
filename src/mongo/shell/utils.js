@@ -29,6 +29,13 @@ function _getErrorWithCode(codeOrObj, message) {
 
         if (codeOrObj.hasOwnProperty("writeErrors")) {
             e.writeErrors = codeOrObj.writeErrors;
+        } else if ((codeOrObj instanceof BulkWriteResult || codeOrObj instanceof BulkWriteError) &&
+                   codeOrObj.hasWriteErrors()) {
+            e.writeErrors = codeOrObj.getWriteErrors();
+        }
+
+        if (codeOrObj instanceof WriteResult && codeOrObj.hasWriteError()) {
+            e.writeErrors = [codeOrObj.getWriteError()];
         }
 
         if (codeOrObj.hasOwnProperty("errorLabels")) {
