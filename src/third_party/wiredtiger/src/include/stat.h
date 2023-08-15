@@ -353,6 +353,7 @@ struct __wt_connection_stats {
     int64_t autocommit_update_retry;
     int64_t background_compact_fail;
     int64_t background_compact_fail_cache_pressure;
+    int64_t background_compact_interrupted;
     int64_t background_compact_running;
     int64_t background_compact_skipped;
     int64_t background_compact_success;

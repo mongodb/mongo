@@ -1290,6 +1290,7 @@ static const char *const __stats_connection_desc[] = {
   "autocommit: retries for update operations",
   "background-compact: background compact failed calls",
   "background-compact: background compact failed calls due to cache pressure",
+  "background-compact: background compact interrupted",
   "background-compact: background compact running",
   "background-compact: background compact skipped as process would not reduce file size",
   "background-compact: background compact successful calls",
@@ -1961,6 +1962,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->autocommit_update_retry = 0;
     stats->background_compact_fail = 0;
     stats->background_compact_fail_cache_pressure = 0;
+    stats->background_compact_interrupted = 0;
     stats->background_compact_running = 0;
     stats->background_compact_skipped = 0;
     stats->background_compact_success = 0;
@@ -2581,6 +2583,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->background_compact_fail += WT_STAT_READ(from, background_compact_fail);
     to->background_compact_fail_cache_pressure +=
       WT_STAT_READ(from, background_compact_fail_cache_pressure);
+    to->background_compact_interrupted += WT_STAT_READ(from, background_compact_interrupted);
     to->background_compact_running += WT_STAT_READ(from, background_compact_running);
     to->background_compact_skipped += WT_STAT_READ(from, background_compact_skipped);
     to->background_compact_success += WT_STAT_READ(from, background_compact_success);
