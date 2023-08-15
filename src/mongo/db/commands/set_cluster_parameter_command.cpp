@@ -81,8 +81,9 @@ public:
                     "setClusterParameter can only run on mongos in sharded clusters",
                     (serverGlobalParams.clusterRole.has(ClusterRole::None)));
 
-            if (!feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (!feature_flags::gFeatureFlagAuditConfigClusterParameter
+                     .isEnabledUseDefaultFCVWhenUninitialized(
+                         serverGlobalParams.featureCompatibility)) {
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << Request::kCommandName << " cannot be run on standalones",
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=

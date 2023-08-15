@@ -811,9 +811,8 @@ bool SSLConfiguration::isClusterMember(
     // If either net.tls.clusterAuthX509.attributes or net.tls.clusterAuthX509.extensionValue have
     // been specified, use them to determine cluster membership. Otherwise, check whether DC, O,
     // and/or OU from the server member certificate's subject DN match the client subject DN.
-    if (_clusterAuthX509Config._configCriteria &&
-        gFeatureFlagConfigurableX509ClusterAuthn.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+
+    if (_clusterAuthX509Config._configCriteria) {
         bool matchesClusterAuthX509Config =
             stdx::visit(visitor, _clusterAuthX509Config._configCriteria.value());
         if (matchesClusterAuthX509Config) {
@@ -830,9 +829,7 @@ bool SSLConfiguration::isClusterMember(
     // If the certificate did not meet either of the above criteria, then it can still be a cluster
     // member if tlsClusterX509AuthOverride is specified and it meets the attribute or extension
     // policy specified.
-    if (_clusterAuthX509Config._overrideCriteria &&
-        gFeatureFlagConfigurableX509ClusterAuthn.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (_clusterAuthX509Config._overrideCriteria) {
         return stdx::visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
     }
 
