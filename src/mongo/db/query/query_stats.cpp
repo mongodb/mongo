@@ -215,7 +215,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         auto configuredSamplingRate = internalQueryStatsRateLimit.load();
         queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
-            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
+            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
     }};
 
 /**

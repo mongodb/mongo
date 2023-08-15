@@ -34,6 +34,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
@@ -53,7 +54,9 @@ public:
      * Constructor for a rate limiter. Specify the number of requests you want to take place, as
      * well as the time period in milliseconds.
      */
-    RateLimiting(RequestCount samplingRate, Milliseconds timePeriod = Seconds{1});
+    RateLimiting(RequestCount samplingRate,
+                 Milliseconds timePeriod = Seconds{1},
+                 ClockSource* clockSource = nullptr);
 
     /*
      * Getter for the sampling rate.
@@ -124,6 +127,6 @@ private:
     /*
      * Mutex used when reading/writing the window.
      */
-    stdx::recursive_mutex _windowMutex;
+    SimpleMutex _windowMutex;
 };
 }  // namespace mongo
