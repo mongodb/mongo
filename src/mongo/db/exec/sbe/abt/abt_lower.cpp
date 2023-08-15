@@ -230,7 +230,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
         boost::optional<sbe::value::SlotId> collatorSlot =
-            _runtimeEnv.getSlotIfExists("collator"_sd);
+            _namedSlots.getSlotIfExists("collator"_sd);
         if (collatorSlot) {
             return sbe::makeE<sbe::EPrimBinary>(
                 sbeOp, std::move(lhs), std::move(rhs), sbe::makeE<sbe::EVariable>(*collatorSlot));
@@ -313,7 +313,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             projectValues.push_back(sbe::makeE<sbe::EVariable>(slotId));
         } else {
             // Otherwise, lower the expression to be referenced by the 'shardFilter' function call.
-            SBEExpressionLowering exprLower{_env, _slotMap, _runtimeEnv};
+            SBEExpressionLowering exprLower{_env, _slotMap, _namedSlots};
             projectValues.push_back(exprLower.optimize(node));
         }
     }
@@ -335,7 +335,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
 
     // Prepare the FunctionCall expression.
     sbe::EExpression::Vector argVector;
-    argVector.push_back(sbe::makeE<sbe::EVariable>(_runtimeEnv.getSlot(kshardFiltererSlotName)));
+    argVector.push_back(sbe::makeE<sbe::EVariable>(_namedSlots.getSlot(kshardFiltererSlotName)));
     argVector.push_back(std::move(shardKeyBSONObjExpression));
     return sbe::makeE<sbe::EFunction>(name, std::move(argVector));
 }
@@ -842,7 +842,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
         aggs.push_back({slot, sbe::AggExprPair{nullptr, std::move(expr)}});
     }
 
-    boost::optional<sbe::value::SlotId> collatorSlot = _runtimeEnv.getSlotIfExists("collator"_sd);
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     // Unused
     sbe::value::SlotVector seekKeysSlots;
 
@@ -935,7 +935,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
     auto outerKeys = convertProjectionsToSlots(slotMap, n.getRightKeys());
     auto outerProjects = convertRequiredProjectionsToSlots(slotMap, rightProps, outerKeys);
 
-    boost::optional<sbe::value::SlotId> collatorSlot = _runtimeEnv.getSlotIfExists("collator"_sd);
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
                                           std::move(innerStage),

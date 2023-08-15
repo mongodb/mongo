@@ -142,7 +142,7 @@ public:
      * Returns a SlotId registered for the given slot 'name'. If the slot with the specified name
      * hasn't been registered, a user exception is raised.
      */
-    value::SlotId getSlot(StringData name) const;
+    value::SlotId getSlot(StringData name) const final;
 
     /**
      * Returns a SlotId registered for the given slot 'name'. If the slot with the specified name
