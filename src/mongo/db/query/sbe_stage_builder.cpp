@@ -638,7 +638,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sbe::EExpression::Vector args;
         for (auto&& elem : ixn->index.keyPattern) {
             StringData name = elem.fieldNameStringData();
-            args.emplace_back(sbe::makeE<sbe::EConstant>(name));
+            args.emplace_back(makeStrConstant(name));
             args.emplace_back(
                 makeVariable(outputs.get(std::make_pair(PlanStageSlots::kField, name))));
         }
@@ -791,7 +791,7 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
                                        std::move(expr))
                 .extractExpr(state);
         case MatchExpression::EXISTS:
-            return makeConstant(sbe::value::TypeTags::Boolean, true);
+            return makeBoolConstant(true);
         case MatchExpression::LT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
@@ -834,10 +834,7 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
             const MatcherTypeSet& ts = tme->typeSet();
 
             return makeFunction(
-                "typeMatch",
-                expr.extractExpr(state),
-                makeConstant(sbe::value::TypeTags::NumberInt64,
-                             sbe::value::bitcastFrom<int64_t>(ts.getBSONTypeMask())));
+                "typeMatch", expr.extractExpr(state), makeInt64Constant(ts.getBSONTypeMask()));
         }
 
         default:
@@ -1243,9 +1240,10 @@ std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
     boost::optional<sbe::value::SlotId> fieldSlot = boost::none) {
     invariant(level < fp.getPathLength());
 
-    auto fieldExpr = fieldSlot
-        ? makeVariable(*fieldSlot)
-        : makeFunction("getField"_sd, std::move(inputExpr), makeConstant(fp.getFieldName(level)));
+    auto fieldExpr = fieldSlot ? makeVariable(*fieldSlot)
+                               : makeFunction("getField"_sd,
+                                              std::move(inputExpr),
+                                              makeStrConstant(fp.getFieldName(level)));
 
     auto resultExpr = [&] {
         if (level == fp.getPathLength() - 1u) {
@@ -1294,7 +1292,7 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldExpr = fieldSlot
         ? makeVariable(*fieldSlot)
-        : makeFunction("getField"_sd, inputVar.clone(), makeConstant(fp.getFieldName(level)));
+        : makeFunction("getField"_sd, inputVar.clone(), makeStrConstant(fp.getFieldName(level)));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
@@ -1345,11 +1343,8 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
     if (!fieldSlot) {
         binds.emplace_back(std::move(fieldExpr));
     }
-    binds.emplace_back(
-        makeFunction("traverseP",
-                     var->clone(),
-                     std::move(lambdaExpr),
-                     makeConstant(sbe::value::TypeTags::NumberInt32, 1) /* maxDepth */));
+    binds.emplace_back(makeFunction(
+        "traverseP", var->clone(), std::move(lambdaExpr), makeInt32Constant(1) /* maxDepth */));
 
     auto helperArgs = sbe::makeEs(resultVar->clone());
     if (collatorSlot) {
@@ -1459,7 +1454,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                   &_frameIdGenerator,
                                                   outputs.getIfExists(std::make_pair(
                                                       PlanStageSlots::kField, fp.getFieldName(0)))),
-                        makeConstant(sbe::value::TypeTags::Boolean, false));
+                        makeBoolConstant(false));
                 };
 
                 auto numArraysExpr = makeIsArrayCheck(*sortPattern[0].fieldPath);
@@ -1469,12 +1464,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                  makeIsArrayCheck(*sortPattern[idx].fieldPath));
                 }
 
-                return makeBinaryOp(
-                    sbe::EPrimBinary::logicOr,
-                    makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                 std::move(numArraysExpr),
-                                 makeConstant(sbe::value::TypeTags::NumberInt32, 1)),
-                    std::move(parallelArraysError));
+                return makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                    makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                                 std::move(numArraysExpr),
+                                                 makeInt32Constant(1)),
+                                    std::move(parallelArraysError));
             }
         }();
 
@@ -1567,11 +1561,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
                                                      : sbe::value::SortDirection::Descending);
 
-                projects.emplace_back(
-                    sortKeySlot,
-                    makeFunction("sortKeyComponentVectorGetElement",
-                                 makeVariable(fullSortKeySlot),
-                                 makeConstant(sbe::value::TypeTags::NumberInt32, i)));
+                projects.emplace_back(sortKeySlot,
+                                      makeFunction("sortKeyComponentVectorGetElement",
+                                                   makeVariable(fullSortKeySlot),
+                                                   makeInt32Constant(i)));
                 ++i;
             }
             stage = sbe::makeS<sbe::ProjectStage>(
@@ -2589,7 +2582,7 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
             groupByEvalExpr = slot;
             stage = std::move(projectStage);
 
-            exprs.emplace_back(makeConstant(fieldName));
+            exprs.emplace_back(makeStrConstant(fieldName));
             exprs.emplace_back(groupByEvalExpr.extractExpr(state));
         }
 
@@ -2623,7 +2616,7 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
         // When the group id is Nothing (with $$REMOVE for example), we use null instead.
         auto tag = groupByExprConstant->getConstant().first;
         if (tag == sbe::value::TypeTags::Nothing) {
-            groupByExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
+            groupByExpr = makeNullConstant();
         }
         return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr)};
     } else {
@@ -3433,9 +3426,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             sbe::value::SlotMap<sbe::AggExprPair> aggExprPairs;
             aggExprPairs.emplace(
                 *documentBoundSlot,
-                sbe::AggExprPair{
-                    nullptr,
-                    makeFunction("sum", makeConstant(sbe::value::TypeTags::NumberInt32, 1))});
+                sbe::AggExprPair{nullptr, makeFunction("sum", makeInt32Constant(1))});
             stage = sbe::makeS<sbe::AggProjectStage>(
                 std::move(stage), std::move(aggExprPairs), windowNode->nodeId());
             forwardSlots.push_back(*documentBoundSlot);
@@ -3706,9 +3697,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             finalExpr = buildFinalize(
                 _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
         }
-        auto emptyWindowExpr = outputField.expr->getOpName() == "$sum"
-            ? makeConstant(sbe::value::TypeTags::NumberInt32, 0)
-            : makeConstant(sbe::value::TypeTags::Null, 0);
+        auto emptyWindowExpr =
+            outputField.expr->getOpName() == "$sum" ? makeInt32Constant(0) : makeNullConstant();
         if (finalExpr) {
             finalExpr =
                 sbe::makeE<sbe::EIf>(makeFunction("exists", makeVariable(firstComponentSlot)),

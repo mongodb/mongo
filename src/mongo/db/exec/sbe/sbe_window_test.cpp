@@ -60,23 +60,21 @@ public:
             window.lowBoundTestingSlot = lowBoundTestingSlot;
             window.lowBoundExpr = nullptr;
             if (lowerOffset) {
-                window.lowBoundExpr = makeBinaryOp(
-                    EPrimBinary::greaterEq,
-                    makeVariable(lowBoundTestingSlot),
-                    makeBinaryOp(EPrimBinary::add,
-                                 makeVariable(lowBoundSlot),
-                                 makeConstant(value::TypeTags::NumberInt32, *lowerOffset)));
+                window.lowBoundExpr = makeBinaryOp(EPrimBinary::greaterEq,
+                                                   makeVariable(lowBoundTestingSlot),
+                                                   makeBinaryOp(EPrimBinary::add,
+                                                                makeVariable(lowBoundSlot),
+                                                                makeInt32Constant(*lowerOffset)));
             }
             window.highBoundSlot = highBoundSlot;
             window.highBoundTestingSlot = highBoundTestingSlot;
             window.highBoundExpr = nullptr;
             if (higherOffset) {
-                window.highBoundExpr = makeBinaryOp(
-                    EPrimBinary::lessEq,
-                    makeVariable(highBoundTestingSlot),
-                    makeBinaryOp(EPrimBinary::add,
-                                 makeVariable(highBoundSlot),
-                                 makeConstant(value::TypeTags::NumberInt32, *higherOffset)));
+                window.highBoundExpr = makeBinaryOp(EPrimBinary::lessEq,
+                                                    makeVariable(highBoundTestingSlot),
+                                                    makeBinaryOp(EPrimBinary::add,
+                                                                 makeVariable(highBoundSlot),
+                                                                 makeInt32Constant(*higherOffset)));
             }
             window.initExpr = nullptr;
             window.addExpr = makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot));
@@ -100,7 +98,7 @@ public:
                 resultSlot,
                 makeE<EIf>(makeFunction("exists", makeVariable(windowSlot)),
                            makeFunction("doubleDoubleSumFinalize", makeVariable(windowSlot)),
-                           makeConstant(value::TypeTags::NumberInt32, 0)));
+                           makeInt32Constant(0)));
         }
         stage = makeS<ProjectStage>(std::move(stage), std::move(projects), kEmptyPlanNodeId);
         return {std::move(stage), std::move(resultSlots)};

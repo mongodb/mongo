@@ -70,9 +70,8 @@ inline auto makeABTFunction(StringData name, Args&&... args) {
         name.toString(), optimizer::makeSeq(std::forward<Args>(args)...));
 }
 
-template <typename T>
-inline auto makeABTConstant(sbe::value::TypeTags tag, T value) {
-    return optimizer::make<optimizer::Constant>(tag, sbe::value::bitcastFrom<T>(value));
+inline auto makeABTConstant(sbe::value::TypeTags tag, sbe::value::Value value) {
+    return optimizer::make<optimizer::Constant>(tag, value);
 }
 
 inline auto makeABTConstant(StringData str) {

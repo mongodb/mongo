@@ -249,14 +249,39 @@ inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&...
     return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
 }
 
-template <typename T>
-inline auto makeConstant(sbe::value::TypeTags tag, T value) {
-    return sbe::makeE<sbe::EConstant>(tag, sbe::value::bitcastFrom<T>(value));
+inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
+    return sbe::makeE<sbe::EConstant>(tag, val);
 }
 
-inline auto makeConstant(StringData str) {
-    auto [tag, value] = sbe::value::makeNewString(str);
-    return sbe::makeE<sbe::EConstant>(tag, value);
+inline auto makeNothingConstant() {
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
+}
+inline auto makeNullConstant() {
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
+}
+inline auto makeBoolConstant(bool boolVal) {
+    auto val = sbe::value::bitcastFrom<bool>(boolVal);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
+}
+inline auto makeInt32Constant(int32_t num) {
+    auto val = sbe::value::bitcastFrom<int32_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, val);
+}
+inline auto makeInt64Constant(int64_t num) {
+    auto val = sbe::value::bitcastFrom<int64_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, val);
+}
+inline auto makeDoubleConstant(double num) {
+    auto val = sbe::value::bitcastFrom<double>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble, val);
+}
+inline auto makeDecimalConstant(const Decimal128& num) {
+    auto [tag, val] = sbe::value::makeCopyDecimal(num);
+    return sbe::makeE<sbe::EConstant>(tag, val);
+}
+inline auto makeStrConstant(StringData str) {
+    auto [tag, val] = sbe::value::makeNewString(str);
+    return sbe::makeE<sbe::EConstant>(tag, val);
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId);
@@ -304,7 +329,7 @@ template <size_t N>
 FieldExprs<N + 2> array_append(FieldExprs<N> fieldExprs, FieldPair field) {
     return array_append(std::move(fieldExprs),
                         std::make_index_sequence<N>{},
-                        makeConstant(field.first),
+                        makeStrConstant(field.first),
                         std::move(field.second));
 }
 
@@ -338,7 +363,7 @@ std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs,
 // Deals with the first 'FieldPair' and adds it to the 'EExpression' array.
 template <typename... Ts>
 std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fields) {
-    return makeNewObjFunction(FieldExprs<2>{makeConstant(field.first), std::move(field.second)},
+    return makeNewObjFunction(FieldExprs<2>{makeStrConstant(field.first), std::move(field.second)},
                               std::forward<Ts>(fields)...);
 }
 

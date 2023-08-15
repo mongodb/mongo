@@ -99,13 +99,12 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
     auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
 
     // Build and prepare for execution loop join of the two scan stages.
-    auto loopJoin = makeS<LoopJoinStage>(
-        std::move(outerScanStage),
-        std::move(innerScanStage),
-        makeSV(outerScanSlot) /*outerProjects*/,
-        makeSV() /*outerCorrelated*/,
-        stage_builder::makeConstant(sbe::value::TypeTags::Boolean, true) /*predicate*/,
-        kEmptyPlanNodeId);
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(innerScanStage),
+                                         makeSV(outerScanSlot) /*outerProjects*/,
+                                         makeSV() /*outerCorrelated*/,
+                                         stage_builder::makeBoolConstant(true) /*predicate*/,
+                                         kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
     auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
     auto inner = loopJoin->getAccessor(*ctx, innerScanSlot);
@@ -135,13 +134,12 @@ TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
     auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
 
     // Build and prepare for execution loop join of the two scan stages.
-    auto loopJoin = makeS<LoopJoinStage>(
-        std::move(outerScanStage),
-        std::move(innerScanStage),
-        makeSV(outerScanSlot) /*outerProjects*/,
-        makeSV() /*outerCorrelated*/,
-        stage_builder::makeConstant(sbe::value::TypeTags::Boolean, false) /*predicate*/,
-        kEmptyPlanNodeId);
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(innerScanStage),
+                                         makeSV(outerScanSlot) /*outerProjects*/,
+                                         makeSV() /*outerCorrelated*/,
+                                         stage_builder::makeBoolConstant(false) /*predicate*/,
+                                         kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
 
     // Executing the stage should produce no results because of the predicate filter.
