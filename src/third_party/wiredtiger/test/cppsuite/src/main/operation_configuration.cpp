@@ -40,6 +40,9 @@ std::function<void(thread_worker *)>
 operation_configuration::get_func(database_operation *dbo)
 {
     switch (type) {
+    case thread_type::BACKGROUND_COMPACT:
+        return (
+          std::bind(&database_operation::background_compact_operation, dbo, std::placeholders::_1));
     case thread_type::CHECKPOINT:
         return (std::bind(&database_operation::checkpoint_operation, dbo, std::placeholders::_1));
     case thread_type::CUSTOM:

@@ -38,6 +38,7 @@ const std::string TIMESTAMP_MANAGER = "timestamp_manager";
 const std::string WORKLOAD_MANAGER = "workload_manager";
 
 /* Configuration API consts. */
+const std::string BACKGROUND_COMPACT_OP_CONFIG = "background_compact_config";
 const std::string CACHE_HS_INSERT = "cache_hs_insert";
 const std::string CACHE_MAX_WAIT_MS = "cache_max_wait_ms";
 const std::string CACHE_SIZE_MB = "cache_size_mb";
@@ -49,6 +50,7 @@ const std::string CUSTOM_OP_CONFIG = "custom_config";
 const std::string DURATION_SECONDS = "duration_seconds";
 const std::string ENABLED = "enabled";
 const std::string ENABLE_LOGGING = "enable_logging";
+const std::string FREE_SPACE_TARGET_MB = "free_space_target_mb";
 const std::string INSERT_OP_CONFIG = "insert_config";
 const std::string KEY_COUNT_PER_COLLECTION = "key_count_per_collection";
 const std::string KEY_SIZE = "key_size";

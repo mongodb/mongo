@@ -125,6 +125,15 @@ checkpoint_operation_thread_config = [
     Config('op_rate', '60s', r'''
         The rate at which checkpoint is executed.''')
 ]
+
+background_compact_thread_config = [
+    Config('thread_count', 0, r'''
+        Specifies the number of threads that will be used to perform background compaction
+           operation.''',
+        min=0, max=1),
+    Config('free_space_target_mb', '20', r'''
+        Minimum amount of space in MB recoverable for compaction to proceed.''')
+]
 custom_operation_thread_config = thread_count + transaction_config + throttle_config + record_config
 read_thread_config = thread_count + throttle_config + transaction_config + record_config
 remove_thread_config = thread_count + transaction_config + throttle_config
@@ -177,6 +186,9 @@ operation_tracker = enabled_config_true + component_config + tracking_config
 # Configuration that applies to the workload_manager component.
 #
 workload_manager = enabled_config_true + component_config + [
+    Config('background_compact_config', '',r'''
+        Config that specifies if background compaction is enabled and its behaviour.''',
+        type='category', subconfig=background_compact_thread_config),
     Config('checkpoint_config', '',r'''
         Config that specifies if the checkpoint thread is enabled and its behaviour.''',
         type='category', subconfig=checkpoint_operation_thread_config),

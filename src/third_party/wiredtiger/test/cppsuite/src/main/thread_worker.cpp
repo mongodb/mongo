@@ -41,6 +41,8 @@ const std::string
 type_string(thread_type type)
 {
     switch (type) {
+    case thread_type::BACKGROUND_COMPACT:
+        return ("background_compact");
     case thread_type::CHECKPOINT:
         return ("checkpoint");
     case thread_type::CUSTOM:
@@ -70,6 +72,7 @@ thread_worker::thread_worker(uint64_t id, thread_type type, configuration *confi
   operation_tracker *op_tracker, database &dbase, std::shared_ptr<barrier> barrier_ptr)
     : /* These won't exist for certain threads which is why we use optional here. */
       collection_count(config->get_optional_int(COLLECTION_COUNT, 1)),
+      free_space_target_mb(config->get_optional_int(FREE_SPACE_TARGET_MB, 1)),
       key_count(config->get_optional_int(KEY_COUNT_PER_COLLECTION, 1)),
       key_size(config->get_optional_int(KEY_SIZE, 1)),
       value_size(config->get_optional_int(VALUE_SIZE, 1)),

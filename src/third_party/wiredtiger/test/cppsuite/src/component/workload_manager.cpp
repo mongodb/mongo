@@ -65,6 +65,8 @@ workload_manager::run()
 
     /* Retrieve useful parameters from the test configuration. */
     operation_configs.push_back(operation_configuration(
+      _config->get_subconfig(BACKGROUND_COMPACT_OP_CONFIG), thread_type::BACKGROUND_COMPACT));
+    operation_configs.push_back(operation_configuration(
       _config->get_subconfig(CHECKPOINT_OP_CONFIG), thread_type::CHECKPOINT));
     operation_configs.push_back(
       operation_configuration(_config->get_subconfig(CUSTOM_OP_CONFIG), thread_type::CUSTOM));
