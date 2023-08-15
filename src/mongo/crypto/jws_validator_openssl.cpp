@@ -120,13 +120,14 @@ public:
         uassertOpenSSL("Failed creating RSAKey", rsa.get() != nullptr);
         uassertOpenSSL("RSA key setup failed",
                        RSA_set0_key(rsa.get(), n.get(), e.get(), nullptr) == 1);
-        n.release();  // Now owned by rsa
-        e.release();  // Now owned by rsa
+        (void)n.release();  // Now owned by rsa, cast to void to explicitly ignore the return value.
+        (void)e.release();  // Now owned by rsa, cast to void to explicitly ignore the return value.
 
         uassertOpenSSL("Failed creating EVP_PKey", _key.get() != nullptr);
         uassertOpenSSL("EVP_PKEY assignment failed",
                        EVP_PKEY_assign_RSA(_key.get(), rsa.get()) == 1);
-        rsa.release();  // Now owned by _key
+        (void)rsa
+            .release();  // Now owned by _key, cast to void to explicitly ignore the return value.
     }
 
     Status validate(StringData algorithm, StringData payload, StringData signature) const final {

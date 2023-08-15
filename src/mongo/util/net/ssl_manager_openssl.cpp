@@ -1700,9 +1700,10 @@ UniqueDHParams makeDefaultDHParameters() {
         return nullptr;
     }
 
-    // DH takes over memory management responsibilities after successfully setting these
-    p.release();
-    g.release();
+    // DH takes over memory management responsibilities after successfully setting these.
+    // Cast to void to explicitly ignore the return value.
+    (void)p.release();
+    (void)g.release();
 
     return dhparams;
 }

@@ -148,7 +148,9 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
                                 "error"_attr = errorMessage(ec));
         }
 
-        ctx.release();
+        // The spawned thread takes over ownership, cast to void to explicitly ignore the return
+        // value.
+        (void)ctx.release();
 #endif
 
     } catch (const std::exception& e) {

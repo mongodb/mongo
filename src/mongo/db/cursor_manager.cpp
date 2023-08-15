@@ -283,8 +283,8 @@ void CursorManager::unpin(OperationContext* opCtx,
     }
 
     // The cursor will stay around in '_cursorMap', so release the unique pointer to avoid deleting
-    // it.
-    cursor.release();
+    // it. Cast to void to explicitly ignore the return value.
+    (void)cursor.release();
 }
 
 void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
