@@ -211,13 +211,16 @@ void ThroughputProbing::_probeUp(double throughput) {
         auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
         auto newConcurrency = expMovingAverage(
             _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
+        auto oldStableConcurrency = _stableConcurrency;
 
-        _stats.timesIncreased.fetchAndAdd(1);
-        _stats.totalAmountIncreased.fetchAndAdd(newConcurrency - _stableConcurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
         _stableConcurrency = newConcurrency;
         _resetConcurrency();
+
+        _stats.timesIncreased.fetchAndAdd(1);
+        _stats.totalAmountIncreased.fetchAndAdd(_readTicketHolder->outof() +
+                                                _writeTicketHolder->outof() - oldStableConcurrency);
     } else {
         // Increasing concurrency did not cause throughput to increase, so go back to stable and get
         // a new baseline to compare against.
@@ -238,13 +241,16 @@ void ThroughputProbing::_probeDown(double throughput) {
         auto concurrency = _readTicketHolder->outof() + _writeTicketHolder->outof();
         auto newConcurrency = expMovingAverage(
             _stableConcurrency, concurrency, gConcurrencyMovingAverageWeight.load());
+        auto oldStableConcurrency = _stableConcurrency;
 
-        _stats.timesDecreased.fetchAndAdd(1);
-        _stats.totalAmountDecreased.fetchAndAdd(_stableConcurrency - newConcurrency);
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
         _stableConcurrency = newConcurrency;
         _resetConcurrency();
+
+        _stats.timesIncreased.fetchAndAdd(1);
+        _stats.totalAmountIncreased.fetchAndAdd(oldStableConcurrency - _readTicketHolder->outof() -
+                                                _writeTicketHolder->outof());
     } else {
         // Decreasing concurrency did not cause throughput to increase, so go back to stable and get
         // a new baseline to compare against.
