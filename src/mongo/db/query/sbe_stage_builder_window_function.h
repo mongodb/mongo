@@ -32,30 +32,59 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/window_function/window_function_statement.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 
 /**
  * Build a list of window function init functions.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(const WindowFunctionStatement& stmt);
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(StageBuilderState& state,
+                                                               const WindowFunctionStatement& stmt);
 
 /**
  * Build a list of window function add functions.
  */
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
-    const WindowFunctionStatement& stmt, std::unique_ptr<sbe::EExpression> arg);
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg);
+
+/**
+ * Similar to above but takes multiple arguments.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
 /**
  * Build a list of window function remove functions.
  */
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
-    const WindowFunctionStatement& stmt, std::unique_ptr<sbe::EExpression> arg);
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg);
+
+/**
+ * Similar to above but takes multiple arguments.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
 /**
  * Build a window function finalize functions from the list of intermediate values.
  */
-std::unique_ptr<sbe::EExpression> buildWindowFinalize(const WindowFunctionStatement& stmt,
+std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
+                                                      const WindowFunctionStatement& stmt,
                                                       sbe::value::SlotVector values);
 
+/**
+ * Create a fake AccumulationStatement from the WindowFunctionStatement in order to invoke
+ * accumulator stage builder.
+ */
+AccumulationStatement createFakeAccumulationStatement(StageBuilderState& state,
+                                                      const WindowFunctionStatement& stmt);
 }  // namespace mongo::stage_builder

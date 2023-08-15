@@ -210,7 +210,7 @@ public:
           _input(std::move(input)),
           _bounds(std::move(bounds)) {}
 
-    std::string getOpName() const {
+    StringData getOpName() const {
         return _accumulatorName;
     }
 
@@ -425,7 +425,8 @@ public:
                         boost::intrusive_ptr<::mongo::Expression> input,
                         WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        if (_accumulatorName == "$sum") {
+        StringDataSet compatibleAccumulators{"$sum", "$covarianceSamp", "$covariancePop"};
+        if (compatibleAccumulators.count(_accumulatorName)) {
             expCtx->sbeWindowCompatibility =
                 std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
         } else {

@@ -104,6 +104,42 @@ private:
     TypedValue _v;
 };
 
+/* Similar to ValueEq, but also value difference within certain limit for double and decimal */
+class ValueRoughEq : public mongo::unittest::match::Matcher {
+public:
+    explicit ValueRoughEq(TypedValue v, double limit) : _v{v}, _limit{limit} {}
+
+    std::string describe() const {
+        std::stringstream ss;
+        ss << "ValueEq(" << _v << ")";
+        return ss.str();
+    }
+
+    MatchResult match(const TypedValue& x) const {
+        auto [tag, val] = sbe::value::compareValue(_v.first, _v.second, x.first, x.second);
+        bool equal =
+            tag == sbe::value::TypeTags::NumberInt32 && sbe::value::bitcastTo<int>(val) == 0;
+        if (!equal) {
+            if (_v.first == sbe::value::TypeTags::NumberDouble &&
+                x.first == sbe::value::TypeTags::NumberDouble) {
+                auto diff = sbe::value::bitcastTo<double>(_v.second) -
+                    sbe::value::bitcastTo<double>(x.second);
+                equal = std::abs(diff) <= _limit;
+            } else if (_v.first == sbe::value::TypeTags::NumberDecimal &&
+                       x.first == sbe::value::TypeTags::NumberDecimal) {
+                auto diff = sbe::value::bitcastTo<Decimal128>(_v.second).subtract(
+                    sbe::value::bitcastTo<Decimal128>(x.second));
+                equal = diff.toAbs().toDouble() <= _limit;
+            }
+        }
+        return MatchResult{equal};
+    }
+
+private:
+    TypedValue _v;
+    double _limit;
+};
+
 class ValueVectorGuard {
     ValueVectorGuard() = delete;
     ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
