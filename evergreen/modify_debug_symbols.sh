@@ -4,9 +4,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 set -o errexit
 
 cd src
+
 # decompress debug symbols
-tar -zxvf mongo-debugsymbols.tgz
+mkdir debug_extract
+tar -zxvf mongo-debugsymbols.tgz -C debug_extract
+
 #  renames dist-test to usr for Antithesis
-mv dist-test usr
+mv debug_extract/dist-test debug_extract/usr
+
 # recompress debug symbols
-tar -czvf mongo-debugsymbols.tgz usr
+tar -czvf mongo-debugsymbols.tgz -C debug_extract usr

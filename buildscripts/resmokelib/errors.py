@@ -92,3 +92,9 @@ class TagFileDoesNotExistError(ResmokeError):
     """Exception raised when a tag file is passed into resmoke that does not exist."""
 
     pass
+
+
+class RequiresForceRemove(ResmokeError):
+    """Exception raised when a directory cannot be removed."""
+
+    pass

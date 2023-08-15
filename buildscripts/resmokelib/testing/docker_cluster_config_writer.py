@@ -5,28 +5,61 @@ import os
 import re
 import shutil
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib.core import programs
 from jinja2 import Environment, FileSystemLoader
+
+from buildscripts.resmokelib.core import programs
+from buildscripts.resmokelib.errors import InvalidMatrixSuiteError, RequiresForceRemove
+from buildscripts.resmokelib.suitesconfig import get_suite
+from buildscripts.resmokelib.testing.fixtures import _builder
 
 MONGOS_PORT = 27017
 MONGOD_PORT = 27018
 CONFIG_PORT = 27019
 
 
+def get_antithesis_base_suite_fixture(antithesis_suite_name) -> None:
+    """
+    Get the base suite fixture to use for generating docker compose configuration.
+
+    :param antithesis_suite_name: The antithesis suite to find the base suite fixture for.
+    """
+    antithesis_suite = get_suite(antithesis_suite_name)
+    if not antithesis_suite.is_matrix_suite() or not antithesis_suite.is_antithesis_suite():
+        raise InvalidMatrixSuiteError(
+            f"The specified suite is not an antithesis matrix suite: {antithesis_suite.get_name()}")
+
+    antithesis_fixture = antithesis_suite.get_executor_config()["fixture"]["class"]
+    if antithesis_fixture != "ExternalShardedClusterFixture":
+        raise InvalidMatrixSuiteError(
+            "Generating docker compose infrastructure for this external fixture is not yet supported"
+        )
+
+    antithesis_base_suite = antithesis_suite.get_executor_config()["fixture"]["original_suite_name"]
+    base_suite_fixture = _builder.make_dummy_fixture(antithesis_base_suite)
+    if base_suite_fixture.__class__.__name__ != "ShardedClusterFixture":
+        raise InvalidMatrixSuiteError(
+            "Generating docker compose infrastructure for this base suite fixture is not yet supported.{}"
+        )
+
+    return base_suite_fixture
+
+
 class DockerClusterConfigWriter(object):
     """Create necessary files and topology for a suite to run with Antithesis."""
 
-    def __init__(self, suite_name, fixture):
+    def __init__(self, antithesis_suite_name, tag):
         """
         Initialize the class with the specified fixture.
 
-        :param suite: Suite we wish to generate files and topology for.
-        :param fixture: Fixture for the suite we wish to generate files and topology for.
+        :param antithesis_suite_name: Suite we wish to generate files and topology for.
+        :param tag: Tag to use for the docker compose configuration and/or base images.
         """
         self.ip_address = 1
-        self.fixture = fixture
-        self.suite_path = os.path.join(os.getcwd(), f"antithesis/antithesis_config/{suite_name}")
+        self.antithesis_suite_name = antithesis_suite_name
+        self.fixture = get_antithesis_base_suite_fixture(antithesis_suite_name)
+        self.tag = tag
+        self.build_context = os.path.join(os.getcwd(),
+                                          f"antithesis/antithesis_config/{antithesis_suite_name}")
         self.jinja_env = Environment(
             loader=FileSystemLoader(os.path.join(os.getcwd(), "antithesis/templates/")))
 
@@ -36,8 +69,8 @@ class DockerClusterConfigWriter(object):
 
         :return: None.
         """
-        # Create directory structure
-        self.create_directory_structure()
+        # Create volume directory structure
+        self.create_volume_directories()
         # Create configsvr init scripts
         self.create_configsvr_init()
         # Create mongod init scripts
@@ -50,6 +83,8 @@ class DockerClusterConfigWriter(object):
         self.write_docker_compose()
         # Create dockerfile
         self.write_dockerfile()
+        # Create run suite script
+        self.write_run_suite_script()
 
     def write_docker_compose(self):
         """
@@ -57,13 +92,13 @@ class DockerClusterConfigWriter(object):
 
         :return: None.
         """
-        with open(os.path.join(self.suite_path, "docker-compose.yml"), 'w') as file:
+        with open(os.path.join(self.build_context, "docker-compose.yml"), 'w') as file:
             template = self.jinja_env.get_template("docker_compose_template.yml.jinja")
             file.write(
                 template.render(
-                    num_configsvr=self.fixture.configsvr_options.get(
-                        "num_nodes", 1), num_shard=self.fixture.num_shards, num_node_per_shard=self.
-                    fixture.num_rs_nodes_per_shard, num_mongos=self.fixture.num_mongos,
+                    num_configsvr=self.fixture.configsvr_options.get("num_nodes", 1),
+                    num_shard=self.fixture.num_shards, num_node_per_shard=self.fixture.
+                    num_rs_nodes_per_shard, num_mongos=self.fixture.num_mongos, tag=self.tag,
                     get_and_increment_ip_address=self.get_and_increment_ip_address) + "\n")
 
     def write_workload_init(self):
@@ -72,7 +107,7 @@ class DockerClusterConfigWriter(object):
 
         :return: None.
         """
-        with open(os.path.join(self.suite_path, "scripts/workload_init.py"), 'w') as file:
+        with open(os.path.join(self.build_context, "scripts/workload_init.py"), 'w') as file:
             template = self.jinja_env.get_template("workload_init_template.py.jinja")
             file.write(template.render() + "\n")
 
@@ -82,26 +117,36 @@ class DockerClusterConfigWriter(object):
 
         :return: None.
         """
-        with open(os.path.join(self.suite_path, "Dockerfile"), 'w') as file:
+        with open(os.path.join(self.build_context, "Dockerfile"), 'w') as file:
             template = self.jinja_env.get_template("dockerfile_template.jinja")
             file.write(template.render() + "\n")
 
-    def create_directory_structure(self):
+    def create_volume_directories(self):
         """
-        Create the necessary directories for Docker topology. These will overwrite any existing topology for this suite.
+        Create the necessary volume directories for the Docker topology.
 
         :return: None.
         """
         paths = [
-            self.suite_path,
-            os.path.join(self.suite_path, "scripts"),
-            os.path.join(self.suite_path, "logs"),
-            os.path.join(self.suite_path, "data"),
-            os.path.join(self.suite_path, "debug")
+            self.build_context,
+            os.path.join(self.build_context, "scripts"),
+            os.path.join(self.build_context, "logs"),
+            os.path.join(self.build_context, "data"),
+            os.path.join(self.build_context, "debug")
         ]
         for p in paths:
             if os.path.exists(p):
-                shutil.rmtree(p)
+                try:
+                    shutil.rmtree(p)
+                except Exception as exc:
+                    exception_text = f"""
+                    Could not remove directory due to old artifacts from a previous run.
+
+                    Please remove this directory and try again -- you may need to force remove:
+                    `{os.path.relpath(p)}`
+                    """
+                    raise RequiresForceRemove(exception_text) from exc
+
             os.makedirs(p)
 
     def get_and_increment_ip_address(self):
@@ -111,7 +156,7 @@ class DockerClusterConfigWriter(object):
         :return: ip_address.
         """
         if self.ip_address > 24:
-            self._resmoke_logger.info("ipv4_address exceeded 10.20.20.24. Exiting with code: 2")
+            print(f"Exiting with code 2 -- ipv4_address exceeded 10.20.20.24: {self.ip_address}")
             sys.exit(2)
         self.ip_address += 1
         return self.ip_address
@@ -147,7 +192,7 @@ class DockerClusterConfigWriter(object):
         :param args: List of arguments for initiating the current node.
         :return: None.
         """
-        script_path = os.path.join(self.suite_path, f"scripts/{node_name}_init.sh")
+        script_path = os.path.join(self.build_context, f"scripts/{node_name}_init.sh")
         with open(script_path, 'w') as file:
             template = self.jinja_env.get_template("node_init_template.sh.jinja")
             file.write(template.render(command=' '.join(args)) + "\n")
@@ -210,7 +255,7 @@ class DockerClusterConfigWriter(object):
         :param args: List of arguments that need to be set for mongod init.
         :return: None.
         """
-        with open(os.path.join(self.suite_path, f"scripts/{mongos_name}_init.py"), 'w') as file:
+        with open(os.path.join(self.build_context, f"scripts/{mongos_name}_init.py"), 'w') as file:
             template = self.jinja_env.get_template("mongos_init_template.py.jinja")
             file.write(
                 template.render(mongos_name=mongos_name, configsvr=self.fixture.configsvr,
@@ -262,3 +307,15 @@ class DockerClusterConfigWriter(object):
                 "electionTimeoutMillis": 2000, "heartbeatTimeoutSecs": 1, "chainingAllowed": False
             })
         return settings
+
+    def write_run_suite_script(self):
+        """
+        Write the `run_suite.sh` file which starts up the docker cluster and runs a sanity check.
+
+        This ensures that the configuration for the suite works as expected.
+
+        :return: None.
+        """
+        with open(os.path.join(self.build_context, "run_suite.sh"), 'w') as file:
+            template = self.jinja_env.get_template("run_suite_template.sh.jinja")
+            file.write(template.render(suite=self.antithesis_suite_name) + "\n")

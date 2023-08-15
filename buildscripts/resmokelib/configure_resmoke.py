@@ -359,6 +359,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.TAG_FILES = config.pop("tag_files")
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
+    _config.SANITY_CHECK = config.pop("sanity_check")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")

@@ -300,24 +300,15 @@ variables:
   teardown_group:
   - func: "umount shared scons directory"
 
-- &antithesis_config_build_and_push_template
-  name: antithesis_config_build_and_push_template
+- &antithesis_task_template
+  name: antithesis_task_template
   tags: ["antithesis"]
   depends_on:
-  - name: antithesis_base_image_build_and_push
+    name: archive_dist_test_debug
   commands:
-  - func: "antithesis config image build and push"
-    vars:
-      suite: suite_name
-
-- &antithesis_config_test_template
-  name: antithesis_config_test_template
-  tags: ["antithesis"]
-  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-  depends_on:
-  - name: antithesis_config_build_and_push_task
-  commands:
-  - func: "antithesis config image test"
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
     vars:
       suite: suite_name
 
@@ -920,6 +911,23 @@ functions:
   - *monitor_process_threads
   - *collect_system_resource_info
   - *collect_ulimit_info
+
+  "do setup for antithesis":
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_debugsymbols}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.${ext|tgz}
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/modify_debug_symbols.sh"
+  - command: git.get_project
+    params:
+      directory: src/buildscripts/antithesis/base_images/workload/src
 
   "do non-compile setup":
   - command: manifest.load
@@ -2469,34 +2477,13 @@ functions:
       content_type: text/plain
       display_name: multiversion_exclude_tags.yml from resmoke invocation
 
-  "antithesis config image build and push":
-  - *f_expansions_write
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_debugsymbols}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.${ext|tgz}
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/modify_debug_symbols.sh"
+  "antithesis image build and push":
   - *f_expansions_write
   - command: subprocess.exec
     params:
       binary: bash
       args:
-      - "./src/evergreen/antithesis_config_image_build_and_push.sh"
-
-  "antithesis config image test":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_config_image_test.sh"
+      - "./src/evergreen/antithesis_image_build_and_push.sh"
 
 # Pre task steps
 pre:
@@ -2687,6 +2674,7 @@ tasks:
       - "jstests/**"
       - "patch_files.txt"
       - "evergreen/**"
+      - "antithesis/**"
       - "src/**.idl"
       - "src/mongo/client/sdam/json_tests/sdam_tests/**"
       - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
@@ -8565,31 +8553,6 @@ tasks:
       args:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
-- name: antithesis_base_image_build_and_push
-  tags: ["antithesis"]
-  depends_on:
-  - name: archive_dist_test_debug
-  commands:
-  - *f_expansions_write
-  - func: "git get project no modules"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "do setup"
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_debugsymbols}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.${ext|tgz}
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_base_image_build_and_push.sh"
-
 - name: generate_buildid_to_debug_symbols_mapping
   tags: ["symbolizer"]
   stepback: false
@@ -8606,21 +8569,14 @@ tasks:
       args:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 
-- <<: *antithesis_config_build_and_push_template
-  name: antithesis_config_build_and_push_concurrency_sharded_with_stepdowns_and_balancer
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
   commands:
-  - func: "antithesis config image build and push"
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
     vars:
-      suite: concurrency_sharded_with_stepdowns_and_balancer
-
-- <<: *antithesis_config_test_template
-  name: antithesis_config_test_concurrency_sharded_with_stepdowns_and_balancer
-  depends_on:
-  - name: antithesis_config_build_and_push_concurrency_sharded_with_stepdowns_and_balancer
-  commands:
-  - func: "antithesis config image test"
-    vars:
-      suite: concurrency_sharded_with_stepdowns_and_balancer
+      suite: antithesis_concurrency_sharded_with_stepdowns_and_balancer
 
 - <<: *task_template
   name: query_golden_classic
@@ -9087,20 +9043,3 @@ task_groups:
   - "crypt_create_debug_lib"
   - "crypt_install_tests"
   - "crypt_run_tests"
-
-- name: antithesis_TG
-  max_hosts: 1
-  share_processes: true
-  setup_group:
-  - func: "f_expansions_write"
-  - func: "git get project no modules"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "do setup"
-  setup_task:
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  tasks:
-    - .antithesis
