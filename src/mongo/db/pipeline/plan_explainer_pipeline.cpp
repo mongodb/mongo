@@ -73,9 +73,7 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
         }
     });
 
-    if (_nReturned) {
-        statsOut->nReturned = _nReturned;
-    }
+    statsOut->nReturned = _nReturned;
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
