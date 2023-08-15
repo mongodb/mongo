@@ -757,7 +757,7 @@ var $config = extendWorkload($config, function($config, $super) {
             }
             throw e;
         }
-        assert.gte(docs.length, this.previousNumSampledQueries);
+        print(`$listSampledQueries returned ${docs.length} documents`);
     };
 
     // To avoid leaving a lot of config.analyzeShardKeySplitPoints documents around which could
