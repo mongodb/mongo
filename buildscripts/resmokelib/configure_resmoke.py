@@ -6,21 +6,32 @@ import datetime
 import os
 import os.path
 import distutils.spawn
+from pathlib import Path
 import sys
 import platform
 import random
 import glob
 import textwrap
 import shlex
+import traceback
+from typing import Optional
 
 import pymongo.uri_parser
 import yaml
+from opentelemetry import trace, context
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
 from buildscripts.idl import gen_all_feature_flag_list
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongo_fuzzer_configs
+
+BASE_16_TO_INT = 16
 
 
 def validate_and_update_config(parser, args):
@@ -146,6 +157,48 @@ def _find_resmoke_wrappers():
     # --installDir argument.
     candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
     return list(candidate_installs)
+
+
+def _set_up_tracing(
+        otel_collector_endpoint: Optional[str],
+        otel_collector_file: Optional[str],
+        trace_id: Optional[str],
+        parent_span_id: Optional[str],
+) -> bool:
+    """Try to set up otel tracing. On success return True. On failure return False."""
+
+    success = True
+    # Service name is required for most backends
+    resource = Resource(attributes={SERVICE_NAME: "resmoke"})
+
+    provider = TracerProvider(resource=resource)
+    if otel_collector_endpoint:
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otel_collector_endpoint))
+        provider.add_span_processor(processor)
+
+    if otel_collector_file:
+        try:
+            otel_collector_file_path = Path(otel_collector_file)
+            otel_collector_file_path.parent.mkdir(parents=True, exist_ok=True)
+            processor = BatchSpanProcessor(
+                ConsoleSpanExporter(out=open(otel_collector_file_path, mode='w')))
+            provider.add_span_processor(processor)
+        except OSError:
+            traceback.print_exc()
+            success = False
+    trace.set_tracer_provider(provider)
+
+    if trace_id and parent_span_id:
+        span_context = SpanContext(
+            trace_id=int(trace_id, BASE_16_TO_INT),
+            span_id=int(parent_span_id, BASE_16_TO_INT),
+            is_remote=False,
+            # Magic number needed for our OTEL collector
+            trace_flags=TraceFlags(0x01),
+        )
+        ctx = trace.set_span_in_context(NonRecordingSpan(span_context))
+        context.attach(ctx)
+    return success
 
 
 def _update_config_vars(values):
@@ -360,6 +413,27 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
     _config.SANITY_CHECK = config.pop("sanity_check")
+
+    # otel info
+    _config.OTEL_TRACE_ID = config.pop("otel_trace_id")
+    _config.OTEL_PARENT_ID = config.pop("otel_parent_id")
+    _config.OTEL_COLLECTOR_ENDPOINT = config.pop("otel_collector_endpoint")
+    _config.OTEL_COLLECTOR_FILE = config.pop("otel_collector_file")
+    try:
+        setup_success = _set_up_tracing(
+            _config.OTEL_COLLECTOR_ENDPOINT,
+            _config.OTEL_COLLECTOR_FILE,
+            _config.OTEL_TRACE_ID,
+            _config.OTEL_PARENT_ID,
+        )
+        if not setup_success:
+            print("Failed to create file to send otel metrics to. Continuing.")
+    except:
+        # We want this as a catch all exception
+        # If there is some problem setting up metrics we don't want resmoke to fail
+        # We would rather just swallow the error
+        traceback.print_exc()
+        print("Failed to set up otel metrics. Continuing.")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")

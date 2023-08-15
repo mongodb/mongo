@@ -1,7 +1,11 @@
 """Enable support for archiving tests or hooks."""
 
+import logging
 import os
 import threading
+from typing import TYPE_CHECKING
+
+from opentelemetry import trace
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
@@ -9,6 +13,12 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import globstar
+
+# TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
+if TYPE_CHECKING:
+    from buildscripts.resmokelib.testing.job import FixtureTestCaseManager, TestResult
+
+TRACER = trace.get_tracer("resmoke")
 
 
 class HookTestArchival(object):
@@ -40,7 +50,9 @@ class HookTestArchival(object):
         self._tests_repeat = {}
         self._lock = threading.Lock()
 
-    def archive(self, logger, result, manager):
+    @TRACER.start_as_current_span("hook_test_archival.archive")
+    def archive(self, logger: logging.Logger, result: 'TestResult',
+                manager: 'FixtureTestCaseManager'):
         """
         Archive data files for hooks or tests.
 
@@ -48,6 +60,9 @@ class HookTestArchival(object):
         :param result: A TestResult named tuple containing the test, hook, and outcome.
         :param manager: FixtureTestCaseManager object for the calling Job.
         """
+
+        archive_span = trace.get_current_span()
+        archive_span.set_attributes(attributes=result.test.get_test_attributes())
 
         success = result.success
         should_archive = (config.ARCHIVE_FILE and self.archive_instance) and not success

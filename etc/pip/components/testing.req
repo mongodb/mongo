@@ -26,3 +26,6 @@ pyjwt
 selenium
 geckodriver-autoinstaller
 pipx==1.2.0
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
