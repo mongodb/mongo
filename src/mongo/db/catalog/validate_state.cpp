@@ -405,7 +405,7 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
     }
 
     std::string dbErrMsg = str::stream()
-        << "Interrupted due to: database drop: " << _nss.db_deprecated()
+        << "Interrupted due to: database drop: " << _nss.dbName().toStringForErrorMsg()
         << " while validating collection: " << _nss.toStringForErrorMsg() << " (" << *_uuid << ")";
 
     _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IS);
