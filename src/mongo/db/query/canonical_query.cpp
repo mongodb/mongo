@@ -206,9 +206,14 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
         if (hasNoTextNodes) {
             // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
             // caching a parameterized plan. Here we add parameter markers to the appropriate match
-            // expression leaf nodes.
+            // expression leaf nodes unless it has too many predicates. If it did not actually get
+            // parameterized, we mark the query as uncacheable for SBE to avoid plan cache flooding.
+            bool parameterized;
             _inputParamIdToExpressionMap =
-                MatchExpression::parameterize(_root.get(), loadMaxParameterCount());
+                MatchExpression::parameterize(_root.get(), loadMaxParameterCount(), &parameterized);
+            if (!parameterized) {
+                setUncacheableSbe();
+            }
         } else {
             LOGV2_DEBUG(6579310,
                         5,
