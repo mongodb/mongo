@@ -236,6 +236,16 @@ functions:
         permissions: public-read
         content_type: text/html
         display_name: Documentation
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: bootstrap.yml
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/bootstrap-${task_name}-${build_id}-${execution}.yml
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/plain
+        display_name: Task Bootstrap Config
   f_dsi_timeout:
     - command: shell.exec
       params:
