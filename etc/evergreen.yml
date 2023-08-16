@@ -178,7 +178,7 @@ variables:
     test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
     external_auth_jobs_max: 1
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - windows-vsCurrent-large
   - name: burn_in_tests_gen
@@ -427,13 +427,13 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel-80-64-bit-coverage
   tasks: &enterprise-rhel-80-64-bit-coverage-tasks
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-large
   - name: .jscore .common
@@ -549,7 +549,7 @@ buildvariants:
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
     compile_variant: *windows-debug-suggested
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - windows-vsCurrent-xlarge
   - name: compile_build_tools_next_TG
@@ -769,7 +769,7 @@ buildvariants:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
   # timing-sensitive tests to fail.
-  - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_and_archive_dist_test_TG
     distros:
     - windows-vsCurrent-large
   - name: compile_build_tools_next_TG
@@ -802,7 +802,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
   - name: compile_build_tools_next_TG
   - name: aggregation !.feature_flag_guarded
   - name: auth_gen
@@ -838,7 +838,7 @@ buildvariants:
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -868,7 +868,7 @@ buildvariants:
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1056,13 +1056,13 @@ buildvariants:
     timeout_secs: 18000 # 5 hour idle timeout
   depends_on: []
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
   - name: compile_integration_and_test_parallel_stream_TG
@@ -1868,9 +1868,9 @@ buildvariants:
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
   - name: jsCore
   - name: noPassthroughHotBackups_gen
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1905,7 +1905,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=incompatible_with_s390x
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
@@ -2105,7 +2105,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_and_archive_dist_test_TG
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
   - name: generate_buildid_to_debug_symbols_mapping
@@ -2326,7 +2326,7 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=tsan_incompatible
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
   - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
   - name: .aggfuzzer !.feature_flag_guarded
@@ -2444,7 +2444,7 @@ buildvariants:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
   - name: .misc_js
@@ -2502,13 +2502,13 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel80-no-latch-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: generate_buildid_to_debug_symbols_mapping
@@ -2534,13 +2534,13 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel80-unoptimized-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: generate_buildid_to_debug_symbols_mapping
@@ -2567,13 +2567,13 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-fixed-service-executor-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: compile_integration_and_test_parallel_stream_TG
@@ -2612,13 +2612,13 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-sdam-replica-set-monitor-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: compile_integration_and_test_parallel_stream_TG
@@ -2654,13 +2654,13 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: compile_integration_and_test_parallel_stream_TG
@@ -2701,13 +2701,13 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: compile_integration_and_test_parallel_stream_TG
@@ -2748,13 +2748,13 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel80-build
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
   - name: compile_integration_and_test_parallel_stream_TG
@@ -2793,7 +2793,7 @@ buildvariants:
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-join-ingress-sessions-on-shutdown
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - rhel80-build
     patch_only: true
@@ -2865,13 +2865,13 @@ buildvariants:
   depends_on: []
   tasks:
   - name: compile_ninja_quick_TG
-  - name: compile_test_and_package_parallel_core_stream_TG
+  - name: compile_test_parallel_core_stream_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
-  - name: compile_test_and_package_parallel_unittest_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
     distros:
     - amazon2-arm64-xlarge-commitqueue
   - name: jsCore

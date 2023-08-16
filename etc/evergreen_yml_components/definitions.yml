@@ -8786,6 +8786,19 @@ task_groups:
   - fetch_and_run_libfuzzertests
 
 - <<: *compile_task_group_template
+  name: compile_test_serial_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_all
+
+- <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG
   tasks:
   - compile_dist_test
@@ -8802,6 +8815,17 @@ task_groups:
 # The *no_unittests_TG taskgroups are useful for static builds,
 # were the static binaries of the unittests can take up to
 # a terabyte of data.
+- <<: *compile_task_group_template
+  name: compile_test_serial_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_all_but_not_unittests
+
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_no_unittests_TG
   tasks:
@@ -8836,6 +8860,20 @@ task_groups:
   - archive_dbtest
   - compile_all_but_not_unittests
   - package
+
+- <<: *compile_task_group_template
+  name: compile_test_benchmark_serial_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_upload_benchmarks
+  - compile_all
 
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_TG
@@ -8888,6 +8926,15 @@ task_groups:
 # groups so that if they do run on the same machine, they can avoid the
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
+  name: compile_test_parallel_core_stream_TG
+  tasks:
+  - compile_dist_test
+  - determine_patch_tests
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_all
+
+- <<: *compile_task_group_template
   name: compile_test_and_package_parallel_core_stream_TG
   tasks:
   - compile_dist_test
@@ -8898,19 +8945,19 @@ task_groups:
   - package
 
 - <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_unittest_stream_TG
+  name: compile_test_parallel_unittest_stream_TG
   tasks:
   - compile_unittests
   - run_unittests
 
 #- <<: *compile_task_group_template
-#  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+#  name: compile_test_parallel_unittest_stream_with_recording_TG
 #  tasks:
 #    - compile_unittests_for_recorded_unittest
 #    - run_unittests_with_recording
 
 - <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_dbtest_stream_TG
+  name: compile_test_parallel_dbtest_stream_TG
   tasks:
   - compile_dbtest
   - run_dbtest
