@@ -308,8 +308,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool timeseriesBucketingParametersMayHaveChanged() const override {
-        return _coll->timeseriesBucketingParametersMayHaveChanged();
+    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const override {
+        return _coll->timeseriesBucketingParametersHaveChanged();
     }
 
     void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
@@ -319,9 +319,9 @@ public:
 
     bool areTimeseriesBucketsFixed() const override {
         auto tsOptions = getTimeseriesOptions();
-        return tsOptions &&
-            tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds() &&
-            !timeseriesBucketingParametersMayHaveChanged();
+        boost::optional<bool> parametersChanged = timeseriesBucketingParametersHaveChanged();
+        return parametersChanged.has_value() && !parametersChanged.get() && tsOptions &&
+            tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
     }
 
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const override {

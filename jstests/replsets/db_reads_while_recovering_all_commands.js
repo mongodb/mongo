@@ -421,6 +421,7 @@ const allCommands = {
     testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},
     testVersion2: {skip: isNotAUserDataRead},
+    timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
     top: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},
     updateRole: {skip: isPrimaryOnly},

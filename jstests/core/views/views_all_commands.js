@@ -731,6 +731,7 @@ let viewsCommandTests = {
     testReshardCloneCollection: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
+    timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
     transitionFromDedicatedConfigServer: {skip: isUnrelated},
     transitionToDedicatedConfigServer: {skip: isUnrelated},

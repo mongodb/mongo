@@ -990,9 +990,25 @@ Status _collModInternal(OperationContext* opCtx,
             auto [newOptions, changed] = res.getValue();
             if (changed) {
                 coll.getWritableCollection(opCtx)->setTimeseriesOptions(opCtx, newOptions);
-                coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(opCtx,
-                                                                                           true);
+                if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(
+                        opCtx, true);
+                };
             }
+        }
+
+        // We involve an empty collMod command during a setFCV downgrade to clean timeseries
+        // bucketing parameters in the catalog. So if the FCV is in downgrading or downgraded stage,
+        // remove time-series bucketing parameters flag, as nodes older than 7.1 cannot understand
+        // this flag.
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+        // TODO SERVER-80003 remove special version handling when LTS becomes 8.0.
+        if (cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
+            coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(opCtx,
+                                                                                       boost::none);
         }
 
         // Fix any invalid index options for indexes belonging to this collection.
