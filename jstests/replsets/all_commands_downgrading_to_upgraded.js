@@ -980,7 +980,6 @@ const allCommands = {
     lockInfo: {
         isAdminCommand: true,
         command: {lockInfo: 1},
-        doesNotRunOnMongos: true,
     },
     logApplicationMessage: {
         isAdminCommand: true,

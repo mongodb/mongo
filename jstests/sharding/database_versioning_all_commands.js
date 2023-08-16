@@ -599,6 +599,7 @@ let testCases = {
     },
     listSearchIndexes: {skip: "executes locally on mongos", conditional: true},
     listShards: {skip: "does not forward command to primary shard"},
+    lockInfo: {skip: "not on a user database"},
     logApplicationMessage: {skip: "not on a user database", conditional: true},
     logMessage: {skip: "not on a user database"},
     logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},

@@ -95,6 +95,7 @@ public:
         _secOkCmdList.insert("find");
         _secOkCmdList.insert("geoNear");
         _secOkCmdList.insert("group");
+        _secOkCmdList.insert("lockInfo");
     }
 } _populateReadPrefSecOkCmdList;
 

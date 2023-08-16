@@ -326,7 +326,7 @@ const allCommands = {
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
     },
     listSearchIndexes: {skip: isNotAUserDataRead},
-    lockInfo: {skip: isPrimaryOnly},
+    lockInfo: {skip: isAnInternalCommand},
     logApplicationMessage: {skip: isNotAUserDataRead},
     logMessage: {skip: isNotAUserDataRead},
     logRotate: {skip: isNotAUserDataRead},

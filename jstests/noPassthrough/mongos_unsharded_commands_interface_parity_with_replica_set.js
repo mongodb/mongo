@@ -294,6 +294,16 @@ const tests = [
             },
         ]
     },
+    {
+        name: "lockInfo",
+        database: "admin",
+        testCases: [
+            {
+                shortDescription: "Runs lockInfo.",
+                command: {lockInfo: 1},
+            },
+        ]
+    },
 ];
 
 function runAndAssertTestCaseWithForcedWriteConcern(testCase, testFixture) {

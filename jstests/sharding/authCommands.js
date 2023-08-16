@@ -211,6 +211,8 @@ var checkWriteOps = function(hasWriteAuth) {
 };
 
 var checkAdminOps = function(hasAuth) {
+    const isMultiversion = jsTest.options().shardMixedBinVersions ||
+        jsTest.options().useRandomBinVersionsWithinReplicaSet;
     if (hasAuth) {
         checkCommandSucceeded(adminDB, {getCmdLineOpts: 1});
         checkCommandSucceeded(adminDB, {serverStatus: 1});
@@ -225,6 +227,9 @@ var checkAdminOps = function(hasAuth) {
         checkCommandSucceeded(
             adminDB,
             {moveChunk: 'test.foo', find: chunk.min, to: st.rs1.name, _waitForDelete: true});
+        if (!isMultiversion) {
+            checkCommandSucceeded(adminDB, {lockInfo: 1});
+        }
     } else {
         checkCommandFailed(adminDB, {getCmdLineOpts: 1});
         checkCommandFailed(adminDB, {serverStatus: 1});
@@ -239,6 +244,9 @@ var checkAdminOps = function(hasAuth) {
         checkCommandFailed(
             adminDB,
             {moveChunk: 'test.foo', find: chunkKey, to: st.rs1.name, _waitForDelete: true});
+        if (!isMultiversion) {
+            checkCommandFailed(adminDB, {lockInfo: 1});
+        }
     }
 };
 

@@ -345,6 +345,18 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
                 formatProfileQuery(undefined, {comment: curOpComment}),
                 "admin");
     }
+
+    const isMultiversion = jsTest.options().shardMixedBinVersions ||
+        jsTest.options().useRandomBinVersionsWithinReplicaSet;
+
+    if (!isMultiversion) {
+        let curOpComment = 'lockInfo_' + ObjectId();
+        cmdTest({lockInfo: 1, comment: curOpComment},
+                allowedOnSecondary.kAlways,
+                true,
+                formatProfileQuery(undefined, {comment: curOpComment}),
+                "admin");
+    }
 };
 
 /**

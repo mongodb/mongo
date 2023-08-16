@@ -15,6 +15,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "cpuload",
     "createUnsplittableCollection",
     "fsyncUnlock",
+    "lockInfo",
     "setQuerySettings",
     "removeQuerySettings",
 ];
