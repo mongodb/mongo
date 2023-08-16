@@ -1838,13 +1838,11 @@ struct WindowNode : public QuerySolutionNode {
     WindowNode(std::unique_ptr<QuerySolutionNode> child,
                boost::optional<boost::intrusive_ptr<Expression>> partitionByArg,
                boost::optional<SortPattern> sortByArg,
-               std::vector<WindowFunctionStatement> outputFieldsArg,
-               bool shouldProduceBson)
+               std::vector<WindowFunctionStatement> outputFieldsArg)
         : QuerySolutionNode(std::move(child)),
           partitionBy(std::move(partitionByArg)),
           sortBy(std::move(sortByArg)),
-          outputFields(std::move(outputFieldsArg)),
-          shouldProduceBson(shouldProduceBson) {
+          outputFields(std::move(outputFieldsArg)) {
         DepsTracker partitionByDeps;
         if (partitionBy) {
             expression::addDependencies(partitionBy->get(), &partitionByDeps);
@@ -1894,7 +1892,5 @@ struct WindowNode : public QuerySolutionNode {
     OrderedPathSet partitionByRequiredFields;
     OrderedPathSet sortByRequiredFields;
     OrderedPathSet outputRequiredFields;
-
-    bool shouldProduceBson;
 };
 }  // namespace mongo

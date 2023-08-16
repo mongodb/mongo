@@ -1833,8 +1833,7 @@ void SearchNode::appendToString(str::stream* ss, int indent) const {
  * WindowNode.
  */
 std::unique_ptr<QuerySolutionNode> WindowNode::clone() const {
-    return std::make_unique<WindowNode>(
-        children[0]->clone(), partitionBy, sortBy, outputFields, shouldProduceBson);
+    return std::make_unique<WindowNode>(children[0]->clone(), partitionBy, sortBy, outputFields);
 }
 
 void WindowNode::appendToString(str::stream* ss, int indent) const {

@@ -1816,8 +1816,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             auto windowNode = std::make_unique<WindowNode>(std::move(solnForAgg),
                                                            windowStage->getPartitionBy(),
                                                            windowStage->getSortBy(),
-                                                           windowStage->getOutputFields(),
-                                                           innerStage->isLastSource());
+                                                           windowStage->getOutputFields());
             solnForAgg = std::move(windowNode);
             continue;
         }

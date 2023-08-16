@@ -130,16 +130,6 @@ bool hasTimeUnit(const std::vector<WindowFunctionStatement>& outputFields) {
     return false;
 }
 
-// TODO SERVER-79563: Allow nested field to be projected for window function results
-bool hasNestedField(const std::vector<WindowFunctionStatement>& outputFields) {
-    for (const auto& outputField : outputFields) {
-        if (FieldPath{outputField.fieldName}.getPathLength() > 1) {
-            return true;
-        }
-    }
-    return false;
-}
-
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,
@@ -179,7 +169,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
-    if (hasTimeUnit(outputFields) || hasNestedField(outputFields)) {
+    if (hasTimeUnit(outputFields)) {
         sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
@@ -416,7 +406,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
-    if (hasTimeUnit(outputFields) || hasNestedField(outputFields)) {
+    if (hasTimeUnit(outputFields)) {
         sbeCompatibility = SbeCompatibility::notCompatible;
     }
 

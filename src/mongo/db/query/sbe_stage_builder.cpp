@@ -115,6 +115,7 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
@@ -3727,32 +3728,34 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::move(stage), std::move(windowFinalProjects), windowNode->nodeId());
 
     if (reqs.has(kResult)) {
-        auto rootSlot = outputs.get(kResult);
-        auto resultSlot = _slotIdGenerator.generate();
-        outputs.set(kResult, resultSlot);
-        if (windowNode->shouldProduceBson) {
-            stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
-                                                      resultSlot,
-                                                      rootSlot,
-                                                      sbe::MakeObjFieldBehavior::drop,
-                                                      std::vector<std::string>{},
-                                                      std::move(windowFields),
-                                                      std::move(windowFinalSlots),
-                                                      true,   // forceNewObject
-                                                      false,  // returnOldObject
-                                                      windowNode->nodeId());
-        } else {
-            stage = sbe::makeS<sbe::MakeObjStage>(std::move(stage),
-                                                  resultSlot,
-                                                  rootSlot,
-                                                  sbe::MakeObjFieldBehavior::drop,
-                                                  std::vector<std::string>{},
-                                                  std::move(windowFields),
-                                                  std::move(windowFinalSlots),
-                                                  true,   // forceNewObject
-                                                  false,  // returnOldObject
-                                                  windowNode->nodeId());
+        // For a nested field output "a.b" with final slot s1, we will create a temporary field
+        // "tmp" and create a projection {a: {b: $tmp}}. The actual slot that holds "$tmp" will be
+        // kept in a temporary PlanStageSlots to generate the correct expression.
+        PlanStageSlots tmpFieldSlots;
+        projection_ast::ProjectionPathASTNode topLevelProjection;
+        for (size_t i = 0; i < windowFields.size(); ++i) {
+            std::string tmpField = str::stream() << "tmp" << i;
+            auto expCtx = _cq.getExpCtxRaw();
+            auto tmpExpr = ExpressionFieldPath::createPathFromString(
+                expCtx, tmpField, expCtx->variablesParseState);
+            projection_ast::addNodeAtPath(
+                &topLevelProjection,
+                FieldPath{windowFields[i]},
+                std::make_unique<projection_ast::ExpressionASTNode>(tmpExpr));
+            tmpFieldSlots.set(std::make_pair(PlanStageSlots::kField, std::move(tmpField)),
+                              windowFinalSlots[i]);
         }
+        projection_ast::Projection projection{std::move(topLevelProjection),
+                                              projection_ast::ProjectType::kAddition};
+        auto projectionExpr =
+            generateProjection(_state, &projection, outputs.get(kResult), &tmpFieldSlots);
+        auto [resultSlot, resultStage] = projectEvalExpr(std::move(projectionExpr),
+                                                         EvalStage{std::move(stage), {}},
+                                                         windowNode->nodeId(),
+                                                         &_slotIdGenerator,
+                                                         _state);
+        stage = resultStage.extractStage(windowNode->nodeId());
+        outputs.set(kResult, resultSlot);
     }
 
     outputs.clearNonRequiredSlots(reqs);
