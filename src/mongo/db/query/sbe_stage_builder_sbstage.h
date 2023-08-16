@@ -51,11 +51,11 @@
 namespace mongo::stage_builder {
 
 /**
- * EvalStage contains a PlanStage (_stage) and a vector of slots (_outSlots).
+ * SbStage contains a PlanStage (_stage) and a vector of slots (_outSlots).
  *
  * _stage can be nullptr or it can point to an SBE PlanStage tree. If _stage is nullptr, the
  * extractStage() method will return a Limit-1/CoScan tree. If _stage is not nullptr, then the
- * extractStage() method will return _stage. EvalStage's default constructor initializes
+ * extractStage() method will return _stage. SbStage's default constructor initializes
  * _stage to be nullptr.
  *
  * The isNull() method allows callers to check if _state is nullptr. Some helper functions (such
@@ -67,17 +67,17 @@ namespace mongo::stage_builder {
  * to ensure that all of the slots produced by the left side are visible to the right side and are
  * also visible to the parent of the LoopJoinStage/TraverseStage.
  */
-class EvalStage {
+class SbStage {
 public:
-    EvalStage() {}
+    SbStage() {}
 
-    EvalStage(std::unique_ptr<sbe::PlanStage> stage, sbe::value::SlotVector outSlots)
+    SbStage(std::unique_ptr<sbe::PlanStage> stage, sbe::value::SlotVector outSlots)
         : _stage(std::move(stage)), _outSlots(std::move(outSlots)) {}
 
-    EvalStage(EvalStage&& other)
+    SbStage(SbStage&& other)
         : _stage(std::move(other._stage)), _outSlots(std::move(other._outSlots)) {}
 
-    EvalStage& operator=(EvalStage&& other) {
+    SbStage& operator=(SbStage&& other) {
         _stage = std::move(other._stage);
         _outSlots = std::move(other._outSlots);
         return *this;
@@ -118,6 +118,10 @@ private:
     sbe::value::SlotVector _outSlots;
 };
 
-using EvalExprStagePair = std::pair<EvalExpr, EvalStage>;
+using EvalStage = SbStage;
+
+using SbExprStagePair = std::pair<SbExpr, SbStage>;
+
+using EvalExprStagePair = SbExprStagePair;
 
 }  // namespace mongo::stage_builder

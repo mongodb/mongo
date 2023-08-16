@@ -40,10 +40,10 @@
 
 namespace mongo::stage_builder {
 
-EvalExpr::EvalExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
+SbExpr::SbExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
 
-std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& varMap,
-                                                        StageBuilderState& state) {
+std::unique_ptr<sbe::EExpression> SbExpr::extractExpr(optimizer::SlotVarMap& varMap,
+                                                      StageBuilderState& state) {
     if (hasSlot()) {
         return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_storage));
     }
@@ -59,20 +59,20 @@ std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& v
     return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_storage));
 }
 
-std::unique_ptr<sbe::EExpression> EvalExpr::getExpr(optimizer::SlotVarMap& varMap,
-                                                    StageBuilderState& state) const {
+std::unique_ptr<sbe::EExpression> SbExpr::getExpr(optimizer::SlotVarMap& varMap,
+                                                  StageBuilderState& state) const {
     return clone().extractExpr(varMap, state);
 }
 
-std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(StageBuilderState& state) {
+std::unique_ptr<sbe::EExpression> SbExpr::extractExpr(StageBuilderState& state) {
     return extractExpr(state.slotVarMap, state);
 }
 
-std::unique_ptr<sbe::EExpression> EvalExpr::getExpr(StageBuilderState& state) const {
+std::unique_ptr<sbe::EExpression> SbExpr::getExpr(StageBuilderState& state) const {
     return getExpr(state.slotVarMap, state);
 }
 
-abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {
+abt::HolderPtr SbExpr::extractABT(optimizer::SlotVarMap& varMap) {
     if (hasSlot()) {
         auto slotId = stdx::get<sbe::value::SlotId>(_storage);
         auto varName = makeVariableName(slotId);

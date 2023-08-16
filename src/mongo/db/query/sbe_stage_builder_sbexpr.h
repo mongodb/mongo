@@ -48,27 +48,26 @@ namespace mongo::stage_builder {
 struct StageBuilderState;
 
 /**
- * EvalExpr is a wrapper around an EExpression that can also carry a SlotId. It is used to eliminate
- * extra project stages. If 'slot' field is set, it contains the result of an expression. The user
- * of the class can just use this slot instead of projecting an expression into a new slot.
+ * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
+ * for "stage builder expression".
  */
-class EvalExpr {
+class SbExpr {
 public:
-    EvalExpr() : _storage{false} {}
+    SbExpr() : _storage{false} {}
 
-    EvalExpr(EvalExpr&& e) : _storage(std::move(e._storage)) {
+    SbExpr(SbExpr&& e) : _storage(std::move(e._storage)) {
         e.reset();
     }
 
-    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
+    SbExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
 
-    EvalExpr(sbe::value::SlotId s) : _storage(s) {}
+    SbExpr(sbe::value::SlotId s) : _storage(s) {}
 
-    EvalExpr(const abt::HolderPtr& a);
+    SbExpr(const abt::HolderPtr& a);
 
-    EvalExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
+    SbExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
 
-    EvalExpr& operator=(EvalExpr&& e) {
+    SbExpr& operator=(SbExpr&& e) {
         if (this == &e) {
             return *this;
         }
@@ -78,18 +77,18 @@ public:
         return *this;
     }
 
-    EvalExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
+    SbExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
         _storage = std::move(e);
         e.reset();
         return *this;
     }
 
-    EvalExpr& operator=(sbe::value::SlotId s) {
+    SbExpr& operator=(sbe::value::SlotId s) {
         _storage = s;
         return *this;
     }
 
-    EvalExpr& operator=(abt::HolderPtr&& a) {
+    SbExpr& operator=(abt::HolderPtr&& a) {
         _storage = std::move(a);
         return *this;
     }
@@ -111,7 +110,7 @@ public:
         return stdx::holds_alternative<abt::HolderPtr>(_storage);
     }
 
-    EvalExpr clone() const {
+    SbExpr clone() const {
         if (hasSlot()) {
             return stdx::get<sbe::value::SlotId>(_storage);
         }
@@ -121,7 +120,7 @@ public:
         }
 
         if (stdx::holds_alternative<bool>(_storage)) {
-            return EvalExpr{};
+            return SbExpr{};
         }
 
         const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_storage);
@@ -158,7 +157,7 @@ public:
                                                   StageBuilderState& state);
 
     /**
-     * Helper function that obtains data needed for EvalExpr::extractExpr from StageBuilderState
+     * Helper function that obtains data needed for SbExpr::extractExpr from StageBuilderState
      */
     std::unique_ptr<sbe::EExpression> extractExpr(StageBuilderState& state);
 
@@ -174,5 +173,7 @@ private:
     stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, abt::HolderPtr>
         _storage;
 };
+
+using EvalExpr = SbExpr;
 
 }  // namespace mongo::stage_builder
