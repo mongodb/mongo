@@ -968,9 +968,9 @@ private:
         return _command->supportsReadMirroring(cmdObj());
     }
 
-    std::string getDBForReadMirroring() const override {
+    DatabaseName getDBForReadMirroring() const override {
         invariant(cmdObj().isOwned());
-        return _command->getDBForReadMirroring(cmdObj());
+        return _dbName;
     }
 
     void appendMirrorableRequest(BSONObjBuilder* bob) const override {

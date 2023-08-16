@@ -1118,11 +1118,11 @@ public:
             return _firstUpdateOp;
         }
 
-        std::string getDBForReadMirroring() const final {
+        DatabaseName getDBForReadMirroring() const final {
             const auto nsIdx = _firstUpdateOp->getUpdate();
             const auto& nsInfo = request().getNsInfo().at(nsIdx);
 
-            return nsInfo.getNs().db_deprecated().toString();
+            return nsInfo.getNs().dbName();
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const final {

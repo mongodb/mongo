@@ -497,8 +497,13 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
             }
         };
 
+        // TODO SERVER-73658 : no longer need to serialize since getDBForReadMirroring returns a
+        // DatabaseName object.
         auto newRequest = executor::RemoteCommandRequest(
-            host, invocation->getDBForReadMirroring(), payload, nullptr);
+            host,
+            DatabaseNameUtil::serialize(invocation->getDBForReadMirroring()),
+            payload,
+            nullptr);
 
         newRequest.options.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))

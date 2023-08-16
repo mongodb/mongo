@@ -110,7 +110,8 @@ private:
         if (!invocation->supportsReadMirroring()) {
             uasserted(ErrorCodes::CommandNotSupported, "command does not support read mirroring");
         }
-        ASSERT_EQ(invocation->getDBForReadMirroring(), kDB);
+        ASSERT_EQ(invocation->getDBForReadMirroring(),
+                  DatabaseName::createDatabaseName_forTest(boost::none, kDB));
 
         BSONObjBuilder bob;
         invocation->appendMirrorableRequest(&bob);

@@ -826,8 +826,8 @@ public:
     /**
      * Returns the name of the database that should be targeted for the mirrored read.
      */
-    virtual std::string getDBForReadMirroring() const {
-        return ns().db_deprecated().toString();
+    virtual DatabaseName getDBForReadMirroring() const {
+        return ns().dbName();
     }
 
     /**
@@ -1022,18 +1022,6 @@ public:
      */
     virtual bool supportsReadMirroring(const BSONObj& cmdObj) const {
         return false;
-    }
-
-    /**
-     * Returns the name of the database that should be targeted for the mirrored read.
-     */
-    virtual std::string getDBForReadMirroring(const BSONObj& cmdObj) const {
-        // Individual command should override this function if $db is
-        // not present instead of using this default implementation.
-        auto db = cmdObj["$db"];
-        invariant(db);
-
-        return db.String();
     }
 
     /**
