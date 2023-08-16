@@ -122,6 +122,34 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeCovariancePop(
         state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddPush(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovablePushAdd", std::move(arg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemovePush(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovablePushRemove"));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizePush(StageBuilderState& state,
+                                                          const WindowFunctionStatement& stmt,
+                                                          sbe::value::SlotVector slots) {
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggRemovablePushFinalize", std::move(exprs));
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state, const WindowFunctionStatement& stmt) {
     using BuildInitFn = std::function<std::vector<std::unique_ptr<sbe::EExpression>>()>;
@@ -130,6 +158,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
         {"$sum", &emptyInitializer<1>},
         {"$covarianceSamp", &emptyInitializer<1>},
         {"$covariancePop", &emptyInitializer<1>},
+        {"$push", &emptyInitializer<1>},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -149,6 +178,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
 
     static const StringDataMap<BuildAddFn> kWindowFunctionBuilders = {
         {"$sum", &buildWindowAddSum},
+        {"$push", &buildWindowAddPush},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -190,6 +220,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
 
     static const StringDataMap<BuildRemoveFn> kWindowFunctionBuilders = {
         {"$sum", &buildWindowRemoveSum},
+        {"$push", &buildWindowRemovePush},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -232,6 +263,7 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
         {"$sum", &buildWindowFinalizeSum},
         {"$covarianceSamp", &buildWindowFinalizeCovarianceSamp},
         {"$covariancePop", &buildWindowFinalizeCovariancePop},
+        {"$push", &buildWindowFinalizePush},
     };
 
     auto opName = stmt.expr->getOpName();

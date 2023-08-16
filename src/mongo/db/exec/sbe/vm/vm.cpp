@@ -7158,6 +7158,29 @@ size_t arrayQueueSize(value::Array* arrayQueue) {
     return queueSize;
 }
 
+// Initialize an array queue
+std::tuple<value::TypeTags, value::Value> arrayQueueInit(size_t bufferSize = 4) {
+    auto [arrayQueueTag, arrayQueueVal] = value::makeNewArray();
+    value::ValueGuard arrayQueueGuard{arrayQueueTag, arrayQueueVal};
+    auto arrayQueue = value::getArrayView(arrayQueueVal);
+    arrayQueue->reserve(static_cast<size_t>(ArrayQueueElems::kSizeOfArray));
+
+    auto [bufferTag, bufferVal] = value::makeNewArray();
+    value::ValueGuard bufferGuard{bufferTag, bufferVal};
+    auto buffer = value::getArrayView(bufferVal);
+    buffer->reserve(bufferSize);
+    for (size_t i = 0; i < bufferSize; ++i) {
+        buffer->push_back(value::TypeTags::Null, 0);
+    }
+
+    bufferGuard.reset();
+    arrayQueue->push_back(bufferTag, bufferVal);
+    arrayQueue->push_back(value::TypeTags::NumberInt64, 0);  // kStartIdx
+    arrayQueue->push_back(value::TypeTags::NumberInt64, 0);  // kQueueSize
+    arrayQueueGuard.reset();
+    return {arrayQueueTag, arrayQueueVal};
+}
+
 // Push an element {tag, value} into the queue
 void arrayQueuePush(value::Array* arrayQueue, value::TypeTags tag, value::Value val) {
     /* The underlying array acts as a circular buffer for the queue with `startIdx` and `queueSize`
@@ -7927,6 +7950,60 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggCovariancePop
     return builtinAggCovarianceFinalize(arity, false /* isSamp */);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePushAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    if (stateTag == value::TypeTags::Nothing) {
+        std::tie(stateTag, stateVal) = arrayQueueInit();
+    }
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [inputTag, inputVal] = moveOwnedFromStack(1);
+    value::ValueGuard inputGuard{inputTag, inputVal};
+
+    uassert(7993100, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+    inputGuard.reset();
+    arrayQueuePush(state, inputTag, inputVal);
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePushRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    uassert(7993101, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+    auto [tag, val] = arrayQueuePop(state);
+    value::releaseValue(tag, val);
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePushFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    uassert(7993102, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+    auto [queueBuffer, startIdx, queueSize] = getArrayQueueState(state);
+
+    auto [resultTag, resultVal] = value::makeNewArray();
+    auto result = value::getArrayView(resultVal);
+    result->reserve(queueSize);
+
+    for (size_t i = 0; i < queueSize; ++i) {
+        auto idx = startIdx + i;
+        if (idx >= queueBuffer->size()) {
+            idx -= queueBuffer->size();
+        }
+        auto [tag, val] = queueBuffer->getAt(idx);
+        std::tie(tag, val) = value::copyValue(tag, val);
+        result->push_back(tag, val);
+    }
+    return {true, resultTag, resultVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -8281,6 +8358,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggCovarianceSampFinalize(arity);
         case Builtin::aggCovariancePopFinalize:
             return builtinAggCovariancePopFinalize(arity);
+        case Builtin::aggRemovablePushAdd:
+            return builtinAggRemovablePushAdd(arity);
+        case Builtin::aggRemovablePushRemove:
+            return builtinAggRemovablePushRemove(arity);
+        case Builtin::aggRemovablePushFinalize:
+            return builtinAggRemovablePushFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -8641,6 +8724,12 @@ std::string builtinToString(Builtin b) {
             return "aggCovarianceSampFinalize";
         case Builtin::aggCovariancePopFinalize:
             return "aggCovariancePopFinalize";
+        case Builtin::aggRemovablePushAdd:
+            return "aggRemovablePushAdd";
+        case Builtin::aggRemovablePushRemove:
+            return "aggRemovablePushRemove";
+        case Builtin::aggRemovablePushFinalize:
+            return "aggRemovablePushFinalize";
         default:
             MONGO_UNREACHABLE;
     }

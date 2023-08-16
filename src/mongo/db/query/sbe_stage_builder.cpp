@@ -3405,6 +3405,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             generateExpression(_state, windowNode->partitionBy->get(), rootSlotOpt, &outputs)
                 .extractABT(_state.slotVarMap));
         auto partitionName = makeLocalVariableName(_state.frameId(), 0);
+        // Assert partition slot is not an array.
         partitionABT = optimizer::make<optimizer::Let>(
             partitionName,
             makeFillEmptyNull(std::move(partitionABT)),
@@ -3447,8 +3448,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto expCtx = _cq.getExpCtxRaw();
             auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
                 expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
-            auto sortExpr = generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, &outputs)
-                                .extractExpr(_state);
+            auto sortByABT =
+                abt::unwrap(generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, &outputs)
+                                .extractABT(_state.slotVarMap));
+            auto sortByName = makeLocalVariableName(_state.frameId(), 0);
+            // Assert sort by slot is a number.
+            sortByABT = optimizer::make<optimizer::Let>(
+                sortByName,
+                makeFillEmptyNull(std::move(sortByABT)),
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("isNumber"_sd, makeVariable(sortByName)),
+                    makeVariable(sortByName),
+                    makeABTFail(ErrorCodes::Error{7993103},
+                                "Invalid range: Expected the sortBy field to be a number")));
+            auto sortExpr = abtToExpr(sortByABT, _state.slotVarMap, _state);
             stage = makeProjectStage(
                 std::move(stage), windowNode->nodeId(), *rangeBoundSlot, std::move(sortExpr));
             forwardSlots.push_back(*rangeBoundSlot);
@@ -3661,15 +3674,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                             document.upper);
             };
             auto rangeCase = [&](const WindowBounds::RangeBased& range) {
+                auto rangeBoundSlot = getRangeBoundSlot();
                 auto makeLowValueExpr = [&](const Value& v) {
-                    window.lowBoundSlot = getRangeBoundSlot();
+                    window.lowBoundSlot = rangeBoundSlot;
                     window.lowBoundTestingSlot = _slotIdGenerator.generate();
                     window.lowBoundExpr = makeLowBoundExpr(*window.lowBoundTestingSlot,
                                                            *window.lowBoundSlot,
                                                            sbe::value::makeValue(v));
                 };
                 auto makeHighValueExpr = [&](const Value& v) {
-                    window.highBoundSlot = getRangeBoundSlot();
+                    window.highBoundSlot = rangeBoundSlot;
                     window.highBoundTestingSlot = _slotIdGenerator.generate();
                     window.highBoundExpr = makeHighBoundExpr(*window.highBoundTestingSlot,
                                                              *window.highBoundSlot,
@@ -3698,9 +3712,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             finalExpr = buildFinalize(
                 _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
         }
-        auto emptyWindowExpr = outputField.expr->getOpName() == "$sum"
-            ? makeConstant(sbe::value::TypeTags::NumberInt32, 0)
-            : makeConstant(sbe::value::TypeTags::Null, 0);
+        auto emptyWindowExpr = [](StringData accExprName) {
+            if (accExprName == "$sum") {
+                return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
+            } else if (accExprName == "$push") {
+                auto [tag, val] = sbe::value::makeNewArray();
+                return makeConstant(tag, val);
+            } else {
+                return makeConstant(sbe::value::TypeTags::Null, 0);
+            }
+        }(outputField.expr->getOpName());
         if (finalExpr) {
             finalExpr =
                 sbe::makeE<sbe::EIf>(makeFunction("exists", makeVariable(firstComponentSlot)),

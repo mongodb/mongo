@@ -823,6 +823,9 @@ enum class Builtin : uint8_t {
     aggCovarianceRemove,
     aggCovarianceSampFinalize,
     aggCovariancePopFinalize,
+    aggRemovablePushAdd,
+    aggRemovablePushRemove,
+    aggRemovablePushFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -1019,7 +1022,7 @@ enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSize
  * Element at `kQueueSize` stores the size of the queue
  * The empty values in the array are filled with Null
  */
-enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize };
+enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize, kSizeOfArray };
 
 enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
 
@@ -1859,6 +1862,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceSampFinalize(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCovariancePopFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
