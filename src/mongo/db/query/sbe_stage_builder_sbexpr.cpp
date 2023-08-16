@@ -29,55 +29,203 @@
 
 #include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 
+#include <charconv>
+
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_const_eval.h"
 #include "mongo/db/query/sbe_stage_builder_type_checker.h"
 
 namespace mongo::stage_builder {
+using EExpr = std::unique_ptr<sbe::EExpression>;
+
+optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slot) {
+    constexpr StringData prefix = "__s"_sd;
+    str::stream varName;
+    varName << prefix << slot;
+    return optimizer::ProjectionName{varName};
+}
+
+optimizer::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId) {
+    constexpr StringData prefix = "__l"_sd;
+    str::stream varName;
+    varName << prefix << frameId << "_" << slotId;
+    return optimizer::ProjectionName{varName};
+}
+
+boost::optional<sbe::value::SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var) {
+    constexpr StringData prefix = "__s"_sd;
+    StringData name = var.value();
+
+    if (name.startsWith(prefix)) {
+        const char* ptr = name.rawData() + prefix.size();
+        const char* endPtr = name.rawData() + name.size();
+
+        sbe::value::SlotId slotId;
+        auto fromCharsResult = std::from_chars(ptr, endPtr, slotId);
+
+        if (fromCharsResult.ec == std::errc{} && fromCharsResult.ptr == endPtr) {
+            return slotId;
+        }
+    }
+
+    return boost::none;
+}
+
+boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariableInfo(
+    const optimizer::ProjectionName& var) {
+    constexpr StringData prefix = "__l"_sd;
+    StringData name = var.value();
+
+    if (name.startsWith(prefix)) {
+        const char* ptr = name.rawData() + prefix.size();
+        const char* endPtr = name.rawData() + name.size();
+
+        sbe::FrameId frameId;
+        auto fromCharsResult = std::from_chars(ptr, endPtr, frameId);
+
+        if (fromCharsResult.ec == std::errc{}) {
+            ptr = fromCharsResult.ptr;
+            if (endPtr - ptr >= 2 && *ptr == '_') {
+                ++ptr;
+
+                sbe::value::SlotId slotId;
+                fromCharsResult = std::from_chars(ptr, endPtr, slotId);
+
+                if (fromCharsResult.ec == std::errc{} && fromCharsResult.ptr == endPtr) {
+                    return std::pair(frameId, slotId);
+                }
+            }
+        }
+    }
+
+    return boost::none;
+}
+
+optimizer::ABT makeABTVariable(sbe::value::SlotId slotId) {
+    return optimizer::make<optimizer::Variable>(getABTVariableName(slotId));
+}
+
+optimizer::ABT makeABTLocalVariable(sbe::FrameId frameId, sbe::value::SlotId slotId) {
+    return optimizer::make<optimizer::Variable>(getABTLocalVariableName(frameId, slotId));
+}
+
+optimizer::ABT makeVariable(optimizer::ProjectionName var) {
+    return optimizer::make<optimizer::Variable>(std::move(var));
+}
+
+EExpr abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
+    auto& runtimeEnv = *state.env;
+
+    auto env = optimizer::VariableEnvironment::build(abt);
+
+    // Do not use descriptive names here.
+    auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
+    // Convert paths into ABT expressions.
+    optimizer::EvalPathLowering pathLower{prefixId, env};
+    pathLower.optimize(abt);
+
+    const CollatorInterface* collator = nullptr;
+    boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
+    if (collatorSlot) {
+        auto [collatorTag, collatorValue] = runtimeEnv.getAccessor(*collatorSlot)->getViewOfValue();
+        tassert(7158700,
+                "Not a collator in collatorSlot",
+                collatorTag == sbe::value::TypeTags::collator);
+        collator = sbe::value::bitcastTo<const CollatorInterface*>(collatorValue);
+    }
+
+    bool modified = false;
+    do {
+        // Run the constant folding to eliminate lambda applications as they are not directly
+        // supported by the SBE VM.
+        ExpressionConstEval constEval{env, collator};
+
+        constEval.optimize(abt);
+
+        TypeChecker typeChecker;
+        typeChecker.typeCheck(abt);
+
+        modified = typeChecker.modified();
+        if (modified) {
+            env.rebuild(abt);
+        }
+    } while (modified);
+
+    auto varResolver = optimizer::VarResolver([](const optimizer::ProjectionName& var) {
+        if (auto slotId = getSbeVariableInfo(var)) {
+            return sbe::makeE<sbe::EVariable>(*slotId);
+        }
+
+        if (auto localVarInfo = getSbeLocalVariableInfo(var)) {
+            auto [frameId, slotId] = *localVarInfo;
+            return sbe::makeE<sbe::EVariable>(frameId, slotId);
+        }
+
+        return EExpr{};
+    });
+
+    // And finally convert to the SBE expression.
+    optimizer::SBEExpressionLowering exprLower{env, std::move(varResolver), runtimeEnv};
+    return exprLower.optimize(abt);
+}
+
+SbVar::SbVar(const optimizer::ProjectionName& name) {
+    if (auto slotId = getSbeVariableInfo(name)) {
+        _slotId = *slotId;
+        return;
+    }
+
+    if (auto localVarInfo = getSbeLocalVariableInfo(name)) {
+        auto [frameId, slotId] = *localVarInfo;
+        _frameId = frameId;
+        _slotId = slotId;
+        return;
+    }
+
+    tasserted(7654321, str::stream() << "Unable to decode variable info for: " << name.value());
+}
 
 SbExpr::SbExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
 
-std::unique_ptr<sbe::EExpression> SbExpr::extractExpr(optimizer::SlotVarMap& varMap,
-                                                      StageBuilderState& state) {
+EExpr SbExpr::extractExpr(StageBuilderState& state) {
     if (hasSlot()) {
-        return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_storage));
+        auto slotId = stdx::get<sbe::value::SlotId>(_storage);
+        return sbe::makeE<sbe::EVariable>(slotId);
     }
 
-    if (hasABT()) {
-        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, varMap, state);
+    if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
+        auto [frameId, slotId] = stdx::get<LocalVarInfo>(_storage);
+        return sbe::makeE<sbe::EVariable>(frameId, slotId);
+    }
+
+    if (stdx::holds_alternative<abt::HolderPtr>(_storage)) {
+        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, state);
     }
 
     if (stdx::holds_alternative<bool>(_storage)) {
-        return std::unique_ptr<sbe::EExpression>{};
+        return EExpr{};
     }
 
-    return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_storage));
+    return std::move(stdx::get<EExpr>(_storage));
 }
 
-std::unique_ptr<sbe::EExpression> SbExpr::getExpr(optimizer::SlotVarMap& varMap,
-                                                  StageBuilderState& state) const {
-    return clone().extractExpr(varMap, state);
+EExpr SbExpr::getExpr(StageBuilderState& state) const {
+    return clone().extractExpr(state);
 }
 
-std::unique_ptr<sbe::EExpression> SbExpr::extractExpr(StageBuilderState& state) {
-    return extractExpr(state.slotVarMap, state);
-}
-
-std::unique_ptr<sbe::EExpression> SbExpr::getExpr(StageBuilderState& state) const {
-    return getExpr(state.slotVarMap, state);
-}
-
-abt::HolderPtr SbExpr::extractABT(optimizer::SlotVarMap& varMap) {
+abt::HolderPtr SbExpr::extractABT() {
     if (hasSlot()) {
         auto slotId = stdx::get<sbe::value::SlotId>(_storage);
-        auto varName = makeVariableName(slotId);
-        varMap.emplace(varName, slotId);
-        return abt::wrap(optimizer::make<optimizer::Variable>(varName));
+        return abt::wrap(makeABTVariable(slotId));
+    }
+
+    if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
+        auto [frameId, slotId] = stdx::get<LocalVarInfo>(_storage);
+        return abt::wrap(makeABTLocalVariable(frameId, slotId));
     }
 
     tassert(6950800,
@@ -85,5 +233,16 @@ abt::HolderPtr SbExpr::extractABT(optimizer::SlotVarMap& varMap) {
             stdx::holds_alternative<abt::HolderPtr>(_storage));
 
     return std::move(stdx::get<abt::HolderPtr>(_storage));
+}
+
+void SbExpr::set(sbe::FrameId frameId, sbe::value::SlotId slotId) {
+    auto frameIdInt32 = representAs<int32_t>(frameId);
+    auto slotIdInt32 = representAs<int32_t>(slotId);
+
+    if (frameIdInt32 && slotIdInt32) {
+        _storage = std::pair(*frameIdInt32, *slotIdInt32);
+    } else {
+        _storage = abt::wrap(makeVariable(getABTLocalVariableName(frameId, slotId)));
+    }
 }
 }  // namespace mongo::stage_builder

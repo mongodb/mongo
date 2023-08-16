@@ -1575,6 +1575,7 @@ execEnv.Library(
         'query/sbe_stage_builder_lookup.cpp',
         'query/sbe_stage_builder_projection.cpp',
         'query/sbe_stage_builder_sbexpr.cpp',
+        'query/sbe_stage_builder_sbexpr_helpers.cpp',
         'query/sbe_stage_builder_state.cpp',
         'query/sbe_stage_builder_type_checker.cpp',
         'query/sbe_stage_builder_window_function.cpp',

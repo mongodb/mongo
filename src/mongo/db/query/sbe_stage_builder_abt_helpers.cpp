@@ -59,7 +59,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
-
 std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTreeImpl(
     sbe::EPrimBinary::Op logicOp,
     std::vector<std::unique_ptr<sbe::EExpression>>& leaves,
@@ -84,12 +83,11 @@ std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
 EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                    std::vector<EvalExpr> leaves,
                                    StageBuilderState& state) {
-    if (std::all_of(
-            leaves.begin(), leaves.end(), [](auto&& e) { return e.hasABT() || e.hasSlot(); })) {
+    if (std::all_of(leaves.begin(), leaves.end(), [](auto&& e) { return e.hasABT(); })) {
         std::vector<optimizer::ABT> abtExprs;
         abtExprs.reserve(leaves.size());
         for (auto&& e : leaves) {
-            abtExprs.push_back(abt::unwrap(e.extractABT(state.slotVarMap)));
+            abtExprs.push_back(abt::unwrap(e.extractABT()));
         }
         return abt::wrap(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
                                                        ? optimizer::Operations::And
@@ -105,63 +103,14 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     return EvalExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }
 
-std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
-                                            optimizer::SlotVarMap& slotMap,
-                                            StageBuilderState& state) {
-    auto& runtimeEnv = *state.env;
-
-    auto env = optimizer::VariableEnvironment::build(abt);
-
-    // Do not use descriptive names here.
-    auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
-    // Convert paths into ABT expressions.
-    optimizer::EvalPathLowering pathLower{prefixId, env};
-    pathLower.optimize(abt);
-
-    const CollatorInterface* collator = nullptr;
-    boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
-    if (collatorSlot) {
-        auto [collatorTag, collatorValue] = runtimeEnv.getAccessor(*collatorSlot)->getViewOfValue();
-        tassert(7158700,
-                "Not a collator in collatorSlot",
-                collatorTag == sbe::value::TypeTags::collator);
-        collator = sbe::value::bitcastTo<const CollatorInterface*>(collatorValue);
-    }
-
-    bool modified = false;
-    do {
-        // Run the constant folding to eliminate lambda applications as they are not directly
-        // supported by the SBE VM.
-        ExpressionConstEval constEval{env, collator};
-
-        constEval.optimize(abt);
-
-        TypeChecker typeChecker;
-        typeChecker.typeCheck(abt);
-
-        modified = typeChecker.modified();
-        if (modified) {
-            env.rebuild(abt);
-        }
-    } while (modified);
-
-    // And finally convert to the SBE expression.
-    optimizer::SBEExpressionLowering exprLower{env, slotMap, runtimeEnv};
-    return exprLower.optimize(abt);
-}
-
-optimizer::ABT makeFillEmpty(optimizer::ABT e, bool valueIfEmpty) {
-    using namespace std::literals;
-    return optimizer::make<optimizer::BinaryOp>(
-        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(valueIfEmpty));
-}
-
 optimizer::ABT makeFillEmptyFalse(optimizer::ABT e) {
-    return makeFillEmpty(std::move(e), false);
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(false));
 }
 
 optimizer::ABT makeFillEmptyTrue(optimizer::ABT e) {
-    return makeFillEmpty(std::move(e), true);
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(true));
 }
 
 optimizer::ABT makeFillEmptyNull(optimizer::ABT e) {
@@ -169,30 +118,25 @@ optimizer::ABT makeFillEmptyNull(optimizer::ABT e) {
         optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::null());
 }
 
+optimizer::ABT makeFillEmptyUndefined(optimizer::ABT e) {
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::FillEmpty,
+        std::move(e),
+        makeABTConstant(sbe::value::TypeTags::bsonUndefined, 0));
+}
+
 optimizer::ABT makeNot(optimizer::ABT e) {
     return makeUnaryOp(optimizer::Operations::Not, std::move(e));
 }
 
-optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId) {
-    // Use a naming scheme that reduces that chances of clashing into a user-created variable name.
-    str::stream varName;
-    varName << "__s" << slotId;
-    return optimizer::ProjectionName{varName};
-}
-
-optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId) {
-    // Use a naming scheme that reduces that chances of clashing into a user-created variable name.
-    str::stream varName;
-    varName << "__l" << frameId << "." << slotId;
-    return optimizer::ProjectionName{varName};
-}
-
-optimizer::ABT makeVariable(optimizer::ProjectionName var) {
-    return optimizer::make<optimizer::Variable>(std::move(var));
-}
-
 optimizer::ABT makeUnaryOp(optimizer::Operations unaryOp, optimizer::ABT operand) {
     return optimizer::make<optimizer::UnaryOp>(unaryOp, std::move(operand));
+}
+
+optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp,
+                            optimizer::ABT lhs,
+                            optimizer::ABT rhs) {
+    return optimizer::make<optimizer::BinaryOp>(binaryOp, std::move(lhs), std::move(rhs));
 }
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ABT var) {
@@ -272,13 +216,6 @@ optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::Project
                                                     sbe::value::TypeTags::NumberInt32))))));
 }
 
-static optimizer::ABT generateIsIntegralType(const optimizer::ProjectionName& var) {
-    return makeABTFunction("typeMatch"_sd,
-                           makeVariable(var),
-                           optimizer::Constant::int32(getBSONTypeMask(BSONType::NumberInt) |
-                                                      getBSONTypeMask(BSONType::NumberLong)));
-}
-
 optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName& var) {
     return makeBalancedBooleanOpTree(
         optimizer::Operations::Or,
@@ -286,11 +223,10 @@ optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName
             // We can perform our numerical test with trunc. trunc will return nothing if we pass a
             // non-number to it. We return true if the comparison returns nothing, or if
             // var != trunc(var), indicating this is not a whole number.
-            makeFillEmpty(
+            makeFillEmptyTrue(
                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Neq,
                                                      makeVariable(var),
-                                                     makeABTFunction("trunc", makeVariable(var))),
-                true),
+                                                     makeABTFunction("trunc", makeVariable(var)))),
             optimizer::make<optimizer::BinaryOp>(
                 optimizer::Operations::Lt, makeVariable(var), optimizer::Constant::int32(-20)),
             optimizer::make<optimizer::BinaryOp>(
@@ -302,9 +238,8 @@ optimizer::ABT generateABTNaNCheck(optimizer::ProjectionName var) {
     return makeABTFunction("isNaN"_sd, makeVariable(std::move(var)));
 }
 
-optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage) {
-    return makeABTFunction(
-        "fail"_sd, optimizer::Constant::int32(error), makeABTConstant(errorMessage));
+optimizer::ABT generateABTInfinityCheck(optimizer::ProjectionName var) {
+    return makeABTFunction("isInfinity"_sd, makeVariable(std::move(var)));
 }
 
 template <>
@@ -333,8 +268,7 @@ optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,
     while (idx > 0) {
         --idx;
 
-        auto frameId = frameIdGenerator->generate();
-        auto var = makeLocalVariableName(frameId, 0);
+        auto var = getABTLocalVariableName(frameIdGenerator->generate(), 0);
 
         expr = optimizer::make<optimizer::Let>(
             var,
@@ -346,4 +280,49 @@ optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,
     return expr;
 }
 
+optimizer::ABT makeIf(optimizer::ABT condExpr, optimizer::ABT thenExpr, optimizer::ABT elseExpr) {
+    return optimizer::make<optimizer::If>(
+        std::move(condExpr), std::move(thenExpr), std::move(elseExpr));
+}
+
+optimizer::ABT makeLet(const optimizer::ProjectionName& name,
+                       optimizer::ABT bindExpr,
+                       optimizer::ABT expr) {
+    // Verify that 'name' was generated by calling 'getABTLocalVariableName(N, 0)' for some
+    // frame ID 'N'.
+    auto localVarInfo = getSbeLocalVariableInfo(name);
+    tassert(7654322, "", localVarInfo.has_value() && localVarInfo->second == 0);
+
+    return optimizer::make<optimizer::Let>(name, std::move(bindExpr), std::move(expr));
+}
+
+optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABT bindExpr, optimizer::ABT expr) {
+    return optimizer::make<optimizer::Let>(
+        getABTLocalVariableName(frameId, 0), std::move(bindExpr), std::move(expr));
+}
+
+optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABTVector bindExprs, optimizer::ABT expr) {
+    for (size_t idx = bindExprs.size(); idx > 0;) {
+        --idx;
+        expr = optimizer::make<optimizer::Let>(
+            getABTLocalVariableName(frameId, idx), std::move(bindExprs[idx]), std::move(expr));
+    }
+
+    return expr;
+}
+
+optimizer::ABT makeLocalLambda(sbe::FrameId frameId, optimizer::ABT expr) {
+    optimizer::ProjectionName var = getABTLocalVariableName(frameId, 0);
+    return optimizer::make<optimizer::LambdaAbstraction>(std::move(var), std::move(expr));
+}
+
+optimizer::ABT makeNumericConvert(optimizer::ABT expr, sbe::value::TypeTags tag) {
+    return makeABTFunction(
+        "convert"_sd, std::move(expr), optimizer::Constant::int32(static_cast<int32_t>(tag)));
+}
+
+optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage) {
+    return makeABTFunction(
+        "fail"_sd, optimizer::Constant::int32(error), makeABTConstant(errorMessage));
+}
 }  // namespace mongo::stage_builder

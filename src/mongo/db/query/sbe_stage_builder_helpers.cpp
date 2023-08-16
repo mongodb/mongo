@@ -110,26 +110,19 @@ std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
 
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               std::unique_ptr<sbe::EExpression> collator) {
-    using namespace std::literals;
-
-    if (collator && sbe::EPrimBinary::isComparisonOp(binaryOp)) {
-        return sbe::makeE<sbe::EPrimBinary>(
-            binaryOp, std::move(lhs), std::move(rhs), std::move(collator));
-    } else {
-        return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs));
-    }
+                                               std::unique_ptr<sbe::EExpression> rhs) {
+    return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs));
 }
 
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               StageBuilderState& state) {
+std::unique_ptr<sbe::EExpression> makeBinaryOpWithCollation(sbe::EPrimBinary::Op binaryOp,
+                                                            std::unique_ptr<sbe::EExpression> lhs,
+                                                            std::unique_ptr<sbe::EExpression> rhs,
+                                                            StageBuilderState& state) {
     auto collatorSlot = state.getCollatorSlot();
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
-    return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
+    return sbe::makeE<sbe::EPrimBinary>(
+        binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
@@ -155,17 +148,8 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
     return generateNullOrMissingExpr(*arg);
 }
 
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state) {
-    auto expr = arg.extractExpr(state.slotVarMap, state);
-    return generateNullOrMissingExpr(*expr);
-}
-
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
     return makeNot(makeFunction("isNumber", var.clone()));
-}
-
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, state)));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
@@ -179,28 +163,23 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
                      makeInt64Constant(std::numeric_limits<int64_t>::min())));
 }
 
+std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
+    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
+
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
     return makeFunction("isNaN", var.clone());
-}
-
-std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, state));
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
     return makeFunction("isInfinity"_sd, var.clone());
 }
 
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, state));
-}
-
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
     return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::lessEq, var.clone(), makeInt32Constant(0));
 }
 
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EExpression& expr) {
-    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::greater, expr.clone(), makeInt32Constant(0));
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var) {
+    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::greater, var.clone(), makeInt32Constant(0));
 }
 
 std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
@@ -211,8 +190,8 @@ std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& v
     return makeNot(makeFunction("isObject", var.clone()));
 }
 
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EExpression& expr) {
-    return makeNot(makeFunction("isString", expr.clone()));
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
+    return makeNot(makeFunction("isString", var.clone()));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
@@ -257,8 +236,11 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
-    using namespace std::literals;
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
+}
+
+std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpression> e) {
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
@@ -356,8 +338,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     // If expr's value is an expression, create a ProjectStage to evaluate the expression
     // into a slot.
     auto slot = slotIdGenerator->generate();
-    stage =
-        makeProject(std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, state));
+    stage = makeProject(std::move(stage), planNodeId, slot, expr.extractExpr(state));
     return {slot, std::move(stage)};
 }
 
@@ -414,56 +395,6 @@ EvalStage makeUnwind(EvalStage inputEvalStage,
                                                     preserveNullAndEmptyArrays,
                                                     planNodeId);
     return {std::move(unwindStage), sbe::makeSV(unwindSlot)};
-}
-
-EvalStage makeBranch(EvalStage thenStage,
-                     EvalStage elseStage,
-                     std::unique_ptr<sbe::EExpression> ifExpr,
-                     sbe::value::SlotVector thenVals,
-                     sbe::value::SlotVector elseVals,
-                     sbe::value::SlotVector outputVals,
-                     PlanNodeId planNodeId) {
-    auto branchStage = sbe::makeS<sbe::BranchStage>(thenStage.extractStage(planNodeId),
-                                                    elseStage.extractStage(planNodeId),
-                                                    std::move(ifExpr),
-                                                    std::move(thenVals),
-                                                    std::move(elseVals),
-                                                    outputVals,
-                                                    planNodeId);
-    return {std::move(branchStage), std::move(outputVals)};
-}
-
-EvalStage makeTraverse(EvalStage outer,
-                       EvalStage inner,
-                       sbe::value::SlotId inField,
-                       sbe::value::SlotId outField,
-                       sbe::value::SlotId outFieldInner,
-                       std::unique_ptr<sbe::EExpression> foldExpr,
-                       std::unique_ptr<sbe::EExpression> finalExpr,
-                       PlanNodeId planNodeId,
-                       boost::optional<size_t> nestedArraysDepth,
-                       const sbe::value::SlotVector& lexicalEnvironment) {
-    sbe::value::SlotVector outerCorrelated = lexicalEnvironment;
-    for (auto slot : outer.getOutSlots()) {
-        if (slot != inField) {
-            outerCorrelated.push_back(slot);
-        }
-    }
-
-    auto outSlots = outer.extractOutSlots();
-    outSlots.push_back(outField);
-
-    return {sbe::makeS<sbe::TraverseStage>(outer.extractStage(planNodeId),
-                                           inner.extractStage(planNodeId),
-                                           inField,
-                                           outField,
-                                           outFieldInner,
-                                           std::move(outerCorrelated),
-                                           std::move(foldExpr),
-                                           std::move(finalExpr),
-                                           planNodeId,
-                                           nestedArraysDepth),
-            std::move(outSlots)};
 }
 
 EvalStage makeLimitSkip(EvalStage input,
@@ -546,9 +477,30 @@ EvalStage makeMkBsonObj(EvalStage stage,
     return stage;
 }
 
-std::unique_ptr<sbe::EExpression> makeIfNullExpr(
-    std::vector<std::unique_ptr<sbe::EExpression>> values,
-    sbe::value::FrameIdGenerator* frameIdGenerator) {
+std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
+                                         std::unique_ptr<sbe::EExpression> thenExpr,
+                                         std::unique_ptr<sbe::EExpression> elseExpr) {
+    return sbe::makeE<sbe::EIf>(std::move(condExpr), std::move(thenExpr), std::move(elseExpr));
+}
+
+std::unique_ptr<sbe::EExpression> makeLet(sbe::FrameId frameId,
+                                          sbe::EExpression::Vector bindExprs,
+                                          std::unique_ptr<sbe::EExpression> expr) {
+    return sbe::makeE<sbe::ELocalBind>(frameId, std::move(bindExprs), std::move(expr));
+}
+
+std::unique_ptr<sbe::EExpression> makeLocalLambda(sbe::FrameId frameId,
+                                                  std::unique_ptr<sbe::EExpression> expr) {
+    return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(expr));
+}
+
+std::unique_ptr<sbe::EExpression> makeNumericConvert(std::unique_ptr<sbe::EExpression> expr,
+                                                     sbe::value::TypeTags tag) {
+    return sbe::makeE<sbe::ENumericConvert>(std::move(expr), tag);
+}
+
+std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values,
+                                                 sbe::value::FrameIdGenerator* frameIdGenerator) {
     tassert(6987503, "Expected 'values' to be non-empty", values.size() > 0);
 
     size_t idx = values.size() - 1;
@@ -1106,11 +1058,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr = makeFunction(
-                    "getField"_sd,
-                    parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
-                                            : parent->value.extractExpr(state.slotVarMap, state),
-                    makeStrConstant(node->name));
+                auto getFieldExpr =
+                    makeFunction("getField"_sd,
+                                 parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
+                                                         : parent->value.extractExpr(state),
+                                 makeStrConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;

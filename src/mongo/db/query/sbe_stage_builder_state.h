@@ -34,7 +34,6 @@
 #include <boost/optional/optional.hpp>
 #include <memory>
 
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 
 namespace mongo {
@@ -136,9 +135,6 @@ struct StageBuilderState {
 
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
-
-    // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
-    optimizer::SlotVarMap slotVarMap;
 
     StringMap<sbe::value::SlotId> stringConstantToSlotMap;
     SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;

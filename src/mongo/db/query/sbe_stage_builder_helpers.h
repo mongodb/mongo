@@ -104,13 +104,12 @@ std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
 
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               std::unique_ptr<sbe::EExpression> collator = {});
+                                               std::unique_ptr<sbe::EExpression> rhs);
 
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               StageBuilderState& state);
+std::unique_ptr<sbe::EExpression> makeBinaryOpWithCollation(sbe::EPrimBinary::Op binaryOp,
+                                                            std::unique_ptr<sbe::EExpression> lhs,
+                                                            std::unique_ptr<sbe::EExpression> rhs,
+                                                            StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
@@ -121,14 +120,12 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
                                                         sbe::value::SlotId slotId);
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg);
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
  * that_ it has already been verified to be neither null nor missing.
  */
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is the value NumberLong(-2^64).
@@ -140,13 +137,11 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
  * already been verified to be numeric.
  */
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a numeric Infinity.
  */
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
@@ -158,7 +153,7 @@ std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable&
  * Generates an EExpression that checks if the input expression is a positive number (i.e. > 0)
  * _assuming that_ it has already been verified to be numeric.
  */
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EExpression& expr);
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var);
 
 /**
  * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
@@ -176,7 +171,7 @@ std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& v
  * Generates an EExpression that checks if the input expression is not a string, _assuming that
  * it has already been verified to be neither null nor missing.
  */
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EExpression& expr);
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var);
 
 /**
  * Generates an EExpression that checks whether the input expression is null, missing, or
@@ -242,9 +237,16 @@ EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1);
  */
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e);
 
+std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpression> e);
+
 /**
  * Creates an EFunction expression with the given name and arguments.
  */
+inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name,
+                                                      sbe::EExpression::Vector args) {
+    return sbe::makeE<sbe::EFunction>(name, std::move(args));
+}
+
 template <typename... Args>
 inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&... args) {
     return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
@@ -432,32 +434,6 @@ EvalStage makeUnwind(EvalStage inputEvalStage,
                      PlanNodeId planNodeId,
                      bool preserveNullAndEmptyArrays = true);
 
-/**
- * Creates a branch stage with the specified condition ifExpr.
- */
-EvalStage makeBranch(EvalStage thenStage,
-                     EvalStage elseStage,
-                     std::unique_ptr<sbe::EExpression> ifExpr,
-                     sbe::value::SlotVector thenVals,
-                     sbe::value::SlotVector elseVals,
-                     sbe::value::SlotVector outputVals,
-                     PlanNodeId planNodeId);
-
-/**
- * Creates traverse stage. All 'outSlots' from 'outer' argument (except for 'inField') along with
- * slots from the 'lexicalEnvironment' argument are passed as correlated.
- */
-EvalStage makeTraverse(EvalStage outer,
-                       EvalStage inner,
-                       sbe::value::SlotId inField,
-                       sbe::value::SlotId outField,
-                       sbe::value::SlotId outFieldInner,
-                       std::unique_ptr<sbe::EExpression> foldExpr,
-                       std::unique_ptr<sbe::EExpression> finalExpr,
-                       PlanNodeId planNodeId,
-                       boost::optional<size_t> nestedArraysDepth,
-                       const sbe::value::SlotVector& lexicalEnvironment = {});
-
 EvalStage makeLimitSkip(EvalStage input,
                         PlanNodeId planNodeId,
                         boost::optional<long long> limit,
@@ -487,13 +463,26 @@ EvalStage makeMkBsonObj(EvalStage stage,
                         bool returnOldObject,
                         PlanNodeId planNodeId);
 
+std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
+                                         std::unique_ptr<sbe::EExpression> thenExpr,
+                                         std::unique_ptr<sbe::EExpression> elseExpr);
+
+std::unique_ptr<sbe::EExpression> makeLet(sbe::FrameId frameId,
+                                          sbe::EExpression::Vector bindExprs,
+                                          std::unique_ptr<sbe::EExpression> expr);
+
+std::unique_ptr<sbe::EExpression> makeLocalLambda(sbe::FrameId frameId,
+                                                  std::unique_ptr<sbe::EExpression> expr);
+
+std::unique_ptr<sbe::EExpression> makeNumericConvert(std::unique_ptr<sbe::EExpression> expr,
+                                                     sbe::value::TypeTags tag);
+
 /**
  * Creates a chain of EIf expressions that will inspect each arg in order and return the first
  * arg that is not null or missing.
  */
-std::unique_ptr<sbe::EExpression> makeIfNullExpr(
-    std::vector<std::unique_ptr<sbe::EExpression>> values,
-    sbe::value::FrameIdGenerator* frameIdGenerator);
+std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values,
+                                                 sbe::value::FrameIdGenerator* frameIdGenerator);
 
 /** This helper takes an SBE SlotIdGenerator and an SBE Array and returns an output slot and a
  * unwind/project/limit/coscan subtree that streams out the elements of the array one at a time via

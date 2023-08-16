@@ -50,7 +50,7 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * This function generates an EvalExpr that implements the filter expression represented by 'root'.
+ * This function generates an SbExpr that implements the filter expression represented by 'root'.
  * The 'inputSlot' and 'slots' parameters specify the input(s) that the filter should use.
  *
  * The 'isFilterOverIxscan' parameter controls if we should search for kField slots in 'slots' that
@@ -61,15 +61,15 @@ class PlanStageSlots;
  * key field names ('keyFields') that lists the names of all the kField slots that are needed by
  * 'root'.
  *
- * This function returns an EvalExpr. If 'root' is an AND with no children, this function will
- * return a null EvalExpr to indicate that there is no filter condition.
+ * This function returns an SbExpr. If 'root' is an AND with no children, this function will
+ * return a null SbExpr to indicate that there is no filter condition.
  */
-EvalExpr generateFilter(StageBuilderState& state,
-                        const MatchExpression* root,
-                        boost::optional<sbe::value::SlotId> inputSlot,
-                        const PlanStageSlots* slots,
-                        const std::vector<std::string>& keyFields = {},
-                        bool isFilterOverIxscan = false);
+SbExpr generateFilter(StageBuilderState& state,
+                      const MatchExpression* root,
+                      boost::optional<sbe::value::SlotId> inputSlot,
+                      const PlanStageSlots* slots,
+                      const std::vector<std::string>& keyFields = {},
+                      bool isFilterOverIxscan = false);
 
 /**
  * Converts the list of bit positions inside of any of the bit-test match expressions
@@ -83,24 +83,20 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
  * The following family of functions convert the given MatchExpression that consumes a single input
  * into an EExpression that consumes the input from the provided slot.
  */
-EvalExpr generateComparisonExpr(StageBuilderState& state,
-                                const ComparisonMatchExpression* expr,
-                                sbe::EPrimBinary::Op binaryOp,
-                                EvalExpr inputExpr);
-EvalExpr generateInExpr(StageBuilderState& state,
-                        const InMatchExpression* expr,
-                        EvalExpr inputExpr);
-EvalExpr generateBitTestExpr(StageBuilderState& state,
-                             const BitTestMatchExpression* expr,
-                             const sbe::BitTestBehavior& bitOp,
-                             EvalExpr inputExpr);
-EvalExpr generateModExpr(StageBuilderState& state,
-                         const ModMatchExpression* expr,
-                         EvalExpr inputExpr);
-EvalExpr generateRegexExpr(StageBuilderState& state,
-                           const RegexMatchExpression* expr,
-                           EvalExpr inputExpr);
-EvalExpr generateWhereExpr(StageBuilderState& state,
-                           const WhereMatchExpression* expr,
-                           EvalExpr inputExpr);
+SbExpr generateComparisonExpr(StageBuilderState& state,
+                              const ComparisonMatchExpression* expr,
+                              sbe::EPrimBinary::Op binaryOp,
+                              SbExpr inputExpr);
+SbExpr generateInExpr(StageBuilderState& state, const InMatchExpression* expr, SbExpr inputExpr);
+SbExpr generateBitTestExpr(StageBuilderState& state,
+                           const BitTestMatchExpression* expr,
+                           const sbe::BitTestBehavior& bitOp,
+                           SbExpr inputExpr);
+SbExpr generateModExpr(StageBuilderState& state, const ModMatchExpression* expr, SbExpr inputExpr);
+SbExpr generateRegexExpr(StageBuilderState& state,
+                         const RegexMatchExpression* expr,
+                         SbExpr inputExpr);
+SbExpr generateWhereExpr(StageBuilderState& state,
+                         const WhereMatchExpression* expr,
+                         SbExpr inputExpr);
 }  // namespace mongo::stage_builder

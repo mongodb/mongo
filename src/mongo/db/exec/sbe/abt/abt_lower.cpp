@@ -97,6 +97,20 @@ static sbe::EExpression::Vector toInlinedVector(
     return inlined;
 }
 
+std::unique_ptr<sbe::EExpression> VarResolver::operator()(const ProjectionName& name) const {
+    if (_slotMap) {
+        if (auto it = _slotMap->find(name); it != _slotMap->end()) {
+            return sbe::makeE<sbe::EVariable>(it->second);
+        }
+    }
+
+    if (_lowerFn) {
+        return _lowerFn(name);
+    }
+
+    return {};
+}
+
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::optimize(const ABT& n) {
     return algebra::transport<false>(n, *this);
 }
@@ -178,12 +192,13 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Variabl
             return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(var));
         }
     }
+
     // If variable was not defined in the scope of the local expression via a Let or
     // LambdaAbstraction, it must be a reference that will be in the slotMap.
-    if (auto it = _slotMap.find(var.name()); it != _slotMap.end()) {
-        // Found the slot.
-        return sbe::makeE<sbe::EVariable>(it->second);
+    if (auto expr = _varResolver(var.name())) {
+        return expr;
     }
+
     tasserted(6624205, str::stream() << "undefined variable: " << var.name());
     return nullptr;
 }
@@ -193,40 +208,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     std::unique_ptr<sbe::EExpression> lhs,
     std::unique_ptr<sbe::EExpression> rhs) {
 
-    sbe::EPrimBinary::Op sbeOp = [](const auto abtOp) {
-        switch (abtOp) {
-            case Operations::Eq:
-                return sbe::EPrimBinary::eq;
-            case Operations::Neq:
-                return sbe::EPrimBinary::neq;
-            case Operations::Gt:
-                return sbe::EPrimBinary::greater;
-            case Operations::Gte:
-                return sbe::EPrimBinary::greaterEq;
-            case Operations::Lt:
-                return sbe::EPrimBinary::less;
-            case Operations::Lte:
-                return sbe::EPrimBinary::lessEq;
-            case Operations::Add:
-                return sbe::EPrimBinary::add;
-            case Operations::Sub:
-                return sbe::EPrimBinary::sub;
-            case Operations::FillEmpty:
-                return sbe::EPrimBinary::fillEmpty;
-            case Operations::And:
-                return sbe::EPrimBinary::logicAnd;
-            case Operations::Or:
-                return sbe::EPrimBinary::logicOr;
-            case Operations::Cmp3w:
-                return sbe::EPrimBinary::cmp3w;
-            case Operations::Div:
-                return sbe::EPrimBinary::div;
-            case Operations::Mult:
-                return sbe::EPrimBinary::mul;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }(op.op());
+    sbe::EPrimBinary::Op sbeOp = getEPrimBinaryOp(op.op());
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
         boost::optional<sbe::value::SlotId> collatorSlot =
@@ -243,16 +225,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     const UnaryOp& op, std::unique_ptr<sbe::EExpression> arg) {
 
-    sbe::EPrimUnary::Op sbeOp = [](const auto abtOp) {
-        switch (abtOp) {
-            case Operations::Neg:
-                return sbe::EPrimUnary::negate;
-            case Operations::Not:
-                return sbe::EPrimUnary::logicNot;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }(op.op());
+    sbe::EPrimUnary::Op sbeOp = getEPrimUnaryOp(op.op());
 
     return sbe::makeE<sbe::EPrimUnary>(sbeOp, std::move(arg));
 }
@@ -309,11 +282,10 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
         // If the child of FunctionCall['shardFilter'] is a Variable, look up the variable in the
         // slot map.
         if (node.is<Variable>()) {
-            sbe::value::SlotId slotId = _slotMap.at(node.cast<Variable>()->name());
-            projectValues.push_back(sbe::makeE<sbe::EVariable>(slotId));
+            projectValues.push_back(_varResolver(node.cast<Variable>()->name()));
         } else {
             // Otherwise, lower the expression to be referenced by the 'shardFilter' function call.
-            SBEExpressionLowering exprLower{_env, _slotMap, _namedSlots};
+            SBEExpressionLowering exprLower{_env, _varResolver, _namedSlots};
             projectValues.push_back(exprLower.optimize(node));
         }
     }

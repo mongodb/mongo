@@ -977,7 +977,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    const optimizer::ProjectionName rootStr = "rowStoreRoot";
+    const optimizer::ProjectionName rootStr = getABTVariableName(rowStoreSlot);
     optimizer::FieldMapBuilder builder(rootStr, true);
 
     // When building its output document (in 'recordSlot'), the 'ColumnStoreStage' should not try to
@@ -1006,9 +1006,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // projecting an empty object.
         tassert(
             6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
-        optimizer::SlotVarMap slotMap{};
-        slotMap[rootStr] = rowStoreSlot;
-        rowStoreExpr = abt ? abtToExpr(*abt, slotMap, _state)
+        rowStoreExpr = abt ? abtToExpr(*abt, _state)
                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     }
 
@@ -3404,8 +3402,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         partitionSlots.push_back(partitionSlot);
         auto partitionABT = abt::unwrap(
             generateExpression(_state, windowNode->partitionBy->get(), rootSlotOpt, &outputs)
-                .extractABT(_state.slotVarMap));
-        auto partitionName = makeLocalVariableName(_state.frameId(), 0);
+                .extractABT());
+        auto partitionName = getABTLocalVariableName(_state.frameId(), 0);
         // Assert partition slot is not an array.
         partitionABT = optimizer::make<optimizer::Let>(
             partitionName,
@@ -3416,7 +3414,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     ErrorCodes::TypeMismatch,
                     "An expression used to partition cannot evaluate to value of type array"),
                 makeVariable(partitionName)));
-        auto partitionExpr = abtToExpr(partitionABT, _state.slotVarMap, _state);
+        auto partitionExpr = abtToExpr(partitionABT, _state);
         stage = sbe::makeProjectStage(
             std::move(stage), root->nodeId(), partitionSlot, std::move(partitionExpr));
     }
@@ -3452,8 +3450,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
             auto sortByABT =
                 abt::unwrap(generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, &outputs)
-                                .extractABT(_state.slotVarMap));
-            auto sortByName = makeLocalVariableName(_state.frameId(), 0);
+                                .extractABT());
+            auto sortByName = getABTLocalVariableName(_state.frameId(), 0);
             // Assert sort by slot is a number.
             sortByABT = optimizer::make<optimizer::Let>(
                 sortByName,
@@ -3462,7 +3460,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     makeABTFunction(typeCheckFn, makeVariable(sortByName)),
                     makeVariable(sortByName),
                     std::move(failABT)));
-            auto sortExpr = abtToExpr(sortByABT, _state.slotVarMap, _state);
+            auto sortExpr = abtToExpr(sortByABT, _state);
             stage =
                 makeProjectStage(std::move(stage), windowNode->nodeId(), slot, std::move(sortExpr));
             forwardSlots.push_back(slot);

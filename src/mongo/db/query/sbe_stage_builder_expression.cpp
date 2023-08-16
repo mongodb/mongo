@@ -89,8 +89,12 @@
 
 namespace mongo::stage_builder {
 namespace {
-
 size_t kArgumentCountForBinaryTree = 100;
+
+inline optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId,
+                                                       sbe::value::SlotId slotId) {
+    return getABTLocalVariableName(frameId, slotId);
+}
 
 struct ExpressionVisitorContext {
     struct VarsFrame {
@@ -134,7 +138,7 @@ struct ExpressionVisitorContext {
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
-        return abt::unwrap(expr.extractABT(state.slotVarMap));
+        return abt::unwrap(expr.extractABT());
     }
 
     EvalExpr popEvalExpr() {
@@ -148,12 +152,6 @@ struct ExpressionVisitorContext {
     EvalExpr done() {
         tassert(6987501, "expected exactly one EvalExpr on the stack", exprStack.size() == 1);
         return popEvalExpr();
-    }
-
-    optimizer::ProjectionName registerVariable(sbe::value::SlotId slotId) {
-        auto varName = stage_builder::makeVariableName(slotId);
-        state.slotVarMap.emplace(varName, slotId);
-        return varName;
     }
 
     StageBuilderState& state;
@@ -193,7 +191,7 @@ optimizer::ABT generateTraverseHelper(
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldName = makeABTConstant(fp.getFieldName(level));
     auto fieldExpr = topLevelFieldSlot
-        ? makeVariable(context->registerVariable(*topLevelFieldSlot))
+        ? makeABTVariable(*topLevelFieldSlot)
         : makeABTFunction("getField"_sd, std::move(*inputExpr), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
@@ -1208,8 +1206,7 @@ public:
         auto startDateExpression = _context->popABTExpr();
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
-        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
         //  Set parameters for an invocation of built-in "dateDiff" function.
         optimizer::ABTVector arguments;
@@ -1347,7 +1344,7 @@ public:
         auto dateStringName = makeLocalVariableName(_context->state.frameId(), 0);
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto timeZoneDBName = getABTVariableName(timeZoneDBSlot);
 
         // Set parameters for an invocation of built-in "dateFromString" function.
         optimizer::ABTVector arguments;
@@ -1741,9 +1738,8 @@ public:
         // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
         // dateParts functions as a variable.
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto computeDate = makeABTFunction(eIsoWeekYear ? "datePartsWeekYear" : "dateParts",
-                                           makeVariable(timeZoneDBName),
+                                           makeABTVariable(timeZoneDBSlot),
                                            yearVar,
                                            monthVar,
                                            dayVar,
@@ -1823,8 +1819,7 @@ public:
         auto date = _context->popABTExpr();
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
-        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
         auto isoTypeMask = getBSONTypeMask(sbe::value::TypeTags::Boolean);
 
@@ -1888,8 +1883,7 @@ public:
             : optimizer::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
-        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
         auto [timezoneDBTag, timezoneDBVal] =
             _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         uassert(4997900,
@@ -2012,8 +2006,7 @@ public:
         auto dateExpression = _context->popABTExpr();
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
-        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
         auto [timezoneDBTag, timezoneDBVal] =
             _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         tassert(7157927,
@@ -2297,7 +2290,7 @@ public:
 
             // A solo variable reference (e.g.: "$$ROOT" or "$$myvar") that doesn't need any
             // traversal.
-            _context->pushExpr(inputExpr.extractABT(_context->state.slotVarMap));
+            _context->pushExpr(inputExpr.extractABT());
             return;
         }
 
@@ -2306,14 +2299,13 @@ public:
                 !inputExpr.isNull() || topLevelFieldSlot.has_value());
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        auto resultExpr = generateTraverse(
-            _context,
-            inputExpr.isNull() ? boost::optional<optimizer::ABT>{}
-                               : abt::unwrap(inputExpr.extractABT(_context->state.slotVarMap)),
-            expectsDocumentInputOnly,
-            *fp,
-            _context->state.frameIdGenerator,
-            topLevelFieldSlot);
+        auto resultExpr = generateTraverse(_context,
+                                           inputExpr.isNull() ? boost::optional<optimizer::ABT>{}
+                                                              : abt::unwrap(inputExpr.extractABT()),
+                                           expectsDocumentInputOnly,
+                                           *fp,
+                                           _context->state.frameIdGenerator,
+                                           topLevelFieldSlot);
         pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionFilter* expr) final {
@@ -2385,10 +2377,9 @@ public:
 
         auto resultExpr = _context->popABTExpr();
         for (auto& binding : currentFrame.bindings) {
-            resultExpr = optimizer::make<optimizer::Let>(
-                makeLocalVariableName(binding.frameId, 0),
-                abt::unwrap(binding.expr.extractABT(_context->state.slotVarMap)),
-                std::move(resultExpr));
+            resultExpr = optimizer::make<optimizer::Let>(makeLocalVariableName(binding.frameId, 0),
+                                                         abt::unwrap(binding.expr.extractABT()),
+                                                         std::move(resultExpr));
         }
 
         pushABT(std::move(resultExpr));
@@ -2942,15 +2933,13 @@ public:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = makeABTConstant(specTag, specVal);
 
-        auto collatorSlot = _context->state.getCollatorSlot();
-        auto collatorVar = collatorSlot.map(
-            [&](auto slotId) { return _context->registerVariable(*collatorSlot); });
-
         auto argumentIsNotArray = makeNot(makeABTFunction("isArray", var));
 
         optimizer::ABTVector functionArgs{std::move(var), std::move(specConstant)};
-        if (collatorVar) {
-            functionArgs.emplace_back(makeVariable(std::move(*collatorVar)));
+
+        auto collatorSlot = _context->state.getCollatorSlot();
+        if (collatorSlot) {
+            functionArgs.emplace_back(makeABTVariable(*collatorSlot));
         }
 
         auto exprSortArr = buildABTMultiBranchConditional(
@@ -3594,8 +3583,7 @@ private:
                 optimizer::make<optimizer::Constant>(timezoneObjTag, timezoneObjVal);
             arguments.push_back(std::move(timezoneConst));
         } else {
-            auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
-            auto timeZoneDBVar = makeVariable(timeZoneDBName);
+            auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
             inputValidationCases.emplace_back(
                 generateABTNonStringCheck(timezoneExpression),
                 makeABTFail(ErrorCodes::Error{5157902},
@@ -3956,7 +3944,7 @@ private:
         auto [operatorName, setFunctionName] =
             getSetOperatorAndFunctionNames(setOp, collatorSlot.has_value());
         if (collatorSlot) {
-            variables.push_back(makeVariable(_context->registerVariable(*collatorSlot)));
+            variables.push_back(makeABTVariable(*collatorSlot));
         }
 
         for (size_t idx = 0; idx < arity; ++idx) {
@@ -4255,7 +4243,7 @@ private:
         }();
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
-        auto timeZoneDBVar = makeVariable(_context->registerVariable(timeZoneDBSlot));
+        auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
         optimizer::ABTVector checkNullArg;
         checkNullArg.push_back(generateABTNullOrMissing(startDateName));

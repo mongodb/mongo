@@ -47,27 +47,137 @@ namespace mongo::stage_builder {
 
 struct StageBuilderState;
 
+optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
+
+optimizer::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
+
+boost::optional<sbe::value::SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var);
+
+boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariableInfo(
+    const optimizer::ProjectionName& var);
+
+optimizer::ABT makeABTVariable(sbe::value::SlotId slot);
+
+std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, StageBuilderState& state);
+
+/**
+ * The SbVar class is used to represent variables in the SBE stage builder. "SbVar" is short for
+ * "stage builder variable". A given SbVar can represent either be a "slot variable" or a "local
+ * variable".
+ *
+ * An SbVar can be constructed from an EVariable or ProjectionName, and likewise an SbVar can be
+ * converted to EVariable or ProjectionName.
+ */
+class SbVar {
+public:
+    SbVar(sbe::value::SlotId slotId) : _slotId(slotId) {}
+    SbVar(sbe::FrameId frameId, sbe::value::SlotId slotId) : _frameId(frameId), _slotId(slotId) {}
+    SbVar(const sbe::EVariable& var) : _frameId(var.getFrameId()), _slotId(var.getSlotId()) {}
+    SbVar(const optimizer::ProjectionName& name);
+
+    bool isSlot() const {
+        return !_frameId;
+    }
+
+    bool isLocalVar() const {
+        return _frameId.has_value();
+    }
+
+    boost::optional<sbe::value::SlotId> getSlot() const {
+        return isSlot() ? boost::make_optional(_slotId) : boost::none;
+    }
+
+    boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getLocalVarInfo() const {
+        return isLocalVar() ? boost::make_optional(std::pair(*_frameId, _slotId)) : boost::none;
+    }
+
+    sbe::EVariable getEVariable() const {
+        return _frameId ? sbe::EVariable(*_frameId, _slotId) : sbe::EVariable(_slotId);
+    }
+
+    optimizer::ProjectionName getABTName() const {
+        return _frameId ? getABTLocalVariableName(*_frameId, _slotId) : getABTVariableName(_slotId);
+    }
+
+    operator sbe::EVariable() const {
+        return getEVariable();
+    }
+
+    operator optimizer::ProjectionName() const {
+        return getABTName();
+    }
+
+private:
+    boost::optional<sbe::FrameId> _frameId;
+    sbe::value::SlotId _slotId;
+};
+
 /**
  * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
  * for "stage builder expression".
+ *
+ * At any given time, an SbExpr object can be in one of 4 states:
+ *  1) Null - The SbExpr doesn't hold anything.
+ *  2) Slot - The SbExpr holds a slot variable.
+ *  3) ABT - The SbExpr holds an ABT that is not known to be a slot variable.
+ *  4) Expr - The SbExpr holds an EExpression that is not known to be a slot variable.
+ *
+ * 'e.isNull()' returns true if 'e' is in state 1. 'e.hasSlot()' returns true if 'e' is in state 2.
+ * 'e.hasABT()' returns true if 'e' is in state 2 or state 3.
  */
 class SbExpr {
 public:
+    using Vector = std::vector<SbExpr>;
+    using CaseValuePair = std::pair<SbExpr, SbExpr>;
+
+    using LocalVarInfo = std::pair<int32_t, int32_t>;
+    using EExpr = std::unique_ptr<sbe::EExpression>;
+
+    template <typename... Args>
+    static inline Vector makeSeq(Args&&... args) {
+        Vector seq;
+        (seq.emplace_back(std::forward<Args>(args)), ...);
+        return seq;
+    }
+
     SbExpr() : _storage{false} {}
 
-    SbExpr(SbExpr&& e) : _storage(std::move(e._storage)) {
+    SbExpr(SbExpr&& e) noexcept : _storage(std::move(e._storage)) {
         e.reset();
     }
 
-    SbExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
+    SbExpr(const SbExpr&) = delete;
 
-    SbExpr(sbe::value::SlotId s) : _storage(s) {}
+    SbExpr(SbVar var) {
+        if (var.isSlot()) {
+            _storage = *var.getSlot();
+        } else {
+            auto [frameId, slotId] = *var.getLocalVarInfo();
+            set(frameId, slotId);
+        }
+    }
+
+    SbExpr(EExpr&& e) noexcept {
+        if (e) {
+            _storage = std::move(e);
+        }
+    }
+
+    SbExpr(sbe::value::SlotId s) noexcept : _storage(s) {}
+
+    SbExpr(boost::optional<sbe::value::SlotId> s) noexcept {
+        if (s) {
+            _storage = *s;
+        }
+    }
 
     SbExpr(const abt::HolderPtr& a);
 
-    SbExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
+    SbExpr(abt::HolderPtr&& a) noexcept : _storage(std::move(a)) {}
 
-    SbExpr& operator=(SbExpr&& e) {
+    ~SbExpr() = default;
+
+    SbExpr& operator=(SbExpr&& e) noexcept {
         if (this == &e) {
             return *this;
         }
@@ -77,37 +187,64 @@ public:
         return *this;
     }
 
-    SbExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
-        _storage = std::move(e);
-        e.reset();
+    SbExpr& operator=(const SbExpr&) = delete;
+
+    SbExpr& operator=(SbVar var) {
+        if (var.isSlot()) {
+            _storage = *var.getSlot();
+        } else {
+            auto [frameId, slotId] = *var.getLocalVarInfo();
+            set(frameId, slotId);
+        }
+
         return *this;
     }
 
-    SbExpr& operator=(sbe::value::SlotId s) {
+    SbExpr& operator=(EExpr&& e) noexcept {
+        if (e) {
+            _storage = std::move(e);
+        } else {
+            reset();
+        }
+
+        e.reset();
+
+        return *this;
+    }
+
+    SbExpr& operator=(sbe::value::SlotId s) noexcept {
         _storage = s;
         return *this;
     }
 
-    SbExpr& operator=(abt::HolderPtr&& a) {
+    SbExpr& operator=(boost::optional<sbe::value::SlotId> s) noexcept {
+        if (s) {
+            _storage = *s;
+        } else {
+            reset();
+        }
+
+        return *this;
+    }
+
+    SbExpr& operator=(abt::HolderPtr&& a) noexcept {
         _storage = std::move(a);
         return *this;
     }
 
-    boost::optional<sbe::value::SlotId> getSlot() const {
+    boost::optional<sbe::value::SlotId> getSlot() const noexcept {
         return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_storage))
                          : boost::none;
     }
 
-    bool hasSlot() const {
+    bool hasSlot() const noexcept {
         return stdx::holds_alternative<sbe::value::SlotId>(_storage);
     }
 
-    bool hasExpr() const {
-        return stdx::holds_alternative<std::unique_ptr<sbe::EExpression>>(_storage);
-    }
-
-    bool hasABT() const {
-        return stdx::holds_alternative<abt::HolderPtr>(_storage);
+    bool hasABT() const noexcept {
+        return stdx::holds_alternative<sbe::value::SlotId>(_storage) ||
+            stdx::holds_alternative<LocalVarInfo>(_storage) ||
+            stdx::holds_alternative<abt::HolderPtr>(_storage);
     }
 
     SbExpr clone() const {
@@ -115,63 +252,56 @@ public:
             return stdx::get<sbe::value::SlotId>(_storage);
         }
 
-        if (hasABT()) {
+        if (stdx::holds_alternative<LocalVarInfo>(_storage)) {
+            return stdx::get<LocalVarInfo>(_storage);
+        }
+
+        if (stdx::holds_alternative<abt::HolderPtr>(_storage)) {
             return stdx::get<abt::HolderPtr>(_storage);
         }
 
-        if (stdx::holds_alternative<bool>(_storage)) {
-            return SbExpr{};
-        }
-
-        const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_storage);
-        if (expr) {
+        if (stdx::holds_alternative<EExpr>(_storage)) {
+            const auto& expr = stdx::get<EExpr>(_storage);
             return expr->clone();
         }
 
         return {};
     }
 
-    bool isNull() const {
+    bool isNull() const noexcept {
         return stdx::holds_alternative<bool>(_storage);
     }
 
-    explicit operator bool() const {
+    explicit operator bool() const noexcept {
         return !isNull();
     }
 
-    void reset() {
+    void reset() noexcept {
         _storage = false;
     }
 
-    std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap,
-                                              StageBuilderState& state) const;
-
-    std::unique_ptr<sbe::EExpression> getExpr(StageBuilderState& state) const;
+    EExpr getExpr(StageBuilderState& state) const;
 
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
      * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
      * convert variable names into slot ids.
      */
-    std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap,
-                                                  StageBuilderState& state);
+    EExpr extractExpr(StageBuilderState& state);
 
     /**
-     * Helper function that obtains data needed for SbExpr::extractExpr from StageBuilderState
+     * Extract the expression on top of the stack as an ABT node. Throws an exception if the
+     * expression is stored as an EExpression.
      */
-    std::unique_ptr<sbe::EExpression> extractExpr(StageBuilderState& state);
-
-    /**
-     * Extract the expression on top of the stack as an ABT node. If the expression is stored as a
-     * slot id, the mapping between the generated ABT node and the slot id is recorded in the map.
-     * Throws an exception if the expression is stored as an SBE EExpression.
-     */
-    abt::HolderPtr extractABT(optimizer::SlotVarMap& varMap);
+    abt::HolderPtr extractABT();
 
 private:
+    SbExpr(LocalVarInfo localVarInfo) : _storage(localVarInfo) {}
+
+    void set(sbe::FrameId frameId, sbe::value::SlotId slotId);
+
     // The bool type as the first option is used to represent the empty storage.
-    stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, abt::HolderPtr>
-        _storage;
+    stdx::variant<bool, EExpr, sbe::value::SlotId, LocalVarInfo, abt::HolderPtr> _storage;
 };
 
 using EvalExpr = SbExpr;

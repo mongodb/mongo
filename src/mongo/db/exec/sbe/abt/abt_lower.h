@@ -55,14 +55,34 @@
 namespace mongo::optimizer {
 constexpr mongo::StringData kshardFiltererSlotName = "shardFilterer"_sd;
 
+class VarResolver {
+public:
+    using LowerFuncT = std::function<std::unique_ptr<sbe::EExpression>(const ProjectionName&)>;
+
+    VarResolver(SlotVarMap& slotMap) : _slotMap(&slotMap) {}
+
+    template <typename FuncT>
+    VarResolver(FuncT lowerFn) : _lowerFn(std::move(lowerFn)) {}
+
+    template <typename FuncT>
+    VarResolver(SlotVarMap& slotMap, FuncT lowerFn)
+        : _slotMap(&slotMap), _lowerFn(std::move(lowerFn)) {}
+
+    std::unique_ptr<sbe::EExpression> operator()(const ProjectionName& name) const;
+
+private:
+    SlotVarMap* _slotMap = nullptr;
+    LowerFuncT _lowerFn;
+};
+
 class SBEExpressionLowering {
 public:
     SBEExpressionLowering(const VariableEnvironment& env,
-                          SlotVarMap& slotMap,
+                          VarResolver vr,
                           const NamedSlotsProvider& namedSlots,
                           const Metadata* metadata = nullptr,
                           const NodeProps* np = nullptr)
-        : _env(env), _slotMap(slotMap), _namedSlots(namedSlots), _metadata(metadata), _np(np) {}
+        : _env(env), _varResolver(vr), _namedSlots(namedSlots), _metadata(metadata), _np(np) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -108,7 +128,7 @@ private:
         std::string name);
 
     const VariableEnvironment& _env;
-    SlotVarMap& _slotMap;
+    VarResolver _varResolver;
     const NamedSlotsProvider& _namedSlots;
     const Metadata* _metadata;
     const NodeProps* _np;
@@ -366,4 +386,49 @@ private:
     PlanYieldPolicy* _yieldPolicy;
 };
 
+inline sbe::EPrimUnary::Op getEPrimUnaryOp(optimizer::Operations op) {
+    switch (op) {
+        case Operations::Neg:
+            return sbe::EPrimUnary::negate;
+        case Operations::Not:
+            return sbe::EPrimUnary::logicNot;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+inline sbe::EPrimBinary::Op getEPrimBinaryOp(optimizer::Operations op) {
+    switch (op) {
+        case Operations::Eq:
+            return sbe::EPrimBinary::eq;
+        case Operations::Neq:
+            return sbe::EPrimBinary::neq;
+        case Operations::Gt:
+            return sbe::EPrimBinary::greater;
+        case Operations::Gte:
+            return sbe::EPrimBinary::greaterEq;
+        case Operations::Lt:
+            return sbe::EPrimBinary::less;
+        case Operations::Lte:
+            return sbe::EPrimBinary::lessEq;
+        case Operations::Add:
+            return sbe::EPrimBinary::add;
+        case Operations::Sub:
+            return sbe::EPrimBinary::sub;
+        case Operations::FillEmpty:
+            return sbe::EPrimBinary::fillEmpty;
+        case Operations::And:
+            return sbe::EPrimBinary::logicAnd;
+        case Operations::Or:
+            return sbe::EPrimBinary::logicOr;
+        case Operations::Cmp3w:
+            return sbe::EPrimBinary::cmp3w;
+        case Operations::Div:
+            return sbe::EPrimBinary::div;
+        case Operations::Mult:
+            return sbe::EPrimBinary::mul;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace mongo::optimizer

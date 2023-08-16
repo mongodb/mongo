@@ -59,9 +59,9 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                    std::vector<EvalExpr> leaves,
                                    StageBuilderState& state);
 
-std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
-                                            optimizer::SlotVarMap& slotMap,
-                                            StageBuilderState& state);
+inline auto makeABTFunction(StringData name, optimizer::ABTVector args) {
+    return optimizer::make<optimizer::FunctionCall>(name.toString(), std::move(args));
+}
 
 template <typename... Args>
 inline auto makeABTFunction(StringData name, Args&&... args) {
@@ -92,13 +92,16 @@ optimizer::ABT makeFillEmptyTrue(optimizer::ABT e);
  * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
  */
 optimizer::ABT makeFillEmptyNull(optimizer::ABT e);
+
+optimizer::ABT makeFillEmptyUndefined(optimizer::ABT e);
+
 optimizer::ABT makeNot(optimizer::ABT e);
 
-optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
-optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
 optimizer::ABT makeVariable(optimizer::ProjectionName var);
 
 optimizer::ABT makeUnaryOp(optimizer::Operations unaryOp, optimizer::ABT operand);
+
+optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp, optimizer::ABT lhs, optimizer::ABT rhs);
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullOrMissing(optimizer::ABT var);
@@ -130,7 +133,7 @@ optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName
  */
 optimizer::ABT generateABTNaNCheck(optimizer::ProjectionName var);
 
-optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage);
+optimizer::ABT generateABTInfinityCheck(optimizer::ProjectionName var);
 
 /**
  * A pair representing a 1) true/false condition and 2) the value that should be returned if that
@@ -164,5 +167,30 @@ optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
 
 optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,
                               sbe::value::FrameIdGenerator* frameIdGenerator);
+
+using SlotABTExprPairVector = std::vector<std::pair<sbe::value::SlotId, optimizer::ABT>>;
+
+struct ABTAggExprPair {
+    optimizer::ABT init;
+    optimizer::ABT acc;
+};
+
+using ABTAggExprVector = std::vector<std::pair<sbe::value::SlotId, ABTAggExprPair>>;
+
+optimizer::ABT makeIf(optimizer::ABT condExpr, optimizer::ABT thenExpr, optimizer::ABT elseExpr);
+
+optimizer::ABT makeLet(const optimizer::ProjectionName& name,
+                       optimizer::ABT bindExpr,
+                       optimizer::ABT expr);
+
+optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABT bindExpr, optimizer::ABT expr);
+
+optimizer::ABT makeLet(sbe::FrameId frameId, optimizer::ABTVector bindExprs, optimizer::ABT expr);
+
+optimizer::ABT makeLocalLambda(sbe::FrameId frameId, optimizer::ABT expr);
+
+optimizer::ABT makeNumericConvert(optimizer::ABT expr, sbe::value::TypeTags tag);
+
+optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage);
 
 }  // namespace mongo::stage_builder
