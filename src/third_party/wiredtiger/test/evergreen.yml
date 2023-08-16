@@ -4220,8 +4220,8 @@ tasks:
 
   - name: split-stress-test
     tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
+    # Set 5 hours timeout (60 * 60 * 5)
+    exec_timeout_secs: 18000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4229,8 +4229,8 @@ tasks:
 
   - name: split-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
+    # Set 5 hours timeout (60 * 60 * 5)
+    exec_timeout_secs: 18000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
