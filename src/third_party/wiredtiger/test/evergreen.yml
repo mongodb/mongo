@@ -6277,7 +6277,6 @@ buildvariants:
 
 - name: rhel8-zseries
   display_name: "~ RHEL8 zSeries"
-  activate: false
   run_on:
   - rhel80-zseries-test
   batchtime: 120 # 2 hours
