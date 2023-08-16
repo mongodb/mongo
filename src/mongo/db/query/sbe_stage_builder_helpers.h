@@ -76,6 +76,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_state.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -605,106 +606,6 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
 
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
-
-/**
- * Common parameters to SBE stage builder functions extracted into separate class to simplify
- * argument passing. Also contains a mapping of global variable ids to slot ids.
- */
-struct StageBuilderState {
-    using InListsSet = absl::flat_hash_set<InListData*>;
-    using CollatorsMap = absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>;
-
-    StageBuilderState(OperationContext* opCtx,
-                      Environment& env,
-                      PlanStageStaticData* data,
-                      const Variables& variables,
-                      sbe::value::SlotIdGenerator* slotIdGenerator,
-                      sbe::value::FrameIdGenerator* frameIdGenerator,
-                      sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                      InListsSet* inListsSet,
-                      CollatorsMap* collatorsMap,
-                      bool needsMerge,
-                      bool allowDiskUse)
-        : slotIdGenerator{slotIdGenerator},
-          frameIdGenerator{frameIdGenerator},
-          spoolIdGenerator{spoolIdGenerator},
-          inListsSet{inListsSet},
-          collatorsMap{collatorsMap},
-          opCtx{opCtx},
-          env{env},
-          data{data},
-          variables{variables},
-          needsMerge{needsMerge},
-          allowDiskUse{allowDiskUse} {}
-
-    StageBuilderState(const StageBuilderState& other) = delete;
-
-    sbe::value::SlotId getGlobalVariableSlot(Variables::Id variableId);
-
-    sbe::value::SlotId slotId() {
-        return slotIdGenerator->generate();
-    }
-
-    sbe::FrameId frameId() {
-        return frameIdGenerator->generate();
-    }
-
-    sbe::SpoolId spoolId() {
-        return spoolIdGenerator->generate();
-    }
-
-    boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
-    boost::optional<sbe::value::SlotId> getCollatorSlot();
-    boost::optional<sbe::value::SlotId> getOplogTsSlot();
-    boost::optional<sbe::value::SlotId> getBuiltinVarSlot(Variables::Id id);
-
-    /**
-     * Given a CollatorInterface, returns a copy of the CollatorInterface that is owned by the
-     * SBE plan currently being built. If 'coll' is already owned by the SBE plan being built,
-     * then this method will simply return 'coll'.
-     */
-    const CollatorInterface* makeCollatorOwned(const CollatorInterface* coll);
-
-    /**
-     * Given an InListData 'inList', this method makes inList's BSON owned, it makes the inList's
-     * Collator owned, it sorts and de-dups the inList's elements if needed, it initializes the
-     * inList's hash set if needed, and it marks the 'inList' as "prepared".
-     */
-    InListData* prepareOwnedInList(const std::shared_ptr<InListData>& inList);
-
-    /**
-     * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
-     * with 'paramId' and tracked in the 'InputParamToSlotMap' for auto-parameterization use. The
-     * slot is set to 'Nothing' on registration and will be populated with the real value when
-     * preparing the SBE plan for execution.
-     */
-    sbe::value::SlotId registerInputParamSlot(MatchExpression::InputParamId paramId);
-
-    sbe::value::SlotIdGenerator* const slotIdGenerator;
-    sbe::value::FrameIdGenerator* const frameIdGenerator;
-    sbe::value::SpoolIdGenerator* const spoolIdGenerator;
-
-    absl::flat_hash_set<InListData*>* const inListsSet;
-    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*>* const collatorsMap;
-
-    OperationContext* const opCtx;
-    Environment& env;
-    PlanStageStaticData* const data;
-
-    const Variables& variables;
-    // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
-    // flags to true so that shards can sends special partial aggregation results to the mongos.
-    bool needsMerge;
-
-    // A flag to indicate the user allows disk use for spilling.
-    bool allowDiskUse;
-
-    // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
-    optimizer::SlotVarMap slotVarMap;
-
-    StringMap<sbe::value::SlotId> stringConstantToSlotMap;
-    SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
-};
 
 /**
  * A tree of nodes arranged based on field path. PathTreeNode can be used to represent index key
