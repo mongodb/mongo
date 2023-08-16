@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   multiversion_incompatible,
- *   does_not_support_transaction,
+ *   does_not_support_transactions,
  * ]
  */
 
