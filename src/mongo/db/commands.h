@@ -173,16 +173,6 @@ struct CommandHelpers {
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type
-     * mongo::String, then that field is interpreted as the collection name, and is
-     * appended to 'dbname' after a '.' character. If the first field is not of type
-     * mongo::String, then 'dbname' is returned unmodified.
-     */
-    // TODO SERVER-68423: Remove this method once all call sites have been updated to pass
-    // DatabaseName.
-    static NamespaceString parseNsFromCommand(StringData dbname, const BSONObj& cmdObj);
-
-    /**
-     * Return the namespace for the command. If the first field in 'cmdObj' is of type
      * mongo::String, then that field is interpreted as the collection name.
      * If the first field is not of type mongo::String, then the namespace only has database name.
      */

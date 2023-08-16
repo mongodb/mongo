@@ -354,10 +354,6 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
     }
 }
 
-NamespaceString CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
-    return parseNsFromCommand(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj);
-}
-
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
