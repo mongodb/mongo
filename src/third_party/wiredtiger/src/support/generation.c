@@ -284,9 +284,6 @@ __wt_gen_active(WT_SESSION_IMPL *session, int which, uint64_t generation)
         if (v != 0 && generation >= v)
             return (true);
     }
-
-    WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_GENERATION_CHECK,
-      generation < __gen_oldest(session, which), "Generation is older than gen_oldest");
     return (false);
 }
 
