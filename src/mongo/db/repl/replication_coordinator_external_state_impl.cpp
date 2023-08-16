@@ -98,9 +98,11 @@
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -1098,6 +1100,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // TransactionCoordinatorService, and they would fail if the onStepUp logic attempted the
         // same transition.
         ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
+        if (gFeatureFlagAllMongodsAreSharded.isEnabled(serverGlobalParams.featureCompatibility)) {
+            ShardingReady::get(opCtx)->scheduleTransitionToConfigShard(opCtx);
+        }
     }
 }
 
