@@ -3456,42 +3456,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     };
 
     // Create window function input arguments.
-    std::vector<StringDataMap<std::unique_ptr<sbe::EExpression>>> windowArgExprs;
+    sbe::EExpression::Vector windowArgExprs;
     sbe::SlotExprPairVector windowArgProjects;
     for (auto& outputField : windowNode->outputFields) {
-        auto accName = outputField.expr->getOpName();
-        StringDataMap<Expression*> args;
-        if (accName == "$covarianceSamp" || accName == "$covariancePop") {
-            auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
-            tassert(7820818,
-                    "Covariance argument should be an array of two elements",
-                    expr && expr->getChildren().size() == 2);
-            auto argX = expr->getChildren()[0].get();
-            auto argY = expr->getChildren()[1].get();
-            args.emplace(AccArgs::kCovarianceX, argX);
-            args.emplace(AccArgs::kCovarianceY, argY);
+        auto argExpr =
+            generateExpression(_state, outputField.expr->input().get(), rootSlotOpt, &outputs)
+                .extractExpr(_state);
+        // Do not project a new slot if the input argument is already a constant or a variable.
+        if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
+            forwardSlots.push_back(varExpr->getSlotId());
+            windowArgExprs.push_back(std::move(argExpr));
+        } else if (argExpr->as<sbe::EConstant>()) {
+            windowArgExprs.push_back(std::move(argExpr));
         } else {
-            args.emplace("", outputField.expr->input().get());
+            auto argSlot = _slotIdGenerator.generate();
+            windowArgExprs.push_back(makeVariable(argSlot));
+            windowArgProjects.emplace_back(argSlot, std::move(argExpr));
+            forwardSlots.push_back(argSlot);
         }
-
-        StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs;
-        for (auto [argName, arg] : args) {
-            auto argExpr =
-                generateExpression(_state, arg, rootSlotOpt, &outputs).extractExpr(_state);
-            // Do not project a new slot if the input argument is already a constant or a variable.
-            if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
-                forwardSlots.push_back(varExpr->getSlotId());
-                argExprs.emplace(argName, std::move(argExpr));
-            } else if (argExpr->as<sbe::EConstant>()) {
-                argExprs.emplace(argName, std::move(argExpr));
-            } else {
-                auto argSlot = _slotIdGenerator.generate();
-                argExprs.emplace(argName, makeVariable(argSlot));
-                windowArgProjects.emplace_back(argSlot, std::move(argExpr));
-                forwardSlots.push_back(argSlot);
-            }
-        }
-        windowArgExprs.emplace_back(std::move(argExprs));
     }
     if (windowArgProjects.size() > 0) {
         stage = sbe::makeS<sbe::ProjectStage>(
@@ -3539,36 +3521,27 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                         windowBounds.bounds);
 
         // Create a fake accumulation statement for non-removable window bounds.
-        auto accStmt = createFakeAccumulationStatement(_state, outputField);
+        auto accExprName = outputField.expr->getOpName();
+        AccumulationExpression accExpr{
+            ExpressionConstant::create(_cq.getExpCtxRaw(), Value(BSONNULL)),
+            outputField.expr->input(),
+            []() { return nullptr; },
+            accExprName};
+        AccumulationStatement accStmt{"", accExpr};
 
         // Create init/add/remove expressions.
         std::vector<std::unique_ptr<sbe::EExpression>> initExprs;
         std::vector<std::unique_ptr<sbe::EExpression>> addExprs;
         std::vector<std::unique_ptr<sbe::EExpression>> removeExprs;
-        auto argExprs = std::move(windowArgExprs[i]);
+        auto argExpr = std::move(windowArgExprs[i]);
         if (removable) {
-            initExprs = buildWindowInit(_state, outputField);
-            if (argExprs.size() == 1) {
-                addExprs = buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
-                removeExprs =
-                    buildWindowRemove(_state, outputField, std::move(argExprs.begin()->second));
-            } else {
-                StringDataMap<std::unique_ptr<sbe::EExpression>> argExprsClone;
-                for (auto& [argName, argExpr] : argExprs) {
-                    argExprsClone.emplace(argName, argExpr->clone());
-                }
-                addExprs = buildWindowAdd(_state, outputField, std::move(argExprs));
-                removeExprs = buildWindowRemove(_state, outputField, std::move(argExprsClone));
-            }
+            initExprs = buildWindowInit(outputField);
+            addExprs = buildWindowAdd(outputField, argExpr->clone());
+            removeExprs = buildWindowRemove(outputField, std::move(argExpr));
         } else {
             initExprs = buildInitialize(accStmt, nullptr, _frameIdGenerator);
-            if (argExprs.size() == 1) {
-                addExprs = buildAccumulator(
-                    accStmt, std::move(argExprs.begin()->second), boost::none, _frameIdGenerator);
-            } else {
-                addExprs =
-                    buildAccumulator(accStmt, std::move(argExprs), boost::none, _frameIdGenerator);
-            }
+            addExprs =
+                buildAccumulator(accStmt, std::move(argExpr), boost::none, _frameIdGenerator);
             removeExprs = std::vector<std::unique_ptr<sbe::EExpression>>{addExprs.size()};
         }
         tassert(7914601,
@@ -3692,13 +3665,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto firstComponentSlot = componentSlots[0];
         std::unique_ptr<sbe::EExpression> finalExpr;
         if (removable) {
-            finalExpr = buildWindowFinalize(_state, outputField, std::move(componentSlots));
+            finalExpr = buildWindowFinalize(outputField, std::move(componentSlots));
         } else {
             finalExpr = buildFinalize(
                 _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
         }
-        auto emptyWindowExpr =
-            outputField.expr->getOpName() == "$sum" ? makeInt32Constant(0) : makeNullConstant();
+        auto emptyWindowExpr = accExprName == "$sum"
+            ? makeConstant(sbe::value::TypeTags::NumberInt32, 0)
+            : makeConstant(sbe::value::TypeTags::Null, 0);
         if (finalExpr) {
             finalExpr =
                 sbe::makeE<sbe::EIf>(makeFunction("exists", makeVariable(firstComponentSlot)),

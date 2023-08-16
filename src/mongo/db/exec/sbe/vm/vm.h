@@ -819,10 +819,6 @@ enum class Builtin : uint8_t {
     aggDerivativeAdd,
     aggDerivativeRemove,
     aggDerivativeFinalize,
-    aggCovarianceAdd,
-    aggCovarianceRemove,
-    aggCovarianceSampFinalize,
-    aggCovariancePopFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -1020,8 +1016,6 @@ enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSize
  * The empty values in the array are filled with Null
  */
 enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize };
-
-enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1850,15 +1844,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> aggRemovableAvgFinalizeImpl(
-        value::Array* sumState, int64_t count);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceRemove(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceFinalize(ArityType arity,
-                                                                                bool isSamp);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceSampFinalize(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovariancePopFinalize(ArityType arity);
+
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
