@@ -44,6 +44,17 @@
 namespace mongo {
 namespace change_stream_pre_image_util {
 /**
+ * If 'expireAfterSeconds' is defined for pre-images, returns its value. Otherwise, returns
+ * boost::none.
+ *
+ * 'expireAfterSeconds' is always defined in a multi-tenant environment, however, not necessarily in
+ * a single-tenant environment. If 'tenantId' is provided, fetches the cluster-wide parameter for
+ * that tenant. Otherwise, fetches the parameter for single-tenant environments.
+ */
+boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx,
+                                               boost::optional<TenantId> tenantId = boost::none);
+
+/**
  * If 'expireAfterSeconds' is defined for pre-images, returns the 'date' at which all pre-images
  * with 'operationTime' <= 'date' are expired. Otherwise, returns boost::none.
  *

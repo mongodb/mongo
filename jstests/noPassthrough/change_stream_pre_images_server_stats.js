@@ -159,6 +159,7 @@ replicaSet.nodes.forEach((node) => {
             node,
             actualServerStats,
             {
+                'expireAfterSeconds': undefined,
                 'numDocs': numberOfDocuments,
                 'totalBytes': expectedPreImagesBytes,
                 'docsInserted': numberOfDocuments,
@@ -218,6 +219,7 @@ replicaSet.nodes.forEach((node) => {
             actualServerStats,
             {
                 purgingJob,
+                'expireAfterSeconds': kExpireAfterSeconds,
                 'numDocs': 0,
                 'totalBytes': 0,
                 'docsInserted': numberOfDocuments,
