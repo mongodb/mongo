@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/memory_usage_tracker.h"
 
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
@@ -39,25 +40,15 @@ class MemoryUsageTrackerTest : public unittest::Test {
 public:
     static constexpr auto kDefaultMax = 1 * 1024;  // 1KB max.
     MemoryUsageTrackerTest()
-        : _tracker(false /** allowDiskUse */, kDefaultMax), _funcTracker(&_tracker) {}
+        : _tracker(false /** allowDiskUse */, kDefaultMax), _funcTracker(_tracker["funcTracker"]) {}
 
 
     MemoryUsageTracker _tracker;
-    MemoryUsageTracker::PerFunctionMemoryTracker _funcTracker;
+    MemoryUsageTracker::Impl _funcTracker;
 };
 
-TEST_F(MemoryUsageTrackerTest, SetUpdatesCurrentAndMax) {
-    _tracker.set(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
-
-    _tracker.set(_tracker.currentMemoryBytes() + 50);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 100LL);
-}
-
 TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
-    _tracker.set(50LL);
+    _tracker.update(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
@@ -80,7 +71,7 @@ TEST_F(MemoryUsageTrackerTest, SetFunctionUsageUpdatesGlobal) {
 }
 
 TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
-    _tracker.set(50LL);
+    _tracker.update(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
@@ -100,28 +91,151 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-// TODO SERVER-61281: Switch to 'DEATH_TEST_F' checking the underflow case.
-TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateFunctionUsageToNegativeIsDisallowed,
+             "Underflow in memory tracking") {
     _funcTracker.set(50LL);
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    _funcTracker.update(-100LL);
+}
 
-    _funcTracker.update(-100);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateMemUsageToNegativeIsDisallowed,
+             "Underflow in memory tracking") {
+    _tracker.update(50LL);
+    _tracker.update(-100LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
+    {
+        MemoryToken token{50LL, &_tracker};
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        {
+            MemoryToken funcToken{100LL, &_funcTracker};
+            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+            ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        }
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    }
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoved) {
+    {
+        MemoryToken token{50LL, &_tracker};
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+
+        MemoryToken token2(std::move(token));
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+    }
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 }
 
-// TODO SERVER-61281: Switch to 'DEATH_TEST_F' checking the underflow case.
-TEST_F(MemoryUsageTrackerTest, UpdateMemUsageToNegativeIsDisallowed) {
-    _tracker.set(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoveAssigned) {
+    {
+        MemoryToken token{50LL, &_tracker};
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+        {
+            MemoryToken token2{100LL, &_funcTracker};
+            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
 
-    _tracker.update(-100);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+            ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
+            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+
+            token = std::move(token2);
+            ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
+            ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+            ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
+            ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+        }
+        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 100LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    }
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeStoredInVector) {
+    auto assertMemory = [this]() {
+        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 100LL);
+        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 150LL);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    };
+
+    auto assertZeroMemory = [this]() {
+        ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0);
+        ASSERT_EQ(_funcTracker.maxMemoryBytes(), 100LL);
+
+        ASSERT_EQ(_tracker.currentMemoryBytes(), 0);
+        ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
+    };
+
+    {
+        std::vector<MemoryToken> tokens;
+        // Use default constructor
+        tokens.resize(10);
+        {
+            std::vector<MemoryToken> tokens2;
+            tokens2.emplace_back(50LL, &_tracker);
+            tokens2.emplace_back(100LL, &_funcTracker);
+            assertMemory();
+
+            // Force reallocation
+            tokens2.reserve(2 * tokens2.capacity());
+            assertMemory();
+
+            tokens = std::move(tokens2);
+            assertMemory();
+        }
+        assertMemory();
+
+        tokens.clear();
+        assertZeroMemory();
+    }
+    assertZeroMemory();
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryTokenWith) {
+    static const std::vector<std::string> kLines = {"a", "bb", "ccc", "dddd"};
+
+    int64_t total_size = 0;
+    std::vector<MemoryTokenWith<std::string>> memory_tracked_vector;
+    for (const auto& line : kLines) {
+        memory_tracked_vector.emplace_back(MemoryToken{line.size(), &_tracker}, line);
+        total_size += line.size();
+        ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
+        ASSERT_EQ(total_size, _tracker.maxMemoryBytes());
+    }
+
+    int64_t max_size = total_size;
+    while (!memory_tracked_vector.empty()) {
+        total_size -= memory_tracked_vector.back().value().size();
+        memory_tracked_vector.pop_back();
+        ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
+        ASSERT_EQ(max_size, _tracker.maxMemoryBytes());
+    }
 }
 
 }  // namespace

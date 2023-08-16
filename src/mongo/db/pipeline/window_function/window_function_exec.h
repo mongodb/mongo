@@ -86,12 +86,11 @@ public:
     virtual void reset() = 0;
 
 protected:
-    WindowFunctionExec(PartitionAccessor iter,
-                       MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+    WindowFunctionExec(PartitionAccessor iter, MemoryUsageTracker::Impl* memTracker)
         : _iter(iter), _memTracker(memTracker){};
 
     PartitionAccessor _iter;
-    MemoryUsageTracker::PerFunctionMemoryTracker* _memTracker;
+    MemoryUsageTracker::Impl* _memTracker;
 };
 
 /**
@@ -109,7 +108,8 @@ public:
 
     void reset() {
         _function->reset();
-        _values = std::queue<Value>();
+        _values = std::queue<MemoryTokenWith<Value>>();
+        _memTracker->set(_function->getApproximateSize());
         doReset();
     }
 
@@ -118,33 +118,32 @@ protected:
                                 PartitionAccessor::Policy policy,
                                 boost::intrusive_ptr<Expression> input,
                                 std::unique_ptr<WindowFunctionState> function,
-                                MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, policy), memTracker),
           _input(std::move(input)),
-          _function(std::move(function)) {}
+          _function(std::move(function)) {
+        _memTracker->set(_function->getApproximateSize());
+    }
 
     void addValue(Value v) {
         long long prior = _function->getApproximateSize();
-        long long valueSize = v.getApproximateSize();
         _function->add(v);
-        _values.push(v);
-        _memTracker->update(valueSize + static_cast<long long>(_function->getApproximateSize()) -
-                            prior);
+        _values.emplace(MemoryToken{v.getApproximateSize(), _memTracker}, std::move(v));
+        _memTracker->update(_function->getApproximateSize() - prior);
     }
 
     void removeValue() {
         tassert(5429400, "Tried to remove more values than we added", !_values.empty());
-        auto v = _values.front();
         long long prior = _function->getApproximateSize();
-        _function->remove(v);
-        _memTracker->update(static_cast<long long>(_function->getApproximateSize()) - prior -
-                            v.getApproximateSize());
+        auto& v = _values.front();
+        _function->remove(std::move(v.value()));
         _values.pop();
+        _memTracker->update(_function->getApproximateSize() - prior);
     }
 
     boost::intrusive_ptr<Expression> _input;
     // Keep track of values in the window function that will need to be removed later.
-    std::queue<Value> _values;
+    std::queue<MemoryTokenWith<Value>> _values;
 
 private:
     /**

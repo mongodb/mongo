@@ -61,14 +61,16 @@ void SpillableCache::verifyInCache(int id) {
             isIdInCache(id));
 }
 void SpillableCache::addDocument(Document input) {
-    _memTracker.update(input.getApproximateSize());
-    _memCache.emplace_back(std::move(input));
+    _memCache.emplace_back(MemoryToken{input.getApproximateSize(), &_memTracker}, std::move(input));
     if (!_memTracker.withinMemoryLimit() && _expCtx->allowDiskUse) {
         spillToDisk();
     }
-    uassert(5643011,
-            "Exceeded max memory. Set 'allowDiskUse: true' to spill to disk",
-            _memTracker.withinMemoryLimit());
+    uassert(
+        5643011,
+        str::stream() << "Exceeded max memory. Current memory: " << _memTracker.currentMemoryBytes()
+                      << " bytes. Max allowed memory: " << _memTracker.maxAllowedMemoryUsageBytes()
+                      << " bytes. Set 'allowDiskUse: true' to spill to disk",
+        _memTracker.withinMemoryLimit());
     ++_nextIndex;
 }
 Document SpillableCache::getDocumentById(int id) {
@@ -87,7 +89,6 @@ void SpillableCache::freeUpTo(int id) {
             tassert(5643010,
                     "Attempted to remove document from empty memCache in SpillableCache",
                     _memCache.size() > 0);
-            _memTracker.update(-1 * _memCache.front().getApproximateSize());
             _memCache.pop_front();
         }
         ++_nextFreedIndex;
@@ -101,7 +102,6 @@ void SpillableCache::clear() {
     _diskWrittenIndex = 0;
     _nextIndex = 0;
     _nextFreedIndex = 0;
-    _memTracker.set(0);
 }
 
 void SpillableCache::writeBatchToDisk(std::vector<Record>& records) {
@@ -140,8 +140,8 @@ void SpillableCache::spillToDisk() {
     std::vector<BSONObj> ownedObjs;
     // Batch our writes to reduce pressure on the storage engine's cache.
     size_t batchSize = 0;
-    for (auto& doc : _memCache) {
-        auto bsonDoc = doc.toBson();
+    for (auto& memoryTokenWithDoc : _memCache) {
+        auto bsonDoc = memoryTokenWithDoc.value().toBson();
         size_t objSize = bsonDoc.objsize();
         if (records.size() == 1000 || batchSize + objSize > kMaxWriteSize) {
             writeBatchToDisk(records);
@@ -156,7 +156,6 @@ void SpillableCache::spillToDisk() {
         ++_diskWrittenIndex;
     }
     _memCache.clear();
-    _memTracker.set(0);
     if (records.size() == 0) {
         return;
     }
@@ -177,14 +176,14 @@ Document SpillableCache::readDocumentFromMemCacheById(int desired) {
     // documents we've ever written to disk. If we have freed documents from the cache, the index
     // into '_memCache' is off by how many documents we've ever freed. In this case what we've
     // written to disk doesn't matter, since those no longer affect in memory indexes.
-    auto lookupIndex = _diskWrittenIndex > _nextFreedIndex ? desired - _diskWrittenIndex
-                                                           : desired - _nextFreedIndex;
+    size_t lookupIndex = _diskWrittenIndex > _nextFreedIndex ? desired - _diskWrittenIndex
+                                                             : desired - _nextFreedIndex;
 
     tassert(5643007,
             str::stream() << "Attempted to lookup " << lookupIndex << " but cache is only holding "
                           << _memCache.size(),
-            lookupIndex < (int)_memCache.size());
-    return _memCache[lookupIndex];
+            lookupIndex < _memCache.size());
+    return _memCache[lookupIndex].value();
 }
 
 }  // namespace mongo

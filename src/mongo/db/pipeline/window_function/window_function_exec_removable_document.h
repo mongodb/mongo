@@ -61,7 +61,7 @@ public:
                                         boost::intrusive_ptr<Expression> input,
                                         std::unique_ptr<WindowFunctionState> function,
                                         WindowBounds::DocumentBased bounds,
-                                        MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
+                                        MemoryUsageTracker::Impl* memTracker);
 
 private:
     void update() final;
@@ -69,9 +69,7 @@ private:
 
     void doReset() final {
         _initialized = false;
-        _memTracker->set(sizeof(*this));
     }
-
 
     void removeFirstValueIfExists() {
         if (_values.size() == 0) {

@@ -79,7 +79,7 @@ SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_pt
       _ws(ws),
       _memTracker(expCtx->allowDiskUse, internalQueryMaxSpoolMemoryUsageBytes.load()) {
 
-    _specificStats.maxMemoryUsageBytes = _memTracker._maxAllowedMemoryUsageBytes;
+    _specificStats.maxMemoryUsageBytes = _memTracker.maxAllowedMemoryUsageBytes();
     _specificStats.maxDiskUsageBytes = internalQueryMaxSpoolDiskUsageBytes.load();
 }
 
@@ -99,7 +99,7 @@ void SpoolStage::spill() {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             "Exceeded memory limit for spool, but didn't allow external sort. Set "
             "allowDiskUseByDefault:true to opt in.",
-            _memTracker._allowDiskUse);
+            _memTracker.allowDiskUse());
     uassert(7443700,
             "Exceeded disk use limit for spool",
             _specificStats.spilledDataStorageSize < _specificStats.maxDiskUsageBytes);

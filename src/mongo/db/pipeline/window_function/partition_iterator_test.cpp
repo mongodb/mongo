@@ -652,7 +652,7 @@ TEST_F(PartitionIteratorTest, ManualPolicy) {
     accessor.manualExpireUpTo(0);
     // Advance the iterator which frees the manually expired documents.
     advance();
-    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize * 1);
+    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize);
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[3].getDocument());
 }
 

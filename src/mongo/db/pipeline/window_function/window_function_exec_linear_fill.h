@@ -62,7 +62,7 @@ public:
                                  boost::intrusive_ptr<Expression> input,
                                  boost::intrusive_ptr<ExpressionFieldPath> sortBy,
                                  WindowBounds bounds,
-                                 MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                 MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kManual),
                              memTracker),
           _input(std::move(input)),

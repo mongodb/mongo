@@ -51,7 +51,7 @@ WindowFunctionExecRemovableRange::WindowFunctionExecRemovableRange(
     boost::intrusive_ptr<ExpressionFieldPath> sortBy,
     std::unique_ptr<WindowFunctionState> function,
     WindowBounds bounds,
-    MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+    MemoryUsageTracker::Impl* memTracker)
     : WindowFunctionExecRemovable(iter,
                                   PartitionAccessor::Policy::kEndpoints,
                                   std::move(input),

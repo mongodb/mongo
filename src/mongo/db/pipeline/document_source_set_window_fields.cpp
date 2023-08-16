@@ -562,7 +562,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             inMemoryLimit = _numDocsProcessed <= data["maxDocsBeforeSpill"].numberInt();
         });
 
-        if (!inMemoryLimit && _memoryTracker._allowDiskUse) {
+        if (!inMemoryLimit && _memoryTracker.allowDiskUse()) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
         }
@@ -572,7 +572,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
                       str::stream()
                           << "Exceeded memory limit in DocumentSourceSetWindowFields, used "
                           << _memoryTracker.currentMemoryBytes() << " bytes but max allowed is "
-                          << _memoryTracker._maxAllowedMemoryUsageBytes);
+                          << _memoryTracker.maxAllowedMemoryUsageBytes());
         }
     }
 
@@ -581,15 +581,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         case PartitionIterator::AdvanceResult::kAdvanced:
             break;
         case PartitionIterator::AdvanceResult::kNewPartition:
-            // We've advanced to a new partition, reset the state of every function as well as the
-            // memory tracker.
-            _memoryTracker.resetCurrent();
+            // We've advanced to a new partition, reset the state of every function.
             for (auto&& [fieldName, function] : _executableOutputs) {
                 function->reset();
             }
-
-            // Account for the memory in the iterator for the new partition.
-            _memoryTracker.set(_iterator.getApproximateSize());
             break;
         case PartitionIterator::AdvanceResult::kEOF:
             _eof = true;
