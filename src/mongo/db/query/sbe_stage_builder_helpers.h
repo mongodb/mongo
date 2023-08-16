@@ -75,7 +75,7 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/query/sbe_stage_builder_state.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/oplog.h"

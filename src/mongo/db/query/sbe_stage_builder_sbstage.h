@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -44,145 +44,11 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/stdx/variant.h"
 
-namespace mongo::sbe {
-class RuntimeEnvironment;
-}
-
 namespace mongo::stage_builder {
-
-struct Environment;
-struct StageBuilderState;
-
-/**
- * EvalExpr is a wrapper around an EExpression that can also carry a SlotId. It is used to eliminate
- * extra project stages. If 'slot' field is set, it contains the result of an expression. The user
- * of the class can just use this slot instead of projecting an expression into a new slot.
- */
-class EvalExpr {
-public:
-    EvalExpr() : _storage{false} {}
-
-    EvalExpr(EvalExpr&& e) : _storage(std::move(e._storage)) {
-        e.reset();
-    }
-
-    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
-
-    EvalExpr(sbe::value::SlotId s) : _storage(s) {}
-
-    EvalExpr(const abt::HolderPtr& a);
-
-    EvalExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
-
-    EvalExpr& operator=(EvalExpr&& e) {
-        if (this == &e) {
-            return *this;
-        }
-
-        _storage = std::move(e._storage);
-        e.reset();
-        return *this;
-    }
-
-    EvalExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
-        _storage = std::move(e);
-        e.reset();
-        return *this;
-    }
-
-    EvalExpr& operator=(sbe::value::SlotId s) {
-        _storage = s;
-        return *this;
-    }
-
-    EvalExpr& operator=(abt::HolderPtr&& a) {
-        _storage = std::move(a);
-        return *this;
-    }
-
-    boost::optional<sbe::value::SlotId> getSlot() const {
-        return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_storage))
-                         : boost::none;
-    }
-
-    bool hasSlot() const {
-        return stdx::holds_alternative<sbe::value::SlotId>(_storage);
-    }
-
-    bool hasExpr() const {
-        return stdx::holds_alternative<std::unique_ptr<sbe::EExpression>>(_storage);
-    }
-
-    bool hasABT() const {
-        return stdx::holds_alternative<abt::HolderPtr>(_storage);
-    }
-
-    EvalExpr clone() const {
-        if (hasSlot()) {
-            return stdx::get<sbe::value::SlotId>(_storage);
-        }
-
-        if (hasABT()) {
-            return stdx::get<abt::HolderPtr>(_storage);
-        }
-
-        if (stdx::holds_alternative<bool>(_storage)) {
-            return EvalExpr{};
-        }
-
-        const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_storage);
-        if (expr) {
-            return expr->clone();
-        }
-
-        return {};
-    }
-
-    bool isNull() const {
-        return stdx::holds_alternative<bool>(_storage);
-    }
-
-    explicit operator bool() const {
-        return !isNull();
-    }
-
-    void reset() {
-        _storage = false;
-    }
-
-    std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap,
-                                              StageBuilderState& state) const;
-
-    std::unique_ptr<sbe::EExpression> getExpr(StageBuilderState& state) const;
-
-    /**
-     * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
-     * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
-     * convert variable names into slot ids.
-     */
-    std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap,
-                                                  StageBuilderState& state);
-
-    /**
-     * Helper function that obtains data needed for EvalExpr::extractExpr from StageBuilderState
-     */
-    std::unique_ptr<sbe::EExpression> extractExpr(StageBuilderState& state);
-
-    /**
-     * Extract the expression on top of the stack as an ABT node. If the expression is stored as a
-     * slot id, the mapping between the generated ABT node and the slot id is recorded in the map.
-     * Throws an exception if the expression is stored as an SBE EExpression.
-     */
-    abt::HolderPtr extractABT(optimizer::SlotVarMap& varMap);
-
-private:
-    // The bool type as the first option is used to represent the empty storage.
-    stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, abt::HolderPtr>
-        _storage;
-};
 
 /**
  * EvalStage contains a PlanStage (_stage) and a vector of slots (_outSlots).

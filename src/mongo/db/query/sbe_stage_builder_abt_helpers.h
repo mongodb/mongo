@@ -45,8 +45,7 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
-
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 
 namespace mongo::stage_builder {
 

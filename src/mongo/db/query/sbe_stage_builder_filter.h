@@ -43,8 +43,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 
 namespace mongo::stage_builder {
 class PlanStageSlots;

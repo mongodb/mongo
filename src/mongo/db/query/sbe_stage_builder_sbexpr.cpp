@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,20 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
-
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/sbe_stage_builder_const_eval.h"
+#include "mongo/db/query/sbe_stage_builder_type_checker.h"
 
 namespace mongo::stage_builder {
 
@@ -76,7 +72,6 @@ std::unique_ptr<sbe::EExpression> EvalExpr::getExpr(StageBuilderState& state) co
     return getExpr(state.slotVarMap, state);
 }
 
-
 abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {
     if (hasSlot()) {
         auto slotId = stdx::get<sbe::value::SlotId>(_storage);
@@ -91,5 +86,4 @@ abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {
 
     return std::move(stdx::get<abt::HolderPtr>(_storage));
 }
-
 }  // namespace mongo::stage_builder
