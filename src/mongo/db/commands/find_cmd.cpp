@@ -909,6 +909,7 @@ public:
                 keyBob.append("min", 1);
                 keyBob.append("max", 1);
                 keyBob.append("shardVersion", 1);
+                keyBob.append("encryptionInformation", 1);
                 return keyBob.obj();
             }();
 
@@ -941,6 +942,10 @@ public:
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
+                LOGV2_DEBUG(7964101,
+                            2,
+                            "Processing Queryable Encryption command",
+                            "cmd"_attr = request.body);
 
                 if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindD(

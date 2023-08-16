@@ -1150,6 +1150,10 @@ public:
             if (nsInfo.getShardVersion()) {
                 nsInfo.getShardVersion()->serialize("shardVersion", bob);
             }
+            if (nsInfo.getEncryptionInformation()) {
+                bob->append(FindCommandRequest::kEncryptionInformationFieldName,
+                            nsInfo.getEncryptionInformation()->toBSON());
+            }
             if (nsInfo.getDatabaseVersion()) {
                 bob->append("databaseVersion", nsInfo.getDatabaseVersion()->toBSON());
             }
