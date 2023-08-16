@@ -166,6 +166,7 @@ env.CppUnitTest(
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',
         'expressions/sbe_constant_test.cpp',
+        'expressions/sbe_covariance_test.cpp',
         'expressions/sbe_date_add_test.cpp',
         'expressions/sbe_date_diff_test.cpp',
         'expressions/sbe_date_expression_accepting_timezone_test.cpp',

@@ -48,6 +48,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -935,6 +936,58 @@ std::unique_ptr<sbe::EExpression> buildFinalizeMinMaxN(
     }
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorCovariance(
+    const AccumulationExpression& expr,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820808, "Incorrect number of arguments", args.size() == 2);
+
+    auto it = args.find(AccArgs::kCovarianceX);
+    tassert(7820809,
+            str::stream() << "Window function expects '" << AccArgs::kCovarianceX << "' argument",
+            it != args.end());
+    auto argX = std::move(it->second);
+
+    it = args.find(AccArgs::kCovarianceY);
+    tassert(7820810,
+            str::stream() << "Window function expects '" << AccArgs::kCovarianceY << "' argument",
+            it != args.end());
+    auto argY = std::move(it->second);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggCovarianceAdd", std::move(argX), std::move(argY)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeCovarianceSamp(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& slots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820814, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggCovarianceSampFinalize", std::move(exprs));
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeCovariancePop(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& slots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820815, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggCovariancePopFinalize", std::move(exprs));
+}
+
 template <int N>
 std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
@@ -1000,6 +1053,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
         {AccumulatorTopBottomN<kTop, false /* single */>::getName(), &buildAccumulatorTopBottomN},
         {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
          &buildAccumulatorTopBottomN},
+        {AccumulatorCovarianceSamp::kName, &buildAccumulatorCovariance},
+        {AccumulatorCovariancePop::kName, &buildAccumulatorCovariance},
     };
 
     auto accExprName = acc.expr.name;
@@ -1116,6 +1171,8 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         {AccumulatorLastN::kName, &buildFinalizeLastN},
         {AccumulatorMaxN::kName, &buildFinalizeMinMaxN},
         {AccumulatorMinN::kName, &buildFinalizeMinMaxN},
+        {AccumulatorCovarianceSamp::kName, &buildFinalizeCovarianceSamp},
+        {AccumulatorCovariancePop::kName, &buildFinalizeCovariancePop},
     };
 
     auto accExprName = acc.expr.name;
@@ -1198,6 +1255,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
          &buildInitializeAccumulatorMulti},
         {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
         {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorCovarianceSamp::kName, &emptyInitializer<1>},
+        {AccumulatorCovariancePop::kName, &emptyInitializer<1>},
     };
 
     auto accExprName = acc.expr.name;

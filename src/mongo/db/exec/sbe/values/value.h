@@ -950,6 +950,13 @@ public:
         _vals.reserve(s);
     }
 
+    void clear() {
+        for (auto [tag, val] : _vals) {
+            releaseValue(tag, val);
+        }
+        _vals.clear();
+    }
+
 private:
     std::vector<std::pair<TypeTags, Value>> _vals;
 };
