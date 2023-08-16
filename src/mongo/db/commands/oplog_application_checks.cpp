@@ -109,7 +109,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (opType == "c"_sd) {
         StringData commandName = o.firstElement().fieldNameStringData();
-        Command* commandInOplogEntry = CommandHelpers::findCommand(commandName);
+        Command* commandInOplogEntry = CommandHelpers::findCommand(opCtx, commandName);
         if (!commandInOplogEntry) {
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
