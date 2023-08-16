@@ -296,6 +296,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final {}
     void onStepDown() final;
+    void onRollback() final {}
     void onBecomeArbiter() final {}
     inline std::string getServiceName() const override final {
         return "MigrationDestinationManager";

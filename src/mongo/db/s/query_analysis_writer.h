@@ -245,6 +245,8 @@ private:
 
     void onStepDown() override final {}
 
+    void onRollback() override final {}
+
     void onBecomeArbiter() override final {}
 
     void onSetCurrentConfig(OperationContext* opCtx) override final {}

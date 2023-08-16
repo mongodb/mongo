@@ -335,6 +335,7 @@ private:
         ttlMonitor->onStepUp(opCtx);
     }
     void onStepDown() override {}
+    void onRollback() override {}
     void onBecomeArbiter() override {}
     inline std::string getServiceName() const override final {
         return "TTLMonitorService";

@@ -262,7 +262,7 @@ void assertInitialSyncCanContinueDuringShardMerge(OperationContext* opCtx,
                 idField = op.getObject2()->getField("_id");
             }
             const auto& migrationId = uassertStatusOK(UUID::parse(idField));
-            tenant_migration_access_blocker::fassertOnUnsafeInitialSync(migrationId);
+            tenant_migration_access_blocker::assertOnUnsafeInitialSync(migrationId);
         }
     }
 }

@@ -66,6 +66,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
@@ -238,9 +239,8 @@ bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
     // syncing node to have only partial donor data. And, if this node went into initial sync (i.e,
     // resync) after it sent `recipientVoteImportedFiles` to the recipient primary, the primary
     // can commit the migration and cause permanent data loss on this node.
-    if (replCoord->getMemberState().startup2() &&
-        doc.getState() < ShardMergeRecipientStateEnum::kConsistent) {
-        fassertOnUnsafeInitialSync(doc.getId());
+    if (replCoord->getMemberState().startup2() && !doc.getExpireAt()) {
+        assertOnUnsafeInitialSync(doc.getId());
     }
 
     // Do not create mtab for following cases. Otherwise, we can get into potential race
@@ -265,12 +265,15 @@ bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
         case ShardMergeRecipientStateEnum::kStarted:
         case ShardMergeRecipientStateEnum::kLearnedFilenames:
             break;
+        case ShardMergeRecipientStateEnum::kConsistent:
+            repl::shard_merge_utils::assertImportDoneMarkerLocalCollExistsOnMergeConsistent(
+                opCtx, doc.getId());
+            FMT_FALLTHROUGH;
         case ShardMergeRecipientStateEnum::kCommitted:
             if (doc.getExpireAt()) {
                 mtab->stopBlockingTTL();
             }
             FMT_FALLTHROUGH;
-        case ShardMergeRecipientStateEnum::kConsistent:
         case ShardMergeRecipientStateEnum::kAborted:
             if (auto rejectTs = doc.getRejectReadsBeforeTimestamp()) {
                 mtab->startRejectingReadsBefore(*rejectTs);
@@ -284,12 +287,14 @@ bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
 }
 }  // namespace
 
-void fassertOnUnsafeInitialSync(const UUID& migrationId) {
-    LOGV2_FATAL_NOTRACE(
+void assertOnUnsafeInitialSync(const UUID& migrationId) {
+    LOGV2_FATAL_CONTINUE(
         7219900,
         "Terminating this node as it not safe to run initial sync when shard merge is "
         "active. Otherwise, it can lead to data loss.",
         "migrationId"_attr = migrationId);
+    uasserted(ErrorCodes::TenantMigrationInProgress,
+              "Illegal to run initial sync when shard merge is active");
 }
 
 void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,

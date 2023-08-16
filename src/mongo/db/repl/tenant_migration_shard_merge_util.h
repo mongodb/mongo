@@ -27,33 +27,17 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
-#include "mongo/client/dbclient_connection.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
-#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/cancellation.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
@@ -66,6 +50,8 @@ inline constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
 inline constexpr StringData kBackupIdFieldName = "backupId"_sd;
 inline constexpr StringData kDonorHostNameFieldName = "donorHostName"_sd;
 inline constexpr StringData kDonorDbPathFieldName = "dbpath"_sd;
+inline constexpr StringData kMovingFilesMarker = ".shardMergeMovingFiles"_sd;
+inline constexpr StringData kTableExtension = ".wt"_sd;
 
 // Keep the backup cursor alive by pinging twice as often as the donor's default
 // cursor timeout.
@@ -141,17 +127,54 @@ void createImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& 
 void dropImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId);
 
 /**
- * Runs rollback to stable on the cloned files associated with the given migration id,
- * and then import the stable cloned files into the main WT instance.
+ * Checks if the import done marker collection exists; triggers a fatal assertion if absent.
+ *
+ * Note: Call this method only during shard merge recipient state transition to kConsistent.
  */
-void runRollbackAndThenImportFiles(OperationContext* opCtx, const UUID& migrationId);
+void assertImportDoneMarkerLocalCollExistsOnMergeConsistent(OperationContext* opCtx,
+                                                            const UUID& migrationId);
 
 /**
- * Send a "getMore" to keep a backup cursor from timing out.
+ * Reads a list of filenames from the marker file kMovingFilesMarker.
+ * Returns empty vector if the marker file is not present.
  */
-SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
-                                       std::shared_ptr<executor::TaskExecutor> executor,
-                                       HostAndPort hostAndPort,
-                                       CursorId cursorId,
-                                       NamespaceString namespaceString);
+std::vector<std::string> readMovingFilesMarker(const boost::filesystem::path& markerDir);
+
+/**
+ * Writes out a marker file kMovingFilesMarker. And, flushes the marker file and it's parent
+ * directory.
+ * @param 'firstEntry' determines whether to truncate the file before writing data or to append the
+ * data.
+ */
+void writeMovingFilesMarker(const boost::filesystem::path& markerDir,
+                            const std::string& ident,
+                            bool firstEntry);
+
+/**
+ * Returns a path by appending the given ident to the srcPath.
+ */
+boost::filesystem::path constructSourcePath(const boost::filesystem::path& srcPath,
+                                            const std::string& ident);
+
+/**
+ * Returns a path by appending the given ident to the data directory path i.e,
+ * storageGlobalParams.dbpath.
+ */
+boost::filesystem::path constructDestinationPath(const std::string& ident);
+
+/**
+ * Removes the file associated with the given path. Throws exceptions on failures.
+ */
+void removeFile(const boost::filesystem::path& path);
+
+/**
+ * performs fsync on the the data directory i.e, storageGlobalParams.dbpath.
+ */
+void fsyncDataDirectory();
+
+/**
+ * Removes the directory associated with the given path. And, performs fsync on the the parent
+ * directory of 'path'. Throws exceptions on failures.
+ */
+void fsyncRemoveDirectory(const boost::filesystem::path& path);
 }  // namespace mongo::repl::shard_merge_utils

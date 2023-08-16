@@ -264,6 +264,7 @@ public:
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStartup(OperationContext* opCtx) override;
     void onSetCurrentConfig(OperationContext* opCtx) override {}
+    void onRollback() override {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
     void onShutdown() override;

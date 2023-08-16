@@ -354,10 +354,10 @@ structs:
                     'config.transactions'
                 type: bool
                 default: false
-            startAt:
-                type: date
+            startAtOpTime:
+                type: optime
                 description: >-
-                    The wall-clock time at which the state machine document is initialized.
+                    The optime at which the state machine document is initialized.
                 optional: true
             startGarbageCollect:
                 type: bool
@@ -368,5 +368,5 @@ structs:
             abortOpTime:
                 type: optime
                 description:
-                    The opTime at which the donor's state document was set to 'aborted'.
+                    The opTime at which the recipient's state document was set to 'aborted'.
                 optional: true

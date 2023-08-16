@@ -139,6 +139,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx, long long term) override;
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override;
+    void onRollback() override {}
     void onBecomeArbiter() override;
     inline std::string getServiceName() const override final {
         return "VectorClockMongoD";

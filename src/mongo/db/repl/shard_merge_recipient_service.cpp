@@ -146,7 +146,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
@@ -466,9 +465,9 @@ ExecutorFuture<void> ShardMergeRecipientService::_rebuildService(
                }
                return Status::OK();
            })
-        .until([token](Status status) { return status.isOK() || token.isCanceled(); })
+        .until([token](Status status) { return status.isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancellationToken::uncancelable());
+        .on(**executor, token);
 }
 
 void ShardMergeRecipientService::checkIfConflictsWithOtherInstances(
@@ -489,14 +488,19 @@ void ShardMergeRecipientService::checkIfConflictsWithOtherInstances(
         return;
     }
 
-    for (auto& instance : existingInstances) {
-        auto existingTypedInstance =
+    for (const auto& instance : existingInstances) {
+        const auto existingTypedInstance =
             checked_cast<const ShardMergeRecipientService::Instance*>(instance);
+
         auto existingStateDoc = existingTypedInstance->getStateDoc();
+        auto forgetMigrationDurableFuture =
+            existingTypedInstance->getForgetMigrationDurableFuture();
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "An existing shard merge is in progress",
-                existingStateDoc.getStartGarbageCollect() || existingStateDoc.getExpireAt());
+                existingStateDoc.getStartGarbageCollect() ||
+                    (forgetMigrationDurableFuture.isReady() &&
+                     forgetMigrationDurableFuture.getNoThrow().isOK()));
     }
 }
 
@@ -555,6 +559,9 @@ boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentO
         }
     }
 
+    if (_stateDoc.getStartAtOpTime()) {
+        _stateDoc.getStartAtOpTime()->append(&bob, "receiveStartOpTime");
+    }
     if (_stateDoc.getStartFetchingDonorOpTime())
         _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");
     if (_stateDoc.getStartApplyingDonorOpTime())
@@ -567,10 +574,6 @@ boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentO
 
     if (_client) {
         bob.append("donorSyncSource", _client->getServerAddress());
-    }
-
-    if (_stateDoc.getStartAt()) {
-        bob.append("receiveStart", *_stateDoc.getStartAt());
     }
 
     if (_tenantOplogApplier) {
@@ -670,7 +673,7 @@ OpTime ShardMergeRecipientService::Instance::waitUntilMigrationReachesReturnAfte
     _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
 
     auto lastOpBeforeUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    _writeStateDoc(opCtx, stateDoc, OpType::kUpdate);
+    _updateStateDoc(opCtx, stateDoc);
     auto lastOpAfterUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
     if (lastOpBeforeUpdate == lastOpAfterUpdate) {
@@ -910,16 +913,18 @@ std::vector<HostAndPort> ShardMergeRecipientService::Instance::_getExcludedDonor
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_initializeAndDurablyPersistStateDoc() {
-    stdx::unique_lock lk(_mutex);
-    uassert(ErrorCodes::TenantMigrationForgotten,
-            str::stream() << "Migration " << getMigrationUUID()
-                          << " already marked for garbage collection",
-            !(_isCommitOrAbortState(lk) || _stateDoc.getStartGarbageCollect()));
+    {
+        stdx::lock_guard lk(_mutex);
+        uassert(ErrorCodes::TenantMigrationForgotten,
+                str::stream() << "Migration " << getMigrationUUID()
+                              << " already marked for garbage collection",
+                !(_isCommitOrAbortState(lk) || _stateDoc.getStartGarbageCollect()));
 
-    uassert(ErrorCodes::TenantMigrationAborted,
-            str::stream() << "Failover happened during migration :: migrationId: "
-                          << getMigrationUUID(),
-            !_stateDoc.getStartAt());
+        uassert(ErrorCodes::TenantMigrationAborted,
+                str::stream() << "Failover happened during migration :: migrationId: "
+                              << getMigrationUUID(),
+                !_stateDoc.getStartAtOpTime());
+    }
 
     LOGV2_DEBUG(7339723,
                 2,
@@ -927,9 +932,6 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_initializeAndDurablyPers
                 "migrationId"_attr = getMigrationUUID(),
                 "connectionString"_attr = _donorConnectionString,
                 "readPreference"_attr = _readPreference);
-
-    // Record the time at which the state doc is initialized.
-    _stateDoc.setStartAt(_serviceContext->getFastClockSource()->now());
 
     if (MONGO_unlikely(failWhilePersistingTenantMigrationRecipientInstanceStateDoc.shouldFail())) {
         LOGV2(7339706, "Persisting state doc failed due to fail point enabled.");
@@ -939,55 +941,86 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_initializeAndDurablyPers
                   "active");
     }
 
-    auto failToInitializeChangeCbk = [&](OperationContext* opCtx) {
-        opCtx->recoveryUnit()->onRollback([&](auto _) {
-            stdx::unique_lock lk(_mutex);
-            _stateDoc.setStartGarbageCollect(true);
-        });
-    };
+    ScopeGuard failToInsertGuard([&] {
+        stdx::unique_lock lk(_mutex);
+        _stateDoc.setStartGarbageCollect(true);
+    });
 
-    return _insertStateDocForMajority(lk, failToInitializeChangeCbk);
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
+
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << nss.toStringForErrorMsg() << " does not exist",
+            collection.exists());
+
+    writeConflictRetry(opCtx, "insertShardMergeRecipientStateDoc", nss, [&]() {
+        WriteUnitOfWork wuow(opCtx);
+        auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+
+        auto stateDocCopy = [&] {
+            stdx::unique_lock lk(_mutex);
+            // Record the opTime at which the state doc is initialized.
+            _stateDoc.setStartAtOpTime(oplogSlot);
+            return _stateDoc.toBSON();
+        }();
+
+        Status status = collection_internal::insertDocument(
+            opCtx,
+            collection.getCollectionPtr(),
+            InsertStatement(kUninitializedStmtId, std::move(stateDocCopy), std::move(oplogSlot)),
+            nullptr);
+
+        uassertStatusOK(status);
+        wuow.commit();
+    });
+
+    failToInsertGuard.dismiss();
+
+    auto waitOptime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    return WaitForMajorityService::get(_serviceContext)
+        .waitUntilMajority(waitOptime, CancellationToken::uncancelable());
 }
 
-SemiFuture<void> ShardMergeRecipientService::Instance::_killBackupCursor() {
-    stdx::lock_guard lk(_mutex);
+void ShardMergeRecipientService::Instance::_killBackupCursor() {
+    executor::RemoteCommandRequest killCursorsRequest;
 
-    auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
-    if (donorBackupCursorInfo.cursorId <= 0) {
-        return SemiFuture<void>::makeReady();
-    }
-
-    if (_backupCursorKeepAliveFuture) {
+    {
+        stdx::lock_guard lk(_mutex);
+        // Cancel the backup cursor keep alive task.
         _backupCursorKeepAliveCancellation.cancel();
+
+        const auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
+        const auto cursorId = donorBackupCursorInfo.cursorId;
+        const auto& nss = donorBackupCursorInfo.nss;
+        if (cursorId <= 0 || nss.isEmpty())
+            return;
+
+        LOGV2_INFO(7339724,
+                   "Killing backup cursor",
+                   "migrationId"_attr = getMigrationUUID(),
+                   "cursorId"_attr = cursorId);
+
+        killCursorsRequest = executor::RemoteCommandRequest(
+            _client->getServerHostAndPort(),
+            donorBackupCursorInfo.nss.dbName(),
+            BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
+                               << BSON_ARRAY(cursorId)),
+            nullptr);
+        killCursorsRequest.options.fireAndForget = true;
     }
 
-    return std::exchange(_backupCursorKeepAliveFuture, {})
-        .value_or(SemiFuture<void>::makeReady())
-        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
-        .then([this, self = shared_from_this(), donorBackupCursorInfo] {
-            LOGV2_INFO(7339724,
-                       "Killing backup cursor",
-                       "migrationId"_attr = getMigrationUUID(),
-                       "cursorId"_attr = donorBackupCursorInfo.cursorId);
-
-            stdx::lock_guard lk(_mutex);
-            executor::RemoteCommandRequest request(
-                _client->getServerHostAndPort(),
-                donorBackupCursorInfo.nss.dbName(),
-                BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
-                                   << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
-                nullptr);
-            request.sslMode = _donorUri.getSSLMode();
-
-            const auto scheduleResult =
-                _scheduleKillBackupCursorWithLock(lk, _backupCursorExecutor);
-            if (!scheduleResult.isOK()) {
-                LOGV2_WARNING(7339725,
-                              "Failed to run killCursors command on backup cursor",
-                              "status"_attr = scheduleResult.getStatus());
-            }
-        })
-        .semi();
+    _backupCursorExecutor
+        ->scheduleRemoteCommand(killCursorsRequest, CancellationToken::uncancelable())
+        .getAsync([](auto&&) {});  // Ignore the result Future
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
@@ -1019,14 +1052,12 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
                                   self = shared_from_this(),
                                   fetchStatus,
                                   metadataInfoPtr = uniqueMetadataInfo.get(),
-                                  token,
                                   startMigrationDonorTimestamp](
                                      const Fetcher::QueryResponseStatus& dataStatus,
                                      Fetcher::NextAction* nextAction,
                                      BSONObjBuilder* getMoreBob) noexcept {
         try {
             uassertStatusOK(dataStatus);
-            uassert(ErrorCodes::CallbackCanceled, "backup cursor interrupted", !token.isCanceled());
 
             const auto uniqueOpCtx = cc().makeOperationContext();
             const auto opCtx = uniqueOpCtx.get();
@@ -1128,8 +1159,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
         executor::RemoteCommandRequest::kNoTimeout, /* aggregateTimeout */
         executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
         RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-            kBackupCursorFileFetcherRetryAttempts, executor::RemoteCommandRequest::kNoTimeout),
-        transport::kGlobalSSLMode);
+            kBackupCursorFileFetcherRetryAttempts, executor::RemoteCommandRequest::kNoTimeout));
 
     uassertStatusOK(_donorFilenameBackupCursorFileFetcher->schedule());
 
@@ -1144,35 +1174,6 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursor(
             uassertStatusOK(fetchStatus->get());
         })
         .semi();
-}
-
-StatusWith<executor::TaskExecutor::CallbackHandle>
-ShardMergeRecipientService::Instance::_scheduleKillBackupCursorWithLock(
-    WithLock lk, std::shared_ptr<executor::TaskExecutor> executor) {
-    auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
-    executor::RemoteCommandRequest killCursorsRequest(
-        _client->getServerHostAndPort(),
-        donorBackupCursorInfo.nss.dbName(),
-        BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
-                           << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
-        nullptr);
-    killCursorsRequest.sslMode = _donorUri.getSSLMode();
-
-    return executor->scheduleRemoteCommand(
-        killCursorsRequest, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            if (!args.response.isOK()) {
-                LOGV2_WARNING(7339730,
-                              "killCursors command task failed",
-                              "error"_attr = redact(args.response.status));
-                return;
-            }
-            auto status = getStatusFromCommandResult(args.response.data);
-            if (status.isOK()) {
-                LOGV2_INFO(7339731, "Killed backup cursor");
-            } else {
-                LOGV2_WARNING(7339732, "killCursors command failed", "error"_attr = redact(status));
-            }
-        });
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_openBackupCursorWithRetry(
@@ -1211,14 +1212,36 @@ void ShardMergeRecipientService::Instance::_keepBackupCursorAlive(const Cancella
                 "migrationId"_attr = getMigrationUUID());
 
     stdx::lock_guard lk(_mutex);
+    uassertStatusOK(_getInterruptStatus());
+    invariant(!_backupCursorKeepAliveCancellation.token().isCanceled());
     _backupCursorKeepAliveCancellation = CancellationSource(token);
+
     auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
+    const auto cursorId = donorBackupCursorInfo.cursorId;
+    const auto& nss = donorBackupCursorInfo.nss;
+    invariant(cursorId > 0 && !nss.isEmpty());
+
+    executor::RemoteCommandRequest getMoreRequest(
+        _client->getServerHostAndPort(),
+        nss.dbName(),
+        std::move(BSON("getMore" << cursorId << "collection" << nss.coll().toString())),
+        nullptr);
+    getMoreRequest.options.fireAndForget = true;
+
     _backupCursorKeepAliveFuture =
-        shard_merge_utils::keepBackupCursorAlive(_backupCursorKeepAliveCancellation,
-                                                 _backupCursorExecutor,
-                                                 _client->getServerHostAndPort(),
-                                                 donorBackupCursorInfo.cursorId,
-                                                 donorBackupCursorInfo.nss);
+        AsyncTry([this,
+                  self = shared_from_this(),
+                  getMoreRequest,
+                  keepAliveToken = _backupCursorKeepAliveCancellation.token()] {
+            return _backupCursorExecutor->scheduleRemoteCommand(getMoreRequest, keepAliveToken);
+        })
+            .until([](auto&&) { return false; })
+            .withDelayBetweenIterations(
+                Milliseconds(shard_merge_utils::kBackupCursorKeepAliveIntervalMillis))
+            .on(_backupCursorExecutor, _backupCursorKeepAliveCancellation.token())
+            .onCompletion(
+                [](auto&&) { LOGV2_INFO(7675002, "Keep backup cursor alive thread stopped"); })
+            .semi();
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_enterLearnedFilenamesState() {
@@ -1839,9 +1862,6 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
                        "mergeRecipientWriteNoopToAdvanceStableTimestamp",
                        NamespaceString::kRsOplogNamespace,
                        [&] {
-                           if (token.isCanceled()) {
-                               return;
-                           }
                            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
                            WriteUnitOfWork wuow(opCtx);
                            const std::string msg = str::stream()
@@ -1853,7 +1873,8 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
 
     // Get the timestamp of the no-op. This will have ts > donorBkpCursorCkptTs.
     auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    return WaitForMajorityService::get(opCtx->getServiceContext()).waitUntilMajority(noOpTs, token);
+    return WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(noOpTs, CancellationToken::uncancelable());
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistConsistentState() {
@@ -1996,12 +2017,12 @@ void ShardMergeRecipientService::Instance::_cleanupOnMigrationCompletion(Status 
     std::shared_ptr<TenantOplogApplier> savedTenantOplogApplier;
     std::unique_ptr<ThreadPool> savedWriterPool;
     std::unique_ptr<Fetcher> savedDonorFilenameBackupCursorFileFetcher;
+    boost::optional<SemiFuture<void>> savedBackupCursorKeepAliveFuture;
     {
         stdx::lock_guard lk(_mutex);
         _cancelRemainingWork(lk, status);
 
-        _backupCursorKeepAliveCancellation = {};
-        _backupCursorKeepAliveFuture = boost::none;
+        _backupCursorKeepAliveCancellation.cancel();
 
         shutdownTarget(lk, _donorOplogFetcher);
         shutdownTargetWithOpCtx(lk, _donorOplogBuffer, opCtx.get());
@@ -2022,6 +2043,11 @@ void ShardMergeRecipientService::Instance::_cleanupOnMigrationCompletion(Status 
         swap(savedTenantOplogApplier, _tenantOplogApplier);
         swap(savedWriterPool, _writerPool);
         swap(savedDonorFilenameBackupCursorFileFetcher, _donorFilenameBackupCursorFileFetcher);
+        swap(savedBackupCursorKeepAliveFuture, _backupCursorKeepAliveFuture);
+    }
+
+    if (_backupCursorKeepAliveFuture) {
+        _backupCursorKeepAliveFuture->wait();
     }
 
     // Perform join outside the lock to avoid deadlocks.
@@ -2037,22 +2063,11 @@ void ShardMergeRecipientService::Instance::_cleanupOnMigrationCompletion(Status 
     }
 }
 
-SemiFuture<void> ShardMergeRecipientService::Instance::_updateStateDocForMajority(
-    WithLock lk, const RegisterChangeCbk& registerChange) {
-    return _writeStateDocForMajority(lk, OpType::kUpdate, registerChange);
-}
-
-SemiFuture<void> ShardMergeRecipientService::Instance::_insertStateDocForMajority(
-    WithLock lk, const RegisterChangeCbk& registerChange) {
-    return _writeStateDocForMajority(lk, OpType::kInsert, registerChange);
-}
-
-SemiFuture<void> ShardMergeRecipientService::Instance::_writeStateDocForMajority(
-    WithLock, OpType opType, const RegisterChangeCbk& registerChange) {
+SemiFuture<void> ShardMergeRecipientService::Instance::_updateStateDocForMajority(WithLock) {
     return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), stateDoc = _stateDoc, opType, registerChange] {
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
             auto opCtx = cc().makeOperationContext();
-            _writeStateDoc(opCtx.get(), stateDoc, opType, registerChange);
+            _updateStateDoc(opCtx.get(), stateDoc);
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
                 .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
@@ -2060,11 +2075,8 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_writeStateDocForMajority
         .semi();
 }
 
-void ShardMergeRecipientService::Instance::_writeStateDoc(
-    OperationContext* opCtx,
-    const ShardMergeRecipientDocument& stateDoc,
-    OpType opType,
-    const RegisterChangeCbk& registerChange) {
+void ShardMergeRecipientService::Instance::_updateStateDoc(
+    OperationContext* opCtx, const ShardMergeRecipientDocument& stateDoc) {
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
     auto collection = acquireCollection(
         opCtx,
@@ -2081,9 +2093,6 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
     writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss, [&]() {
         WriteUnitOfWork wunit(opCtx);
 
-        if (registerChange)
-            registerChange(opCtx);
-
         const auto filter =
             BSON(TenantMigrationRecipientDocument::kIdFieldName << stateDoc.getId());
         auto updateResult = Helpers::upsert(opCtx,
@@ -2091,28 +2100,14 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
                                             filter,
                                             stateDoc.toBSON(),
                                             /*fromMigrate=*/false);
-        switch (opType) {
-            case OpType::kInsert:
-                uassert(ErrorCodes::ConflictingOperationInProgress,
-                        str::stream()
-                            << "Failed to insert the shard merge recipient state doc: "
-                            << tenant_migration_util::redactStateDoc(stateDoc.toBSON())
-                            << "; Found active migration for migrationId: " << stateDoc.getId(),
-                        !updateResult.upsertedId.isEmpty());
-                break;
-            case OpType::kUpdate:
-                // Intentionally not checking `updateResult.numDocsModified` to handle no-op
-                // updates.
-                uassert(ErrorCodes::NoSuchKey,
-                        str::stream()
-                            << "Failed to update shard merge recipient state document due to "
-                               "missing state document for migrationId: "
-                            << stateDoc.getId(),
-                        updateResult.numMatched);
-                break;
-            default:
-                MONGO_UNREACHABLE
-        }
+
+        // Intentionally not checking `updateResult.numDocsModified` to handle no-op
+        // updates.
+        uassert(ErrorCodes::NoSuchKey,
+                str::stream() << "Failed to update shard merge recipient state document due to "
+                                 "missing state document for migrationId: "
+                              << stateDoc.getId(),
+                updateResult.numMatched);
 
         wunit.commit();
     });
@@ -2302,8 +2297,11 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_startMigrationIfSafeToRu
         })
         .then([this, self = shared_from_this()] { _startOplogFetcher(); })
         .then([this, self = shared_from_this()] { return _waitForAllNodesToFinishImport(); })
-        .then([this, self = shared_from_this()] { return _killBackupCursor(); })
         .then([this, self = shared_from_this()] { return _enterConsistentState(); })
+        .onCompletion([this, self = shared_from_this()](Status status) {
+            _killBackupCursor();
+            return status;
+        })
         .then([this, self = shared_from_this()] {
             return _fetchCommittedTransactionsBeforeStartOpTime();
         })
@@ -2400,7 +2398,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
                 // deleted.
                 // 3) Fail to initialize the state document.
                 invariant(_stateDoc.getStartGarbageCollect());
-                _stateDoc.setStartAt(_serviceContext->getFastClockSource()->now());
+                _stateDoc.setStartAtOpTime(oplogSlot);
             }
             return _stateDoc.toBSON();
         }();

@@ -53,7 +53,7 @@ namespace mongo {
 
 namespace tenant_migration_access_blocker {
 
-void fassertOnUnsafeInitialSync(const UUID& migrationId);
+void assertOnUnsafeInitialSync(const UUID& migrationId);
 
 /**
  * Parse the tenantId from a database name, or return boost::none if there is no tenantId.

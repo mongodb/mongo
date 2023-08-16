@@ -109,7 +109,7 @@ public:
     /**
      * Begins the process of copying and importing files for a given migration.
      */
-    void startMigration(const UUID& migrationId);
+    void startMigration(const UUID& migrationId, const OpTime& startMigrationOpTime);
 
     /**
      * Called for each file to be copied for a given migration.
@@ -140,6 +140,18 @@ public:
     void interruptAll();
 
     /**
+     * Returns a Future that will be resolved when the collection import task completes for the
+     * given migration id. Return boost::none if no active migration matches the provided migration
+     * id.
+     */
+    boost::optional<SharedSemiFuture<void>> getImportCompletedFuture(const UUID& migrationId);
+
+    /**
+     * Checks if there is an active migration with the given migration ID.
+     */
+    bool hasActiveMigration(const UUID& migrationId);
+
+    /**
      * Returns the migration stats for the given migrationId.
      * If no migrationId is provided, it returns the stats of an ongoing migration, if any.
      */
@@ -154,6 +166,11 @@ public:
             // Prevents a new migration from starting up during or after shutdown.
             _isShuttingDown = true;
         }
+        interruptAll();
+        _resetMigrationHandle();
+    }
+
+    void onRollback() override final {
         interruptAll();
         _resetMigrationHandle();
     }
@@ -212,6 +229,19 @@ private:
                     const BSONObj& metadataDoc);
 
     /**
+     * Waits until the majority committed StartMigrationTimestamp is successfully checkpointed.
+     *
+     * Note: Refer to the calling site for more information on its significance.
+     */
+    void _waitUntilStartMigrationTimestampIsCheckpointed(OperationContext* opCtx,
+                                                         const UUID& migrationId);
+    /**
+     * Runs rollback to stable on the cloned files associated with the given migration id,
+     * and then import the stable cloned files into the main WT instance.
+     */
+    void _runRollbackAndThenImportFiles(OperationContext* opCtx, const UUID& migrationId);
+
+    /**
      * Called to inform the primary that we have finished copying and importing all files.
      */
     void _voteImportedFiles(OperationContext* opCtx, const UUID& migrationId);
@@ -243,7 +273,9 @@ private:
                                                         State targetState,
                                                         bool dryRun = false);
 
-    void _makeMigrationHandleIfNotPresent(WithLock, const UUID& migrationId);
+    void _makeMigrationHandleIfNotPresent(WithLock,
+                                          const UUID& migrationId,
+                                          const OpTime& startMigrationOpTime);
 
     struct ImporterEvent {
         enum class Type { kNone, kLearnedFileName, kLearnedAllFilenames };
@@ -262,10 +294,13 @@ private:
     // Represents a handle for managing the migration process. It holds various resources and
     // information required for cloning files and importing them.
     struct MigrationHandle {
-        explicit MigrationHandle(const UUID& migrationId);
+        explicit MigrationHandle(const UUID& migrationId, const OpTime& startMigrationOpTime);
 
         // Shard merge migration Id.
         const UUID migrationId;
+
+        // Optime at which the recipient state machine document for this migration is initialized.
+        const OpTime startMigrationOpTime;
 
         // Queue to process ImporterEvents.
         const std::unique_ptr<Queue> eventQueue;
@@ -275,6 +310,12 @@ private:
 
         // Shared between the importer service and TenantFileCloners
         const std::unique_ptr<TenantMigrationSharedData> sharedData;
+
+        // Indicates if collection import for this migration has begun.
+        bool importStarted = false;
+
+        // Promise fulfilled upon completion of collection import for this migration.
+        SharedPromise<void> importCompletedPromise;
 
         // Worker thread to orchestrate the cloning, importing and notifying the primary steps.
         std::unique_ptr<stdx::thread> workerThread;

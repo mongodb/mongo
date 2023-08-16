@@ -83,6 +83,8 @@ private:
 
     void onStepDown() final;
 
+    void onRollback() final {}
+
     void onShutdown() final {}
 
     void onBecomeArbiter() final {}

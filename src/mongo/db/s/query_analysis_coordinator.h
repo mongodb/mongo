@@ -171,6 +171,8 @@ private:
 
     void onStepDown() override final {}
 
+    void onRollback() override final {}
+
     void onBecomeArbiter() override final {}
 
     inline std::string getServiceName() const override final {

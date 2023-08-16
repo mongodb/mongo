@@ -66,7 +66,7 @@ const migrationOpts = {
 };
 
 // Start migration, and then wait for the migration to get committed and garbage collected.
-assert.commandWorked(
+TenantMigrationTest.assertCommitted(
     tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: true}));
 
 jsTestLog("Restart recipient primary.");

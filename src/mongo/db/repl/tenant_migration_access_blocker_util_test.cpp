@@ -39,6 +39,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
@@ -55,6 +57,7 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -503,6 +506,9 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientConsistent) {
                                              kDefaultStartMigrationTimestamp,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     recipientDoc.setState(ShardMergeRecipientStateEnum::kConsistent);
+    // Create the import done marker collection.
+    ASSERT_OK(createCollection(
+        opCtx(), CreateCommand(repl::shard_merge_utils::getImportDoneMarkerNs(kMigrationId))));
 
     insertStateDocument(NamespaceString::kShardMergeRecipientsNamespace, recipientDoc.toBSON());
 
@@ -560,9 +566,7 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientRejectBeforeTimestamp) {
     }
 }
 
-DEATH_TEST_REGEX_F(RecoverAccessBlockerTest,
-                   InitialSyncUsingSyncSourceRunningShardMergeImportFasserts,
-                   "Fatal assertion.*7219900") {
+TEST_F(RecoverAccessBlockerTest, InitialSyncUsingSyncSourceRunningShardMergeImportAsserts) {
     ShardMergeRecipientDocument recipientDoc(UUID::gen(),
                                              kDefaultDonorConnStr,
                                              _tenantIds,
@@ -575,11 +579,34 @@ DEATH_TEST_REGEX_F(RecoverAccessBlockerTest,
     // Simulate the node is in initial sync.
     ASSERT_OK(_replMock->setFollowerMode(repl::MemberState::RS_STARTUP2));
 
+    ASSERT_THROWS_CODE_AND_WHAT(
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx()),
+        DBException,
+        ErrorCodes::TenantMigrationInProgress,
+        "Illegal to run initial sync when shard merge is active");
+}
+
+TEST_F(RecoverAccessBlockerTest, SyncSourceCompletesShardMergeBeforeInitialSyncStart) {
+    ShardMergeRecipientDocument recipientDoc(kMigrationId,
+                                             kDefaultDonorConnStr,
+                                             _tenantIds,
+                                             kDefaultStartMigrationTimestamp,
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    recipientDoc.setState(ShardMergeRecipientStateEnum::kCommitted);
+    recipientDoc.setExpireAt(opCtx()->getServiceContext()->getFastClockSource()->now());
+
+    insertStateDocument(NamespaceString::kShardMergeRecipientsNamespace, recipientDoc.toBSON());
+
+    // Simulate the node is in initial sync.
+    ASSERT_OK(_replMock->setFollowerMode(repl::MemberState::RS_STARTUP2));
+
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx());
 }
 
-TEST_F(RecoverAccessBlockerTest, SyncSourceCompletesShardMergeImportBeforeInitialSyncStart) {
-    ShardMergeRecipientDocument recipientDoc(kMigrationId,
+DEATH_TEST_REGEX_F(RecoverAccessBlockerTest,
+                   ShardMergeRecipientConsistentStateWithoutImportDoneMarkerCollectionFasserts,
+                   "Fatal assertion.*7219902") {
+    ShardMergeRecipientDocument recipientDoc(UUID::gen(),
                                              kDefaultDonorConnStr,
                                              _tenantIds,
                                              kDefaultStartMigrationTimestamp,
@@ -587,9 +614,6 @@ TEST_F(RecoverAccessBlockerTest, SyncSourceCompletesShardMergeImportBeforeInitia
     recipientDoc.setState(ShardMergeRecipientStateEnum::kConsistent);
 
     insertStateDocument(NamespaceString::kShardMergeRecipientsNamespace, recipientDoc.toBSON());
-
-    // Simulate the node is in initial sync.
-    ASSERT_OK(_replMock->setFollowerMode(repl::MemberState::RS_STARTUP2));
 
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx());
 }
