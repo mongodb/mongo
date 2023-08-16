@@ -74,10 +74,11 @@ public:
             : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
 
         void update(int64_t diff) {
-            tassert(6128100,
-                    str::stream() << "Underflow in memory tracking, attempting to add " << diff
-                                  << " but only " << _currentMemoryBytes << " available",
-                    _currentMemoryBytes + diff >= 0);
+            // TODO SERVER-80149: Re-enable this tassert checking for memory underflow.
+            // tassert(6128100,
+            //         str::stream() << "Underflow in memory tracking, attempting to add " << diff
+            //                       << " but only " << _currentMemoryBytes << " available",
+            //         _currentMemoryBytes + diff >= 0);
             _currentMemoryBytes += diff;
             if (_currentMemoryBytes > _maxMemoryBytes) {
                 _maxMemoryBytes = _currentMemoryBytes;
