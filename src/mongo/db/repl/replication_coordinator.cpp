@@ -91,11 +91,7 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
 }
 
 bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
-    if (nss.isLocalDB()) {
-        return true;
-    }
-
-    if (nss.isSystemDotProfile()) {
+    if (!nss.isReplicated()) {
         return true;
     }
 
