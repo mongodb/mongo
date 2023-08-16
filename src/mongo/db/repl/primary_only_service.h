@@ -615,6 +615,7 @@ public:
     void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;
     void onStepDown() final;
+    void onRollback() final {}
     inline std::string getServiceName() const override final {
         return "PrimaryOnlyServiceRegistry";
     }

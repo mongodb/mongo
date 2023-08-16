@@ -64,6 +64,7 @@ public:
     int numCallsOnStepUpBegin{0};
     int numCallsOnStepUpComplete{0};
     int numCallsOnStepDown{0};
+    int numCallsOnRollback{0};
     int numCallsOnBecomeArbiter{0};
 
 protected:
@@ -89,6 +90,10 @@ protected:
 
     void onStepDown() override {
         numCallsOnStepDown++;
+    }
+
+    void onRollback() override {
+        numCallsOnRollback++;
     }
 
     void onBecomeArbiter() override {
@@ -200,6 +205,11 @@ private:
     void onStepDown() final {
         ASSERT_EQ(numCallsOnStepDown, ServiceB::get(getServiceContext())->numCallsOnStepDown - 1);
         TestService::onStepDown();
+    }
+
+    void onRollback() final {
+        ASSERT_EQ(numCallsOnRollback, ServiceB::get(getServiceContext())->numCallsOnRollback - 1);
+        TestService::onRollback();
     }
 
     void onBecomeArbiter() final {
@@ -320,6 +330,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+    ASSERT_EQ(0, a->numCallsOnRollback);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, b->numCallsOnStartup);
@@ -328,6 +339,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, b->numCallsOnStepUpBegin);
     ASSERT_EQ(0, b->numCallsOnStepUpComplete);
     ASSERT_EQ(0, b->numCallsOnStepDown);
+    ASSERT_EQ(0, b->numCallsOnRollback);
     ASSERT_EQ(0, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(0, c->numCallsOnStartup);
@@ -336,6 +348,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, c->numCallsOnStepUpBegin);
     ASSERT_EQ(0, c->numCallsOnStepUpComplete);
     ASSERT_EQ(0, c->numCallsOnStepDown);
+    ASSERT_EQ(0, c->numCallsOnRollback);
     ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
     ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
@@ -349,6 +362,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
+    ReplicaSetAwareServiceRegistry::get(sc).onRollback();
     ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 
     ASSERT_EQ(0, a->numCallsOnStartup);
@@ -357,6 +371,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, a->numCallsOnStepUpBegin);
     ASSERT_EQ(0, a->numCallsOnStepUpComplete);
     ASSERT_EQ(0, a->numCallsOnStepDown);
+    ASSERT_EQ(0, a->numCallsOnRollback);
     ASSERT_EQ(0, a->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, b->numCallsOnStartup);
@@ -365,6 +380,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(3, b->numCallsOnStepUpBegin);
     ASSERT_EQ(2, b->numCallsOnStepUpComplete);
     ASSERT_EQ(1, b->numCallsOnStepDown);
+    ASSERT_EQ(1, b->numCallsOnRollback);
     ASSERT_EQ(1, b->numCallsOnBecomeArbiter);
 
     ASSERT_EQ(1, c->numCallsOnStartup);
@@ -373,6 +389,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(3, c->numCallsOnStepUpBegin);
     ASSERT_EQ(2, c->numCallsOnStepUpComplete);
     ASSERT_EQ(1, c->numCallsOnStepDown);
+    ASSERT_EQ(1, c->numCallsOnRollback);
     ASSERT_EQ(1, c->numCallsOnBecomeArbiter);
 }
 

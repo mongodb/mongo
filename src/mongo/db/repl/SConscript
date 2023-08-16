@@ -567,6 +567,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'drop_pending_collection_reaper',
+        'replica_set_aware_service',
     ],
 )
 
@@ -1093,7 +1094,6 @@ env.Library(
         'tenant_base_cloner.cpp',
         'tenant_file_cloner.cpp',
         'tenant_file_importer_service.cpp',
-        'tenant_migration_shard_merge_util.cpp',
     ],
     LIBDEPS=[
         'base_cloner',
@@ -1403,6 +1403,7 @@ env.Library(
 env.Library(
     target='tenant_migration_utils',
     source=[
+        'tenant_migration_shard_merge_util.cpp',
         'tenant_migration_util.cpp',
         'tenant_migration_recipient_entry_helpers.cpp',
     ],
@@ -1420,6 +1421,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/storage/storage_file_util',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         'tenant_migration_state_machine_idl',
     ],
@@ -1541,6 +1543,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        'tenant_migration_utils',
     ],
 )
 
@@ -1814,6 +1817,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/query/command_request_response',
             '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
             '$BUILD_DIR/mongo/db/server_base',
+            '$BUILD_DIR/mongo/db/serverless/serverless_lock',
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',

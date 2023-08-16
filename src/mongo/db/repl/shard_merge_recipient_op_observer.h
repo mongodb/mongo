@@ -85,14 +85,6 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
-    void onCreateCollection(OperationContext* opCtx,
-                            const CollectionPtr& coll,
-                            const NamespaceString& collectionName,
-                            const CollectionOptions& options,
-                            const BSONObj& idIndex,
-                            const OplogSlot& createOpTime,
-                            bool fromMigrate) final;
-
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,

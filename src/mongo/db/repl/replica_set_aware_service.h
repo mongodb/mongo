@@ -99,6 +99,9 @@ namespace mongo {
  *     void onStepDown() final {
  *         // ...
  *     }
+ *     void onRollback() final {
+ *         // ...
+ *     }
  *     void onBecomeArbiter() final {
  *         // ...
  *     }
@@ -181,6 +184,11 @@ public:
     virtual void onStepDown() = 0;
 
     /**
+     * Called after the node has transitioned to ROLLBACK.
+     */
+    virtual void onRollback() = 0;
+
+    /**
      * Called when the node commences being an arbiter.
      */
     virtual void onBecomeArbiter() = 0;
@@ -243,6 +251,7 @@ public:
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;
+    void onRollback() final;
     void onBecomeArbiter() final;
     inline std::string getServiceName() const override final {
         return "ReplicaSetAwareServiceRegistry";

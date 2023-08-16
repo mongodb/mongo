@@ -188,6 +188,8 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
     std::vector<CollectionImportMetadata> metadatas;
 
     while (true) {
+        opCtx->checkForInterrupt();
+
         int ret = mdbCatalogCursor->next(mdbCatalogCursor);
         if (ret == WT_NOTFOUND) {
             break;

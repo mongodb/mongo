@@ -68,6 +68,7 @@
 #include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/tenant_id.h"
@@ -84,7 +85,44 @@
 
 namespace mongo::repl {
 using namespace fmt;
+using namespace shard_merge_utils;
 namespace {
+bool markedGCAfterMigrationStart(const ShardMergeRecipientDocument& doc) {
+    return !doc.getStartGarbageCollect() && doc.getExpireAt();
+}
+
+void dropTempFilesAndCollsIfAny(OperationContext* opCtx, const UUID& migrationId) {
+    const auto tempWTDirectory = fileClonerTempDir(migrationId);
+    // Do an early exit if the temp dir is not present.
+    if (!boost::filesystem::exists(tempWTDirectory))
+        return;
+
+    // Remove idents unknown to both storage and mdb_catalog.
+    bool filesRemoved = false;
+    const auto movingIdents = readMovingFilesMarker(tempWTDirectory);
+    for (const auto& ident : movingIdents) {
+        // It's impossible for files to be known by mdb_catalog but not storage. Files known to
+        // storage but not mdb_catalog could occur if node restarts during import. However, startup
+        // recovery removes such files. Therefore, we only need to handle files unknown to both
+        // mdb_catalog and storage. Thus, verifying the file(ident) existence in storage is
+        // sufficent.
+        bool identKnown =
+            getGlobalServiceContext()->getStorageEngine()->getEngine()->hasIdent(opCtx, ident);
+        if (!identKnown) {
+            filesRemoved = true;
+            removeFile(constructDestinationPath(ident));
+        }
+    }
+    if (filesRemoved)
+        fsyncDataDirectory();
+
+    // Remove the temp directory.
+    fsyncRemoveDirectory(tempWTDirectory);
+
+    // Now, drop the import done marker collection.
+    dropImportDoneMarkerLocalCollection(opCtx, migrationId);
+}
+
 void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
                                      const ShardMergeRecipientDocument& doc) {
     invariant(doc.getAbortOpTime());
@@ -144,29 +182,6 @@ void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
     }
 }
 
-void assertImportDoneMarkerLocalCollectionExists(OperationContext* opCtx, const UUID& migrationId) {
-    const auto& markerNss = shard_merge_utils::getImportDoneMarkerNs(migrationId);
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
-    AutoGetCollectionForRead collection(opCtx, markerNss);
-
-    // If the node is restored using cloud provider snapshot that was taken from a backup node
-    // that's in the middle of of file copy/import phase of shard merge, it can cause the restored
-    // node to have only partial donor data. And, if this node is restored (i.e resync) after it has
-    // voted yes to R primary that it has imported all donor data, it can make R primary to commit
-    // the migration and leading to have permanent data loss on this node. To prevent such
-    // situation, we check the marker collection exists on transitioning to 'kConsistent'state to
-    // guarantee that this node has imported all donor data.
-    if (!collection) {
-        LOGV2_FATAL_NOTRACE(
-            7219902,
-            "Shard merge trying to transition to 'kConsistent' state without 'ImportDoneMarker' "
-            "collection. It's unsafe to continue at this point as there is no guarantee "
-            "this node has copied all donor data. So, terminating this node.",
-            "migrationId"_attr = migrationId,
-            "markerNss"_attr = markerNss);
-    }
-}
-
 void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator first,
                                      std::vector<InsertStatement>::const_iterator last) {
@@ -180,7 +195,7 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
             case ShardMergeRecipientStateEnum::kStarted: {
                 invariant(!recipientStateDoc.getStartGarbageCollect());
 
-                auto migrationId = recipientStateDoc.getId();
+                const auto migrationId = recipientStateDoc.getId();
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
                                  migrationId);
@@ -203,9 +218,14 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                             migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
                 });
 
-                opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
-                    repl::TenantFileImporterService::get(opCtx)->startMigration(migrationId);
-                });
+                const auto& startAtOpTimeOptional = recipientStateDoc.getStartAtOpTime();
+                invariant(startAtOpTimeOptional);
+                opCtx->recoveryUnit()->onCommit(
+                    [migrationId, startAtOpTime = *startAtOpTimeOptional](OperationContext* opCtx,
+                                                                          auto _) {
+                        repl::TenantFileImporterService::get(opCtx)->startMigration(migrationId,
+                                                                                    startAtOpTime);
+                    });
             } break;
             case ShardMergeRecipientStateEnum::kCommitted:
             case ShardMergeRecipientStateEnum::kAborted:
@@ -225,8 +245,7 @@ void onDonatedFilesCollNssInsert(OperationContext* opCtx,
 
     for (auto it = first; it != last; it++) {
         const auto& metadataDoc = it->doc;
-        auto migrationId =
-            uassertStatusOK(UUID::parse(metadataDoc[shard_merge_utils::kMigrationIdFieldName]));
+        const auto migrationId = uassertStatusOK(UUID::parse(metadataDoc[kMigrationIdFieldName]));
         repl::TenantFileImporterService::get(opCtx)->learnedFilename(migrationId, metadataDoc);
     }
 }
@@ -270,7 +289,7 @@ void onTransitioningToLearnedFilenames(OperationContext* opCtx,
 
 void onTransitioningToConsistent(OperationContext* opCtx,
                                  const ShardMergeRecipientDocument& recipientStateDoc) {
-    assertImportDoneMarkerLocalCollectionExists(opCtx, recipientStateDoc.getId());
+    assertImportDoneMarkerLocalCollExistsOnMergeConsistent(opCtx, recipientStateDoc.getId());
     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {
         opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx, auto _) {
             auto mtabVector =
@@ -293,11 +312,7 @@ void onTransitioningToCommitted(OperationContext* opCtx,
     // the migration decision is not reversible.
     repl::TenantFileImporterService::get(opCtx)->interruptMigration(migrationId);
 
-    auto markedGCAfterMigrationStart = [&] {
-        return !recipientStateDoc.getStartGarbageCollect() && recipientStateDoc.getExpireAt();
-    }();
-
-    if (markedGCAfterMigrationStart) {
+    if (markedGCAfterMigrationStart(recipientStateDoc)) {
         opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
             auto mtabVector = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                                   .getRecipientAccessBlockersForMigration(migrationId);
@@ -315,7 +330,7 @@ void onTransitioningToCommitted(OperationContext* opCtx,
         });
 
         repl::TenantFileImporterService::get(opCtx)->resetMigration(migrationId);
-        shard_merge_utils::dropImportDoneMarkerLocalCollection(opCtx, migrationId);
+        dropTempFilesAndCollsIfAny(opCtx, migrationId);
     }
 }
 
@@ -326,13 +341,18 @@ void onTransitioningToAborted(OperationContext* opCtx,
     // the migration decision is not reversible.
     repl::TenantFileImporterService::get(opCtx)->interruptMigration(migrationId);
     tenantMigrationInfo(opCtx) = boost::make_optional<TenantMigrationInfo>(migrationId);
+
+    const auto& importCompletedFuture =
+        repl::TenantFileImporterService::get(opCtx)->getImportCompletedFuture(migrationId);
+    // Wait for the importer service to stop collection import task before dropping imported
+    // collections.
+    if (importCompletedFuture) {
+        LOGV2(7458507, "Waiting for the importer service to finish importing task");
+        importCompletedFuture->wait(opCtx);
+    }
     deleteTenantDataWhenMergeAborts(opCtx, recipientStateDoc);
 
-    auto markedGCAfterMigrationStart = [&] {
-        return !recipientStateDoc.getStartGarbageCollect() && recipientStateDoc.getExpireAt();
-    }();
-
-    if (markedGCAfterMigrationStart) {
+    if (markedGCAfterMigrationStart(recipientStateDoc)) {
         opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {
             // Remove access blocker and release locks to allow faster migration retry.
             // (Note: Not needed to unblock TTL deletions as we would have already dropped all
@@ -347,48 +367,30 @@ void onTransitioningToAborted(OperationContext* opCtx,
         });
 
         repl::TenantFileImporterService::get(opCtx)->resetMigration(migrationId);
-        shard_merge_utils::dropImportDoneMarkerLocalCollection(opCtx, migrationId);
+        dropTempFilesAndCollsIfAny(opCtx, migrationId);
     }
 }
+
+void handleUpdateRecoveryMode(OperationContext* opCtx,
+                              const ShardMergeRecipientDocument& recipientStateDoc) {
+    // Note that we expect this path not running during initial sync(inconsistent data), as we
+    // intentionally crash the server upon detecting the state document oplog entry for replay.
+    const auto migrationId = recipientStateDoc.getId();
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    invariant(!(replCoord->getSettings().isReplSet() &&
+                repl::TenantFileImporterService::get(opCtx)->hasActiveMigration(migrationId)));
+
+    if (recipientStateDoc.getState() == ShardMergeRecipientStateEnum::kAborted) {
+        deleteTenantDataWhenMergeAborts(opCtx, recipientStateDoc);
+    }
+
+    if (markedGCAfterMigrationStart(recipientStateDoc)) {
+        dropTempFilesAndCollsIfAny(opCtx, migrationId);
+    }
+}
+
 }  // namespace
-
-void ShardMergeRecipientOpObserver::onCreateCollection(OperationContext* opCtx,
-                                                       const CollectionPtr& coll,
-                                                       const NamespaceString& collectionName,
-                                                       const CollectionOptions& options,
-                                                       const BSONObj& idIndex,
-                                                       const OplogSlot& createOpTime,
-                                                       bool fromMigrate) {
-    if (!shard_merge_utils::isDonatedFilesCollection(collectionName) ||
-        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        return;
-    }
-
-    auto collString = collectionName.coll().toString();
-    auto migrationUUID = uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
-    auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
-
-    LOGV2_INFO(7219912,
-               "Creating the temporary WT dbpath",
-               "tempDbPath"_attr = fileClonerTempDirPath.string());
-
-    boost::system::error_code ec;
-    bool createdNewDir = boost::filesystem::create_directory(fileClonerTempDirPath, ec);
-    uassert(7339767,
-            str::stream() << "Failed to create WT temp directory:: "
-                          << fileClonerTempDirPath.string() << ", Error:: " << ec.message(),
-            !ec);
-    uassert(7339768, str::stream() << "WT temp directory already exists", createdNewDir);
-
-    // Register onRollback handler after we successfully able to create the temp directory.
-    opCtx->recoveryUnit()->onRollback([fileClonerTempDirPath](auto _) {
-        LOGV2_INFO(7219913,
-                   "Removing the temporary WT dbpath",
-                   "tempDbPath"_attr = fileClonerTempDirPath.string());
-        boost::system::error_code ec;
-        boost::filesystem::remove(fileClonerTempDirPath, ec);
-    });
-}
 
 void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
                                               const CollectionPtr& coll,
@@ -402,7 +404,7 @@ void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
         return;
     }
 
-    if (shard_merge_utils::isDonatedFilesCollection(coll->ns())) {
+    if (isDonatedFilesCollection(coll->ns())) {
         onDonatedFilesCollNssInsert(opCtx, first, last);
         return;
     }
@@ -411,19 +413,22 @@ void ShardMergeRecipientOpObserver::onInserts(OperationContext* opCtx,
 void ShardMergeRecipientOpObserver::onUpdate(OperationContext* opCtx,
                                              const OplogUpdateEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
-    if (args.coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
-        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+    if (args.coll->ns() != NamespaceString::kShardMergeRecipientsNamespace) {
         return;
     }
 
+    auto recipientStateDoc = ShardMergeRecipientDocument::parse(
+        IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
+    if (tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+        handleUpdateRecoveryMode(opCtx, recipientStateDoc);
+        return;
+    }
+
+    auto nextState = recipientStateDoc.getState();
     auto prevState = ShardMergeRecipientState_parse(
         IDLParserContext("preImageRecipientStateDoc"),
         args.updateArgs->preImageDoc[ShardMergeRecipientDocument::kStateFieldName]
             .valueStringData());
-    auto recipientStateDoc = ShardMergeRecipientDocument::parse(
-        IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
-    auto nextState = recipientStateDoc.getState();
-
     assertStateTransitionIsValid(prevState, nextState);
 
     switch (nextState) {

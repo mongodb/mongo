@@ -106,6 +106,7 @@ private:
         _lsidsToEagerlyReap.clear();
     }
 
+    void onRollback() override final {}
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}

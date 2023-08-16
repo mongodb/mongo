@@ -99,6 +99,8 @@ function checkStatFieldsOK(res) {
 // Check currentOp fields' expected value once the recipient is in state "consistent" or later.
 function checkPostConsistentFieldsOK(res) {
     const currOp = res.inprog[0];
+    assert(currOp.hasOwnProperty("receiveStartOpTime") && checkOptime(currOp.receiveStartOpTime),
+           res);
     assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
                checkOptime(currOp.startFetchingDonorOpTime),
            res);
@@ -154,6 +156,8 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kStarted, res);
     assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.migrationCompleted, false, res);
+    assert(currOp.hasOwnProperty("receiveStartOpTime") && checkOptime(currOp.receiveStartOpTime),
+           res);
     assert(!currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
     assert(!currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -175,7 +179,6 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
     checkStandardFieldsOK(res);
     checkStatFieldsOK(res);
     let currOp = res.inprog[0];
-    assert.gt(new Date(), currOp.receiveStart, tojson(res));
     assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kLearnedFilenames, res);
     assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.migrationCompleted, false, res);
@@ -186,6 +189,8 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
            res);
     assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
                checkOptime(currOp.startApplyingDonorOpTime),
+           res);
+    assert(currOp.hasOwnProperty("receiveStartOpTime") && checkOptime(currOp.receiveStartOpTime),
            res);
     assert(currOp.hasOwnProperty("donorSyncSource") && typeof currOp.donorSyncSource === 'string',
            res);

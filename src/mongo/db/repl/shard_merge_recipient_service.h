@@ -357,9 +357,10 @@ public:
         void _keepBackupCursorAlive(const CancellationToken& token);
 
         /**
-         * Kills the Donor backup cursor.
+         * Kills the backup cursor opened on donor, if any.
+         *
          */
-        SemiFuture<void> _killBackupCursor();
+        void _killBackupCursor();
 
         /**
          * Gets the backup cursor metadata info.
@@ -529,43 +530,22 @@ public:
          */
         void _stopOrHangOnFailPoint(FailPoint* fp, OperationContext* opCtx = nullptr);
 
-        enum class OpType { kInsert, kUpdate };
-        using RegisterChangeCbk = std::function<void(OperationContext* opCtx)>;
         /**
-         * Insert/updates the shard merge recipient state doc and waits for that change to be
+         * Updates the shard merge recipient state doc and waits for that change to be
          * propagated to a majority.
          */
-        SemiFuture<void> _insertStateDocForMajority(
-            WithLock lk, const RegisterChangeCbk& registerChange = nullptr);
-        SemiFuture<void> _updateStateDocForMajority(
-            WithLock lk, const RegisterChangeCbk& registerChange = nullptr);
+        SemiFuture<void> _updateStateDocForMajority(WithLock lk);
 
         /**
-         * Helper to persist state doc.
+         * Updates the shard merge recipient state doc. Throws error if it fails to
+         * update.
          */
-        SemiFuture<void> _writeStateDocForMajority(
-            WithLock, OpType opType, const RegisterChangeCbk& registerChange = nullptr);
-
-        /**
-         * Insert/updates the shard merge recipient state doc. Throws error if it fails to
-         * perform the operation opType.
-         */
-        void _writeStateDoc(OperationContext* opCtx,
-                            const ShardMergeRecipientDocument& stateDoc,
-                            OpType opType,
-                            const RegisterChangeCbk& registerChange = nullptr);
+        void _updateStateDoc(OperationContext* opCtx, const ShardMergeRecipientDocument& stateDoc);
 
         /**
          * Returns the majority OpTime on the donor node that 'client' is connected to.
          */
         OpTime _getDonorMajorityOpTime(std::unique_ptr<mongo::DBClientConnection>& client);
-
-        /**
-         * Send the killBackupCursor command to the remote in order to close the backup cursor
-         * connection on the donor.
-         */
-        StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleKillBackupCursorWithLock(
-            WithLock lk, std::shared_ptr<executor::TaskExecutor> executor);
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardMergeRecipientService::_mutex");
 

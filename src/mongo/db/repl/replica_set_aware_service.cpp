@@ -165,6 +165,12 @@ void ReplicaSetAwareServiceRegistry::onStepDown() {
     });
 }
 
+void ReplicaSetAwareServiceRegistry::onRollback() {
+    std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
+        service->onRollback();
+    });
+}
+
 void ReplicaSetAwareServiceRegistry::onBecomeArbiter() {
     std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
         service->onBecomeArbiter();

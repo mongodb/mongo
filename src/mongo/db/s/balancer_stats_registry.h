@@ -100,6 +100,7 @@ private:
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onBecomeArbiter() override final {}
     void onShutdown() override final {}
+    void onRollback() override final {}
 
     void onStartup(OperationContext* opCtx) override final;
     void onStepUpComplete(OperationContext* opCtx, long long term) override final;

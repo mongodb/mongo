@@ -51,6 +51,7 @@
 #include "mongo/db/repl/tenant_file_importer_service.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/executor/task_executor_test_fixture.h"
@@ -80,6 +81,7 @@ namespace {
 constexpr auto kDonorHostName = "localhost:12345"_sd;
 constexpr auto kDonorDBPath = "/path/to/remoteDB/"_sd;
 static const UUID kBackupId = UUID::gen();
+const OpTime kStartMigrationOpTime(Timestamp(1, 1), 1);
 
 }  // namespace
 class TenantFileImporterServiceTest : public ServiceContextMongoDTest {
@@ -135,6 +137,12 @@ public:
         });
 
         globalFailPointRegistry().find("skipImportFiles")->setMode(FailPoint::alwaysOn);
+
+        // Set the stable timestamp to avoid hang in
+        // TenantFileImporterService::_waitUntilStartMigrationTimestampIsCheckpointed().
+        auto opCtx = cc().makeOperationContext();
+        auto engine = serviceContext->getStorageEngine()->getEngine();
+        engine->setStableTimestamp(Timestamp(1, 1), true);
     }
 
     void tearDown() override {
@@ -169,7 +177,9 @@ TEST_F(TenantFileImporterServiceTest, ConcurrentMigrationWithDifferentMigrationI
 
     auto verifyAllStateTransitionFailsForAnotherMigrationId = [&] {
         ASSERT_THROWS_CODE(
-            _importerService->startMigration(anotherMigrationId), DBException, 7800210);
+            _importerService->startMigration(anotherMigrationId, kStartMigrationOpTime),
+            DBException,
+            7800210);
         ASSERT_THROWS_CODE(_importerService->learnedFilename(
                                anotherMigrationId, makefileMetaDoc(migrationId, "some-file.wt", 1)),
                            DBException,
@@ -182,7 +192,7 @@ TEST_F(TenantFileImporterServiceTest, ConcurrentMigrationWithDifferentMigrationI
             _importerService->resetMigration(anotherMigrationId), DBException, 7800210);
     };
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
@@ -213,7 +223,7 @@ TEST_F(TenantFileImporterServiceTest, ConcurrentMigrationWithDifferentMigrationI
 
     {
         // Starting a new migration with anotherMigrationId is now possible.
-        _importerService->startMigration(anotherMigrationId);
+        _importerService->startMigration(anotherMigrationId, kStartMigrationOpTime);
         ASSERT_EQ(_importerService->getMigrationId_forTest(), anotherMigrationId);
         ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
     }
@@ -223,26 +233,28 @@ TEST_F(TenantFileImporterServiceTest, StartConcurrentMigrationWithSameMigrationI
     FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
     // startMigration calls with the same migrationId will be ignored.
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
 
     _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(),
               TenantFileImporterService::State::kLearnedFilename);
 
-    ASSERT_THROWS_CODE(_importerService->startMigration(migrationId), DBException, 7800210);
+    ASSERT_THROWS_CODE(
+        _importerService->startMigration(migrationId, kStartMigrationOpTime), DBException, 7800210);
 
     _importerService->learnedAllFilenames(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(),
               TenantFileImporterService::State::kLearnedAllFilenames);
 
-    ASSERT_THROWS_CODE(_importerService->startMigration(migrationId), DBException, 7800210);
+    ASSERT_THROWS_CODE(
+        _importerService->startMigration(migrationId, kStartMigrationOpTime), DBException, 7800210);
 
     _importerService->interruptMigration(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
@@ -252,7 +264,7 @@ TEST_F(TenantFileImporterServiceTest, StartConcurrentMigrationWithSameMigrationI
     ASSERT(!_importerService->getMigrationId_forTest());
 
     // Starting a new migration with same migrationId is now possible.
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 }
@@ -260,7 +272,7 @@ TEST_F(TenantFileImporterServiceTest, StartConcurrentMigrationWithSameMigrationI
 TEST_F(TenantFileImporterServiceTest, ShouldHaveLearntAtLeastOneFileName) {
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_THROWS_CODE(_importerService->learnedAllFilenames(migrationId), DBException, 7800210);
 }
 
@@ -268,7 +280,7 @@ TEST_F(TenantFileImporterServiceTest, learnedAllFilenamesFollowedByLearnedFileNa
     FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
     _importerService->learnedAllFilenames(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
@@ -308,7 +320,7 @@ TEST_F(TenantFileImporterServiceTest, MigrationNotStartedYetShouldIgnoreAnyState
 TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationAfterMigrationStart) {
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
@@ -321,7 +333,7 @@ TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationWhenLearnedFileName) 
     FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(),
@@ -336,7 +348,7 @@ TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationWhenLearnedAllFileNam
     FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->learnedFilename(migrationId, makefileMetaDoc(migrationId, "some-file.wt", 1));
     _importerService->learnedAllFilenames(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
@@ -350,7 +362,7 @@ TEST_F(TenantFileImporterServiceTest, CanInterruptMigrationWhenLearnedAllFileNam
 
 TEST_F(TenantFileImporterServiceTest, CanInterruptAMigrationMoreThanOnce) {
     auto migrationId = UUID::gen();
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->interruptMigration(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
@@ -361,7 +373,7 @@ TEST_F(TenantFileImporterServiceTest, CanInterruptAMigrationMoreThanOnce) {
 TEST_F(TenantFileImporterServiceTest, InterruptedMigrationCannotLearnNewFiles) {
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->interruptMigration(migrationId);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kInterrupted);
@@ -379,7 +391,7 @@ TEST_F(TenantFileImporterServiceTest, resetMigration) {
     FailPointEnableBlock failPoint("skipCloneFiles");
     auto migrationId = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
@@ -432,7 +444,7 @@ TEST_F(TenantFileImporterServiceTest, ImportsFilesWhenAllFilenamesLearned) {
     auto tempWTDirectory = fileClonerTempDir(migrationId);
     ASSERT(!boost::filesystem::exists(tempWTDirectory / fileName));
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     _importerService->learnedFilename(migrationId,
                                       makefileMetaDoc(migrationId, fileName, fileData.size()));
     _importerService->learnedAllFilenames(migrationId);
@@ -467,7 +479,7 @@ TEST_F(TenantFileImporterServiceTest, statsForInvalidMigrationID) {
     auto migrationId = UUID::gen();
     auto invalidMigrationID = UUID::gen();
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     ASSERT_EQ(_importerService->getMigrationId_forTest(), migrationId);
     ASSERT_EQ(_importerService->getState_forTest(), TenantFileImporterService::State::kStarted);
 
@@ -505,7 +517,7 @@ TEST_F(TenantFileImporterServiceTest, statsForValidMigrationID) {
     auto stats = _importerService->getStats(migrationId);
     ASSERT(stats.isEmpty());
 
-    _importerService->startMigration(migrationId);
+    _importerService->startMigration(migrationId, kStartMigrationOpTime);
     // Sleep to prevent the race with "totalReceiveElapsedMillis" field.
     mongo::sleepmillis(1);
 
