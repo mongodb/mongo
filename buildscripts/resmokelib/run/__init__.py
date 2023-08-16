@@ -13,8 +13,6 @@ import time
 from typing import List, Optional
 
 import psutil
-from opentelemetry import trace
-from opentelemetry.trace.status import StatusCode
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import parser as main_parser
@@ -41,8 +39,6 @@ _MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
 _BENCHMARK_ARGUMENT_TITLE = "Benchmark/Benchrun test options"
 _EVERGREEN_ARGUMENT_TITLE = "Evergreen options"
 _CEDAR_ARGUMENT_TITLE = "Cedar options"
-
-TRACER = trace.get_tracer("resmoke")
 
 
 class TestRunner(Subcommand):
@@ -496,14 +492,10 @@ class TestRunner(Subcommand):
         self._resmoke_logger.info("Summary of %s suite: %s", suite.get_display_name(),
                                   self._get_suite_summary(suite))
 
-    @TRACER.start_as_current_span("run.__init__._execute_suite")
     def _execute_suite(self, suite: Suite) -> bool:
         """Execute Fa suite and return True if interrupted, False otherwise."""
-        execute_suite_span = trace.get_current_span()
-        execute_suite_span.set_attributes(attributes=suite.get_suite_attributes())
         self._shuffle_tests(suite)
         if not suite.tests:
-            execute_suite_span.set_status(StatusCode.OK, description="skipped")
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
             suite.return_code = 0
             return False
@@ -513,26 +505,19 @@ class TestRunner(Subcommand):
                 self._exec_logger, suite, archive_instance=self._archive, **executor_config)
             executor.run()
         except (errors.UserInterrupt, errors.LoggerRuntimeConfigError) as err:
-            execute_suite_span.set_status(
-                StatusCode.ERROR, description="user_interrupt" if isinstance(
-                    err, errors.UserInterrupt) else "logger_runtime_config")
             self._exec_logger.error("Encountered an error when running %ss of suite %s: %s",
                                     suite.test_kind, suite.get_display_name(), err)
             suite.return_code = err.EXIT_CODE
             return True
         except OSError as err:
-            execute_suite_span.set_attribute("errno", err.errno)
-            execute_suite_span.set_status(StatusCode.ERROR, description="os_error")
             self._exec_logger.error("Encountered an OSError: %s", err)
             suite.return_code = 74  # Exit code for OSError on POSIX systems.
             return True
         except:  # pylint: disable=bare-except
-            execute_suite_span.set_status(StatusCode.ERROR, description="unknown_error")
             self._exec_logger.exception("Encountered an error when running %ss of suite %s.",
                                         suite.test_kind, suite.get_display_name())
             suite.return_code = 2
             return False
-        execute_suite_span.set_status(StatusCode.OK, description="success")
         return False
 
     def _shuffle_tests(self, suite: Suite):
@@ -972,39 +957,6 @@ class RunPlugin(PluginInterface):
 
         parser.add_argument("--tagFile", action="append", dest="tag_files", metavar="TAG_FILES",
                             help="One or more YAML files that associate tests and tags.")
-
-        parser.add_argument(
-            "--otelTraceId",
-            dest="otel_trace_id",
-            type=str,
-            default=os.environ.get("OTEL_TRACE_ID", None),
-            help="Open Telemetry Trace ID",
-        )
-
-        parser.add_argument(
-            "--otelParentId",
-            dest="otel_parent_id",
-            type=str,
-            default=os.environ.get("OTEL_PARENT_ID", None),
-            help="Open Telemetry Parent ID",
-        )
-
-        otel_collector_endpoint = os.environ.get("OTEL_COLLECTOR_ENDPOINT", None)
-        parser.add_argument(
-            "--otelCollectorEndpoint",
-            dest="otel_collector_endpoint",
-            type=str,
-            default=otel_collector_endpoint,
-            help="Open Collector Endpoint",
-        )
-
-        parser.add_argument(
-            "--otelCollectorFile",
-            dest="otel_collector_file",
-            type=str,
-            default="" if otel_collector_endpoint else "build/metrics.json",
-            help="Open Collector Files",
-        )
 
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,

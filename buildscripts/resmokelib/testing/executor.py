@@ -5,8 +5,6 @@ import threading
 import time
 from typing import Generic, List, Optional, TypeVar, Union
 
-from opentelemetry import trace
-
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
@@ -179,7 +177,6 @@ class TestSuiteExecutor(object):
             for job in self._jobs:
                 thr = threading.Thread(
                     target=job, args=(test_queue, interrupt_flag), kwargs=dict(
-                        parent_span_context=trace.get_current_span().get_span_context(),
                         setup_flag=setup_flag,
                         teardown_flag=teardown_flag,
                         hook_failure_flag=hook_failure_flag,

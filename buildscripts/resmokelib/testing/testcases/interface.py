@@ -11,7 +11,7 @@ import uuid
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils import registry
 
-from typing import Any, Dict, Callable
+from typing import Dict, Callable
 
 _TEST_CASES: Dict[str, Callable] = {}  # type: ignore
 
@@ -114,15 +114,6 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
     def as_command(self):
         """Return the command invocation used to run the test or None."""
         return None
-
-    def get_test_attributes(self) -> Dict[str, Any]:
-        return {
-            "test_base_name": self.basename(),
-            "test_long_name": self.long_name(),
-            "test_id": str(self.id()),
-            "test_kind": self.get_test_kind(),
-            "test_dynamic": self.dynamic,
-        }
 
 
 class UndoDBUtilsMixin:

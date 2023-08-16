@@ -3,7 +3,7 @@
 import itertools
 import threading
 import time
-from typing import Any, Dict, List
+from typing import List
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
@@ -435,15 +435,3 @@ class Suite(object):
             return None
 
         return self.get_config()["description"]
-
-    def get_suite_attributes(self) -> Dict[str, Any]:
-        return {
-            "suite_kind": self.test_kind,
-            "suite_display_name": self.get_display_name(),
-            "suite_name": self.get_name(),
-            "suite_num_jobs_to_start": self.get_num_jobs_to_start(),
-            "suite_num_times_to_repeat_tests": self.get_num_times_to_repeat_tests(),
-            "suite_is_matrix_suite": self.is_matrix_suite(),
-            "suite_is_antithesis_suite": self.is_antithesis_suite(),
-            "suite_return_code": self.return_code,
-        }
