@@ -1,5 +1,5 @@
 /**
- * Tests running the delete command on a time-series collection while specifying query-level and/or
+ * Tests running the update command on a time-series collection while specifying query-level  and/or
  * collection-level collation.
  *
  * @tags: [
@@ -15,7 +15,7 @@ import {testCollation} from "jstests/core/timeseries/libs/timeseries_writes_util
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
-const collNamePrefix = "timeseries_delete_collation_";
+const collNamePrefix = "timeseries_update_collation_";
 let testCaseId = 0;
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -52,18 +52,16 @@ const docs = [
 ];
 
 /**
- * Confirms that a set of deletes returns the expected set of documents and runs the correct delete
- * stage and bucket query.
+ * Confirms that updates return the expected set of documents and run the correct bucket query.
  */
 function runTest({
-    deleteFilter,
+    updateFilter,
     queryCollation,
     collectionCollation,
-    nDeleted,
+    nModified,
     expectedBucketQuery,
-    expectedDeleteStage
 }) {
-    jsTestLog(`Running ${tojson(deleteFilter)} with queryCollation: ${
+    jsTestLog(`Running ${tojson(updateFilter)} with queryCollation: ${
         tojson(queryCollation)} and collectionCollation: ${tojson(collectionCollation)}`);
 
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
@@ -76,19 +74,20 @@ function runTest({
     testCollation({
         testDB: testDB,
         coll: coll,
-        filter: deleteFilter,
+        filter: updateFilter,
+        update: {$inc: {newField: 1}},
         queryCollation: queryCollation,
-        nModified: nDeleted,
+        nModified: nModified,
         expectedBucketQuery: expectedBucketQuery,
-        expectedStage: expectedDeleteStage
+        expectedStage: "TS_MODIFY"
     });
 }
 
 (function testNoCollation() {
     // Residual filter.
     runTest({
-        deleteFilter: {str: "Hello"},
-        nDeleted: 0,
+        updateFilter: {str: "Hello"},
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -96,11 +95,10 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {str: "hello"},
-        nDeleted: 3,
+        updateFilter: {str: "hello"},
+        nModified: 3,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -108,40 +106,37 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
 
     // Bucket filter.
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
-        nDeleted: 0,
+        updateFilter: {[metaFieldName]: "a"},
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "A"},
-        nDeleted: 4,
+        updateFilter: {[metaFieldName]: "A"},
+        nModified: 4,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "A"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
 })();
 
 (function testQueryLevelCollation() {
     // Residual filter.
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         queryCollation: caseSensitive,
-        nDeleted: 0,
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -149,12 +144,11 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         queryCollation: caseInsensitive,
-        nDeleted: 6,
+        nModified: 6,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -162,42 +156,39 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
 
     // Bucket filter.
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         queryCollation: caseSensitive,
-        nDeleted: 0,
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         queryCollation: caseInsensitive,
-        nDeleted: 4,
+        nModified: 4,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
 })();
 
 (function testCollectionLevelCollation() {
     // Residual filter.
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         collectionCollation: caseSensitive,
-        nDeleted: 0,
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -205,12 +196,11 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         collectionCollation: caseInsensitive,
-        nDeleted: 6,
+        nModified: 6,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -218,43 +208,40 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
 
     // Bucket filter.
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         collectionCollation: caseSensitive,
-        nDeleted: 0,
+        nModified: 0,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         collectionCollation: caseInsensitive,
-        nDeleted: 4,
+        nModified: 4,
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
 })();
 
 (function testQueryLevelCollationOverridesDefault() {
     // Residual filter.
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         queryCollation: caseInsensitive,
         collectionCollation: caseInsensitive,
-        nDeleted: 6,
+        nModified: 6,
         expectedBucketQuery: {
             $and: [
                 closedBucketFilter,
@@ -262,23 +249,21 @@ function runTest({
                 {"control.min.str": {$_internalExprLte: "Hello"}}
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         queryCollation: caseInsensitive,
         collectionCollation: caseSensitive,
-        nDeleted: 6,
+        nModified: 6,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: closedBucketFilter,
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "A", str: "Hello"},
+        updateFilter: {[metaFieldName]: "A", str: "Hello"},
         queryCollation: caseInsensitive,
         collectionCollation: caseSensitive,
-        nDeleted: 2,
+        nModified: 2,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
@@ -287,67 +272,62 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
 
     // Bucket filter.
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         queryCollation: caseInsensitive,
         collectionCollation: caseInsensitive,
-        nDeleted: 4,
-        // We can push down bucket filter for DELETE stage with the query level collation.
+        nModified: 4,
+        // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         queryCollation: caseInsensitive,
         collectionCollation: caseSensitive,
-        nDeleted: 4,
-        // We can push down bucket filter for DELETE stage with the query level collation.
+        nModified: 4,
+        // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
 })();
 
 (function testQueryLevelSimpleCollationOverridesNonSimpleDefault() {
     // Residual filter.
     runTest({
-        deleteFilter: {str: "Hello"},
+        updateFilter: {str: "Hello"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 0,
+        nModified: 0,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: closedBucketFilter,
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {str: "hello"},
+        updateFilter: {str: "hello"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 3,
+        nModified: 3,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: closedBucketFilter,
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "a", str: "hello"},
+        updateFilter: {[metaFieldName]: "a", str: "hello"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 0,
+        nModified: 0,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
@@ -356,13 +336,12 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "A", str: "HELLO"},
+        updateFilter: {[metaFieldName]: "A", str: "HELLO"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 1,
+        nModified: 1,
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
@@ -371,36 +350,33 @@ function runTest({
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "TS_MODIFY"
     });
 
     // Bucket filter.
     runTest({
-        deleteFilter: {[metaFieldName]: "a"},
+        updateFilter: {[metaFieldName]: "a"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 0,
-        // We can push down bucket filter for DELETE stage with the query level collation.
+        nModified: 0,
+        // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "a"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
     runTest({
-        deleteFilter: {[metaFieldName]: "A"},
+        updateFilter: {[metaFieldName]: "A"},
         queryCollation: simple,
         collectionCollation: caseInsensitive,
-        nDeleted: 4,
-        // We can push down bucket filter for DELETE stage with the query level collation.
+        nModified: 4,
+        // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
             $and: [
                 {meta: {$eq: "A"}},
                 closedBucketFilter,
             ]
         },
-        expectedDeleteStage: "DELETE"
     });
 })();
