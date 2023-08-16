@@ -30,6 +30,8 @@ global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/query_settings.idl"
     - "mongo/db/query/query_shape_hash.idl"

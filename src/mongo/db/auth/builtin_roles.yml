@@ -361,6 +361,7 @@ roles:
                   - getClusterParameter
                   - setChangeStreamState
                   - getChangeStreamState
+                  - querySettings
                   - queryStatsRead
                   - queryStatsReadTransformed
                   - checkMetadataConsistency
