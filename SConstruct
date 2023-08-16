@@ -298,7 +298,7 @@ add_option(
 
 add_option(
     'use-glibcxx-debug',
-    help='Enable the glibc++ debug implementations of the C++ standard libary',
+    help='Enable the glibc++ debug implementations of the C++ standard library',
     nargs=0,
 )
 
@@ -3988,7 +3988,7 @@ def doConfigure(myenv):
             myenv.FatalError("--use-glibcxx-debug requires --dbg=on")
         if not usingLibStdCxx:
             myenv.FatalError("--use-glibcxx-debug is only compatible with the GNU implementation "
-                             "of the C++ standard libary")
+                             "of the C++ standard library")
         if using_system_version_of_cxx_libraries():
             myenv.FatalError("--use-glibcxx-debug not compatible with system versions of "
                              "C++ libraries.")
