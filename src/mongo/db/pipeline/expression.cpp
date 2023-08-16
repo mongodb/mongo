@@ -308,111 +308,204 @@ const char* ExpressionAbs::getOpName() const {
 
 /* ------------------------- ExpressionAdd ----------------------------- */
 
-StatusWith<Value> ExpressionAdd::apply(Value lhs, Value rhs) {
-    BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
+namespace {
 
-    if (diffType == NumberDecimal) {
-        Decimal128 left = lhs.coerceToDecimal();
-        Decimal128 right = rhs.coerceToDecimal();
-        return Value(left.add(right));
-    } else if (diffType == NumberDouble) {
-        double right = rhs.coerceToDouble();
-        double left = lhs.coerceToDouble();
-        return Value(left + right);
-    } else if (diffType == NumberLong) {
-        long long result;
-
-        // If there is an overflow, convert the values to doubles.
-        if (overflow::add(lhs.coerceToLong(), rhs.coerceToLong(), &result)) {
-            return Value(lhs.coerceToDouble() + rhs.coerceToDouble());
+/**
+ * We'll try to return the narrowest possible result value while avoiding overflow or implicit use
+ * of decimal types. To do that, compute separate sums for long, double and decimal values, and
+ * track the current widest type. The long sum will be converted to double when the first double
+ * value is seen or when long arithmetic would overflow.
+ */
+class AddState {
+public:
+    /**
+     * Update the internal state with another operand. It is up to the caller to validate that the
+     * operand is of a proper type.
+     */
+    void operator+=(const Value& operand) {
+        auto oldWidestType = widestType;
+        // Dates are represented by the long number of milliseconds since the unix epoch, so we can
+        // treat them as regular numeric values for the purposes of addition after making sure that
+        // only one date is present in the operand list.
+        Value valToAdd;
+        if (operand.getType() == Date) {
+            uassert(16612, "only one date allowed in an $add expression", !isDate);
+            Value oldValue = getValue();
+            longTotal = 0;
+            addToDateValue(oldValue);
+            isDate = true;
+            valToAdd = Value(operand.getDate().toMillisSinceEpoch());
+        } else {
+            widestType = Value::getWidestNumeric(widestType, operand.getType());
+            valToAdd = operand;
         }
-        return Value(result);
-    } else if (diffType == NumberInt) {
-        long long right = rhs.coerceToLong();
-        long long left = lhs.coerceToLong();
-        return Value::createIntOrLong(left + right);
-    } else if (lhs.nullish() || rhs.nullish()) {
-        return Value(BSONNULL);
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "cannot $add a" << typeName(rhs.getType()) << " from a "
-                                    << typeName(lhs.getType()));
+
+        if (isDate) {
+            addToDateValue(valToAdd);
+            return;
+        }
+
+        // If this operation widens the return type, perform any necessary type conversions.
+        if (oldWidestType != widestType) {
+            switch (widestType) {
+                case NumberLong:
+                    // Int -> Long is handled by the same sum.
+                    break;
+                case NumberDouble:
+                    // Int/Long -> Double converts the existing longTotal to a doubleTotal.
+                    doubleTotal = longTotal;
+                    break;
+                case NumberDecimal:
+                    // Convert the right total to NumberDecimal by looking at the old widest type.
+                    switch (oldWidestType) {
+                        case NumberInt:
+                        case NumberLong:
+                            decimalTotal = Decimal128(longTotal);
+                            break;
+                        case NumberDouble:
+                            decimalTotal = Decimal128(doubleTotal);
+                            break;
+                        default:
+                            MONGO_UNREACHABLE;
+                    }
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+
+        // Perform the add operation.
+        switch (widestType) {
+            case NumberInt:
+            case NumberLong:
+                // If the long long arithmetic overflows, promote the result to a NumberDouble and
+                // start incrementing the doubleTotal.
+                long long newLongTotal;
+                if (overflow::add(longTotal, valToAdd.coerceToLong(), &newLongTotal)) {
+                    widestType = NumberDouble;
+                    doubleTotal = longTotal + valToAdd.coerceToDouble();
+                } else {
+                    longTotal = newLongTotal;
+                }
+                break;
+            case NumberDouble:
+                doubleTotal += valToAdd.coerceToDouble();
+                break;
+            case NumberDecimal:
+                decimalTotal = decimalTotal.add(valToAdd.coerceToDecimal());
+                break;
+            default:
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream() << "$add only supports numeric or date types, not "
+                                        << typeName(valToAdd.getType()));
+        }
     }
+
+    Value getValue() const {
+        // If one of the operands was a date, then return long value as Date.
+        if (isDate) {
+            return Value(Date_t::fromMillisSinceEpoch(longTotal));
+        } else {
+            switch (widestType) {
+                case NumberInt:
+                    return Value::createIntOrLong(longTotal);
+                case NumberLong:
+                    return Value(longTotal);
+                case NumberDouble:
+                    return Value(doubleTotal);
+                case NumberDecimal:
+                    return Value(decimalTotal);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+    }
+
+private:
+    // Convert 'valToAdd' into the data type used for dates (long long) and add it to 'longTotal'.
+    void addToDateValue(Value valToAdd) {
+        switch (valToAdd.getType()) {
+            case NumberInt:
+            case NumberLong:
+                if (overflow::add(longTotal, valToAdd.coerceToLong(), &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow");
+                }
+                break;
+            case NumberDouble: {
+                using limits = std::numeric_limits<long long>;
+                double doubleToAdd = valToAdd.coerceToDouble();
+                uassert(ErrorCodes::Overflow,
+                        "date overflow",
+                        // The upper bound is exclusive because it rounds up when it is cast to
+                        // a double.
+                        doubleToAdd >= static_cast<double>(limits::min()) &&
+                            doubleToAdd < static_cast<double>(limits::max()));
+
+                if (overflow::add(longTotal, llround(doubleToAdd), &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow");
+                }
+                break;
+            }
+            case NumberDecimal: {
+                Decimal128 decimalToAdd = valToAdd.coerceToDecimal();
+
+                std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+                std::int64_t longToAdd = decimalToAdd.toLong(&signalingFlags);
+                if (signalingFlags != Decimal128::SignalingFlag::kNoFlag ||
+                    overflow::add(longTotal, longToAdd, &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow");
+                }
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    long long longTotal = 0;
+    double doubleTotal = 0;
+    Decimal128 decimalTotal;
+    BSONType widestType = NumberInt;
+    bool isDate = false;
+};
+
+Status checkAddOperandType(Value val) {
+    if (!val.numeric() && val.getType() != Date) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "$add only supports numeric or date types, not "
+                                    << typeName(val.getType()));
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
+StatusWith<Value> ExpressionAdd::apply(Value lhs, Value rhs) {
+    if (lhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkAddOperandType(lhs); !s.isOK())
+        return s;
+    if (rhs.nullish())
+        return Value(BSONNULL);
+    if (Status s = checkAddOperandType(rhs); !s.isOK())
+        return s;
+
+    AddState state;
+    state += lhs;
+    state += rhs;
+    return state.getValue();
 }
 
 Value ExpressionAdd::evaluate(const Document& root, Variables* variables) const {
-    // We'll try to return the narrowest possible result value while avoiding overflow, loss
-    // of precision due to intermediate rounding or implicit use of decimal types. To do that,
-    // compute a compensated sum for non-decimal values and a separate decimal sum for decimal
-    // values, and track the current narrowest type.
-    DoubleDoubleSummation nonDecimalTotal;
-    Decimal128 decimalTotal;
-    BSONType totalType = NumberInt;
-    bool haveDate = false;
-
-    const size_t n = _children.size();
-    for (size_t i = 0; i < n; ++i) {
-        Value val = _children[i]->evaluate(root, variables);
-
-        switch (val.getType()) {
-            case NumberDecimal:
-                decimalTotal = decimalTotal.add(val.getDecimal());
-                totalType = NumberDecimal;
-                break;
-            case NumberDouble:
-                nonDecimalTotal.addDouble(val.getDouble());
-                if (totalType != NumberDecimal)
-                    totalType = NumberDouble;
-                break;
-            case NumberLong:
-                nonDecimalTotal.addLong(val.getLong());
-                if (totalType == NumberInt)
-                    totalType = NumberLong;
-                break;
-            case NumberInt:
-                nonDecimalTotal.addDouble(val.getInt());
-                break;
-            case Date:
-                uassert(16612, "only one date allowed in an $add expression", !haveDate);
-                haveDate = true;
-                nonDecimalTotal.addLong(val.getDate().toMillisSinceEpoch());
-                break;
-            default:
-                uassert(16554,
-                        str::stream() << "$add only supports numeric or date types, not "
-                                      << typeName(val.getType()),
-                        val.nullish());
-                return Value(BSONNULL);
-        }
+    AddState state;
+    for (auto&& child : _children) {
+        Value val = child->evaluate(root, variables);
+        if (val.nullish())
+            return Value(BSONNULL);
+        uassertStatusOK(checkAddOperandType(val));
+        state += val;
     }
-
-    if (haveDate) {
-        int64_t longTotal;
-        if (totalType == NumberDecimal) {
-            longTotal = decimalTotal.add(nonDecimalTotal.getDecimal()).toLong();
-        } else {
-            uassert(ErrorCodes::Overflow, "date overflow in $add", nonDecimalTotal.fitsLong());
-            longTotal = nonDecimalTotal.getLong();
-        }
-        return Value(Date_t::fromMillisSinceEpoch(longTotal));
-    }
-    switch (totalType) {
-        case NumberDecimal:
-            return Value(decimalTotal.add(nonDecimalTotal.getDecimal()));
-        case NumberLong:
-            dassert(nonDecimalTotal.isInteger());
-            if (nonDecimalTotal.fitsLong())
-                return Value(nonDecimalTotal.getLong());
-        // Fallthrough.
-        case NumberInt:
-            if (nonDecimalTotal.fitsLong())
-                return Value::createIntOrLong(nonDecimalTotal.getLong());
-        // Fallthrough.
-        case NumberDouble:
-            return Value(nonDecimalTotal.getDouble());
-        default:
-            massert(16417, "$add resulted in a non-numeric type", false);
-    }
+    return state.getValue();
 }
 
 REGISTER_STABLE_EXPRESSION(add, ExpressionAdd::parse);
@@ -5551,14 +5644,45 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
     } else if (lhs.getType() == Date) {
-        if (rhs.getType() == Date) {
-            return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
-        } else if (rhs.numeric()) {
-            return Value(lhs.getDate() - Milliseconds(rhs.coerceToLong()));
-        } else {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "can't $subtract " << typeName(rhs.getType()) << " from Date");
+        BSONType rhsType = rhs.getType();
+        switch (rhsType) {
+            case Date:
+                return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
+            case NumberInt:
+            case NumberLong: {
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                if (overflow::sub(longDiff, rhs.coerceToLong(), &longDiff)) {
+                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                }
+                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+            }
+            case NumberDouble: {
+                using limits = std::numeric_limits<long long>;
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                double doubleRhs = rhs.coerceToDouble();
+                // check the doubleRhs should not exceed int64 limit and result will not overflow
+                if (doubleRhs >= static_cast<double>(limits::min()) &&
+                    doubleRhs < static_cast<double>(limits::max()) &&
+                    !overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
+                    return Value(Date_t::fromMillisSinceEpoch(longDiff));
+                }
+                return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+            }
+            case NumberDecimal: {
+                long long longDiff = lhs.getDate().toMillisSinceEpoch();
+                Decimal128 decimalRhs = rhs.coerceToDecimal();
+                std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+                std::int64_t longRhs = decimalRhs.toLong(&signalingFlags);
+                if (signalingFlags != Decimal128::SignalingFlag::kNoFlag ||
+                    overflow::sub(longDiff, longRhs, &longDiff)) {
+                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                }
+                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+            }
+            default:
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream()
+                                  << "can't $subtract " << typeName(rhs.getType()) << " from Date");
         }
     } else {
         return Status(ErrorCodes::TypeMismatch,
