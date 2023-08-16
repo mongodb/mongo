@@ -1,7 +1,6 @@
 /*
  * Tests whether a plan summary is returned in the $currentOp output for a find command
- * TODO SERVER-78101: Check to see if test can be enabled for suites that involve sharded
- * collections.
+ * TODO SERVER-71280: Ensure that we have test coverage for $currentOp in a sharded collection.
  * @tags: [
  *   assumes_read_preference_unchanged,
  *   assumes_read_concern_unchanged,
