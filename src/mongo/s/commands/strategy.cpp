@@ -532,13 +532,13 @@ void ParseAndRunCommand::_parseCommand() {
     const auto& request = _rec->getRequest();
     auto replyBuilder = _rec->getReplyBuilder();
 
-    auto const command = CommandHelpers::findCommand(_commandName);
+    auto const command = CommandHelpers::findCommand(opCtx, _commandName);
     if (!command) {
         const std::string errorMsg = "no such cmd: {}"_format(_commandName);
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder,
                                                    {ErrorCodes::CommandNotFound, errorMsg});
-        globalCommandRegistry()->incrementUnknownCommands();
+        getCommandRegistry(opCtx)->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
         iassert(Status(ErrorCodes::SkipCommandExecution, errorMsg));
     }
