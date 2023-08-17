@@ -2973,7 +2973,7 @@ WorkloadOptions::WorkloadOptions()
       timestamp_advance(0.0), max_idle_table_cycle_fatal(false), create_count(0),
       create_interval(0), create_prefix(""), create_target(0), create_trigger(0), drop_count(0),
       drop_interval(0), drop_target(0), drop_trigger(0), random_table_values(false),
-      mirror_tables(false), mirror_suffix("_mirror"), _options()
+      mirror_tables(false), mirror_suffix("_mirror"), background_compact(0), _options()
 {
     _options.add_int("max_latency", max_latency,
       "prints warning if any latency measured exceeds this number of "
@@ -3034,6 +3034,8 @@ WorkloadOptions::WorkloadOptions()
     _options.add_bool("mirror_tables", mirror_tables, "mirror database operations");
     _options.add_string(
       "mirror_suffix", mirror_suffix, "the suffix to append to mirrored table names");
+    _options.add_int("background_compact", background_compact,
+      "minimum amount of space recoverable for compaction to proceed in MB, 0 to disable.");
 }
 
 WorkloadOptions::WorkloadOptions(const WorkloadOptions &other)
@@ -3379,6 +3381,23 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
                 stopping = true;
             }
         }
+    }
+
+    // Start the background compaction thread.
+    if (options->background_compact > 0) {
+        WT_SESSION *session;
+
+        if (conn->open_session(conn, nullptr, nullptr, &session) != 0)
+            THROW("Error opening a session.");
+
+        const std::string bg_compact_cfg("background=true,free_space_target=" +
+          std::to_string(options->background_compact) + "MB");
+        int ret = session->compact(session, nullptr, bg_compact_cfg.c_str());
+        if (ret != 0)
+            THROW_ERRNO(ret, "WT_SESSION->compact background compaction could not be enabled.");
+
+        if ((ret = session->close(session, NULL)) != 0)
+            THROW("Session close failed.");
     }
 
     timespec now;

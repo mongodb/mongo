@@ -463,6 +463,7 @@ struct WorkloadOptions {
     bool random_table_values;
     bool mirror_tables;
     std::string mirror_suffix;
+    int background_compact;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
