@@ -162,7 +162,9 @@ __compact_server(void *arg)
             ret = 0;
         }
 
-        /* In the case of WT_ERROR, make sure the server is not supposed to be running. */
+        /*
+         * WT_ERROR should indicate the server was interrupted, make sure it is no longer running.
+         */
         if (ret == WT_ERROR) {
             __wt_spin_lock(session, &conn->background_compact.lock);
             running = conn->background_compact.running;
@@ -178,15 +180,15 @@ __compact_server(void *arg)
 
     WT_STAT_CONN_SET(session, background_compact_running, 0);
 
-    WT_ERR(__wt_metadata_cursor_close(session));
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+
     __wt_free(session, config);
     __wt_free(session, conn->background_compact.config);
     __wt_free(session, uri);
 
-    if (0) {
-err:
+    if (ret != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "compact server error"));
-    }
     return (WT_THREAD_RET_VALUE);
 }
 
