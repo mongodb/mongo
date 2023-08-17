@@ -86,6 +86,7 @@ public:
     }
 
     void tearDown() override {
+        getServiceContext()->getServiceEntryPoint()->endAllSessions({});
         _tlManager->shutdown();
         _tlManager.reset();
         ServiceContextTest::tearDown();
