@@ -678,23 +678,22 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
 
     // Regular single deletes must target a single shard or be exact-ID.
     // Time-series single deletes must target a single shard.
-    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
-    auto isExactId = _isExactIdQuery(*cq, _cri.cm);
+    auto isExactId = _isExactIdQuery(*cq, _cri.cm) && !_isRequestOnTimeseriesViewNamespace;
     uassert(ErrorCodes::ShardKeyNotFound,
             fmt::format("A single delete on a sharded {} contain the shard key (and have the "
                         "simple collation). Delete request: {}, shard key pattern: {}",
-                        isShardedTimeseriesCollection
+                        _isRequestOnTimeseriesViewNamespace
                             ? "time-series collection must"
                             : "collection must contain an exact match on _id (and have the "
                               "collection default collation) or",
                         deleteOp.toBSON().toString(),
                         _cri.cm.getShardKeyPattern().toString()),
-            isMulti || (isExactId && !isShardedTimeseriesCollection) ||
+            isMulti || isExactId ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
     if (!isMulti) {
-        if (isExactId && !isShardedTimeseriesCollection) {
+        if (isExactId) {
             deleteOneTargetedShardedCount.increment(1);
         } else {
             deleteOneNonTargetedShardedCount.increment(1);
