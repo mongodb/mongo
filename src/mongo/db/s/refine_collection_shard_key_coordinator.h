@@ -70,6 +70,45 @@ private:
         return RefineCollectionShardKeyCoordinatorPhase_serializer(phase);
     }
 
+    bool _mustAlwaysMakeProgress() override {
+        return _doc.getPhase() > Phase::kRemoteIndexValidation;
+    }
+
+    void _performNoopWriteOnDataShardsAndConfigServer(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const OperationSessionInfo& osi,
+        const std::shared_ptr<executor::TaskExecutor>& executor);
+
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
+
+    const mongo::RefineCollectionShardKeyRequest _request;
+
+    // Critical section reason.
+    const BSONObj _critSecReason;
+};
+
+class RefineCollectionShardKeyCoordinatorPre71Compatible
+    : public RecoverableShardingDDLCoordinator<
+          RefineCollectionShardKeyCoordinatorDocumentPre71Compatible,
+          RefineCollectionShardKeyCoordinatorPhasePre71CompatibleEnum> {
+public:
+    using StateDoc = RefineCollectionShardKeyCoordinatorDocumentPre71Compatible;
+    using Phase = RefineCollectionShardKeyCoordinatorPhasePre71CompatibleEnum;
+
+    RefineCollectionShardKeyCoordinatorPre71Compatible(ShardingDDLCoordinatorService* service,
+                                                       const BSONObj& initialState);
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+
+private:
+    StringData serializePhase(const Phase& phase) const override {
+        return RefineCollectionShardKeyCoordinatorPhasePre71Compatible_serializer(phase);
+    }
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

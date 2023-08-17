@@ -293,6 +293,11 @@ public:
         return _cm->getTimeseriesFields();
     }
 
+    bool isUniqueShardKey() const {
+        invariant(hasRoutingTable());
+        return _cm->isUnique();
+    }
+
 private:
     // The full routing table for the collection or boost::none if the collection is not sharded
     boost::optional<ChunkManager> _cm;

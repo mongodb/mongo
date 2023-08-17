@@ -480,10 +480,25 @@ public:
      * denotes the new shard key, which must contain the old shard key as a prefix.
      *
      * Throws exception on errors.
+     * TODO SERVER-79064: Remove once 8.0 becomes last LTS
      */
-    void refineCollectionShardKey(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const ShardKeyPattern& newShardKey);
+    void refineCollectionShardKeyDEPRECATED(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const ShardKeyPattern& newShardKey);
+
+    /**
+     * Executes the commit of the refine collection shard key of an existing collection with
+     * namespace 'nss' using the new transaction API. Here, 'shardKey' denotes the new shard key,
+     * which must contain the old shard key as a prefix.
+     *
+     * Throws exception on transaction errors.
+     */
+    void commitRefineCollectionShardKey(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const ShardKeyPattern& newShardKey,
+                                        const Timestamp& newTimestamp,
+                                        const OID& newEpoch,
+                                        const Timestamp& oldTimestamp);
 
     void configureCollectionBalancing(OperationContext* opCtx,
                                       const NamespaceString& nss,
