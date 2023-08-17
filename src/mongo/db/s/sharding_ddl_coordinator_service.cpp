@@ -153,13 +153,14 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())
         .getAsync([this](auto status) {
+            AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+            auto opCtx = cc().makeOperationContext();
             stdx::lock_guard lg(_mutex);
             if (_state != State::kRecovering) {
                 return;
             }
             invariant(_numCoordinatorsToWait > 0);
             if (--_numCoordinatorsToWait == 0) {
-                auto opCtx = cc().makeOperationContext();
                 _transitionToRecovered(lg, opCtx.get());
             }
         });
