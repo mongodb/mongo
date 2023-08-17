@@ -49,6 +49,9 @@ function assertRetryCommand(cmdResponse, retryResponse) {
     // The retry response can contain a different 'clusterTime' from the initial response.
     delete cmdResponse.$clusterTime;
     delete retryResponse.$clusterTime;
+    // The retry response can contain a different 'operationTime' from the initial response.
+    delete cmdResponse.operationTime;
+    delete retryResponse.operationTime;
     // The retry response contains the "retriedStmtId" field but the initial response does not.
     delete retryResponse.retriedStmtId;
 
