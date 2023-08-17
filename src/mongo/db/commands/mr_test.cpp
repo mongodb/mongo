@@ -495,7 +495,7 @@ BSONObj MapReduceCommandTest::_makeCmdObj(StringData mapCode, StringData reduceC
 }
 
 Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCode) {
-    auto command = CommandHelpers::findCommand(_opCtx.get(), "mapReduce");
+    auto command = CommandHelpers::findCommand("mapReduce");
     ASSERT(command) << "Unable to look up mapReduce command";
 
     auto request =

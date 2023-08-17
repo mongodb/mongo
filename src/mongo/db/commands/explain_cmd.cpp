@@ -206,8 +206,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                               << innerDbName.toStringForErrorMsg(),
                 innerDbName == dbName);
     }
-    auto explainedCommand =
-        CommandHelpers::findCommand(opCtx, explainedObj.firstElementFieldName());
+    auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Explain failed due to unknown command: "
                           << explainedObj.firstElementFieldName(),

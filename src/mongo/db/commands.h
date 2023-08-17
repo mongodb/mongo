@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <fmt/format.h>
 #include <functional>
@@ -57,7 +59,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -76,16 +77,21 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+extern FailPoint failCommand;
+extern FailPoint waitInCommandMarkKillOnClientDisconnect;
+extern const OperationContext::Decoration<boost::optional<BSONArray>> errorLabelsOverride;
+extern const std::set<std::string> kNoApiVersions;
+extern const std::set<std::string> kApiVersions1;
 
 class AuthorizationContract;
 class Command;
@@ -96,14 +102,6 @@ class OperationContext;
 namespace mutablebson {
 class Document;
 }  // namespace mutablebson
-
-extern FailPoint failCommand;
-extern FailPoint waitInCommandMarkKillOnClientDisconnect;
-
-extern const std::set<std::string> kNoApiVersions;
-extern const std::set<std::string> kApiVersions1;
-
-boost::optional<BSONArray>& errorLabelsOverride(OperationContext* opCtx);
 
 /**
  * A simple set of type-erased hooks for pre and post command actions.
@@ -186,11 +184,7 @@ struct CommandHelpers {
      */
     static ResourcePattern resourcePatternForNamespace(const NamespaceString& ns);
 
-    static Command* findCommand(OperationContext* opCtx, StringData name);
-
-    static Command* findCommand(StringData name) {
-        return findCommand(nullptr, name);
-    }
+    static Command* findCommand(StringData name);
 
     /**
      * Helper for setting errmsg and ok field in command result object.
@@ -399,6 +393,7 @@ struct CommandHelpers {
  */
 class Command {
 public:
+    using CommandMap = StringMap<Command*>;
     enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
     enum class HandshakeRole { kNone, kHello, kAuth };
 
@@ -438,11 +433,6 @@ public:
      */
     const std::string& getName() const {
         return _name;
-    }
-
-    /** Returns the command's aliases if any. Constant. */
-    const std::vector<StringData>& getAliases() const {
-        return _aliases;
     }
 
     /**
@@ -703,7 +693,10 @@ public:
     }
 
 private:
+    // The full name of the command
     const std::string _name;
+
+    // The list of aliases for the command
     const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
@@ -1387,169 +1380,33 @@ std::unique_ptr<CommandInvocation> TypedCommand<Derived>::parse(OperationContext
  */
 class CommandRegistry {
 public:
+    using CommandMap = Command::CommandMap;
+
     CommandRegistry() = default;
     CommandRegistry(const CommandRegistry&) = delete;
     CommandRegistry& operator=(const CommandRegistry&) = delete;
 
-    /**
-     * Invokes a callable `f` for each distinct `Command* c` in the registry, as `f(c)`.
-     * A `Command*` may be mapped to multiple aliases, but these are omitted
-     * from the callback sequence.
-     */
-    template <typename F>
-    void forEachCommand(const F& f) const {
-        for (const auto& [command, entry] : _commands)
-            f(entry->command);
+    const CommandMap& allCommands() const {
+        return _commands;
     }
 
-    /** Add `command` to the registry. */
-    void registerCommand(Command* command);
-
-    /** Variant of `registerCommand` called from inside the `command` constructor. */
-    void selfRegister(Command* command);
+    void registerCommand(Command* command, StringData name, std::vector<StringData> aliases);
 
     Command* findCommand(StringData name) const;
 
-    void incrementUnknownCommands();
-
-    void logWeakRegistrations() const;
-
-private:
-    struct Entry {
-        Command* command;
-        bool isWeak;
-    };
-
-    stdx::unordered_map<Command*, std::unique_ptr<Entry>> _commands;
-    StringMap<Command*> _commandNames;
-};
-
-/**
- * When CommandRegistry objects are initialized, they look into the global
- * CommandConstructionPlan to find the list of Command objects that need to
- * be created.
- *
- * It will be populated mainly by the use of EntryBuilder objects.
- */
-class CommandConstructionPlan {
-public:
-    struct Entry {
-        std::function<std::unique_ptr<Command>()> construct;
-        const FeatureFlag* featureFlag = nullptr;
-        bool testOnly = false;
-        const std::type_info* typeInfo = nullptr;
-    };
-
-    class EntryBuilder;
-
-    void addEntry(std::unique_ptr<Entry> e) {
-        _entries.push_back(std::move(e));
+    void incrementUnknownCommands() {
+        _unknowns.increment();
     }
 
-    const std::vector<std::unique_ptr<Entry>>& entries() const {
-        return _entries;
-    }
-
-    void execute(CommandRegistry* registry) const;
-
 private:
-    std::vector<std::unique_ptr<Entry>> _entries;
+    CounterMetric _unknowns{"commands.<UNKNOWN>"};
+    CommandMap _commands;
 };
-
-/**
- * Returns the command registry for the service relevant to `opCtx`.
- */
-CommandRegistry* getCommandRegistry(OperationContext* opCtx);
 
 /**
  * Accessor to the command registry, an always-valid singleton.
- * Legacy compatibility. Prefer `getCommandRegistry(opCtx)`.
  */
-inline CommandRegistry* globalCommandRegistry() {
-    return getCommandRegistry(nullptr);
-}
-
-/**
- * CommandRegisterer objects attach entries to this instance at static-init
- * time by default.
- */
-CommandConstructionPlan& globalCommandConstructionPlan();
-
-/**
- * Builder type designed to inject entries into the global
- * `CommandConstructionPlan`.
- * Example:
- *
- *   auto dum = *CommandConstructionPlan::EntryBuilder::make<CmdType>()
- *       .requiresFeatureFlag(&myFeatureFlag)
- *       .testOnly();
- */
-class CommandConstructionPlan::EntryBuilder {
-public:
-    /**
-     * Returns a builder specifying a simple value-initialized instance of
-     * `Cmd`.
-     */
-    template <typename Cmd>
-    static EntryBuilder make() {
-        EntryBuilder eb;
-        eb._entry->construct = [] {
-            return std::unique_ptr<Command>{std::make_unique<Cmd>()};
-        };
-        eb._entry->typeInfo = &typeid(Cmd);
-        return eb;
-    }
-
-    EntryBuilder() = default;
-
-    EntryBuilder testOnly() && {
-        _entry->testOnly = true;
-        return std::move(*this);
-    }
-
-    EntryBuilder requiresFeatureFlag(const FeatureFlag* featureFlag) && {
-        _entry->featureFlag = featureFlag;
-        return std::move(*this);
-    }
-
-    /**
-     * Set the plan into which the entry will be registered. Used for testing.
-     * The default is the `globalCommandConstructionPlan()` singleton.
-     */
-    EntryBuilder setPlan(CommandConstructionPlan* plan) && {
-        _plan = plan;
-        return std::move(*this);
-    }
-
-    /** The deref operator executes the build, registering the product. */
-    EntryBuilder operator*() && {
-        _plan->addEntry(std::move(_entry));
-        return std::move(*this);
-    }
-
-private:
-    CommandConstructionPlan* _plan = &globalCommandConstructionPlan();
-    std::unique_ptr<Entry> _entry = std::make_unique<Entry>();
-};
-
-#define MONGO_COMMAND_DUMMY_ID_INNER_(x, y) x##y
-#define MONGO_COMMAND_DUMMY_ID_(x, y) MONGO_COMMAND_DUMMY_ID_INNER_(x, y)
-
-/**
- * Creates a builder for CommandConstuctorPlan entry, which will
- * create a Command of the specified CmdType.
- *
- * Does not end with `;`, which allows attachment of
- * properties to the command plan entry before it is registered.
- * Example:
- *
- *     MONGO_REGISTER_COMMAND(MyCommandType)
- *        .testOnly()
- *        .forFeatureFlag(&myFeatureFlag);
- */
-#define MONGO_REGISTER_COMMAND(...)                                              \
-    static auto MONGO_COMMAND_DUMMY_ID_(mongoRegisterCommand_dummy_, __LINE__) = \
-        *CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()
+CommandRegistry* globalCommandRegistry();
 
 /**
  * Creates a test command object of type CmdType if test commands are enabled
@@ -1559,11 +1416,13 @@ private:
  *
  * The command objects will be created after the "default" initializer, and all
  * startup option processing happens prior to "default" (see base/init.h).
- *
- * Add `.testOnly()` to the registration instead of using this macro:
- *     MONGO_REGISTER_COMMAND(MyCommandType).testOnly();
  */
-#define MONGO_REGISTER_TEST_COMMAND(CmdType) MONGO_REGISTER_COMMAND(CmdType).testOnly()
+#define MONGO_REGISTER_TEST_COMMAND(CmdType)                                \
+    MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
+        if (getTestCommandsEnabled()) {                                     \
+            new CmdType();                                                  \
+        }                                                                   \
+    }
 
 /**
  * Creates a command object of type CmdType if the featureFlag is enabled for
@@ -1573,11 +1432,12 @@ private:
  *
  * The command objects will be created after the "default" initializer, and all
  * startup option processing happens prior to "default" (see base/init.h).
- *
- * Add `.requiresFeatureFlag(&featureFlag)` to the registration instead of using this macro:
- *     MONGO_REGISTER_COMMAND(MyCommandType).requiresFeatureFlag(&featureFlag);
  */
-#define MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CmdType, featureFlag) \
-    MONGO_REGISTER_COMMAND(CmdType).requiresFeatureFlag(&featureFlag)
+#define MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CmdType, featureFlag)        \
+    MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
+        if (featureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup()) {           \
+            new CmdType();                                                  \
+        }                                                                   \
+    }
 
 }  // namespace mongo

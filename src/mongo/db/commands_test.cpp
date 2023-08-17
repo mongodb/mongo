@@ -54,7 +54,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/session.h"
@@ -68,8 +67,6 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -248,7 +245,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ExampleIncrementCommand);
 
 // Just like ExampleIncrementCommand, but using the MinimalInvocationBase.
 class ExampleMinimalCommand final : public TypedCommand<ExampleMinimalCommand> {
@@ -296,7 +292,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ExampleMinimalCommand);
 
 // Just like ExampleIncrementCommand, but with a void typedRun.
 class ExampleVoidCommand final : public TypedCommand<ExampleVoidCommand> {
@@ -344,10 +339,9 @@ public:
 
     mutable std::int32_t iCapture = 0;
 };
-MONGO_REGISTER_COMMAND(ExampleVoidCommand);
 
-template <typename Derived>
-class MyCommand : public TypedCommand<MyCommand<Derived>> {
+template <typename Fn, typename AuthFn>
+class MyCommand final : public TypedCommand<MyCommand<Fn, AuthFn>> {
 public:
     class Invocation final : public TypedCommand<MyCommand>::InvocationBase {
     public:
@@ -355,7 +349,7 @@ public:
         using Base::Base;
 
         auto typedRun(OperationContext*) const {
-            return _command()->doRun();
+            return _command()->_fn();
         }
 
     private:
@@ -366,20 +360,20 @@ public:
             return false;
         }
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            return _command()->doAuth();
+            return _command()->_authFn();
         }
 
-        const Derived* _command() const {
-            return static_cast<const Derived*>(Base::definition());
+        const MyCommand* _command() const {
+            return static_cast<const MyCommand*>(Base::definition());
         }
     };
 
     using Request = commands_test_example::ExampleVoid;
 
-    explicit MyCommand(StringData name) : TypedCommand<MyCommand>(name) {}
-
-    void doRun() const {}
-    void doAuth() const {}
+    MyCommand(StringData name, Fn fn, AuthFn authFn)
+        : TypedCommand<MyCommand<Fn, AuthFn>>(name),
+          _fn{std::move(fn)},
+          _authFn{std::move(authFn)} {}
 
 private:
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -389,50 +383,33 @@ private:
     std::string help() const override {
         return "Accepts Request and returns void.";
     }
+
+    Fn _fn;
+    AuthFn _authFn;
 };
 
-class ThrowsStatusCommand : public MyCommand<ThrowsStatusCommand> {
-public:
-    ThrowsStatusCommand() : MyCommand<ThrowsStatusCommand>{"throwsStatus"} {}
-    void doRun() const {
-        uasserted(ErrorCodes::UnknownError, "some error");
-    }
+template <typename Fn, typename AuthFn>
+using CmdT = MyCommand<typename std::decay<Fn>::type, typename std::decay<AuthFn>::type>;
+
+auto throwFn = [] {
+    uasserted(ErrorCodes::UnknownError, "some error");
 };
-MONGO_REGISTER_COMMAND(ThrowsStatusCommand);
-
-class UnauthorizedCommand : public MyCommand<UnauthorizedCommand> {
-public:
-    UnauthorizedCommand() : MyCommand<UnauthorizedCommand>{"unauthorizedCmd"} {}
-    void doAuth() const {
-        uasserted(ErrorCodes::Unauthorized, "Not authorized");
-    }
+auto authSuccessFn = [] {
+    return;
 };
-MONGO_REGISTER_COMMAND(UnauthorizedCommand);
+auto authFailFn = [] {
+    uasserted(ErrorCodes::Unauthorized, "Not authorized");
+};
 
-template <typename ConcreteCommand>
-auto& fetchCommandAs(StringData name) {
-    return *dynamic_cast<ConcreteCommand*>(globalCommandRegistry()->findCommand(name));
-}
-
-auto& throwsStatusCommand() {
-    return fetchCommandAs<ThrowsStatusCommand>("throwsStatus");
-}
-
-auto& unauthorizedCommand() {
-    return fetchCommandAs<UnauthorizedCommand>("unauthorizedCmd");
-}
-
-auto& exampleIncrementCommand() {
-    return fetchCommandAs<ExampleIncrementCommand>("exampleIncrement");
-}
-
-auto& exampleMinimalCommand() {
-    return fetchCommandAs<ExampleMinimalCommand>("exampleMinimal");
-}
-
-auto& exampleVoidCommand() {
-    return fetchCommandAs<ExampleVoidCommand>("exampleVoid");
-}
+ExampleIncrementCommand exampleIncrementCommand;
+ExampleMinimalCommand exampleMinimalCommand;
+ExampleVoidCommand exampleVoidCommand;
+CmdT<decltype(throwFn), decltype(authSuccessFn)> throwStatusCommand("throwsStatus",
+                                                                    throwFn,
+                                                                    authSuccessFn);
+CmdT<decltype(throwFn), decltype(authFailFn)> unauthorizedCommand("unauthorizedCmd",
+                                                                  throwFn,
+                                                                  authFailFn);
 
 class TypedCommandTest : public ServiceContextMongoDTest {
 public:
@@ -543,7 +520,7 @@ TEST_F(TypedCommandTest, runTyped) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(exampleIncrementCommand(), [](int i, const BSONObj& reply) {
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
@@ -556,7 +533,7 @@ TEST_F(TypedCommandTest, runMinimal) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(exampleMinimalCommand(), [](int i, const BSONObj& reply) {
+    runIncr(exampleMinimalCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(reply["iPlusOne"].Int(), i + 1);
     });
@@ -569,9 +546,9 @@ TEST_F(TypedCommandTest, runVoid) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(exampleVoidCommand(), [&](int i, const BSONObj& reply) {
+    runIncr(exampleVoidCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
-        ASSERT_EQ(exampleVoidCommand().iCapture, i + 1);
+        ASSERT_EQ(exampleVoidCommand.iCapture, i + 1);
     });
 }
 
@@ -582,10 +559,10 @@ TEST_F(TypedCommandTest, runThrowStatus) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(throwsStatusCommand(), [](int i, const BSONObj& reply) {
+    runIncr(throwStatusCommand, [](int i, const BSONObj& reply) {
         Status status = Status::OK();
         try {
-            uasserted(ErrorCodes::UnknownError, "some error");
+            (void)throwFn();
         } catch (const DBException& e) {
             status = e.toStatus();
         }
@@ -603,10 +580,10 @@ TEST_F(TypedCommandTest, runThrowDoCheckAuthorization) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(unauthorizedCommand(), [](int i, const BSONObj& reply) {
+    runIncr(unauthorizedCommand, [](int i, const BSONObj& reply) {
         Status status = Status::OK();
         try {
-            uasserted(ErrorCodes::Unauthorized, "Not authorized");
+            (void)authFailFn();
         } catch (const DBException& e) {
             status = e.toStatus();
         }
@@ -623,7 +600,7 @@ TEST_F(TypedCommandTest, runThrowNoUserAuthenticated) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(exampleIncrementCommand(), [](int i, const BSONObj& reply) {
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 0.0);
         ASSERT_EQ(reply["errmsg"].String(),
                   str::stream() << "Command exampleIncrement requires authentication");
@@ -645,7 +622,7 @@ TEST_F(TypedCommandTest, runThrowAuthzSessionExpired) {
         _authzSession->startRequest(opCtx.get());
     }
 
-    runIncr(exampleIncrementCommand(), [](int i, const BSONObj& reply) {
+    runIncr(exampleIncrementCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 0.0);
         ASSERT_EQ(
             reply["errmsg"].String(),
@@ -655,58 +632,6 @@ TEST_F(TypedCommandTest, runThrowAuthzSessionExpired) {
         ASSERT_EQ(reply["codeName"].String(),
                   ErrorCodes::errorString(ErrorCodes::ReauthenticationRequired));
     });
-}
-
-class CommandConstructionPlanTest : public unittest::Test {
-public:
-    template <int n>
-    class TrivialNopCommand : public BasicCommand {
-    public:
-        TrivialNopCommand() : BasicCommand{std::to_string(n)} {}
-        bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
-            return true;
-        }
-        AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-            return AllowedOnSecondary::kAlways;
-        }
-        bool supportsWriteConcern(const BSONObj&) const override {
-            return true;
-        }
-        Status checkAuthForOperation(OperationContext*,
-                                     const DatabaseName&,
-                                     const BSONObj&) const override {
-            return Status::OK();
-        }
-    };
-};
-
-TEST_F(CommandConstructionPlanTest, EntriesShowUp) {
-    CommandConstructionPlan plan;
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<100>>().setPlan(&plan);
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<101>>().setPlan(&plan);
-    std::set<const std::type_info*> actual;
-    for (const auto& e : plan.entries())
-        ASSERT_TRUE(actual.insert(e->typeInfo).second);
-    ASSERT_EQ(actual,
-              (std::set{
-                  &typeid(TrivialNopCommand<100>),
-                  &typeid(TrivialNopCommand<101>),
-              }));
-}
-
-TEST_F(CommandConstructionPlanTest, ExecutePlan) {
-    CommandConstructionPlan plan;
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<200>>().setPlan(&plan);
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<201>>().setPlan(&plan);
-    CommandRegistry reg;
-    { plan.execute(&reg); }
-    std::set<const std::type_info*> actual;
-    reg.forEachCommand([&](Command* cmd) { ASSERT_TRUE(actual.insert(&typeid(*cmd)).second); });
-    ASSERT_EQ(actual,
-              (std::set{
-                  &typeid(TrivialNopCommand<200>),
-                  &typeid(TrivialNopCommand<201>),
-              }));
 }
 
 }  // namespace

@@ -100,11 +100,11 @@ public:
 
 private:
     BSONObj getMirroredCommand(OpMsgRequest& request) {
+        auto cmd = globalCommandRegistry()->findCommand(request.getCommandName());
+        ASSERT(cmd);
+
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(_lsid);
-
-        auto cmd = getCommandRegistry(opCtx.get())->findCommand(request.getCommandName());
-        ASSERT(cmd);
 
         auto invocation = cmd->parse(opCtx.get(), request);
         if (!invocation->supportsReadMirroring()) {

@@ -683,7 +683,7 @@ public:
                 [&opCtx, &cursorPin](const BSONObj& data) {
                     auto dataForFailCommand =
                         data.addField(BSON("failCommands" << BSON_ARRAY("getMore")).firstElement());
-                    auto* getMoreCommand = CommandHelpers::findCommand(opCtx, "getMore");
+                    auto* getMoreCommand = CommandHelpers::findCommand("getMore");
                     return CommandHelpers::shouldActivateFailCommandFailPoint(
                         dataForFailCommand, cursorPin->nss(), getMoreCommand, opCtx->getClient());
                 });

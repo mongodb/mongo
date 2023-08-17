@@ -69,7 +69,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -83,14 +82,13 @@ using namespace fmt::literals;
 
 namespace mongo {
 
+using logv2::LogComponent;
 const std::set<std::string> kNoApiVersions = {};
 const std::set<std::string> kApiVersions1 = {"1"};
 
 namespace {
 
 const char kWriteConcernField[] = "writeConcern";
-
-CounterMetric unknowns{"commands.<UNKNOWN>"};
 
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
 bool checkAuthorizationImplPreParse(OperationContext* opCtx,
@@ -136,25 +134,6 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 
 auto getCommandInvocationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
-
-thread_local CommandRegistry* selfRegisterTarget = nullptr;
-
-void selfRegister(Command* cmd) {
-    if (selfRegisterTarget == nullptr)
-        selfRegisterTarget = globalCommandRegistry();
-    selfRegisterTarget->selfRegister(cmd);
-}
-
-std::shared_ptr<void> selfRegisterTargetGuard(CommandRegistry* reg) {
-    struct SavedValue {
-        explicit SavedValue(CommandRegistry* reg) : _orig{std::exchange(selfRegisterTarget, reg)} {}
-        ~SavedValue() {
-            selfRegisterTarget = _orig;
-        }
-        CommandRegistry* _orig;
-    };
-    return std::make_shared<SavedValue>(reg);
-}
 
 }  // namespace
 
@@ -370,8 +349,8 @@ ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceStrin
     return ResourcePattern::forExactNamespace(ns);
 }
 
-Command* CommandHelpers::findCommand(OperationContext* opCtx, StringData name) {
-    return getCommandRegistry(opCtx)->findCommand(name);
+Command* CommandHelpers::findCommand(StringData name) {
+    return globalCommandRegistry()->findCommand(name);
 }
 
 bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status) {
@@ -628,12 +607,8 @@ MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
 // A decoration representing error labels specified in a failCommand failpoint that has affected a
 // command in this OperationContext.
-const auto errorLabelsOverrideDecoration =
+const OperationContext::Decoration<boost::optional<BSONArray>> errorLabelsOverride =
     OperationContext::declareDecoration<boost::optional<BSONArray>>();
-
-boost::optional<BSONArray>& errorLabelsOverride(OperationContext* opCtx) {
-    return (*opCtx)[errorLabelsOverrideDecoration];
-}
 
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         const CommandInvocation* invocation,
@@ -923,7 +898,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         LOGV2_OPTIONS(20436,
-                      {logv2::LogComponent::kAccessControl},
+                      {LogComponent::kAccessControl},
                       "Checking authorization failed: {error}",
                       "Checking authorization failed",
                       "error"_attr = e.toStatus());
@@ -1048,7 +1023,7 @@ Command::Command(StringData name, std::vector<StringData> aliases)
       _aliases(std::move(aliases)),
       _commandsExecuted("commands." + _name + ".total"),
       _commandsFailed("commands." + _name + ".failed") {
-    selfRegister(this);
+    globalCommandRegistry()->registerCommand(this, _name, _aliases);
 }
 
 const std::set<std::string>& Command::apiVersions() const {
@@ -1094,102 +1069,31 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 //////////////////////////////////////////////////////////////
 // CommandRegistry
 
-void CommandRegistry::registerCommand(Command* command) {
-    auto it = _commands.find(command);
-    invariant(it != _commands.end());
-    it->second->isWeak = false;
-}
-
-void CommandRegistry::selfRegister(Command* command) {
-    // Calls to `registerCommand` will be redundant with `selfRegister` for now.
-    // As we work to convert the commands to the non-self registration paradigm,
-    // we'll want to identify registrations that come in ONLY through
-    // `selfRegister`. Eventually we'll remove `selfRegister`.
-    StringData name = command->getName();
-    std::vector<StringData> aliases = command->getAliases();
-    auto ep = std::make_unique<Entry>();
-    ep->command = command;
-    ep->isWeak = true;
-    auto [cIt, cOk] = _commands.emplace(command, std::move(ep));
-    invariant(cOk, "Command identity collision: {}"_format(name));
-
-    // When a `Command*` is introduced to `_commands`, its names are introduced
-    // to `_commandNames`.
+void CommandRegistry::registerCommand(Command* command,
+                                      StringData name,
+                                      std::vector<StringData> aliases) {
     aliases.push_back(name);
-    for (StringData key : aliases) {
-        if (key.empty())
+
+    for (auto key : aliases) {
+        if (key.empty()) {
             continue;
-        auto [nIt, nOk] = _commandNames.try_emplace(key, command);
-        invariant(nOk, "Command name collision: {}"_format(key));
+        }
+
+        auto result = _commands.try_emplace(key, command);
+        invariant(result.second, str::stream() << "command name collision: " << key);
     }
 }
 
 Command* CommandRegistry::findCommand(StringData name) const {
-    auto it = _commandNames.find(name);
-    if (it == _commandNames.end())
+    auto it = _commands.find(name);
+    if (it == _commands.end())
         return nullptr;
     return it->second;
 }
 
-void CommandRegistry::logWeakRegistrations() const {
-    std::vector<StringData> weakCommands;
-    for (const auto& [_, entry] : _commands)
-        if (entry->isWeak)
-            weakCommands.push_back(entry->command->getName());
-    if (!weakCommands.empty())
-        LOGV2_INFO(7897605, "Weakly-registered Commands", "commands"_attr = weakCommands);
-}
-
-void CommandRegistry::incrementUnknownCommands() {
-    unknowns.increment();
-}
-
-CommandRegistry* getCommandRegistry(OperationContext* opCtx) {
-    // For now there's one service for everything.
-    static StaticImmortal<CommandRegistry> obj{};
-    return &*obj;
-}
-
-CommandConstructionPlan& globalCommandConstructionPlan() {
-    static StaticImmortal<CommandConstructionPlan> obj{};
-    return *obj;
-}
-
-void CommandConstructionPlan::execute(CommandRegistry* registry) const {
-    LOGV2_DEBUG(7897601, 1, "Constructing Command objects from specs");
-    auto selfRegisterGuard = selfRegisterTargetGuard(registry);
-    for (auto&& entry : entries()) {
-        auto type = demangleName(*entry->typeInfo);
-        if (entry->testOnly && !getTestCommandsEnabled()) {
-            LOGV2_DEBUG(7897603, 1, "Skipping test-only command", "type"_attr = type);
-            continue;
-        }
-        if (entry->featureFlag && !entry->featureFlag->isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            LOGV2_DEBUG(7897604, 1, "Skipping FeatureFlag gated command", "type"_attr = type);
-            continue;
-        }
-        auto c = entry->construct();
-        LOGV2_DEBUG(7897602, 1, "Created", "command"_attr = c->getName(), "type"_attr = type);
-        registry->registerCommand(&*c);
-
-        // In the future, we should get to the point where the registry owns the
-        // command object. But we aren't there yet and they have to be leaked,
-        // So we at least do it as an explicit choice here.
-        // After selfRegister is removed, a CommandRegistry can own its commands.
-        static StaticImmortal leakedCommands = std::vector<std::unique_ptr<Command>>{};
-        leakedCommands->push_back(std::move(c));
-    }
-
-    registry->logWeakRegistrations();
-}
-
-/**
- * Activates the command construction plan, constructing Commands as
- * appropriate.  In the near future, this will be part of the setup of each
- * CommandRegistry object instead of a MONGO_INITIALIZER.
- */
-MONGO_INITIALIZER(CreateAllSpecifiedCommands)(InitializerContext*) {
-    globalCommandConstructionPlan().execute(globalCommandRegistry());
+CommandRegistry* globalCommandRegistry() {
+    static auto reg = new CommandRegistry();
+    return reg;
 }
 
 }  // namespace mongo

@@ -2369,7 +2369,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
-                Command* cmd = CommandHelpers::findCommand(opCtx, o.firstElement().fieldName());
+                Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
 
                 auto ns =

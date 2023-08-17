@@ -2149,10 +2149,9 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                 // displaying potentially sensitive information in the logs, we restrict the log
                 // message to the name of the unrecognized command. However, the complete command
                 // object will still be echoed to the client.
-                if (execContext->setCommand(
-                        CommandHelpers::findCommand(opCtx, request.getCommandName()));
+                if (execContext->setCommand(CommandHelpers::findCommand(request.getCommandName()));
                     !execContext->getCommand()) {
-                    getCommandRegistry(opCtx)->incrementUnknownCommands();
+                    globalCommandRegistry()->incrementUnknownCommands();
                     LOGV2_DEBUG(21964,
                                 2,
                                 "No such command: {command}",

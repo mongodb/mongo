@@ -208,7 +208,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     }
 
     const std::string cmdName = explainedObj.firstElementFieldName();
-    auto explainedCommand = CommandHelpers::findCommand(opCtx, cmdName);
+    auto explainedCommand = CommandHelpers::findCommand(cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Explain failed due to unknown command: " << cmdName,
             explainedCommand);
