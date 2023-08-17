@@ -1009,6 +1009,8 @@ config_in_memory(void)
      */
     if (ntables > 10)
         return;
+    if (config_explicit(NULL, "background_compact"))
+        return;
     if (config_explicit(NULL, "backup"))
         return;
     if (config_explicit(NULL, "block_cache"))
@@ -1061,6 +1063,8 @@ config_in_memory_reset(void)
         return;
 
     /* Turn off a lot of stuff. */
+    if (!config_explicit(NULL, "background_compact"))
+        config_off(NULL, "background_compact");
     if (!config_explicit(NULL, "backup"))
         config_off(NULL, "backup");
     if (!config_explicit(NULL, "block_cache"))
@@ -2259,11 +2263,25 @@ config_file_type(u_int type)
 static void
 config_compact(void)
 {
+    char buf[128];
+
     /* FIXME-WT-11432: Background and foreground compaction should not be executed in parallel. */
     if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT) &&
       config_explicit(NULL, "ops.compaction") && GV(OPS_COMPACTION))
         testutil_die(EINVAL,
           "%s: Background and foreground compaction cannot be enabled at the same time", progname);
+
+    /* Compaction does not work on in-memory databases, disable it. */
+    if (GV(RUNS_IN_MEMORY)) {
+        if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT))
+            testutil_die(
+              EINVAL, "%s: Background compaction cannot be enabled for in-memory runs", progname);
+        if (config_explicit(NULL, "ops.compaction") && GV(OPS_COMPACTION))
+            testutil_die(
+              EINVAL, "%s: Foreground compaction cannot be enabled for in-memory runs", progname);
+        config_off(NULL, "background_compact");
+        config_off(NULL, "ops.compaction");
+    }
 
     /*
      * FIXME-WT-11432: If both are enabled, disable the one that is not explicitly set or choose one
@@ -2271,20 +2289,24 @@ config_compact(void)
      */
     if (GV(BACKGROUND_COMPACT) && GV(OPS_COMPACTION)) {
         if (config_explicit(NULL, "background_compact"))
-            config_single(NULL, "ops.compaction=0", false);
+            config_off(NULL, "ops.compaction");
         else if (config_explicit(NULL, "ops.compaction"))
-            config_single(NULL, "background_compact=0", false);
-        else {
-            if (mmrand(&g.data_rnd, 1, 2) == 1)
-                config_single(NULL, "background_compact=0", false);
-            else
-                config_single(NULL, "ops.compaction=0", false);
-        }
+            config_off(NULL, "background_compact");
+        else if (mmrand(&g.data_rnd, 1, 2) == 1)
+            config_off(NULL, "background_compact");
+        else
+            config_off(NULL, "ops.compaction");
     }
 
     /* Generate values if not explicit set. */
-    if (!config_explicit(NULL, "background_compact.free_space_target"))
-        GV(BACKGROUND_COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
-    if (!config_explicit(NULL, "compact.free_space_target"))
-        GV(COMPACT_FREE_SPACE_TARGET) = mmrand(&g.extra_rnd, 1, 100);
+    if (!config_explicit(NULL, "background_compact.free_space_target")) {
+        testutil_snprintf(buf, sizeof(buf), "background_compact.free_space_target=%" PRIu32,
+          mmrand(&g.extra_rnd, 1, 100));
+        config_single(NULL, buf, false);
+    }
+    if (!config_explicit(NULL, "compact.free_space_target")) {
+        testutil_snprintf(
+          buf, sizeof(buf), "compact.free_space_target=%" PRIu32, mmrand(&g.extra_rnd, 1, 100));
+        config_single(NULL, buf, false);
+    }
 }
