@@ -2,9 +2,10 @@
  * Validate csfle1 and qe collections are counted correctly.
  */
 
-import {
-    EncryptedClient,
-} from "jstests/fle2/libs/encrypted_client_util.js";
+load("jstests/fle2/libs/encrypted_client_util.js");
+
+(function() {
+'use strict';
 
 let dbName = jsTestName();
 
@@ -77,3 +78,4 @@ rst.initiate();
 rst.awaitReplication();
 runTest(rst.getPrimary());
 rst.stopSet();
+}());
