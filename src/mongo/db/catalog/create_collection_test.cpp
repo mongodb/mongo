@@ -335,8 +335,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-    ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
-    ASSERT_FALSE(*bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
@@ -347,7 +346,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
 
     ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
     AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
-    ASSERT_FALSE(collForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_TRUE(collForRead->timeseriesBucketingParametersMayHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, ValidationOptions) {

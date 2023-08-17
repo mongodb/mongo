@@ -278,7 +278,7 @@ public:
         return false;
     }
 
-    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const final {
+    bool timeseriesBucketingParametersMayHaveChanged() const final {
         unimplementedTasserted();
         return false;
     }

@@ -394,7 +394,7 @@ public:
     virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                             boost::optional<bool> setting) = 0;
 
-    virtual boost::optional<bool> timeseriesBucketingParametersHaveChanged() const = 0;
+    virtual bool timeseriesBucketingParametersMayHaveChanged() const = 0;
 
     /**
      * Sets the 'timeseriesBucketingParametersHaveChanged' catalog entry flag to 'value' for this

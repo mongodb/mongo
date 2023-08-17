@@ -173,7 +173,7 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     // Run collMod without changing the bucket span and validate that the
-    // timeseriesBucketingParametersHaveChanged() returns false.
+    // timeseriesBucketingParametersMayHaveChanged() returns false.
     CollMod collModCmd(curNss);
     CollModRequest collModRequest;
     stdx::variant<std::string, std::int64_t> expireAfterSeconds = 100;
@@ -184,12 +184,11 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
         opCtx.get(), curNss, collModCmd, true, &result));
     {
         AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-        ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
-        ASSERT_FALSE(*bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+        ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
     }
 
     // Run collMod which changes the bucket span and validate that the
-    // timeseriesBucketingParametersHaveChanged() returns true.
+    // timeseriesBucketingParametersMayHaveChanged() returns true.
     CollModTimeseries collModTs;
     collModTs.setBucketMaxSpanSeconds(200);
     collModTs.setBucketRoundingSeconds(200);
@@ -199,8 +198,7 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
         opCtx.get(), curNss, collModCmd, true, &result));
     {
         AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-        ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
-        ASSERT_TRUE(*bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+        ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
     }
 }
 
@@ -230,7 +228,7 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
         }));
 
     AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
-    ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersHaveChanged());
+    ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
 }
 
 }  // namespace
