@@ -186,8 +186,6 @@ define_build_mode(Coverage
     DEPENDS "NOT MSVC"
 )
 
-define_build_mode(Debug)
-
 # Set the WiredTiger default build type to Debug.
 # Primary users of the build are our developers, who want as much help diagnosing
 # issues as possible. Builds targeted for release to customers should switch to a "Release" setting.
@@ -222,3 +220,6 @@ else()
     string(REPLACE "-g" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
 endif()
 
+if(GNU_C_COMPILER OR GNU_CXX_COMPILER)
+    add_compile_options(-fno-strict-aliasing)
+endif()
