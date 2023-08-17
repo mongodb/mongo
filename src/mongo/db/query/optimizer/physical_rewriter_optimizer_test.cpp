@@ -5965,7 +5965,7 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetBasic) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
+    ShardingMetadata sm({{_get("b", _id())._n, CollationOp::Ascending}}, true);
 
     auto scanDef = createScanDef({},
                                  {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
@@ -5986,20 +5986,34 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetBasic) {
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    // ScanNode can also be expanded to a Seek Node, with shard filtering applied.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   FunctionCall [shardFilter]\n"
-        "|   |   Variable [shardKey_3]\n"
-        "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': shardKey_3}, c1]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
-        "{=Const "
-        "[1]}]\n",
-        optimized);
+
+    // Note: we don't assert on the explain of the plan verbatim because there is non-determinism in
+    // the order of rewrites that are applied which causes non-determinism in the projection names
+    // that are generated.
+
+    // Assert plan structure contains NLJ with in index scan on left and shard filter + seek on the
+    // right.
+    const BSONObj explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.indexDefName");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
+    ASSERT_BSON_PATH("\"FunctionCall\"", explainRoot, "child.rightChild.filter.nodeType");
+    ASSERT_BSON_PATH("\"shardFilter\"", explainRoot, "child.rightChild.filter.name");
+    ASSERT_BSON_PATH("\"LimitSkip\"", explainRoot, "child.rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
+
+    // Assert that shard key {b: 1} projection was pushed down into the SeekNode.
+    const auto shardKeyElem = dotted_path_support::extractElementAtPath(
+        explainRoot, "child.rightChild.child.child.fieldProjectionMap.b");
+    ASSERT_TRUE(shardKeyElem.ok());
+    // Get projection to which the shard key is bound.
+    const auto shardKeyProj = shardKeyElem.String();
+    // Assert that the projection used in the 'shardFilter' function call is that of the shard key.
+    ASSERT_EQ(shardKeyProj,
+              dotted_path_support::extractElementAtPath(explainRoot,
+                                                        "child.rightChild.filter.arguments.0.name")
+                  .String());
 }
 
 TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix) {
@@ -6033,33 +6047,20 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix)
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    // The top level field names are pushed down into the Seek node, just as in the PhysicalScan
-    // case.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   FunctionCall [shardFilter]\n"
-        "|   |   |   Variable [shardKey_8]\n"
-        "|   |   Variable [shardKey_7]\n"
-        "|   Evaluation [{shardKey_8}]\n"
-        "|   |   EvalPath []\n"
-        "|   |   |   Variable [shardKey_6]\n"
-        "|   |   PathGet [b]\n"
-        "|   |   PathGet [d]\n"
-        "|   |   PathIdentity []\n"
-        "|   Evaluation [{shardKey_7}]\n"
-        "|   |   EvalPath []\n"
-        "|   |   |   Variable [shardKey_6]\n"
-        "|   |   PathGet [b]\n"
-        "|   |   PathGet [c]\n"
-        "|   |   PathIdentity []\n"
-        "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': shardKey_6}, c1]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
-        "[3]}]\n",
-        optimized);
+
+    const BSONObj explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.indexDefName");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
+    ASSERT_BSON_PATH("\"Evaluation\"", explainRoot, "child.rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"Evaluation\"", explainRoot, "child.rightChild.child.child.nodeType");
+    ASSERT_BSON_PATH("\"LimitSkip\"", explainRoot, "child.rightChild.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.child.child.nodeType");
+    // Assert top level field of shard key is pushed down into the SeekNode.
+    ASSERT_TRUE(dotted_path_support::extractElementAtPath(
+                    explainRoot, "child.rightChild.child.child.child.child.fieldProjectionMap.a")
+                    .ok());
 }
 
 // TODO SERVER-78507: Examine the physical alternatives in the memo, rather than the logical nodes,
