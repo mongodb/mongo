@@ -33,7 +33,7 @@ selector:
   - requires_capped
   # emptycapped command is blocked during tenant migration.
   - requires_emptycapped
-  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
+  # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   # Full validation can cause ongoing queries to fail. This can affect the tenant migration
   # process.
@@ -54,7 +54,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_tenant_prefix.js');
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData

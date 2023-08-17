@@ -245,7 +245,7 @@ selector:
   - does_not_support_transactions
   # Full validation can cause ongoing queries to fail. This can affect the shard split process.
   - uses_full_validation
-  # Multi-updates that conflict with shard split are not retried by inject_tenant_prefix.js.
+  # Multi-updates that conflict with shard split are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   - multiple_tenants_incompatible
   - requires_timeseries # Tenant migration, transactions not supported
@@ -260,14 +260,14 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_tenant_prefix.js');
-        await import('jstests/libs/override_methods/enable_sessions.js');
-        await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
-        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
+        await import("jstests/libs/override_methods/network_error_and_txn_override.js");
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
-          # Informs behavior in the inject_tenant_prefix override.
+          # Informs behavior in the simulate_atlas_proxy override.
           splitPassthrough: true
           tenantIds: ["636d957b2646ddfaf9b5e13f", "123d957b2646ddfaf9b5e91d"]
           # Temp collections are removed when the recipient steps up. We expect a mismatch, this

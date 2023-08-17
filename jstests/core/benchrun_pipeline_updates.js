@@ -6,7 +6,7 @@
  *     not_allowed_with_security_token,
  *     uses_multiple_connections,
  *     # This test uses exhaust which does not use runCommand (required by the
- *     # inject_tenant_prefix.js override).
+ *     # simulate_atlas_proxy.js override).
  *     tenant_migration_incompatible,
  * ]
  */

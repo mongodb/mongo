@@ -13,7 +13,7 @@
  *   uses_parallel_shell,
  *   no_selinux,
  *   # This test uses legacy read mode which does not use runCommand (required by the
- *   # inject_tenant_prefix.js override).
+ *   # simulate_atlas_proxy.js override).
  *   tenant_migration_incompatible,
  * ]
  */

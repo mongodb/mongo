@@ -249,7 +249,7 @@ selector:
   # Full validation can cause ongoing queries to fail. This can affect the tenant migration
   # process.
   - uses_full_validation
-  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
+  # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   - requires_timeseries # Tenant migration, transactions not supported
   - requires_fastcount
@@ -265,10 +265,10 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_tenant_prefix.js');
-        await import('jstests/libs/override_methods/enable_sessions.js');
-        await import('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
-        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
+        await import("jstests/libs/override_methods/network_error_and_txn_override.js");
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData

@@ -1,12 +1,10 @@
 // @tags: [
 //   requires_getmore,
-//   # This test uses exhaust which does not use runCommand (required by the inject_tenant_prefix.js
+//   # This test uses exhaust which does not use runCommand (required by the simulate_atlas_proxy.js
 //   # override).
 //   tenant_migration_incompatible,
 //   no_selinux
 // ]
-
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var coll = db.exhaustColl;
 coll.drop();

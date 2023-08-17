@@ -90,7 +90,7 @@ selector:
   - requires_capped
   # emptycapped command is blocked during shard split.
   - requires_emptycapped
-  # Multi-updates that conflict with shard split are not retried by inject_tenant_prefix.js.
+  # Multi-updates that conflict with shard split are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
@@ -120,13 +120,13 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        await import('jstests/libs/override_methods/inject_tenant_prefix.js');
-        await import('jstests/libs/override_methods/enable_causal_consistency.js');
-        await import('jstests/libs/override_methods/enable_sessions.js');
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
-          # Informs behavior in the inject_tenant_prefix override.
+          # Informs behavior in the simulate_atlas_proxy override.
           splitPassthrough: true
           tenantIds: ["636d957b2646ddfaf9b5e13f", "123d957b2646ddfaf9b5e91d"]
           auth: true

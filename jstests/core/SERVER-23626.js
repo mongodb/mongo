@@ -1,5 +1,5 @@
 // @tags: [
-//   # This test does not support tojson of command objects so the inject_tenant_prefix.js override
+//   # This test does not support tojson of command objects so the simulate_atlas_proxy.js override
 //   # cannot deep copy the command objects correctly.
 //   tenant_migration_incompatible,
 // ]
