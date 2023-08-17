@@ -1733,7 +1733,16 @@ struct SentinelNode : public QuerySolutionNode {
 };
 
 struct SearchNode : public QuerySolutionNode {
-    explicit SearchNode(bool isSearchMeta) : isSearchMeta(isSearchMeta) {
+    SearchNode() = default;
+
+    SearchNode(bool isSearchMeta,
+               BSONObj searchQuery,
+               boost::optional<long long> limit,
+               boost::optional<int> intermediateResultsProtocolVersion)
+        : isSearchMeta(isSearchMeta),
+          searchQuery(searchQuery),
+          limit(limit),
+          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion) {
         // TODO SERVER-78565: Support $search in SBE plan cache
         eligibleForPlanCache = false;
     }
@@ -1766,6 +1775,22 @@ struct SearchNode : public QuerySolutionNode {
      * True for $searchMeta, False for $search query.
      */
     bool isSearchMeta;
+
+    const BSONObj searchQuery;
+
+    /**
+     * This will populate the docsRequested field of the cursorOptions document sent as part of the
+     * command to mongot in the case where the query has an extractable limit that can guide the
+     * number of documents that mongot returns to mongod.
+     */
+    boost::optional<long long> limit;
+
+    /**
+     * Protocol version if it must be communicated via the search request.
+     * If we are in a sharded environment but are targeting unsharded collection we may have a
+     * protocol version even though it should not be sent to mongot.
+     */
+    boost::optional<int> intermediateResultsProtocolVersion;
 };
 
 /**

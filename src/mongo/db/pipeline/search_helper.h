@@ -139,6 +139,24 @@ public:
     virtual bool isSearchMetaStage(DocumentSource* stage) {
         return false;
     }
+
+    /**
+     * Gets the information for the search QSN from DocumentSourceSearch.
+     * The results are returned as a tuple of the format:
+     * <limit, mongotDocsRequested, searchQuery, taskExecutor, intermediateResultsProtocolVersion>
+     */
+    virtual std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) {
+        return nullptr;
+    }
+
+    /**
+     * Executes the initial $search query to get the cursor id and first batch for building the
+     * $search SBE plan.
+     */
+    virtual std::pair<CursorResponse, CursorResponse> establishSearchQueryCursors(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, const SearchNode* searchNode) {
+        return {CursorResponse(), CursorResponse()};
+    }
 };
 
 /**

@@ -556,8 +556,11 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
                 "Pushing down $search into SBE but featureFlagSearchInSbe is disabled.",
                 feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe());
 
+        auto searchNode =
+            getSearchHelpers(query.getOpCtx()->getServiceContext())->getSearchNode(stage);
+
         auto querySoln = std::make_unique<QuerySolution>();
-        querySoln->setRoot(std::make_unique<SearchNode>(isSearchMeta));
+        querySoln->setRoot(std::move(searchNode));
         return std::move(querySoln);
     }
 
