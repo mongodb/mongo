@@ -1956,8 +1956,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     }
 
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
-    // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
-    // if we're not the primary we will uassert anyways.
+    // transaction was prepared, we dropped the RSTL.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
@@ -2237,8 +2236,7 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
     // Re-acquire the RSTL to prevent state transitions while aborting the transaction. Since the
-    // transaction was prepared, we dropped it on preparing the transaction. We do not need to
-    // reacquire the PBWM because if we're not the primary we will uassert anyways.
+    // transaction was prepared, we dropped it on preparing the transaction.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state

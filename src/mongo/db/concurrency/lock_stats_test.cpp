@@ -241,7 +241,7 @@ TEST_F(LockStatsTest, ServerStatus) {
     stats.report(&builder);
     ASSERT_EQUALS(0, builder.done().nFields());
 
-    // Take the global, PBWM and RSTL locks in MODE_IX to create acquisition stats for them.
+    // Take the global and RSTL locks in MODE_IX to create acquisition stats for them.
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), LockMode::MODE_IX);

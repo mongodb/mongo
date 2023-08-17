@@ -595,14 +595,13 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // commits before an operation with an earlier optime, and readers should wait so that all data
     // is consistent.
     //
-    // Secondaries can't wait for oplog visibility without the PBWM lock because it can introduce a
-    // hang while a batch application is in progress. The wait is done while holding a global lock,
-    // and the oplog visibility timestamp is updated at the end of every batch on a secondary,
-    // signalling the wait to complete. If a replication worker had a global lock and temporarily
-    // released it, a reader could acquire the lock to read the oplog. If the secondary reader were
-    // to wait for the oplog visibility timestamp to be updated, it would wait for a replication
-    // batch that would never complete because it couldn't reacquire its own lock, the global lock
-    // held by the waiting reader.
+    // On secondaries, the wait is done while holding a global lock, and the oplog visibility
+    // timestamp is updated at the end of every batch on a secondary, signalling the wait to
+    // complete. If a replication worker had a global lock and temporarily released it, a reader
+    // could acquire the lock to read the oplog. If the secondary reader were to wait for the oplog
+    // visibility timestamp to be updated, it would wait for a replication batch that would never
+    // complete because it couldn't reacquire its own lock, the global lock held by the waiting
+    // reader.
     return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
         opCtx, DatabaseName::kAdmin);
 }

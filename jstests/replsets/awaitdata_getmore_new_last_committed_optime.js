@@ -3,14 +3,6 @@
 // while a tailable awaitData query is running. See SERVER-35239. This also tests that when the
 // client's lastKnownCommittedOpTime is behind the node's lastCommittedOpTime, getMore returns early
 // with an empty batch.
-//
-// The test runs a secondary read (getMore) that is blocked on a failpoint while waiting for
-// replication. If the storage engine supports snapshot reads, secondary reads do not acquire PBWM
-// locks. So in order to not block secondary oplog application while the secondary read is blocked
-// on a failpoint, we only run this test with storage engine that supports snapshot read.
-// @tags: [
-//   requires_snapshot_read,
-// ]
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = 'awaitdata_getmore_new_last_committed_optime';

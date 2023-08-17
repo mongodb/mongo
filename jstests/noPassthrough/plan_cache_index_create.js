@@ -80,15 +80,6 @@ function runTest({rst, readDB, writeDB}) {
     assert.commandWorked(
         readDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
 
-    // The commitIndexBuild oplog entry may block $planCacheStats on the secondary during oplog
-    // application because it will hold the PBWM while waiting for the index build to complete in
-    // the backgroud. Therefore, we get the primary to hold off on writing the commitIndexBuild
-    // oplog entry until we are ready to resume index builds on the secondary.
-    if (writeDB.getMongo().host != readDB.getMongo().host) {
-        assert.commandWorked(writeDB.adminCommand(
-            {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
-    }
-
     // Build a "most selective" index in the background.
     TestData.dbName = dbName;
     TestData.collName = collName;
@@ -115,10 +106,6 @@ function runTest({rst, readDB, writeDB}) {
     // Disable the hang and wait for the index build to complete.
     assert.commandWorked(
         readDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
-
-    // No effect if the fail point is already disabled.
-    assert.commandWorked(
-        writeDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
 
     assert.soon(() => !indexBuildIsRunning(readDB, "most_selective"));
     createIdxShell({checkExitSuccess: true});

@@ -1973,8 +1973,7 @@ TEST(StorageTimestampTest, KVDropDatabasePrimary) {
  *
  * Secondaries timestamp starting their index build by being in a `TimestampBlock` when the oplog
  * entry is processed. Secondaries will look at the logical clock when completing the index
- * build. This is safe so long as completion is not racing with secondary oplog application (i.e:
- * enforced via the parallel batch writer mode lock).
+ * build. This is safe so long as completion is not racing with secondary oplog application.
  */
 class TimestampIndexBuilds : public StorageTimestampTest {
 private:

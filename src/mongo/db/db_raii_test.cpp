@@ -286,9 +286,9 @@ TEST_F(DBRAIITestFixture,
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
-    // This test simulates a situation where AutoGetCollectionForRead cant read at lastApplied
-    // because it is set to a point earlier than the catalog change. We expect to read without a
-    // timestamp and hold the PBWM lock.
+    // This test simulates a situation where we read from the last applied timestamp but that point
+    // in time is earlier than the catalog change. We expect to reconstruct the state from that
+    // point in time in order to read at last applied.
     auto replCoord = repl::ReplicationCoordinator::get(client1.second.get());
     CollectionOptions defaultCollectionOptions;
     ASSERT_OK(

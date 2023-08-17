@@ -259,15 +259,13 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
     // * Reading inconsistent, out-of-order data is either inconsequential or required by
     //   the operation.
 
-    // If the caller entered this function expecting to conflict with batch application
-    // (i.e. no ShouldNotConflict block in scope), but they are reading without a timestamp and
-    // not holding the PBWM lock, then there is a possibility that this reader may
-    // unintentionally see inconsistent data during a batch. However there are a couple exceptions
-    // to this:
+    // If the caller is reading without a timestamp, then there is a possibility that this reader
+    // may unintentionally see inconsistent data during a batch. However there are a couple
+    // exceptions to this:
     // * If we are not enforcing contraints, then we are ourselves within batch application or some
     //   similar state where this is expected
     // * Certain namespaces are applied serially in oplog application, and therefore can be safely
-    //   read without taking the PBWM or reading at a timestamp
+    //   read without a timestamp
     if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && isEnforcingConstraints && nss &&
         !nss->mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
         LOGV2_FATAL(4728700,
@@ -364,13 +362,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
-    // During batch application on secondaries, there is a potential to read inconsistent states
-    // that would normally be protected by the PBWM lock. In order to serve secondary reads
-    // during this period, we default to not acquiring the lock (by setting
-    // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
-    // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
-    // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
-    // which is set after each complete batch.
+    // On secondaries, we have to guarantee we read at a consistent state, so we must read at the
+    // lastApplied timestamp, which is set after each complete batch.
 
     // Once we have our locks, check whether or not we should override the ReadSource that was
     // set before acquiring locks.

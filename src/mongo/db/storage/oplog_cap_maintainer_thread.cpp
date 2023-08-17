@@ -88,7 +88,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
 
     try {
         // A Global IX lock should be good enough to protect the oplog truncation from
-        // interruptions such as restartCatalog. PBWM, database lock or collection lock is not
+        // interruptions such as restartCatalog. Database lock or collection lock is not
         // needed. This improves concurrency if oplog truncation takes long time.
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
         const auto& oplog = oplogWrite.getCollection();

@@ -486,8 +486,7 @@ public:
     virtual bool isGlobalLockedRecursively() = 0;
 
     /**
-     * Pending means we are currently trying to get a lock (could be the parallel batch writer
-     * lock).
+     * Pending means we are currently trying to get a lock.
      */
     virtual bool hasLockPending() const = 0;
 

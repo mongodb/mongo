@@ -944,7 +944,7 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     globalStats.recordAcquisition(_id, resId, mode);
     _stats.recordAcquisition(resId, mode);
 
-    // Give priority to the full modes for Global, PBWM, and RSTL resources so we don't stall global
+    // Give priority to the full modes for Global and RSTL resources so we don't stall global
     // operations such as shutdown or stepdown.
     if (resType == RESOURCE_GLOBAL) {
         if (mode == MODE_S || mode == MODE_X) {

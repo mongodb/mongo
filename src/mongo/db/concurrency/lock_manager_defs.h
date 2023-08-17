@@ -357,12 +357,12 @@ extern const ResourceId resourceIdGlobal;
 
 // Hardcoded resource id for a full FCV transition from start -> upgrading -> upgraded (or
 // equivalent for downgrading). This lock is used as a barrier to prevent writes from spanning an
-// FCV change. This lock is acquired after the PBWM but before the RSTL and resourceIdGlobal.
+// FCV change. This lock is acquired before the RSTL and resourceIdGlobal.
 extern const ResourceId resourceIdFeatureCompatibilityVersion;
 
 // Hardcoded resource id for the ReplicationStateTransitionLock (RSTL). This lock is acquired in
 // mode X for any replication state transition and is acquired by all other reads and writes in mode
-// IX. This lock is acquired after the PBWM and FCV locks but before the resourceIdGlobal.
+// IX. This lock is acquired after the FCV lock but before the resourceIdGlobal.
 extern const ResourceId resourceIdReplicationStateTransitionLock;
 
 /**

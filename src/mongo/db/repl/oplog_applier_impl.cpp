@@ -788,8 +788,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();
 
-        // Use this fail point to hold the PBWM lock after we have written the oplog entries but
-        // before we have applied them.
+        // Use this fail point to hang after we have written the oplog entries but before we have
+        // applied them.
         if (MONGO_unlikely(pauseBatchApplicationAfterWritingOplogEntries.shouldFail())) {
             LOGV2(21231,
                   "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. Blocking "
@@ -865,7 +865,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         }
     }
 
-    // Use this fail point to hold the PBWM lock and prevent the batch from completing.
+    // Use this fail point to prevent the batch from completing.
     if (MONGO_unlikely(pauseBatchApplicationBeforeCompletion.shouldFail())) {
         LOGV2(21232,
               "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
@@ -882,8 +882,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     }
 
     Timestamp firstTimeInBatch = ops.front().getTimestamp();
-    // Set any indexes to multikey that this batch ignored. This must be done while holding the
-    // parallel batch writer mode lock.
+    // Set any indexes to multikey that this batch ignored.
     for (const WorkerMultikeyPathInfo& infoVector : multikeyVector) {
         for (const MultikeyPathInfo& info : infoVector) {
             // We timestamp every multikey write with the first timestamp in the batch. It is always

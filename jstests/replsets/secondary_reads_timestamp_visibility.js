@@ -2,8 +2,8 @@
  * Tests that reads on a secondary during batch application only see changes that occur at the last
  * applied timestamp, which is advanced at the completion of each batch.
  *
- * This test uses a failpoint to block right before batch application finishes, while holding the
- * PBWM lock, and before advancing the last applied timestamp for readers.
+ * This test uses a failpoint to block right before batch application finishes, before advancing the
+ * last applied timestamp for readers.
  *
  */
 import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";

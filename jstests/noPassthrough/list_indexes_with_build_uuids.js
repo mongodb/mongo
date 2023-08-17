@@ -56,13 +56,6 @@ replSet.awaitReplication();
 // Start hanging index builds on the secondary.
 IndexBuildTest.pauseIndexBuilds(secondary);
 
-// With storage engines that do not support snapshot reads, the commitIndexBuild oplog entry may
-// block the listIndexes command on the secondary during oplog application because it will hold the
-// PBWM while waiting for the index build to complete in the backgroud. Therefore, we get the
-// primary to hold off on writing the commitIndexBuild oplog entry until we are ready to resume
-// index builds on the secondary.
-IndexBuildTest.pauseIndexBuilds(primary);
-
 // Build and hang on the second index. This should be run in the background if we pause index
 // builds on the primary because the createIndexes command will block.
 const coll = primaryDB.getCollection(collName);
@@ -99,9 +92,6 @@ assert(indexes[2].hasOwnProperty("buildUUID"));
 
 // Allow the replica set to finish the index build.
 IndexBuildTest.resumeIndexBuilds(secondary);
-
-// Wait for the index build to complete on the primary if we paused it.
-IndexBuildTest.resumeIndexBuilds(primary);
 createIdx();
 
 replSet.stopSet();

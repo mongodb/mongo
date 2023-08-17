@@ -166,8 +166,8 @@ private:
 
 /**
  * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
- * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
- * consistent in-memory and on-disk view of the storage catalog.
+ * Takes the global lock, same as AutoGetCollectionForRead. Ensures a consistent in-memory and
+ * on-disk view of the storage catalog.
  *
  * This implementation uses the point-in-time (PIT) catalog.
  */
