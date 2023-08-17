@@ -952,10 +952,10 @@ public:
 /**
  * Describes a window function expression that accepts 'n' as a parameter. Templated by
  * 'WindowFunctionN', which corresponds to the 'WindowFunctionState' removable type associated
- * with this expression. It is also templated by AccumulatorType which is the AccumulatorState
+ * with this expression. It is also templated by 'AccumulatorNType' which is the AccumulatorState
  * associated with this expression.
  */
-template <typename WindowFunctionN, typename AcumulatorNType>
+template <typename WindowFunctionN, typename AccumulatorNType>
 class ExpressionN : public Expression {
 public:
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
