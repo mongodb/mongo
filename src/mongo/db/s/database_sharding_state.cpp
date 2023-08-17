@@ -200,25 +200,21 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
                                                 : ShardingMigrationCriticalSection::kRead);
         const auto optCritSecReason = scopedDss->getCriticalSectionReason();
 
-        uassert(
-            StaleDbRoutingVersion(
-                DatabaseNameUtil::serialize(dbName), receivedVersion, boost::none, critSecSignal),
-            str::stream() << "The critical section for the database "
-                          << dbName.toStringForErrorMsg()
-                          << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
-            !critSecSignal);
+        uassert(StaleDbRoutingVersion(dbName, receivedVersion, boost::none, critSecSignal),
+                str::stream() << "The critical section for the database "
+                              << dbName.toStringForErrorMsg() << " is acquired with reason: "
+                              << scopedDss->getCriticalSectionReason(),
+                !critSecSignal);
     }
 
     const auto wantedVersion = scopedDss->getDbVersion(opCtx);
-    uassert(
-        StaleDbRoutingVersion(DatabaseNameUtil::serialize(dbName), receivedVersion, boost::none),
-        str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
-        wantedVersion);
+    uassert(StaleDbRoutingVersion(dbName, receivedVersion, boost::none),
+            str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
+            wantedVersion);
 
-    uassert(
-        StaleDbRoutingVersion(DatabaseNameUtil::serialize(dbName), receivedVersion, *wantedVersion),
-        str::stream() << "Version mismatch for the database " << dbName.toStringForErrorMsg(),
-        receivedVersion == *wantedVersion);
+    uassert(StaleDbRoutingVersion(dbName, receivedVersion, *wantedVersion),
+            str::stream() << "Version mismatch for the database " << dbName.toStringForErrorMsg(),
+            receivedVersion == *wantedVersion);
 }
 
 void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,

@@ -270,7 +270,7 @@ Future<bool> AsyncDBClient::completeSpeculativeAuth(std::shared_ptr<SaslClientSe
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
                                             executor::NetworkConnectionHook* const hook) {
     auto requestObj = _buildHelloRequest(appName, hook);
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", requestObj);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, requestObj);
 
     auto msgId = nextMessageId();
     return _call(opMsgRequest.serialize(), msgId)

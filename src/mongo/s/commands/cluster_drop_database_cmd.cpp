@@ -98,8 +98,7 @@ public:
 
             try {
                 const CachedDatabaseInfo dbInfo =
-                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                        opCtx, DatabaseNameUtil::serializeForCatalog(dbName)));
+                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
                 // Invalidate the database metadata so the next access kicks off a full reload, even
                 // if sending the command to the config server fails due to e.g. a NetworkError.
@@ -114,7 +113,7 @@ public:
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    DatabaseNameUtil::serialize(dbName),
+                    dbName,
                     dbInfo,
                     CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
                                                                opCtx->getWriteConcern()),

@@ -81,13 +81,13 @@ std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
 
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const CachedDatabaseInfo& dbInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
     ShardId shardId;
-    if (dbName == DatabaseName::kConfig.db()) {
+    if (dbName == DatabaseName::kConfig) {
         auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
         uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
         std::sort(shardIds.begin(), shardIds.end());
@@ -109,14 +109,14 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
 }  // namespace
 
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
-                                  StringData dbName,
+                                  const DatabaseName& dbName,
                                   const boost::optional<ShardId>& suggestedPrimaryId) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     auto dbStatus = catalogCache->getDatabase(opCtx, dbName);
 
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
-        ConfigsvrCreateDatabase request(dbName.toString());
+        ConfigsvrCreateDatabase request(DatabaseNameUtil::serialize(dbName));
         request.setDbName(DatabaseName::kAdmin);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
@@ -130,8 +130,8 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.writeConcernStatus);
         uassertStatusOKWithContext(response.commandStatus,
-                                   str::stream()
-                                       << "Database " << dbName << " could not be created");
+                                   str::stream() << "Database " << dbName.toStringForErrorMsg()
+                                                 << " could not be created");
 
         auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
             IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
@@ -145,11 +145,11 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
     const auto& nss = request.getNamespace();
-    const auto dbInfo = createDatabase(opCtx, nss.db_forSharding());
+    const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
     auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
         opCtx,
-        nss.db_forSharding(),
+        nss.dbName(),
         dbInfo,
         CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),

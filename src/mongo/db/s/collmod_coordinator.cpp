@@ -393,9 +393,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         opCtx, originalNss(), cmd, true, &collModResBuilder));
                     auto collModRes = collModResBuilder.obj();
 
-                    const auto dbInfo =
-                        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                            opCtx, nss().db_forSharding()));
+                    const auto dbInfo = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss().dbName()));
                     const auto shard = uassertStatusOK(
                         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
                     BSONObjBuilder builder;

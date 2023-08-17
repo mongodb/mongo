@@ -141,7 +141,7 @@ public:
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.db_forSharding(),
+                nss.dbName(),
                 nss,
                 cri,
                 applyReadWriteConcern(
@@ -257,7 +257,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.db_forSharding(),
+                                                           nss.dbName(),
                                                            nss,
                                                            cri,
                                                            explainCmd,

@@ -186,7 +186,7 @@ public:
      */
     virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
-    virtual void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) = 0;
+    virtual void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * Only used for unit-tests, clears a previously-created catalog cache loader from the specified

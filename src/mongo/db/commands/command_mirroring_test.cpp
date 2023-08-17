@@ -82,7 +82,8 @@ public:
             bob << arg.firstElement();
         }
 
-        auto request = OpMsgRequest::fromDBAndBody(kDB, bob.obj());
+        auto request = OpMsgRequest::fromDBAndBody(
+            DatabaseName::createDatabaseName_forTest(boost::none, kDB), bob.obj());
         return request;
     }
 

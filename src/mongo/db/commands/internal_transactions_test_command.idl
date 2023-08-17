@@ -47,7 +47,7 @@ structs:
     strict: false
     fields:
       dbName:
-        type: string
+        type: database_name
       command:
         type: object_owned
       exhaustCursor:

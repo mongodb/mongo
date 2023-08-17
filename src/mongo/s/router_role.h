@@ -69,7 +69,7 @@ protected:
  */
 class DBPrimaryRouter : public RouterBase {
 public:
-    DBPrimaryRouter(ServiceContext* service, StringData db);
+    DBPrimaryRouter(ServiceContext* service, const DatabaseName& db);
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
@@ -94,7 +94,7 @@ private:
     CachedDatabaseInfo _getRoutingInfo(OperationContext* opCtx) const;
     void _onException(RouteContext* context, Status s);
 
-    std::string _db;
+    DatabaseName _dbName;
 };
 
 /**

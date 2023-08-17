@@ -76,7 +76,7 @@ namespace {
 class DatabaseShardingStateTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
-    const StringData kDbName{"test"};
+    const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
@@ -133,7 +133,7 @@ public:
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
         return DatabaseType(
-            kDbName.toString(), kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
+            kDbName.toString_forTest(), kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
     }
 };
 
@@ -144,12 +144,10 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, OnDbVersionMismatch) {
     auto checkOnDbVersionMismatch = [&](const auto& newDb, bool expectRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
-
         auto getActiveDbVersion = [&] {
-            AutoGetDb autoDb(
-                opCtx, DatabaseName::createDatabaseName_forTest(boost::none, kDbName), MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                opCtx, DatabaseName::createDatabaseName_forTest(boost::none, kDbName));
+            AutoGetDb autoDb(opCtx, kDbName, MODE_IS);
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, kDbName);
             return scopedDss->getDbVersion(opCtx);
         };
 
@@ -182,10 +180,9 @@ TEST_F(DatabaseShardingStateTestWithMockedLoader, ForceDatabaseRefresh) {
         ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kDbName, boost::none));
 
         boost::optional<DatabaseVersion> activeDbVersion = [&] {
-            AutoGetDb autoDb(
-                opCtx, DatabaseName::createDatabaseName_forTest(boost::none, kDbName), MODE_IS);
-            const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                opCtx, DatabaseName::createDatabaseName_forTest(boost::none, kDbName));
+            AutoGetDb autoDb(opCtx, kDbName, MODE_IS);
+            const auto scopedDss =
+                DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, kDbName);
             return scopedDss->getDbVersion(opCtx);
         }();
         ASSERT_TRUE(activeDbVersion);

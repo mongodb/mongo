@@ -108,19 +108,19 @@ public:
         _responses.emplace(cmd);
     }
 
-    void pushRequest(StringData dbname, const BSONObj& cmd) {
+    void pushRequest(const DatabaseName& dbname, const BSONObj& cmd) {
         _requests.emplace(OpMsgRequest::fromDBAndBody(dbname, cmd));
     }
 
     BSONObj loadMongoCRConversation() {
         // 1. Client sends 'getnonce' command
-        pushRequest("admin", BSON("getnonce" << 1));
+        pushRequest(DatabaseName::kAdmin, BSON("getnonce" << 1));
 
         // 2. Client receives nonce
         pushResponse(BSON("nonce" << _nonce << "ok" << 1));
 
         // 3. Client sends 'authenticate' command
-        pushRequest("admin",
+        pushRequest(DatabaseName::kAdmin,
                     BSON("authenticate" << 1 << "nonce" << _nonce << "user" << _username << "key"
                                         << _digest));
 
@@ -139,7 +139,7 @@ public:
 
     BSONObj loadX509Conversation() {
         // 1. Client sends 'authenticate' command
-        pushRequest("$external",
+        pushRequest(DatabaseName::kExternal,
                     BSON("authenticate" << 1 << "mechanism"
                                         << "MONGODB-X509"
                                         << "user" << _username));

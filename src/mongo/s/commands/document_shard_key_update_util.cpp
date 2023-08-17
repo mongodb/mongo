@@ -75,7 +75,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeInsertOnUpdateShardKey);
 bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
                                              const BSONObj& deleteCmdObj,
                                              const BSONObj& insertCmdObj,
-                                             const StringData db,
+                                             const DatabaseName& db,
                                              const bool shouldUpsert) {
     auto deleteOpMsg = OpMsgRequest::fromDBAndBody(db, deleteCmdObj);
     auto deleteRequest = BatchedCommandRequest::parseDelete(deleteOpMsg);
@@ -174,11 +174,8 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
         updatePreImage);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
-    return executeOperationsAsPartOfShardKeyUpdate(opCtx,
-                                                   deleteCmdObj,
-                                                   insertCmdObj,
-                                                   nss.db_forSharding(),
-                                                   documentKeyChangeInfo.getShouldUpsert());
+    return executeOperationsAsPartOfShardKeyUpdate(
+        opCtx, deleteCmdObj, insertCmdObj, nss.dbName(), documentKeyChangeInfo.getShouldUpsert());
 }
 
 void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
@@ -254,8 +251,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
 
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
                 nss, changeInfo.getPostImage().getOwned(), fleCrudProcessed);
-            auto insertOpMsg =
-                OpMsgRequest::fromDBAndBody(nss.db_forSharding(), std::move(insertCmdObj));
+            auto insertOpMsg = OpMsgRequest::fromDBAndBody(nss.dbName(), std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 
             // Same as for the insert, retry history isn't necessary so opt out with a sentinel

@@ -131,8 +131,7 @@ public:
                     logAttrs(nss),
                     "command"_attr = redact(cmdObj));
 
-        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
-            opCtx, DatabaseNameUtil::serializeForCatalog(cmd.getDbName()));
+        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName());
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {
             uassert(
                 CollectionUUIDMismatchInfo(
@@ -153,11 +152,10 @@ public:
 
         ShardsvrCollMod collModCommand(nss);
         collModCommand.setCollModRequest(cmd.getCollModRequest());
-        // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
         auto cmdResponse =
             uassertStatusOK(executeCommandAgainstDatabasePrimary(
                                 opCtx,
-                                DatabaseNameUtil::serialize(dbName),
+                                dbName,
                                 dbInfo,
                                 CommandHelpers::appendMajorityWriteConcern(
                                     collModCommand.toBSON({}), opCtx->getWriteConcern()),

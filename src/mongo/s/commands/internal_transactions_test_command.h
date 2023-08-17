@@ -102,8 +102,7 @@ public:
                             continue;
                         }
 
-                        const auto res = txnClient.runCommandSync(
-                            DatabaseName::createDatabaseName_forTest(boost::none, dbName), command);
+                        const auto res = txnClient.runCommandSync(dbName, command);
 
                         sharedBlock->responses.emplace_back(
                             CommandHelpers::filterCommandReplyForPassthrough(

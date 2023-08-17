@@ -79,7 +79,7 @@ public:
             });
 
             const auto dbInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNss.db_forSharding()));
+                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNss.dbName()));
 
             ShardsvrMovePrimary shardsvrRequest{dbNss.dbName()};
             shardsvrRequest.setDbName(DatabaseName::kAdmin);
@@ -87,7 +87,7 @@ public:
 
             const auto commandResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
-                DatabaseName::kAdmin.toString(),
+                DatabaseName::kAdmin,
                 dbInfo,
                 CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON({}),
                                                            opCtx->getWriteConcern()),

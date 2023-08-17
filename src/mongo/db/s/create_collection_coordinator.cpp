@@ -883,7 +883,7 @@ void createCollectionOnNonPrimaryShards(
 
     if (!requests.empty()) {
         auto responses = gatherResponses(opCtx,
-                                         nss.db_forSharding(),
+                                         nss.dbName(),
                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                          Shard::RetryPolicy::kIdempotent,
                                          requests);

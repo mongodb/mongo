@@ -1016,7 +1016,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
             if (_settings.shouldAutoInitiate()) {
                 BSONObjBuilder bob;
                 bob.append("replSetInitiate", BSONObj());
-                auto initiateCmd = OpMsgRequest::fromDBAndBody("", bob.obj());
+                auto initiateCmd = OpMsgRequest::fromDBAndBody(DatabaseName::kEmpty, bob.obj());
                 auto status = getStatusFromCommandResult(
                     CommandHelpers::runCommandDirectly(opCtx, initiateCmd));
                 uassertStatusOK(status);

@@ -94,7 +94,7 @@ class FTDCSimpleInternalCommandCollector : public FTDCCollectorInterface {
 public:
     FTDCSimpleInternalCommandCollector(StringData command,
                                        StringData name,
-                                       StringData ns,
+                                       const DatabaseName& db,
                                        BSONObj cmdObj);
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override;

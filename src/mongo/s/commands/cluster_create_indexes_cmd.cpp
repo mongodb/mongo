@@ -127,8 +127,7 @@ public:
                     logAttrs(nss),
                     "command"_attr = redact(cmdObj));
 
-        // TODO SERVER-67798 Change cluster::createDatabase to use DatabaseName
-        cluster::createDatabase(opCtx, DatabaseNameUtil::serialize(dbName));
+        cluster::createDatabase(opCtx, dbName);
 
         auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();
@@ -140,7 +139,7 @@ public:
 
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
-            nss.db_forSharding(),
+            nss.dbName(),
             targeter.getNS(),
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(

@@ -141,7 +141,7 @@ public:
     static constexpr auto code = ErrorCodes::StaleDbVersion;
 
     StaleDbRoutingVersion(
-        std::string db,
+        const DatabaseName& db,
         DatabaseVersion received,
         boost::optional<DatabaseVersion> wanted,
         boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
@@ -170,7 +170,7 @@ public:
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    std::string _db;
+    DatabaseName _db;
     DatabaseVersion _received;
     boost::optional<DatabaseVersion> _wanted;
 

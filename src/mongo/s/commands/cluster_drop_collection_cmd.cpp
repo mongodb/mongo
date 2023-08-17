@@ -118,7 +118,7 @@ public:
                 });
 
                 const auto dbInfo = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db_forSharding()));
+                    Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
                 // Send it to the primary shard
                 ShardsvrDropCollection dropCollectionCommand(nss);
@@ -127,7 +127,7 @@ public:
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    nss.db_forSharding(),
+                    nss.dbName(),
                     dbInfo,
                     CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
                                                                opCtx->getWriteConcern()),

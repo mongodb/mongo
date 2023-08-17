@@ -89,6 +89,7 @@ private:
 
     void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
 
+    // TODO SERVER-80223 _dbName becomes a DatabaseName instead of StringData
     StringData _dbName;
 
     const BSONObj _critSecReason;

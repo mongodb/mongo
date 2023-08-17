@@ -181,9 +181,9 @@ Status onUpdateFTDCPerInterimUpdate(const std::int32_t potentialNewValue) {
 
 FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringData command,
                                                                        StringData name,
-                                                                       StringData ns,
+                                                                       const DatabaseName& db,
                                                                        BSONObj cmdObj)
-    : _name(name.toString()), _request(OpMsgRequest::fromDBAndBody(ns, std::move(cmdObj))) {
+    : _name(name.toString()), _request(OpMsgRequest::fromDBAndBody(db, std::move(cmdObj))) {
     invariant(command == _request.getCommandName());
     invariant(CommandHelpers::findCommand(command));  // Fail early if it doesn't exist.
 }
@@ -263,7 +263,7 @@ public:
 
         commandBuilder.done();
 
-        auto request = OpMsgRequest::fromDBAndBody("", commandBuilder.obj());
+        auto request = OpMsgRequest::fromDBAndBody(DatabaseName::kEmpty, commandBuilder.obj());
         auto result = CommandHelpers::runCommandDirectly(opCtx, request);
 
         Status status = getStatusFromCommandResult(result);
@@ -329,15 +329,15 @@ void startFTDC(boost::filesystem::path& path,
 
     // CmdBuildInfo
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "buildInfo", "buildInfo", "", BSON("buildInfo" << 1)));
+        "buildInfo", "buildInfo", DatabaseName::kEmpty, BSON("buildInfo" << 1)));
 
     // CmdGetCmdLineOpts
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "getCmdLineOpts", "getCmdLineOpts", "", BSON("getCmdLineOpts" << 1)));
+        "getCmdLineOpts", "getCmdLineOpts", DatabaseName::kEmpty, BSON("getCmdLineOpts" << 1)));
 
     // HostInfoCmd
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "hostInfo", "hostInfo", "", BSON("hostInfo" << 1)));
+        "hostInfo", "hostInfo", DatabaseName::kEmpty, BSON("hostInfo" << 1)));
 
     // Install the new controller
     auto& staticFTDC = getFTDCController(getGlobalServiceContext());

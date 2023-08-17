@@ -190,7 +190,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.db_forSharding(),
+                                                           nss.dbName(),
                                                            nss,
                                                            cri,
                                                            explainCmd,
@@ -213,7 +213,7 @@ public:
             }
 
             auto viewAggCmd =
-                OpMsgRequest::fromDBAndBody(nss.db_forSharding(), aggCmdOnView.getValue()).body;
+                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -279,7 +279,7 @@ public:
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.db_forSharding(),
+                nss.dbName(),
                 nss,
                 cri,
                 applyReadWriteConcern(
@@ -300,7 +300,7 @@ public:
             uassertStatusOK(aggCmdOnView.getStatus());
 
             auto viewAggCmd =
-                OpMsgRequest::fromDBAndBody(nss.db_forSharding(), aggCmdOnView.getValue()).body;
+                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,

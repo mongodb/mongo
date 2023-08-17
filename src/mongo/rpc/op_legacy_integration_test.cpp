@@ -139,7 +139,9 @@ Message makeUnsupportedOpGetMoreMessage(StringData ns,
 // and killCursors wire protocol ops.
 int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
     Message findCmdRequest =
-        OpMsgRequest::fromDBAndBody("testOpLegacy", BSON("find" << collName << "batchSize" << 2))
+        OpMsgRequest::fromDBAndBody(
+            DatabaseName::createDatabaseName_forTest(boost::none, "testOpLegacy"),
+            BSON("find" << collName << "batchSize" << 2))
             .serialize();
     Message findCmdReply;
     conn->call(findCmdRequest, findCmdReply);

@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog_cache.h"
@@ -46,7 +47,7 @@ namespace cluster {
  * primary node.
  */
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
-                                  StringData dbName,
+                                  const DatabaseName& dbName,
                                   const boost::optional<ShardId>& suggestedPrimaryId = boost::none);
 
 /**

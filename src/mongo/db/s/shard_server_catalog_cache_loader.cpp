@@ -651,7 +651,7 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
 }
 
 void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
-                                                         StringData dbName) {
+                                                         const DatabaseName& dbName) {
 
     stdx::unique_lock<Latch> lg(_mutex);
     const auto initialTerm = _term;
@@ -661,11 +661,12 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
     while (true) {
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Unable to wait for database metadata flush for "
-                              << dbName.toString()
+                              << dbName.toStringForErrorMsg()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
-        auto it = _dbTaskLists.find(dbName.toString());
+        // TODO SERVER-80342 _dbTaskLists to pass a DatabaseName
+        auto it = _dbTaskLists.find(DatabaseNameUtil::serialize(dbName));
 
         // If there are no tasks for the specified namespace, everything must have been completed
         if (it == _dbTaskLists.end())
@@ -710,7 +711,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             // It is only correct to wait again on condVar if the taskNum has not changed, meaning
             // that it must still be the same task list.
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
-                const auto it = _dbTaskLists.find(dbName.toString());
+                const auto it = _dbTaskLists.find(DatabaseNameUtil::serialize(dbName));
                 return it == _dbTaskLists.end() || it->second.empty() ||
                     it->second.front().taskNum != activeTaskNum;
             });

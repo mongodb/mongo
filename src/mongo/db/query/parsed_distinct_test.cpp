@@ -75,7 +75,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -120,7 +120,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -179,7 +179,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
     auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -232,7 +232,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
     auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -280,7 +280,7 @@ TEST(ParsedDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
 
     ASSERT_FALSE(agg.getValue().hasField("explain"));
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());

@@ -219,7 +219,7 @@ executor::RemoteCommandResponse initWireVersion(
     }
 
     Date_t start{Date_t::now()};
-    auto result = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
+    auto result = conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));
     Date_t finish{Date_t::now()};
 
     BSONObj helloObj = result->getCommandReply().getOwned();

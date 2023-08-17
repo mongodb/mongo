@@ -98,7 +98,7 @@ public:
                 auto result = CommandHelpers::runCommandDirectly(
                     opCtx,
                     OpMsgRequest::fromDBAndBody(
-                        ns.db_deprecated(),
+                        ns.dbName(),
                         BSON("aggregate" << ns.coll() << "cursor" << BSONObj{} << "pipeline"
                                          << BSON_ARRAY(BSON("$collStats" << BSON(
                                                                 "storageStats" << BSON(
@@ -125,14 +125,14 @@ void registerMongoDCollectors(FTDCController* controller) {
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetStatus",
             "replSetGetStatus",
-            "",
+            DatabaseName::kEmpty,
             BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
 
         // CollectionStats
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "aggregate",
             "local.oplog.rs.stats",
-            "local",
+            DatabaseName::kLocal,
             BSON("aggregate"
                  << "oplog.rs"
                  << "cursor" << BSONObj{} << "pipeline"
@@ -144,7 +144,7 @@ void registerMongoDCollectors(FTDCController* controller) {
             controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
                 "getDefaultRWConcern",
                 "getDefaultRWConcern",
-                "",
+                DatabaseName::kEmpty,
                 BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
         }
     }

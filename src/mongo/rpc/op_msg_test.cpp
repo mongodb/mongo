@@ -1153,7 +1153,8 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
 TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();
-    auto msg = OpMsgRequest::fromDBAndBody("db", std::move(body));
+    auto msg = OpMsgRequest::fromDBAndBody(
+        DatabaseName::createDatabaseName_forTest(boost::none, "db"), std::move(body));
 
     ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1, $db: 'db'}"));
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
@@ -1197,7 +1198,8 @@ TEST(OpMsgRequest, SetDollarTenantFailWithDiffTenant) {
                                                                    true);
     const TenantId tenantId(OID::gen());
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
-    auto request = OpMsgRequest::fromDBAndBody("testDb", body);
+    auto request = OpMsgRequest::fromDBAndBody(
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDb"), body);
     ASSERT_THROWS_CODE(request.setDollarTenant(TenantId(OID::gen())), DBException, 8423373);
 }
 

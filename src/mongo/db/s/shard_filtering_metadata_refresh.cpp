@@ -170,8 +170,8 @@ Status refreshDbMetadata(OperationContext* opCtx,
     });
 
     // Force a refresh of the cached database metadata from the config server.
-    const auto swDbMetadata = Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(
-        opCtx, DatabaseNameUtil::serialize(dbName));
+    const auto swDbMetadata =
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName);
 
     // Before setting the database metadata, exit early if the database version received by the
     // config server is not newer than the cached one. This is a best-effort optimization to reduce
@@ -253,15 +253,15 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
 }
 
 void onDbVersionMismatch(OperationContext* opCtx,
-                         const StringData dbName,
+                         const DatabaseName& dbName,
                          boost::optional<DatabaseVersion> receivedDbVersion) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
     tassert(ErrorCodes::IllegalOperation,
-            "Can't check version of {} database"_format(dbName),
-            dbName != DatabaseName::kAdmin.db() && dbName != DatabaseName::kConfig.db());
+            "Can't check version of {} database"_format(dbName.toStringForErrorMsg()),
+            !dbName.isAdminDB() && !dbName.isConfigDB());
 
     Timer t{};
     ScopeGuard finishTiming([&] {
@@ -279,12 +279,11 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
         {
             boost::optional<Lock::DBLock> dbLock;
-            dbLock.emplace(opCtx, DatabaseNameUtil::deserialize(boost::none, dbName), MODE_IS);
+            dbLock.emplace(opCtx, dbName, MODE_IS);
 
             if (receivedDbVersion) {
-                auto scopedDss =
-                    boost::make_optional(DatabaseShardingState::assertDbLockedAndAcquireShared(
-                        opCtx, DatabaseNameUtil::deserialize(boost::none, dbName)));
+                auto scopedDss = boost::make_optional(
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
 
                 if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                     // Waited for another thread to exit from the critical section or to complete an
@@ -309,9 +308,8 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 return;
             }
 
-            auto scopedDss =
-                boost::make_optional(DatabaseShardingState::assertDbLockedAndAcquireExclusive(
-                    opCtx, DatabaseNameUtil::deserialize(boost::none, dbName)));
+            auto scopedDss = boost::make_optional(
+                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName));
 
             if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                 // Waited for another thread to exit from the critical section or to complete an
@@ -328,9 +326,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedDss)
                 ->setDbMetadataRefreshFuture(
-                    recoverRefreshDbVersion(opCtx,
-                                            DatabaseNameUtil::deserialize(boost::none, dbName),
-                                            cancellationToken),
+                    recoverRefreshDbVersion(opCtx, dbName, cancellationToken),
                     std::move(cancellationSource));
             dbMetadataRefreshFuture = (*scopedDss)->getDbMetadataRefreshFuture();
         }
@@ -760,7 +756,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
 }
 
 Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
-                                   const StringData dbName,
+                                   const DatabaseName& dbName,
                                    boost::optional<DatabaseVersion> clientDbVersion) noexcept {
     try {
         onDbVersionMismatch(opCtx, dbName, clientDbVersion);

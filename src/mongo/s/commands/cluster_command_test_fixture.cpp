@@ -156,7 +156,7 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
 
     // If bulkWrite then append adminDB.
     if (cmd.firstElementFieldNameStringData() == "bulkWrite") {
-        opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), cmd);
+        opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
     } else {
         opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.dbName(), cmd);
     }

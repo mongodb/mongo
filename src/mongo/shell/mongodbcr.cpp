@@ -84,7 +84,8 @@ StatusWith<OpMsgRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
         return std::move(db.getStatus());
     }
 
-    return OpMsgRequest::fromDBAndBody(db.getValue(), kGetNonceCmd);
+    return OpMsgRequest::fromDBAndBody(DatabaseNameUtil::deserialize(boost::none, db.getValue()),
+                                       kGetNonceCmd);
 }
 
 OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
@@ -118,7 +119,9 @@ OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonc
         b << "key" << digestToString(d);
     }
 
-    return OpMsgRequest::fromDBAndBody(uassertStatusOK(extractDBField(params)), b.obj());
+    return OpMsgRequest::fromDBAndBody(
+        DatabaseNameUtil::deserialize(boost::none, uassertStatusOK(extractDBField(params))),
+        b.obj());
 }
 
 Future<void> authMongoCRImpl(RunCommandHook runCommand, const BSONObj& params) {

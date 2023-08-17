@@ -94,7 +94,7 @@ public:
         return Status::OK();
     }
 
-    void unlockLockedShards(OperationContext* opCtx, const std::string& dbname) {
+    void unlockLockedShards(OperationContext* opCtx, const DatabaseName& dbname) {
 
         auto request = OpMsgRequest::fromDBAndBody(dbname, BSON("fsyncUnlock" << 1));
         auto response = CommandHelpers::runCommandDirectly(opCtx, request);
@@ -119,7 +119,7 @@ public:
 
         auto shardResults = scatterGatherUnversionedTargetConfigServerAndShards(
             opCtx,
-            dbname,
+            dbName,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(fsyncCmdObj)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
@@ -134,7 +134,7 @@ public:
         result.append("all", rawResult.obj());
         if (!response.responseOK) {
             if (cmdObj["lock"].trueValue()) {
-                unlockLockedShards(opCtx, dbname);
+                unlockLockedShards(opCtx, dbName);
             }
             return false;
         }

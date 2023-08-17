@@ -719,7 +719,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
     // Technically, findAndModify should only be creating database if upsert is true, but this
     // would require that the parsing be pulled into this function.
-    cluster::createDatabase(opCtx, nss.db_forSharding());
+    cluster::createDatabase(opCtx, nss.dbName());
 
     auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
     const auto& cm = cri.cm;
@@ -950,8 +950,8 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(cmdObjForPassthrough);
         const auto explainClusterQueryWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
-        auto opMsg = OpMsgRequest::fromDBAndBody(nss.db_forSharding(),
-                                                 explainClusterQueryWithoutShardKeyCmd);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(nss.dbName(), explainClusterQueryWithoutShardKeyCmd);
         return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
     }();
 
@@ -965,8 +965,8 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
             write_without_shard_key::targetDocForExplain);
         const auto explainClusterWriteWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
-        auto opMsg = OpMsgRequest::fromDBAndBody(nss.db_forSharding(),
-                                                 explainClusterWriteWithoutShardKeyCmd);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(nss.dbName(), explainClusterWriteWithoutShardKeyCmd);
         return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
     }();
 

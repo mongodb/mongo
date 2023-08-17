@@ -116,12 +116,11 @@ public:
                 std::move(reshardCollectionRequest));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo =
-                uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db_forSharding()));
+            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
-                "admin",
+                DatabaseName::kAdmin,
                 dbInfo,
                 CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON({}),
                                                            opCtx->getWriteConcern()),

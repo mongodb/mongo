@@ -148,7 +148,7 @@ const auto getShardingCatalogManager =
     ServiceContext::declareDecoration<boost::optional<ShardingCatalogManager>>();
 
 OpMsg runCommandInLocalTxn(OperationContext* opCtx,
-                           StringData db,
+                           const DatabaseName& db,
                            bool startTransaction,
                            TxnNumber txnNumber,
                            BSONObj cmdObj) {
@@ -166,8 +166,7 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
     return OpMsg::parseOwned(
         opCtx->getServiceContext()
             ->getServiceEntryPoint()
-            ->handleRequest(opCtx,
-                            OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
+            ->handleRequest(opCtx, OpMsgRequest::fromDBAndBody(db, bob.obj()).serialize())
             .get()
             .response);
 }
@@ -194,7 +193,7 @@ void startTransactionWithNoopFind(OperationContext* opCtx,
     findCommand.setSingleBatch(true);
 
     auto res = runCommandInLocalTxn(opCtx,
-                                    nss.db_forSharding(),
+                                    nss.dbName(),
                                     true /*startTransaction*/,
                                     txnNumber,
                                     findCommand.toBSON(BSONObj()))
@@ -236,9 +235,8 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     const auto replyOpMsg = OpMsg::parseOwned(
         newOpCtx->getServiceContext()
             ->getServiceEntryPoint()
-            ->handleRequest(
-                newOpCtx.get(),
-                OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.toString(), cmdObj).serialize())
+            ->handleRequest(newOpCtx.get(),
+                            OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmdObj).serialize())
             .get()
             .response);
     return replyOpMsg.body;
@@ -1104,7 +1102,7 @@ BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opC
     invariant(nss.dbName() == DatabaseName::kConfig);
     auto response =
         runCommandInLocalTxn(
-            opCtx, nss.db_forSharding(), false /* startTransaction */, txnNumber, request.toBSON())
+            opCtx, nss.dbName(), false /* startTransaction */, txnNumber, request.toBSON())
             .body;
 
     uassertStatusOK(getStatusFromWriteCommandReply(response));
@@ -1155,7 +1153,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     findCommand.setLimit(1);
 
     auto res = runCommandInLocalTxn(opCtx,
-                                    nss.db_forSharding(),
+                                    nss.dbName(),
                                     false /*startTransaction*/,
                                     txnNumber,
                                     findCommand.toBSON(BSONObj()))

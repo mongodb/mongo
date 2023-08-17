@@ -81,7 +81,10 @@ void assertMessageBodyCameFromRequest(Message m, RemoteCommandRequest rcr) {
     ASSERT_BSONOBJ_EQ(opMsg.body, expectedOpMsg.body);
 }
 
-void assertMessageBodyAndDBName(Message m, BSONObj body, BSONObj metadata, std::string dbName) {
+void assertMessageBodyAndDBName(Message m,
+                                BSONObj body,
+                                BSONObj metadata,
+                                const DatabaseName& dbName) {
     auto opMsg = OpMsgRequest::parse(m);
     auto expectedOpMsg = OpMsgRequest::fromDBAndBody(dbName, body, metadata);
     ASSERT_BSONOBJ_EQ(opMsg.body, expectedOpMsg.body);
@@ -155,7 +158,8 @@ TEST_F(PinnedConnectionTaskExecutorTest, RunTwoRemoteCommandsSimultaneously) {
         int32_t responseToId;
         expectSinkMessage([&](Message m) {
             responseToId = m.header().getId();
-            assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << i), "admin");
+            assertMessageBodyAndDBName(
+                m, BSON("hello" << 1), BSON("forTest" << i), DatabaseName::kAdmin);
             pf.promise.emplaceValue();
             return Status::OK();
         });
@@ -198,7 +202,8 @@ TEST_F(PinnedConnectionTaskExecutorTest, FailCommandRemotelyDoesntBreakOtherComm
     int32_t responseToId;
     expectSinkMessage([&](Message m) {
         responseToId = m.header().getId();
-        assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << 0), "admin");
+        assertMessageBodyAndDBName(
+            m, BSON("hello" << 1), BSON("forTest" << 0), DatabaseName::kAdmin);
         return Status::OK();
     });
     // Fail the first request
@@ -214,7 +219,8 @@ TEST_F(PinnedConnectionTaskExecutorTest, FailCommandRemotelyDoesntBreakOtherComm
     // Second command should still be able to succeed:
     expectSinkMessage([&](Message m) {
         responseToId = m.header().getId();
-        assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << 1), "admin");
+        assertMessageBodyAndDBName(
+            m, BSON("hello" << 1), BSON("forTest" << 1), DatabaseName::kAdmin);
         return Status::OK();
     });
     expectSourceMessage([&]() {
@@ -390,7 +396,8 @@ TEST_F(PinnedConnectionTaskExecutorTest, StreamFailureShutsDownAndCancels) {
     int32_t responseToId;
     expectSinkMessage([&](Message m) {
         responseToId = m.header().getId();
-        assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << 0), "admin");
+        assertMessageBodyAndDBName(
+            m, BSON("hello" << 1), BSON("forTest" << 0), DatabaseName::kAdmin);
         return Status::OK();
     });
 
@@ -444,7 +451,8 @@ TEST_F(PinnedConnectionTaskExecutorTest, EnsureStreamDestroyedBeforeCommandCompl
     int32_t responseToId;
     expectSinkMessage([&](Message m) {
         responseToId = m.header().getId();
-        assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << 0), "admin");
+        assertMessageBodyAndDBName(
+            m, BSON("hello" << 1), BSON("forTest" << 0), DatabaseName::kAdmin);
         return Status::OK();
     });
 

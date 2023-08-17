@@ -1223,7 +1223,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
             // should not participate in the shard version protocol.
             shardResults =
                 scatterGatherUnversionedTargetAllShards(opCtx,
-                                                        expCtx->ns.db_deprecated(),
+                                                        expCtx->ns.dbName(),
                                                         targetedCommand,
                                                         ReadPreferenceSetting::get(opCtx),
                                                         Shard::RetryPolicy::kIdempotent);
@@ -1234,7 +1234,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                     cri);
             shardResults =
                 scatterGatherVersionedTargetByRoutingTable(expCtx,
-                                                           expCtx->ns.db_deprecated(),
+                                                           expCtx->ns.dbName(),
                                                            expCtx->ns,
                                                            *cri,
                                                            targetedCommand,

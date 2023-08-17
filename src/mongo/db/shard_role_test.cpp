@@ -422,7 +422,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb, exInfo->getDb());
         ASSERT_EQ(incorrectDbVersion, exInfo->getVersionReceived());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -464,7 +464,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb, exInfo->getDb());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
         ASSERT_EQ(boost::none, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -506,7 +506,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
 
         auto validateException = [&](const DBException& ex) {
             const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-            ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
+            ASSERT_EQ(dbNameTestDb, exInfo->getDb());
             ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
             ASSERT_TRUE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -840,7 +840,7 @@ TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecause
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb, exInfo->getDb());
         ASSERT_EQ(incorrectDbVersion, exInfo->getVersionReceived());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -1338,7 +1338,7 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbV
                              ExceptionFor<ErrorCodes::StaleDbVersion>,
                              [&](const DBException& ex) {
                                  const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-                                 ASSERT_EQ(nss.db_forTest(), exInfo->getDb());
+                                 ASSERT_EQ(nss.dbName(), exInfo->getDb());
                                  ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
                                  ASSERT_EQ(newDbVersion, exInfo->getVersionWanted());
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());

@@ -92,7 +92,7 @@ public:
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             auto cmd = request();
             auto dbName = cmd.getDbName();
-            cluster::createDatabase(opCtx, DatabaseNameUtil::serialize(dbName));
+            cluster::createDatabase(opCtx, dbName);
 
             uassert(ErrorCodes::InvalidOptions,
                     "specify size:<n> when capped is true",
@@ -102,12 +102,12 @@ public:
                     !cmd.getTemp());
 
             // Manually forward the create collection command to the primary shard.
-            const auto dbInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                opCtx, DatabaseNameUtil::serializeForCatalog(dbName)));
+            const auto dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
             auto response = uassertStatusOK(
                 executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    DatabaseNameUtil::serialize(dbName),
+                    dbName,
                     dbInfo,
                     applyReadWriteConcern(
                         opCtx,

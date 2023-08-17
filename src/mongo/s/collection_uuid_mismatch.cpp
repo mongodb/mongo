@@ -86,8 +86,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     opCtx = alternativeOpCtx.get();
     AlternativeClientRegion acr{client};
 
-    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
-        opCtx, DatabaseNameUtil::serializeForCatalog(info->dbName()));
+    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->dbName());
     if (!swDbInfo.isOK()) {
         return swDbInfo.getStatus();
     }
@@ -99,7 +98,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             DatabaseNameUtil::serialize(info->dbName()),
+                                             info->dbName(),
                                              swDbInfo.getValue(),
                                              listCollections.toBSON({}),
                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},

@@ -182,7 +182,7 @@ public:
      * and returns it. If the database was not in cache, all the sharded collections will be in the
      * 'needsRefresh' state.
      */
-    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
      * Blocking method to get both the placement information and the index information for a
@@ -217,7 +217,7 @@ public:
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
      */
     StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
-                                                          StringData dbName);
+                                                          const DatabaseName& dbName);
 
     /**
      * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
@@ -272,7 +272,7 @@ public:
      *
      * In the case the passed version is boost::none, invalidates the cache for the given database.
      */
-    void onStaleDatabaseVersion(StringData dbName,
+    void onStaleDatabaseVersion(const DatabaseName& dbName,
                                 const boost::optional<DatabaseVersion>& wantedVersion);
 
     /**
@@ -408,7 +408,7 @@ private:
     // by checking for ErrorCodes::ShardCannotRefreshDueToLocksHeld and addint the full namespace to
     // the exception.
     StatusWith<CachedDatabaseInfo> _getDatabase(OperationContext* opCtx,
-                                                StringData dbName,
+                                                const DatabaseName& dbName,
                                                 bool allowLocks = false);
 
     StatusWith<ChunkManager> _getCollectionPlacementInfoAt(OperationContext* opCtx,

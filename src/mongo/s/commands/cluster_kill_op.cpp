@@ -129,7 +129,7 @@ private:
         BSONObjBuilder bob(BSON("killOp" << 1 << "op" << opId));
         APIParameters::get(opCtx).appendInfo(&bob);
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
+        conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of

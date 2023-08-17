@@ -208,8 +208,7 @@ public:
         ClusterClientCursorGuard _establishCursorOnDbPrimary(OperationContext* opCtx,
                                                              const NamespaceString& nss) {
             const CachedDatabaseInfo dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                    opCtx, DatabaseNameUtil::serializeForCatalog(nss.dbName())));
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
             shardsvrRequest.setDbName(nss.dbName());

@@ -133,7 +133,7 @@ public:
         const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
             auto shardResults =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.db_forSharding(),
+                                                           nss.dbName(),
                                                            nss,
                                                            cri,
                                                            cmdObj,

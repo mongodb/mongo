@@ -474,8 +474,7 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest =
-            OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), upsertCmdObj);
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, upsertCmdObj);
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest));
@@ -490,8 +489,7 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest =
-            OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), upsertCmdObj);
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, upsertCmdObj);
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest),

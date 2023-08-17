@@ -95,10 +95,9 @@ bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           BSONObjBuilder* out,
                                           const PrivilegeVector& privileges) {
-    // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
     auto response = executeCommandAgainstDatabasePrimary(
         opCtx,
-        DatabaseNameUtil::serialize(dbName),
+        dbName,
         dbInfo,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
@@ -276,9 +275,7 @@ public:
             newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
         }
 
-        // TODO SERVER-67797 Change CatalogCache to use DatabaseName object
-        auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(
-            opCtx, DatabaseNameUtil::serializeForCatalog(dbName));
+        auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!dbInfoStatus.isOK()) {
             appendEmptyResultSet(opCtx, output, dbInfoStatus.getStatus(), nss);
             return true;

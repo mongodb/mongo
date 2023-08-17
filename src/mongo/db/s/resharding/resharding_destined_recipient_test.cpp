@@ -296,7 +296,7 @@ protected:
                          "y"),
             boost::none);
 
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db_forTest(), boost::none));
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.dbName(), boost::none));
         forceShardFilteringMetadataRefresh(opCtx, kNss);
 
         if (refreshTempNss)

@@ -110,7 +110,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
  */
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests);
@@ -177,7 +177,7 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy);
@@ -198,7 +198,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigServerAndShards(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy);
@@ -215,7 +215,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
  */
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -232,7 +232,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
  */
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
@@ -253,7 +253,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardsToSkip,
@@ -271,7 +271,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
  */
 AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     const CachedDatabaseInfo& dbInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,

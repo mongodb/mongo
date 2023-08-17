@@ -362,10 +362,9 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
         const auto& [cmd, firstElement] = body.firstElement();
         if (cmd != "getMore"_sd)
             return false;
-        StringData db = inRequest.getDatabase();
         sep->handleRequest(client->makeOperationContext().get(),
                            OpMsgRequest::fromDBAndBody(
-                               db,
+                               inRequest.getDbName(),
                                KillCursorsCommandRequest(
                                    NamespaceStringUtil::deserialize(inRequest.getDbName(),
                                                                     body["collection"].String()),

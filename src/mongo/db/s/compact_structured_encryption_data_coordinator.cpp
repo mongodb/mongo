@@ -90,7 +90,7 @@ const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
  * using majority write concern.
  */
 template <typename Request>
-Status doRunCommand(OperationContext* opCtx, StringData dbname, const Request& request) {
+Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const Request& request) {
     DBDirectClient client(opCtx);
     BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client.runCommand(OpMsgRequest::fromDBAndBody(dbname, cmd))->getCommandReply();
@@ -213,7 +213,7 @@ bool doRenameOperation(const CompactionState& state,
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
 
-        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db_forSharding(), cmd));
+        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 
@@ -228,7 +228,7 @@ bool doRenameOperation(const CompactionState& state,
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         createCmd.setClusteredIndex(
             stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
-        auto status = doRunCommand(opCtx.get(), ecocNss.db_forSharding(), createCmd);
+        auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {
                 uassertStatusOK(status);
@@ -314,7 +314,7 @@ void doDropOperation(const State& state) {
 
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
-    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db_forSharding(), cmd));
+    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.dbName(), cmd));
 }
 
 }  // namespace

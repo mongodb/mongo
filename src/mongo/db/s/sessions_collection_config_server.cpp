@@ -127,7 +127,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
 
             return scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.db(),
+                nss.dbName(),
                 nss,
                 cri,
                 SessionsCollection::generateCreateIndexesCmd(),

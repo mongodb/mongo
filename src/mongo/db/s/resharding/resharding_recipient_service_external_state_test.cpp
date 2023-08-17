@@ -251,11 +251,10 @@ public:
     void expectStaleDbVersionError(const NamespaceString& nss, StringData expectedCmdName) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldNameStringData(), expectedCmdName);
-            return createErrorCursorResponse(
-                Status(StaleDbRoutingVersion(nss.db_forTest().toString(),
-                                             DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                                             boost::none),
-                       "dummy stale db version error"));
+            return createErrorCursorResponse(Status(
+                StaleDbRoutingVersion(
+                    nss.dbName(), DatabaseVersion(UUID::gen(), Timestamp(1, 1)), boost::none),
+                "dummy stale db version error"));
         });
     }
 

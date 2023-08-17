@@ -498,8 +498,7 @@ Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCo
     auto command = CommandHelpers::findCommand(_opCtx.get(), "mapReduce");
     ASSERT(command) << "Unable to look up mapReduce command";
 
-    auto request =
-        OpMsgRequest::fromDBAndBody(inputNss.db_forTest(), _makeCmdObj(mapCode, reduceCode));
+    auto request = OpMsgRequest::fromDBAndBody(inputNss.dbName(), _makeCmdObj(mapCode, reduceCode));
     auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpMsg);
     auto result = CommandHelpers::runCommandDirectly(_opCtx.get(), request);
     auto status = getStatusFromCommandResult(result);

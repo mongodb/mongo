@@ -126,7 +126,7 @@ void registerMongoSCollectors(FTDCController* controller) {
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
         "getDefaultRWConcern",
         "getDefaultRWConcern",
-        "",
+        DatabaseName::kEmpty,
         BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
 }
 

@@ -143,8 +143,7 @@ public:
                         ActionType::setUserWriteBlockMode));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            auto swDbInfo =
-                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db_forSharding());
+            auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.dbName());
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 uassert(CollectionUUIDMismatchInfo(fromNss.dbName(),
                                                    *request().getCollectionUUID(),

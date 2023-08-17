@@ -82,7 +82,7 @@ public:
 
             auto responses = scatterGatherUnversionedTargetConfigServerAndShards(
                 opCtx,
-                DatabaseName::kAdmin.db(),
+                DatabaseName::kAdmin,
                 applyReadWriteConcern(
                     opCtx,
                     this,

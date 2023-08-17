@@ -846,7 +846,8 @@ public:
                            << "verbosity"
                            << "executionStats");
 
-        auto reply = _client.runCommand(OpMsgRequest::fromDBAndBody("local", explainCmdObj));
+        auto reply =
+            _client.runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kLocal, explainCmdObj));
         BSONObj explainCmdReplyBody = reply->getCommandReply();
         ASSERT_OK(getStatusFromCommandResult(explainCmdReplyBody));
 

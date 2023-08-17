@@ -58,7 +58,7 @@ public:
     void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
                                                 const Timestamp& commitTime) override {}
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
-    void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
+    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;

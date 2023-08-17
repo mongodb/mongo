@@ -137,7 +137,7 @@ void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* op
 }
 
 void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
-                                                          StringData dbName) {
+                                                          const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 

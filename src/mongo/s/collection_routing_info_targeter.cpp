@@ -247,7 +247,7 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
  * namespace.
  */
 CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opCtx, bool refresh) {
-    cluster::createDatabase(opCtx, _nss.db_forSharding());
+    cluster::createDatabase(opCtx, _nss.dbName());
 
     if (refresh) {
         uassertStatusOK(
@@ -827,7 +827,7 @@ void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
                                                         const ShardEndpoint& endpoint,
                                                         const StaleDbRoutingVersion& staleInfo) {
     dassert(!_lastError || _lastError.value() == LastErrorType::kStaleDbVersion);
-    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.db_forSharding(),
+    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());
     _lastError = LastErrorType::kStaleDbVersion;
 }

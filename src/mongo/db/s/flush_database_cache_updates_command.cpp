@@ -141,7 +141,7 @@ public:
          * ns() is the database to flush, with no collection.
          */
         NamespaceString ns() const {
-            return NamespaceStringUtil::deserialize(boost::none, _dbName());
+            return NamespaceString(_dbName());
         }
 
         bool supportsWriteConcern() const override {
@@ -169,8 +169,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
-
-            if (_dbName() == DatabaseName::kAdmin.db() || _dbName() == DatabaseName::kConfig.db()) {
+            const auto dbName = _dbName();
+            if (dbName.isAdminDB() || dbName.isConfigDB()) {
                 // The admin and config databases have fixed metadata that does not need to be
                 // refreshed.
 
@@ -183,9 +183,8 @@ public:
                     LOGV2_DEBUG(6910800,
                                 1,
                                 "Inserting a database collection entry with fixed metadata",
-                                "db"_attr = _dbName());
-                    uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(
-                        opCtx, DatabaseNameUtil::deserialize(boost::none, _dbName())));
+                                "db"_attr = dbName);
+                    uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(opCtx, dbName));
                 }
 
                 return;
@@ -194,8 +193,7 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                AutoGetDb autoDb(
-                    opCtx, DatabaseNameUtil::deserialize(boost::none, _dbName()), MODE_IS);
+                AutoGetDb autoDb(opCtx, dbName, MODE_IS);
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime
@@ -203,7 +201,7 @@ public:
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
                 const auto scopedDss =
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, ns().dbName());
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
                 criticalSectionSignal =
                     scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
             }
@@ -216,18 +214,19 @@ public:
                             1,
                             "Forcing remote routing table refresh for {db}",
                             "Forcing remote routing table refresh",
-                            "db"_attr = _dbName());
-                uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, _dbName(), boost::none));
+                            "db"_attr = dbName);
+                uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, dbName, boost::none));
             }
 
-            CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, _dbName());
+            CatalogCacheLoader::get(opCtx).waitForDatabaseFlush(opCtx, dbName);
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
 
     private:
-        StringData _dbName() const {
-            return Base::request().getCommandParameter();
+        DatabaseName _dbName() const {
+            return DatabaseNameUtil::deserialize(boost::none,
+                                                 Base::request().getCommandParameter());
         }
     };
 };

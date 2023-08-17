@@ -115,7 +115,7 @@ public:
 
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
 
-    void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
+    void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override;
 
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to
@@ -350,6 +350,7 @@ private:
         // completed. Must be used in conjunction with the loader's mutex.
         std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
     };
+    // TODO SERVER-80342 change string type to DatabaseName.
     typedef std::map<std::string, DbTaskList> DbTaskLists;
 
     typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;

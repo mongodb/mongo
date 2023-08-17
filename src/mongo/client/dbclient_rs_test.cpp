@@ -152,7 +152,9 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
     auto tagSet = secondaryOk ? TagSet() : TagSet::primaryOnly();
     // We need the command to be a "SecOk command"
     auto res = replConn.runCommand(
-        OpMsgRequest::fromDBAndBody("foo", BSON("dbStats" << 1), makeMetadata(rp, tagSet)));
+        OpMsgRequest::fromDBAndBody(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                                    BSON("dbStats" << 1),
+                                    makeMetadata(rp, tagSet)));
     stdx::unordered_set<HostAndPort> hostSet;
     for (const auto& hostName : hostNames) {
         hostSet.emplace(hostName);
@@ -274,7 +276,9 @@ void assertRunCommandWithReadPrefThrows(MockReplicaSet* replSet, ReadPreference 
 
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
     ASSERT_THROWS(replConn.runCommand(OpMsgRequest::fromDBAndBody(
-                      "foo", BSON("dbStats" << 1), makeMetadata(rp, ts))),
+                      DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                      BSON("dbStats" << 1),
+                      makeMetadata(rp, ts))),
                   AssertionException);
 }
 

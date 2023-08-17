@@ -101,7 +101,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleEpochInfo::parse(const BSONObj& obj) 
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
-    bob->append("db", _db);
+    bob->append("db", _db.toStringForErrorMsg());
     bob->append("vReceived", _received.toBSON());
     if (_wanted) {
         bob->append("vWanted", _wanted->toBSON());
@@ -109,11 +109,11 @@ void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
-    return std::make_shared<StaleDbRoutingVersion>(obj["db"].String(),
-                                                   DatabaseVersion(obj["vReceived"].Obj()),
-                                                   !obj["vWanted"].eoo()
-                                                       ? DatabaseVersion(obj["vWanted"].Obj())
-                                                       : boost::optional<DatabaseVersion>{});
+    return std::make_shared<StaleDbRoutingVersion>(
+        DatabaseNameUtil::deserializeForErrorMsg(obj["db"].String()),
+        DatabaseVersion(obj["vReceived"].Obj()),
+        !obj["vWanted"].eoo() ? DatabaseVersion(obj["vWanted"].Obj())
+                              : boost::optional<DatabaseVersion>{});
 }
 
 }  // namespace mongo

@@ -388,20 +388,17 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
                     auto recoveryService = ShardingRecoveryService::get(opCtx);
+                    // TODO SERVER-80223 _dbName becomes a DatabaseName object.
+                    const auto nss = NamespaceStringUtil::deserialize(boost::none, _dbName);
                     recoveryService->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx,
-                        NamespaceStringUtil::deserialize(boost::none, _dbName),
-                        _critSecReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        opCtx, nss, _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
                     recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                        opCtx,
-                        NamespaceStringUtil::deserialize(boost::none, _dbName),
-                        _critSecReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                        opCtx, nss, _critSecReason, ShardingCatalogClient::kLocalWriteConcern);
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
-                    dropDatabaseParticipantCmd.setDbName(
-                        DatabaseNameUtil::deserialize(boost::none, _dbName));
+                    // TODO SERVER-80223 _dbName becomes a DatabaseName instead of StringData
+                    const auto dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
+                    dropDatabaseParticipantCmd.setDbName(dbName);
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                         dropDatabaseParticipantCmd.toBSON({}));
 
@@ -410,7 +407,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     {
                         DBDirectClient dbDirectClient(opCtx);
                         const auto commandResponse =
-                            dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(_dbName, cmdObj));
+                            dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
                         uassertStatusOK(
                             getStatusFromCommandResult(commandResponse->getCommandReply()));
 

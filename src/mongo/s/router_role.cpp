@@ -55,8 +55,8 @@ namespace router {
 
 RouterBase::RouterBase(ServiceContext* service) : _service(service) {}
 
-DBPrimaryRouter::DBPrimaryRouter(ServiceContext* service, StringData db)
-    : RouterBase(service), _db(db.toString()) {}
+DBPrimaryRouter::DBPrimaryRouter(ServiceContext* service, const DatabaseName& db)
+    : RouterBase(service), _dbName(db) {}
 
 void DBPrimaryRouter::appendDDLRoutingTokenToCommand(const DatabaseType& dbt,
                                                      BSONObjBuilder* builder) {
@@ -79,7 +79,7 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
     auto catalogCache = Grid::get(_service)->catalogCache();
-    return uassertStatusOK(catalogCache->getDatabase(opCtx, _db));
+    return uassertStatusOK(catalogCache->getDatabase(opCtx, _dbName));
 }
 
 void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
@@ -89,9 +89,10 @@ void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
         tassert(6375900, "StaleDbVersion must have extraInfo", si);
         tassert(6375901,
-                str::stream() << "StaleDbVersion on unexpected database. Expected " << _db
-                              << ", received " << si->getDb(),
-                si->getDb() == _db);
+                str::stream() << "StaleDbVersion on unexpected database. Expected "
+                              << _dbName.toStringForErrorMsg() << ", received "
+                              << si->getDb().toStringForErrorMsg(),
+                si->getDb() == _dbName);
 
         catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
     } else {

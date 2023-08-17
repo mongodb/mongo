@@ -147,13 +147,11 @@ public:
 
         // TODO SERVER-67797 Change CatalogCache to use DatabaseName object
         const CachedDatabaseInfo dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
-                opCtx, DatabaseNameUtil::serializeForCatalog(dbName)));
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
-        // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
         auto cmdResponse = executeCommandAgainstDatabasePrimary(
             opCtx,
-            DatabaseNameUtil::serialize(dbName),
+            dbName,
             dbInfo,
             CommandHelpers::appendMajorityWriteConcern(shardsvrDropIndexCmd.toBSON({}),
                                                        opCtx->getWriteConcern()),

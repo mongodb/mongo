@@ -43,7 +43,8 @@ void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
+void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
+                                                      const DatabaseName& dbName) {
     MONGO_UNREACHABLE;
 }
 

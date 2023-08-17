@@ -123,7 +123,9 @@ protected:
 
         bool isExplain = false;
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequest::fromDBAndBody("test", cmdObj).body;
+        auto cmd = OpMsgRequest::fromDBAndBody(
+                       DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmdObj)
+                       .body;
         auto findCommand =
             query_request_helper::makeFromFindCommandForTests(cmd, NamespaceString());
 
