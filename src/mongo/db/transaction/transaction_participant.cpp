@@ -2045,6 +2045,15 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
             TransactionParticipant::get(splitOpCtx.get());
         newTxnParticipant.beginOrContinueTransactionUnconditionally(
             splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
+
+        // This function is called while userOpCtx's lockState is under an UninterruptibleLockGuard,
+        // because once entering "committing with prepare" we cannot throw an exception, and
+        // therefore our lock acquisitions cannot be interruptible. We need to set an
+        // UninterruptibleLockGuard on newTxnParticipant's locker (this will be swapped into
+        // splitOpCtx's locker in unstashTransactionResources) in order to prevent the split
+        // transaction's lock acquisitions from being interruptible.
+        UninterruptibleLockGuard noInterrupt(                   // NOLINT
+            newTxnParticipant.o().txnResourceStash->locker());  // NOLINT
         newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "commitTransaction");
 
         splitOpCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);

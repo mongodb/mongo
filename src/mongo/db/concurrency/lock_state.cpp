@@ -361,7 +361,10 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
     do {
         for (auto it = _requests.begin(); it; it.next()) {
             invariant(it->mode == LockMode::MODE_IS || it->mode == LockMode::MODE_IX);
-            opCtx->checkForInterrupt();
+            // TODO SERVER-80206: Remove opCtx->checkForInterrupt().
+            if (!_uninterruptibleLocksRequested) {
+                opCtx->checkForInterrupt();
+            }
 
             // If we've reached this point then that means we tried to acquire a ticket but were
             // unsuccessful, implying that tickets are currently exhausted. Additionally, since
