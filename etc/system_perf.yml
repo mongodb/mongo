@@ -6,6 +6,7 @@ stepback: false
 parameters:
   - key: patch_compile_flags
     description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+  # see https://github.com/10gen/performance-tooling-docs/blob/main/patch_testing.md#skipping-compilation-on-sys-perf-projects
   - key: reuse_compile_from
     description: "Version_id of the commit/patch to reuse the compile artifacts from, e.g., sys_perf_7.0_37d84072b5c5b9fd723db5fa133fb202ad2317f1"
 
