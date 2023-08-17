@@ -99,6 +99,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 
 BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
+    opts.includePath = true;
     return BSON("$elemMatch" << _sub->serialize(opts));
 }
 

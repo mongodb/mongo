@@ -2125,5 +2125,35 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RedactsExpressionCorrec
                                                                        << "?")))),
                       elemMatchExpr->getSerializedRightHandSide(opts));
 }
+
+TEST(SerializeBasic, SerializesNestedElemMatchCorrectly) {
+    auto query = fromjson(R"({a: {$elemMatch: {$elemMatch: {b: {$lt: 6, $gt: 4}}}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({"a": {
+                "$elemMatch": {
+                    "$elemMatch": {
+                        "$and": [
+                            {
+                                "b": {
+                                    "$lt": "?"
+                                }
+                            },
+                            {
+                                "b": {
+                                    "$gt": "?"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        })",
+        objMatch.getValue()->serialize(opts));
+}
 }  // namespace
 }  // namespace mongo
