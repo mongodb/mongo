@@ -33,6 +33,9 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/read_concern.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -184,12 +187,66 @@ Status RSLocalClient::runAggregation(
     const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
+    /* We use DBDirectClient to read locally, which uses the readSource/readTimestamp set on the
+     * opCtx rather than applying the readConcern speficied in the command. This is not
+     * consistent with any remote client. We extract the readConcern from the request and apply
+     * it to the opCtx's readSource/readTimestamp. Leave as it was originally before returning*/
+
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    // extracting readConcern
+    repl::ReadConcernArgs requestReadConcernArgs;
+    if (!aggRequest.getReadConcern()) {
+        requestReadConcernArgs =
+            repl::ReadConcernArgs{_getLastOpTime(), repl::ReadConcernLevel::kLocalReadConcern};
+    } else {
+        // initialize read concern args
+        auto readConcernParseStatus = requestReadConcernArgs.parse(*aggRequest.getReadConcern());
+        if (!readConcernParseStatus.isOK()) {
+            return readConcernParseStatus;
+        }
+
+        // if after cluster time is set, change it with lastOp time if this comes later
+        if (requestReadConcernArgs.getArgsAfterClusterTime()) {
+            auto afterClusterTime = *requestReadConcernArgs.getArgsAfterClusterTime();
+            if (afterClusterTime.asTimestamp() < _getLastOpTime().getTimestamp())
+                requestReadConcernArgs =
+                    repl::ReadConcernArgs{_getLastOpTime(), requestReadConcernArgs.getLevel()};
+        }
+    }
+    // saving original read source and read concern
+    auto originalRCA = repl::ReadConcernArgs::get(opCtx);
+    auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
+    boost::optional<Timestamp> originalReadTimestamp;
+    if (originalReadSource == RecoveryUnit::ReadSource::kProvided)
+        originalReadTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+
+    ON_BLOCK_EXIT([&]() {
+        repl::ReadConcernArgs::get(opCtx) = originalRCA;
+        if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+            opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource,
+                                                          originalReadTimestamp);
+        } else {
+            opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource);
+        }
+    });
+
+    // Waits for any writes performed by this ShardLocal instance to be committed and
+    // visible. This will set the correct ReadSource as well
+    repl::ReadConcernArgs::get(opCtx) = requestReadConcernArgs;
+    Status rcStatus = mongo::waitForReadConcern(
+        opCtx, requestReadConcernArgs, aggRequest.getNamespace().dbName(), true);
+
+    if (!rcStatus.isOK())
+        return rcStatus;
+
+    // run aggregation
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
         DBClientCursor::fromAggregationRequest(
             &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
         "Failed to establish a cursor for aggregation");
-
     while (cursor->more()) {
         std::vector<BSONObj> batchDocs;
         batchDocs.reserve(cursor->objsLeftInBatch());
@@ -210,5 +267,4 @@ Status RSLocalClient::runAggregation(
 
     return Status::OK();
 }
-
 }  // namespace mongo

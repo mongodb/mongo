@@ -1896,6 +1896,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'dbdirectclient',
+        'rw_concern_d',
     ],
 )
 
