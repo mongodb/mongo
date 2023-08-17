@@ -31,6 +31,23 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
+function waitForFsyncLockToWaitForLock(st, numThreads) {
+    assert.soon(() => {
+        let ops = st.s.getDB('admin')
+                      .aggregate([
+                          {$currentOp: {allUsers: true, idleConnections: true}},
+                          {$match: {desc: "fsyncLockWorker", waitingForLock: true}},
+                      ])
+                      .toArray();
+        if (ops.length != numThreads) {
+            jsTest.log("Num operations: " + ops.length + ", expected: " + numThreads);
+            jsTest.log(ops);
+            return false;
+        }
+        return true;
+    });
+}
+
 function runTxn(mongosHost, dbName, collName) {
     const mongosConn = new Mongo(mongosHost);
     jsTest.log("Starting a cross-shard transaction with shard0 and shard1 as the participants " +
@@ -78,9 +95,9 @@ writeDecisionFp.wait();
 let fsyncLockThread = new Thread(runFsyncLock, st.s.host);
 fsyncLockThread.start();
 
-// Wait for fsyncLock to wait for the global S lock, may have to be changed to a failpoint in the
-// future (sleep is not as deterministic)
-sleep(100);
+// Wait for fsyncLockWorker threads on the shard primaries to wait for the global S lock (enqueued
+// in the conflict queue).
+waitForFsyncLockToWaitForLock(st, 2 /*blocked fsyncLockWorker threads*/);
 
 // Unpause the TransactionCoordinator.
 // The transaction thread can now acquire the IX locks since the blocking fsyncLock request (with an
