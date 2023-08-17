@@ -699,7 +699,8 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (!params.count("net.port")) {
         if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
             serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-        } else if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ConfigServer)) {
+        } else if (serverGlobalParams.clusterRole.hasExclusively(
+                       {ClusterRole::ShardServer, ClusterRole::ConfigServer})) {
             serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
         }
     }
