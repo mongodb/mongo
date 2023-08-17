@@ -18,7 +18,6 @@
 
 #include "mongocrypt-cache-private.h"
 
-void
-_mongocrypt_cache_collinfo_init (_mongocrypt_cache_t *cache);
+void _mongocrypt_cache_collinfo_init(_mongocrypt_cache_t *cache);
 
 #endif /* MONGOCRYPT_CACHE_COLLINFO_PRIVATE_H */

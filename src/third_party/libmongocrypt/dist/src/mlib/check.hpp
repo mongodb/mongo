@@ -1,74 +1,58 @@
 #ifndef MLIB_CHECK_HPP_INCLUDED
 #define MLIB_CHECK_HPP_INCLUDED
 
-#include <iostream>
 #include <cstdio>
+#include <iostream>
 #include <string>
 
-namespace mlib
-{
-namespace detail
-{
+namespace mlib {
+namespace detail {
 struct check_info {
-   const char *filename;
-   int line;
-   const char *expr;
+    const char *filename;
+    int line;
+    const char *expr;
 };
 
-struct nil {
-};
+struct nil {};
 
 template <typename Left> struct bound_lhs {
-   check_info info;
-   Left value;
+    check_info info;
+    Left value;
 
-#define DEFOP(Oper)                                                         \
-   template <typename Rhs> nil operator Oper (Rhs rhs) const noexcept       \
-   {                                                                        \
-      if (value Oper rhs) {                                                 \
-         return {};                                                         \
-      }                                                                     \
-      std::fprintf (stderr,                                                 \
-                    "%s:%d: CHECK( %s ) failed!\n",                         \
-                    info.filename,                                          \
-                    info.line,                                              \
-                    info.expr);                                             \
-      std::cerr << "Expanded expression: " << value << " " #Oper " " << rhs \
-                << '\n';                                                    \
-      std::exit (2);                                                        \
-   }
-   DEFOP (==)
-   DEFOP (!=)
-   DEFOP (<)
-   DEFOP (<=)
-   DEFOP (>)
-   DEFOP (>=)
+#define DEFOP(Oper)                                                                                                    \
+    template <typename Rhs> nil operator Oper(Rhs rhs) const noexcept {                                                \
+        if (value Oper rhs) {                                                                                          \
+            return {};                                                                                                 \
+        }                                                                                                              \
+        std::fprintf(stderr, "%s:%d: CHECK( %s ) failed!\n", info.filename, info.line, info.expr);                     \
+        std::cerr << "Expanded expression: " << value << " " #Oper " " << rhs << '\n';                                 \
+        std::exit(2);                                                                                                  \
+    }
+    DEFOP(==)
+    DEFOP(!=)
+    DEFOP(<)
+    DEFOP(<=)
+    DEFOP(>)
+    DEFOP(>=)
 #undef DEFOP
 };
 
 struct check_magic {
-   check_info info;
+    check_info info;
 
-   template <typename Oper>
-   bound_lhs<Oper>
-   operator->*(Oper op)
-   {
-      return bound_lhs<Oper>{info, op};
-   }
+    template <typename Oper> bound_lhs<Oper> operator->*(Oper op) {
+        return bound_lhs<Oper>{info, op};
+    }
 };
 
 struct check_consume {
-   void
-   operator= (nil)
-   {
-   }
+    void operator=(nil) {
+    }
 
-   void
-   operator= (bound_lhs<bool> const &l)
-   {
-      // Invoke the test for truthiness:
-      (void) (l == true);
-   }
+    void operator=(const bound_lhs<bool> &l) {
+        // Invoke the test for truthiness:
+        (void)(l == true);
+    }
 };
 
 /**
@@ -77,11 +61,9 @@ struct check_consume {
  * Only supports simple comparison binary expressions, and plain boolean
  * expressions
  */
-#define MLIB_CHECK(Cond)                                        \
-   ::mlib::detail::check_consume{} =                            \
-      ::mlib::detail::check_magic{                              \
-         ::mlib::detail::check_info{__FILE__, __LINE__, #Cond}} \
-         ->*Cond
+#define MLIB_CHECK(Cond)                                                                                               \
+    ::mlib::detail::check_consume{} =                                                                                  \
+        ::mlib::detail::check_magic{::mlib::detail::check_info{__FILE__, __LINE__, #Cond}}->*Cond
 
 } // namespace detail
 } // namespace mlib

@@ -144,7 +144,8 @@ public:
      */
     static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
         uassert(ErrorCodes::InvalidNamespace,
-                "Invalid namespace '{}.system.buckets.{}'"_format(nss.db_deprecated(), nss.coll()),
+                "Invalid namespace '{}.system.buckets.{}'"_format(
+                    nss.dbName().toStringForErrorMsg(), nss.coll()),
                 !nss.coll().startsWith("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
     }

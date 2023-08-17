@@ -660,7 +660,6 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "getShardVersion",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
-        {commandName: "getnonce", skip: "removed in v6.3"},
         {
             commandName: "grantPrivilegesToRole",
             run: {
@@ -1464,8 +1463,6 @@ export let MongosAPIParametersUtil = (function() {
         assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
             .storageEngine.supportsCommittedReads;
 
-    const isConfigShardEnabled = ConfigShardUtil.isTransitionEnabledIgnoringFCV(st);
-
     (() => {
         // Validate test cases for all commands. Ensure there is at least one test case for every
         // mongos command, and that the test cases are well formed.
@@ -1578,9 +1575,6 @@ export let MongosAPIParametersUtil = (function() {
                         continue;
 
                     if (!supportsCommittedReads && runOrExplain.requiresCommittedReads)
-                        continue;
-
-                    if (!isConfigShardEnabled && runOrExplain.requiresCatalogShardEnabled)
                         continue;
 
                     if (apiParameters.apiStrict && !runOrExplain.inAPIVersion1)

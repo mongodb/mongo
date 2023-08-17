@@ -246,6 +246,27 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         bucket->preparedBatch.reset();
+
+        auto prevMemoryUsage = bucket->memoryUsage;
+
+        // Clear the compression state and memory usage from the previous operation as we're about
+        // to replace it with the compression state from the user operation that committed.
+        if (bucket->decompressed) {
+            bucket->memoryUsage -=
+                (bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize());
+            bucket->decompressed = boost::none;
+        }
+
+        // TODO SERVER-77347: Remove check on numPreviouslyCommittedMeasurements once updates on
+        // compressed buckets are supported.
+        // Take ownership of the committed batch's decompressed image.
+        if (batch->decompressed && batch->numPreviouslyCommittedMeasurements == 0) {
+            bucket->decompressed = std::move(batch->decompressed);
+            bucket->memoryUsage +=
+                bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize();
+        }
+
+        catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);
     }
 
     auto& stats = batch->stats;

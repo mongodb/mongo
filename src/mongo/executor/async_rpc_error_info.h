@@ -157,7 +157,7 @@ public:
      * Construct the relevant extra info from the RemoteCommandResponse provided by the TaskExecutor
      * used to invoke the remote command.
      */
-    AsyncRPCErrorInfo(RemoteCommandOnAnyResponse rcr, std::vector<HostAndPort> targets)
+    AsyncRPCErrorInfo(RemoteCommandOnAnyResponse rcr, boost::optional<HostAndPort> target)
         : _prov{[&] {
               if (!rcr.status.isOK())
                   return CommandErrorProvenance::kLocal;
@@ -170,15 +170,15 @@ public:
                   return RemoteError(rcr);
               }
           }()},
-          _targetsAttempted{targets} {}
+          _targetAttempted{target} {}
     /**
      * Construct the relevant extra info from an error status - used if a remote command invokation
      * attempt fails before it reaches the TaskExecutor level.
      */
     explicit AsyncRPCErrorInfo(Status s) : _prov{CommandErrorProvenance::kLocal}, _error{s} {}
 
-    AsyncRPCErrorInfo(Status s, std::vector<HostAndPort> targets)
-        : _prov{CommandErrorProvenance::kLocal}, _error{s}, _targetsAttempted{targets} {}
+    AsyncRPCErrorInfo(Status s, boost::optional<HostAndPort> target)
+        : _prov{CommandErrorProvenance::kLocal}, _error{s}, _targetAttempted{target} {}
 
     bool isLocal() const {
         return _prov == CommandErrorProvenance::kLocal;
@@ -196,12 +196,12 @@ public:
         return stdx::get<Status>(_error);
     }
 
-    std::vector<HostAndPort> getTargetsAttempted() const {
-        return _targetsAttempted;
+    boost::optional<HostAndPort> getTargetAttempted() const {
+        return _targetAttempted;
     }
 
-    void setTargetsAttempted(std::vector<HostAndPort> targetsAttempted) {
-        _targetsAttempted = targetsAttempted;
+    void setTargetAttempted(boost::optional<HostAndPort> targetAttempted) {
+        _targetAttempted = targetAttempted;
     }
 
     // Unused and marked unreachable - the RemoteCommandExecutionError is InternalOnly and should
@@ -212,7 +212,7 @@ private:
     AsyncRPCErrorInfo(RemoteError err) : _prov{CommandErrorProvenance::kRemote}, _error{err} {}
     CommandErrorProvenance _prov;
     stdx::variant<Status, RemoteError> _error;
-    std::vector<HostAndPort> _targetsAttempted;
+    boost::optional<HostAndPort> _targetAttempted;
 };
 
 namespace async_rpc {

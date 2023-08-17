@@ -52,7 +52,6 @@ def use_external_fixture(suite_name, suite):
     if suite.get("executor", {}).get("fixture", None):
         suite["executor"]["fixture"] = {
             "class": f"External{suite['executor']['fixture']['class']}",
-            "shell_conn_string": get_mongos_connection_url(suite),
             "original_suite_name": suite_name,
         }
 
@@ -94,14 +93,19 @@ def update_exclude_tags(suite):
         suite['selector']['exclude_with_any_tags'].append('antithesis_incompatible')
 
 
-def make_suite_antithesis_compatible(suite_name, suite):
+def get_antithesis_suite_config(suite_name):
     """Modify suite in-place to be antithesis compatible."""
+    with open(os.path.join(_SUITES_PATH, f"{suite_name}.yml")) as fstream:
+        suite = yaml.safe_load(fstream)
+
     delete_archival(suite)
     make_hooks_compatible(suite)
     use_external_fixture(suite_name, suite)
     update_test_data(suite)
     update_shell(suite)
     update_exclude_tags(suite)
+
+    return suite
 
 
 @click.group()
@@ -111,10 +115,7 @@ def cli():
 
 
 def _generate(suite_name: str) -> None:
-    with open(os.path.join(_SUITES_PATH, f"{suite_name}.yml")) as fstream:
-        suite = yaml.safe_load(fstream)
-
-    make_suite_antithesis_compatible(suite_name, suite)
+    suite = get_antithesis_suite_config(suite_name)
 
     out = yaml.dump(suite)
     with open(os.path.join(_SUITES_PATH, f"antithesis_{suite_name}.yml"), "w") as fstream:

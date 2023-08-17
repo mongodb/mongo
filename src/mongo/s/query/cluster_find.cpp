@@ -870,7 +870,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         [&opCtx, nss](const BSONObj& data) {
             auto dataForFailCommand =
                 data.addField(BSON("failCommands" << BSON_ARRAY("getMore")).firstElement());
-            auto* getMoreCommand = CommandHelpers::findCommand("getMore");
+            auto* getMoreCommand = CommandHelpers::findCommand(opCtx, "getMore");
             return CommandHelpers::shouldActivateFailCommandFailPoint(
                 dataForFailCommand, nss, getMoreCommand, opCtx->getClient());
         });

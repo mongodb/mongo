@@ -1,3 +1,10 @@
+/**
+ * This hook runs the reconfig command against the primary of a replica set:
+ * The reconfig command first chooses a random node (not the primary) and will change
+ * its votes and priority to 0 or 1 depending on the current value.
+ *
+ * This hook will run concurrently with tests.
+ */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 /**

@@ -3,6 +3,7 @@
  */
 
 import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const timeFieldName = "time";
 export const metaFieldName = "tag";
@@ -330,6 +331,7 @@ export function testUpdateOne({
     updateQuery,
     updateObj,
     c,
+    collation,
     resultDocList,
     nMatched,
     nModified = nMatched,
@@ -348,6 +350,9 @@ export function testUpdateOne({
     if (c) {
         upd["c"] = c;
         upd["upsertSupplied"] = true;
+    }
+    if (collation) {
+        upd["collation"] = collation;
     }
     const updateCommand = {
         update: coll.getName(),
@@ -381,6 +386,34 @@ export function testUpdateOne({
                            coll.find().toArray(),
                            "Collection contents did not match expected after update");
     }
+}
+
+export function testCollation(
+    {testDB, coll, filter, update, queryCollation, nModified, expectedBucketQuery, expectedStage}) {
+    let command;
+    if (update) {
+        command = {
+            update: coll.getName(),
+            updates: [{q: filter, u: update, multi: true, collation: queryCollation}],
+        };
+    } else {
+        command = {
+            delete: coll.getName(),
+            deletes: [{q: filter, limit: 0, collation: queryCollation}],
+        };
+    }
+    const explain = testDB.runCommand({explain: command, verbosity: "queryPlanner"});
+    const parsedQuery = FixtureHelpers.isMongos(testDB)
+        ? explain.queryPlanner.winningPlan.shards[0].parsedQuery
+        : explain.queryPlanner.parsedQuery;
+
+    assert.eq(expectedBucketQuery, parsedQuery, `Got wrong parsedQuery: ${tojson(explain)}`);
+    assert.neq(null,
+               getPlanStage(explain.queryPlanner.winningPlan, expectedStage),
+               `${expectedStage} stage not found in the plan: ${tojson(explain)}`);
+
+    const res = assert.commandWorked(testDB.runCommand(command));
+    assert.eq(nModified, res.n);
 }
 
 /**

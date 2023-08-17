@@ -967,7 +967,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
             uassert(40655,
                     str::stream() << "Invalid name " << newCollName.toStringForErrorMsg()
                                   << " for UUID " << uuid,
-                    currentName->db_deprecated() == newCollName.db_deprecated());
+                    currentName->isEqualDb(newCollName));
             return writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName, [&] {
                 auto [currentCollLock, newCollLock] =
                     acquireCollLocksForRename(opCtx, *currentName, newCollName);

@@ -117,4 +117,24 @@ CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheMoc
     return static_cast<CatalogCacheMock*>(catalogCache());
 }
 
+CatalogCacheLoaderMock* ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheLoaderMock() {
+    return _cacheLoaderMock;
+}
+
+void ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp() {
+    auto loader = std::make_unique<CatalogCacheLoaderMock>();
+    _cacheLoaderMock = loader.get();
+    setCatalogCacheLoader(std::move(loader));
+    ShardServerTestFixture::setUp();
+}
+
+CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheLoaderMock::getCatalogCacheMock() {
+    return static_cast<CatalogCacheMock*>(catalogCache());
+}
+
+CatalogCacheLoaderMock*
+ShardServerTestFixtureWithCatalogCacheLoaderMock::getCatalogCacheLoaderMock() {
+    return _cacheLoaderMock;
+}
+
 }  // namespace mongo

@@ -68,7 +68,7 @@ public:
                                    boost::intrusive_ptr<Expression> input,
                                    boost::intrusive_ptr<AccumulatorState> function,
                                    WindowBounds::Bound<int> upperDocumentBound,
-                                   MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                   MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential),
                              memTracker),
           _input(std::move(input)),

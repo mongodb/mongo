@@ -1,3 +1,7 @@
+/**
+ * Tests that $out errors when trying to write to time-series collections on older server versions.
+ * $out with the 'timeseries' option should only succeed if the FCV >= 7.1.
+ */
 import "jstests/multiVersion/libs/multi_cluster.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 

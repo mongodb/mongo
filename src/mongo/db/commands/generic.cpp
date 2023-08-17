@@ -205,11 +205,7 @@ public:
              BSONObjBuilder& result) override {
         // Sort the command names before building the result BSON.
         std::vector<Command*> commands;
-        for (const auto& command : globalCommandRegistry()->allCommands()) {
-            // Don't show oldnames
-            if (command.first == command.second->getName())
-                commands.push_back(command.second);
-        }
+        getCommandRegistry(opCtx)->forEachCommand([&](Command* c) { commands.push_back(c); });
         std::sort(commands.begin(), commands.end(), [](Command* lhs, Command* rhs) {
             return (lhs->getName()) < (rhs->getName());
         });

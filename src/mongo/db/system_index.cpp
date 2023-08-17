@@ -228,6 +228,9 @@ void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, 
         } catch (const StorageUnavailableException&) {
             throw;
         } catch (const DBException& ex) {
+            if (!opCtx->checkForInterruptNoAssert().isOK()) {
+                throw;
+            }
             fassertFailedWithStatus(40456, ex.toStatus());
         }
     }

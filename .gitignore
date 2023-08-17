@@ -282,3 +282,12 @@ bazelisk
 
 # generated configs for antithesis
 antithesis/antithesis_config
+
+# artifacts from antithesis docker base image builds
+antithesis-dist-test
+buildscripts/antithesis/base_images/mongo_binaries/dist-test
+buildscripts/antithesis/base_images/mongo_binaries/libvoidstar.so
+
+buildscripts/antithesis/base_images/workload/src
+buildscripts/antithesis/base_images/workload/mongo
+buildscripts/antithesis/base_images/workload/libvoidstar.so

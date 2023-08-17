@@ -12,8 +12,9 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
- *   # The SBE plan cache was first enabled in 6.3.
- *   requires_fcv_63,
+ *   # The SBE plan cache was first enabled in 6.3, but SERVER-79867, now tested here as well, was
+ *   # first fixed in 7.1.
+ *   requires_fcv_71,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
@@ -64,4 +65,87 @@ if (isSbeEnabled) {
 } else {
     assert(!stats.cachedPlan.hasOwnProperty("queryPlan"), stats);
     assert(!stats.cachedPlan.hasOwnProperty("slotBasedPlan"), stats);
+}
+
+if (isSbeEnabled) {
+    // Test that a plan whose match expression has > 512 predicates does not get cached for SBE,
+    // because in that case it will not be auto-parameterized, so caching the plan would cause cache
+    // flooding with plans that will likely never be resused (SERVER-79867). Also verify the results
+    // are correct.
+    const kDocFields = 513;
+    let doc0 = {_id: 0};
+    let doc1 = {_id: 1};
+    for (let field = 0; field < kDocFields; ++field) {
+        doc0["field_" + field] = 0;
+        doc1["field_" + field] = 1;
+    }
+    doc0 = sortDoc(doc0);
+    doc1 = sortDoc(doc1);
+    assert.commandWorked(coll.insert(doc0));
+    assert.commandWorked(coll.insert(doc1));
+
+    // Define $match stages with kDocFields > 512 match predicates.
+    let match0 = {"$match": doc0};
+    let match1 = {"$match": doc1};
+    coll.getPlanCache().clear();
+
+    // Run each query twice as query plans do not show up in cache stats until they have been
+    // activated, which occurs on the second execution.
+    for (let i = 0; i < 2; ++i) {
+        let agg = coll.aggregate([match0]).toArray();
+        assert.eq(1, agg.length);
+        assert.eq(doc0, sortDoc(agg[0]), sortDoc(agg[0]));
+    }
+
+    for (let i = 0; i < 2; ++i) {
+        let agg = coll.aggregate([match1]).toArray();
+        assert.eq(1, agg.length);
+        assert.eq(doc1, sortDoc(agg[0]), sortDoc(agg[0]));
+    }
+
+    // There should be zero SBE plan cache entries.
+    let planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    assert.eq(0, planCacheStats.length, planCacheStats);
+}
+
+if (isSbeEnabled) {
+    // Test that a plan whose match expression has <= 512 predicates does get cached for SBE. Also
+    // verify the results are correct. There is currently an overhead of one parameter, so we must
+    // not use more than 511 match predicates, but to future-proof this against any additional
+    // overhead, we use only 500 for this test case.
+    const kDocFields = 500;
+    let doc2 = {_id: 2};
+    let doc3 = {_id: 3};
+    for (let field = 0; field < kDocFields; ++field) {
+        doc2["field_" + field] = 2;
+        doc3["field_" + field] = 3;
+    }
+    doc2 = sortDoc(doc2);
+    doc3 = sortDoc(doc3);
+    assert.commandWorked(coll.insert(doc2));
+    assert.commandWorked(coll.insert(doc3));
+
+    // Define $match stages with kDocFields < 512 match predicates.
+    let match2 = {"$match": doc2};
+    let match3 = {"$match": doc3};
+    coll.getPlanCache().clear();
+
+    // Run each query twice as query plans do not show up in cache stats until they have been
+    // activated, which occurs on the second execution.
+    for (let i = 0; i < 2; ++i) {
+        let agg = coll.aggregate([match2]).toArray();
+        assert.eq(1, agg.length);
+        assert.eq(doc2, sortDoc(agg[0]), sortDoc(agg[0]));
+    }
+
+    for (let i = 0; i < 2; ++i) {
+        let agg = coll.aggregate([match3]).toArray();
+        assert.eq(1, agg.length);
+        assert.eq(doc3, sortDoc(agg[0]), sortDoc(agg[0]));
+    }
+
+    // There should be one SBE plan cache entry as the above aggreegations are parameterized and
+    // thus all share the same plan.
+    let planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    assert.eq(1, planCacheStats.length, planCacheStats);
 }

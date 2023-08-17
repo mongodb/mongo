@@ -220,8 +220,8 @@ public:
     /**
      * Returns true if this is a collectionless aggregation on the specified database.
      */
-    bool isDBAggregation(StringData dbName) const {
-        return ns.db_deprecated() == dbName && ns.isCollectionlessAggregateNS();
+    bool isDBAggregation(const NamespaceString& other) const {
+        return ns.isEqualDb(other) && ns.isCollectionlessAggregateNS();
     }
 
     /**
@@ -560,6 +560,12 @@ public:
     // reset for every $_internalSetWindowFields stage we parse. Each $_internalSetWindowFields
     // stage has its own per-stage flag.
     SbeCompatibility sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
+
+    // In some situations we could lower the collection access and, maybe, a prefix of a pipeline to
+    // SBE but doing so would prevent a specific optimization that exists in the classic engine from
+    // being applied. Until we implement the same optimization in SBE, we need to fallback to
+    // running the query in the classic engine entirely.
+    SbeCompatibility sbePipelineCompatibility = SbeCompatibility::fullyCompatible;
 
     // These fields can be used in a context when API version validations were not enforced during
     // parse time (Example creating a view or validator), but needs to be enforce while querying

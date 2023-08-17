@@ -147,13 +147,6 @@ function isAcceptableRetryFailedResponse(cmdName, res) {
              res.code === ErrorCodes.IndexNotFound));
 }
 
-const kCmdsThatInsert = new Set([
-    'insert',
-    'update',
-    'findAndModify',
-    'findandmodify',
-]);
-
 // Commands that may return different values or fail if retried on a new primary after a
 // failover.
 const kNonFailoverTolerantCommands = new Set([
@@ -262,7 +255,8 @@ function isFailedToSatisfyPrimaryReadPreferenceError(res) {
 }
 
 function hasError(res) {
-    return res.ok !== 1 || res.writeErrors;
+    return res.ok !== 1 || res.writeErrors ||
+        (res.hasOwnProperty("numErrors") && res.numErrors != 0);
 }
 
 function hasWriteConcernError(res) {
@@ -584,6 +578,8 @@ function calculateStmtIdInc(cmdName, cmdObj) {
                 return cmdObj.updates.length;
             case "delete":
                 return cmdObj.deletes.length;
+            case "bulkWrite":
+                return cmdObj.ops.length;
             default:
                 return 1;
         }

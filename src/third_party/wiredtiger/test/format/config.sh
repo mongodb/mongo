@@ -73,6 +73,10 @@ done<<END_OF_INPUT>$fc
 CONFIG configuration_list[] = {
 {"assert.read_timestamp", "assert read_timestamp", C_BOOL, 2, 0, 0}
 
+{"background_compact", "configure background compaction", C_BOOL, 10, 0, 0}
+
+{"background_compact.free_space_target", "free space target for background compaction (MB)", 0x0, 1, 100, UINT_MAX}
+
 {"backup", "configure backups", C_BOOL, 20, 0, 0}
 
 {"backup.incremental", "backup type (off | block | log)", C_IGNORE | C_STRING, 0, 0, 0}
@@ -294,6 +298,8 @@ CONFIG configuration_list[] = {
 {"stress.checkpoint_evict_page", "stress force checkpoint to evict all reconciling pages", C_BOOL, 2, 0, 0}
 
 {"stress.checkpoint_prepare", "stress checkpoint prepare", C_BOOL, 2, 0, 0}
+
+{"stress.compact_slow", "stress compact", C_BOOL, 2, 0, 0}
 
 {"stress.evict_reposition", "stress evict reposition", C_BOOL, 2, 0, 0}
 

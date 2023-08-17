@@ -38,7 +38,7 @@ server_parameters:
     cpp_varname: gStepMultiple
     default: 0.1
     validator:
-      gte: 0.1
+      gte: 0.01
       lte: 0.5
 
   throughputProbingInitialConcurrency:

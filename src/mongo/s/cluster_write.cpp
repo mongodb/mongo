@@ -83,6 +83,19 @@ void write(OperationContext* opCtx,
 
 bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
                                               const BulkWriteCommandRequest& request) {
+    if (request.getNsInfo().size() > 1) {
+        for (const auto& nsInfo : request.getNsInfo()) {
+            uassert(ErrorCodes::BadValue,
+                    "BulkWrite with Queryable Encryption supports only a single namespace.",
+                    !nsInfo.getEncryptionInformation().has_value());
+        }
+    } else if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
+        auto [result, replies] = bulk_write_exec::attemptExecuteFLE(opCtx, request);
+        if (result == FLEBatchResult::kProcessed) {
+            return replies;
+        }  // else fallthrough.
+    }
+
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.reserve(request.getNsInfo().size());
     for (const auto& nsInfo : request.getNsInfo()) {

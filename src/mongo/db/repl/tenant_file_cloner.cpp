@@ -70,7 +70,6 @@
 
 namespace mongo::repl {
 
-// TODO SERVER-63119: Verify if we need the below failpoints for TenantFileCloner unit testing.
 // Failpoint which causes the file cloner to hang after handling the next batch of results
 // from the DBClientConnection, optionally limited to a specific file name.
 MONGO_FAIL_POINT_DEFINE(TenantFileClonerHangAfterHandlingBatchResponse);
@@ -202,9 +201,8 @@ void TenantFileCloner::runQuery() {
                 "TenantFileCloner running aggregation",
                 "source"_attr = getSource(),
                 "aggRequest"_attr = aggregation_request_helper::serializeToCommandObj(aggRequest));
-    const bool useExhaust = !MONGO_unlikely(TenantFileClonerDisableExhaust.shouldFail());
     std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        getClient(), std::move(aggRequest), true /* secondaryOk */, useExhaust));
+        getClient(), std::move(aggRequest), true /* secondaryOk */, true /* useExhaust */));
     try {
         while (cursor->more()) {
             handleNextBatch(*cursor);

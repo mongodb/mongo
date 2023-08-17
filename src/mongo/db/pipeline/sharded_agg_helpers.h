@@ -170,7 +170,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
     boost::optional<ExplainOptions::Verbosity> explain,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
-    AsyncRequestsSender::ShardHostMap designatedHostsMap = {});
+    AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
+    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap = {});
 
 BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

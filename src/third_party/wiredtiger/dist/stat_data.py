@@ -35,6 +35,12 @@ class AutoCommitStat(Stat):
     prefix = 'autocommit'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, AutoCommitStat.prefix, desc, flags)
+
+class BackgroundCompactStat(Stat):
+    prefix = 'background-compact'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, BackgroundCompactStat.prefix, desc, flags)
+
 class BlockCacheStat(Stat):
     prefix = 'block-cache'
     def __init__(self, name, desc, flags=''):
@@ -189,6 +195,17 @@ conn_stats = [
     ConnStat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
     ConnStat('time_travel', 'detected system time went backwards'),
     ConnStat('write_io', 'total write I/Os'),
+    
+    ##########################################
+    # Background compaction statistics
+    ##########################################
+    BackgroundCompactStat('background_compact_fail', 'background compact failed calls', 'no_scale'),
+    BackgroundCompactStat('background_compact_fail_cache_pressure', 'background compact failed calls due to cache pressure', 'no_scale'),
+    BackgroundCompactStat('background_compact_interrupted', 'background compact interrupted', 'no_scale'),
+    BackgroundCompactStat('background_compact_running', 'background compact running', 'no_scale'),
+    BackgroundCompactStat('background_compact_skipped', 'background compact skipped as process would not reduce file size', 'no_scale'),
+    BackgroundCompactStat('background_compact_success', 'background compact successful calls', 'no_scale'),
+    BackgroundCompactStat('background_compact_timeout', 'background compact timeout', 'no_scale'),
 
     ##########################################
     # Block cache statistics
@@ -543,7 +560,6 @@ conn_stats = [
     ##########################################
     # Session operations
     ##########################################
-    SessionOpStat('session_background_compact_running', 'background compact running', 'no_clear,no_scale'),
     SessionOpStat('session_open', 'open session count', 'no_clear,no_scale'),
     SessionOpStat('session_query_ts', 'session query timestamp calls'),
     SessionOpStat('session_table_alter_fail', 'table alter failed calls', 'no_clear,no_scale'),

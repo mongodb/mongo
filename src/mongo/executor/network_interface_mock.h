@@ -230,6 +230,11 @@ public:
     bool hasReadyRequests();
 
     /**
+     * Returns true if the given iterator points to the end of the network operation list.
+     */
+    bool isNetworkOperationIteratorAtEnd(const NetworkInterfaceMock::NetworkOperationIterator& itr);
+
+    /**
      * Gets the next unscheduled request to process, blocking until one is available.
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.

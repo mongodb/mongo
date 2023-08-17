@@ -1222,7 +1222,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
          * Periodically check if we've timed out or eviction is stuck. Quit if eviction is stuck,
          * we're making the problem worse.
          */
-        WT_ERR(__wt_session_compact_check_timeout(session));
+        WT_ERR(__wt_session_compact_check_interrupted(session));
         if (__wt_cache_stuck(session))
             WT_ERR(EBUSY);
         __wt_sleep(1, 0);

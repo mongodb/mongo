@@ -293,7 +293,7 @@ let testCases = {
     listIndexes: {skip: "primary only"},
     listSearchIndexes: {skip: "does not return user data"},
     listShards: {skip: "does not return user data"},
-    lockInfo: {skip: "primary only"},
+    lockInfo: {skip: "does not return user data"},
     logApplicationMessage: {skip: "primary only"},
     logMessage: {skip: "does not return user data"},
     logRotate: {skip: "does not return user data"},

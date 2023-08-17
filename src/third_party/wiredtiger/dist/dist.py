@@ -1,5 +1,6 @@
 from __future__ import print_function
 import filecmp, fnmatch, glob, os, re, shutil, subprocess
+from contextlib import contextmanager
 
 # source_files --
 #    Return a list of the WiredTiger source file names.
@@ -73,3 +74,56 @@ def format_srcfile(src):
         subprocess.check_call(['./s_clang_format', src])
     except subprocess.CalledProcessError as e:
         print(e)
+
+# ModifyFile --
+#    This manages a file that may be modified, possibly multiple times.
+# and at the end, may need to be formatted and compared to the original.
+# All modifications must be done using replace_fragment.
+class ModifyFile:
+    def __init__(self, filename):
+        self.final_name = filename
+        self.mod_name = filename + ".MOD"
+        self.tmp_name = filename + ".TMP"
+        self.current = filename
+
+    # Remove a possibly nonexistent file
+    def remove(self, filename):
+        try:
+            os.remove(filename)
+        except:
+            pass
+
+    @contextmanager
+    def replace_fragment(self, match):
+        tfile = open(self.tmp_name, 'w')
+        skip = False
+        try:
+            for line in open(self.current, 'r'):
+                if skip:
+                    if match + ': END' in line:
+                        tfile.write('/*\n' + line)
+                        skip = False
+                else:
+                    tfile.write(line)
+                if match + ': BEGIN' in line:
+                    skip = True
+                    tfile.write(' */\n')
+                    yield tfile
+        finally:
+            tfile.close()
+
+        self.remove(self.mod_name)
+        os.rename(self.tmp_name, self.mod_name)
+        self.current = self.mod_name
+
+    # Called to signal we are done with all modifications.
+    # The modified file should be formatted and compared against
+    # the original, potentially moving a new version into place.
+    def done(self, format=True):
+        if self.current == self.final_name:
+            # Nothing was changed
+            return
+        if format:
+            format_srcfile(self.mod_name)
+        compare_srcfile(self.mod_name, self.final_name)
+        self.remove(self.tmp_name)

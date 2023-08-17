@@ -980,7 +980,6 @@ const allCommands = {
     lockInfo: {
         isAdminCommand: true,
         command: {lockInfo: 1},
-        doesNotRunOnMongos: true,
     },
     logApplicationMessage: {
         isAdminCommand: true,
@@ -1519,6 +1518,7 @@ const allCommands = {
     testReshardCloneCollection: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},
+    timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
     top: {
         command: {top: 1},
         isAdminCommand: true,

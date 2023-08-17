@@ -1,3 +1,6 @@
+/**
+ * Use prototype overrides to set read preference to "secondary" when running tests.
+ */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const kReadPreferenceSecondary = {

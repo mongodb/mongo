@@ -99,14 +99,6 @@ public:
                                                     const SplitPolicyParams& params) = 0;
 
     /**
-     * Returns whether the chunk generation strategy being used is optimized or not. Since there is
-     * only a single unoptimized policy, we return true by default here.
-     */
-    virtual bool isOptimized() {
-        return true;
-    }
-
-    /**
      * Returns split points to use for creating chunks in cases where the shard key contains a
      * hashed field. For new collections which use hashed shard keys, we can can pre-split the range
      * of possible hashes into a large number of chunks, and distribute them evenly at creation

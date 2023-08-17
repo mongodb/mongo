@@ -29,11 +29,15 @@
 
 #include "rate_limiting.h"
 
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {
-RateLimiting::RateLimiting(RequestCount samplingRate, Milliseconds timePeriod)
-    : _clockSource(SystemClockSource::get()),
+RateLimiting::RateLimiting(RequestCount samplingRate,
+                           Milliseconds timePeriod,
+                           ClockSource* clockSource)
+    : _clockSource(clockSource != nullptr ? clockSource : SystemClockSource::get()),
       _samplingRate(samplingRate),
       _timePeriod(timePeriod),
       _windowStart(_clockSource->now()),
@@ -64,6 +68,7 @@ bool RateLimiting::handleRequestFixedWindow() {
 }
 
 bool RateLimiting::handleRequestSlidingWindow() {
+    // TODO SERVER-80006: Determine the best RAII type to hold the lock.
     stdx::unique_lock windowLock{_windowMutex};
 
     Date_t currentTime = tickWindow();

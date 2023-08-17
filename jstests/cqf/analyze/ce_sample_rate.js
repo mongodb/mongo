@@ -75,7 +75,7 @@ function testSampleRatesForDocsWithPredicates(docs, expectedEst, expectedHistogr
  * generated histogram estimates are close to what we would expect for a histogram built on the
  * entire collection.
  */
-runHistogramsTest(function testSampleRates() {
+await runHistogramsTest(function testSampleRates() {
     // Test a scalar histogram with only one value (50).
     {
         const docs = generateDocs(() => 50);

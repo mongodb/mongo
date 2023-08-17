@@ -186,7 +186,7 @@ UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
         BSONObj original = applyParams.element.getDocument().getObject();
         updateResult = updateExistingElement(&applyParams.element,
                                              updateNodeApplyParams.pathTaken->fieldRef());
-        if (updateResult == ModifyResult::kNoOp) {
+        if (updateResult.type == ModifyResult::kNoOp) {
             return ApplyResult::noopResult();
         }
         checkImmutablePathsNotModifiedFromOriginal(applyParams.element,
@@ -196,14 +196,14 @@ UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
     } else {
         updateResult = updateExistingElement(&applyParams.element,
                                              updateNodeApplyParams.pathTaken->fieldRef());
-        if (updateResult == ModifyResult::kNoOp) {
+        if (updateResult.type == ModifyResult::kNoOp) {
             return ApplyResult::noopResult();
         }
         checkImmutablePathsNotModified(applyParams.element,
                                        updateNodeApplyParams.pathTaken->fieldRef(),
                                        applyParams.immutablePaths);
     }
-    invariant(updateResult != ModifyResult::kCreated);
+    invariant(updateResult.type != ModifyResult::kCreated);
 
     ApplyResult applyResult;
 
@@ -386,9 +386,9 @@ void ModifierNode::logUpdate(LogBuilderInterface* logBuilder,
                              ModifyResult modifyResult,
                              boost::optional<int> createdFieldIdx) const {
     invariant(logBuilder);
-    invariant(modifyResult == ModifyResult::kNormalUpdate ||
-              modifyResult == ModifyResult::kCreated);
-    if (modifyResult == ModifyResult::kCreated) {
+    invariant(modifyResult.type == ModifyResult::kNormalUpdate ||
+              modifyResult.type == ModifyResult::kCreated);
+    if (modifyResult.type == ModifyResult::kCreated) {
         invariant(createdFieldIdx);
         uassertStatusOK(logBuilder->logCreatedField(pathTaken, *createdFieldIdx, element));
     } else {

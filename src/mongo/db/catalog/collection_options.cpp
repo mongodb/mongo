@@ -47,7 +47,6 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_validation.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"

@@ -111,7 +111,9 @@ public:
         repl::ReadConcernArgs readConcernArgs;
 
         // Only set for transactions with snapshot level read concern.
-        boost::optional<LogicalTime> atClusterTime;
+        boost::optional<LogicalTime> atClusterTimeForSnapshotReadConcern;
+
+        boost::optional<LogicalTime> placementConflictTimeForNonSnapshotReadConcern;
 
         bool isInternalTransactionForRetryableWrite;
     };
@@ -626,25 +628,11 @@ public:
         BSONObj _handOffCommitToCoordinator(OperationContext* opCtx);
 
         /**
-         * Sets the given logical time as the atClusterTime for the transaction to be the greater of
-         * the given time and the user's afterClusterTime, if one was provided.
-         */
-        void _setAtClusterTime(OperationContext* opCtx,
-                               const boost::optional<LogicalTime>& afterClusterTime,
-                               LogicalTime candidateTime);
-
-        /**
          * Throws NoSuchTransaction if the response from abortTransaction failed with a code other
          * than NoSuchTransaction. Does not check for write concern errors.
          */
         void _assertAbortStatusIsOkOrNoSuchTransaction(
             const AsyncRequestsSender::Response& response) const;
-
-        /**
-         * If the transaction's read concern level is snapshot, asserts the participant's
-         * atClusterTime matches the transaction's.
-         */
-        void _verifyParticipantAtClusterTime(const Participant& participant);
 
         /**
          * Removes all participants created during the current statement from the participant list
@@ -778,7 +766,24 @@ public:
         BSONObj cmdObj,
         const repl::ReadConcernArgs& readConcernArgs,
         const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
+        const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
         bool doAppendStartTransaction);
+
+    /**
+     * Appends the needed fields when continuing a transaction on a participant.
+     */
+    static BSONObj appendFieldsForContinueTransaction(
+        BSONObj cmdObj,
+        const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern);
+
+    /**
+     * Returns a new read concern settings object by combining the input settings.
+     */
+    static repl::ReadConcernArgs reconcileReadConcern(
+        const boost::optional<repl::ReadConcernArgs>& cmdLevelReadConcern,
+        const repl::ReadConcernArgs& txnLevelReadConcern,
+        const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
+        const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern);
 
 private:
     /**
@@ -817,7 +822,8 @@ private:
         // The cluster time of the timestamp all participant shards in the current transaction with
         // snapshot level read concern must read from. Only set for transactions running with
         // snapshot level read concern.
-        boost::optional<AtClusterTime> atClusterTime;
+        boost::optional<AtClusterTime> atClusterTimeForSnapshotReadConcern;
+        boost::optional<AtClusterTime> placementConflictTimeForNonSnapshotReadConcern;
 
         // String representing the reason a transaction aborted. Either the string name of the error
         // code that led to an implicit abort or "abort" if the client sent abortTransaction.

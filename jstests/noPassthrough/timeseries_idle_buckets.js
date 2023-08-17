@@ -6,7 +6,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 10485760}});
@@ -14,8 +13,8 @@ rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
 
-const alwaysUseCompressedBuckets =
-    FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets");
+// TODO SERVER-70605: Remove.
+const alwaysUseCompressedBuckets = TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db);
 const isBucketReopeningEnabled = TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
 assert.commandWorked(db.dropDatabase());

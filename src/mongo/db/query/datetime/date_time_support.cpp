@@ -724,6 +724,7 @@ constexpr auto kMillisecondsPerSecond = 1000LL;
 constexpr int kDaysPerWeek = 7;
 constexpr auto kQuartersPerYear = 4LL;
 constexpr auto kQuarterLengthInMonths = 3LL;
+constexpr auto kDaysInTypicalMonth = 30LL;
 constexpr long kMillisecondsPerDay{kHoursPerDay * kMinutesPerHour * kSecondsPerMinute *
                                    kMillisecondsPerSecond};
 constexpr long kLeapYearReferencePoint = -1000000000L;
@@ -1360,13 +1361,21 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
     return returnDate;
 }
 
-StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit) {
+long long timeUnitValueInSeconds(TimeUnit unit) {
+    tassert(7823404,
+            "Cannot return an integer value for the number of seconds in a millisecond.",
+            unit != TimeUnit::millisecond);
+    return timeUnitTypicalMilliseconds(unit) / kMillisecondsPerSecond;
+}
+
+long long timeUnitTypicalMilliseconds(TimeUnit unit) {
     auto constexpr millisecond = 1;
     auto constexpr second = millisecond * kMillisecondsPerSecond;
     auto constexpr minute = second * kSecondsPerMinute;
     auto constexpr hour = minute * kMinutesPerHour;
     auto constexpr day = hour * kHoursPerDay;
     auto constexpr week = day * kDaysPerWeek;
+    auto constexpr month = day * kDaysInTypicalMonth;
 
     switch (unit) {
         case TimeUnit::millisecond:
@@ -1382,12 +1391,14 @@ StatusWith<long long> timeUnitTypicalMilliseconds(TimeUnit unit) {
         case TimeUnit::week:
             return week;
         case TimeUnit::month:
+            return month;
         case TimeUnit::quarter:
+            return month * kQuarterLengthInMonths;
         case TimeUnit::year:
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "TimeUnit is too big: " << serializeTimeUnit(unit));
+            return day * kDaysInNonLeapYear;
     }
-    MONGO_UNREACHABLE_TASSERT(5423303);
+
+    MONGO_UNREACHABLE_TASSERT(7823401);
 }
 
 Date_t truncateDate(Date_t date,

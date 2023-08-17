@@ -12,7 +12,8 @@ export function wordInString(str, word) {
     return regexp.test(str);
 }
 
-export function checkExpectedDbNameInString(str, dbName, prefixedDbName, originalRes) {
+export function checkExpectedDbNameInString(
+    str, dbName, prefixedDbName, originalRes, expectPrefix) {
     // System db names (admin, local and config) should never be tenant prefixed.
     if (dbName == "admin" || dbName == "local" || dbName == "config") {
         assert.eq(false,
@@ -21,10 +22,9 @@ export function checkExpectedDbNameInString(str, dbName, prefixedDbName, origina
                       dbName}". The response is "${originalRes}"`);
         return;
     }
-    // Currently, we do not expect prefixed db name in db name field as we only test with
-    // "featureFlagRequireTenantID: true".
-    // TODO SERVER-78300: expect prefixed db name if "expectPrefix" option in request is true.
-    assert.eq(false,
+    // If expect prefix is true, the string should contain the tenant prefix. Otherwise it
+    // shouldn't.
+    assert.eq(expectPrefix,
               wordInString(str, prefixedDbName),
               `Response db name "${str}" does not match sent db name "${
                   dbName}". The response is "${originalRes}"`);
@@ -106,9 +106,10 @@ function assertErrorExtraInfoIfExists(res, tenantPrefix) {
  * @param {*} prefixedDbName the tenant prefixed db name expected by inject_dollar_tenant.js and
  *     inject_security_toiken.js.
  * @param {*} originalResForLogging the original response for logging.
+ * @param {*} expectPrefix is true if the dbName should include the tenant prefix.
  */
 export function assertExpectedDbNameInResponse(
-    res, requestDbName, prefixedDbName, originalResForLogging) {
+    res, requestDbName, prefixedDbName, originalResForLogging, expectPrefix) {
     if (requestDbName.length === 0) {
         return;
     }
@@ -123,13 +124,16 @@ export function assertExpectedDbNameInResponse(
         if (typeof v === "string") {
             if (k === "dbName" || k == "db" || k == "dropped") {
                 checkExpectedDbNameInString(
-                    v, requestDbName, prefixedDbName, originalResForLogging);
+                    v, requestDbName, prefixedDbName, originalResForLogging, expectPrefix);
             } else if (k === "namespace" || k === "ns") {
-                checkExpectedDbNameInString(
-                    getDbName(v), requestDbName, prefixedDbName, originalResForLogging);
+                checkExpectedDbNameInString(getDbName(v),
+                                            requestDbName,
+                                            prefixedDbName,
+                                            originalResForLogging,
+                                            expectPrefix);
             } else if (k == "name") {
                 checkExpectedDbNameInString(
-                    v, requestDbName, prefixedDbName, originalResForLogging);
+                    v, requestDbName, prefixedDbName, originalResForLogging, expectPrefix);
             } else if (k === "errmsg") {
                 checkExpectedDbInErrorMsg(v, requestDbName, prefixedDbName, originalResForLogging);
             }
@@ -137,10 +141,11 @@ export function assertExpectedDbNameInResponse(
             v.forEach((item) => {
                 if (typeof item === "object" && item !== null)
                     assertExpectedDbNameInResponse(
-                        item, requestDbName, prefixedDbName, originalResForLogging);
+                        item, requestDbName, prefixedDbName, originalResForLogging, expectPrefix);
             });
         } else if (typeof v === "object" && v !== null && Object.keys(v).length > 0) {
-            assertExpectedDbNameInResponse(v, requestDbName, prefixedDbName, originalResForLogging);
+            assertExpectedDbNameInResponse(
+                v, requestDbName, prefixedDbName, originalResForLogging, expectPrefix);
         }
     }
 }

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,55 +29,45 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <stack>
-#include <utility>
-#include <variant>
+#include <vector>
 
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
-#include "mongo/db/query/stage_types.h"
-#include "mongo/stdx/variant.h"
 
-namespace mongo::sbe {
-class RuntimeEnvironment;
-}
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/abt/named_slots.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::stage_builder {
 
-struct Environment;
 struct StageBuilderState;
 
 /**
- * EvalExpr is a wrapper around an EExpression that can also carry a SlotId. It is used to eliminate
- * extra project stages. If 'slot' field is set, it contains the result of an expression. The user
- * of the class can just use this slot instead of projecting an expression into a new slot.
+ * The SbExpr class is used to represent expressions in the SBE stage builder. "SbExpr" is short
+ * for "stage builder expression".
  */
-class EvalExpr {
+class SbExpr {
 public:
-    EvalExpr() : _storage{false} {}
+    SbExpr() : _storage{false} {}
 
-    EvalExpr(EvalExpr&& e) : _storage(std::move(e._storage)) {
+    SbExpr(SbExpr&& e) : _storage(std::move(e._storage)) {
         e.reset();
     }
 
-    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
+    SbExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
 
-    EvalExpr(sbe::value::SlotId s) : _storage(s) {}
+    SbExpr(sbe::value::SlotId s) : _storage(s) {}
 
-    EvalExpr(const abt::HolderPtr& a);
+    SbExpr(const abt::HolderPtr& a);
 
-    EvalExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
+    SbExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
 
-    EvalExpr& operator=(EvalExpr&& e) {
+    SbExpr& operator=(SbExpr&& e) {
         if (this == &e) {
             return *this;
         }
@@ -87,18 +77,18 @@ public:
         return *this;
     }
 
-    EvalExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
+    SbExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
         _storage = std::move(e);
         e.reset();
         return *this;
     }
 
-    EvalExpr& operator=(sbe::value::SlotId s) {
+    SbExpr& operator=(sbe::value::SlotId s) {
         _storage = s;
         return *this;
     }
 
-    EvalExpr& operator=(abt::HolderPtr&& a) {
+    SbExpr& operator=(abt::HolderPtr&& a) {
         _storage = std::move(a);
         return *this;
     }
@@ -120,7 +110,7 @@ public:
         return stdx::holds_alternative<abt::HolderPtr>(_storage);
     }
 
-    EvalExpr clone() const {
+    SbExpr clone() const {
         if (hasSlot()) {
             return stdx::get<sbe::value::SlotId>(_storage);
         }
@@ -130,7 +120,7 @@ public:
         }
 
         if (stdx::holds_alternative<bool>(_storage)) {
-            return EvalExpr{};
+            return SbExpr{};
         }
 
         const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_storage);
@@ -167,7 +157,7 @@ public:
                                                   StageBuilderState& state);
 
     /**
-     * Helper function that obtains data needed for EvalExpr::extractExpr from StageBuilderState
+     * Helper function that obtains data needed for SbExpr::extractExpr from StageBuilderState
      */
     std::unique_ptr<sbe::EExpression> extractExpr(StageBuilderState& state);
 
@@ -184,74 +174,6 @@ private:
         _storage;
 };
 
-/**
- * EvalStage contains a PlanStage (_stage) and a vector of slots (_outSlots).
- *
- * _stage can be nullptr or it can point to an SBE PlanStage tree. If _stage is nullptr, the
- * extractStage() method will return a Limit-1/CoScan tree. If _stage is not nullptr, then the
- * extractStage() method will return _stage. EvalStage's default constructor initializes
- * _stage to be nullptr.
- *
- * The isNull() method allows callers to check if _state is nullptr. Some helper functions (such
- * as makeLoopJoin()) take advantage of this knowledge and are able to perform optimizations in
- * the case where isNull() == true.
- *
- * The _outSlots vector keeps track of all of the "output" slots that are produced by the current
- * sbe::PlanStage tree (_stage). The _outSlots vector is used by makeLoopJoin() and makeTraverse()
- * to ensure that all of the slots produced by the left side are visible to the right side and are
- * also visible to the parent of the LoopJoinStage/TraverseStage.
- */
-class EvalStage {
-public:
-    EvalStage() {}
-
-    EvalStage(std::unique_ptr<sbe::PlanStage> stage, sbe::value::SlotVector outSlots)
-        : _stage(std::move(stage)), _outSlots(std::move(outSlots)) {}
-
-    EvalStage(EvalStage&& other)
-        : _stage(std::move(other._stage)), _outSlots(std::move(other._outSlots)) {}
-
-    EvalStage& operator=(EvalStage&& other) {
-        _stage = std::move(other._stage);
-        _outSlots = std::move(other._outSlots);
-        return *this;
-    }
-
-    bool isNull() const {
-        return !_stage;
-    }
-
-    std::unique_ptr<sbe::PlanStage> extractStage(PlanNodeId planNodeId) {
-        return _stage ? std::move(_stage)
-                      : sbe::makeS<sbe::LimitSkipStage>(
-                            sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
-    }
-
-    void setStage(std::unique_ptr<sbe::PlanStage> stage) {
-        _stage = std::move(stage);
-    }
-
-    const sbe::value::SlotVector& getOutSlots() const {
-        return _outSlots;
-    }
-
-    sbe::value::SlotVector extractOutSlots() {
-        return std::move(_outSlots);
-    }
-
-    void setOutSlots(sbe::value::SlotVector outSlots) {
-        _outSlots = std::move(outSlots);
-    }
-
-    void addOutSlot(sbe::value::SlotId slot) {
-        _outSlots.push_back(slot);
-    }
-
-private:
-    std::unique_ptr<sbe::PlanStage> _stage;
-    sbe::value::SlotVector _outSlots;
-};
-
-using EvalExprStagePair = std::pair<EvalExpr, EvalStage>;
+using EvalExpr = SbExpr;
 
 }  // namespace mongo::stage_builder

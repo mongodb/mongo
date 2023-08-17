@@ -206,13 +206,10 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
 /**
  * Invokes the given command and aborts the transaction on any non-retryable errors.
  */
-Future<void> invokeInTransactionRouter(std::shared_ptr<RequestExecutionContext> rec,
+Future<void> invokeInTransactionRouter(TransactionRouter::Router& txnRouter,
+                                       std::shared_ptr<RequestExecutionContext> rec,
                                        std::shared_ptr<CommandInvocation> invocation) {
     auto opCtx = rec->getOpCtx();
-    auto txnRouter = TransactionRouter::get(opCtx);
-    invariant(txnRouter);
-
-    // No-op if the transaction is not running with snapshot read concern.
     txnRouter.setDefaultAtClusterTime(opCtx);
 
     return runCommandInvocation(rec, std::move(invocation))
@@ -328,7 +325,7 @@ void ExecCommandClient::_prologue() {
 Future<void> ExecCommandClient::_run() {
     OperationContext* opCtx = _rec->getOpCtx();
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
-        return invokeInTransactionRouter(_rec, _invocation);
+        return invokeInTransactionRouter(txnRouter, _rec, _invocation);
     } else {
         return runCommandInvocation(_rec, _invocation);
     }
@@ -391,7 +388,6 @@ void ExecCommandClient::_onCompletion() {
 Future<void> ExecCommandClient::run() {
     return makeReadyFutureWith([&] {
                _prologue();
-
                return _run();
            })
         .then([this] { _epilogue(); })
@@ -536,13 +532,13 @@ void ParseAndRunCommand::_parseCommand() {
     const auto& request = _rec->getRequest();
     auto replyBuilder = _rec->getReplyBuilder();
 
-    auto const command = CommandHelpers::findCommand(_commandName);
+    auto const command = CommandHelpers::findCommand(opCtx, _commandName);
     if (!command) {
         const std::string errorMsg = "no such cmd: {}"_format(_commandName);
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder,
                                                    {ErrorCodes::CommandNotFound, errorMsg});
-        globalCommandRegistry()->incrementUnknownCommands();
+        getCommandRegistry(opCtx)->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
         iassert(Status(ErrorCodes::SkipCommandExecution, errorMsg));
     }

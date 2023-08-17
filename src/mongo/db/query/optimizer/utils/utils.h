@@ -497,7 +497,7 @@ bool hasProperIntervals(const PSRExpr::Node& reqs);
  * path, and the filter node needed to perform shard filtering. Determines the CE of the nodes
  * according to the indexReqTarget.
  */
-void handleScanNodeRemoveOrphansRequirement(const ABTVector& shardKeyPaths,
+void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
                                             PhysPlanBuilder& builder,
                                             FieldProjectionMap& fieldProjectionMap,
                                             IndexReqTarget indexReqTarget,

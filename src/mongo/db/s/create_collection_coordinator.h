@@ -109,56 +109,6 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
-
-    void _acquireCriticalSections(OperationContext* opCtx);
-
-    void _promoteCriticalSectionsToBlockReads(OperationContext* opCtx) const;
-
-    void _releaseCriticalSections(OperationContext* opCt, bool throwIfReasonDiffers = true);
-
-    /**
-     * Ensures the collection is created locally and has the appropiate shard index.
-     */
-    void _createCollectionAndIndexes(OperationContext* opCtx,
-                                     const ShardKeyPattern& shardKeyPattern);
-
-    /**
-     * Creates the appropiate split policy.
-     */
-    void _createPolicy(OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern);
-
-    /**
-     * Given the appropiate split policy, create the initial chunks.
-     */
-    void _createChunks(OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern);
-
-    /**
-     * If the optimized path can be taken, ensure the collection is already created in all the
-     * participant shards.
-     */
-    void _createCollectionOnNonPrimaryShards(OperationContext* opCtx,
-                                             const OperationSessionInfo& osi);
-
-    /**
-     * Does the following writes:
-     * 1. Updates the config.collections entry for the new sharded collection
-     * 2. Updates config.chunks entries for the new sharded collection
-     * 3. Inserts an entry into config.placementHistory with the sublist of shards that will host
-     * one or more chunks of the new collections at creation time
-     */
-    void _commit(OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
-
-    /**
-     * Helper function to audit and log the shard collection event.
-     */
-    void _logStartCreateCollection(OperationContext* opCtx);
-
-    /**
-     * Helper function to log the end of the shard collection event.
-     */
-    void _logEndCreateCollection(OperationContext* opCtx);
-
     mongo::CreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
@@ -211,12 +161,41 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    /**
+     * Acquires critical sections on all shards.
+     */
+    void _acquireCriticalSectionsOnParticipants(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token);
+
+    /**
+     * Releases critical sections on all shards.
+     */
+    void _releaseCriticalSectionsOnParticipants(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token);
+
+    /**
+     * Functions to encapsulate each phase
+     */
+    void _checkPreconditions(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
     mongo::CreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
 
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
+
+    // The fields below are only populated if the coordinator enters in the branch where the
+    // collection is not already sharded (i.e., they will not be present on early return)
+
+    boost::optional<UUID> _collectionUUID;
+    std::unique_ptr<InitialSplitPolicy> _splitPolicy;
+    boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
+    boost::optional<bool> _collectionEmpty;
 };
 
 }  // namespace mongo

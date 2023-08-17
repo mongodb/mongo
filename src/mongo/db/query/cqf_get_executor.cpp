@@ -174,6 +174,9 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
     auto indexIterator =
         indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
 
+    const bool queryHasNaturalHint = indexHint && !indexHint->isEmpty() &&
+        indexHint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
         const IndexDescriptor& descriptor = *catalogEntry.descriptor();
@@ -184,10 +187,23 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
-        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+        // If there is a $natural hint, we should not assert here as we will not use the index.
+        // TODO SERVER-78502: Remove the second part of the if statement's guard below regarding the
+        // presence of a hashed index.
+        const bool isSpecialIndex =
+            descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
             descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-            !descriptor.collation().isEmpty()) {
+            !descriptor.collation().isEmpty();
+        if ((!queryHasNaturalHint && isSpecialIndex) ||
+            descriptor.getIndexType() == IndexType::INDEX_HASHED) {
             uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
+        }
+
+        // We do not want to try to build index metadata for a special index (since we do not
+        // support those yet in CQF) but we should allow the query to go through CQF if there is a
+        // $natural hint.
+        if (queryHasNaturalHint && isSpecialIndex) {
+            continue;
         }
 
         if (indexHint) {
@@ -390,7 +406,6 @@ static ExecParams createExecutor(
     const MultipleCollectionAccessor& collections,
     const bool requireRID,
     const ScanOrder scanOrder,
-    const bool needsExplain,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
@@ -444,36 +459,35 @@ static ExecParams createExecutor(
                                       std::move(staticData));
 
     sbePlan->attachToOperationContext(opCtx);
-    if (needsExplain || expCtx->mayDbProfile) {
+    if (expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
 
     std::unique_ptr<ABTPrinter> abtPrinter;
-    if (needsExplain) {
-        // By default, we print the optimized ABT. For test-only versions we output the post-memo
-        // plan instead.
-        PlanAndProps toExplain = std::move(planAndProps);
 
-        ExplainVersion explainVersion = ExplainVersion::Vmax;
-        const auto& explainVersionStr = internalCascadesOptimizerExplainVersion.get();
-        if (explainVersionStr == "v1"_sd) {
-            explainVersion = ExplainVersion::V1;
-            toExplain = *phaseManager.getPostMemoPlan();
-        } else if (explainVersionStr == "v2"_sd) {
-            explainVersion = ExplainVersion::V2;
-            toExplain = *phaseManager.getPostMemoPlan();
-        } else if (explainVersionStr == "v2compact"_sd) {
-            explainVersion = ExplainVersion::V2Compact;
-            toExplain = *phaseManager.getPostMemoPlan();
-        } else if (explainVersionStr == "bson"_sd) {
-            explainVersion = ExplainVersion::V3;
-        } else {
-            // Should have been validated.
-            MONGO_UNREACHABLE;
-        }
+    // By default, we print the optimized ABT. For test-only versions we output the post-memo
+    // plan instead.
+    PlanAndProps toExplain = std::move(planAndProps);
 
-        abtPrinter = std::make_unique<ABTPrinter>(std::move(toExplain), explainVersion);
+    ExplainVersion explainVersion = ExplainVersion::Vmax;
+    const auto& explainVersionStr = internalCascadesOptimizerExplainVersion.get();
+    if (explainVersionStr == "v1"_sd) {
+        explainVersion = ExplainVersion::V1;
+        toExplain = *phaseManager.getPostMemoPlan();
+    } else if (explainVersionStr == "v2"_sd) {
+        explainVersion = ExplainVersion::V2;
+        toExplain = *phaseManager.getPostMemoPlan();
+    } else if (explainVersionStr == "v2compact"_sd) {
+        explainVersion = ExplainVersion::V2Compact;
+        toExplain = *phaseManager.getPostMemoPlan();
+    } else if (explainVersionStr == "bson"_sd) {
+        explainVersion = ExplainVersion::V3;
+    } else {
+        // Should have been validated.
+        MONGO_UNREACHABLE;
     }
+    abtPrinter = std::make_unique<ABTPrinter>(
+        phaseManager.getMetadata(), std::move(toExplain), explainVersion);
 
     sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
@@ -663,30 +677,28 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     const size_t numberOfPartitions = internalQueryDefaultDOP.load();
 
     const bool isSharded = collection.isSharded_DEPRECATED();
-    ABTVector shardKey;
+    IndexCollationSpec shardKey;
     if (isSharded) {
         for (auto&& e : collection.getShardKeyPattern().getKeyPattern().toBSON()) {
-            shardKey.push_back(translateShardKeyField(e.fieldName()));
+            CollationOp collationOp{CollationOp::Ascending};
+            if (e.type() == BSONType::String && e.String() == IndexNames::HASHED) {
+                collationOp = CollationOp::Clustered;
+            }
+            shardKey.emplace_back(translateShardKeyField(e.fieldName()), collationOp);
         }
     }
 
-    DistributionType type{DistributionType::UnknownPartitioning};
-    if (isSharded) {
-        // TODO SERVER-78503: Handle hashed distribution
-        type = DistributionType::RangePartitioning;
-    } else if (numberOfPartitions == 1) {
-        type = DistributionType::Centralized;
-    }
-
     // For now handle only local parallelism (no over-the-network exchanges).
-    DistributionAndPaths distribution{type, shardKey};
+    DistributionAndPaths distribution{(numberOfPartitions == 1)
+                                          ? DistributionType::Centralized
+                                          : DistributionType::UnknownPartitioning};
 
     opt::unordered_map<std::string, ScanDefinition> scanDefs;
     boost::optional<CEType> numRecords;
     if (collectionExists) {
         numRecords = static_cast<double>(collection->numRecords(opCtx));
     }
-    ShardingMetadata shardingMetadata{.mayContainOrphans = isSharded};
+    ShardingMetadata shardingMetadata(shardKey, isSharded);
 
     scanDefs.emplace(scanDefName,
                      createScanDef({{"type", "mongod"},
@@ -728,7 +740,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                           const bool requireRID,
                                           Metadata metadata,
                                           const ConstFoldFn& constFold,
-                                          const bool supportExplain,
                                           QueryHints hints) {
     switch (mode) {
         case CEMode::kSampling: {
@@ -737,7 +748,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 // Do not use indexes for sampling.
                 entry.second.getIndexDefs().clear();
                 // Do not perform shard filtering for sampling.
-                entry.second.shardingMetadata().mayContainOrphans = false;
+                entry.second.shardingMetadata().setMayContainOrphans(false);
             }
 
             // TODO: consider a limited rewrite set.
@@ -750,7 +761,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                                                     std::make_unique<CostEstimatorImpl>(costModel),
                                                     defaultConvertPathToInterval,
                                                     constFold,
-                                                    supportExplain,
                                                     DebugInfo::kDefaultForProd,
                                                     {} /*hints*/};
             return {OptPhaseManager::getAllRewritesSet(),
@@ -765,7 +775,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
-                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
         }
@@ -782,7 +791,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
-                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -796,7 +804,6 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::make_unique<CostEstimatorImpl>(costModel),
                     defaultConvertPathToInterval,
                     constFold,
-                    supportExplain,
                     DebugInfo::kDefaultForProd,
                     std::move(hints)};
 
@@ -895,8 +902,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     }
 
     auto costModel = cost_model::costModelManager(opCtx->getServiceContext()).getCoefficients();
-    const bool needsExplain = expCtx->explain.has_value();
-
     OptPhaseManager phaseManager = createPhaseManager(mode,
                                                       costModel,
                                                       nss,
@@ -906,7 +911,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                                       requireRID,
                                                       std::move(metadata),
                                                       constFold,
-                                                      needsExplain,
                                                       std::move(queryHints));
     auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
     if (resultPlans.empty()) {
@@ -951,8 +955,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           nss,
                           collections,
                           requireRID,
-                          scanOrder,
-                          needsExplain);
+                          scanOrder);
 }
 
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(

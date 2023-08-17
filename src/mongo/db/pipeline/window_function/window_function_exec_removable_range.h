@@ -76,12 +76,11 @@ public:
                                      boost::intrusive_ptr<ExpressionFieldPath> sortBy,
                                      std::unique_ptr<WindowFunctionState> function,
                                      WindowBounds bounds,
-                                     MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
+                                     MemoryUsageTracker::Impl* memTracker);
 
 private:
     void doReset() final {
         _lastEndpoints = boost::none;
-        _memTracker->set(0);
     }
 
     void update() final;

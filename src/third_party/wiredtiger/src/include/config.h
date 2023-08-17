@@ -16,6 +16,23 @@ struct __wt_config {
     const int8_t *go;
 };
 
+/*
+ * We have jump tables that for each ASCII character, show
+ * the offset in a lookup table that keys starting with that
+ * character start at. All keys are 7 bit ASCII.
+ */
+#define WT_CONFIG_JUMP_TABLE_SIZE 128
+
+/*
+ * The expected types of a configuration value.
+ */
+#define WT_CONFIG_COMPILED_TYPE_INT 0
+#define WT_CONFIG_COMPILED_TYPE_BOOLEAN 1
+#define WT_CONFIG_COMPILED_TYPE_FORMAT 2
+#define WT_CONFIG_COMPILED_TYPE_STRING 3
+#define WT_CONFIG_COMPILED_TYPE_CATEGORY 4
+#define WT_CONFIG_COMPILED_TYPE_LIST 5
+
 struct __wt_config_check {
     const char *name;
     const char *type;
@@ -23,6 +40,11 @@ struct __wt_config_check {
     const char *checks;
     const WT_CONFIG_CHECK *subconfigs;
     u_int subconfigs_entries;
+    const uint8_t *subconfigs_jump;
+    u_int compiled_type;
+    int64_t min_value;
+    int64_t max_value;
+    const char **choices;
 };
 
 #define WT_CONFIG_REF(session, n) (S2C(session)->config_entries[WT_CONFIG_ENTRY_##n])
@@ -34,6 +56,7 @@ struct __wt_config_entry {
 
     const WT_CONFIG_CHECK *checks; /* check array */
     u_int checks_entries;
+    const uint8_t *checks_jump;
 };
 
 struct __wt_config_parser_impl {

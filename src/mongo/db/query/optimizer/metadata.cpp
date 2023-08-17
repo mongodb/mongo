@@ -45,26 +45,27 @@
 
 namespace mongo::optimizer {
 
-// Computes the top level field names and returns. Used to populate _topLevelShardKeyFieldNames
-// field.
-static std::vector<FieldNameType> computeTopLevelShardKeyFields(const ABTVector& paths) {
+namespace {
+
+// Computes the top level field names of the given shard key spec.
+// For example: {"a": 1, "b.c": 1, "d.e": "hashed"} -> ["a", "b", "d"].
+std::vector<FieldNameType> computeTopLevelShardKeyFields(const IndexCollationSpec& shardKey) {
     auto topLevelShardKeyFieldNames = std::vector<FieldNameType>{};
-    for (auto& path : paths) {
-        const PathGet* pathGet = path.cast<PathGet>();
+    for (auto&& e : shardKey) {
+        const PathGet* pathGet = e._path.cast<PathGet>();
         tassert(7903401, "First component of shard key field was not a PathGet", pathGet);
         const auto& fieldName = FieldNameType{pathGet->name().value().toString()};
         topLevelShardKeyFieldNames.push_back(fieldName);
     }
     return topLevelShardKeyFieldNames;
 }
+}  // namespace
 
 DistributionAndPaths::DistributionAndPaths(DistributionType type)
     : DistributionAndPaths(type, {}) {}
 
 DistributionAndPaths::DistributionAndPaths(DistributionType type, ABTVector paths)
-    : _type(type),
-      _paths(std::move(paths)),
-      _topLevelShardKeyFieldNames(computeTopLevelShardKeyFields(_paths)) {
+    : _type(type), _paths(std::move(paths)) {
     uassert(6624080,
             "Invalid distribution type",
             _paths.empty() || _type == DistributionType::HashPartitioning ||
@@ -233,6 +234,13 @@ bool ScanDefinition::exists() const {
 const boost::optional<CEType>& ScanDefinition::getCE() const {
     return _ce;
 }
+
+ShardingMetadata::ShardingMetadata() : ShardingMetadata({}, false) {}
+
+ShardingMetadata::ShardingMetadata(IndexCollationSpec shardKey, bool mayContainOrphans)
+    : _shardKey(shardKey),
+      _mayContainOrphans(mayContainOrphans),
+      _topLevelShardKeyFieldNames(computeTopLevelShardKeyFields(shardKey)) {}
 
 const ShardingMetadata& ScanDefinition::shardingMetadata() const {
     return _shardingMetadata;

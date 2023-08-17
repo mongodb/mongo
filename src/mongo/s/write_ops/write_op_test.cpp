@@ -441,7 +441,7 @@ TEST_F(WriteOpTest, CancelSingle) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-    writeOp.cancelWrites(nullptr);
+    writeOp.cancelWrites();
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }

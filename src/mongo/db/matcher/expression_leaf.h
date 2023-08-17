@@ -55,6 +55,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -720,6 +721,10 @@ public:
     explicit InMatchExpression(boost::optional<StringData> path,
                                clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
+    explicit InMatchExpression(boost::optional<StringData> path,
+                               clonable_ptr<ErrorAnnotation> annotation,
+                               std::shared_ptr<InListData> equalities);
+
     std::unique_ptr<MatchExpression> clone() const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
@@ -736,46 +741,91 @@ public:
      */
     virtual void _doSetCollator(const CollatorInterface* collator);
 
-    Status setEqualities(std::vector<BSONElement> equalities);
-
-    void setBackingBSON(BSONObj equalityStorage);
-
-    Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
-
     const std::vector<BSONElement>& getEqualities() const {
-        return _equalitySet;
+        return _equalities->getElements();
     }
 
-    bool contains(const BSONElement& e) const;
+    const std::shared_ptr<InListData>& getInList() const {
+        return _equalities;
+    }
 
     const std::vector<std::unique_ptr<RegexMatchExpression>>& getRegexes() const {
         return _regexes;
     }
 
     const CollatorInterface* getCollator() const {
-        return _collator;
+        return _equalities->getCollator();
     }
 
-    bool hasNull() const {
-        return _hasNull;
+    /**
+     * Sets the equalities to 'bsonArray'. If 'bool(fn)' is true, then 'fn' will be invoked
+     * for each element in 'bsonArray'. If 'fn' returns a non-OK Status for any element, this
+     * function will immediately break and return that Status. If 'bool(fn)' is false, then
+     * 'fn' is ignored.
+     *
+     * This function will throw an error if any value in 'bsonArray' is Undefined. Any Regex
+     * values in 'bsonArray' will get passed to 'fn()' (assuming that 'bool(fn)' is true) but
+     * otherwise will be ignored.
+     */
+    Status setEqualitiesArray(BSONObj bsonArray,
+                              const std::function<Status(const BSONElement&)>& fn) {
+        cloneEqualitiesBeforeWriteIfNeeded();
+        constexpr bool errorOnRegex = false;
+        return _equalities->setElementsArray(std::move(bsonArray), errorOnRegex, fn);
+    }
+
+    /**
+     * Sets the equalities to 'bsonArray'. This function will throw an error if any value in
+     * 'bsonArray' is Regex or Undefined.
+     */
+    Status setEqualitiesArray(BSONObj bsonArray) {
+        cloneEqualitiesBeforeWriteIfNeeded();
+        return _equalities->setElementsArray(std::move(bsonArray));
+    }
+
+    /**
+     * Sets the equalities to 'equalities'. This function will throw an error if any value in
+     * 'equalities' is Regex or Undefined.
+     */
+    Status setEqualities(std::vector<BSONElement> equalities) {
+        cloneEqualitiesBeforeWriteIfNeeded();
+        return _equalities->setElements(std::move(equalities));
+    }
+
+    Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
+
+    bool contains(const BSONElement& e) const {
+        return _equalities->contains(e);
     }
 
     bool hasRegex() const {
         return !_regexes.empty();
     }
 
+    bool hasNull() const {
+        return _equalities->hasNull();
+    }
+    bool hasArray() const {
+        return _equalities->hasArray();
+    }
+    bool hasObject() const {
+        return _equalities->hasObject();
+    }
     bool hasEmptyArray() const {
-        return _hasEmptyArray;
+        return _equalities->hasEmptyArray();
     }
-
     bool hasEmptyObject() const {
-        return _hasEmptyObject;
+        return _equalities->hasEmptyObject();
     }
-
+    bool hasNonEmptyArray() const {
+        return _equalities->hasNonEmptyArray();
+    }
+    bool hasNonEmptyObject() const {
+        return _equalities->hasNonEmptyObject();
+    }
     bool hasNonEmptyArrayOrObject() const {
-        return _hasNonEmptyArrayOrObject;
+        return hasNonEmptyArray() || hasNonEmptyObject();
     }
-
     bool hasNonScalarOrNonEmptyValues() const {
         return hasNonEmptyArrayOrObject() || hasNull() || hasRegex();
     }
@@ -797,53 +847,25 @@ public:
     }
 
 private:
+    inline void cloneEqualitiesBeforeWriteIfNeeded() {
+        // If '_equalities' has been prepared then it can't be modified, so make a mutable copy
+        // and then update '_equalities' to point to the copy.
+        if (_equalities->isPrepared()) {
+            _equalities = _equalities->clone();
+        }
+    }
+
     ExpressionOptimizerFunc getOptimizer() const final;
 
-    /**
-     * A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
-     * 'opts' and whether we have a mixed-type $in or not.
-     */
+    // A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
+    // 'opts' and whether we have a mixed-type $in or not.
     void serializeToShape(BSONObjBuilder* bob, const SerializationOptions& opts) const;
 
-    // Whether or not '_equalities' has a jstNULL element in it.
-    bool _hasNull = false;
-
-    // Whether or not '_equalities' has an empty array element in it.
-    bool _hasEmptyArray = false;
-
-    // Whether or not '_equalities' has an empty object element in it.
-    bool _hasEmptyObject = false;
-
-    // Whether or not '_equalities' has a non-empty array or object element in it.
-    bool _hasNonEmptyArrayOrObject = false;
-
-    // Collator used to construct '_eltCmp';
-    const CollatorInterface* _collator = nullptr;
-
-    // Comparator used to compare elements. By default, simple binary comparison will be used.
-    BSONElementComparator _eltCmp;
-
-    // Original container of equality elements, including duplicates. Needed for re-computing
-    // '_equalitySet' in case '_collator' changes after elements have been added.
-    //
-    // We keep the equalities in sorted order according to the current BSON element comparator. This
-    // enables a fast-path to avoid re-sorting if the expression is serialized and re-parsed.
-    std::vector<BSONElement> _originalEqualityVector;
-
-    // Deduped set of equality elements associated with this expression. Kept in sorted order to
-    // support std::binary_search. Because we need to sort the elements anyway for things like index
-    // bounds building, using binary search avoids the overhead of inserting into a hash table which
-    // doesn't pay for itself in the common case where lookups are done a few times if ever.
-    // TODO It may be worth dynamically creating a hashset after matchesSingleElement() has been
-    // called "many" times.
-    std::vector<BSONElement> _equalitySet;
+    // List of equalities (excluding regexes).
+    std::shared_ptr<InListData> _equalities;
 
     // Container of regex elements this object owns.
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
-
-    // When this $in is generated internally, e.g. via a rewrite, this is where we store the
-    // data of the corresponding equality elements.
-    BSONObj _equalityStorage;
 
     boost::optional<InputParamId> _inputParamId;
 };

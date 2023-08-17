@@ -72,13 +72,6 @@ struct DistributionAndPaths {
      * need any paths.
      */
     ABTVector _paths;
-
-    /**
-     * In the event that we need shard filtering, the top level field name of each shard key path
-     * will pushed down into a Scan to prevent costly PathGet operations. This field is initialized
-     * in the constructor.
-     */
-    std::vector<FieldNameType> _topLevelShardKeyFieldNames;
 };
 
 /**
@@ -191,9 +184,43 @@ using ScanDefOptions = opt::unordered_map<std::string, std::string>;
 /**
  * Metadata associated with the sharding state of a collection.
  */
-struct ShardingMetadata {
+class ShardingMetadata {
+public:
+    ShardingMetadata();
+
+    ShardingMetadata(IndexCollationSpec shardKey, bool mayContainOrphans);
+
+    const IndexCollationSpec& shardKey() const {
+        return _shardKey;
+    }
+
+    bool mayContainOrphans() const {
+        return _mayContainOrphans;
+    }
+
+    void setMayContainOrphans(bool val) {
+        _mayContainOrphans = val;
+    }
+
+    const std::vector<FieldNameType>& topLevelShardKeyFieldNames() const {
+        return _topLevelShardKeyFieldNames;
+    }
+
+private:
+    // Shard key of the collection. This is stored as an IndexCollectionSpec because the shard key
+    // is conceptually an index to the shard which contains a particular key. The only collation ops
+    // that are allowed are Ascending and Clustered.
+    // Note: Clustered collation op is intended to represent a hashed shard key; however, if two
+    // keys hash to the same value, it is possible that an index scan of the hashed index will
+    // produce a stream of keys which are not clustered. Hashed indexes are implemented with a
+    // B-tree using the hashed value as a key, which makes it sensitive to insertion order.
+    IndexCollationSpec _shardKey;
+
     // Whether the collection may contain orphans.
-    bool mayContainOrphans{false};
+    bool _mayContainOrphans{false};
+
+    // Top level field name of each component of the shard key.
+    std::vector<FieldNameType> _topLevelShardKeyFieldNames;
 };
 
 /**

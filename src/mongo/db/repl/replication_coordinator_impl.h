@@ -1726,6 +1726,17 @@ private:
      */
     void _validateDefaultWriteConcernOnShardStartup(WithLock lk) const;
 
+    /**
+     * Checks whether the node can currently accept replicated writes. This method is unsafe and
+     * is for internal use only as its result is only accurate while holding the RSTL.
+     */
+    bool _canAcceptReplicatedWrites_UNSAFE(OperationContext* opCtx);
+
+    /**
+     * Checks whether the collection indicated by nsOrUUID is replicated.
+     */
+    bool _isCollectionReplicated(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

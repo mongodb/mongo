@@ -477,7 +477,7 @@ static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, 
             // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
             // constructing a BSONArray.
             BSONArrayBuilder builder;
-            bson::convertToBsonObj(builder, value::ArrayEnumerator{tag, val});
+            bson::convertToBsonArr(builder, value::ArrayEnumerator{tag, val});
             buf.appendBool(true);
             buf.appendArray(BSONArray(builder.done()));
             break;
@@ -734,6 +734,7 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += sizeof(TimeZone);
             break;
         case TypeTags::collator:
+        case TypeTags::inListData:
             // This type points to a block of memory that it doesn't own, so we don't acccount
             // for the size of this block of memory here.
             break;

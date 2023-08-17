@@ -5716,68 +5716,6 @@ TEST(PhysRewriter, AvoidFetchingNonNullIndexedFields) {
         optimized);
 }
 
-TEST(PhysRewriter, RemoveOrphansEnforcer) {
-    // Hypothetical MQL which could generate this ABT: {$match: {a: 1}}
-    ABT rootNode = NodeBuilder{}
-                       .root("root")
-                       .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
-                       .finish(_scan("root", "c1"));
-
-    auto prefixId = PrefixId::createForTests();
-
-    auto scanDef =
-        createScanDef(ScanDefOptions{},
-                      IndexDefinitions{},
-                      MultikeynessTrie{},
-                      ConstEval::constFold,
-                      // Sharded on {a: 1, b:1}
-                      DistributionAndPaths{DistributionType::RangePartitioning,
-                                           ABTVector{make<PathGet>("a", make<PathIdentity>()),
-                                                     make<PathGet>("b", make<PathIdentity>())}},
-                      true /*exists*/,
-                      boost::none /*ce*/,
-                      ShardingMetadata{.mayContainOrphans = true});
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1", scanDef}}},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-
-    // Note new evaluation nodes for fields of the shard key and the filter node to perform the
-    // shard filtering.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "Filter []\n"
-        "|   FunctionCall [shardFilter]\n"
-        "|   |   Variable [shardKey_1]\n"
-        "|   Variable [shardKey_0]\n"
-        "Evaluation [{shardKey_1}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [b]\n"
-        "|   PathIdentity []\n"
-        "Evaluation [{shardKey_0}]\n"
-        "|   EvalPath []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [a]\n"
-        "|   PathIdentity []\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse [1]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n",
-        optimized);
-}
-
 TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
     // Hypothetical MQL which could generate this ABT:
     //   db.c1.aggregate([{$unionWith: {coll: "c2", pipeline: [{$match: {}}]}}])
@@ -5795,11 +5733,10 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
                       MultikeynessTrie{},
                       ConstEval::constFold,
                       // Sharded on {a: 1}
-                      DistributionAndPaths{DistributionType::RangePartitioning,
-                                           ABTVector{make<PathGet>("a", make<PathIdentity>())}},
+                      DistributionAndPaths{DistributionType::Centralized},
                       true /*exists*/,
                       boost::none /*ce*/,
-                      ShardingMetadata{.mayContainOrphans = true});
+                      ShardingMetadata({{_get("a", _id())._n, CollationOp::Ascending}}, true));
 
     auto scanDef2 =
         createScanDef(ScanDefOptions{},
@@ -5807,11 +5744,10 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
                       MultikeynessTrie{},
                       ConstEval::constFold,
                       // Sharded on {b: 1}
-                      DistributionAndPaths{DistributionType::RangePartitioning,
-                                           ABTVector{make<PathGet>("b", make<PathIdentity>())}},
+                      DistributionAndPaths{DistributionType::Centralized},
                       true /*exists*/,
                       boost::none /*ce*/,
-                      ShardingMetadata{.mayContainOrphans = true});
+                      ShardingMetadata({{_get("b", _id())._n, CollationOp::Ascending}}, true));
 
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -5840,20 +5776,19 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
         optimized);
 }
 
-// Common setup function. Returns rootNode, phaseManager, given a DistributionAndPaths with the
-// shard key.
-auto ScanNodeRemoveOrphansImplementerSetupAndOptimize = [](ABT& rootNode,
-                                                           DistributionAndPaths dnp) {
+// Common setup function to construct optimizer metadata with no indexes and invoke optimization
+// given a physical plan and sharding metadata. Returns the optimized plan.
+ABT optimizeABTWithShardingMetadataNoIndexes(ABT& rootNode, ShardingMetadata shardingMetadata) {
     auto prefixId = PrefixId::createForTests();
 
     auto scanDef = createScanDef(ScanDefOptions{},
                                  IndexDefinitions{},
                                  MultikeynessTrie{},
                                  ConstEval::constFold,
-                                 dnp,
+                                 DistributionAndPaths{DistributionType::Centralized},
                                  true /*exists*/,
                                  boost::none /*ce*/,
-                                 ShardingMetadata{.mayContainOrphans = true});
+                                 shardingMetadata);
 
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -5866,17 +5801,16 @@ auto ScanNodeRemoveOrphansImplementerSetupAndOptimize = [](ABT& rootNode,
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    return std::pair<ABT, std::string>{optimized,
-                                       ExplainGenerator::explainMemo(phaseManager.getMemo())};
+    return optimized;
 };
 
 TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerBasic) {
     ABT rootNode = NodeBuilder{}.root("root").finish(_scan("root", "c1"));
 
-    DistributionAndPaths shardKey{DistributionType::RangePartitioning,
-                                  ABTVector{_get("a", _id())._n, _get("b", _id())._n}};
-    const auto& [optimized, memo] =
-        ScanNodeRemoveOrphansImplementerSetupAndOptimize(rootNode, shardKey);
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending},
+                         {_get("b", _id())._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(rootNode, sm);
     // The fields of the shard key are extracted in the physical scan.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
@@ -5890,11 +5824,10 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerBasic) {
 
 TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerDottedBasic) {
     ABT rootNode = NodeBuilder{}.root("root").finish(_scan("root", "c1"));
-    DistributionAndPaths shardKey{
-        DistributionType::RangePartitioning,
-        ABTVector{_get("a", _get("b", _id()))._n, _get("c", _get("d", _id()))._n}};
-    const auto& [optimized, memo] =
-        ScanNodeRemoveOrphansImplementerSetupAndOptimize(rootNode, shardKey);
+    ShardingMetadata sm({{_get("a", _get("b", _id()))._n, CollationOp::Ascending},
+                         {_get("c", _get("d", _id()))._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(rootNode, sm);
     // The top-level of each field's path is pushed down into the physical scan, and the rest of
     // the path is obtained with an evaluation node.
     ASSERT_EXPLAIN_V2_AUTO(
@@ -5919,11 +5852,10 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerDottedBasic) {
 
 TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerDottedSharedPrefix) {
     ABT rootNode = NodeBuilder{}.root("root").finish(_scan("root", "c1"));
-    DistributionAndPaths shardKey{
-        DistributionType::RangePartitioning,
-        ABTVector{_get("a", _get("b", _id()))._n, _get("a", _get("c", _id()))._n}};
-    const auto& [optimized, memo] =
-        ScanNodeRemoveOrphansImplementerSetupAndOptimize(rootNode, shardKey);
+    ShardingMetadata sm({{_get("a", _get("b", _id()))._n, CollationOp::Ascending},
+                         {_get("a", _get("c", _id()))._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(rootNode, sm);
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
         "Filter []\n"
@@ -5947,11 +5879,10 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerDottedSharedPrefix) {
 TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerDottedDoubleSharedPrefix) {
     ABT rootNode = NodeBuilder{}.root("root").finish(_scan("root", "c1"));
     // Sharded on {a.b.c: 1, a.b.d:1}
-    DistributionAndPaths shardKey{DistributionType::RangePartitioning,
-                                  ABTVector{_get("a", _get("b", _get("c", _id())))._n,
-                                            _get("a", _get("b", _get("d", _id())))._n}};
-    const auto& [optimized, memo] =
-        ScanNodeRemoveOrphansImplementerSetupAndOptimize(rootNode, shardKey);
+    ShardingMetadata sm({{_get("a", _get("b", _get("c", _id())))._n, CollationOp::Ascending},
+                         {_get("a", _get("b", _get("d", _id())))._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(rootNode, sm);
     // Only the top level of shared paths is currently pushed down into the physical scan.
     // TODO SERVER-79435: Factor out a shared path to the greatest extent possible (e.g. 'a.b'
     // rather than just 'a').
@@ -5993,17 +5924,16 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetBasic) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    DistributionAndPaths shardKey{DistributionType::RangePartitioning,
-                                  ABTVector{_get("a", _id())._n}};
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
 
     auto scanDef = createScanDef({},
                                  {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
                                  MultikeynessTrie{},
                                  ConstEval::constFold,
-                                 shardKey,
+                                 DistributionAndPaths{DistributionType::Centralized},
                                  true,
                                  boost::none,
-                                 ShardingMetadata{.mayContainOrphans = true});
+                                 sm);
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -6036,18 +5966,19 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix)
                        .root("root")
                        .filter(_evalf(_get("e", _traverse1(_cmp("Eq", "3"_cint64))), "root"_var))
                        .finish(_scan("root", "c1"));
+    // Sharded on {a.b.c: 1, a.b.d:1}
+    ShardingMetadata sm({{_get("a", _get("b", _get("c", _id())))._n, CollationOp::Ascending},
+                         {_get("a", _get("b", _get("d", _id())))._n, CollationOp::Ascending}},
+                        true);
     auto shardScanDef =
         createScanDef(ScanDefOptions{},
                       {{"index1", makeIndexDefinition("e", CollationOp::Ascending)}},
                       MultikeynessTrie{},
                       ConstEval::constFold,
-                      // Sharded on {a.b.c: 1, a.b.d:1}
-                      DistributionAndPaths{DistributionType::RangePartitioning,
-                                           ABTVector{_get("a", _get("b", _get("c", _id())))._n,
-                                                     _get("a", _get("b", _get("d", _id())))._n}},
+                      DistributionAndPaths{DistributionType::Centralized},
                       true /*exists*/,
                       boost::none /*ce*/,
-                      ShardingMetadata{.mayContainOrphans = true});
+                      sm);
 
     auto prefixId = PrefixId::createForTests();
 
@@ -6069,24 +6000,89 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix)
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   FunctionCall [shardFilter]\n"
-        "|   |   |   Variable [shardKey_8]\n"
-        "|   |   Variable [shardKey_7]\n"
-        "|   Evaluation [{shardKey_8}]\n"
+        "|   |   |   Variable [shardKey_10]\n"
+        "|   |   Variable [shardKey_9]\n"
+        "|   Evaluation [{shardKey_10}]\n"
         "|   |   EvalPath []\n"
-        "|   |   |   Variable [shardKey_6]\n"
+        "|   |   |   Variable [shardKey_8]\n"
         "|   |   PathGet [b]\n"
         "|   |   PathGet [d]\n"
         "|   |   PathIdentity []\n"
-        "|   Evaluation [{shardKey_7}]\n"
+        "|   Evaluation [{shardKey_9}]\n"
         "|   |   EvalPath []\n"
-        "|   |   |   Variable [shardKey_6]\n"
+        "|   |   |   Variable [shardKey_8]\n"
         "|   |   PathGet [b]\n"
         "|   |   PathGet [c]\n"
         "|   |   PathIdentity []\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': shardKey_6}, c1]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': shardKey_8}, c1]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
         "[3]}]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphansSargableNodeComplete) {
+    // Hypothetical MQL which could generate this ABT: {$match: {a: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 1, b: 1};
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending},
+                         {_get("b", _id())._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // Projections on 'a' and 'b' pushed down into PhysicalScan and used as args to 'shardFilter()'.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   |   Variable [evalTemp_1]\n"
+        "|   Variable [evalTemp_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphansSargableNodeCompleteDottedShardKey) {
+    // {$match: {"a.b": {$gt: 1}}}
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_get("a", _traverse1(_get("b", _traverse1(_cmp("Gt", "1"_cint64))))),
+                           "root"_var))
+            .finish(_scan("root", "c1"));
+    // Shard key {'a.b': 1}
+    ShardingMetadata sm({{_get("a", _get("b", _id()))._n, CollationOp::Ascending}}, true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // Push down projection on 'a' into PhysicalScan and use that stream to project 'b' to use as
+    // input to 'shardFilter()'. This avoids explicitly projecting 'a.b' from the root projection.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   Variable [shardKey_1]\n"
+        "Evaluation [{shardKey_1}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathGet [b]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n",
         optimized);
 }
 
@@ -6111,22 +6107,21 @@ TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
 
     {
         auto prefixId = PrefixId::createForTests();
+        ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
              OptPhase::MemoImplementationPhase},
             prefixId,
             {{{"c1",
-               createScanDef(
-                   {},
-                   {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
-                   MultikeynessTrie{},
-                   ConstEval::constFold,
-                   DistributionAndPaths{DistributionType::RangePartitioning,
-                                        ABTVector{make<PathGet>("a", make<PathIdentity>())}},
-                   true,        /* exists */
-                   boost::none, /*ce*/
-                   ShardingMetadata{.mayContainOrphans = true})}}},
+               createScanDef({},
+                             {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
+                             MultikeynessTrie{},
+                             ConstEval::constFold,
+                             DistributionAndPaths{DistributionType::Centralized},
+                             true /*exists*/,
+                             boost::none /*ce*/,
+                             sm)}}},
             boost::none /*costModel*/,
             {true /*debugMode*/, 3 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
             {});

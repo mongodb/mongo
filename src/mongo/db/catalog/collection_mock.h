@@ -201,7 +201,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool timeseriesBucketingParametersMayHaveChanged() const {
+    boost::optional<bool> timeseriesBucketingParametersHaveChanged() const {
         MONGO_UNREACHABLE;
     }
 

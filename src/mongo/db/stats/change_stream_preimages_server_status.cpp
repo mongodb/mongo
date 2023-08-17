@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
@@ -53,6 +54,12 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
     if (!preImagesColl) {
         return;
     }
+
+    const auto expireAfterSeconds = change_stream_pre_image_util::getExpireAfterSeconds(opCtx);
+    if (expireAfterSeconds) {
+        result->append("expireAfterSeconds", expireAfterSeconds->count());
+    }
+
     int64_t numRecords = preImagesColl->numRecords(opCtx);
     int64_t dataSize = preImagesColl->dataSize(opCtx);
     result->append("numDocs", numRecords);

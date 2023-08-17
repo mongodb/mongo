@@ -1,3 +1,6 @@
+/**
+ * Basic tests for the $minN/$maxN accumulators.
+ */
 import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db[jsTestName()];

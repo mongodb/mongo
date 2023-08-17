@@ -7,9 +7,9 @@ variables:
   - rhel80-xlarge
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
@@ -74,9 +74,9 @@ buildvariants:
     compile_variant: *linux-x86-dynamic-compile
   tasks:
     - name: compile_ninja_quick_TG
-    - name: compile_test_and_package_parallel_unittest_stream_TG
-    - name: compile_test_and_package_parallel_core_stream_TG
-    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+    - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: run_pretty_printer_tests
@@ -100,7 +100,7 @@ buildvariants:
   - name: version_expansions_gen
     variant: enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.
@@ -119,9 +119,9 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     compile_variant: *linux-x86-dynamic-debug-compile-required
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *generic_linux_compile_params
@@ -210,9 +210,9 @@ buildvariants:
     compile_variant: *windows-compile-required
   tasks:
   - name: compile_ninja_quick_TG
-  - name: compile_test_and_package_parallel_core_stream_TG
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
   - name: compile_build_tools_next_TG
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -230,9 +230,9 @@ buildvariants:
       distros:
         - amazon2-arm64-xlarge
     - name: compile_ninja_quick_TG
-    - name: compile_test_and_package_parallel_unittest_stream_TG
-    - name: compile_test_and_package_parallel_core_stream_TG
-    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+    - name: compile_test_parallel_dbtest_stream_TG
     - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: iwyu_self_test_TG
@@ -283,9 +283,9 @@ buildvariants:
       --mongodSetParameters="{featureFlagGRPC: true}"
   tasks:
     - name: compile_ninja_quick_TG
-    - name: compile_test_and_package_parallel_unittest_stream_TG
-    - name: compile_test_and_package_parallel_core_stream_TG
-    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+    - name: compile_test_parallel_dbtest_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: .jscore .common
     - name: .lint

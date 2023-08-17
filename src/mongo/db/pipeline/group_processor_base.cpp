@@ -144,7 +144,7 @@ std::pair<GroupProcessorBase::GroupsMap::iterator, bool> GroupProcessorBase::fin
 
     const size_t numAccumulators = _accumulatedFields.size();
     if (emplaceResult.second) {
-        _memoryTracker.set(_memoryTracker.currentMemoryBytes() + key.getApproximateSize());
+        _memoryTracker.update(key.getApproximateSize());
 
         // Initialize and add the accumulators
         Value expandedId = expandId(key);

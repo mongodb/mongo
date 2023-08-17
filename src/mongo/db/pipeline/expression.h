@@ -4374,6 +4374,27 @@ public:
         return static_cast<bool>(_children[_kBinSize]);
     }
 
+    boost::optional<TimeUnit> getOptimizedUnit() const {
+        if (_parsedUnit) {
+            return _parsedUnit;
+        }
+        return boost::none;
+    }
+
+    boost::optional<long long> getOptimizedBinSize() const {
+        if (_parsedBinSize) {
+            return _parsedBinSize;
+        }
+        return boost::none;
+    }
+
+    boost::optional<TimeZone> getOptimizedTimeZone() const {
+        if (_parsedTimeZone) {
+            return _parsedTimeZone;
+        }
+        return boost::none;
+    }
+
 private:
     /**
      * Converts $dateTrunc expression parameter "date" 'value' to Date_t type.

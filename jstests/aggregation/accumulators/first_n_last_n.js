@@ -1,3 +1,6 @@
+/**
+ * Basic tests for the $firstN/$lastN accumulators.
+ */
 import "jstests/libs/sbe_assert_error_override.js";
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
@@ -11,6 +14,7 @@ const largestIntPlus1 = NumberDecimal("9223372036854775808");  // Adding 1 puts 
 
 // Basic correctness tests.
 let docs = [];
+let docId = 0;
 const defaultN = 3;
 const kMaxSales = 20;
 let expectedFirstThree = [];
@@ -30,7 +34,7 @@ for (const states
     for (let i = 0; i < kMaxSales; ++i) {
         const salesAmt = i * 10;
         if (i < sales) {
-            docs.push({state: state, sales: salesAmt, stateObj: {"st": state}, n: 3});
+            docs.push({_id: docId++, state: state, sales: salesAmt, stateObj: {"st": state}, n: 3});
 
             // First N candidate.
             if (i < defaultN) {

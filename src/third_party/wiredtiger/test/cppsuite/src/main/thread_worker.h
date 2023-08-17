@@ -43,7 +43,7 @@
 #include "src/util/barrier.h"
 
 namespace test_harness {
-enum class thread_type { CHECKPOINT, CUSTOM, INSERT, READ, REMOVE, UPDATE };
+enum class thread_type { BACKGROUND_COMPACT, CHECKPOINT, CUSTOM, INSERT, READ, REMOVE, UPDATE };
 
 const std::string type_string(thread_type type);
 
@@ -105,6 +105,7 @@ public:
 
 public:
     const int64_t collection_count;
+    const int64_t free_space_target_mb;
     const int64_t key_count;
     const int64_t key_size;
     const int64_t value_size;

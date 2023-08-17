@@ -45,8 +45,7 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
-
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 
 namespace mongo::stage_builder {
 
@@ -70,9 +69,8 @@ inline auto makeABTFunction(StringData name, Args&&... args) {
         name.toString(), optimizer::makeSeq(std::forward<Args>(args)...));
 }
 
-template <typename T>
-inline auto makeABTConstant(sbe::value::TypeTags tag, T value) {
-    return optimizer::make<optimizer::Constant>(tag, sbe::value::bitcastFrom<T>(value));
+inline auto makeABTConstant(sbe::value::TypeTags tag, sbe::value::Value value) {
+    return optimizer::make<optimizer::Constant>(tag, value);
 }
 
 inline auto makeABTConstant(StringData str) {

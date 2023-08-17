@@ -69,7 +69,7 @@ public:
                                  boost::intrusive_ptr<Expression> time,
                                  WindowBounds bounds,
                                  boost::optional<TimeUnit> unit,
-                                 MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                 MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
                              memTracker),
           _position(std::move(position)),
@@ -79,9 +79,11 @@ public:
               if (!unit)
                   return boost::none;
 
-              auto status = timeUnitTypicalMilliseconds(*unit);
-              tassert(status);
-              return status.getValue();
+              auto milliseconds = timeUnitTypicalMilliseconds(*unit);
+              tassert(7823403,
+                      "TimeUnit must be less than or equal to a 'week' ",
+                      milliseconds <= timeUnitTypicalMilliseconds(TimeUnit::week));
+              return milliseconds;
           }()) {}
 
     Value getNext() final;

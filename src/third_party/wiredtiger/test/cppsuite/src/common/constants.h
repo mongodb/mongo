@@ -41,6 +41,7 @@ extern const std::string TIMESTAMP_MANAGER;
 extern const std::string WORKLOAD_MANAGER;
 
 /* Configuration API consts. */
+extern const std::string BACKGROUND_COMPACT_OP_CONFIG;
 extern const std::string CACHE_HS_INSERT;
 extern const std::string CACHE_MAX_WAIT_MS;
 extern const std::string CACHE_SIZE_MB;
@@ -52,6 +53,7 @@ extern const std::string CUSTOM_OP_CONFIG;
 extern const std::string DURATION_SECONDS;
 extern const std::string ENABLED;
 extern const std::string ENABLE_LOGGING;
+extern const std::string FREE_SPACE_TARGET_MB;
 extern const std::string INSERT_OP_CONFIG;
 extern const std::string KEY_COUNT_PER_COLLECTION;
 extern const std::string KEY_SIZE;

@@ -361,20 +361,13 @@ public:
         _testExecutor = makeTestExecutor();
     }
 
-    void tearDown() override {
-        // Ensure that even on test failures all failpoint state gets reset.
-        globalFailPointRegistry().disableAllFailpoints();
-
-        WaitForMajorityService::get(getServiceContext()).shutDown();
-
+    void shutdownHook() override {
         _testExecutor->shutdown();
         _testExecutor->join();
         _testExecutor.reset();
 
         _registry->onShutdown();
         _service = nullptr;
-
-        ServiceContextMongoDTest::tearDown();
     }
 
     void stepUp() {

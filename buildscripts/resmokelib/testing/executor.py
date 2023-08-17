@@ -312,6 +312,8 @@ class TestSuiteExecutor(object):
         for test_name in self._suite.make_test_case_names_list():
             queue_elem = self._create_queue_elem_for_test_name(test_name)
             test_cases.append(queue_elem)
+            if _config.SANITY_CHECK:
+                break
         test_queue.add_test_cases(test_cases)
 
         return test_queue

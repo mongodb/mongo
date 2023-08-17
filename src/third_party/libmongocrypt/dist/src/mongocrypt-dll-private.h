@@ -1,8 +1,8 @@
 #ifndef MONGOCRYPT_DLL_PRIVATE_H
 #define MONGOCRYPT_DLL_PRIVATE_H
 
-#include <mlib/str.h>
 #include <mlib/error.h>
+#include <mlib/str.h>
 
 #include <stdlib.h>
 
@@ -14,17 +14,16 @@
 #define MCR_DLL_SUFFIX ".so"
 #endif
 
-#define MCR_DLL_NULL \
-   ((mcr_dll){._native_handle = NULL, .error_string = MSTR_NULL})
+#define MCR_DLL_NULL ((mcr_dll){._native_handle = NULL, .error_string = MSTR_NULL})
 
 /**
  * @brief A dynamically-loaded library i.e. returned by LoadLibrary() or
  * dlopen()
  */
 typedef struct mcr_dll {
-   // (All supported platforms use a void* as the library handle type)
-   void *_native_handle;
-   mstr error_string;
+    // (All supported platforms use a void* as the library handle type)
+    void *_native_handle;
+    mstr error_string;
 } mcr_dll;
 
 /**
@@ -42,20 +41,17 @@ typedef struct mcr_dll {
  * a filename), it will be resolved relative to the application's working
  * directory.
  */
-mcr_dll
-mcr_dll_open (const char *lib);
+mcr_dll mcr_dll_open(const char *lib);
 
 /**
  * @brief Close a dynamic library opened with @ref mcr_dll_open
  *
  * @param dll A dynamic library handle
  */
-static inline void
-mcr_dll_close (mcr_dll dll)
-{
-   extern void mcr_dll_close_handle (mcr_dll);
-   mcr_dll_close_handle (dll);
-   mstr_free (dll.error_string);
+static inline void mcr_dll_close(mcr_dll dll) {
+    extern void mcr_dll_close_handle(mcr_dll);
+    mcr_dll_close_handle(dll);
+    mstr_free(dll.error_string);
 }
 
 /**
@@ -65,21 +61,18 @@ mcr_dll_close (mcr_dll dll)
  * @param symbol The name of a symbol to open
  * @return void* A pointer to that symbol, or NULL if not found
  */
-void *
-mcr_dll_sym (mcr_dll dll, const char *symbol);
+void *mcr_dll_sym(mcr_dll dll, const char *symbol);
 
 /**
  * @brief Determine whether the given DLL is a handle to an open library
  */
-static inline bool
-mcr_dll_is_open (mcr_dll dll)
-{
-   return dll._native_handle != NULL;
+static inline bool mcr_dll_is_open(mcr_dll dll) {
+    return dll._native_handle != NULL;
 }
 
 typedef struct mcr_dll_path_result {
-   mstr path;
-   mstr error_string;
+    mstr path;
+    mstr error_string;
 } mcr_dll_path_result;
 
 /**
@@ -91,7 +84,6 @@ typedef struct mcr_dll_path_result {
  *
  * @note Caller must free both `retval.path` and `retval.error_string`.
  */
-mcr_dll_path_result
-mcr_dll_path (mcr_dll dll);
+mcr_dll_path_result mcr_dll_path(mcr_dll dll);
 
 #endif // MONGOCRYPT_DLL_PRIVATE_H

@@ -792,6 +792,11 @@ class RunPlugin(PluginInterface):
                   " run."))
 
         parser.add_argument(
+            "--sanityCheck", action="store_true", dest="sanity_check", help=
+            "Truncate the test queue to 1 item, just in order to verify the suite is properly set up."
+        )
+
+        parser.add_argument(
             "--includeWithAllTags", action="append", dest="include_with_all_tags",
             metavar="TAG1,TAG2",
             help=("Comma separated list of tags. For the jstest portion of the suite(s),"

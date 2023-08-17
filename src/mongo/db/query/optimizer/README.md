@@ -63,4 +63,10 @@ SCons install directory is something more like `build/opt/install/bin`.
 ## Evergreen Testing Recommendation
 In addition to the above suites, there is a patch-only variant which enables the CQF feature flag
 on a selection of existing suites. The variant, "Query (all feature flags and CQF enabled)", runs
-all the tasks from the recommended all-feature-flags variants.
+all the tasks from the recommended all-feature-flags variants. When testing on evergreen, you
+may want a combination of passthrough tests from the CQF variant and CQF-targeted tests (like the
+integration suites mentioned above and unit tests) on interesting variants such as ASAN. 
+
+You can define local evergreen aliases to make scheduling these tasks easier and faster than
+selecting them individually on each evergreen patch. A discussion of evergreen aliases can be
+found in the query team wiki.

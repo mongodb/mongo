@@ -42,13 +42,6 @@
 namespace mongo {
 namespace executor {
 
-namespace {
-
-MONGO_FAIL_POINT_DEFINE(pauseTaskExecutorAfterReceivesNetworkRespones);
-MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
-
-}  // namespace
-
 /**
  * Provides exclusive access to an underlying Promise at set-time, guaranteeing that the Promise
  * will be set at most one time globally. This prevents races between completion and cancellation,
@@ -141,19 +134,8 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
                 // canceled). Errors from the remote host will be contained in the response.
                 exclusivePromiseAccess->setError(status);
             }
-            pauseTaskExecutorAfterReceivesNetworkRespones.pauseWhileSet();
         }
     };
-
-    // Fail point to make this method to wait until the token is canceled.
-    if (!token.isCanceled()) {
-        try {
-            pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
-                Interruptible::notInterruptible(), token);
-        } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
-            // Swallow the interrupted exception that arrives from canceling a failpoint.
-        }
-    }
 
     auto scheduleStatus = wrapCallbackHandleWithCancelToken(
         executor,
@@ -316,20 +298,6 @@ ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand
                                                     TaskExecutor::ResponseStatus>(
         shared_from_this(),
         [this](const auto&... args) { return scheduleRemoteCommand(args...); },
-        request,
-        token,
-        baton,
-        [](const auto& args) {});
-}
-
-ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const CancellationToken& token,
-    const BatonHandle& baton) {
-    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
-                                                    TaskExecutor::ResponseOnAnyStatus>(
-        shared_from_this(),
-        [this](const auto&... args) { return scheduleRemoteCommandOnAny(args...); },
         request,
         token,
         baton,

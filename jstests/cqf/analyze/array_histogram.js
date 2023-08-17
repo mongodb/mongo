@@ -8,7 +8,7 @@ import {
 } from "jstests/libs/ce_stats_utils.js";
 import {forceCE} from "jstests/libs/optimizer_utils.js";
 
-runHistogramsTest(function verifyArrayHistograms() {
+await runHistogramsTest(function verifyArrayHistograms() {
     const coll = db.array_histogram;
     coll.drop();
 

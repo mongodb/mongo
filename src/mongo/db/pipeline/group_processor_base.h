@@ -206,7 +206,7 @@ protected:
     std::vector<AccumulationStatement> _accumulatedFields;
     // Per-field memory trackers corresponding to each AccumulationStatement in _accumulatedFields.
     // Caching these helps avoid lookups in the map in MemoryUsageTracker for every input document.
-    std::vector<MemoryUsageTracker::PerFunctionMemoryTracker*> _accumulatedFieldMemoryTrackers;
+    std::vector<MemoryUsageTracker::Impl*> _accumulatedFieldMemoryTrackers;
 
     bool _doingMerge{false};
 

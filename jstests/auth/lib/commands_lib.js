@@ -2300,6 +2300,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert']},
@@ -2317,6 +2320,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2341,6 +2347,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['update']},
@@ -2358,6 +2367,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2382,6 +2394,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['remove']},
@@ -2399,6 +2414,9 @@ export const authCommandsLib = {
             bypassDocumentValidation: true,
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [
@@ -2427,6 +2445,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [{
             runOnDb: adminDbName,
             privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert', 'update', 'remove']},
@@ -4801,9 +4822,7 @@ export const authCommandsLib = {
           testname: "getClusterParameter",
           command: {getClusterParameter: "testIntClusterParameter"},
           skipTest: (conn) => {
-              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
-              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return isStandalone;
+            return isStandalone(conn);
           },
           testcases: [
             {
@@ -5023,6 +5042,9 @@ export const authCommandsLib = {
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
           },
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagBulkWriteCommand;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -6442,9 +6464,7 @@ export const authCommandsLib = {
           testname: "setClusterParameter",
           command: {setClusterParameter: {testIntClusterParameter: {intData: 17}}},
           skipTest: (conn) => {
-              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
-              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return isStandalone;
+            return isStandalone(conn);
           },
           testcases: [
               {
@@ -6539,9 +6559,7 @@ export const authCommandsLib = {
           testname: "setUserWriteBlockMode",
           command: {setUserWriteBlockMode: 1, global: false},
           skipTest: (conn) => {
-              const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
-              const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
-              return isStandalone;
+              return isStandalone(conn);
           },
           testcases: [
               {
@@ -7242,6 +7260,82 @@ export const authCommandsLib = {
               },
           ]
       },
+      {
+        testname: "query_settings_agg_command",
+        command: {
+          aggregate: 1,
+          pipeline: [{$querySettings: {}}],
+          cursor: {}
+        },
+        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
+        skipTest: (conn) => {
+          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+        },
+        testcases: [
+          // Tests that a cluster admin can successfully run the `$querySettings` stage as part of
+          // the aggregation pipeline.
+          {
+            runOnDb: adminDbName,
+            roles: roles_clusterManager,
+            privileges: [{resource: {cluster: true}, actions: ["querySettings"]}]
+          },
+      ]
+      },
+      {
+        testname: "set_query_settings_commands",
+        command: {
+          setQuerySettings: {
+            find: "foo",
+            $db: firstDbName,
+          },
+          settings: {
+            "indexHints": {
+              "allowedIndexes": [{ "sku": 1 }]
+            }
+          }
+        },
+        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
+        skipTest: (conn) => {
+          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+        },
+        teardown: function(db) {
+          db.adminCommand({removeQuerySettings: {
+            find: "foo",
+            $db: firstDbName,
+          }});
+        },
+        testcases: [
+          // Tests that an admin cluster can successfully run the `setQuerySettings` command.
+          {
+            runOnDb: adminDbName,
+            roles: roles_clusterManager,
+            privileges: [{resource: {cluster: true}, actions: ["querySettings"]}]
+          },
+      ]
+      },
+      {
+        testname: "remove_query_settings_commands",
+        command: {
+          removeQuerySettings: {
+            find: "foo",
+            $db: firstDbName,
+          }
+        },
+        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
+        skipTest: (conn) => {
+          return isStandalone(conn) || !TestData.setParameters.featureFlagQuerySettings;
+        },
+        testcases: [
+          // Tests that an admin cluster can successfully run the `removeQuerySettings` command.
+          {
+            runOnDb: adminDbName,
+            roles: roles_clusterManager,
+            privileges: [{resource: {cluster: true}, actions: ["querySettings"]}],
+            expectAuthzFailure: false, // We expect the request to be authorized.
+            expectFail: true // We expect to receive 7746701 because there are no matching query settings .
+          },
+      ]
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/
@@ -7350,3 +7444,12 @@ export const authCommandsLib = {
         assert.eq(0, failures.length);
     }
 };
+
+/**
+ * Returns true iff the test is ran in a standalone environment.
+ */
+function isStandalone(conn) {
+    const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
+    const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+    return isStandalone;
+}

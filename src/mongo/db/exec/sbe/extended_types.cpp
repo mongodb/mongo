@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
@@ -235,6 +236,28 @@ struct IndexBoundsOps {
 
     static constexpr ExtendedTypeOps typeOps{&makeCopy, &release, &print, &getApproxSize};
 };
+
+struct InListDataOps {
+    static std::pair<TypeTags, Value> makeCopy(Value val) {
+        return {TypeTags::inListData, val};
+    }
+
+    static void release(Value val) {
+        // Do nothing.
+    }
+
+    static std::string print(Value val) {
+        std::stringstream ss;
+        value::getInListDataView(val)->writeToStream(ss);
+        return ss.str();
+    }
+
+    static size_t getApproxSize(Value val) {
+        return 0;
+    }
+
+    static constexpr ExtendedTypeOps typeOps{&makeCopy, &release, &print, &getApproxSize};
+};
 }  // namespace
 
 MONGO_INITIALIZER(ExtendedSbeTypes)(InitializerContext* context) {
@@ -245,6 +268,6 @@ MONGO_INITIALIZER(ExtendedSbeTypes)(InitializerContext* context) {
     value::registerExtendedTypeOps(TypeTags::sortSpec, &SortSpecOps::typeOps);
     value::registerExtendedTypeOps(TypeTags::makeObjSpec, &MakeObjSpecOps::typeOps);
     value::registerExtendedTypeOps(TypeTags::indexBounds, &IndexBoundsOps::typeOps);
+    value::registerExtendedTypeOps(TypeTags::inListData, &InListDataOps::typeOps);
 }
-
 }  // namespace mongo::sbe

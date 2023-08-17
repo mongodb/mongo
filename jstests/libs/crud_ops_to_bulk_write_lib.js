@@ -224,7 +224,9 @@ export const BulkWriteUtils = (function() {
                      "opTime",
                      "$clusterTime",
                      "electionId",
-                     "operationTime"]
+                     "operationTime",
+                     "errorLabels",
+                     "_mongo"]
                         .forEach(property => {
                             if (bulkWriteResponse.hasOwnProperty(property)) {
                                 resp[property] = bulkWriteResponse[property];

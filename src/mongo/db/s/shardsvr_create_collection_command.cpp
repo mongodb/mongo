@@ -120,9 +120,7 @@ public:
                 FixedFCVRegion fixedFcvRegion{opCtx};
 
                 auto coordinatorDoc = [&] {
-                    // TODO SERVER-79246 Remove ns() the condition over config.system.session
-                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(*fixedFcvRegion) &&
-                        ns() != NamespaceString::kLogicalSessionsNamespace) {
+                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(*fixedFcvRegion)) {
                         const DDLCoordinatorTypeEnum coordType =
                             DDLCoordinatorTypeEnum::kCreateCollection;
                         auto doc = CreateCollectionCoordinatorDocument();

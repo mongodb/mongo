@@ -90,17 +90,6 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
     }
 }
 
-void PrimaryOnlyServiceMongoDTest::tearDown() {
-    // Ensure that even on test failures all failpoint state gets reset.
-    globalFailPointRegistry().disableAllFailpoints();
-
-    WaitForMajorityService::get(getServiceContext()).shutDown();
-
-    shutdown();
-
-    ServiceContextMongoDTest::tearDown();
-}
-
 void PrimaryOnlyServiceMongoDTest::startup(OperationContext* opCtx) {
     _registry->onStartup(opCtx);
 }
@@ -123,6 +112,21 @@ void PrimaryOnlyServiceMongoDTest::stepDown() {
 std::unique_ptr<repl::ReplicationCoordinator>
 PrimaryOnlyServiceMongoDTest::makeReplicationCoordinator() {
     return std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
+}
+
+void PrimaryOnlyServiceMongoDTest::tearDown() {
+    // Ensure that even on test failures all failpoint state gets reset.
+    globalFailPointRegistry().disableAllFailpoints();
+
+    WaitForMajorityService::get(getServiceContext()).shutDown();
+
+    shutdownHook();
+
+    ServiceContextMongoDTest::tearDown();
+}
+
+void PrimaryOnlyServiceMongoDTest::shutdownHook() {
+    shutdown();
 }
 
 void stepUp(OperationContext* opCtx,

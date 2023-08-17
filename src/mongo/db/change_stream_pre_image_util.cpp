@@ -87,6 +87,7 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 
     return boost::none;
 }
+}  // namespace
 
 boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx,
                                                boost::optional<TenantId> tenantId) {
@@ -100,7 +101,6 @@ boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx,
     auto expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(changeStreamOptions);
     return expireAfterSeconds ? boost::optional<Seconds>(*expireAfterSeconds) : boost::none;
 }
-}  // namespace
 
 boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
                                                         boost::optional<TenantId> tenantId,

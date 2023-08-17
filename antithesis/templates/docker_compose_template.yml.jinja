@@ -5,7 +5,7 @@ services:
     configsvr{{ i }}:
         container_name: configsvr{{ i }}
         hostname: configsvr{{ i }}
-        image: mongo-binaries:evergreen-latest-master
+        image: mongo-binaries:{{ tag }}
         volumes:
             - ./logs/configsvr{{ i }}:/var/log/mongodb/
             - ./scripts:/scripts/
@@ -22,7 +22,7 @@ services:
     mongod{{ i }}:
         container_name: mongod{{ i }}
         hostname: mongod{{ i }}
-        image: mongo-binaries:evergreen-latest-master
+        image: mongo-binaries:{{ tag }}
         volumes:
             - ./logs/mongod{{ i }}:/var/log/mongodb/
             - ./scripts:/scripts/
@@ -38,7 +38,7 @@ services:
     mongos{{ m }}:
         container_name: mongos{{ m }}
         hostname: mongos{{ m }}
-        image: mongo-binaries:evergreen-latest-master
+        image: mongo-binaries:{{ tag }}
         volumes:
             - ./logs/mongos{{ m }}:/var/log/mongodb/
             - ./scripts:/scripts/
@@ -60,7 +60,7 @@ services:
     workload:
         container_name: workload
         hostname: workload
-        image: workload:evergreen-latest-master
+        image: workload:{{ tag }}
         volumes:
             - ./logs/workload:/var/log/resmoke/
             - ./scripts:/scripts/

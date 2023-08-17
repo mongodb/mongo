@@ -74,6 +74,7 @@
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/shard_version_gen.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -255,6 +256,14 @@ protected:
             txnRouter.beginOrContinueTxn(
                 opCtx, *opCtx->getTxnNumber(), TransactionRouter::TransactionActions::kStart);
         });
+    }
+
+    ShardVersionBase exampleShardVersion() const {
+        ShardVersionBase version;
+        version.setGeneration({OID::gen(), Timestamp(4, 1)});
+        version.setPlacement(Timestamp(6, 2));
+
+        return version;
     }
 
 private:
@@ -953,11 +962,13 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToP
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
+    const auto clockTime = VectorClock::get(operationContext())->getTime();
+    const auto afterClusterTime = clockTime.clusterTime().asTimestamp();
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "readConcern" << BSONObj() << "startTransaction" << true
-                                  << "coordinator" << true << "autocommit" << false << "txnNumber"
-                                  << txnNum);
+                                  << "readConcern" << BSON("afterClusterTime" << afterClusterTime)
+                                  << "startTransaction" << true << "coordinator" << true
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -1329,83 +1340,147 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 }
 
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
+TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
     repl::ReadConcernArgs defaultRCArgs;
+    const auto shardVersion = exampleShardVersion();
     auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1), defaultRCArgs, boost::none, true /* doAppendStartTransaction */);
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
+        defaultRCArgs,
+        boost::none,
+        LogicalTime{Timestamp(10, 1)},
+        true /* doAppendStartTransaction */);
 
     ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    ASSERT_BSONOBJ_EQ(result["readConcern"].Obj(), BSONObj());
+    repl::ReadConcernArgs resultArgs;
+    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
     ASSERT_EQ(result["startTransaction"].boolean(), true);
+
+    auto expectedShardVersion = shardVersion;
+    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 }
 
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) {
+TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) {
     repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+    const auto shardVersion = exampleShardVersion();
     auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1), defaultRCArgs, boost::none, true /* doAppendStartTransaction */);
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
+        defaultRCArgs,
+        boost::none,
+        LogicalTime{Timestamp(10, 1)},
+        true /* doAppendStartTransaction */);
 
     ASSERT_EQ(result["MyCmd"].numberLong(), 1);
     repl::ReadConcernArgs resultArgs;
     ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "majority");
-    ASSERT(!result["readConcern"]["atClusterTime"]);
+    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kMajorityReadConcern);
+    ASSERT(!resultArgs.getArgsAtClusterTime());
+    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
     ASSERT_EQ(result["startTransaction"].boolean(), true);
+
+    auto expectedShardVersion = shardVersion;
+    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
 }
 
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCLocal) {
+TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCLocal) {
     repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    auto result =
-        TransactionRouter::appendFieldsForStartTransaction(BSON("MyCmd" << 1 << "readConcern"
-                                                                        << BSON("level"
-                                                                                << "local")),
-                                                           defaultRCArgs,
-                                                           boost::none,
-                                                           true /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "local");
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
-}
-
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshot) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    auto result =
-        TransactionRouter::appendFieldsForStartTransaction(BSON("MyCmd" << 1 << "readConcern"
-                                                                        << BSON("level"
-                                                                                << "snapshot")),
-                                                           defaultRCArgs,
-                                                           LogicalTime(Timestamp(1, 2)),
-                                                           false /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "snapshot");
-    ASSERT_EQ(result["readConcern"]["atClusterTime"].timestamp(), Timestamp(1, 2));
-    ASSERT(!result["startTransaction"]);
-}
-
-TEST(TransactionRouterTest,
-     AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshotAndAtClusterTime) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    defaultRCArgs.setArgsAtClusterTimeForSnapshot(Timestamp(1, 2));
+    const auto shardVersion = exampleShardVersion();
     auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "readConcern"
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
                      << BSON("level"
-                             << "snapshot"
-                             << "atClusterTime" << Timestamp(1, 2))),
+                             << "local")),
+        defaultRCArgs,
+        boost::none,
+        LogicalTime{Timestamp(10, 1)},
+        true /* doAppendStartTransaction */);
+
+    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+    repl::ReadConcernArgs resultArgs;
+    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kLocalReadConcern);
+    ASSERT(!resultArgs.getArgsAtClusterTime());
+    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+    ASSERT_EQ(result["startTransaction"].boolean(), true);
+
+    auto expectedShardVersion = shardVersion;
+    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+}
+
+TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshot) {
+    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    const auto shardVersion = exampleShardVersion();
+    auto result = TransactionRouter::appendFieldsForStartTransaction(
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
+                     << BSON("level"
+                             << "snapshot")),
         defaultRCArgs,
         LogicalTime(Timestamp(1, 2)),
+        boost::none,
         false /* doAppendStartTransaction */);
 
     ASSERT_EQ(result["MyCmd"].numberLong(), 1);
     repl::ReadConcernArgs resultArgs;
     ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "snapshot");
-    ASSERT_EQ(result["readConcern"]["atClusterTime"].timestamp(), Timestamp(1, 2));
+    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
+    ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+    ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
     ASSERT(!result["startTransaction"]);
+}
+
+TEST_F(TransactionRouterTest,
+       AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshotAndAtClusterTime) {
+    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    const auto shardVersion = exampleShardVersion();
+
+    auto result = TransactionRouter::appendFieldsForStartTransaction(
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
+                     << BSON("level"
+                             << "snapshot"
+                             << "atClusterTime" << Timestamp(1, 2))),
+        defaultRCArgs,
+        LogicalTime(Timestamp(1, 2)),
+        boost::none,
+        false /* doAppendStartTransaction */);
+
+    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+    repl::ReadConcernArgs resultArgs;
+    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
+    ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+    ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
+    ASSERT(!result["startTransaction"]);
+}
+
+TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionNoShardVersion) {
+    auto result = TransactionRouter::appendFieldsForContinueTransaction(
+        BSON("MyCmd" << 1), LogicalTime{Timestamp(10, 1)});
+
+    ASSERT_BSONOBJ_EQ(BSON("MyCmd" << 1), result);
+}
+
+TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion) {
+    const auto shardVersion = exampleShardVersion();
+    auto result = TransactionRouter::appendFieldsForContinueTransaction(
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
+        LogicalTime{Timestamp(10, 1)});
+
+    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+
+    auto expectedShardVersion = shardVersion;
+    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+}
+
+TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersionNoConflictTime) {
+    const auto shardVersion = exampleShardVersion();
+    auto result = TransactionRouter::appendFieldsForContinueTransaction(
+        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()), boost::none);
+
+    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+    ASSERT_BSONOBJ_EQ(shardVersion.toBSON(), result["shardVersion"].Obj());
 }
 
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
@@ -2698,8 +2773,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
         txnRouter.setDefaultAtClusterTime(operationContext());
         ASSERT(!txnRouter.getSelectedAtClusterTime());
 
-        // Can't continue on snapshot errors.
-        ASSERT(!txnRouter.canContinueOnSnapshotError());
+        // Can continue on snapshot errors since this is the first statement.
+        ASSERT(txnRouter.canContinueOnSnapshotError());
     }
 }
 
@@ -2714,7 +2789,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
         txnRouter.setDefaultAtClusterTime(operationContext());
 
-        const BSONObj expectedRC = BSON("level" << rcIt.first);
+        const auto vectorTime = VectorClock::get(operationContext())->getTime();
+        const BSONObj expectedRC = BSON("level" << rcIt.first << "afterClusterTime"
+                                                << vectorTime.clusterTime().asTimestamp());
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                         shard1,
                                                         BSON("insert"
@@ -2757,28 +2834,6 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_BSONOBJ_EQ(
             BSON("level" << rcIt.first << "afterClusterTime" << clusterTime.asTimestamp()),
             newCmd["readConcern"].Obj());
-    }
-}
-
-TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPreserveAfterOpTime) {
-    const auto opTime = repl::OpTime(Timestamp(10, 1), 2);
-    TxnNumber txnNum{3};
-    for (const auto& rcIt : supportedNonSnapshotRCLevels) {
-        repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs(opTime, rcIt.second);
-
-        auto txnRouter = TransactionRouter::get(operationContext());
-        txnRouter.beginOrContinueTxn(
-            operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
-
-        // Call setDefaultAtClusterTime to simulate real command execution.
-        txnRouter.setDefaultAtClusterTime(operationContext());
-
-        auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                                        shard1,
-                                                        BSON("insert"
-                                                             << "test"));
-        ASSERT_BSONOBJ_EQ(BSON("level" << rcIt.first << "afterOpTime" << opTime),
-                          newCmd["readConcern"].Obj());
     }
 }
 
@@ -4293,6 +4348,7 @@ TEST_F(TransactionRouterMetricsTest, CommitDurationResetByNewTransaction) {
     operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
 
     future = beginAndPauseCommit();
 
@@ -4684,6 +4740,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
@@ -4691,6 +4748,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
     // Test inactive.
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 2, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
@@ -4698,6 +4756,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 3, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     txnRouter().stash(operationContext(), TransactionRouter::StashReason::kDone);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
@@ -4943,6 +5002,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalStarted_IsCumulative) {
     operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalStarted());
 
     // Shouldn't go down when a transaction ends.
@@ -5012,6 +5072,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalCommitted_IsCumulative) {
     operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalCommitted());
 }
@@ -5078,6 +5139,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalAborted_IsCumulative) {
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     ASSERT_THROWS_CODE(txnRouter().abortTransaction(operationContext()),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
@@ -5105,6 +5167,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalContactedParticipants) {
     // Is cumulative across transactions.
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalContactedParticipants());
 
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
@@ -5189,6 +5252,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalParticipantsAtCommit) {
     operationContext()->setTxnNumber(kTxnNumber + 1);
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber + 1, TransactionRouter::TransactionActions::kStart);
+    txnRouter().setDefaultAtClusterTime(operationContext());
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     runCommit(kDummyOkRes);
     ASSERT_EQUALS(3L, routerTxnMetrics()->getTotalParticipantsAtCommit());
@@ -5538,6 +5602,188 @@ TEST_F(TransactionRouterTest, EagerlyReapRetryableSessionsUponNewRetryableTransa
     ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
     ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+}
+
+DEATH_TEST_F(TransactionRouterTest,
+             ReconcileReadConcernMustSpecifyEitherAtClusterOrPlacementConflict,
+             "invariant") {
+    static_cast<void>(
+        TransactionRouter::reconcileReadConcern(boost::none, {}, boost::none, boost::none));
+}
+
+TEST_F(TransactionRouterTest, CmdLevelReadConcernLevelMustMatchWithTxnLevel) {
+    repl::ReadConcernArgs cmdLevelReadConcern;
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    LogicalTime atClusterTime;
+
+    ASSERT_THROWS(TransactionRouter::reconcileReadConcern(
+                      cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, boost::none),
+                  AssertionException);
+}
+
+TEST_F(TransactionRouterTest, CmdLevelAtClusterTimeMustMatchWithTxnLevel) {
+    repl::ReadConcernArgs cmdLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    cmdLevelReadConcern.setArgsAtClusterTimeForSnapshot(Timestamp(10, 2));
+
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    boost::optional<LogicalTime> atClusterTime = LogicalTime{Timestamp(10, 1)};
+    boost::optional<LogicalTime> conflictTime;
+
+    ASSERT_THROWS(TransactionRouter::reconcileReadConcern(
+                      cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime),
+                  AssertionException);
+}
+
+TEST_F(TransactionRouterTest, CannotSpecifyAtClusterTimeWhenNotOriginallyPresent) {
+    repl::ReadConcernArgs cmdLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    cmdLevelReadConcern.setArgsAtClusterTimeForSnapshot(Timestamp(10, 1));
+
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    boost::optional<LogicalTime> atClusterTime;
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 1)};
+
+    ASSERT_THROWS(TransactionRouter::reconcileReadConcern(
+                      cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime),
+                  AssertionException);
+}
+
+TEST_F(TransactionRouterTest, CmdLevelAfterClusterTimeMustBeGTEToTxnLevelWithAfterClusterTime) {
+    repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(10, 1)}, boost::none);
+    boost::optional<LogicalTime> atClusterTime;
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 3)};
+
+    {
+        repl::ReadConcernArgs cmdLevelReadConcern(LogicalTime{Timestamp(7, 2)}, boost::none);
+        ASSERT_THROWS(TransactionRouter::reconcileReadConcern(
+                          cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime),
+                      AssertionException);
+    }
+
+    {
+        repl::ReadConcernArgs cmdLevelReadConcern(LogicalTime{Timestamp(10, 1)}, boost::none);
+        auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+            cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime);
+
+        ASSERT_FALSE(finalReadConcern.hasLevel());
+        ASSERT_TRUE(finalReadConcern.getArgsAfterClusterTime());
+        ASSERT_EQ(Timestamp(10, 3), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
+    }
+}
+
+DEATH_TEST_REGEX_F(TransactionRouterTest,
+                   AssertsIfConflictTimeIsLowerThanTxnLevelAfterClusterTime,
+                   "Tripwire assertion.*7750604") {
+    repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(10, 5)}, boost::none);
+    repl::ReadConcernArgs cmdLevelReadConcern;
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 3)};
+    boost::optional<LogicalTime> atClusterTime;
+
+    static_cast<void>(TransactionRouter::reconcileReadConcern(
+        cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime));
+}
+
+DEATH_TEST_REGEX_F(TransactionRouterTest,
+                   AssertsIfConflictTimeIsLowerThanCmdLevelAfterClusterTime,
+                   "Tripwire assertion.*7750605") {
+    repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(10, 1)}, boost::none);
+    repl::ReadConcernArgs cmdLevelReadConcern(LogicalTime{Timestamp(10, 4)}, boost::none);
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 3)};
+    boost::optional<LogicalTime> atClusterTime;
+
+    static_cast<void>(TransactionRouter::reconcileReadConcern(
+        cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime));
+}
+
+TEST_F(TransactionRouterTest, HigherConflictTimeWithNoTxnLevelReadConcern) {
+    repl::ReadConcernArgs txnLevelReadConcern;
+    boost::optional<LogicalTime> atClusterTime;
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 3)};
+
+    {
+        repl::ReadConcernArgs cmdLevelReadConcern(LogicalTime{Timestamp(10, 1)}, boost::none);
+        auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+            cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime);
+
+        ASSERT_FALSE(finalReadConcern.hasLevel());
+        ASSERT_TRUE(finalReadConcern.getArgsAfterClusterTime());
+        ASSERT_EQ(Timestamp(10, 3), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
+    }
+}
+
+TEST_F(TransactionRouterTest, AtClusterTimeOverridesCmdLevelAfterClusterTime) {
+    repl::ReadConcernArgs cmdLevelReadConcern(LogicalTime{Timestamp(20, 1)},
+                                              repl::ReadConcernLevel::kSnapshotReadConcern);
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    boost::optional<LogicalTime> atClusterTime = LogicalTime{Timestamp(10, 1)};
+    boost::optional<LogicalTime> conflictTime;
+
+    auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+        cmdLevelReadConcern, txnLevelReadConcern, atClusterTime, conflictTime);
+    ASSERT_TRUE(finalReadConcern.hasLevel());
+    ASSERT_EQ(repl::ReadConcernLevel::kSnapshotReadConcern, finalReadConcern.getLevel());
+    ASSERT_TRUE(finalReadConcern.getArgsAtClusterTime());
+    ASSERT_EQ(Timestamp(10, 1), finalReadConcern.getArgsAtClusterTime()->asTimestamp());
+}
+
+TEST_F(TransactionRouterTest, ReadConcernLevelShouldNotBeSetIfInputDidntHaveIt) {
+    boost::optional<LogicalTime> atClusterTime;
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(10, 1)};
+
+    auto finalReadConcern =
+        TransactionRouter::reconcileReadConcern(boost::none, {}, atClusterTime, conflictTime);
+    ASSERT_FALSE(finalReadConcern.hasLevel());
+    ASSERT_EQ(Timestamp(10, 1), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
+}
+
+TEST_F(TransactionRouterTest, TxnAtClusterTimeSpecifiedWithNoCmdReadConcern) {
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    boost::optional<LogicalTime> atClusterTime = LogicalTime{Timestamp(10, 1)};
+    boost::optional<LogicalTime> conflictTime;
+
+    auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+        boost::none, txnLevelReadConcern, atClusterTime, conflictTime);
+    ASSERT_TRUE(finalReadConcern.hasLevel());
+    ASSERT_EQ(repl::ReadConcernLevel::kSnapshotReadConcern, finalReadConcern.getLevel());
+    ASSERT_TRUE(finalReadConcern.getArgsAtClusterTime());
+    ASSERT_EQ(Timestamp(10, 1), finalReadConcern.getArgsAtClusterTime()->asTimestamp());
+}
+
+TEST_F(TransactionRouterTest, HigherConflictTimeWithNoCmdReadConcern) {
+    boost::optional<LogicalTime> atClusterTime;
+
+    {
+        repl::ReadConcernArgs txnLevelReadConcern(LogicalTime{Timestamp(20, 1)}, boost::none);
+        boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(30, 1)};
+
+        auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+            boost::none, txnLevelReadConcern, atClusterTime, conflictTime);
+        ASSERT_FALSE(finalReadConcern.hasLevel());
+        ASSERT_TRUE(finalReadConcern.getArgsAfterClusterTime());
+        ASSERT_EQ(Timestamp(30, 1), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
+    }
+
+    {
+        boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(30, 5)};
+
+        auto finalReadConcern =
+            TransactionRouter::reconcileReadConcern(boost::none, {}, atClusterTime, conflictTime);
+        ASSERT_FALSE(finalReadConcern.hasLevel());
+        ASSERT_TRUE(finalReadConcern.getArgsAfterClusterTime());
+        ASSERT_EQ(Timestamp(30, 5), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
+    }
+}
+
+TEST_F(TransactionRouterTest, TxnLevelShouldBePreservedWithNoCmdReadConcern) {
+    boost::optional<LogicalTime> atClusterTime;
+    repl::ReadConcernArgs txnLevelReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+    boost::optional<LogicalTime> conflictTime = LogicalTime{Timestamp(20, 1)};
+
+    auto finalReadConcern = TransactionRouter::reconcileReadConcern(
+        boost::none, txnLevelReadConcern, atClusterTime, conflictTime);
+    ASSERT_TRUE(finalReadConcern.hasLevel());
+    ASSERT_EQ(repl::ReadConcernLevel::kSnapshotReadConcern, finalReadConcern.getLevel());
+    ASSERT_TRUE(finalReadConcern.getArgsAfterClusterTime());
+    ASSERT_EQ(Timestamp(20, 1), finalReadConcern.getArgsAfterClusterTime()->asTimestamp());
 }
 
 }  // unnamed namespace

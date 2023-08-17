@@ -42,6 +42,7 @@
 #include "mongo/db/commands/lock_info_gen.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -50,7 +51,7 @@ namespace mongo {
 
 class CmdLockInfo : public TypedCommand<CmdLockInfo> {
 public:
-    using Request = LockInfo;
+    using Request = LockInfoCommand;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -91,6 +92,13 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            AutoStatsTracker statsTracker(
+                opCtx,
+                ns(),
+                Top::LockType::NotLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(request().getDbName()));
+
             auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
             auto result = reply->getBodyBuilder();
             LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);

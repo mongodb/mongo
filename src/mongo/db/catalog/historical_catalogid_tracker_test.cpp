@@ -1070,6 +1070,5 @@ TEST(HistoricalCatalogIdTrackerTest, CleanupAfterMixedMode2) {
     // Try and cleanup for the namespace that was previously marked for needing cleanup
     tracker.cleanup(Timestamp(1, 2));
 }
-
 }  // namespace
 }  // namespace mongo

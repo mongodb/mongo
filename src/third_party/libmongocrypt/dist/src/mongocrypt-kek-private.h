@@ -19,8 +19,8 @@
 
 #include <bson/bson.h>
 
-#include "mongocrypt.h"
 #include "mongocrypt-endpoint-private.h"
+#include "mongocrypt.h"
 
 /* Defines structs for Key Encryption Keys (KEKs)
  * The KEK is used as part of envelope encryption. It encrypts a Data Encryption
@@ -37,48 +37,49 @@
  *   kms_set |= MONGOCRYPT_KMS_PROVIDER_LOCAL
  */
 typedef enum {
-   MONGOCRYPT_KMS_PROVIDER_NONE = 0,
-   MONGOCRYPT_KMS_PROVIDER_AWS = 1 << 0,
-   MONGOCRYPT_KMS_PROVIDER_LOCAL = 1 << 1,
-   MONGOCRYPT_KMS_PROVIDER_AZURE = 1 << 2,
-   MONGOCRYPT_KMS_PROVIDER_GCP = 1 << 3,
-   MONGOCRYPT_KMS_PROVIDER_KMIP = 1 << 4
+    MONGOCRYPT_KMS_PROVIDER_NONE = 0,
+    MONGOCRYPT_KMS_PROVIDER_AWS = 1 << 0,
+    MONGOCRYPT_KMS_PROVIDER_LOCAL = 1 << 1,
+    MONGOCRYPT_KMS_PROVIDER_AZURE = 1 << 2,
+    MONGOCRYPT_KMS_PROVIDER_GCP = 1 << 3,
+    MONGOCRYPT_KMS_PROVIDER_KMIP = 1 << 4
 } _mongocrypt_kms_provider_t;
 
 typedef struct {
-   _mongocrypt_endpoint_t *key_vault_endpoint;
-   char *key_name;
-   char *key_version;
+    _mongocrypt_endpoint_t *key_vault_endpoint;
+    char *key_name;
+    char *key_version;
 } _mongocrypt_azure_kek_t;
 
 typedef struct {
-   char *project_id;
-   char *location;
-   char *key_ring;
-   char *key_name;
-   char *key_version;                /* optional */
-   _mongocrypt_endpoint_t *endpoint; /* optional. */
+    char *project_id;
+    char *location;
+    char *key_ring;
+    char *key_name;
+    char *key_version;                /* optional */
+    _mongocrypt_endpoint_t *endpoint; /* optional. */
 } _mongocrypt_gcp_kek_t;
 
 typedef struct {
-   char *region;
-   char *cmk;
-   _mongocrypt_endpoint_t *endpoint; /* optional. */
+    char *region;
+    char *cmk;
+    _mongocrypt_endpoint_t *endpoint; /* optional. */
 } _mongocrypt_aws_kek_t;
 
 typedef struct {
-   char *key_id; /* optional on parsing, required on appending. */
-   _mongocrypt_endpoint_t *endpoint; /* optional. */
+    char *key_id;                     /* optional on parsing, required on appending. */
+    _mongocrypt_endpoint_t *endpoint; /* optional. */
 } _mongocrypt_kmip_kek_t;
 
 typedef struct {
-   _mongocrypt_kms_provider_t kms_provider;
-   union {
-      _mongocrypt_azure_kek_t azure;
-      _mongocrypt_gcp_kek_t gcp;
-      _mongocrypt_aws_kek_t aws;
-      _mongocrypt_kmip_kek_t kmip;
-   } provider;
+    _mongocrypt_kms_provider_t kms_provider;
+
+    union {
+        _mongocrypt_azure_kek_t azure;
+        _mongocrypt_gcp_kek_t gcp;
+        _mongocrypt_aws_kek_t aws;
+        _mongocrypt_kmip_kek_t kmip;
+    } provider;
 } _mongocrypt_kek_t;
 
 /* Parse a document describing a key encryption key.
@@ -87,23 +88,16 @@ typedef struct {
  * mongocrypt_ctx_setopt_key_encryption_key
  * 2. The "masterKey" document from a data encryption key document.
  */
-bool
-_mongocrypt_kek_parse_owned (const bson_t *bson,
-                             _mongocrypt_kek_t *out,
-                             mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+bool _mongocrypt_kek_parse_owned(const bson_t *bson,
+                                 _mongocrypt_kek_t *out,
+                                 mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
-bool
-_mongocrypt_kek_append (const _mongocrypt_kek_t *kek,
-                        bson_t *out,
-                        mongocrypt_status_t *status)
-   MONGOCRYPT_WARN_UNUSED_RESULT;
+bool _mongocrypt_kek_append(const _mongocrypt_kek_t *kek,
+                            bson_t *out,
+                            mongocrypt_status_t *status) MONGOCRYPT_WARN_UNUSED_RESULT;
 
-void
-_mongocrypt_kek_copy_to (const _mongocrypt_kek_t *src, _mongocrypt_kek_t *dst);
+void _mongocrypt_kek_copy_to(const _mongocrypt_kek_t *src, _mongocrypt_kek_t *dst);
 
-void
-_mongocrypt_kek_cleanup (_mongocrypt_kek_t *kek);
-
+void _mongocrypt_kek_cleanup(_mongocrypt_kek_t *kek);
 
 #endif /* MONGOCRYPT_KEK_PRIVATE_H */

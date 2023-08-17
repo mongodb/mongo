@@ -1,3 +1,11 @@
+/**
+ * Tests that $lookup and $graphLookup correctly succeed if the foreign collection is sharded, or if
+ * it becomes sharded mid-iteration.
+ *
+ *@tags: [
+ *   requires_persistence
+ * ]
+ */
 import "jstests/multiVersion/libs/multi_cluster.js";
 
 const st = new ShardingTest({shards: 1, mongos: 2, rs: {nodes: 1}});

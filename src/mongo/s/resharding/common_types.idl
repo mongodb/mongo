@@ -127,6 +127,10 @@ structs:
                 optional: true
                 description: >-
                     The resharding UUID provided by the user, used to identify retries.
+            provenance:
+                type: string
+                description: "The source operation that called this resharding operation."
+                optional: true
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

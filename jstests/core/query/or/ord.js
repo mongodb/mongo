@@ -5,6 +5,7 @@
 //   # An index drop does not necessarily cause cursors to be killed on the secondary.
 //   does_not_support_causal_consistency,
 // ]
+import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.jstests_ord;
@@ -21,6 +22,20 @@ for (let i = 0; i < 100; ++i) {
     assert.commandWorked(coll.insert({b: 1}));
 }
 
+for (let i = 0; i < 1000; ++i) {
+    assert.commandWorked(coll.insert({c: 1}));
+}
+
+// The test scenario relies on the optimizer choosing an index for the query. We can do a
+// preliminary check here, using explain. However, this does not guarantee the query below will use
+// an ixscan, because the chosen plan may not be the same.
+const explainRes = assert.commandWorked(coll.find({$or: [{a: 1}, {b: 1}]}).explain());
+const orStages = getPlanStages(getWinningPlan(explainRes.queryPlanner), "OR");
+assert(orStages.length > 0, "Expected to find OR stage in explain: " + tojson(explainRes));
+assert(orStages.every(orStage => (getPlanStages(orStage, "IXSCAN").length > 0)),
+       "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes));
+
+// This query should match 180 out of 1180 total documents.
 const cursor = coll.find({$or: [{a: 1}, {b: 1}]}).batchSize(100);
 for (let i = 0; i < 100; ++i) {
     cursor.next();

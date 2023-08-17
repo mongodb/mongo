@@ -33,6 +33,7 @@
 #include <string>
 #include <utility>
 
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -98,6 +99,12 @@ protected:
             return std::move(*this);
         }
 
+        Options useMockAuthzManagerExternalState(
+            std::unique_ptr<AuthzManagerExternalStateMock> mockAuthzExternalState) {
+            _mockAuthzExternalState = std::move(mockAuthzExternalState);
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
@@ -110,6 +117,7 @@ protected:
         Milliseconds _autoAdvancingMockClockIncrement{0};
         std::unique_ptr<TickSource> _mockTickSource;
         std::unique_ptr<JournalListener> _journalListener;
+        std::unique_ptr<AuthzManagerExternalStateMock> _mockAuthzExternalState;
         bool _forceDisableTableLogging = false;
 
         friend class ServiceContextMongoDTest;
@@ -123,6 +131,9 @@ protected:
 
     // The JournalListener must stay alive as long as the storage engine is running.
     std::unique_ptr<JournalListener> _journalListener;
+
+    // Raw pointer authorization manager external state if using a mock.
+    AuthzManagerExternalStateMock* _authzExternalState = nullptr;
 
 private:
     struct {

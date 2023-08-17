@@ -96,6 +96,10 @@ commands:
                 - privilege: # $planCacheStats
                     resource_pattern: exact_namespace
                     action_type: planCacheRead
+                - privilege: # $querySettings
+                    agg_stage: querySettings
+                    resource_pattern: cluster
+                    action_type: querySettings
                 - privilege: # $queryStats
                     agg_stage: queryStats
                     resource_pattern: cluster

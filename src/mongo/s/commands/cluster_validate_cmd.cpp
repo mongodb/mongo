@@ -123,8 +123,8 @@ public:
 
         Status firstFailedShardStatus = Status::OK();
         bool isValid = true;
+        BSONObjBuilder rawResBuilder;
 
-        BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         for (const auto& cmdResult : results) {
             const auto& shardId = cmdResult.shardId;
 
@@ -161,8 +161,15 @@ public:
         }
         rawResBuilder.done();
 
-        if (firstFailedShardStatus.isOK())
-            output.appendBool("valid", isValid);
+        if (firstFailedShardStatus.isOK()) {
+            if (!isShardedColl(opCtx, nss)) {
+                CommandHelpers::filterCommandReplyForPassthrough(
+                    results[0].swResponse.getValue().data, &output);
+            } else {
+                output.appendBool("valid", isValid);
+            }
+        }
+        output.append("raw", rawResBuilder.obj());
 
         uassertStatusOK(firstFailedShardStatus);
         return true;

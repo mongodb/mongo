@@ -580,6 +580,12 @@ struct PlanStageStaticData {
     // Stores CollatorInterface to be used for this plan. Raw pointer may be stored inside data
     // structures, so it must be kept stable.
     std::shared_ptr<CollatorInterface> queryCollator;
+
+    // Shared pointers to InListDatas used by this SBE plan.
+    std::vector<std::shared_ptr<InListData>> inLists;
+
+    // Shared pointers (and a map) to the additonal collators used by this SBE plan.
+    std::vector<std::unique_ptr<CollatorInterface>> collators;
 };
 
 /**
@@ -600,7 +606,9 @@ struct PlanStageData {
           replanReason(other.replanReason),
           savedStatsOnEarlyExit(std::unique_ptr<sbe::PlanStageStats>(
               other.savedStatsOnEarlyExit ? other.savedStatsOnEarlyExit->clone() : nullptr)),
-          debugInfo(other.debugInfo) {}
+          debugInfo(other.debugInfo),
+          inLists(other.inLists),
+          inListsSet(other.inListsSet) {}
 
     PlanStageData& operator=(PlanStageData&&) = default;
 
@@ -612,6 +620,8 @@ struct PlanStageData {
             savedStatsOnEarlyExit = std::unique_ptr<sbe::PlanStageStats>{
                 other.savedStatsOnEarlyExit ? other.savedStatsOnEarlyExit->clone() : nullptr};
             debugInfo = other.debugInfo;
+            inLists = other.inLists;
+            inListsSet = other.inListsSet;
         }
         return *this;
     }
@@ -635,6 +645,12 @@ struct PlanStageData {
     // Stores plan cache entry information used as debug information or for "explain" purpose. Note
     // that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
     std::shared_ptr<const DebugInfoSBE> debugInfo;
+
+    // Shared pointers to InListDatas used by this SBE plan.
+    std::vector<std::shared_ptr<InListData>> inLists;
+
+    // Hash set of the InListData pointers in 'inLists'.
+    absl::flat_hash_set<InListData*> inListsSet;
 };
 
 /**
@@ -787,6 +803,12 @@ private:
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
+
+    // Hash set tracking the InListDatas used by the SBE plan being built.
+    absl::flat_hash_set<InListData*> _inListsSet;
+
+    // Hash set tracking the Collators used by the SBE plan being built.
+    absl::flat_hash_map<const CollatorInterface*, const CollatorInterface*> _collatorMap;
 
     const MultipleCollectionAccessor& _collections;
 

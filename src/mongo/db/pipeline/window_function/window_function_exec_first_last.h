@@ -55,7 +55,7 @@ protected:
                                   boost::intrusive_ptr<Expression> input,
                                   WindowBounds bounds,
                                   const boost::optional<Value>& defaultValue,
-                                  MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                                  MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
                              memTracker),
           _input(std::move(input)),
@@ -92,7 +92,7 @@ public:
                             boost::intrusive_ptr<Expression> input,
                             WindowBounds bounds,
                             const boost::optional<Value>& defaultValue,
-                            MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                            MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExecForEndpoint(
               iter, std::move(input), std::move(bounds), defaultValue, memTracker) {}
 
@@ -106,7 +106,7 @@ public:
     WindowFunctionExecLast(PartitionIterator* iter,
                            boost::intrusive_ptr<Expression> input,
                            WindowBounds bounds,
-                           MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+                           MemoryUsageTracker::Impl* memTracker)
         : WindowFunctionExecForEndpoint(
               iter, std::move(input), std::move(bounds), boost::none, memTracker) {}
 

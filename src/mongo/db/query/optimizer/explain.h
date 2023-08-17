@@ -54,11 +54,14 @@ enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
  */
 class ABTPrinter : public AbstractABTPrinter {
 public:
-    ABTPrinter(PlanAndProps planAndProps, ExplainVersion explainVersion);
+    ABTPrinter(Metadata metadata, PlanAndProps planAndProps, ExplainVersion explainVersion);
 
     BSONObj explainBSON() const override final;
+    std::string getPlanSummary() const override final;
 
 private:
+    // Metadata field used to populate index information for index scans in the planSummary field.
+    Metadata _metadata;
     PlanAndProps _planAndProps;
     ExplainVersion _explainVersion;
 };

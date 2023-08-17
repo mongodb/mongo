@@ -306,15 +306,10 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
         .thenRunOn(*_ars->_subBaton)
         .then([this, status = std::move(status), rcr = std::move(rcr)](
                   std::shared_ptr<mongo::Shard>&& shard) {
-            std::vector<HostAndPort> failedTargets;
-
             if (rcr.response.target) {
-                failedTargets = {*rcr.response.target};
-            } else {
-                failedTargets = rcr.request.target;
+                shard->updateReplSetMonitor(*rcr.response.target, status);
             }
 
-            shard->updateReplSetMonitor(failedTargets.front(), status);
             bool isStartingTransaction = _cmdObj.getField("startTransaction").booleanSafe();
             if (!_ars->_stopRetrying &&
                 shard->isRetriableError(status.code(), _ars->_retryPolicy) &&
@@ -327,7 +322,8 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
                     "{error} and will be retried",
                     "Command to remote shard failed with retryable error and will be retried",
                     "shardId"_attr = _shardId,
-                    "hosts"_attr = failedTargets,
+                    "attemptedHosts"_attr = rcr.request.target,
+                    "failedHost"_attr = rcr.response.target,
                     "error"_attr = redact(status));
                 ++_retryCount;
                 _shardHostAndPort.reset();

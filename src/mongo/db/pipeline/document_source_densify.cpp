@@ -482,7 +482,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
     while (_partitionTable.size() != 0) {
         auto firstPartitionKeyVal = _partitionTable.begin();
         Value firstPartition = firstPartitionKeyVal->first;
-        DensifyValue firstPartitionVal = firstPartitionKeyVal->second;
+        DensifyValue firstPartitionVal = firstPartitionKeyVal->second.value();
         // We've already seen the stored value, we want to start generating on the next
         // one.
         auto valToGenerate = firstPartitionVal.increment(_range);
@@ -795,7 +795,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                                           }
                                           // Otherwise densify between the last seen value and this
                                           // one.
-                                          _current = foundPartitionVal->second;
+                                          _current = foundPartitionVal->second.value();
                                       }
                                       return handleNeedGen(currentDoc);
                                   },
@@ -809,7 +809,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                                           return nextDoc;
                                       }
                                       // Reset current to be the last value in this partition.
-                                      _current = foundPartitionVal->second;
+                                      _current = foundPartitionVal->second.value();
                                       return handleNeedGen(currentDoc);
                                   },
                                   [&](ExplicitBounds bounds) {
@@ -827,7 +827,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                                           }
                                           // Otherwise reset current to be the last value in this
                                           // partition.
-                                          _current = foundPartitionVal->second;
+                                          _current = foundPartitionVal->second.value();
                                       }
                                       return handleNeedGenExplicit(nextDoc.getDocument());
                                   }},

@@ -353,6 +353,55 @@ public:
 
 MONGO_REGISTER_TEST_COMMAND(DurableHistoryReplicatedTestCmd);
 
+// TODO SERVER-80003 remove this test command when 8.0 branches off.
+class TimeseriesCatalogBucketParamsChangedTestCmd : public BasicCommand {
+public:
+    TimeseriesCatalogBucketParamsChangedTestCmd()
+        : BasicCommand("timeseriesCatalogBucketParamsChanged") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    bool adminOnly() const override {
+        return false;
+    }
+
+    bool requiresAuth() const override {
+        return false;
+    }
+
+    // No auth needed because it only works when enabled via command line.
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    std::string help() const override {
+        return "return the value of timeseriesCatalogBucketParamsChanged";
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+        AutoGetCollection autoColl(opCtx, fullNs, MODE_IS);
+        auto output = autoColl->timeseriesBucketingParametersHaveChanged();
+        if (output) {
+            result.append("changed", *output);
+        }
+        return true;
+    }
+};
+
+MONGO_REGISTER_TEST_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd);
+
 }  // namespace
 
 std::string TestingDurableHistoryPin::getName() {

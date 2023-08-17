@@ -10,8 +10,7 @@
  * ]
  */
 
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {testCollation} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -67,8 +66,6 @@ function runTest({
     jsTestLog(`Running ${tojson(deleteFilter)} with queryCollation: ${
         tojson(queryCollation)} and collectionCollation: ${tojson(collectionCollation)}`);
 
-    assert(expectedDeleteStage === "TS_MODIFY" || expectedDeleteStage === "DELETE");
-
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
     assert.commandWorked(testDB.createCollection(coll.getName(), {
         timeseries: {timeField: timeFieldName, metaField: metaFieldName},
@@ -76,22 +73,15 @@ function runTest({
     }));
     assert.commandWorked(coll.insert(docs));
 
-    const deleteCommand = {
-        delete: coll.getName(),
-        deletes: [{q: deleteFilter, limit: 0, collation: queryCollation}]
-    };
-    const explain = testDB.runCommand({explain: deleteCommand, verbosity: "queryPlanner"});
-    const parsedQuery = FixtureHelpers.isMongos(testDB)
-        ? explain.queryPlanner.winningPlan.shards[0].parsedQuery
-        : explain.queryPlanner.parsedQuery;
-
-    assert.eq(expectedBucketQuery, parsedQuery, `Got wrong parsedQuery: ${tojson(explain)}`);
-    assert.neq(null,
-               getPlanStage(explain.queryPlanner.winningPlan, expectedDeleteStage),
-               `${expectedDeleteStage} stage not found in the plan: ${tojson(explain)}`);
-
-    const res = assert.commandWorked(testDB.runCommand(deleteCommand));
-    assert.eq(nDeleted, res.n);
+    testCollation({
+        testDB: testDB,
+        coll: coll,
+        filter: deleteFilter,
+        queryCollation: queryCollation,
+        nModified: nDeleted,
+        expectedBucketQuery: expectedBucketQuery,
+        expectedStage: expectedDeleteStage
+    });
 }
 
 (function testNoCollation() {

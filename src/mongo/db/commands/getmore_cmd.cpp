@@ -552,7 +552,7 @@ public:
             // virtual collections in the new 'opCtx'.
             ExternalDataSourceScopeGuard::updateOperationContext(cursorPin.getCursor(), opCtx);
 
-            boost::optional<HandleTransactionResourcesFromCursor> txnResourcesHandler;
+            boost::optional<HandleTransactionResourcesFromStasher> txnResourcesHandler;
 
             // On early return, typically due to a failed assertion, delete the cursor.
             ScopeGuard cursorDeleter([&] {
@@ -683,7 +683,7 @@ public:
                 [&opCtx, &cursorPin](const BSONObj& data) {
                     auto dataForFailCommand =
                         data.addField(BSON("failCommands" << BSON_ARRAY("getMore")).firstElement());
-                    auto* getMoreCommand = CommandHelpers::findCommand("getMore");
+                    auto* getMoreCommand = CommandHelpers::findCommand(opCtx, "getMore");
                     return CommandHelpers::shouldActivateFailCommandFailPoint(
                         dataForFailCommand, cursorPin->nss(), getMoreCommand, opCtx->getClient());
                 });

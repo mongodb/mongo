@@ -235,6 +235,43 @@ if (!db.getMongo().isMongos()) {
     });
 })();
 
+// Query on the metaField and a metric field. This should be a no-op using the default collation.
+(function testMetaFieldQueryMetricFieldMetricWithDefaultCollation() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}, f: "f"},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+        }],
+        resultDocList: [doc_id_3_a_b_string_metric, doc_id_2_a_b_array_metric],
+        nMatched: 0,
+    });
+})();
+
+// Query on the metaField and a metric field using a case insensitive collation.
+(function testMetaFieldQueryMetricFieldMetricWithCaseInsensitiveCollation() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", b: "B"}, f: "f"},
+            u: {$set: {[metaFieldName]: {c: "C"}}},
+            multi: true,
+            collation: {locale: "en", strength: 2}
+        }],
+        resultDocList: [
+            {
+                _id: 3,
+                [timeFieldName]: dateTime,
+                [metaFieldName]: {c: "C"},
+                f: "F",
+            },
+            doc_id_2_a_b_array_metric
+        ],
+        nMatched: 1,
+    });
+})();
+
 // Query on the metaField and modify the metaField and a metric field.
 (function testMetaFieldQueryMetaAndMetricFieldUpdate() {
     testUpdate({

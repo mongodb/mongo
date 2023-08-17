@@ -47,6 +47,9 @@ public:
     virtual void populate(database &database, timestamp_manager *tsm, configuration *config,
       operation_tracker *op_tracker);
 
+    /* Enabled the background compaction server. */
+    virtual void background_compact_operation(thread_worker *tc);
+
     /* Performs a checkpoint periodically. */
     virtual void checkpoint_operation(thread_worker *tc);
 

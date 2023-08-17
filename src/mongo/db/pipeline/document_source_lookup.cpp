@@ -49,7 +49,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -1055,7 +1054,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // Support alternative $lookup from config.cache.chunks* namespaces.
     //
     // Do not include the tenantId in serialized 'from' namespace.
-    auto fromValue = (pExpCtx->ns.db_deprecated() == _fromNs.db_deprecated())
+    auto fromValue = pExpCtx->ns.isEqualDb(_fromNs)
         ? Value(opts.serializeIdentifier(_fromNs.coll()))
         : Value(Document{
               {"db",

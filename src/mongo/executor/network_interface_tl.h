@@ -190,7 +190,7 @@ private:
         /**
          * Set a timer to fulfill the promise with a timeout error.
          */
-        virtual void setTimer();
+        virtual void setTimer(std::shared_ptr<RequestState> requestState);
 
         /**
          * Fulfill the promise with the response.

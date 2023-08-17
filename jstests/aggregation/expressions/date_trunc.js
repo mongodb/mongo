@@ -1,3 +1,8 @@
+/**
+ * Tests $dateTrunc expression.
+ * @tags: [
+ * ]
+ */
 import "jstests/libs/sbe_assert_error_override.js";
 import {executeAggregationTestCase} from "jstests/libs/aggregation_pipeline_utils.js";
 

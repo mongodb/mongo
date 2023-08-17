@@ -253,8 +253,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            // TODO: SERVER-77551 Ensure only users with allowed permissions may invoke query
-            // settings commands.
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::querySettings}));
         }
     };
 } setChangeStreamStateCommand;
@@ -340,8 +344,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            // TODO: SERVER-77551 Ensure only users with allowed permissions may invoke query
-            // settings commands.
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::querySettings}));
         }
     };
 } removeChangeStreamStateCommand;

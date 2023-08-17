@@ -232,14 +232,12 @@ void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUU
                                   MODE_IX);
             if (!coll.exists())
                 return;
-            WriteUnitOfWork wuow(opCtx);
             deleteObjects(opCtx,
                           coll,
                           BSON(ReshardingRecipientResumeData::kIdFieldName + "." +
                                    ReshardingRecipientResumeDataId::kReshardingUUIDFieldName
                                << reshardingUUID),
                           false /* justOne */);
-            wuow.commit();
         });
 }
 
@@ -308,15 +306,25 @@ int insertBatchTransactionally(OperationContext* opCtx,
                                TxnNumber& txnNumber,
                                std::vector<InsertStatement>& batch,
                                const UUID& reshardingUUID,
-                               ShardId donorShard,
-                               HostAndPort donorHost,
+                               const ShardId& donorShard,
+                               const HostAndPort& donorHost,
                                const BSONObj& resumeToken) {
     int numBytes = 0;
     int attempt = 1;
     for (auto insert = batch.begin(); insert != batch.end(); ++insert) {
         numBytes += insert->doc.objsize();
     }
-    invariant(numBytes > 0);
+    LOGV2_DEBUG(7763605,
+                3,
+                "resharding_data_copy_util::insertBatchTransactionally",
+                "reshardingUUID"_attr = reshardingUUID,
+                "reshardingTmpNss"_attr = nss,
+                "batchSizeBytes"_attr = numBytes,
+                "txnNumber"_attr = txnNumber,
+                "donorShard"_attr = donorShard,
+                "donorHost"_attr = donorHost,
+                "resumeToken"_attr = resumeToken);
+
     while (true) {
         try {
             ++txnNumber;
@@ -332,8 +340,12 @@ int insertBatchTransactionally(OperationContext* opCtx,
                                       << "' did not already exist",
                         outputColl.exists());
 
-                uassertStatusOK(collection_internal::insertDocuments(
-                    opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
+                if (numBytes > 0) {
+                    // It is legal to have an empty batch; in that case we should still write the
+                    // resume token.
+                    uassertStatusOK(collection_internal::insertDocuments(
+                        opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
+                }
 
                 auto resumeDataColl = acquireCollection(
                     opCtx,
@@ -354,9 +366,9 @@ int insertBatchTransactionally(OperationContext* opCtx,
                 updateRequest.setUpdateModification(resumeDataBSON);
                 updateRequest.setUpsert(true);
                 UpdateResult ur = update(opCtx, resumeDataColl, updateRequest);
-                // We always expect to make progress.  If we don't,
+                // When we have new data we always expect to make progress.  If we don't,
                 // we just inserted duplicate documents, so fail.
-                invariant(ur.numDocsModified == 1 || !ur.upsertedId.isEmpty());
+                invariant(ur.numDocsModified == 1 || !ur.upsertedId.isEmpty() || numBytes == 0);
             });
             return numBytes;
         } catch (const DBException& ex) {
@@ -575,6 +587,23 @@ void updateSessionRecord(OperationContext* opCtx,
 
             wuow.commit();
         });
+}
+
+std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationContext* opCtx,
+                                                                  const UUID& reshardingUUID) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findCommand(NamespaceString::kRecipientReshardingResumeDataNamespace);
+    const auto filterField = ReshardingRecipientResumeData::kIdFieldName + "." +
+        mongo::ReshardingRecipientResumeDataId::kReshardingUUIDFieldName;
+    findCommand.setFilter(BSON(filterField << reshardingUUID));
+    auto cursor = client.find(findCommand, ReadPreferenceSetting{}, ExhaustMode::kOff);
+    std::vector<ReshardingRecipientResumeData> results;
+    while (cursor->more()) {
+        auto obj = cursor->nextSafe();
+        results.emplace_back(ReshardingRecipientResumeData::parseOwned(
+            IDLParserContext("resharding::data_copy::getRecipientResumeData"), std::move(obj)));
+    }
+    return results;
 }
 
 }  // namespace mongo::resharding::data_copy

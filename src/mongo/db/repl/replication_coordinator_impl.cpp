@@ -3085,12 +3085,12 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* op
 
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationContext* opCtx,
                                                                    const DatabaseName& dbName) {
-    // _canAcceptNonLocalWrites is always true for standalone nodes, and adjusted based on
+    // _canAcceptReplicatedWrites_UNSAFE is always true for standalone nodes, and adjusted based on
     // primary+drain state in replica sets.
     //
     // Stand-alone nodes and drained replica set primaries can always accept writes.  Writes are
     // always permitted to the "local" database.
-    if (_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx)) {
+    if (_canAcceptReplicatedWrites_UNSAFE(opCtx)) {
         return true;
     }
     if (dbName == DatabaseName::kLocal) {
@@ -3120,52 +3120,60 @@ bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& ns
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
-    if (!_settings.isReplSet() || nsOrUUID.dbName().isLocalDB()) {
-        // Writes on stand-alone nodes or "local" database are always permitted.
+    // Writes on unreplicated collections are always permitted.
+    if (!_isCollectionReplicated(opCtx, nsOrUUID)) {
         return true;
     }
-
-    // Writes to the system.profile collection are always permitted as it is an unreplicated
-    // collection
-    if (isSystemDotProfile(opCtx, nsOrUUID)) {
-        return true;
-    }
-
+    // Assert that we are holding the RSTL, meaning the value returned from
+    // `_canAcceptReplicatedWrites_UNSAFE` is guaranteed to be accurate.
     invariant(opCtx->lockState()->isRSTLLocked(), toStringForLogging(nsOrUUID));
-    return canAcceptWritesFor_UNSAFE(opCtx, nsOrUUID);
+    // Otherwise, check whether we can currently accept replicated writes.
+    return _canAcceptReplicatedWrites_UNSAFE(opCtx);
 }
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceStringOrUUID& nsOrUUID) {
-    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, nsOrUUID.dbName());
-
-    if (!canWriteToDB && !isSystemDotProfile(opCtx, nsOrUUID)) {
-        return false;
-    }
-
-    // Even if we think we can write to the database we need to make sure we're not trying
-    // to write to the oplog in ROLLBACK.
-    // If we can accept non local writes (ie we're PRIMARY) then we must not be in ROLLBACK.
-    // This check is redundant of the check of _memberState below, but since this can be checked
-    // without locking, we do it as an optimization.
-    if (_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx)) {
+    // Writes on unreplicated collections are always permitted.
+    if (!_isCollectionReplicated(opCtx, nsOrUUID)) {
         return true;
     }
+    // Otherwise, check whether we can currently accept replicated writes.
+    return _canAcceptReplicatedWrites_UNSAFE(opCtx);
+}
 
-    if (nsOrUUID.isNamespaceString()) {
-        if (!nsOrUUID.nss().isOplog()) {
-            return true;
-        }
-    } else if (const auto& oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
-        if (oplogCollection->uuid() != nsOrUUID.uuid()) {
-            return true;
-        }
-    }
+bool ReplicationCoordinatorImpl::_canAcceptReplicatedWrites_UNSAFE(OperationContext* opCtx) {
+    return _readWriteAbility->canAcceptNonLocalWrites_UNSAFE() || alwaysAllowNonLocalWrites(opCtx);
+}
 
-    stdx::lock_guard<Latch> lock(_mutex);
-    if (_memberState.rollback()) {
+bool ReplicationCoordinatorImpl::_isCollectionReplicated(OperationContext* opCtx,
+                                                         const NamespaceStringOrUUID& nsOrUUID) {
+    // Writes are never replicated for a standalone.
+    if (!_settings.isReplSet()) {
         return false;
     }
+
+    // Note that we can only reliably translate a UUID to a namespace via the collection catalog
+    // after acquiring a consistent catalog/storage snapshot. However, it is ok to skip that in
+    // this case because we do not allow renames between replicated and unreplicated collections.
+    // So even if the namespace string is incorrect, whether or not the collection is replicated
+    // will be accurate.
+    auto ns = nsOrUUID.isNamespaceString()
+        ? nsOrUUID.nss()
+        : CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, nsOrUUID.uuid());
+
+    if (ns) {
+        return ns->isReplicated();
+    }
+
+    // If ns is null, we failed to find it in the catalog. In that case, we fall back to checking
+    // the DB name.
+    if (nsOrUUID.dbName() == DatabaseName::kLocal) {
+        return false;
+    }
+
+    // Otherwise, if it is not in the catalog and not the local DB, assume it is replicated. Note
+    // this could be incorrect if it is system.profile since that is the one unreplicated collection
+    // not in the local DB.
     return true;
 }
 

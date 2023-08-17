@@ -53,7 +53,6 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
@@ -1278,7 +1277,8 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     return YieldedTransactionResources(TransactionResources::detachFromOpCtx(opCtx), originalState);
 }
 
-void stashTransactionResourcesFromOperationContext(OperationContext* opCtx, ClientCursor* cursor) {
+void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
+                                                   TransactionResourcesStasher* stasher) {
     auto& transactionResources = TransactionResources::get(opCtx);
     invariant(
         !(transactionResources.yielded ||
@@ -1320,7 +1320,7 @@ void stashTransactionResourcesFromOperationContext(OperationContext* opCtx, Clie
     auto stashedResources =
         StashedTransactionResources{TransactionResources::detachFromOpCtx(opCtx), originalState};
 
-    cursor->stashTransactionResources(std::move(stashedResources));
+    stasher->stashTransactionResources(std::move(stashedResources));
 }
 
 void restoreTransactionResourcesToOperationContext(
@@ -1488,10 +1488,10 @@ StashTransactionResourcesForDBDirect::~StashTransactionResourcesForDBDirect() {
     TransactionResources::attachToOpCtx(_opCtx, std::move(_originalTransactionResources));
 }
 
-HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(OperationContext* opCtx,
-                                                                           ClientCursor* cursor)
-    : _opCtx(opCtx), _cursor(cursor) {
-    auto stashedResources = cursor->releaseStashedTransactionResources();
+HandleTransactionResourcesFromStasher::HandleTransactionResourcesFromStasher(
+    OperationContext* opCtx, TransactionResourcesStasher* stasher)
+    : _opCtx(opCtx), _stasher(stasher) {
+    auto stashedResources = stasher->releaseStashedTransactionResources();
 
     if (TransactionResources::isPresent(opCtx)) {
         _originalTransactionResources = TransactionResources::detachFromOpCtx(opCtx);
@@ -1506,7 +1506,7 @@ HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(Opera
         }
         stashedResources._yieldedResources->releaseAllResourcesOnCommitOrAbort();
         stashedResources._yieldedResources->state = TransactionResources::State::FAILED;
-        cursor->stashTransactionResources(std::move(stashedResources));
+        stasher->stashTransactionResources(std::move(stashedResources));
         TransactionResources::attachToOpCtx(opCtx, std::move(_originalTransactionResources));
     });
 
@@ -1577,13 +1577,13 @@ HandleTransactionResourcesFromCursor::HandleTransactionResourcesFromCursor(Opera
     restoreFailedGuard.dismiss();
 }
 
-HandleTransactionResourcesFromCursor::~HandleTransactionResourcesFromCursor() {
+HandleTransactionResourcesFromStasher::~HandleTransactionResourcesFromStasher() {
     if (TransactionResources::isPresent(_opCtx)) {
         auto& txnResources = TransactionResources::get(_opCtx);
-        if (_cursor && txnResources.state != TransactionResources::State::FAILED) {
+        if (_stasher && txnResources.state != TransactionResources::State::FAILED) {
             // If the resources for the entire transaction are still valid and we haven't dismissed
             // the resources due to a failure, we yield and stash them.
-            stashTransactionResourcesFromOperationContext(_opCtx, _cursor);
+            stashTransactionResourcesFromOperationContext(_opCtx, _stasher);
         } else {
             // Otherwise, the transaction resources for this operation have to be destroyed since
             // the operation has failed.
@@ -1595,10 +1595,10 @@ HandleTransactionResourcesFromCursor::~HandleTransactionResourcesFromCursor() {
     TransactionResources::attachToOpCtx(_opCtx, std::move(_originalTransactionResources));
 }
 
-void HandleTransactionResourcesFromCursor::dismissRestoredResources() {
+void HandleTransactionResourcesFromStasher::dismissRestoredResources() {
     auto& txnResources = TransactionResources::get(_opCtx);
     txnResources.releaseAllResourcesOnCommitOrAbort();
     txnResources.state = shard_role_details::TransactionResources::State::FAILED;
-    _cursor = nullptr;
+    _stasher = nullptr;
 }
 }  // namespace mongo

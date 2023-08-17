@@ -64,10 +64,10 @@ DEATH_TEST_REGEX(AddToSetNodeTest,
 }
 
 TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
-    auto update = fromjson("{$addToSet: {a: {$each: {}}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: {}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    auto result = node.init(update["$addToSet"]["a"], expCtx);
+    auto result = node.init(update["$addToSet"]["fieldName"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
     ASSERT_EQ(result.reason(),
@@ -75,10 +75,10 @@ TEST(AddToSetNodeTest, InitFailsIfEachIsNotArray) {
 }
 
 TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
-    auto update = fromjson("{$addToSet: {a: {$each: [], bad: 1}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [], bad: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    auto result = node.init(update["$addToSet"]["a"], expCtx);
+    auto result = node.init(update["$addToSet"]["fieldName"], expCtx);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.code(), ErrorCodes::BadValue);
     ASSERT_EQ(result.reason(),
@@ -86,346 +86,347 @@ TEST(AddToSetNodeTest, InitFailsIfThereAreFieldsAfterEach) {
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithFailsBeforeEach) {
-    auto update = fromjson("{$addToSet: {a: {other: 1, $each: []}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {other: 1, $each: []}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithObject) {
-    auto update = fromjson("{$addToSet: {a: {}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithArray) {
-    auto update = fromjson("{$addToSet: {a: []}}");
+    auto update = fromjson("{$addToSet: {fieldName: []}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
 TEST(AddToSetNodeTest, InitSucceedsWithScaler) {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 }
 
 TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: 2}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
+    mutablebson::Document doc(fromjson("{fieldName: 2}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
+        node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::BadValue,
-        "Cannot apply $addToSet to non-array field. Field named 'a' has non-array type int");
+        "Cannot apply $addToSet to non-array field. Field named 'fieldName' has non-array type "
+        "int");
 }
 
 TEST_F(AddToSetNodeTest, ApplyNonEach) {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 1}}}"));
 
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
-    auto update = fromjson("{$addToSet: {a: [1]}}");
+    auto update = fromjson("{$addToSet: {fieldName: [1]}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, [1]]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, [1]]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, [1]]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: [1]}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyEach) {
-    auto update = fromjson("{$addToSet: {a: {$each: [1, 2]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [1, 2]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1, 2]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1, 2]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 1, u2: 2}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
-    auto update = fromjson("{$addToSet: {a: {$each: [1, 2]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [1, 2]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: []}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [1, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [1, 2]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u0: 1, u1: 2}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
-    auto update = fromjson("{$addToSet: {a: {$each: [1, 1]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [1, 1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 1}}}"));
 
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
-    auto update = fromjson("{$addToSet: {a: {$each: [0, 1]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [0, 1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 1}}}"));
 
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
-    auto update = fromjson("{$addToSet: {a: {$each: [1]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0, 0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0, 0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 0, 1]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u2: 1}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyNoElementsToAdd) {
-    auto update = fromjson("{$addToSet: {a: {$each: []}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: []}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     assertOplogEntryIsNoop();
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyNoNonDuplicateElementsToAdd) {
-    auto update = fromjson("{$addToSet: {a: {$each: [0]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [0]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     assertOplogEntryIsNoop();
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyCreateArray) {
-    auto update = fromjson("{$addToSet: {a: {$each: [0, 1]}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: [0, 1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
-    setPathToCreate("a");
-    addIndexedPath("a");
+    setPathToCreate("fieldName");
+    addIndexedPath("fieldName");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: [0, 1]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {fieldName: [0, 1]}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
-    auto update = fromjson("{$addToSet: {a: {$each: []}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: []}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
     mutablebson::Document doc(fromjson("{}"));
-    setPathToCreate("a");
-    addIndexedPath("a");
+    setPathToCreate("fieldName");
+    addIndexedPath("fieldName");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: []}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {i: {a: []}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {i: {fieldName: []}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
-    auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(std::move(collator));
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: []}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: ['abc', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u0: 'abc', u1: 'def'}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
-    auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'def']}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: ['abc', 'def']}}}");
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(std::move(collator));
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: ['ABC']}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: ['ABC']}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: ['ABC', 'def']}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: ['ABC', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['ABC', 'def']}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 'def'}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
-    auto update = fromjson("{$addToSet: {a: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
+    auto update = fromjson("{$addToSet: {fieldName: {$each: ['abc', 'ABC', 'def', 'abc']}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
     node.setCollator(&caseInsensitiveCollator);
 
-    mutablebson::Document doc(fromjson("{a: []}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{fieldName: []}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
+    addIndexedPath("fieldName");
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: ['abc', 'def']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: ['abc', 'def']}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u0: 'abc', u1: 'def'}}}"));
 
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 DEATH_TEST_REGEX(AddToSetNodeTest,
                  CannotSetCollatorIfCollatorIsNonNull,
                  "Invariant failure.*!_collator") {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     auto caseInsensitiveCollator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(std::move(caseInsensitiveCollator));
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
     node.setCollator(expCtx->getCollator());
 }
 
 DEATH_TEST_REGEX(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
@@ -434,58 +435,59 @@ DEATH_TEST_REGEX(AddToSetNodeTest, CannotSetCollatorTwice, "Invariant failure.*!
 }
 
 TEST_F(AddToSetNodeTest, ApplyNestedArray) {
-    auto update = fromjson("{ $addToSet : { 'a.1' : 1 } }");
+    auto update = fromjson("{ $addToSet : { 'fieldName.1' : 1 } }");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a.1"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName.1"], expCtx));
 
-    mutablebson::Document doc(fromjson("{ _id : 1, a : [1, []] }"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a.1"));
-    addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
+    mutablebson::Document doc(fromjson("{ _id : 1, fieldName : [1, []] }"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName.1"));
+    addIndexedPath("fieldName");
+    auto result =
+        node.apply(getApplyParams(doc.root()["fieldName"][1]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{ _id : 1, a : [1, [1]] }"), doc);
+    ASSERT_EQUALS(fromjson("{ _id : 1, fieldName : [1, [1]] }"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {sa: {a: true, u1: [1]}}}"));
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, s1: {a: true, u0: 1}}}}"));
 
-    ASSERT_EQUALS(getModifiedPaths(), "{a.1}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName.1}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
     addIndexedPath("b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$v: 2, diff: {u: {a: [0, 1]}}}"));
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    assertOplogEntry(fromjson("{$v: 2, diff: {sfieldName: {a: true, u1: 1}}}"));
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 TEST_F(AddToSetNodeTest, ApplyNoIndexDataOrLogBuilder) {
-    auto update = fromjson("{$addToSet: {a: 1}}");
+    auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
-    ASSERT_OK(node.init(update["$addToSet"]["a"], expCtx));
+    ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
 
-    mutablebson::Document doc(fromjson("{a: [0]}"));
-    setPathTaken(makeRuntimeUpdatePathForTest("a"));
+    mutablebson::Document doc(fromjson("{fieldName: [0]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("fieldName"));
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    auto result = node.apply(getApplyParams(doc.root()["fieldName"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{fieldName: [0, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(getModifiedPaths(), "{a}");
+    ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
 }  // namespace

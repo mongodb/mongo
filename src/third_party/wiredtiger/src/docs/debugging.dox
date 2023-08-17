@@ -63,7 +63,6 @@ The following diagnostic categories (\c WT_DIAGNOSTIC_*) are defined:
 @row{\c WT_DIAGNOSTIC_CURSOR_CHECK, Verify expected outcome of cursor operation.}
 @row{\c WT_DIAGNOSTIC_DISK_VALIDATE, Validate correctness of data written to and read from disk.}
 @row{\c WT_DIAGNOSTIC_EVICTION_CHECK, Ensure correct page state when performing eviction. }
-@row{\c WT_DIAGNOSTIC_GENERATION_CHECK, Check correctness of generation logic.}
 @row{\c WT_DIAGNOSTIC_HS_VALIDATE, Ensure correctness of records in the history store and data fetched from it.}
 @row{\c WT_DIAGNOSTIC_KEY_OUT_OF_ORDER, Verify correct ordering of keys in the btree.}
 @row{\c WT_DIAGNOSTIC_LOG_VALIDATE, Verify correctness of the Write Ahead Log.}

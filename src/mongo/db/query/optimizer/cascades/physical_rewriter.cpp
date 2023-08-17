@@ -294,7 +294,8 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
             auto& scanDef = _metadata._scanDefs.at(
                 getPropertyConst<IndexingAvailability>(logicalProps).getScanDefName());
             setPropertyOverwrite(
-                physProps, RemoveOrphansRequirement{scanDef.shardingMetadata().mayContainOrphans});
+                physProps,
+                RemoveOrphansRequirement{scanDef.shardingMetadata().mayContainOrphans()});
         }
     }
 

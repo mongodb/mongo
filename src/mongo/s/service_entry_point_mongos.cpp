@@ -83,17 +83,6 @@
 
 namespace mongo {
 
-namespace {
-
-BSONObj buildErrReply(const DBException& ex) {
-    BSONObjBuilder errB;
-    errB.append("$err", ex.what());
-    errB.append("code", ex.code());
-    return errB.obj();
-}
-
-}  // namespace
-
 // Allows for decomposing `handleRequest` into parts and simplifies composing the future-chain.
 struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
     struct CommandOpRunner;

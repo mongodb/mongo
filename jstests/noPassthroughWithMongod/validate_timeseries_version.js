@@ -2,12 +2,14 @@
  * Tests that the validate command checks data consistencies of the version field in time-series
  * bucket collections and return warnings properly.
  *
+ * Version 1 indicates the bucket is uncompressed, and version 2 indicates the bucket is compressed.
+ *
  * @tags: [
  * requires_fcv_62
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_version";
@@ -40,10 +42,18 @@ assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
 
-// Inserts documents into another bucket but manually changes the version to 2. Expects warnings
-// from validation.
-jsTestLog(
-    "Manually changing 'control.version' from 1 to 2 and checking for warnings from validation.");
+// Inserts documents into another bucket but manually changes the version. Expects warnings
+// from validation. If the feature flag is enabled, the previous documents will have inserted into
+// a compressed bucket (i.e. version 2).
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+    assert.eq(1, bucket.find({"control.version": 2}).count());
+    jsTestLog(
+        "Manually changing 'control.version' from 2 to 1 and checking for warnings from validation.");
+} else {
+    assert.eq(1, bucket.find({"control.version": 1}).count());
+    jsTestLog(
+        "Manually changing 'control.version' from 1 to 2 and checking for warnings from validation.");
+}
 testCount += 1;
 collName = collNamePrefix + testCount;
 bucketName = bucketNamePrefix + testCount;
@@ -58,7 +68,11 @@ coll.insertMany([...Array(10).keys()].map(i => ({
                                               "temp": i
                                           })),
                 {ordered: false});
-bucket.updateOne({"meta.sensorId": 2}, {"$set": {"control.version": 2}});
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+    bucket.updateOne({"meta.sensorId": 2}, {"$set": {"control.version": 1}});
+} else {
+    bucket.updateOne({"meta.sensorId": 2}, {"$set": {"control.version": 2}});
+}
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -66,32 +80,27 @@ assert.eq(res.warnings.length, 1);
 
 // Inserts enough documents to close a bucket and then manually changes the version to 1.
 // Expects warnings from validation.
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-    // TODO SERVER-77454: Investigate re-enabling this.
-    jsTestLog(
-        "Changing the 'control.version' of a closed bucket from 2 to 1, and checking for warnings from validation.");
-    testCount += 1;
-    collName = collNamePrefix + testCount;
-    bucketName = bucketNamePrefix + testCount;
-    db.getCollection(collName).drop();
-    assert.commandWorked(db.createCollection(
-        collName,
-        {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
-    coll = db.getCollection(collName);
-    bucket = db.getCollection(bucketName);
-    coll.insertMany(
-        [...Array(1200).keys()].map(i => ({
-                                        "metadata": {"sensorId": 3, "type": "temperature"},
-                                        "timestamp": ISODate(),
-                                        "temp": i
-                                    })),
-        {ordered: false});
-    bucket.updateOne({"meta.sensorId": 3, "control.version": 2}, {"$set": {"control.version": 1}});
-    res = bucket.validate();
-    assert(res.valid, tojson(res));
-    assert.eq(res.nNonCompliantDocuments, 1);
-    assert.eq(res.warnings.length, 1);
-}
+jsTestLog(
+    "Changing the 'control.version' of a closed bucket from 2 to 1, and checking for warnings from validation.");
+testCount += 1;
+collName = collNamePrefix + testCount;
+bucketName = bucketNamePrefix + testCount;
+db.getCollection(collName).drop();
+assert.commandWorked(db.createCollection(
+    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+coll = db.getCollection(collName);
+bucket = db.getCollection(bucketName);
+coll.insertMany([...Array(1200).keys()].map(i => ({
+                                                "metadata": {"sensorId": 3, "type": "temperature"},
+                                                "timestamp": ISODate(),
+                                                "temp": i
+                                            })),
+                {ordered: false});
+bucket.updateOne({"meta.sensorId": 3, "control.version": 2}, {"$set": {"control.version": 1}});
+res = bucket.validate();
+assert(res.valid, tojson(res));
+assert.eq(res.nNonCompliantDocuments, 1);
+assert.eq(res.warnings.length, 1);
 
 // Returns warnings on a bucket with an unsupported version.
 jsTestLog("Changing 'control.version' to an unsupported version and checking for warnings.");
@@ -109,13 +118,8 @@ coll.insertMany([...Array(1100).keys()].map(i => ({
                                                 "temp": i
                                             })),
                 {ordered: false});
-if (FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-    bucket.updateOne({"meta.sensorId": 4, "control.version": 1},
-                     {"$set": {"control.version": 500}});
-} else {
-    bucket.updateOne({"meta.sensorId": 4, "control.version": 2},
-                     {"$set": {"control.version": 500}});
-}
+assert.gte(bucket.find({"meta.sensorId": 4, "control.version": 2}).count(), 1);
+bucket.updateOne({"meta.sensorId": 4, "control.version": 2}, {"$set": {"control.version": 500}});
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -125,7 +129,11 @@ assert.eq(res.warnings.length, 1);
 // reported from a single collection with multiple inconsistent documents.
 jsTestLog(
     "Making a type-version mismatch in the same bucket as the previous test and checking for warnings.");
-bucket.updateOne({"meta.sensorId": 4, "control.version": 1}, {"$set": {"control.version": 2}});
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+    bucket.updateOne({"meta.sensorId": 4, "control.version": 2}, {"$set": {"control.version": 1}});
+} else {
+    bucket.updateOne({"meta.sensorId": 4, "control.version": 1}, {"$set": {"control.version": 2}});
+}
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 2);

@@ -308,5 +308,32 @@ TEST(BoolExpr, BoolExprVisitorEarlyReturnTest) {
         });
     ASSERT_EQ(1, visitedNodes);
 }
+
+TEST(BoolExpr, BoolExprArbitraryFormTests) {
+    BoolExprBuilder<int> b;
+    b.pushConj().pushConj().atom(1).atom(2).atom(3).pop().pushDisj().atom(4).atom(5).pop();
+    auto intExpr = b.finish().get();
+
+    ASSERT_FALSE(IntBoolExpr::isCNF(intExpr));
+    ASSERT_FALSE(IntBoolExpr::isDNF(intExpr));
+
+    int visitedNodes = 0;
+    IntBoolExpr::visitConjuncts(intExpr,
+                                [&](const IntBoolExpr::Node& node,
+                                    const IntBoolExpr::VisitorContext& ctx) { visitedNodes++; });
+    ASSERT_EQ(2, visitedNodes);
+
+    b.pushDisj().pushConj().atom(1).atom(2).atom(3).pop().pushDisj().atom(4).atom(5).pop();
+    intExpr = b.finish().get();
+
+    ASSERT_FALSE(IntBoolExpr::isCNF(intExpr));
+    ASSERT_FALSE(IntBoolExpr::isDNF(intExpr));
+
+    visitedNodes = 0;
+    IntBoolExpr::visitDisjuncts(intExpr,
+                                [&](const IntBoolExpr::Node& node,
+                                    const IntBoolExpr::VisitorContext& ctx) { visitedNodes++; });
+    ASSERT_EQ(2, visitedNodes);
+}
 }  // namespace
 }  // namespace mongo::optimizer

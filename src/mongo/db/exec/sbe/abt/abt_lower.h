@@ -37,7 +37,6 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/abt/named_slots.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -60,10 +59,10 @@ class SBEExpressionLowering {
 public:
     SBEExpressionLowering(const VariableEnvironment& env,
                           SlotVarMap& slotMap,
-                          const mongo::sbe::RuntimeEnvironment& runtimeEnv,
+                          const NamedSlotsProvider& namedSlots,
                           const Metadata* metadata = nullptr,
                           const NodeProps* np = nullptr)
-        : _env(env), _slotMap(slotMap), _runtimeEnv(runtimeEnv), _metadata(metadata), _np(np) {}
+        : _env(env), _slotMap(slotMap), _namedSlots(namedSlots), _metadata(metadata), _np(np) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -110,7 +109,7 @@ private:
 
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
-    const sbe::RuntimeEnvironment& _runtimeEnv;
+    const NamedSlotsProvider& _namedSlots;
     const Metadata* _metadata;
     const NodeProps* _np;
 
@@ -128,14 +127,14 @@ enum class ScanOrder {
 class SBENodeLowering {
 public:
     SBENodeLowering(const VariableEnvironment& env,
-                    const sbe::RuntimeEnvironment& runtimeEnv,
+                    const NamedSlotsProvider& namedSlots,
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
                     const ScanOrder scanOrder,
                     PlanYieldPolicy* yieldPolicy = nullptr)
         : _env(env),
-          _runtimeEnv(runtimeEnv),
+          _namedSlots(namedSlots),
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
@@ -342,7 +341,7 @@ private:
      */
     SBEExpressionLowering getExpressionLowering(SlotVarMap& slotMap,
                                                 const NodeProps* np = nullptr) {
-        return SBEExpressionLowering{_env, slotMap, _runtimeEnv, &_metadata, np};
+        return SBEExpressionLowering{_env, slotMap, _namedSlots, &_metadata, np};
     }
 
     std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e,
@@ -351,7 +350,7 @@ private:
         return getExpressionLowering(slotMap, np).optimize(e);
     }
     const VariableEnvironment& _env;
-    const sbe::RuntimeEnvironment& _runtimeEnv;
+    const NamedSlotsProvider& _namedSlots;
 
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 

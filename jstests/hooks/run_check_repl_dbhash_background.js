@@ -1,3 +1,20 @@
+/**
+ * Runs the dbHash command across all members of a replica set and compares the output.
+ *
+ * Unlike run_check_repl_dbhash.js, this version of the hook doesn't require that all operations
+ * have finished replicating, nor does it require that the test has finished running. The dbHash
+ * command reads at a particular clusterTime in order for an identical snapshot to be used by all
+ * members of the replica set.
+ *
+ * The find and getMore commands used to generate the collection diff read at the same clusterTime
+ * as the dbHash command. While this ensures the diagnostics for a dbhash mismatch aren't subjected
+ * to changes from any operations in flight, it is possible for the collection or an index on the
+ * collection to be dropped due to no locks being held.
+ *
+ * If a transient error occurs, then the dbhash check is retried until it succeeds, or until it
+ * fails with a non-transient error. The most common case of a transient error is attempting to read
+ * from a collection after a catalog operation has been performed on the collection or database.
+ */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 

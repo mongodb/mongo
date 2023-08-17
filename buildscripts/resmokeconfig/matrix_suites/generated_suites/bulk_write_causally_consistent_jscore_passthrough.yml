@@ -1,0 +1,109 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_causally_consistent_jscore_passthrough.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHashInBackground
+    - ValidateCollectionsInBackground
+    - CheckReplDBHash
+    - CheckReplOplogs
+    - ValidateCollections
+  config:
+    shell_options:
+      eval: globalThis.testingReplication = true;; await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');;
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2
+  hooks:
+  - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+  - jstests/core/**/set_param1.js
+  - jstests/core/**/or_to_in.js
+  - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
+  - jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
+  - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
+  - jstests/core/timeseries/clustered_index_crud.js
+  - jstests/core/timeseries/libs/timeseries.js
+  - jstests/core/timeseries/libs/timeseries_writes_util.js
+  - jstests/core/timeseries/timeseries_bucket_index.js
+  - jstests/core/timeseries/timeseries_bucket_manual_removal.js
+  - jstests/core/timeseries/timeseries_collmod.js
+  - jstests/core/timeseries/timeseries_delete_collation.js
+  - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
+  - jstests/core/timeseries/timeseries_delete_hint.js
+  - jstests/core/timeseries/timeseries_delete_multi.js
+  - jstests/core/timeseries/timeseries_delete_one.js
+  - jstests/core/timeseries/timeseries_delete_with_meta.js
+  - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
+  - jstests/core/timeseries/timeseries_explain_delete.js
+  - jstests/core/timeseries/timeseries_explain_update.js
+  - jstests/core/timeseries/timeseries_find_and_modify_remove.js
+  - jstests/core/timeseries/timeseries_find_and_modify_update.js
+  - jstests/core/timeseries/timeseries_id_range.js
+  - jstests/core/timeseries/timeseries_insert_after_delete.js
+  - jstests/core/timeseries/timeseries_insert_after_update.js
+  - jstests/core/timeseries/timeseries_predicates.js
+  - jstests/core/timeseries/timeseries_predicates_with_projections.js
+  - jstests/core/timeseries/timeseries_update.js
+  - jstests/core/timeseries/timeseries_update_compressed_buckets.js
+  - jstests/core/timeseries/timeseries_update_concurrent.js
+  - jstests/core/timeseries/timeseries_update_hint.js
+  - jstests/core/timeseries/timeseries_update_multi.js
+  - jstests/core/timeseries/timeseries_update_one.js
+  - jstests/core/**/set_param1.js
+  - jstests/core/**/top*.js
+  - jstests/core/**/profile*.js
+  - jstests/core/**/*histogram*.js
+  - jstests/core/views/views_stats.js
+  - jstests/core/write/update/update_metrics.js
+  - jstests/core/comment_field.js
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  - jstests/core/**/explain*.js
+  - jstests/core/write/insert/batch_write_command_insert.js
+  - jstests/core/write/update/batch_write_command_update.js
+  - jstests/core/write/delete/batch_write_command_delete.js
+  - jstests/core/failcommand_failpoint.js
+  - jstests/core/version_api_v1_command_coverage.js
+  - jstests/core/write/write_commands_reject_unknown_fields.js
+  - jstests/core/txns/api_params_transaction.js
+  - jstests/core/txns/transactions_profiling.js
+  - jstests/core/txns/currentop_blocked_operations.js
+  - jstests/core/txns/transactions_profiling_with_drops.js
+  - jstests/core/txns/multi_statement_transaction_write_error.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  - requires_collstats
+  - uses_transactions
+  - requires_profiling
+  - uses_parallel_shell
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

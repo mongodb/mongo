@@ -79,7 +79,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=off
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - rhel81-power8-large
 
@@ -222,6 +222,6 @@ buildvariants:
       --linker=gold
       --use-diagnostic-latches=off
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_serial_TG
     distros:
     - rhel83-zseries-large

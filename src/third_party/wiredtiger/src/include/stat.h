@@ -351,6 +351,13 @@ struct __wt_connection_stats {
     int64_t lsm_work_queue_max;
     int64_t autocommit_readonly_retry;
     int64_t autocommit_update_retry;
+    int64_t background_compact_fail;
+    int64_t background_compact_fail_cache_pressure;
+    int64_t background_compact_interrupted;
+    int64_t background_compact_running;
+    int64_t background_compact_skipped;
+    int64_t background_compact_success;
+    int64_t background_compact_timeout;
     int64_t block_cache_blocks_update;
     int64_t block_cache_bytes_update;
     int64_t block_cache_blocks_evicted;
@@ -801,7 +808,6 @@ struct __wt_connection_stats {
     int64_t rec_split_stashed_bytes;
     int64_t rec_split_stashed_objects;
     int64_t local_objects_inuse;
-    int64_t session_background_compact_running;
     int64_t flush_tier_fail;
     int64_t flush_tier;
     int64_t flush_tier_skipped;

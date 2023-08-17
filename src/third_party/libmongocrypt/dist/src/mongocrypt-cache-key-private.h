@@ -25,31 +25,25 @@
 #include "mongocrypt-status-private.h"
 
 typedef struct {
-   _mongocrypt_key_doc_t *key_doc;
-   _mongocrypt_buffer_t decrypted_key_material;
+    _mongocrypt_key_doc_t *key_doc;
+    _mongocrypt_buffer_t decrypted_key_material;
 } _mongocrypt_cache_key_value_t;
 
 typedef struct {
-   _mongocrypt_buffer_t id;               /* may be empty */
-   _mongocrypt_key_alt_name_t *alt_names; /* may be NULL */
+    _mongocrypt_buffer_t id;               /* may be empty */
+    _mongocrypt_key_alt_name_t *alt_names; /* may be NULL */
 } _mongocrypt_cache_key_attr_t;
 
-void
-_mongocrypt_cache_key_init (_mongocrypt_cache_t *cache);
+void _mongocrypt_cache_key_init(_mongocrypt_cache_t *cache);
 
-_mongocrypt_cache_key_attr_t *
-_mongocrypt_cache_key_attr_new (_mongocrypt_buffer_t *id,
-                                _mongocrypt_key_alt_name_t *alt_names);
+_mongocrypt_cache_key_attr_t *_mongocrypt_cache_key_attr_new(_mongocrypt_buffer_t *id,
+                                                             _mongocrypt_key_alt_name_t *alt_names);
 
-_mongocrypt_cache_key_value_t *
-_mongocrypt_cache_key_value_new (_mongocrypt_key_doc_t *key_doc,
-                                 _mongocrypt_buffer_t *decrypted_key_material);
+_mongocrypt_cache_key_value_t *_mongocrypt_cache_key_value_new(_mongocrypt_key_doc_t *key_doc,
+                                                               _mongocrypt_buffer_t *decrypted_key_material);
 
-void
-_mongocrypt_cache_key_value_destroy (void *value);
+void _mongocrypt_cache_key_value_destroy(void *value);
 
-void
-_mongocrypt_cache_key_attr_destroy (_mongocrypt_cache_key_attr_t *attr);
-
+void _mongocrypt_cache_key_attr_destroy(_mongocrypt_cache_key_attr_t *attr);
 
 #endif /* MONGOCRYPT_CACHE_KEY_PRIVATE_H */

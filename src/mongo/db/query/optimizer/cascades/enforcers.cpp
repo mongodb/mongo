@@ -288,7 +288,7 @@ public:
 
         // Constuct a plan fragment which enforces the requirement by projecting all fields of the
         // shard key and invoking the shardFilter FunctionCall in a filter.
-        const auto& shardKey = scanDef.getDistributionAndPaths()._paths;
+        const auto& shardKey = scanDef.shardingMetadata().shardKey();
         tassert(
             7829702,
             "Enforcer for RemoveOrphansRequirement but scan definition doesn't have a shard key.",
@@ -308,11 +308,11 @@ public:
         // Save a pointer to the MemoLogicalDelagatorNode so we can use it in the childPropsMap.
         ABT* childPtr = nullptr;
 
-        for (auto&& field : shardKey) {
+        for (auto&& fieldSpec : shardKey) {
             auto projName = _prefixId.getNextId("shardKey");
             builder.make<EvaluationNode>(ce.getEstimate(),
                                          projName,
-                                         make<EvalPath>(field, make<Variable>(scanProj)),
+                                         make<EvalPath>(fieldSpec._path, make<Variable>(scanProj)),
                                          std::move(builder._node));
             shardKeyFieldVars.push_back(make<Variable>(projName));
             if (childPtr == nullptr) {

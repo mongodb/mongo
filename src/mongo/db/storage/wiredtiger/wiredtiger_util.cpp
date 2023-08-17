@@ -862,12 +862,11 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
                        WT_SESSION* session,
                        WT_EVENT_TYPE type,
                        void* arg) {
-    if (type != WT_EVENT_COMPACT_CHECK) {
+    if (type != WT_EVENT_COMPACT_CHECK || session == nullptr || session->app_private == nullptr) {
         return 0;
     }
 
     OperationContext* opCtx = reinterpret_cast<OperationContext*>(session->app_private);
-    invariant(opCtx);
 
     Status status = opCtx->checkForInterruptNoAssert();
     if (!status.isOK()) {

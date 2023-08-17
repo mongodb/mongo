@@ -56,6 +56,7 @@ constexpr std::array hedgeCommands{
     "find"_sd,
     "listCollections"_sd,
     "listIndexes"_sd,
+    "lockInfo"_sd,
     "planCacheListFilters"_sd,
 };
 

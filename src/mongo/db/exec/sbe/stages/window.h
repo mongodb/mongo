@@ -139,6 +139,8 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _windowRemoveCodes;
 
     // The id of the current document, starting from 1.
+    // We use 1-based id since we want to use the id for spilling as the key in the
+    // temporary record store, and id 0 is reserved
     size_t _currId{0};
     // The id ranges each window function state current holds, inclusive on both ends. Empty ranges
     // are represented as [a+1, a].

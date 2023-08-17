@@ -49,11 +49,13 @@ public:
             uassert(7746800,
                     "$querySettings stage expects a document as argument",
                     spec.type() == BSONType::Object);
-            return std::make_unique<LiteParsed>(spec.fieldName());
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
         }
 
-        LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                     ActionType::querySettings)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -61,9 +63,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            // TODO: SERVER-77551 Ensure only users with allowed permissions may invoke query
-            // settings commands.
-            return {};
+            return _privileges;
         }
 
         bool allowedToPassthroughFromMongos() const {
@@ -77,6 +77,9 @@ public:
         void assertSupportsMultiDocumentTransaction() const {
             transactionNotSupported(kStageName);
         }
+
+    private:
+        const PrivilegeVector _privileges;
     };
 
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(

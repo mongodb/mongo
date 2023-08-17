@@ -48,6 +48,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -65,9 +66,8 @@ std::unique_ptr<sbe::EExpression> wrapMinMaxArg(std::unique_ptr<sbe::EExpression
     return makeLocalBind(
         &frameIdGenerator,
         [](sbe::EVariable input) {
-            return sbe::makeE<sbe::EIf>(generateNullOrMissing(input),
-                                        makeConstant(sbe::value::TypeTags::Nothing, 0),
-                                        input.clone());
+            return sbe::makeE<sbe::EIf>(
+                generateNullOrMissing(input), makeNothingConstant(), input.clone());
         },
         std::move(arg));
 }
@@ -217,8 +217,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorAvg(
             return sbe::makeE<sbe::EIf>(makeBinaryOp(sbe::EPrimBinary::logicOr,
                                                      generateNullOrMissing(input),
                                                      generateNonNumericCheck(input)),
-                                        makeConstant(sbe::value::TypeTags::NumberInt64, 0),
-                                        makeConstant(sbe::value::TypeTags::NumberInt64, 1));
+                                        makeInt64Constant(0),
+                                        makeInt64Constant(1));
         },
         std::move(arg));
     auto counterExpr = makeFunction("sum", std::move(addend));
@@ -271,10 +271,8 @@ std::unique_ptr<sbe::EExpression> buildFinalizeAvg(StageBuilderState& state,
         // If we've encountered any numeric input, the counter would contain a positive integer.
         // Unlike $sum, when there is no numeric input, $avg should return null.
         auto finalizingExpression = sbe::makeE<sbe::EIf>(
-            makeBinaryOp(sbe::EPrimBinary::eq,
-                         makeVariable(aggSlots[1]),
-                         makeConstant(sbe::value::TypeTags::NumberInt64, 0)),
-            makeConstant(sbe::value::TypeTags::Null, 0),
+            makeBinaryOp(sbe::EPrimBinary::eq, makeVariable(aggSlots[1]), makeInt64Constant(0)),
+            makeNullConstant(),
             makeBinaryOp(sbe::EPrimBinary::div,
                          makeFunction("doubleDoubleSumFinalize", makeVariable(aggSlots[0])),
                          makeVariable(aggSlots[1])));
@@ -396,16 +394,12 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorAddToSetHelper(
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     const int cap = internalQueryMaxAddToSetBytes.load();
     if (collatorSlot) {
-        aggs.push_back(makeFunction(
-            funcNameWithCollator,
-            sbe::makeE<sbe::EVariable>(*collatorSlot),
-            std::move(arg),
-            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
+        aggs.push_back(makeFunction(funcNameWithCollator,
+                                    sbe::makeE<sbe::EVariable>(*collatorSlot),
+                                    std::move(arg),
+                                    makeInt32Constant(cap)));
     } else {
-        aggs.push_back(makeFunction(
-            funcName,
-            std::move(arg),
-            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
+        aggs.push_back(makeFunction(funcName, std::move(arg), makeInt32Constant(cap)));
     }
     return aggs;
 }
@@ -449,8 +443,7 @@ std::unique_ptr<sbe::EExpression> buildFinalizeCappedAccumulator(
     auto pushFinalize =
         makeFunction("getElement",
                      makeVariable(accSlots[0]),
-                     makeConstant(sbe::value::TypeTags::NumberInt32,
-                                  static_cast<int>(sbe::vm::AggArrayWithSize::kValues)));
+                     makeInt32Constant(static_cast<int>(sbe::vm::AggArrayWithSize::kValues)));
 
     return pushFinalize;
 }
@@ -459,10 +452,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorPushHelper(
     std::unique_ptr<sbe::EExpression> arg, StringData aggFuncName) {
     const int cap = internalQueryMaxPushBytes.load();
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction(
-        aggFuncName,
-        std::move(arg),
-        makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(cap))));
+    aggs.push_back(makeFunction(aggFuncName, std::move(arg), makeInt32Constant(cap)));
     return aggs;
 }
 
@@ -518,24 +508,21 @@ std::unique_ptr<sbe::EExpression> buildFinalizePartialStdDev(sbe::value::SlotId 
     auto stdDevResult = makeVariable(stdDevSlot);
 
     return makeNewObjFunction(
-        FieldPair{
-            "m2"_sd,
-            makeFunction("getElement",
-                         stdDevResult->clone(),
-                         makeConstant(sbe::value::TypeTags::NumberInt32,
-                                      static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningM2)))},
+        FieldPair{"m2"_sd,
+                  makeFunction("getElement",
+                               stdDevResult->clone(),
+                               makeInt32Constant(
+                                   static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningM2)))},
         FieldPair{"mean"_sd,
+                  makeFunction("getElement",
+                               stdDevResult->clone(),
+                               makeInt32Constant(
+                                   static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningMean)))},
+        FieldPair{"count"_sd,
                   makeFunction(
                       "getElement",
                       stdDevResult->clone(),
-                      makeConstant(sbe::value::TypeTags::NumberInt32,
-                                   static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningMean)))},
-        FieldPair{
-            "count"_sd,
-            makeFunction("getElement",
-                         stdDevResult->clone(),
-                         makeConstant(sbe::value::TypeTags::NumberInt32,
-                                      static_cast<int>(sbe::vm::AggStdDevValueElems::kCount)))});
+                      makeInt32Constant(static_cast<int>(sbe::vm::AggStdDevValueElems::kCount)))});
 }
 
 std::unique_ptr<sbe::EExpression> buildFinalizeStdDevPop(
@@ -625,13 +612,12 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
                 "parameter 'n' must be coercible to a positive 64-bit integer",
                 convertTag != sbe::value::TypeTags::Nothing &&
                     static_cast<int64_t>(convertVal) > 0);
-        aggs.push_back(
-            makeFunction("newArray",
-                         makeFunction("newArray"),
-                         makeConstant(sbe::value::TypeTags::NumberInt64, 0),
-                         makeConstant(convertTag, convertVal),
-                         makeConstant(sbe::value::TypeTags::NumberInt32, 0),
-                         makeConstant(sbe::value::TypeTags::NumberInt32, maxAccumulatorBytes)));
+        aggs.push_back(makeFunction("newArray",
+                                    makeFunction("newArray"),
+                                    makeInt64Constant(0),
+                                    makeConstant(convertTag, convertVal),
+                                    makeInt32Constant(0),
+                                    makeInt32Constant(maxAccumulatorBytes)));
     } else {
         auto localBind = makeLocalBind(
             &frameIdGenerator,
@@ -640,17 +626,15 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
                     sbe::makeE<sbe::EPrimBinary>(
                         sbe::EPrimBinary::logicAnd,
                         makeFunction("exists", maxSizeConvertVar.clone()),
-                        sbe::makeE<sbe::EPrimBinary>(
-                            sbe::EPrimBinary::greater,
-                            maxSizeConvertVar.clone(),
-                            makeConstant(sbe::value::TypeTags::NumberInt64, 0))),
-                    makeFunction(
-                        "newArray",
-                        makeFunction("newArray"),
-                        makeConstant(sbe::value::TypeTags::NumberInt64, 0),
-                        maxSizeConvertVar.clone(),
-                        makeConstant(sbe::value::TypeTags::NumberInt32, 0),
-                        makeConstant(sbe::value::TypeTags::NumberInt32, maxAccumulatorBytes)),
+                        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::greater,
+                                                     maxSizeConvertVar.clone(),
+                                                     makeInt64Constant(0))),
+                    makeFunction("newArray",
+                                 makeFunction("newArray"),
+                                 makeInt64Constant(0),
+                                 maxSizeConvertVar.clone(),
+                                 makeInt32Constant(0),
+                                 makeInt32Constant(maxAccumulatorBytes)),
                     makeFail(7548607,
                              "parameter 'n' must be coercible to a positive 64-bit integer"));
             },
@@ -839,36 +823,27 @@ std::unique_ptr<sbe::EExpression> buildFinalizeTopBottomNImpl(
         auto heapExpr =
             makeFunction("getElement",
                          inputVar->clone(),
-                         makeConstant(sbe::value::TypeTags::NumberInt32,
-                                      static_cast<int>(sbe::vm::AggMultiElems::kInternalArr)));
+                         makeInt32Constant(static_cast<int>(sbe::vm::AggMultiElems::kInternalArr)));
         auto lambdaFrameId = frameIdGenerator.generate();
         auto pairVar = makeVariable(lambdaFrameId, 0);
         auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
             lambdaFrameId,
             makeNewObjFunction(
                 FieldPair{AccumulatorN::kFieldNameGeneratedSortKey,
-                          makeFunction("getElement",
-                                       pairVar->clone(),
-                                       makeConstant(sbe::value::TypeTags::NumberInt32, 0))},
+                          makeFunction("getElement", pairVar->clone(), makeInt32Constant(0))},
                 FieldPair{AccumulatorN::kFieldNameOutput,
-                          makeFunction("getElement",
-                                       pairVar->clone(),
-                                       makeConstant(sbe::value::TypeTags::NumberInt32, 1))}));
+                          makeFunction("getElement", pairVar->clone(), makeInt32Constant(1))}));
         // Convert the array pair representation [key, output] to an object format that the merging
         // code expects.
-        return makeFunction("traverseP",
-                            std::move(heapExpr),
-                            std::move(lambdaExpr),
-                            makeConstant(sbe::value::TypeTags::NumberInt32, 1));
+        return makeFunction(
+            "traverseP", std::move(heapExpr), std::move(lambdaExpr), makeInt32Constant(1));
     } else {
         auto finalExpr =
             makeFunction(isAccumulatorTopN(expr) ? "aggTopNFinalize" : "aggBottomNFinalize",
                          inputVar->clone(),
                          std::move(sortSpec));
         if (single) {
-            finalExpr = makeFunction("getElement",
-                                     std::move(finalExpr),
-                                     makeConstant(sbe::value::TypeTags::NumberInt32, 0));
+            finalExpr = makeFunction("getElement", std::move(finalExpr), makeInt32Constant(0));
         }
         return finalExpr;
     }
@@ -961,6 +936,58 @@ std::unique_ptr<sbe::EExpression> buildFinalizeMinMaxN(
     }
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorCovariance(
+    const AccumulationExpression& expr,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820808, "Incorrect number of arguments", args.size() == 2);
+
+    auto it = args.find(AccArgs::kCovarianceX);
+    tassert(7820809,
+            str::stream() << "Window function expects '" << AccArgs::kCovarianceX << "' argument",
+            it != args.end());
+    auto argX = std::move(it->second);
+
+    it = args.find(AccArgs::kCovarianceY);
+    tassert(7820810,
+            str::stream() << "Window function expects '" << AccArgs::kCovarianceY << "' argument",
+            it != args.end());
+    auto argY = std::move(it->second);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggCovarianceAdd", std::move(argX), std::move(argY)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeCovarianceSamp(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& slots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820814, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggCovarianceSampFinalize", std::move(exprs));
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeCovariancePop(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& slots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7820815, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggCovariancePopFinalize", std::move(exprs));
+}
+
 template <int N>
 std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
@@ -1026,6 +1053,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
         {AccumulatorTopBottomN<kTop, false /* single */>::getName(), &buildAccumulatorTopBottomN},
         {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
          &buildAccumulatorTopBottomN},
+        {AccumulatorCovarianceSamp::kName, &buildAccumulatorCovariance},
+        {AccumulatorCovariancePop::kName, &buildAccumulatorCovariance},
     };
 
     auto accExprName = acc.expr.name;
@@ -1142,6 +1171,8 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         {AccumulatorLastN::kName, &buildFinalizeLastN},
         {AccumulatorMaxN::kName, &buildFinalizeMinMaxN},
         {AccumulatorMinN::kName, &buildFinalizeMinMaxN},
+        {AccumulatorCovarianceSamp::kName, &buildFinalizeCovarianceSamp},
+        {AccumulatorCovariancePop::kName, &buildFinalizeCovariancePop},
     };
 
     auto accExprName = acc.expr.name;
@@ -1224,6 +1255,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
          &buildInitializeAccumulatorMulti},
         {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
         {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorCovarianceSamp::kName, &emptyInitializer<1>},
+        {AccumulatorCovariancePop::kName, &emptyInitializer<1>},
     };
 
     auto accExprName = acc.expr.name;

@@ -41,3 +41,8 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingImprovements
         default: false
         shouldBeFCVGated: true
+    featureFlagMoveCollection:
+        description: "Feature flag for implementing online move collection."
+        cpp_varname: gFeatureFlagMoveCollection
+        default: false
+        shouldBeFCVGated: true

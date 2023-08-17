@@ -186,8 +186,9 @@ private:
     };
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _sourceNss.db_deprecated() + " db: { " + stage->getName() + ": UUID(\"" +
-            _sourceDbAndUuid.uuid().toString() + "\") coll: " + _sourceNss.coll() + " }";
+        return toStringForLogging(_sourceNss.dbName()) + " db: { " + stage->getName() +
+            ": UUID(\"" + _sourceDbAndUuid.uuid().toString() + "\") coll: " + _sourceNss.coll() +
+            " }";
     }
 
     /**

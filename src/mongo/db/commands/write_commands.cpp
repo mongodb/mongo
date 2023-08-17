@@ -454,6 +454,10 @@ public:
                 !shardVersion.eoo()) {
                 bob->append(shardVersion);
             }
+            if (const auto& encryptionInfo = _commandObj.getField("encryptionInformation");
+                !encryptionInfo.eoo()) {
+                bob->append(encryptionInfo);
+            }
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {

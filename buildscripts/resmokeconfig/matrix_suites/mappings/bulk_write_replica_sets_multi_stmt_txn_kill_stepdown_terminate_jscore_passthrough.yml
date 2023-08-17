@@ -1,0 +1,7 @@
+base_suite: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+overrides:
+  - "bulk_write.kill_stepdown_hooks"
+eval:
+  - "bulk_write.single_op_override"
+excludes:
+  - "bulk_write.single_op_core_excluded_files"

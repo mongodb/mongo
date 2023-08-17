@@ -533,7 +533,6 @@ export const TenantMigrationConcurrentWriteUtil = {
         getQueryableEncryptionCountInfo: {skip: isNotWriteCommand},
         getShardMap: {skip: isNotRunOnUserDatabase},
         getShardVersion: {skip: isNotRunOnUserDatabase},
-        getnonce: {skip: "removed in v6.3"},
         godinsert: {skip: isNotRunOnUserDatabase},
         grantPrivilegesToRole: {skip: isAuthCommand},
         grantRolesToRole: {skip: isAuthCommand},

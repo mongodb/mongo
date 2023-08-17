@@ -104,6 +104,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         }
 
         try {
+            /* eslint-disable-next-line no-restricted-syntax */
             load("jstests/libs/legacyThreadSupport.js");  // For Thread.
             return true;
         } catch (e) {
@@ -1218,7 +1219,8 @@ var ReplSetTest = function ReplSetTest(opts) {
                     ErrorCodes.NewReplicaSetConfigurationIncompatible,
                     ErrorCodes.InterruptedDueToReplStateChange,
                     ErrorCodes.ConfigurationInProgress,
-                    ErrorCodes.CurrentConfigNotCommittedYet
+                    ErrorCodes.CurrentConfigNotCommittedYet,
+                    ErrorCodes.NotWritablePrimary,
                 ],
                 errorMsg);
             return result.ok;
@@ -3439,7 +3441,6 @@ var ReplSetTest = function ReplSetTest(opts) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
         } else if (parallelValidate) {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
-            print(`   FOR PORTS: [${tojson(this.ports)}]`);
             this._validateNodes(this.ports);
         }
 
@@ -3676,6 +3677,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         keyFile,
         host,
         waitForKeys,
+        useAutoBootstrapProcedure,
         pidValue = undefined
     }) {
         print('Recreating replica set from existing nodes ' + tojson(nodeHosts));
@@ -3700,6 +3702,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         rst.waitForKeys = waitForKeys;
         rst.keyFile = keyFile;
         rst.nodeOptions = nodeOptions;
+        rst.useAutoBootstrapProcedure = useAutoBootstrapProcedure || false;
     }
 
     // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.

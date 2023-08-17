@@ -75,7 +75,8 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
+#include "mongo/db/query/sbe_stage_builder_state.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -109,14 +110,6 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
                                                std::unique_ptr<sbe::EExpression> rhs,
-                                               StageBuilderState& state);
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               std::unique_ptr<sbe::EExpression> collator = {});
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
                                                StageBuilderState& state);
 
 /**
@@ -257,14 +250,39 @@ inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&...
     return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
 }
 
-template <typename T>
-inline auto makeConstant(sbe::value::TypeTags tag, T value) {
-    return sbe::makeE<sbe::EConstant>(tag, sbe::value::bitcastFrom<T>(value));
+inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
+    return sbe::makeE<sbe::EConstant>(tag, val);
 }
 
-inline auto makeConstant(StringData str) {
-    auto [tag, value] = sbe::value::makeNewString(str);
-    return sbe::makeE<sbe::EConstant>(tag, value);
+inline auto makeNothingConstant() {
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
+}
+inline auto makeNullConstant() {
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
+}
+inline auto makeBoolConstant(bool boolVal) {
+    auto val = sbe::value::bitcastFrom<bool>(boolVal);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
+}
+inline auto makeInt32Constant(int32_t num) {
+    auto val = sbe::value::bitcastFrom<int32_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, val);
+}
+inline auto makeInt64Constant(int64_t num) {
+    auto val = sbe::value::bitcastFrom<int64_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, val);
+}
+inline auto makeDoubleConstant(double num) {
+    auto val = sbe::value::bitcastFrom<double>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble, val);
+}
+inline auto makeDecimalConstant(const Decimal128& num) {
+    auto [tag, val] = sbe::value::makeCopyDecimal(num);
+    return sbe::makeE<sbe::EConstant>(tag, val);
+}
+inline auto makeStrConstant(StringData str) {
+    auto [tag, val] = sbe::value::makeNewString(str);
+    return sbe::makeE<sbe::EConstant>(tag, val);
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId);
@@ -312,7 +330,7 @@ template <size_t N>
 FieldExprs<N + 2> array_append(FieldExprs<N> fieldExprs, FieldPair field) {
     return array_append(std::move(fieldExprs),
                         std::make_index_sequence<N>{},
-                        makeConstant(field.first),
+                        makeStrConstant(field.first),
                         std::move(field.second));
 }
 
@@ -346,7 +364,7 @@ std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs,
 // Deals with the first 'FieldPair' and adds it to the 'EExpression' array.
 template <typename... Ts>
 std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fields) {
-    return makeNewObjFunction(FieldExprs<2>{makeConstant(field.first), std::move(field.second)},
+    return makeNewObjFunction(FieldExprs<2>{makeStrConstant(field.first), std::move(field.second)},
                               std::forward<Ts>(fields)...);
 }
 
@@ -588,82 +606,6 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
 
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
-
-/**
- * Common parameters to SBE stage builder functions extracted into separate class to simplify
- * argument passing. Also contains a mapping of global variable ids to slot ids.
- */
-struct StageBuilderState {
-    StageBuilderState(OperationContext* opCtx,
-                      Environment& env,
-                      PlanStageStaticData* data,
-                      const Variables& variables,
-                      sbe::value::SlotIdGenerator* slotIdGenerator,
-                      sbe::value::FrameIdGenerator* frameIdGenerator,
-                      sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                      bool needsMerge,
-                      bool allowDiskUse)
-        : slotIdGenerator{slotIdGenerator},
-          frameIdGenerator{frameIdGenerator},
-          spoolIdGenerator{spoolIdGenerator},
-          opCtx{opCtx},
-          env{env},
-          data{data},
-          variables{variables},
-          needsMerge{needsMerge},
-          allowDiskUse{allowDiskUse} {}
-
-    StageBuilderState(const StageBuilderState& other) = delete;
-
-    sbe::value::SlotId getGlobalVariableSlot(Variables::Id variableId);
-
-    sbe::value::SlotId slotId() {
-        return slotIdGenerator->generate();
-    }
-
-    sbe::FrameId frameId() {
-        return frameIdGenerator->generate();
-    }
-
-    sbe::SpoolId spoolId() {
-        return spoolIdGenerator->generate();
-    }
-
-    boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
-    boost::optional<sbe::value::SlotId> getCollatorSlot();
-    boost::optional<sbe::value::SlotId> getOplogTsSlot();
-    boost::optional<sbe::value::SlotId> getBuiltinVarSlot(Variables::Id id);
-
-    /**
-     * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
-     * with 'paramId' and tracked in the 'InputParamToSlotMap' for auto-parameterization use. The
-     * slot is set to 'Nothing' on registration and will be populated with the real value when
-     * preparing the SBE plan for execution.
-     */
-    sbe::value::SlotId registerInputParamSlot(MatchExpression::InputParamId paramId);
-
-    sbe::value::SlotIdGenerator* const slotIdGenerator;
-    sbe::value::FrameIdGenerator* const frameIdGenerator;
-    sbe::value::SpoolIdGenerator* const spoolIdGenerator;
-
-    OperationContext* const opCtx;
-    Environment& env;
-    PlanStageStaticData* const data;
-
-    const Variables& variables;
-    // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
-    // flags to true so that shards can sends special partial aggregation results to the mongos.
-    bool needsMerge;
-
-    // A flag to indicate the user allows disk use for spilling.
-    bool allowDiskUse;
-
-    // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
-    optimizer::SlotVarMap slotVarMap;
-
-    StringMap<sbe::value::SlotId> stringConstantToSlotMap;
-    SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
-};
 
 /**
  * A tree of nodes arranged based on field path. PathTreeNode can be used to represent index key

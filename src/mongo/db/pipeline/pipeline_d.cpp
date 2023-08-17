@@ -707,33 +707,36 @@ bool areSortFieldsModifiedByProjection(bool seenUnpack,
     }
 }
 
-std::tuple<DocumentSourceInternalUnpackBucket*, DocumentSourceSort*> findUnpackThenSort(
-    const Pipeline::SourceContainer& sources) {
-    DocumentSourceSort* sortStage = nullptr;
-    DocumentSourceInternalUnpackBucket* unpackStage = nullptr;
+// There can be exactly one unpack stage in a pipeline but multiple sort stages. We'll find the
+// _first_ sort.
+struct SortAndUnpackInPipeline {
+    DocumentSourceInternalUnpackBucket* unpack = nullptr;
+    DocumentSourceSort* sort = nullptr;
+    int unpackIdx = -1;
+    int sortIdx = -1;
+};
+SortAndUnpackInPipeline findUnpackAndSort(const Pipeline::SourceContainer& sources) {
+    SortAndUnpackInPipeline su;
 
-    auto sourcesIt = sources.begin();
-    while (sourcesIt != sources.end()) {
-        if (!sortStage) {
-            sortStage = dynamic_cast<DocumentSourceSort*>(sourcesIt->get());
-
-            if (sortStage) {
-                // Do not double optimize
-                if (sortStage->isBoundedSortStage()) {
-                    return {nullptr, nullptr};
-                }
-
-                return {unpackStage, sortStage};
-            }
+    int idx = 0;
+    auto itr = sources.begin();
+    while (itr != sources.end()) {
+        if (!su.unpack) {
+            su.unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(itr->get());
+            su.unpackIdx = idx;
+        }
+        if (!su.sort) {
+            su.sort = dynamic_cast<DocumentSourceSort*>(itr->get());
+            su.sortIdx = idx;
+        }
+        if (su.unpack && su.sort) {
+            break;
         }
 
-        if (!unpackStage) {
-            unpackStage = dynamic_cast<DocumentSourceInternalUnpackBucket*>(sourcesIt->get());
-        }
-        ++sourcesIt;
+        ++itr;
+        ++idx;
     }
-
-    return {unpackStage, sortStage};
+    return su;
 }
 }  // namespace
 
@@ -1000,7 +1003,7 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
 
     boost::optional<BucketUnpacker> bucketUnpacker;
     if (unpackBucketStage) {
-        bucketUnpacker = unpackBucketStage->bucketUnpacker();
+        bucketUnpacker = unpackBucketStage->bucketUnpacker().copy();
     }
     auto exec = uassertStatusOK(createRandomCursorExecutor(
         collection, expCtx, pipeline, sampleSize, numRecords, std::move(bucketUnpacker)));
@@ -1565,10 +1568,27 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
         ? DepsTracker::kDefaultUnavailableMetadata & ~DepsTracker::kOnlyTextScore
         : DepsTracker::kDefaultUnavailableMetadata;
 
-    // If this is a query on a time-series collection then it may be eligible for a post-planning
-    // sort optimization. We check eligibility and perform the rewrite here.
-    auto [unpack, sort] = findUnpackThenSort(pipeline->_sources);
-    const bool timeseriesBoundedSortOptimization = unpack && sort;
+    // If this is a query on a time-series collection we might need to keep it fully classic to
+    // ensure no perf regressions until we implement the corresponding scenarios fully in SBE.
+    SortAndUnpackInPipeline su = findUnpackAndSort(pipeline->_sources);
+    // Do not double-optimize the sort.
+    auto sort = (su.sort && su.sort->isBoundedSortStage()) ? nullptr : su.sort;
+    auto unpack = su.unpack;
+    if (unpack &&
+        unpack->bucketUnpacker().bucketSpec().behavior() == BucketSpec::Behavior::kExclude) {
+        // Currently we only support in SBE unpacking with a statically known set of fields.
+        expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+    }
+    if (unpack && sort) {
+        // TODO SERVER-79061: disable only the case when it's possible for bounded sort to be used.
+        // NB: tests in jstests/core/timeseries/timeseries_lastpoint.js over-specify the expected
+        // plan shapes and fail when lowered to SBE even if the bounded sort isn't used.
+        expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+    }
+
+    // But in classic it may be eligible for a post-planning sort optimization. We check eligibility
+    // and perform the rewrite here.
+    const bool timeseriesBoundedSortOptimization = unpack && sort && (su.unpackIdx < su.sortIdx);
     QueryPlannerParams plannerOpts;
     if (timeseriesBoundedSortOptimization) {
         plannerOpts.traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);

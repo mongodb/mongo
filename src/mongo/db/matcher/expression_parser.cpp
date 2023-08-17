@@ -724,11 +724,11 @@ StatusWithMatchExpression parseRegexDocument(
 }
 
 Status parseInExpression(InMatchExpression* inExpression,
-                         const BSONObj& theArray,
+                         BSONObj theArray,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     inExpression->setCollator(expCtx->getCollator());
-    std::vector<BSONElement> equalities;
-    for (auto e : theArray) {
+
+    return inExpression->setEqualitiesArray(std::move(theArray), [&](const BSONElement& e) {
         // Allow DBRefs, but reject all fields with names starting with $.
         if (isExpressionDocument(e, false)) {
             return Status(ErrorCodes::BadValue, "cannot nest $ under $in");
@@ -739,11 +739,10 @@ Status parseInExpression(InMatchExpression* inExpression,
             if (!status.isOK()) {
                 return status;
             }
-        } else {
-            equalities.push_back(e);
         }
-    }
-    return inExpression->setEqualities(std::move(equalities));
+
+        return Status::OK();
+    });
 }
 
 template <class T>

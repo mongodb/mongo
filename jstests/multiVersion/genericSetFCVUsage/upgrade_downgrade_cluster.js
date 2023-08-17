@@ -1,3 +1,8 @@
+/**
+ * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
+ * sharded and unsharded collection at each step of cluster upgrade/downgrade between last-lts and
+ * latest and between last-continuous and latest.
+ */
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";
 

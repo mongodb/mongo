@@ -20,104 +20,70 @@
 
 #include <bson/bson.h>
 
-void
-_mongocrypt_log_init (_mongocrypt_log_t *log)
-{
-   BSON_ASSERT_PARAM (log);
+void _mongocrypt_log_init(_mongocrypt_log_t *log) {
+    BSON_ASSERT_PARAM(log);
 
-   _mongocrypt_mutex_init (&log->mutex);
-   /* Initially, no log function is set. */
-   _mongocrypt_log_set_fn (log, NULL, NULL);
+    _mongocrypt_mutex_init(&log->mutex);
+    /* Initially, no log function is set. */
+    _mongocrypt_log_set_fn(log, NULL, NULL);
 #ifdef MONGOCRYPT_ENABLE_TRACE
-   log->trace_enabled = (getenv ("MONGOCRYPT_TRACE") != NULL);
+    log->trace_enabled = (getenv("MONGOCRYPT_TRACE") != NULL);
 #endif
 }
 
+void _mongocrypt_log_cleanup(_mongocrypt_log_t *log) {
+    if (!log) {
+        return;
+    }
 
-void
-_mongocrypt_log_cleanup (_mongocrypt_log_t *log)
-{
-   if (!log) {
-      return;
-   }
-
-   _mongocrypt_mutex_cleanup (&log->mutex);
-   memset (log, 0, sizeof (*log));
+    _mongocrypt_mutex_cleanup(&log->mutex);
+    memset(log, 0, sizeof(*log));
 }
 
-void
-_mongocrypt_stdout_log_fn (mongocrypt_log_level_t level,
-                           const char *message,
-                           uint32_t message_len,
-                           void *ctx)
-{
-   BSON_ASSERT_PARAM (message);
+void _mongocrypt_stdout_log_fn(mongocrypt_log_level_t level, const char *message, uint32_t message_len, void *ctx) {
+    BSON_ASSERT_PARAM(message);
 
-   switch (level) {
-   case MONGOCRYPT_LOG_LEVEL_FATAL:
-      printf ("FATAL");
-      break;
-   case MONGOCRYPT_LOG_LEVEL_ERROR:
-      printf ("ERROR");
-      break;
-   case MONGOCRYPT_LOG_LEVEL_WARNING:
-      printf ("WARNING");
-      break;
-   case MONGOCRYPT_LOG_LEVEL_INFO:
-      printf ("INFO");
-      break;
-   case MONGOCRYPT_LOG_LEVEL_TRACE:
-      printf ("TRACE");
-      break;
-   default:
-      printf ("UNKNOWN");
-      break;
-   }
-   printf (" %s\n", message);
+    switch (level) {
+    case MONGOCRYPT_LOG_LEVEL_FATAL: printf("FATAL"); break;
+    case MONGOCRYPT_LOG_LEVEL_ERROR: printf("ERROR"); break;
+    case MONGOCRYPT_LOG_LEVEL_WARNING: printf("WARNING"); break;
+    case MONGOCRYPT_LOG_LEVEL_INFO: printf("INFO"); break;
+    case MONGOCRYPT_LOG_LEVEL_TRACE: printf("TRACE"); break;
+    default: printf("UNKNOWN"); break;
+    }
+    printf(" %s\n", message);
 }
 
+void _mongocrypt_log_set_fn(_mongocrypt_log_t *log, mongocrypt_log_fn_t fn, void *ctx) {
+    BSON_ASSERT_PARAM(log);
 
-void
-_mongocrypt_log_set_fn (_mongocrypt_log_t *log,
-                        mongocrypt_log_fn_t fn,
-                        void *ctx)
-{
-   BSON_ASSERT_PARAM (log);
-
-   _mongocrypt_mutex_lock (&log->mutex);
-   log->fn = fn;
-   log->ctx = ctx;
-   _mongocrypt_mutex_unlock (&log->mutex);
+    _mongocrypt_mutex_lock(&log->mutex);
+    log->fn = fn;
+    log->ctx = ctx;
+    _mongocrypt_mutex_unlock(&log->mutex);
 }
 
+void _mongocrypt_log(_mongocrypt_log_t *log, mongocrypt_log_level_t level, const char *format, ...) {
+    va_list args;
+    char *message;
 
-void
-_mongocrypt_log (_mongocrypt_log_t *log,
-                 mongocrypt_log_level_t level,
-                 const char *format,
-                 ...)
-{
-   va_list args;
-   char *message;
+    BSON_ASSERT_PARAM(log);
+    BSON_ASSERT_PARAM(format);
 
-   BSON_ASSERT_PARAM (log);
-   BSON_ASSERT_PARAM (format);
+    if (level == MONGOCRYPT_LOG_LEVEL_TRACE && !log->trace_enabled) {
+        return;
+    }
 
-   if (level == MONGOCRYPT_LOG_LEVEL_TRACE && !log->trace_enabled) {
-      return;
-   }
+    va_start(args, format);
+    message = bson_strdupv_printf(format, args);
+    va_end(args);
 
+    BSON_ASSERT(message);
 
-   va_start (args, format);
-   message = bson_strdupv_printf (format, args);
-   va_end (args);
-
-   BSON_ASSERT (message);
-
-   _mongocrypt_mutex_lock (&log->mutex);
-   if (log->fn) {
-      log->fn (level, message, (uint32_t) strlen (message), log->ctx);
-   }
-   _mongocrypt_mutex_unlock (&log->mutex);
-   bson_free (message);
+    _mongocrypt_mutex_lock(&log->mutex);
+    if (log->fn) {
+        log->fn(level, message, (uint32_t)strlen(message), log->ctx);
+    }
+    _mongocrypt_mutex_unlock(&log->mutex);
+    bson_free(message);
 }

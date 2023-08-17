@@ -54,7 +54,7 @@ public:
                            BucketUnpacker bucketUnpacker);
 
     StageType stageType() const final {
-        return STAGE_UNPACK_TIMESERIES_BUCKET;
+        return STAGE_UNPACK_SAMPLED_TS_BUCKET;
     }
 
     bool isEOF() final {

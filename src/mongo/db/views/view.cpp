@@ -69,7 +69,7 @@ ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
 }
 
 void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
-    invariant(_viewNss.db_deprecated() == viewOnNss.db_deprecated());
+    invariant(_viewNss.isEqualDb(viewOnNss));
     _viewOnNss = viewOnNss;
 }
 

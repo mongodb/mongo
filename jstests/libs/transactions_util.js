@@ -64,6 +64,11 @@ export var TransactionsUtil = (function() {
                 if (db === 'local' || db === 'config' || db === 'system') {
                     return false;
                 }
+                // Make sure no namespaces are system. collections
+                var coll = ns['ns'].substring(ns['ns'].indexOf('.') + 1);
+                if (coll.startsWith('system.')) {
+                    return false;
+                }
             }
         } else {
             if (dbName === 'local' || dbName === 'config' || dbName === 'admin') {

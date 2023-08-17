@@ -211,6 +211,73 @@ __wt_conn_foc_discard(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __config_add_checks --
+ *     Process the list of checks so they can be performed quickly.
+ */
+static int
+__config_add_checks(WT_SESSION_IMPL *session, WT_CONFIG_ENTRY *entry, WT_CONFIG_CHECK *cp)
+{
+    WT_CONFIG cparser, sparser;
+    WT_CONFIG_ITEM ck, cv, v, dummy;
+    WT_DECL_RET;
+    u_int count;
+    char *endnum;
+
+    fprintf(stderr, "%s: %s\n", entry->method, cp->name);
+
+    cp->min_value = INT64_MIN;
+    cp->max_value = INT64_MAX;
+    if (cp->checks != NULL) {
+        /* Setup an iterator for the check string. */
+        __wt_config_init(session, &cparser, cp->checks);
+        while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
+            if (WT_STRING_MATCH("min", ck.str, ck.len)) {
+                cp->min_value = strtoll(cv.str, &endnum, 10);
+                if (endnum != &cv.str[cv.len])
+                    WT_RET_MSG(session, EINVAL, "min value invalid for key '%s'", cp->name);
+            } else if (WT_STRING_MATCH("max", ck.str, ck.len)) {
+                cp->max_value = strtoll(cv.str, &endnum, 10);
+                if (endnum != &cv.str[cv.len])
+                    WT_RET_MSG(session, EINVAL, "max value invalid for key '%s'", cp->name);
+            } else if (WT_STRING_MATCH("choices", ck.str, ck.len)) {
+                if (cv.len == 0)
+                    WT_RET_MSG(session, EINVAL, "Key '%s' requires a value", cp->name);
+                if (cv.type == WT_CONFIG_ITEM_STRUCT) {
+                    /*
+                     * Handle the 'verbose' case of a list containing restricted choices. This
+                     * doesn't need to be fast, count the number of items first.
+                     */
+                    __wt_config_subinit(session, &sparser, &cv);
+                    count = 0;
+                    while ((ret = __wt_config_next(&sparser, &v, &dummy)) == 0)
+                        ++count;
+                    WT_RET_NOTFOUND_OK(ret);
+
+                    WT_RET(__wt_calloc_def(session, count + 1, &cp->choices));
+
+                    __wt_config_subinit(session, &sparser, &cv);
+                    count = 0;
+                    while ((ret = __wt_config_next(&sparser, &v, &dummy)) == 0) {
+                        WT_RET(__wt_config_subgetraw(session, &cv, &v, &dummy));
+                        WT_RET(__wt_strndup(session, v.str, v.len, &cp->choices[count]));
+                        __conn_foc_add(session, cp->choices[count]);
+                        ++count;
+                    }
+                    WT_RET_NOTFOUND_OK(ret);
+                } else {
+                    WT_RET(__wt_calloc_def(session, 2, &cp->choices));
+                    WT_RET(__wt_config_subgetraw(session, &cv, &v, &dummy));
+                    WT_RET(__wt_strndup(session, v.str, v.len, &cp->choices[0]));
+                    __conn_foc_add(session, cp->choices[0]);
+                }
+                __conn_foc_add(session, cp->choices);
+            }
+        }
+    }
+    return (0);
+}
+
+/*
  * __wt_configure_method --
  *     WT_CONNECTION.configure_method.
  */
@@ -225,6 +292,7 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     size_t cnt, len;
+    u_int compiled_type;
     char *newcheck_name, *p;
 
     /*
@@ -253,6 +321,20 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
         WT_RET_MSG(session, EINVAL, "no configuration type specified");
     if (strcmp(type, "boolean") != 0 && strcmp(type, "int") != 0 && strcmp(type, "list") != 0 &&
       strcmp(type, "string") != 0)
+        WT_RET_MSG(
+          session, EINVAL, "type must be one of \"boolean\", \"int\", \"list\" or \"string\"");
+
+    /* Determine the compiled type. */
+    compiled_type = 0;
+    if (strcmp(type, "boolean") == 0)
+        compiled_type = WT_CONFIG_COMPILED_TYPE_BOOLEAN;
+    else if (strcmp(type, "int") == 0)
+        compiled_type = WT_CONFIG_COMPILED_TYPE_INT;
+    else if (strcmp(type, "list") == 0)
+        compiled_type = WT_CONFIG_COMPILED_TYPE_LIST;
+    else if (strcmp(type, "string") == 0)
+        compiled_type = WT_CONFIG_COMPILED_TYPE_STRING;
+    else
         WT_RET_MSG(
           session, EINVAL, "type must be one of \"boolean\", \"int\", \"list\" or \"string\"");
 
@@ -306,8 +388,12 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
         for (cp = (*epp)->checks; cp->name != NULL; ++cp)
             if (strcmp(newcheck_name, cp->name) != 0)
                 checks[cnt++] = *cp;
+
     newcheck = &checks[cnt];
     newcheck->name = newcheck_name;
+    newcheck->compiled_type = compiled_type;
+    newcheck->checks = check;
+    __config_add_checks(session, entry, newcheck);
     WT_ERR(__wt_strdup(session, type, &newcheck->type));
     WT_ERR(__wt_strdup(session, check, &newcheck->checks));
     entry->checks = checks;

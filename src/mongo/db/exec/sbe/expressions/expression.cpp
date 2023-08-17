@@ -722,7 +722,6 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"aggConcatArraysCapped",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggConcatArraysCapped, true}},
     {"isMember", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isMember, false}},
-    {"collIsMember", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collIsMember, false}},
     {"indexOfBytes",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfBytes, false}},
     {"indexOfCP",
@@ -749,6 +748,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"aggSetUnion", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggSetUnion, true}},
     {"aggSetUnionCapped",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggSetUnionCapped, true}},
+    {"aggCollSetUnion",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggCollSetUnion, true}},
     {"aggCollSetUnionCapped",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::aggCollSetUnionCapped, true}},
     {"runJsPredicate",
@@ -854,6 +855,20 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggDerivativeRemove, true}},
     {"aggDerivativeFinalize",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggDerivativeFinalize, false}},
+    {"aggCovarianceAdd",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggCovarianceAdd, true}},
+    {"aggCovarianceRemove",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggCovarianceRemove, true}},
+    {"aggCovarianceSampFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggCovarianceSampFinalize, false}},
+    {"aggCovariancePopFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggCovariancePopFinalize, false}},
+    {"aggRemovablePushAdd",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushAdd, true}},
+    {"aggRemovablePushRemove",
+     BuiltinFn{[](size_t n) { return n == 0; }, vm::Builtin::aggRemovablePushRemove, true}},
+    {"aggRemovablePushFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushFinalize, false}},
 };
 
 /**
@@ -1115,11 +1130,8 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
         // specialized variants.
         if (_name == "typeMatch" && _nodes[1]->as<EConstant>()) {
             auto [tag, val] = _nodes[1]->as<EConstant>()->getConstant();
-            if (tag == value::TypeTags::NumberInt64) {
-                auto mask = value::bitcastTo<int64_t>(val);
-                uassert(6996901,
-                        "Second argument to typeMatch() must be a 32-bit integer constant",
-                        mask >> 32 == 0 || mask >> 32 == -1);
+            if (tag == value::TypeTags::NumberInt32) {
+                auto mask = static_cast<uint32_t>(value::bitcastTo<int32_t>(val));
                 auto param = appendParameter(code, ctx, _nodes[0].get());
                 code.appendTypeMatch(param, mask);
 

@@ -79,6 +79,12 @@ public:
     }
 
     void
+    background_compact_operation(thread_worker *) override final
+    {
+        logger::log_msg(LOG_WARN, "background_compact_operation: nothing done");
+    }
+
+    void
     checkpoint_operation(thread_worker *) override final
     {
         logger::log_msg(LOG_WARN, "checkpoint_operation: nothing done");

@@ -260,7 +260,7 @@ void WriteOp::_updateOpState() {
     _childOps.clear();
 }
 
-void WriteOp::cancelWrites(const write_ops::WriteError* why) {
+void WriteOp::cancelWrites() {
     invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
     _state = WriteOpState_Ready;
     _childOps.clear();

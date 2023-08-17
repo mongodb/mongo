@@ -51,7 +51,7 @@ namespace mongo {
 class SpillableCache {
 public:
     SpillableCache(ExpressionContext* expCtx, MemoryUsageTracker* tracker)
-        : _expCtx(expCtx), _memTracker(tracker) {}
+        : _memTracker((*tracker)["SpillableCache"]), _expCtx(expCtx) {}
 
     /**
      * Adds 'input' to the in-memory cache and spills to disk if the document size puts us over the
@@ -136,8 +136,11 @@ private:
     Document readDocumentFromMemCacheById(int desired);
     void verifyInCache(int desired);
     void writeBatchToDisk(std::vector<Record>& records);
+
+    MemoryUsageTracker::Impl _memTracker;
+
     ExpressionContext* _expCtx;
-    std::deque<Document> _memCache;
+    std::deque<MemoryTokenWith<Document>> _memCache;
 
     std::unique_ptr<TemporaryRecordStore> _diskCache = nullptr;
     // The number of documents we've written to disk, as well as the recordID of the last document
@@ -154,8 +157,6 @@ private:
 
     // Be able to report that disk was used after the cache has been finalized.
     bool _usedDisk = false;
-
-    MemoryUsageTracker::PerFunctionMemoryTracker _memTracker;
 };
 
 }  // namespace mongo

@@ -830,10 +830,11 @@ public:
 
     UUID createCollection(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          Timestamp timestamp) {
+                          Timestamp timestamp,
+                          bool allowMixedModeWrites = false) {
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
-        UUID uuid = _createCollection(opCtx, nss);
+        UUID uuid = _createCollection(opCtx, nss, boost::none, allowMixedModeWrites);
         wuow.commit();
         return uuid;
     }
@@ -1059,7 +1060,8 @@ private:
 
     UUID _createCollection(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           boost::optional<UUID> uuid = boost::none) {
+                           boost::optional<UUID> uuid = boost::none,
+                           bool allowMixedModeWrites = false) {
         AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
         auto db = databaseWriteGuard.ensureDbExists(opCtx);
         ASSERT(db);
@@ -1084,6 +1086,9 @@ private:
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
             opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         ownedCollection->init(opCtx);
+        invariant(ownedCollection->getSharedDecorations());
+        historicalIDTrackerAllowsMixedModeWrites(ownedCollection->getSharedDecorations())
+            .store(allowMixedModeWrites);
 
         // Adds the collection to the in-memory catalog.
         CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
@@ -3339,6 +3344,37 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
     ASSERT_EQ(0, latestColl->getIndexCatalog()->numIndexesReady());
     ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesInProgress());
     ASSERT(!entry->isReady());
+}
+
+TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
+    // This tests checks the following sequence: untimestamped collection create
+    // -> timestamped drop -> untimestamped collection recreate.
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+
+    // Initialize the oldest timestamp.
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(1, 1));
+    });
+
+    // Create and drop the collection. We have a time window where the namespace exists.
+    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+    dropCollection(opCtx.get(), nss, Timestamp(10, 10));
+
+    // Before performing cleanup, re-create the collection.
+    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+
+    // Perform collection catalog cleanup.
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(20, 20));
+    });
+
+    // Drop the re-created collection.
+    dropCollection(opCtx.get(), nss, Timestamp(30, 30));
+
+    // Cleanup again.
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(40, 40));
+    });
 }
 }  // namespace
 }  // namespace mongo

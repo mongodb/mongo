@@ -43,7 +43,8 @@ ShardVersion ShardVersion::parse(const BSONElement& element) {
     auto version = parsedVersion.getVersion();
     return ShardVersion(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
                                      {version.getSecs(), version.getInc()}),
-                        parsedVersion.getIndexVersion());
+                        parsedVersion.getIndexVersion(),
+                        parsedVersion.getPlacementConflictTime());
 }
 
 void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
@@ -51,9 +52,12 @@ void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
     version.setGeneration({placementVersion().epoch(), placementVersion().getTimestamp()});
     version.setPlacement(
         Timestamp(placementVersion().majorVersion(), placementVersion().minorVersion()));
+    version.setPlacementConflictTime(_placementConflictTime);
+
     CollectionIndexesBase indexVersion;
     indexVersion.setIndexVersion(_indexVersion);
     version.setIndex(indexVersion);
+
     builder->append(field, version.toBSON());
 }
 

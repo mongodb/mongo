@@ -29,6 +29,13 @@ function _getErrorWithCode(codeOrObj, message) {
 
         if (codeOrObj.hasOwnProperty("writeErrors")) {
             e.writeErrors = codeOrObj.writeErrors;
+        } else if ((codeOrObj instanceof BulkWriteResult || codeOrObj instanceof BulkWriteError) &&
+                   codeOrObj.hasWriteErrors()) {
+            e.writeErrors = codeOrObj.getWriteErrors();
+        }
+
+        if (codeOrObj instanceof WriteResult && codeOrObj.hasWriteError()) {
+            e.writeErrors = [codeOrObj.getWriteError()];
         }
 
         if (codeOrObj.hasOwnProperty("errorLabels")) {
@@ -319,6 +326,11 @@ if (typeof TestData == "undefined") {
     TestData = undefined;
 }
 
+function _optimizationsEnabled(flags) {
+    const sanitizeMatch = /(\s|^)-O2(\s|$)/.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
+    return Boolean(sanitizeMatch);
+}
+
 function __sanitizeMatch(flag) {
     var sanitizeMatch = /-fsanitize=([^\s]+) /.exec(getBuildInfo()["buildEnvironment"]["ccflags"]);
     if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
@@ -466,6 +478,8 @@ jsTestOptions = function() {
 
             evergreenTaskId: TestData.evergreenTaskId || null,
             configShard: TestData.configShard || false,
+
+            useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
         });
     }
     return _jsTestOptions;

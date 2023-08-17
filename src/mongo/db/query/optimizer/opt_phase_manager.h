@@ -109,7 +109,6 @@ public:
                     std::unique_ptr<CostEstimator> costEstimator,
                     PathToIntervalFn pathToInterval,
                     ConstFoldFn constFold,
-                    bool supportExplain,
                     DebugInfo debugInfo,
                     QueryHints queryHints = {});
 
@@ -190,11 +189,6 @@ private:
     static PhaseSet _allRewrites;
 
     const PhaseSet _phaseSet;
-
-    /**
-     * True if we should maintain extra internal state in support of explain.
-     */
-    const bool _supportExplain;
 
     const DebugInfo _debugInfo;
 

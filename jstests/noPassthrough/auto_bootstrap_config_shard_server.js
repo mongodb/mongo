@@ -30,7 +30,8 @@ let replSetName = assert.commandWorked(node0.adminCommand({replSetGetStatus: 1})
 let url = `${replSetName}/${node0.name}`;
 const mongos = MongoRunner.runMongos({configdb: url});
 
-// TODO SERVER-79108: Remove once autobootstrap calls this command internally.
+// TODO SERVER-80010: Remove once route role waits for autobootstrap to finish before accepting
+// connections.
 assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
 
 // Inserts into replicated collections should succeed.

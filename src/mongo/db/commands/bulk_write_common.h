@@ -67,5 +67,30 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
  */
 NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
 
+/**
+ * Helper for FLE support. Build a InsertCommandRequest from a BulkWriteCommandRequest.
+ */
+write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
+    const std::vector<mongo::BSONObj>& documents,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry);
+
+/**
+ * Helper for FLE support. Build a UpdateCommandRequest from a BulkWriteUpdateOp.
+ */
+write_ops::UpdateCommandRequest makeUpdateCommandRequestForFLE(
+    OperationContext* opCtx,
+    const BulkWriteUpdateOp* op,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry);
+
+/**
+ * Helper for FLE support. Build a DeleteCommandRequest from a BulkWriteDeleteOp.
+ */
+write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
+    OperationContext* opCtx,
+    const BulkWriteDeleteOp* op,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry);
 }  // namespace bulk_write_common
 }  // namespace mongo

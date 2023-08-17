@@ -110,8 +110,7 @@ public:
                std::unique_ptr<CommandInvocation> innerInvocation)
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
-          _dbName{_outerRequest->getDatabase().toString()},
-          _ns{CommandHelpers::parseNsFromCommand(_dbName, _outerRequest->body)},
+          _ns{CommandHelpers::parseNsFromCommand(_outerRequest->getDbName(), _outerRequest->body)},
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
@@ -149,7 +148,6 @@ private:
     }
 
     const OpMsgRequest* _outerRequest;
-    const std::string _dbName;
     NamespaceString _ns;
     ExplainOptions::Verbosity _verbosity;
     std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
@@ -210,7 +208,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
     }
 
     const std::string cmdName = explainedObj.firstElementFieldName();
-    auto explainedCommand = CommandHelpers::findCommand(cmdName);
+    auto explainedCommand = CommandHelpers::findCommand(opCtx, cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Explain failed due to unknown command: " << cmdName,
             explainedCommand);

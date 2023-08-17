@@ -12,21 +12,24 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-    runMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 import {createRstArgs} from "jstests/replsets/rslib.js";
 
-const tenantMigrationTest = new TenantMigrationTest({
-    name: jsTestName(),
-    sharedOptions: {setParameter: {tenantMigrationGarbageCollectionDelayMS: 1 * 1000}}
-});
+const tenantMigrationTest = new TenantMigrationTest(
+    {name: jsTestName(), sharedOptions: {nodes: 1}, quickGarbageCollection: true});
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+const kValidFromHostName = recipientPrimary.host;
+const kInvalidFromHostName = "dummy:27017";
+const kTenantId = ObjectId();
+const migrationId = UUID();
+const migrationOpts = {
+    migrationIdString: extractUUIDFromObject(migrationId),
+    recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    tenantIds: [kTenantId]
+};
 
 // Note: including this explicit early return here due to the fact that multiversion
 // suites will execute this test without featureFlagShardMerge enabled (despite the
@@ -38,68 +41,65 @@ if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     quit();
 }
 
-const kTenantId = ObjectId();
-
-function runVoteCmd(migrationId) {
+function runVoteCmd(migrationId, fromHostName) {
     // Pretend the primary tells itself it has imported files. This may preempt the primary's real
     // life message, but that's ok. We use a failpoint to prevent migration from progressing too
     // far.
     return recipientPrimary.adminCommand({
         recipientVoteImportedFiles: 1,
         migrationId: migrationId,
-        from: tenantMigrationTest.getRecipientPrimary().host,
-        success: true
+        from: fromHostName,
     });
 }
 
-function voteShouldFail(migrationId) {
-    const reply = runVoteCmd(migrationId);
-    jsTestLog(`Vote with migrationId ${migrationId}, reply` +
+function voteShouldFail(migrationId, fromHostName) {
+    const reply = runVoteCmd(migrationId, fromHostName);
+    jsTestLog(`Vote with migrationId ${migrationId} from ${fromHostName}, reply` +
               ` (should fail): ${tojson(reply)}`);
-    assert.commandFailed(reply);
+    assert.commandFailedWithCode(reply, ErrorCodes.NoSuchTenantMigration);
 }
 
-function voteShouldSucceed(migrationId) {
-    assert.commandWorked(runVoteCmd(migrationId));
+function voteShouldSucceed(migrationId, fromHostName) {
+    assert.commandWorked(runVoteCmd(migrationId, fromHostName));
 }
 
-const migrationId = UUID();
-const migrationOpts = {
-    migrationIdString: extractUUIDFromObject(migrationId),
-    recipientConnString: tenantMigrationTest.getRecipientConnString(),
-    tenantIds: tojson([kTenantId]),
-};
+jsTestLog("Test recipientVoteImportedFiles with no migration started");
+voteShouldFail(migrationId, kValidFromHostName);
 
-const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+const fpHangBeforeVoteImportedFiles =
+    configureFailPoint(recipientPrimary, "hangBeforeVoteImportedFiles");
 
-jsTestLog("Test that recipientVoteImportedFiles fails with no migration started");
-voteShouldFail(migrationId);
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+fpHangBeforeVoteImportedFiles.wait();
 
-jsTestLog("Start a migration and pause after cloning");
-const fpAfterStartingOplogApplierMigrationRecipientInstance = configureFailPoint(
-    recipientPrimary, "fpAfterStartingOplogApplierMigrationRecipientInstance", {action: "hang"});
-const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
-migrationThread.start();
+jsTestLog("Test recipientVoteImportedFiles with wrong migrationId during migration");
+voteShouldFail(UUID(), kValidFromHostName);
 
-jsTestLog("Wait for recipient to log 'Waiting for all nodes to call recipientVoteImportedFiles'");
-assert.soon(() => checkLog.checkContainsOnceJson(recipientPrimary, 7339751, {}));
+// Import quorum will be satisfied only after receiving votes from all voting data-bearing
+// nodes that are part of  current replica set config.
+jsTestLog("Test recipientVoteImportedFiles with voter not part of current config during migration");
+voteShouldSucceed(migrationId, kInvalidFromHostName);
+let currOpRes = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
+assert.eq(currOpRes.inprog.length, 1, currOpRes);
+assert.eq(currOpRes.inprog[0].importQuorumSatisfied, false, currOpRes);
 
-jsTestLog("Test that recipientVoteImportedFiles succeeds");
-voteShouldSucceed(migrationId);
+jsTestLog("Test recipientVoteImportedFiles with voter part of current config during migration");
+voteShouldSucceed(migrationId, kValidFromHostName);
+currOpRes = recipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"});
+assert.eq(currOpRes.inprog.length, 1, currOpRes);
+assert.eq(currOpRes.inprog[0].importQuorumSatisfied, true, currOpRes);
 
-jsTestLog("Test that recipientVoteImportedFiles fails with wrong migrationId");
-voteShouldFail(UUID());
+fpHangBeforeVoteImportedFiles.off();
 
-fpAfterStartingOplogApplierMigrationRecipientInstance.wait();
-fpAfterStartingOplogApplierMigrationRecipientInstance.off();
-
-TenantMigrationTest.assertCommitted(migrationThread.returnData());
-jsTestLog("Test that recipientVoteImportedFiles succeeds after migration commits");
 // Just a delayed message, the primary replies "ok".
-voteShouldSucceed(migrationId);
-assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-jsTestLog("Await garbage collection");
+jsTestLog("Test recipientVoteImportedFiles after import quorum satisfied");
+voteShouldSucceed(migrationId, kValidFromHostName);
+
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
+    migrationOpts, false /* retryOnRetryableErrors */, true /* forgetMigration */));
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId.str);
-jsTestLog("Test that recipientVoteImportedFiles fails after migration is forgotten");
-voteShouldFail(migrationId);
+
+jsTestLog("Test recipientVoteImportedFiles after migration forgotten");
+voteShouldFail(migrationId, kValidFromHostName);
+
 tenantMigrationTest.stop();

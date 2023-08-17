@@ -17,9 +17,9 @@
 #ifndef MC_FLE2_FIND_RANGE_PAYLOAD_PRIVATE_V2_H
 #define MC_FLE2_FIND_RANGE_PAYLOAD_PRIVATE_V2_H
 
-#include "mongocrypt.h"
-#include "mongocrypt-private.h"
 #include "mongocrypt-buffer-private.h"
+#include "mongocrypt-private.h"
+#include "mongocrypt.h"
 
 #include "mc-array-private.h"
 #include "mc-fle2-range-operator-private.h"
@@ -28,8 +28,8 @@
  * find query. It is encoded inside an FLE2FindRangePayloadV2.
  */
 typedef struct {
-   mc_array_t edgeFindTokenSetArray;           // g
-   int64_t maxContentionCounter;               // cm
+    mc_array_t edgeFindTokenSetArray; // g
+    int64_t maxContentionCounter;     // cm
 } mc_FLE2FindRangePayloadEdgesInfoV2_t;
 
 /**
@@ -48,18 +48,19 @@ typedef struct {
  * cm: <int64> // Queryable Encryption max counter
  */
 typedef struct {
-   struct {
-      mc_FLE2FindRangePayloadEdgesInfoV2_t value;
-      bool set;
-   } payload;
-   // payloadId Id of payload - must be paired with another payload.
-   int32_t payloadId;
-   // firstOperator represents the first query operator for which this payload
-   // was generated.
-   mc_FLE2RangeOperator_t firstOperator;
-   // secondOperator represents the second query operator for which this payload
-   // was generated. Only populated for two-sided ranges. It is 0 if unset.
-   mc_FLE2RangeOperator_t secondOperator;
+    struct {
+        mc_FLE2FindRangePayloadEdgesInfoV2_t value;
+        bool set;
+    } payload;
+
+    // payloadId Id of payload - must be paired with another payload.
+    int32_t payloadId;
+    // firstOperator represents the first query operator for which this payload
+    // was generated.
+    mc_FLE2RangeOperator_t firstOperator;
+    // secondOperator represents the second query operator for which this payload
+    // was generated. Only populated for two-sided ranges. It is 0 if unset.
+    mc_FLE2RangeOperator_t secondOperator;
 } mc_FLE2FindRangePayloadV2_t;
 
 /**
@@ -73,19 +74,15 @@ typedef struct {
  * mc_FLE2FindRangePayloadV2_cleanup.
  */
 typedef struct {
-   _mongocrypt_buffer_t edcDerivedToken;            // d
-   _mongocrypt_buffer_t escDerivedToken;            // s
-   _mongocrypt_buffer_t serverDerivedFromDataToken; // l
+    _mongocrypt_buffer_t edcDerivedToken;            // d
+    _mongocrypt_buffer_t escDerivedToken;            // s
+    _mongocrypt_buffer_t serverDerivedFromDataToken; // l
 } mc_EdgeFindTokenSetV2_t;
 
-void
-mc_FLE2FindRangePayloadV2_init (mc_FLE2FindRangePayloadV2_t *payload);
+void mc_FLE2FindRangePayloadV2_init(mc_FLE2FindRangePayloadV2_t *payload);
 
-bool
-mc_FLE2FindRangePayloadV2_serialize (const mc_FLE2FindRangePayloadV2_t *payload,
-                                   bson_t *out);
+bool mc_FLE2FindRangePayloadV2_serialize(const mc_FLE2FindRangePayloadV2_t *payload, bson_t *out);
 
-void
-mc_FLE2FindRangePayloadV2_cleanup (mc_FLE2FindRangePayloadV2_t *payload);
+void mc_FLE2FindRangePayloadV2_cleanup(mc_FLE2FindRangePayloadV2_t *payload);
 
 #endif /* MC_FLE2_FIND_RANGE_PAYLOAD_PRIVATE_V2_H */

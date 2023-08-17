@@ -26,21 +26,16 @@
 #define mongocrypt_mutex_t CRITICAL_SECTION
 #endif
 
-void
-_mongocrypt_mutex_init (mongocrypt_mutex_t *mutex);
+void _mongocrypt_mutex_init(mongocrypt_mutex_t *mutex);
 
-void
-_mongocrypt_mutex_cleanup (mongocrypt_mutex_t *mutex);
+void _mongocrypt_mutex_cleanup(mongocrypt_mutex_t *mutex);
 
-void
-_mongocrypt_mutex_lock (mongocrypt_mutex_t *mutex);
+void _mongocrypt_mutex_lock(mongocrypt_mutex_t *mutex);
 
-void
-_mongocrypt_mutex_unlock (mongocrypt_mutex_t *mutex);
+void _mongocrypt_mutex_unlock(mongocrypt_mutex_t *mutex);
 
-#define MONGOCRYPT_WITH_MUTEX(Mutex)                                       \
-   for (int only_once = (_mongocrypt_mutex_lock (&(Mutex)), 1); only_once; \
-        _mongocrypt_mutex_unlock (&(Mutex)))                               \
-      for (; only_once; only_once = 0)
+#define MONGOCRYPT_WITH_MUTEX(Mutex)                                                                                   \
+    for (int only_once = (_mongocrypt_mutex_lock(&(Mutex)), 1); only_once; _mongocrypt_mutex_unlock(&(Mutex)))         \
+        for (; only_once; only_once = 0)
 
 #endif /* MONGOCRYPT_MUTEX_PRIVATE_H */

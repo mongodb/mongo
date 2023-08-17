@@ -300,24 +300,15 @@ variables:
   teardown_group:
   - func: "umount shared scons directory"
 
-- &antithesis_config_build_and_push_template
-  name: antithesis_config_build_and_push_template
+- &antithesis_task_template
+  name: antithesis_task_template
   tags: ["antithesis"]
   depends_on:
-  - name: antithesis_base_image_build_and_push
+    name: archive_dist_test_debug
   commands:
-  - func: "antithesis config image build and push"
-    vars:
-      suite: suite_name
-
-- &antithesis_config_test_template
-  name: antithesis_config_test_template
-  tags: ["antithesis"]
-  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-  depends_on:
-  - name: antithesis_config_build_and_push_task
-  commands:
-  - func: "antithesis config image test"
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
     vars:
       suite: suite_name
 
@@ -920,6 +911,23 @@ functions:
   - *monitor_process_threads
   - *collect_system_resource_info
   - *collect_ulimit_info
+
+  "do setup for antithesis":
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_debugsymbols}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.${ext|tgz}
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/modify_debug_symbols.sh"
+  - command: git.get_project
+    params:
+      directory: src/buildscripts/antithesis/base_images/workload/src
 
   "do non-compile setup":
   - command: manifest.load
@@ -2469,34 +2477,13 @@ functions:
       content_type: text/plain
       display_name: multiversion_exclude_tags.yml from resmoke invocation
 
-  "antithesis config image build and push":
-  - *f_expansions_write
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_debugsymbols}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.${ext|tgz}
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/modify_debug_symbols.sh"
+  "antithesis image build and push":
   - *f_expansions_write
   - command: subprocess.exec
     params:
       binary: bash
       args:
-      - "./src/evergreen/antithesis_config_image_build_and_push.sh"
-
-  "antithesis config image test":
-  - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_config_image_test.sh"
+      - "./src/evergreen/antithesis_image_build_and_push.sh"
 
 # Pre task steps
 pre:
@@ -2687,6 +2674,7 @@ tasks:
       - "jstests/**"
       - "patch_files.txt"
       - "evergreen/**"
+      - "antithesis/**"
       - "src/**.idl"
       - "src/mongo/client/sdam/json_tests/sdam_tests/**"
       - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
@@ -4161,6 +4149,36 @@ tasks:
       num_files: 5
       num_tasks: 5
       jstestfuzz_vars: --diffTestingMode timeseries
+      npm_command: agg-fuzzer
+      suite: generational_fuzzer
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+## Standalone fuzzer for checking Bonsai optimizations correctness vs SBE stage-builders ##
+- <<: *jstestfuzz_template
+  name: aggregation_bonsai_m2_vs_sbe_stagebuilders_fuzzer_gen
+  tags: ["aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 5
+      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_sbe_stagebuilders
+      npm_command: agg-fuzzer
+      suite: generational_fuzzer
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+## Standalone fuzzer for checking Bonsai optimizations correctness vs Classic ##
+- <<: *jstestfuzz_template
+  name: aggregation_bonsai_m2_vs_classic_fuzzer_gen
+  tags: ["aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 5
+      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_classic
       npm_command: agg-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -6015,6 +6033,38 @@ tasks:
 
 - <<: *gen_task_template
   name: bulk_write_replica_sets_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_multi_stmt_txn_kill_stepdown_terminate_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_replica_sets_kill_stepdown_terminate_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_causally_consistent_jscore_passthrough_gen
   tags: ["bulk_write"]
   commands:
   - func: "generate resmoke tasks"
@@ -8533,31 +8583,6 @@ tasks:
       args:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
-- name: antithesis_base_image_build_and_push
-  tags: ["antithesis"]
-  depends_on:
-  - name: archive_dist_test_debug
-  commands:
-  - *f_expansions_write
-  - func: "git get project no modules"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "do setup"
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mongo_debugsymbols}
-      bucket: mciuploads
-      local_file: src/mongo-debugsymbols.${ext|tgz}
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_base_image_build_and_push.sh"
-
 - name: generate_buildid_to_debug_symbols_mapping
   tags: ["symbolizer"]
   stepback: false
@@ -8574,21 +8599,14 @@ tasks:
       args:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 
-- <<: *antithesis_config_build_and_push_template
-  name: antithesis_config_build_and_push_concurrency_sharded_with_stepdowns_and_balancer
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
   commands:
-  - func: "antithesis config image build and push"
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
     vars:
-      suite: concurrency_sharded_with_stepdowns_and_balancer
-
-- <<: *antithesis_config_test_template
-  name: antithesis_config_test_concurrency_sharded_with_stepdowns_and_balancer
-  depends_on:
-  - name: antithesis_config_build_and_push_concurrency_sharded_with_stepdowns_and_balancer
-  commands:
-  - func: "antithesis config image test"
-    vars:
-      suite: concurrency_sharded_with_stepdowns_and_balancer
+      suite: antithesis_concurrency_sharded_with_stepdowns_and_balancer
 
 - <<: *task_template
   name: query_golden_classic
@@ -8768,6 +8786,19 @@ task_groups:
   - fetch_and_run_libfuzzertests
 
 - <<: *compile_task_group_template
+  name: compile_test_serial_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_all
+
+- <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG
   tasks:
   - compile_dist_test
@@ -8784,6 +8815,17 @@ task_groups:
 # The *no_unittests_TG taskgroups are useful for static builds,
 # were the static binaries of the unittests can take up to
 # a terabyte of data.
+- <<: *compile_task_group_template
+  name: compile_test_serial_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_all_but_not_unittests
+
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_no_unittests_TG
   tasks:
@@ -8818,6 +8860,20 @@ task_groups:
   - archive_dbtest
   - compile_all_but_not_unittests
   - package
+
+- <<: *compile_task_group_template
+  name: compile_test_benchmark_serial_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_unittests
+  - run_unittests
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_upload_benchmarks
+  - compile_all
 
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_TG
@@ -8870,6 +8926,15 @@ task_groups:
 # groups so that if they do run on the same machine, they can avoid the
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
+  name: compile_test_parallel_core_stream_TG
+  tasks:
+  - compile_dist_test
+  - determine_patch_tests
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_all
+
+- <<: *compile_task_group_template
   name: compile_test_and_package_parallel_core_stream_TG
   tasks:
   - compile_dist_test
@@ -8880,19 +8945,19 @@ task_groups:
   - package
 
 - <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_unittest_stream_TG
+  name: compile_test_parallel_unittest_stream_TG
   tasks:
   - compile_unittests
   - run_unittests
 
 #- <<: *compile_task_group_template
-#  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+#  name: compile_test_parallel_unittest_stream_with_recording_TG
 #  tasks:
 #    - compile_unittests_for_recorded_unittest
 #    - run_unittests_with_recording
 
 - <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_dbtest_stream_TG
+  name: compile_test_parallel_dbtest_stream_TG
   tasks:
   - compile_dbtest
   - run_dbtest
@@ -9055,20 +9120,3 @@ task_groups:
   - "crypt_create_debug_lib"
   - "crypt_install_tests"
   - "crypt_run_tests"
-
-- name: antithesis_TG
-  max_hosts: 1
-  share_processes: true
-  setup_group:
-  - func: "f_expansions_write"
-  - func: "git get project no modules"
-  - func: "f_expansions_write"
-  - func: "kill processes"
-  - func: "cleanup environment"
-  - func: "set up venv"
-  - func: "do setup"
-  setup_task:
-  - func: "set task expansion macros"
-  - func: "f_expansions_write"
-  tasks:
-    - .antithesis

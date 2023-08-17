@@ -380,6 +380,10 @@ PlanState WindowStage::getNext() {
     // Free documents from cache if not needed.
     size_t requiredIdLow = _currId;
     for (size_t windowIndex = 0; windowIndex < _windows.size(); windowIndex++) {
+        // We can't free past what hasn't been added to idRange.
+        // Additionally, if lower bound is not unbounded, we can't free anything that has been added
+        // to the range, since its needed to be removed later.
+        requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].second + 1);
         if (_windows[windowIndex].lowBoundExpr) {
             requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].first);
         }

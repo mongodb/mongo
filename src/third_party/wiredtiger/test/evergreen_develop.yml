@@ -65,7 +65,7 @@ buildvariants:
   name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
   run_on:
-    - ubuntu2004-medium
+    - ubuntu2004-perf-testing
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTests
@@ -89,7 +89,7 @@ buildvariants:
   name: ubuntu2004-perf-tests-arm64
   display_name: Ubuntu 20.04 Performance tests (ARM64)
   run_on:
-    - ubuntu2004-arm64-large
+    - ubuntu2004-arm64-perf-testing
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTestsARM64

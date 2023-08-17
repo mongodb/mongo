@@ -776,6 +776,7 @@ public:
 
     void visit(const InMatchExpression* expr) final {
         encodeSingleParamPathNode(expr);
+
         // Encode the number of unique $in values as part of the plan cache key. If the query is
         // optimized by exploding for sort, the number of unique elements in $in determines how many
         // merge branches we get in the query plan.
@@ -1023,7 +1024,11 @@ private:
      * parameter marker.
      */
     void encodeRhs(const PathMatchExpression* expr) {
-        encodeHelper(expr->getSerializedRightHandSide());
+        // Call getSerializedRightHandSide() with 'inMatchExprSortAndDedupElements' set to false.
+        SerializationOptions opts;
+        opts.inMatchExprSortAndDedupElements = false;
+
+        encodeHelper(expr->getSerializedRightHandSide(std::move(opts)));
     }
 
     /**

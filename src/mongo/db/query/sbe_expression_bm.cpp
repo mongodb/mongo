@@ -59,9 +59,9 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -135,6 +135,8 @@ public:
             &_slotIdGenerator,
             &_frameIdGenerator,
             &_spoolIdGenerator,
+            &_inListsSet,
+            &_collatorsMap,
             false /* needsMerge */,
             false /* allowDiskUse */
         };
@@ -193,6 +195,8 @@ private:
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
+    stage_builder::StageBuilderState::InListsSet _inListsSet;
+    stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
 
     sbe::value::SlotId _inputSlotId;
     std::unique_ptr<TimeZoneDatabase> _timeZoneDB;

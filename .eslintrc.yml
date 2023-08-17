@@ -17,6 +17,14 @@ rules:
   no-redeclare: 0
   no-constant-condition: 0
   no-loss-of-precision: 0
+  no-restricted-syntax: [
+    'error',
+    {
+      message: "Invalid load call. Please convert your library to a module and import it instead.",
+      selector:
+        'CallExpression > Identifier[name="load"]'
+    }
+  ]
 
 globals:
   TestData: true
@@ -94,6 +102,10 @@ globals:
   isString: true
   _createSecurityToken: true
   _isAddressSanitizerActive: true
+  _isLeakSanitizerActive: true
+  _isThreadSanitizerActive: true
+  _isUndefinedBehaviorSanitizerActive: true
+  _optimizationsEnabled: true
   allocatePort: true
   allocatePorts: true
   resetAllocatedPorts: true

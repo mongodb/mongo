@@ -7,8 +7,11 @@ set -o errexit
 set -o verbose
 
 activate_venv
-if [ "${has_packages}" = "true" ]; then
-  cd buildscripts
-  $python ${packager_script} --prefix $(pwd)/.. --distros ${packager_distro} --tarball $(pwd)/../mongodb-dist.tgz -s ${version} -m HEAD -a ${packager_arch}
-  cd ..
+if [ "${has_packages}" != "true" ]; then
+  echo "Error: packager run when has_packages is not set to true, please remove the package task from this variant (or variant task group) or set has_packages to true if this variant is intended to run the packager."
+  exit 1
 fi
+
+cd buildscripts
+$python ${packager_script} --prefix $(pwd)/.. --distros ${packager_distro} --tarball $(pwd)/../mongodb-dist.tgz -s ${version} -m HEAD -a ${packager_arch}
+cd ..

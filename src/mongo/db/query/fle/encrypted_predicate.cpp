@@ -65,12 +65,9 @@ void logTagsExceeded(const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex)
 }
 
 std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray) {
-    auto tagElems = std::vector<BSONElement>();
-    tagArray.elems(tagElems);
-
     auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
-    inExpr->setBackingBSON(std::move(tagArray));
-    uassertStatusOK(inExpr->setEqualities(std::move(tagElems)));
+
+    uassertStatusOK(inExpr->setEqualitiesArray(std::move(tagArray)));
 
     // __safeContent__ is always an array, so wrap the $in expr in an $elemMatch.
     // most of the time, wrapping the predicate in $elemMatch doesn't have an effect (see the Single

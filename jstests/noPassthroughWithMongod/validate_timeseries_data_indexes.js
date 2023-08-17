@@ -4,6 +4,14 @@
  * @tags: [requires_fcv_62]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
+// TODO SERVER-77347 Enable once we can perform updates on compressed buckets.
+if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+    jsTestLog("Skipping tests until updates to compressed buckets are enabled.");
+    quit();
+}
+
 const collPrefix = "validate_timeseries_data_indexes";
 const bucketPrefix = "system.buckets.validate_timeseries_data_indexes";
 let collName = collPrefix;

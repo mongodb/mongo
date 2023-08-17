@@ -204,7 +204,8 @@ var getCompletions = function(prefix) {
     return __autocomplete__;
 };
 
-var myNumberLong = new NumberLong();
+// assign `myNumberLong` to `globalThis` in case we are being run from another shell context.
+globalThis.myNumberLong = new NumberLong();
 var completions = getCompletions('myNumberLong.');
 assert(completions.indexOf('myNumberLong.floatApprox') >= 0);
 assert(completions.indexOf('myNumberLong.top') >= 0);

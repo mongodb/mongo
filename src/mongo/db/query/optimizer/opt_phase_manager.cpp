@@ -69,11 +69,9 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  std::unique_ptr<CostEstimator> costEstimator,
                                  PathToIntervalFn pathToInterval,
                                  ConstFoldFn constFold,
-                                 const bool supportExplain,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints)
     : _phaseSet(std::move(phaseSet)),
-      _supportExplain(supportExplain),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
       _metadata(std::move(metadata)),
@@ -323,7 +321,7 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
     auto planExtractionResult = runMemoRewritePhases(includeRejected, env, input);
     // At this point "input" has been siphoned out.
 
-    if (_supportExplain && !planExtractionResult.empty()) {
+    if (!planExtractionResult.empty()) {
         // Retain first post-memo plan for explain purposes.
         _postMemoPlan = planExtractionResult.front();
     }

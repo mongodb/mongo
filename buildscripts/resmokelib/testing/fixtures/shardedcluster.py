@@ -350,7 +350,6 @@ class ShardedClusterFixture(interface.Fixture):
             del mongod_options["shardsvr"]
             mongod_options["configsvr"] = ""
             replset_config_options["configsvr"] = True
-            mongod_options["set_parameters"]["featureFlagTransitionToCatalogShard"] = "true"
             mongod_options["storageEngine"] = "wiredTiger"
 
             configsvr_options = self.configsvr_options.copy()
@@ -424,14 +423,17 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
 
     REGISTERED_NAME = "ExternalShardedClusterFixture"
 
-    def __init__(self, logger, job_num, fixturelib, shell_conn_string, original_suite_name):
+    def __init__(self, logger, job_num, fixturelib, original_suite_name):
         """Initialize ExternalShardedClusterFixture."""
-        external.ExternalFixture.__init__(self, logger, job_num, fixturelib, shell_conn_string)
-        ShardedClusterFixture.__init__(self, logger, job_num, fixturelib, mongod_options={})
         self.dummy_fixture = _builder.make_dummy_fixture(original_suite_name)
+        self.shell_conn_string = "mongodb://" + ",".join(
+            [f"mongos{i}:27017" for i in range(self.dummy_fixture.num_mongos)])
+
+        external.ExternalFixture.__init__(self, logger, job_num, fixturelib, self.shell_conn_string)
+        ShardedClusterFixture.__init__(self, logger, job_num, fixturelib, mongod_options={})
 
     def setup(self):
-        """Use ExternalFixture method."""
+        """Execute some setup before offically starting testing against this external cluster."""
         client = pymongo.MongoClient(self.get_driver_connection_url())
         for i in range(50):
             if i == 49:
@@ -446,8 +448,6 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
                 continue
             if len(payload["shards"]) > self.dummy_fixture.num_shards:
                 raise RuntimeError('More shards in cluster than expected.')
-
-        return external.ExternalFixture.setup(self)
 
     def pids(self):
         """Use ExternalFixture method."""

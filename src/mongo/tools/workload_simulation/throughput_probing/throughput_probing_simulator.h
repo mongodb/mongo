@@ -46,8 +46,7 @@ namespace mongo::workload_simulation {
  */
 class ThroughputProbing : public Simulation {
 public:
-    ThroughputProbing(
-        StringData workloadName, int32_t min, int32_t initial, int32_t max, Milliseconds interval);
+    ThroughputProbing(StringData workloadName);
 
     void setup() override;
     void teardown() override;
@@ -81,11 +80,6 @@ public:
     void run(Seconds runTime);
 
 private:
-    int32_t _minTickets;
-    int32_t _initialTickets;
-    int32_t _maxTickets;
-    Milliseconds _probingInterval;
-
     std::unique_ptr<TicketHolder> _readTicketHolder;
     std::unique_ptr<TicketHolder> _writeTicketHolder;
 

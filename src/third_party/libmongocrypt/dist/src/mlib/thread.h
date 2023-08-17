@@ -16,9 +16,9 @@
  */
 typedef struct mlib_once_flag {
 #ifdef _WIN32
-   INIT_ONCE _native;
+    INIT_ONCE _native;
 #else
-   pthread_once_t _native;
+    pthread_once_t _native;
 #endif
 } mlib_once_flag;
 
@@ -28,34 +28,28 @@ typedef struct mlib_once_flag {
  * "reset" a flag.
  */
 #ifdef _WIN32
-#define MLIB_ONCE_INITIALIZER          \
-   {                                   \
-      ._native = INIT_ONCE_STATIC_INIT \
-   }
+#define MLIB_ONCE_INITIALIZER                                                                                          \
+    { ._native = INIT_ONCE_STATIC_INIT }
 #else
-#define MLIB_ONCE_INITIALIZER      \
-   {                               \
-      ._native = PTHREAD_ONCE_INIT \
-   }
+#define MLIB_ONCE_INITIALIZER                                                                                          \
+    { ._native = PTHREAD_ONCE_INIT }
 #endif
 
 /**
  * @brief The type of an mlib_call_once callback function.
  */
-typedef void (*mlib_init_once_fn_t) (void);
+typedef void (*mlib_init_once_fn_t)(void);
 
 #if _WIN32
 /**
  * An indirection layer for mlib_once on Windows platforms. Do not use directly.
  */
-static inline BOOL WINAPI
-_mlib_win32_once_callthru (PINIT_ONCE once, PVOID param, PVOID *ctx)
-{
-   (void) once;
-   (void) ctx;
-   mlib_init_once_fn_t *fn = param;
-   (*fn) ();
-   return TRUE;
+static inline BOOL WINAPI _mlib_win32_once_callthru(PINIT_ONCE once, PVOID param, PVOID *ctx) {
+    (void)once;
+    (void)ctx;
+    mlib_init_once_fn_t *fn = param;
+    (*fn)();
+    return TRUE;
 }
 #endif
 
@@ -73,15 +67,12 @@ _mlib_win32_once_callthru (PINIT_ONCE once, PVOID param, PVOID *ctx)
  * @param fn A callback to execute if the flag is not in the "finished" state
  * @return true on success, false otherwise
  */
-static inline bool
-mlib_call_once (mlib_once_flag *flag, mlib_init_once_fn_t fn)
-{
+static inline bool mlib_call_once(mlib_once_flag *flag, mlib_init_once_fn_t fn) {
 #ifdef _WIN32
-   bool okay = InitOnceExecuteOnce (
-      &flag->_native, &_mlib_win32_once_callthru, &fn, NULL);
-   return okay;
+    bool okay = InitOnceExecuteOnce(&flag->_native, &_mlib_win32_once_callthru, &fn, NULL);
+    return okay;
 #else
-   return pthread_once (&flag->_native, fn) == 0;
+    return pthread_once(&flag->_native, fn) == 0;
 #endif
 }
 

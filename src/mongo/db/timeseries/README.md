@@ -27,13 +27,13 @@ certain properties:
 
 ## Bucket Collection Schema
 
+Uncompressed bucket (version 1):
 ```
 {
     _id: <Object ID with time component equal to control.min.<time field>>,
     control: {
-        // <Some statistics on the measurements such min/max values of data fields>
-        version: 1,  // Version of bucket schema. Currently fixed at 1 since this is the
-                     // first iteration of time-series collections.
+        // <Some statistics on the measurements such as min/max values of data fields>
+        version: 1,  // Version of bucket schema, version 1 indicates the bucket is uncompressed.
         min: {
             <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
             <field0>: <minimum value of 'field0' across all measurements>,
@@ -67,6 +67,40 @@ certain properties:
             '1', <value of 'field1' in second measurement>,
             ...
         },
+        ...
+    }
+}
+```
+
+Compressed bucket (version 2):
+```
+{
+    _id: <Object ID with time component equal to control.min.<time field>>,
+    control: {
+        // <Some statistics on the measurements such as min/max values of data fields>
+        version: 2,  // Version of bucket schema, version 2 indicates the bucket is compressed.
+        min: {
+            <time field>: <time of first measurement in this bucket, rounded down based on granularity>,
+            <field0>: <minimum value of 'field0' across all measurements>,
+            <field1>: <maximum value of 'field1' across all measurements>,
+            ...
+        },
+        max: {
+            <time field>: <time of last measurement in this bucket>,
+            <field0>: <maximum value of 'field0' across all measurements>,
+            <field1>: <maximum value of 'field1' across all measurements>,
+            ...
+        },
+        closed: <bool>, // Optional, signals the database that this document will not receive any
+                        // additional measurements.
+        count: <int>    // The number of measurements contained in this bucket. Only present in 
+                        // compressed buckets.
+    },
+    meta: <meta-data field (if specified at creation) value common to all measurements in this bucket>,
+    data: {
+        <time field>: BinData(7, ...), // BinDataType 7 represents BSONColumn.
+        <field0>:     BinData(7, ...),
+        <field1>:     BinData(7, ...),
         ...
     }
 }
@@ -193,9 +227,9 @@ Finally, the `BucketCatalog` will archive a bucket if a new measurement's timest
 the minimum timestamp for the current open bucket for it's time series.
 
 When a bucket is closed during insertion, the `BucketCatalog` will either open a new bucket or
-reopen an old one in order to accomodate the new measurement.
+reopen an old one in order to accommodate the new measurement.
 
-# Bucketing Parameters
+## Bucketing Parameters
 
 The maximum span of time that a single bucket is allowed to cover is controlled by
 `bucketMaxSpanSeconds`.
@@ -225,28 +259,56 @@ A `collMod` operation can change these settings as long as the net effect is tha
 valid ranges. Notably, one can convert from fixed range bucketing to one of the `granularity`
 presets or vice versa, as long as the associated seconds parameters do not decrease as a result.
 
-# Updates and Deletes
+## Updates and Deletes
 
-Time-series collections support deletes which satisfy the following restrictions:
-* Query on only the `metaField`
-* `multi: true`
+Time-series collections support arbitrary updates and deletes with the same user facing behaviors as
+regular collections.
 
-and updates which satisfy these same conditions, plus the following:
-* Update only the `metaField`
-* Update specified as an update document (versus a replacement document or update pipeline)
-* `upsert: false`
+### Deletes
 
-These updates and deletes are performed by translating the operation into a corresponding update or
-delete on the underlying buckets collection. In particular, for both the query and update document,
-we replace any references to the collection's `metaField` with literal `"meta"` (see
-[Bucket Collection Schema](#bucket-collection-schema)).
+Time-series user deletes are done one bucket document at a time. The bucket document will be
+unpacked, with each of its measurements checked against the user delete query predicate. If there
+are any measurements not needed to be deleted, they will be repacked back to the original bucket
+document with the same `_id` as an update operation. If all measurements match the query predicate,
+the whole bucket document will be deleted.
 
-For example, for a time-series collection `db.ts` created with `metaField: "tag"`, consider an
-update on this collection with query `{"tag.tag.a": "a"}` and update document
-`{$set: {"tag.tag.a": "A"}, $rename: {"tag.tag.b": "tag.tag.c"}}`. This gets translated into an
-update on `db.system.buckets.ts` with query `{"meta.tag.a": "a"}` and update document
-`{$set: {"meta.tag.a": "A"}, $rename: {"meta.tag.b": "meta.tag.c"}}`. We can then execute this
-translated update as a regular update operation. The same process applies for deletes.
+If the delete query predicate applies to the whole bucket document, the delete will skip unpacking
+the bucket documents and directly run against the bucket documents.
+
+### Updates
+
+Similar to deletes, time-series user updates are done one bucket document at a time. The unmatched
+measurements not needed to be updated will be repacked back to the original bucket document with the
+same `_id` as an update operation. If any measurement matches the query predicate, the user-provided
+update operation will be applied to the matched measurements, and the updated measurements will be
+inserted into new bucket documents. If all measurements match the query predicate, the whole bucket
+document will be deleted.
+
+To avoid the [Halloween Problem](https://en.wikipedia.org/wiki/Halloween_Problem) for `{multi: true}`
+updates, a [Spool Stage](https://github.com/mongodb/mongo/blob/cd7f99721a32a14bc76d20e207ebefd26134ff40/src/mongo/db/exec/spool.h)
+is used to record all record ids of the bucket documents returned from the scan stage. This, along
+with inserting updated measurements to new buckets, helps avoid seeing measurements already updated
+by the current update command. If the query is non-selective and there are too many matching bucket
+documents, the spool stage will spill record ids of matching bucket documents when it hits the
+maximum memory usage limit.
+
+Since time-series updates will perform at least two writes to storage (a modification to the
+original bucket document and inserts of new bucket documents), the oplog entries are grouped
+together as an `applyOps` command to ensure atomicity of the operation.
+
+Time-series upserts share the same process as updates. An `_id` will be generated for the upserted
+measurement.
+
+### Transaction Support
+
+Time-series singleton updates and deletes are supported in multi-document transactions. They are
+used internally for singleton update/delete without shard key, shard key update, and retryable
+time-series update/delete.
+
+### Retryable Writes
+
+Time-series deletes support retryable writes with the existing mechanisms. For time-series updates,
+they are run through the Internal Transaction API to make sure the two writes to storage are atomic.
 
 # References
 See:

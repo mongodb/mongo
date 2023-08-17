@@ -178,11 +178,11 @@ __compact_handle_append(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_session_compact_check_timeout --
+ * __session_compact_check_timeout --
  *     Check if the timeout has been exceeded.
  */
-int
-__wt_session_compact_check_timeout(WT_SESSION_IMPL *session)
+static int
+__session_compact_check_timeout(WT_SESSION_IMPL *session)
 {
     struct timespec end;
     WT_DECL_RET;
@@ -206,6 +206,42 @@ __wt_session_compact_check_timeout(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_session_compact_check_interrupted --
+ *     Check if compaction has been interrupted.
+ */
+int
+__wt_session_compact_check_interrupted(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    conn = S2C(session);
+
+    /* Compaction can be interrupted through the event handler. */
+    if (session->event_handler->handle_general != NULL) {
+        ret = session->event_handler->handle_general(
+          session->event_handler, &conn->iface, &session->iface, WT_EVENT_COMPACT_CHECK, NULL);
+        /* If the user's handler returned non-zero we return WT_ERROR to the caller. */
+        if (ret != 0)
+            WT_RET_MSG(session, WT_ERROR, "compact interrupted by application");
+    }
+
+    /* Compaction can be interrupted if the timeout has exceeded. */
+    WT_RET(__session_compact_check_timeout(session));
+
+    /* Background compaction may have been disabled in the meantime. */
+    if (session == conn->background_compact.session) {
+        __wt_spin_lock(session, &conn->background_compact.lock);
+        if (!conn->background_compact.running)
+            ret = WT_ERROR;
+        __wt_spin_unlock(session, &conn->background_compact.lock);
+        if (ret != 0)
+            WT_RET_MSG(session, ret, "background compact interrupted by application");
+    }
+
+    return (0);
+}
+
+/*
  * __compact_checkpoint --
  *     This function does wait and force checkpoint.
  */
@@ -219,8 +255,8 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
     const char *checkpoint_cfg[] = {
       WT_CONFIG_BASE(session, WT_SESSION_checkpoint), "force=1", NULL};
 
-    /* Checkpoints take a lot of time, check if we've run out. */
-    WT_RET(__wt_session_compact_check_timeout(session));
+    /* Checkpoints may take a lot of time, check if compaction has been interrupted. */
+    WT_RET(__wt_session_compact_check_interrupted(session));
     return (__wt_txn_checkpoint(session, checkpoint_cfg, true));
 }
 
@@ -271,9 +307,11 @@ __compact_worker(WT_SESSION_IMPL *session)
              * work, skip this file in the future.
              */
             if (ret == 0) {
-                if (session->compact_state == WT_COMPACT_SUCCESS)
+                if (session->compact_state == WT_COMPACT_SUCCESS) {
+                    if (session == S2C(session)->background_compact.session)
+                        WT_STAT_CONN_INCR(session, background_compact_success);
                     another_pass = true;
-                else
+                } else
                     session->op_handle[i]->compact_skip = true;
                 continue;
             }

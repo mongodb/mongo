@@ -704,12 +704,12 @@ enum class Builtin : uint8_t {
     // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
     aggConcatArraysCapped,
 
-    // Agg functions to compute the set union of two arrays, failing when the accumulator reaches a
-    // specified size.
+    // Agg functions to compute the set union of two arrays (no size cap).
+    aggSetUnion,
+    aggCollSetUnion,
+    // Agg functions to compute the set union of two arrays (with a size cap).
     aggSetUnionCapped,
     aggCollSetUnionCapped,
-    // Agg function for a simple set union (with no size cap or collation).
-    aggSetUnion,
 
     acos,
     acosh,
@@ -728,7 +728,6 @@ enum class Builtin : uint8_t {
     tanh,
     round,
     isMember,
-    collIsMember,
     indexOfBytes,
     indexOfCP,
     isDayOfWeek,
@@ -820,6 +819,13 @@ enum class Builtin : uint8_t {
     aggDerivativeAdd,
     aggDerivativeRemove,
     aggDerivativeFinalize,
+    aggCovarianceAdd,
+    aggCovarianceRemove,
+    aggCovarianceSampFinalize,
+    aggCovariancePopFinalize,
+    aggRemovablePushAdd,
+    aggRemovablePushRemove,
+    aggRemovablePushFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -1016,7 +1022,9 @@ enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSize
  * Element at `kQueueSize` stores the size of the queue
  * The empty values in the array are filled with Null
  */
-enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize };
+enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize, kSizeOfArray };
+
+enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1337,17 +1345,6 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> genericRoundTrunc(
         std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity);
     std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
-    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
-                                                             value::Value lhsVal,
-                                                             value::TypeTags rhsTag,
-                                                             value::Value rhsVal,
-                                                             CollatorInterface* collator = nullptr);
-    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
-                                                             value::Value lhsVal,
-                                                             value::TypeTags rhsTag,
-                                                             value::Value rhsVal,
-                                                             value::TypeTags collTag,
-                                                             value::Value collVal);
 
     std::pair<value::TypeTags, value::Value> compare3way(
         value::TypeTags lhsTag,
@@ -1740,6 +1737,7 @@ private:
                                                                bool trimRight);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(
@@ -1748,7 +1746,6 @@ private:
         int32_t sizeCap,
         CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsDayOfWeek(ArityType arity);
@@ -1856,7 +1853,18 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeFinalize(ArityType arity);
-
+    FastTuple<bool, value::TypeTags, value::Value> aggRemovableAvgFinalizeImpl(
+        value::Array* sumState, int64_t count);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceFinalize(ArityType arity,
+                                                                                bool isSamp);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovarianceSampFinalize(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCovariancePopFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

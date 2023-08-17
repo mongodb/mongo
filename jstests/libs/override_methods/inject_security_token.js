@@ -130,12 +130,18 @@ function runCommandWithResponseCheck(
 
     prepareSecurityToken(conn);
 
+    let expectPrefix = false;
+    if (TestData.expectPrefix) {
+        expectPrefix = TestData.expectPrefix;
+        cmdObj = Object.assign(cmdObj, {"expectPrefix": TestData.expectPrefix});
+    }
+
     // Actually run the provided command.
     let res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
     const prefix = kTenantId + "_";
     const prefixedDbName = prefix + dbName;
 
-    assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res));
+    assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res), expectPrefix);
     removeTenantPrefixFromResponse(res, prefix);
     return res;
 }

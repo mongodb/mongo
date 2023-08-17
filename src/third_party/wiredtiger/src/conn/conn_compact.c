@@ -46,20 +46,25 @@ __compact_server(void *arg)
     exact = 0;
     full_iteration = running = signalled = false;
 
-    WT_STAT_CONN_SET(session, session_background_compact_running, 0);
+    WT_STAT_CONN_SET(session, background_compact_running, 0);
 
     for (;;) {
 
         /* When the entire metadata file has been parsed, take a break or wait until signalled. */
         if (full_iteration || !running) {
 
-            full_iteration = false;
             /*
-             * FIXME-WT-11409: Depending on the previous state, we may not want to clear out the
-             * last key used. This could be useful if the server was paused to be resumed later.
+             * In order to always try to parse all the candidates present in the metadata file even
+             * though the compaction server may be stopped at random times, only set the URI to the
+             * prefix for the very first iteration and when all the candidates in the metadata file
+             * have been parsed.
              */
-            __wt_free(session, uri);
-            WT_ERR(__wt_strndup(session, prefix, strlen(prefix), &uri));
+            if (uri == NULL || full_iteration) {
+                full_iteration = false;
+                __wt_free(session, uri);
+                WT_ERR(__wt_strndup(session, prefix, strlen(prefix), &uri));
+            }
+
             /* Check every 10 seconds in case the signal was missed. */
             __wt_cond_wait(
               session, conn->background_compact.cond, 10 * WT_MILLION, __compact_server_run_chk);
@@ -73,7 +78,7 @@ __compact_server(void *arg)
         running = conn->background_compact.running;
         if (conn->background_compact.signalled) {
             conn->background_compact.signalled = false;
-            WT_STAT_CONN_SET(session, session_background_compact_running, running);
+            WT_STAT_CONN_SET(session, background_compact_running, running);
         }
         __wt_spin_unlock(session, &conn->background_compact.lock);
 
@@ -141,15 +146,37 @@ __compact_server(void *arg)
         /*
          * Compact may return:
          * - EBUSY or WT_ROLLBACK for various reasons.
-         * - ETIMEDOUT if the configured timer has elapsed.
          * - ENOENT if the underlying file does not exist.
+         * - ETIMEDOUT if the configured timer has elapsed.
+         * - WT_ERROR if the background compaction has been interrupted.
          */
-        if (ret == EBUSY || ret == ENOENT || ret == ETIMEDOUT || ret == WT_ROLLBACK)
+        if (ret == EBUSY || ret == ENOENT || ret == ETIMEDOUT || ret == WT_ROLLBACK) {
+            WT_STAT_CONN_INCR(session, background_compact_fail);
+
+            if (ret == EBUSY && __wt_cache_stuck(session))
+                WT_STAT_CONN_INCR(session, background_compact_fail_cache_pressure);
+
+            if (ret == ETIMEDOUT)
+                WT_STAT_CONN_INCR(session, background_compact_timeout);
+
             ret = 0;
+        }
+
+        /* In the case of WT_ERROR, make sure the server is not supposed to be running. */
+        if (ret == WT_ERROR) {
+            __wt_spin_lock(session, &conn->background_compact.lock);
+            running = conn->background_compact.running;
+            __wt_spin_unlock(session, &conn->background_compact.lock);
+            if (!running) {
+                WT_STAT_CONN_INCR(session, background_compact_interrupted);
+                ret = 0;
+            }
+        }
+
         WT_ERR(ret);
     }
 
-    WT_STAT_CONN_SET(session, session_background_compact_running, 0);
+    WT_STAT_CONN_SET(session, background_compact_running, 0);
 
     WT_ERR(__wt_metadata_cursor_close(session));
     __wt_free(session, config);

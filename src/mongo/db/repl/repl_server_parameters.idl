@@ -513,6 +513,17 @@ server_parameters:
         validator:
             gte: 1
 
+    importQuorumTimeoutSeconds:
+        description: >-
+            Period of time, in seconds, shard merge recipient primary will wait for import quorum to get satisfied.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: importQuorumTimeoutSeconds
+        default:
+            expr: 24 * 60 * 60   # 24 hours
+        validator:
+            gte: 1
+
     maxShardSplitDonorServiceThreadPoolSize:
         description: >-
             The maximum number of threads in the shard split donor service's thread pool.

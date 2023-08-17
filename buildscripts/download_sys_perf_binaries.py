@@ -1,17 +1,20 @@
-import requests
+#!/usr/bin/env python3
+"""Download the binaries from a previous sys-perf run."""
+
 import argparse
+import requests
 
 BASE_URI = 'https://evergreen.mongodb.com/rest/v2/'
 
 
-def get_auth_headers(evergreen_api_user, evergreen_api_key):
+def _get_auth_headers(evergreen_api_user, evergreen_api_key):
     return {
         'Api-User': evergreen_api_user,
         'Api-Key': evergreen_api_key,
     }
 
 
-def get_build_id(build_variant_name, version_id, auth_headers):
+def _get_build_id(build_variant_name, version_id, auth_headers):
     url = BASE_URI + 'versions/' + version_id
     response = requests.get(url, headers=auth_headers)
     if response.status_code != 200:
@@ -29,7 +32,7 @@ def get_build_id(build_variant_name, version_id, auth_headers):
 
 # All of our sys-perf compile variants have exactly one task,
 # so we can safely select the first one from the build variants tasks.
-def get_task_id(build_id, auth_headers):
+def _get_task_id(build_id, auth_headers):
     url = BASE_URI + 'builds/' + build_id
     response = requests.get(url, headers=auth_headers)
     if response.status_code != 200:
@@ -43,7 +46,7 @@ def get_task_id(build_id, auth_headers):
 
 
 # The API used here always grabs the latest execution
-def get_binary_details(task_id, auth_headers):
+def _get_binary_details(task_id, auth_headers):
     url = BASE_URI + 'tasks/' + task_id
     response = requests.get(url, headers=auth_headers)
     if response.status_code != 200:
@@ -60,15 +63,15 @@ def get_binary_details(task_id, auth_headers):
     raise RuntimeError('Unexpected list of artifacts:' + artifacts)
 
 
-def get_binary_url(version_id, build_variant, evergreen_api_user, evergreen_api_key):
-    auth_headers = get_auth_headers(evergreen_api_user, evergreen_api_key)
-    build_id = get_build_id(build_variant, version_id, auth_headers)
-    task_id = get_task_id(build_id, auth_headers)
-    binary_json = get_binary_details(task_id, auth_headers)
+def _get_binary_url(version_id, build_variant, evergreen_api_user, evergreen_api_key):
+    auth_headers = _get_auth_headers(evergreen_api_user, evergreen_api_key)
+    build_id = _get_build_id(build_variant, version_id, auth_headers)
+    task_id = _get_task_id(build_id, auth_headers)
+    binary_json = _get_binary_details(task_id, auth_headers)
     return binary_json['url']
 
 
-def download_binary_file(url, save_path):
+def _download_binary_file(url, save_path):
     response = requests.get(url, stream=True)
     if response.status_code == 200:
         with open(save_path, 'wb') as file:
@@ -78,9 +81,9 @@ def download_binary_file(url, save_path):
         raise RuntimeError('Failed to download the file ' + url)
 
 
-def download_sys_perf_binaries(version_id, build_variant, evergreen_api_user, evergreen_api_key):
-    url = get_binary_url(version_id, build_variant, evergreen_api_user, evergreen_api_key)
-    download_binary_file(url, 'binary.tar.gz')
+def _download_sys_perf_binaries(version_id, build_variant, evergreen_api_user, evergreen_api_key):
+    url = _get_binary_url(version_id, build_variant, evergreen_api_user, evergreen_api_key)
+    _download_binary_file(url, 'binary.tar.gz')
 
 
 if __name__ == '__main__':
@@ -96,5 +99,5 @@ if __name__ == '__main__':
                            help="Evergreen API key, see https://spruce.mongodb.com/preferences/cli")
     args = argParser.parse_args()
 
-    download_sys_perf_binaries(args.version_id, args.build_variant, args.evergreen_api_user,
-                               args.evergreen_api_key)
+    _download_sys_perf_binaries(args.version_id, args.build_variant, args.evergreen_api_user,
+                                args.evergreen_api_key)

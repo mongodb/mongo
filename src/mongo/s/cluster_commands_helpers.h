@@ -313,7 +313,8 @@ RawResponsesResult appendRawResponses(
     OperationContext* opCtx,
     std::string* errmsg,
     BSONObjBuilder* output,
-    const std::vector<AsyncRequestsSender::Response>& shardResponses);
+    const std::vector<AsyncRequestsSender::Response>& shardResponses,
+    bool appendWriteConcernError = true);
 
 /**
  * Extracts the query from a query-embedding command ('query' or 'q' fields). If the command does
@@ -379,5 +380,10 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
  */
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
                                                                    const NamespaceString& nss);
+
+/**
+ * Returns a boolean indicating whether the collection is sharded or not.
+ */
+bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace mongo

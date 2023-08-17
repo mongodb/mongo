@@ -127,8 +127,9 @@ commands:
   recipientVoteImportedFiles:
     command_name: recipientVoteImportedFiles
     cpp_name: RecipientVoteImportedFiles
-    description: "An internal mongod command to coordinate recipient steps of a multitenant
-                  migration."
+    description: >-
+      An internal mongod command to coordinate recipient steps of shard merge.
+      It's used to signal the recipient primary when the node completes file import.
     strict: true
     namespace: ignored
     api_version: ""
@@ -140,13 +141,6 @@ commands:
       from:
         type: HostAndPort
         description: "Replica set member identification."
-      success:
-        type: safeBool
-        description: "Whether the calling node succeeded at importing all files."
-      reason:
-        type: string
-        optional: true
-        description: "Optional failure reason string."
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."

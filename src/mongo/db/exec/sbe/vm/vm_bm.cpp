@@ -199,35 +199,12 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)(benchmark::Sta
     auto strings = generateRandomStrings(state.range(0) /*count*/, state.range(1) /*size*/);
     ValueVectorGuard guards(strings);
     auto collator = createCollator();
-    auto collatorSlotId = setCollator(collator.get());
 
     TagValue arraySet = makeArraySet(strings, collator.get());
     auto arraySetConstant = makeE<EConstant>(arraySet.first, arraySet.second);
 
-    auto expr = makeE<EFunction>("collIsMember"_sd,
-                                 makeEs(makeE<EVariable>(collatorSlotId),
-                                        makeE<EVariable>(inputSlotId()),
-                                        std::move(arraySetConstant)));
-    TagValue searchValue = generateRandomString(state.range(1) /*size*/);
-    value::ValueGuard guard{searchValue.first, searchValue.second};
-    benchmarkExpression(std::move(expr), {searchValue}, state);
-}
-
-BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator_Linear)(benchmark::State& state) {
-    auto strings = generateRandomStrings(state.range(0) /*count*/, state.range(1) /*size*/);
-    ValueVectorGuard guards(strings);
-    auto collator = createCollator();
-    auto collatorSlotId = setCollator(collator.get());
-
-    // Do not pass collator to ArraySet to make VM use linear search.
-    TagValue arraySet = makeArraySet(strings, nullptr);
-    auto arraySetConstant = makeE<EConstant>(arraySet.first, arraySet.second);
-
-    auto expr = makeE<EFunction>("collIsMember"_sd,
-                                 makeEs(makeE<EVariable>(collatorSlotId),
-                                        makeE<EVariable>(inputSlotId()),
-                                        std::move(arraySetConstant)));
-
+    auto expr = makeE<EFunction>(
+        "isMember"_sd, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
     TagValue searchValue = generateRandomString(state.range(1) /*size*/);
     value::ValueGuard guard{searchValue.first, searchValue.second};
     benchmarkExpression(std::move(expr), {searchValue}, state);
@@ -247,8 +224,6 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator_Linear)(benchma
 BENCHMARK_REGISTER_F(SbeVmBenchmark, BM_IsMember_ArraySet_NoCollator)->Args({100, 100});
 
 BENCHMARK_REGISTER_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)->ADD_ARGS();
-
-BENCHMARK_REGISTER_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator_Linear)->ADD_ARGS();
 
 }  // namespace
 }  // namespace mongo::sbe

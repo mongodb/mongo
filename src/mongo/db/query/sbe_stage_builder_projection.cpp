@@ -350,7 +350,7 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectionNode>>* node,
     if (isInclusionOrAddFields && !containsComputedField) {
         innerExpr = sbe::makeE<sbe::EIf>(makeFunction("isObject", childInputExpr->clone()),
                                          std::move(innerExpr),
-                                         makeConstant(sbe::value::TypeTags::Nothing, 0));
+                                         makeNothingConstant());
     } else if (!isInclusionOrAddFields) {
         innerExpr = sbe::makeE<sbe::EIf>(makeFunction("isObject", childInputExpr->clone()),
                                          std::move(innerExpr),
@@ -364,11 +364,9 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectionNode>>* node,
 
     auto fromExpr = topLevelFieldSlot
         ? makeVariable(*topLevelFieldSlot)
-        : makeFunction("getField"_sd, ctx.topLevel().getInputExpr(), makeConstant(node->name));
+        : makeFunction("getField"_sd, ctx.topLevel().getInputExpr(), makeStrConstant(node->name));
 
-    auto depthExpr = traversalDepth
-        ? makeConstant(sbe::value::TypeTags::NumberInt32, *traversalDepth)
-        : makeConstant(sbe::value::TypeTags::Nothing, 0);
+    auto depthExpr = traversalDepth ? makeInt32Constant(*traversalDepth) : makeNothingConstant();
 
     // Create the call to traverseP().
     ctx.pushEvaluate(makeFunction("traverseP",
@@ -455,15 +453,14 @@ EvalExpr evaluateSliceOps(StageBuilderState& state,
             // is not a 'Slice'.
             auto [limit, skip] = node->value->getSlice();
             auto arrayFromField = makeFunction(
-                "getField"_sd, context.topLevel().getInputExpr(), makeConstant(node->name));
+                "getField"_sd, context.topLevel().getInputExpr(), makeStrConstant(node->name));
             auto innerBinds = sbe::makeEs(std::move(arrayFromField));
             auto innerFrameId = state.frameId();
             sbe::EVariable arrayVariable{innerFrameId, 0};
 
-            auto arguments = sbe::makeEs(arrayVariable.clone(),
-                                         makeConstant(sbe::value::TypeTags::NumberInt32, limit));
+            auto arguments = sbe::makeEs(arrayVariable.clone(), makeInt32Constant(limit));
             if (skip) {
-                arguments.push_back(makeConstant(sbe::value::TypeTags::NumberInt32, *skip));
+                arguments.push_back(makeInt32Constant(*skip));
             }
 
             auto extractSubArrayExpr = sbe::makeE<sbe::EIf>(

@@ -459,7 +459,7 @@ void restoreTransactionResourcesToOperationContext(
  * An opaque class meant for containing TransactionResources that are stashed for subsequent
  * getMores.
  *
- * Usage of this class must be done via the RAII type HandleTransactionResourcesFromCursor. It will
+ * Usage of this class must be done via the RAII type HandleTransactionResourcesFromStasher. It will
  * take care of restoring the TransactionResources onto the operation and stash them back once it
  * goes out of scope.
  */
@@ -491,10 +491,30 @@ public:
     void dispose();
 
 private:
-    friend class HandleTransactionResourcesFromCursor;
+    friend class HandleTransactionResourcesFromStasher;
 
     std::unique_ptr<shard_role_details::TransactionResources> _yieldedResources;
     shard_role_details::TransactionResources::State _originalState;
+};
+
+/**
+ * Interface for supporting storing/releasing of stashed transaction resources.
+ * See ClientCursor for example implementation.
+ */
+class TransactionResourcesStasher {
+public:
+    TransactionResourcesStasher() = default;
+    virtual ~TransactionResourcesStasher() = default;
+
+    /**
+     *  Releases the stashed TransactionResources to the caller.
+     */
+    virtual StashedTransactionResources releaseStashedTransactionResources() = 0;
+
+    /**
+     * Stashes the provided TransactionResources.
+     */
+    virtual void stashTransactionResources(StashedTransactionResources resources) = 0;
 };
 
 class StashTransactionResourcesForDBDirect {
@@ -507,27 +527,27 @@ private:
     std::unique_ptr<shard_role_details::TransactionResources> _originalTransactionResources;
 };
 
-class ClientCursor;
-
 /**
  * This method puts the TransactionResources associated with the current OpCtx into the stashed
  * state and then detaches them from the OpCtx, moving their ownership to the given cursor.
  */
-void stashTransactionResourcesFromOperationContext(OperationContext* opCtx, ClientCursor* cursor);
+void stashTransactionResourcesFromOperationContext(OperationContext* opCtx,
+                                                   TransactionResourcesStasher* stasher);
 
 /**
  * An RAII class that handles restoration of the TransactionResources onto the OperationContext from
- * a ClientCursor.
+ * a TransactionResourcesStasher.
  *
- * This class automatically handles stashing and unstashing the resources onto the ClientCursor as
- * long as the TransactionResources aren't in the FAILED state. If the operation has failed and the
- * resources have to be released the user must dismissRestoredResources() in order to release them
- * and not stash them into the ClientCursor.
+ * This class automatically handles stashing and unstashing the resources onto the
+ * TransactionResourcesStasher as long as the TransactionResources aren't in the FAILED
+ * state. If the operation has failed and the resources have to be released the user must
+ * dismissRestoredResources() in order to release them and not stash them into the stasher.
  */
-class HandleTransactionResourcesFromCursor {
+class HandleTransactionResourcesFromStasher {
 public:
-    HandleTransactionResourcesFromCursor(OperationContext* opCtx, ClientCursor* cursor);
-    ~HandleTransactionResourcesFromCursor();
+    HandleTransactionResourcesFromStasher(OperationContext* opCtx,
+                                          TransactionResourcesStasher* stasher);
+    ~HandleTransactionResourcesFromStasher();
 
     /**
      * Marks the current TransactionResources as FAILED and releases all resources. After calling
@@ -537,7 +557,7 @@ public:
 
 private:
     OperationContext* _opCtx;
-    ClientCursor* _cursor;
+    TransactionResourcesStasher* _stasher;
     std::unique_ptr<shard_role_details::TransactionResources> _originalTransactionResources;
 };
 

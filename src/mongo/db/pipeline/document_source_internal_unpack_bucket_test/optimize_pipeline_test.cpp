@@ -237,14 +237,14 @@ TEST_F(OptimizePipeline, MetaMatchThenCountPushedDown) {
 
     // We should push down the $match and internalize the empty dependency set.
     auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(4u, serialized.size());
+    // The $group is rewritten to make use of '$control.count' and the $unpack stage is removed.
+    ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$eq: 'abc'}}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: [], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$group: {_id: {$const: null}, foo: { $sum: { $cond: [ { $gte: [ "
+                               "'$control.version', { $const: 2 } ] }, '$control.count', { $size: "
+                               "[ { $objectToArray: ['$data.time']} ] } ] } } } }"),
                       serialized[1]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$group: {_id: {$const: null}, foo: {$sum: {$const: 1}}}}"),
-                      serialized[2]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$project: {foo: true, _id: false}}"), serialized[3]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {foo: true, _id: false}}"), serialized[2]);
 }
 
 TEST_F(OptimizePipeline, SortThenMetaMatchPushedDown) {

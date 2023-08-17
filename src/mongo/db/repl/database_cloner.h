@@ -109,8 +109,7 @@ private:
     void postStage() final;
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return DatabaseNameUtil::serializeForCatalog(_dbName) + " db: { " + stage->getName() +
-            ": 1 } ";
+        return toStringForLogging(_dbName) + " db: { " + stage->getName() + ": 1 } ";
     }
 
     // All member variables are labeled with one of the following codes indicating the

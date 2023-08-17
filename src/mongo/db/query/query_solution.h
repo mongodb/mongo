@@ -52,6 +52,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/timeseries/bucket_spec.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -1732,7 +1733,16 @@ struct SentinelNode : public QuerySolutionNode {
 };
 
 struct SearchNode : public QuerySolutionNode {
-    explicit SearchNode(bool isSearchMeta) : isSearchMeta(isSearchMeta) {
+    SearchNode() = default;
+
+    SearchNode(bool isSearchMeta,
+               BSONObj searchQuery,
+               boost::optional<long long> limit,
+               boost::optional<int> intermediateResultsProtocolVersion)
+        : isSearchMeta(isSearchMeta),
+          searchQuery(searchQuery),
+          limit(limit),
+          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion) {
         // TODO SERVER-78565: Support $search in SBE plan cache
         eligibleForPlanCache = false;
     }
@@ -1765,19 +1775,99 @@ struct SearchNode : public QuerySolutionNode {
      * True for $searchMeta, False for $search query.
      */
     bool isSearchMeta;
+
+    const BSONObj searchQuery;
+
+    /**
+     * This will populate the docsRequested field of the cursorOptions document sent as part of the
+     * command to mongot in the case where the query has an extractable limit that can guide the
+     * number of documents that mongot returns to mongod.
+     */
+    boost::optional<long long> limit;
+
+    /**
+     * Protocol version if it must be communicated via the search request.
+     * If we are in a sharded environment but are targeting unsharded collection we may have a
+     * protocol version even though it should not be sent to mongot.
+     */
+    boost::optional<int> intermediateResultsProtocolVersion;
+};
+
+/**
+ * Represents a node to unpack time-series buckets into measurements. Currently we only support
+ * unpacking buckets with a statically known set of fields in SBE.
+ */
+struct UnpackTsBucketNode : public QuerySolutionNode {
+    UnpackTsBucketNode(std::unique_ptr<QuerySolutionNode> child,
+                       const BucketSpec& spec,
+                       std::unique_ptr<MatchExpression> eventFilter,
+                       std::unique_ptr<MatchExpression> wholeBucketFilter,
+                       bool includeMeta)
+        : QuerySolutionNode(std::move(child)),
+          bucketSpec(spec),
+          eventFilter(std::move(eventFilter)),
+          wholeBucketFilter(std::move(wholeBucketFilter)),
+          includeMeta(includeMeta) {
+        tassert(7969700,
+                "Only support unpacking with a statically known set of fields.",
+                bucketSpec.behavior() == BucketSpec::Behavior::kInclude);
+    }
+
+    StageType getType() const override {
+        return STAGE_UNPACK_TS_BUCKET;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override {
+        *ss << "UNPACK_TS_BUCKET\n";
+    }
+
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        if (bucketSpec.fieldSet().contains(field)) {
+            // The 'bucketSpec' has a statically known set of fields which include the computed meta
+            // projections and so, are fully provided.
+            return FieldAvailability::kFullyProvided;
+        } else {
+            return FieldAvailability::kNotProvided;
+        }
+    }
+
+    bool sortedByDiskLoc() const override {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    // TODO SERVER-79699 & SERVER-79700: Return the sort set which should be translated from the
+    // child's sort set.
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final {
+        return std::make_unique<UnpackTsBucketNode>(children[0]->clone(),
+                                                    bucketSpec,
+                                                    eventFilter->clone(),
+                                                    wholeBucketFilter->clone(),
+                                                    includeMeta);
+    }
+
+    BucketSpec bucketSpec;
+    std::unique_ptr<MatchExpression> eventFilter = nullptr;
+    std::unique_ptr<MatchExpression> wholeBucketFilter = nullptr;
+    bool includeMeta = false;
 };
 
 struct WindowNode : public QuerySolutionNode {
     WindowNode(std::unique_ptr<QuerySolutionNode> child,
                boost::optional<boost::intrusive_ptr<Expression>> partitionByArg,
                boost::optional<SortPattern> sortByArg,
-               std::vector<WindowFunctionStatement> outputFieldsArg,
-               bool shouldProduceBson)
+               std::vector<WindowFunctionStatement> outputFieldsArg)
         : QuerySolutionNode(std::move(child)),
           partitionBy(std::move(partitionByArg)),
           sortBy(std::move(sortByArg)),
-          outputFields(std::move(outputFieldsArg)),
-          shouldProduceBson(shouldProduceBson) {
+          outputFields(std::move(outputFieldsArg)) {
         DepsTracker partitionByDeps;
         if (partitionBy) {
             expression::addDependencies(partitionBy->get(), &partitionByDeps);
@@ -1827,7 +1917,5 @@ struct WindowNode : public QuerySolutionNode {
     OrderedPathSet partitionByRequiredFields;
     OrderedPathSet sortByRequiredFields;
     OrderedPathSet outputRequiredFields;
-
-    bool shouldProduceBson;
 };
 }  // namespace mongo

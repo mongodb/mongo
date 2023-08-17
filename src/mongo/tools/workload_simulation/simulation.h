@@ -45,21 +45,21 @@
  * 'WORKLOAD' name will be passed as arguments to the 'SUITE' constructor after, after the
  * stringized 'WORKLOAD'.
  */
-#define SIMULATION(SUITE, WORKLOAD, ...)                                 \
-    class CLASS_NAME(SUITE, WORKLOAD) : public SUITE {                   \
-    public:                                                              \
-        CLASS_NAME(SUITE, WORKLOAD)() : SUITE(#WORKLOAD, __VA_ARGS__) {} \
-        void _doRun() override;                                          \
-                                                                         \
-    private:                                                             \
-        struct RegistrationAgent {                                       \
-            RegistrationAgent() {                                        \
-                SimulationRegistry::get().registerSimulation(            \
-                    std::make_unique<CLASS_NAME(SUITE, WORKLOAD)>());    \
-            }                                                            \
-        };                                                               \
-        static inline RegistrationAgent _agent;                          \
-    };                                                                   \
+#define SIMULATION(SUITE, WORKLOAD)                                   \
+    class CLASS_NAME(SUITE, WORKLOAD) : public SUITE {                \
+    public:                                                           \
+        CLASS_NAME(SUITE, WORKLOAD)() : SUITE(#WORKLOAD) {}           \
+        void _doRun() override;                                       \
+                                                                      \
+    private:                                                          \
+        struct RegistrationAgent {                                    \
+            RegistrationAgent() {                                     \
+                SimulationRegistry::get().registerSimulation(         \
+                    std::make_unique<CLASS_NAME(SUITE, WORKLOAD)>()); \
+            }                                                         \
+        };                                                            \
+        static inline RegistrationAgent _agent;                       \
+    };                                                                \
     void CLASS_NAME(SUITE, WORKLOAD)::_doRun()
 
 namespace mongo::workload_simulation {

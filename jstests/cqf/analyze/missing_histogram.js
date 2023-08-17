@@ -9,7 +9,7 @@ import {
 } from "jstests/libs/ce_stats_utils.js";
 import {forceCE} from "jstests/libs/optimizer_utils.js";
 
-runHistogramsTest(function testEmptyAndMissingHistograms() {
+await runHistogramsTest(function testEmptyAndMissingHistograms() {
     const emptyColl = db.missing_histogram_empty;
     emptyColl.drop();
     assert.commandWorked(emptyColl.createIndex({"notAField": 1}));

@@ -60,7 +60,6 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -779,10 +778,8 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
     return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
 }
 
-bool CollectionImpl::timeseriesBucketingParametersMayHaveChanged() const {
-    return _metadata->timeseriesBucketingParametersHaveChanged
-        ? *_metadata->timeseriesBucketingParametersHaveChanged
-        : true;
+boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
+    return _metadata->timeseriesBucketingParametersHaveChanged;
 }
 
 void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
@@ -848,9 +845,9 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
 
 bool CollectionImpl::areTimeseriesBucketsFixed() const {
     auto tsOptions = getTimeseriesOptions();
-    return tsOptions &&
-        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds() &&
-        !timeseriesBucketingParametersMayHaveChanged();
+    boost::optional<bool> parametersChanged = timeseriesBucketingParametersHaveChanged();
+    return parametersChanged.has_value() && !parametersChanged.get() && tsOptions &&
+        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
 }
 
 bool CollectionImpl::isClustered() const {

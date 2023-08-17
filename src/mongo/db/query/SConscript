@@ -607,3 +607,16 @@ env.Benchmark(
         "query_test_service_context",
     ],
 )
+
+env.Benchmark(
+    target='rate_limiting_bm',
+    source=[
+        'rate_limiting_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'rate_limiting',
+    ],
+)

@@ -262,20 +262,7 @@ private:
     /**
      * Resets the state of the iterator with the first document of the new partition.
      */
-    void advanceToNextPartition() {
-        tassert(5340101,
-                "Invalid call to PartitionIterator::advanceToNextPartition",
-                _nextPartitionDoc != boost::none);
-        resetCache();
-        // The memory accounted for in the _nextPartitionDoc will be moved to the spillable cache,
-        // so subtract it out here.
-        _tracker->update(-1 * getNextPartitionStateSize());
-
-        // Cache is cleared, and we are moving the _nextPartitionDoc value to different positions.
-        _cache->addDocument(std::move(*_nextPartitionDoc));
-        _nextPartitionDoc.reset();
-        _state = IteratorState::kIntraPartition;
-    }
+    void advanceToNextPartition();
 
     // Internal helpers for 'getEndpoints()'.
     boost::optional<std::pair<int, int>> getEndpointsRangeBased(
@@ -300,12 +287,16 @@ private:
     // iterator has advanced to it. This document is not accessible until then.
     boost::optional<Document> _nextPartitionDoc;
     size_t getNextPartitionStateSize() const {
+        size_t size = 0;
         if (_nextPartitionDoc) {
-            return _nextPartitionDoc->getApproximateSize() +
-                _partitionComparator->getApproximateSize();
+            size += _nextPartitionDoc->getApproximateSize();
         }
-        return 0;
+        if (_partitionComparator) {
+            size += _partitionComparator->getApproximateSize();
+        }
+        return size;
     }
+    void updateNextPartitionStateSize();
 
     enum class IteratorState {
         // Default state, no documents have been pulled into the cache.
@@ -333,7 +324,9 @@ private:
     // the memory limit given to PartitionIterator to disk. Behaves like a deque.
     std::unique_ptr<SpillableCache> _cache = nullptr;
 
-    MemoryUsageTracker* _tracker;
+    // Memory token, used to track memory consumption of PartitionIterator. Needed to avoid problems
+    // when getNextPartitionStateSize() changes value between invocations.
+    MemoryToken _memoryToken;
 };
 
 /**

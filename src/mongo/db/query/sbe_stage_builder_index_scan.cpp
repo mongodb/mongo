@@ -72,9 +72,9 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
+#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -334,9 +334,10 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
 
     sbe::SlotExprPairVector projects;
     projects.emplace_back(
-        lowKeySlot, makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("l"_sd)));
+        lowKeySlot, makeFunction("getField"_sd, makeVariable(unwindSlot), makeStrConstant("l"_sd)));
     projects.emplace_back(
-        highKeySlot, makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("h"_sd)));
+        highKeySlot,
+        makeFunction("getField"_sd, makeVariable(unwindSlot), makeStrConstant("h"_sd)));
 
     // Add another project stage to extract low and high keys from each value produced by unwind and
     // bind the keys to the 'lowKeySlot' and 'highKeySlot'.
@@ -423,7 +424,9 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
         boundsExpr = makeVariable(*boundsSlot);
     } else {
         // 'sbe::EConstant' will take the ownership of the 'IndexBounds' pointer.
-        boundsExpr = makeConstant(sbe::value::TypeTags::indexBounds, new IndexBounds(ixn->bounds));
+        boundsExpr =
+            makeConstant(sbe::value::TypeTags::indexBounds,
+                         sbe::value::bitcastFrom<IndexBounds*>(new IndexBounds(ixn->bounds)));
     }
 
     sbe::GenericIndexScanStageParams params{
@@ -559,10 +562,14 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                       sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                                 : boost::none;
 
-    auto lowKeyExpr = !lowKey ? makeVariable(*lowKeySlot)
-                              : makeConstant(sbe::value::TypeTags::ksValue, lowKey.release());
-    auto highKeyExpr = !highKey ? makeVariable(*highKeySlot)
-                                : makeConstant(sbe::value::TypeTags::ksValue, highKey.release());
+    auto lowKeyExpr = !lowKey
+        ? makeVariable(*lowKeySlot)
+        : makeConstant(sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
+    auto highKeyExpr = !highKey
+        ? makeVariable(*highKeySlot)
+        : makeConstant(sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
 
     auto snapshotIdSlot = reqs.has(PlanStageSlots::kSnapshotId)
         ? boost::make_optional(slotIdGenerator->generate())

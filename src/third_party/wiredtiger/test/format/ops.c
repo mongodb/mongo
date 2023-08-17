@@ -267,7 +267,8 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     TINFO *tinfo, total;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    wt_thread_t alter_tid, backup_tid, checkpoint_tid, compact_tid, hs_tid, import_tid, random_tid;
+    wt_thread_t alter_tid, background_compact_tid, backup_tid, checkpoint_tid, compact_tid, hs_tid,
+      import_tid, random_tid;
     wt_thread_t timestamp_tid;
     int64_t fourths, quit_fourths, thread_ops;
     uint32_t i;
@@ -281,6 +282,7 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
 
     session = NULL; /* -Wconditional-uninitialized */
     memset(&alter_tid, 0, sizeof(alter_tid));
+    memset(&background_compact_tid, 0, sizeof(background_compact_tid));
     memset(&backup_tid, 0, sizeof(backup_tid));
     memset(&checkpoint_tid, 0, sizeof(checkpoint_tid));
     memset(&compact_tid, 0, sizeof(compact_tid));
@@ -346,6 +348,8 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     /* Start optional special-purpose threads. */
     if (GV(OPS_ALTER))
         testutil_check(__wt_thread_create(NULL, &alter_tid, alter, NULL));
+    if (GV(BACKGROUND_COMPACT))
+        testutil_check(__wt_thread_create(NULL, &background_compact_tid, background_compact, NULL));
     if (GV(BACKUP))
         testutil_check(__wt_thread_create(NULL, &backup_tid, backup, NULL));
     if (GV(OPS_COMPACTION))
@@ -443,6 +447,8 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
     g.workers_finished = true;
     if (GV(OPS_ALTER))
         testutil_check(__wt_thread_join(NULL, &alter_tid));
+    if (GV(BACKGROUND_COMPACT))
+        testutil_check(__wt_thread_join(NULL, &background_compact_tid));
     if (GV(BACKUP))
         testutil_check(__wt_thread_join(NULL, &backup_tid));
     if (g.checkpoint_config == CHECKPOINT_ON)

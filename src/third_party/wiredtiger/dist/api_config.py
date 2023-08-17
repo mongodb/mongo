@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 import os, re, sys, textwrap
-from dist import compare_srcfile, format_srcfile
+from dist import compare_srcfile, format_srcfile, ModifyFile
 
 test_config = False
 
@@ -94,10 +94,79 @@ def parseconfig(c, method_name, name_indent=''):
         output += '@config{' + name_indent + ' ),,}\n'
     return output
 
+# Convert a string to a number string that can be parsed by the C compiler.
+# All numbers are decimal, but with the possibility of 'K', 'Mb', 'GB', etc. appended
+def getcompnum(s):
+    # Already converted?
+    if type(s) == int:
+        return str(s)
+    result = re.search(r'([-\d]+)([bBkKmMgGtTpP]*)', s)
+    num = int(result.group(1))
+    mult = ''
+    for ch in result.group(2):
+        ch = ch.lower()
+        if ch == 'b':
+            pass    # No change.  Useful for example '10GB'
+        elif ch == 'k':
+            mult += ' * WT_KILOBYTE'
+        elif ch == 'm':
+            mult += ' * WT_MEGABYTE'
+        elif ch == 'g':
+            mult += ' * WT_GIGABYTE'
+        elif ch == 't':
+            mult += ' * WT_TERABYTE'
+        elif ch == 'p':
+            mult += ' * WT_PETABYTE'
+
+    # If numbers are large or have a multiplier, make it a long long literal
+    # so it won't overflow.
+    if num > 1000000 or len(mult) > 0:
+        num = str(num) + 'LL'
+    else:
+        num = str(num)
+    return num + mult
+
+choices_names = set()
+# Get fields that assist the configuration compiler.
+def getcompstr(c):
+    comptype = -1
+    ty = gettype(c)
+    # E.g. "WT_CONFIG_COMPILED_TYPE_INT"
+    comptype = 'WT_CONFIG_COMPILED_TYPE_' + ty.upper()
+    checks = c.flags
+    minval = 'INT64_MIN'
+    maxval = 'INT64_MAX'
+    if 'min' in checks:
+        minval = getcompnum(checks['min'])
+    if 'max' in checks:
+        maxval = getcompnum(checks['max'])
+    choices = checks.get('choices', [])
+    if len(choices) == 0:
+        choices_ref = 'NULL'
+    else:
+        name = c.name
+        suffix = 1
+        while name in choices_names:
+            suffix += 1
+            name = c.name + str(suffix)
+        choices_names.add(name)
+        choices_ref = 'confchk_' + name + '_choices'
+        tfile.write('''
+        %(name)s[] = {
+        \t%(values)s
+        \tNULL
+        };
+        ''' % {
+            'name' : '\n'.join(ws.wrap('static const char *' + choices_ref)),
+            'values' : '\n\t'.join('"' + choice + '",' for choice in choices),
+        })
+
+    return ', {}, {}, {}, {}'.format(comptype, minval, maxval, choices_ref)
+
 def getconfcheck(c):
     check = '{ "' + c.name + '", "' + gettype(c) + '",'
     cstr = checkstr(c)
-    sstr = getsubconfigstr(c)
+    sstr = getsubconfigstr(c) + getcompstr(c)
     if cstr != 'NULL':
         cstr = '"\n\t    "'.join(w.wrap(cstr))
         # Manually re-wrap when there is a check string to avoid ugliness
@@ -222,20 +291,58 @@ def get_default(c):
     else:
         return ''
 
+# Build a jump table from a sorted array of strings
+# e.g. given [ "ant", "cat", "deer", "dog", "giraffe" ],
+#   produce [ 0, 0, 0, ...., 0, 1, 1, 2, 4, 4, 4, 5, 5, 5, ....]
+#
+# For position 'a', we produce 0 (offset of "ant"),
+# position 'b' is 1 (offset of "cat"),
+# position 'c' is 1 (offset of "cat"),
+# position 'd' is 2 (offset of "deer"),
+# 'e' and 'f' are 4 (offset of "giraffe"),
+# 'g' is 4 (offset of "giraffe"),
+# 'h' and beyond is 5 (not found).
+def build_jump(arr):
+    assert sorted(arr) == arr
+    end = len(arr)
+    assert end < 256   # we're using a byte array currently
+    result = [-1] * 128
+    pos = 0
+    for name in arr:
+        letter = name[0]
+        i = ord(letter)
+        assert i < 128
+        if result[i] == -1:
+            result[i] = pos
+        pos += 1
+    cur = end
+    for i in range(127, -1, -1):
+        if result[i] == -1:
+            result[i] = cur
+        else:
+            cur = result[i]
+    assert cur == 0
+    return result
+
 created_subconfigs=set()
 def add_subconfig(c, cname):
     if cname in created_subconfigs:
         return
     created_subconfigs.add(cname)
+    jump = build_jump([subc.name for subc in sorted(c.subconfig)])
     tfile.write('''
-%(name)s[] = {
+static const WT_CONFIG_CHECK %(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL, 0 }
+\t{ NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, NULL }
+};
+
+static const uint8_t %(name)s_jump[WT_CONFIG_JUMP_TABLE_SIZE] = {
+\t%(jump_contents)s
 };
 ''' % {
-    'name' : '\n    '.join(ws.wrap(\
-        'static const WT_CONFIG_CHECK confchk_' + cname + '_subconfigs')),
+    'name' : '\n    '.join(ws.wrap('confchk_' + cname + '_subconfigs')),
     'check' : '\n\t'.join(getconfcheck(subc) for subc in sorted(c.subconfig)),
+    'jump_contents' : ', '.join([str(i) for i in jump]),
 })
 
 def getcname(c):
@@ -250,23 +357,30 @@ def getsubconfigstr(c):
     if ctype == 'category':
         cname = getcname(c)
         add_subconfig(c, cname)
-        return 'confchk_' + cname + '_subconfigs, ' + str(len(c.subconfig))
+        confchk_name = 'confchk_' + cname + '_subconfigs'
+        return confchk_name + ', ' + str(len(c.subconfig)) + ', ' + confchk_name + '_jump'
     else:
-        return 'NULL, 0'
+        return 'NULL, 0, NULL'
 
 # Write structures of arrays of allowable configuration options, including a
 # NULL as a terminator for iteration.
 for name in sorted(api_data_def.methods.keys()):
     config = api_data_def.methods[name].config
     if config:
+        jump = build_jump([c.name for c in config])
         tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL, 0 }
+\t{ NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, NULL }
+};
+
+static const uint8_t confchk_%(name)s_jump[WT_CONFIG_JUMP_TABLE_SIZE] = {
+\t%(jump_contents)s
 };
 ''' % {
     'name' : name.replace('.', '_'),
     'check' : '\n\t'.join(getconfcheck(c) for c in config),
+    'jump_contents' : ', '.join([str(i) for i in jump]),
 })
 
 # Write the initialized list of configuration entry structures.
@@ -299,15 +413,16 @@ for name in sorted(api_data_def.methods.keys()):
     # Write the checks reference, or NULL if no related checks structure.
     tfile.write('\n\t  ')
     if config:
+        confchk_name = 'confchk_' + name.replace('.', '_')
         tfile.write(
-            'confchk_' + name.replace('.', '_') + ', ' + str(len(config)))
+            confchk_name + ', ' + str(len(config)) + ', ' + confchk_name + '_jump')
     else:
-        tfile.write('NULL, 0')
+        tfile.write('NULL, 0, NULL')
 
     tfile.write('\n\t},')
 
 # Write a NULL as a terminator for iteration.
-tfile.write('\n\t{ NULL, NULL, NULL, 0 }')
+tfile.write('\n\t{ NULL, NULL, NULL, 0, NULL }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list
@@ -386,20 +501,6 @@ compare_srcfile(tmp_file, f)
 
 # Update the config.h file with the #defines for the configuration entries.
 if not test_config:
-    tfile = open(tmp_file, 'w')
-    skip = 0
-    config_file = '../src/include/config.h'
-    for line in open(config_file, 'r'):
-        if skip:
-            if 'configuration section: END' in line:
-                tfile.write('/*\n' + line)
-                skip = 0
-        else:
-            tfile.write(line)
-        if 'configuration section: BEGIN' in line:
-            skip = 1
-            tfile.write(' */\n')
+    config_h = ModifyFile('../src/include/config.h')
+    with config_h.replace_fragment('configuration section') as tfile:
             tfile.write(config_defines)
-    tfile.close()
-    format_srcfile(tmp_file)
-    compare_srcfile(tmp_file, config_file)

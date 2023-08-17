@@ -31,62 +31,36 @@
  */
 
 struct _mc_writer_t {
-   uint8_t *ptr;
-   uint64_t pos;
-   uint64_t len;
+    uint8_t *ptr;
+    uint64_t pos;
+    uint64_t len;
 
-   const char *parser_name;
+    const char *parser_name;
 };
 
 typedef struct _mc_writer_t mc_writer_t;
 
-void
-mc_writer_init (mc_writer_t *writer,
-                uint8_t *ptr,
-                uint64_t len,
-                const char *parser_name);
+void mc_writer_init(mc_writer_t *writer, uint8_t *ptr, uint64_t len, const char *parser_name);
 
-void
-mc_writer_init_from_buffer (mc_writer_t *writer,
-                            _mongocrypt_buffer_t *buf,
-                            const char *parser_name);
+void mc_writer_init_from_buffer(mc_writer_t *writer, _mongocrypt_buffer_t *buf, const char *parser_name);
 
-mc_writer_t *
-mc_writer_new (uint8_t *ptr, uint64_t len, const char *parser_name);
+mc_writer_t *mc_writer_new(uint8_t *ptr, uint64_t len, const char *parser_name);
 
-void
-mc_writer_destroy (mc_writer_t *writer);
+void mc_writer_destroy(mc_writer_t *writer);
 
-bool
-mc_writer_write_u8 (mc_writer_t *writer,
-                    const uint8_t value,
-                    mongocrypt_status_t *status);
+bool mc_writer_write_u8(mc_writer_t *writer, const uint8_t value, mongocrypt_status_t *status);
 
-bool
-mc_writer_write_u32 (mc_writer_t *writer,
-                     const uint32_t value,
-                     mongocrypt_status_t *status);
+bool mc_writer_write_u32(mc_writer_t *writer, const uint32_t value, mongocrypt_status_t *status);
 
-bool
-mc_writer_write_u64 (mc_writer_t *writer,
-                     const uint64_t value,
-                     mongocrypt_status_t *status);
+bool mc_writer_write_u64(mc_writer_t *writer, const uint64_t value, mongocrypt_status_t *status);
 
-bool
-mc_writer_write_buffer (mc_writer_t *writer,
-                        const _mongocrypt_buffer_t *buf,
-                        uint64_t length,
-                        mongocrypt_status_t *status);
+bool mc_writer_write_buffer(mc_writer_t *writer,
+                            const _mongocrypt_buffer_t *buf,
+                            uint64_t length,
+                            mongocrypt_status_t *status);
 
+bool mc_writer_write_uuid_buffer(mc_writer_t *writer, const _mongocrypt_buffer_t *buf, mongocrypt_status_t *status);
 
-bool
-mc_writer_write_uuid_buffer (mc_writer_t *writer,
-                             const _mongocrypt_buffer_t *buf,
-                             mongocrypt_status_t *status);
-
-bool
-mc_writer_write_prfblock_buffer (mc_writer_t *writer,
-                                 const _mongocrypt_buffer_t *buf,
-                                 mongocrypt_status_t *status);
+bool mc_writer_write_prfblock_buffer(mc_writer_t *writer, const _mongocrypt_buffer_t *buf, mongocrypt_status_t *status);
 
 #endif /* MONGOCRYPT_READER_PRIVATE_H */

@@ -59,7 +59,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -88,11 +87,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
-
-
-// Keep the backup cursor alive by pinging twice as often as the donor's default
-// cursor timeout.
-constexpr int kBackupCursorKeepAliveIntervalMillis = mongo::kCursorTimeoutMillisDefault / 2;
 
 namespace mongo::repl::shard_merge_utils {
 namespace {
@@ -233,6 +227,8 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
             opCtx, nss, importResult.catalogId, md, std::move(importResult.rs));
         ownedCollection->init(opCtx);
+        historicalIDTrackerAllowsMixedModeWrites(ownedCollection->getSharedDecorations())
+            .store(true);
 
         // Update the number of records and data size on commit.
         opCtx->recoveryUnit()->registerChange(
@@ -417,7 +413,8 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
         .until([](auto&&) { return false; })
         .withDelayBetweenIterations(Milliseconds(kBackupCursorKeepAliveIntervalMillis))
         .on(executor, cancellationSource.token())
-        .onCompletion([](auto&&) {})
+        .onCompletion(
+            [](auto&&) { LOGV2_INFO(7675002, "Keep backup cursor alive thread stopped"); })
         .semi();
 }
 }  // namespace mongo::repl::shard_merge_utils

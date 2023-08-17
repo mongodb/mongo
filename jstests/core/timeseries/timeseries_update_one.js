@@ -40,7 +40,7 @@ import {
     };
     const doc_stringM1_a_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
-        [metaFieldName]: "1",
+        [metaFieldName]: "string",
         _id: 1,
         a: 1,
         b: 1
@@ -129,6 +129,30 @@ import {
         });
     })();
 
+    // Match and update zero docs.
+    (function testMatchNoneWithCaseSensitiveCollation() {
+        testUpdateOne({
+            initialDocList: [doc_a_b, doc_m1_a_b, doc_stringM1_a_b],
+            updateQuery: {[metaFieldName]: "STRING"},
+            collation: {locale: "en", strength: 3},
+            updateObj: {$unset: {[metaFieldName]: ""}},
+            resultDocList: [doc_a_b, doc_m1_a_b, doc_stringM1_a_b],
+            nMatched: 0,
+        });
+    })();
+
+    // Match and update 1 doc with insensitive collation.
+    (function testMatchOneWithCaseInsensitiveCollation() {
+        testUpdateOne({
+            initialDocList: [doc_a_b, doc_m1_a_b, doc_stringM1_a_b],
+            updateQuery: {[metaFieldName]: "STRING"},
+            collation: {locale: "en", strength: 1},
+            updateObj: {$unset: {[metaFieldName]: ""}},
+            resultDocList: [doc_a_b, doc_m1_a_b, doc_a_b],
+            nMatched: 1,
+        });
+    })();
+
     // Meta-only update only updates one.
     (function testMetaOnlyUpdateOne() {
         testUpdateOne({
@@ -178,7 +202,7 @@ import {
         testUpdateOne({
             initialDocList: [doc_m1_a_b, doc_m1_c_d],
             updateQuery: query_m1_a1,
-            updateObj: {$set: {[metaFieldName]: "1"}},
+            updateObj: {$set: {[metaFieldName]: "string"}},
             resultDocList: [doc_stringM1_a_b, doc_m1_c_d],
             nMatched: 1
         });

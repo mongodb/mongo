@@ -35,6 +35,7 @@ namespace mongo::optimizer {
 
 class NamedSlotsProvider {
 public:
+    virtual sbe::value::SlotId getSlot(StringData name) const = 0;
     virtual boost::optional<sbe::value::SlotId> getSlotIfExists(StringData name) const = 0;
 };
 

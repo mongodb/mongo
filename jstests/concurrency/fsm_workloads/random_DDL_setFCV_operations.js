@@ -13,6 +13,9 @@
 
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    uniformDistTransitions
+} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_DDL_operations.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -44,14 +47,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog('setFCV state finished');
     };
 
-    // TODO (SERVER-73875): Include `movePrimary` state once 7.0 becomes last LTS.
-    $config.transitions = {
-        create: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
-        drop: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
-        rename: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
-        collMod: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
-        setFCV: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10}
-    };
+    $config.transitions = uniformDistTransitions($config.states);
 
     $config.teardown = function(db, collName, cluster) {
         assert.commandWorked(

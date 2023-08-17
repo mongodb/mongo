@@ -95,7 +95,7 @@ struct AsyncCommandExecutionTest::TestState {
         rec = std::make_shared<RequestExecutionContext>(opCtx.get(), mockMessage());
         rec->setReplyBuilder(makeReplyBuilder(rpc::protocolForMessage(rec->getMessage())));
         rec->setRequest(rpc::opMsgRequestFromAnyProtocol(rec->getMessage(), opCtx->getClient()));
-        rec->setCommand(CommandHelpers::findCommand(rec->getRequest().getCommandName()));
+        rec->setCommand(CommandHelpers::findCommand(&*opCtx, rec->getRequest().getCommandName()));
 
         // Setup the invocation
         auto cmd = rec->getCommand();

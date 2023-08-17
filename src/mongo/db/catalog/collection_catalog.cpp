@@ -92,6 +92,19 @@
 
 
 namespace mongo {
+/**
+ * If a collection is initially created with an untimestamped write, but later DDL operations
+ * (including drop) on this collection are timestamped, set this decoration to 'true' for
+ * HistoricalCatalogIdTracker to support this mixed mode write sequence for a collection.
+ *
+ * CAUTION: This decoration is not to support other mixed mode write sequences (such as
+ * timestamped collection creation followed by untimestamped drop) that violates wiredtiger's
+ * timestamp rules.
+ */
+const SharedCollectionDecorations::Decoration<AtomicWord<bool>>
+    historicalIDTrackerAllowsMixedModeWrites =
+        SharedCollectionDecorations::declareDecoration<AtomicWord<bool>>();
+
 namespace {
 constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissingMapping"_sd;
 
@@ -714,7 +727,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
         return Status::OK();
     }
 
-    if (viewName.db_deprecated() != viewOn.db_deprecated())
+    if (!viewName.isEqualDb(viewOn))
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
@@ -757,7 +770,7 @@ Status CollectionCatalog::modifyView(
     invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
-    if (viewName.db_deprecated() != viewOn.db_deprecated())
+    if (!viewName.isEqualDb(viewOn))
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
@@ -2027,9 +2040,12 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
         coll->setMinimumValidSnapshot(commitTime.value());
     }
 
+    const auto allowMixedModeWrites = coll->getSharedDecorations() &&
+        historicalIDTrackerAllowsMixedModeWrites(coll->getSharedDecorations()).load();
+
     // When restarting from standalone mode to a replica set, the stable timestamp may be null.
     // We still need to register the nss and UUID with the catalog.
-    _catalogIdTracker.create(nss, uuid, coll->getCatalogId(), commitTime);
+    _catalogIdTracker.create(nss, uuid, coll->getCatalogId(), commitTime, allowMixedModeWrites);
 
 
     if (!nss.isOnInternalDb() && !nss.isSystem()) {

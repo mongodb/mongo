@@ -570,7 +570,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();
     auto request = makeTestCommand(Milliseconds{1000}, makeSleepCmdObj());
-    auto deferred = runCommand(cb, request);
+    auto deferred = runCommandOnAny(cb, request);
 
     waitForHello();
 
@@ -581,6 +581,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     if (!pingCommandMissing(result)) {
         ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
         ASSERT(result.elapsed);
+        ASSERT_EQ(result.target, fixture().getServers().front());
         assertNumOps(0u, 1u, 0u, 0u);
     }
 }
@@ -601,7 +602,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
-    auto deferred = runCommand(cb, request);
+    auto deferred = runCommandOnAny(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
     // in runCommand. The delay between setting the deadline on opCtx and starting the command can
     // be long enough that the assertion about opCtxDeadline fails.
@@ -624,6 +625,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     // the timeout specified in the request constructor.
     ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
     ASSERT_LT(result.elapsed.value(), requestTimeout);
+    ASSERT_EQ(result.target, fixture().getServers().front());
     assertNumOps(0u, 1u, 0u, 0u);
 }
 
@@ -643,7 +645,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
-    auto deferred = runCommand(cb, request);
+    auto deferred = runCommandOnAny(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
     // in runCommand. The delay between setting the deadline on opCtx and starting the command can
     // be long enough that the assertion about opCtxDeadline fails.
@@ -1262,6 +1264,20 @@ TEST_F(NetworkInterfaceTest, RunCommandOnLeasedStream) {
     ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
     ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
     ASSERT_EQ(1, res.data.getIntField("ok"));
+}
+
+TEST_F(NetworkInterfaceTest, ConnectionErrorAssociatedWithRemote) {
+    FailPointEnableBlock fpb("connectionPoolReturnsErrorOnGet");
+
+    auto cb = makeCallbackHandle();
+    auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj());
+    auto deferred = runCommandOnAny(cb, request);
+
+    auto result = deferred.get();
+
+    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
+    ASSERT_EQ(result.target, fixture().getServers().front());
+    assertNumOps(0u, 0u, 1u, 0u);
 }
 
 }  // namespace

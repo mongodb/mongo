@@ -54,7 +54,6 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/cluster_role.h"
@@ -363,9 +362,6 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
     auto const shardingState = ShardingState::get(opCtx);
     if (!shardingState->enabled())
         return;
-
-    auto const grid = Grid::get(opCtx);
-    grid->shardRegistry()->shutdown();
 
     _replicaSetChangeListener.reset();
 }

@@ -45,6 +45,8 @@
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -150,6 +152,88 @@ NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite) {
             "BulkWrite with Queryable Encryption supports only a single namespace",
             nss.size() == 1);
     return nss[0];
+}
+
+write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
+    const std::vector<mongo::BSONObj>& documents,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry) {
+    write_ops::InsertCommandRequest request(nsInfoEntry.getNs(), documents);
+    request.setDollarTenant(req.getDollarTenant());
+    request.setExpectPrefix(req.getExpectPrefix());
+    auto& requestBase = request.getWriteCommandRequestBase();
+    requestBase.setEncryptionInformation(nsInfoEntry.getEncryptionInformation());
+    requestBase.setOrdered(req.getOrdered());
+    requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
+
+    return request;
+}
+
+write_ops::UpdateCommandRequest makeUpdateCommandRequestForFLE(
+    OperationContext* opCtx,
+    const BulkWriteUpdateOp* op,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry) {
+    uassert(ErrorCodes::InvalidOptions,
+            "BulkWrite update with Queryable Encryption does not support sort.",
+            !op->getSort());
+
+    write_ops::UpdateOpEntry update;
+    update.setQ(op->getFilter());
+    update.setMulti(op->getMulti());
+    update.setC(op->getConstants());
+    update.setU(op->getUpdateMods());
+    update.setHint(op->getHint());
+    if (op->getCollation()) {
+        update.setCollation(op->getCollation().value());
+    }
+    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
+    update.setUpsert(op->getUpsert());
+
+    std::vector<write_ops::UpdateOpEntry> updates{update};
+    write_ops::UpdateCommandRequest updateCommand(nsInfoEntry.getNs(), updates);
+    updateCommand.setDollarTenant(req.getDollarTenant());
+    updateCommand.setExpectPrefix(req.getExpectPrefix());
+    updateCommand.setLet(req.getLet());
+    updateCommand.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+
+    updateCommand.getWriteCommandRequestBase().setEncryptionInformation(
+        nsInfoEntry.getEncryptionInformation());
+    updateCommand.getWriteCommandRequestBase().setBypassDocumentValidation(
+        req.getBypassDocumentValidation());
+
+    return updateCommand;
+}
+
+write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
+    OperationContext* opCtx,
+    const BulkWriteDeleteOp* op,
+    const BulkWriteCommandRequest& req,
+    const mongo::NamespaceInfoEntry& nsInfoEntry) {
+    uassert(ErrorCodes::InvalidOptions,
+            "BulkWrite delete with Queryable Encryption does not support sort.",
+            !op->getSort());
+
+    write_ops::DeleteOpEntry deleteEntry;
+    if (op->getCollation()) {
+        deleteEntry.setCollation(op->getCollation());
+    }
+    deleteEntry.setHint(op->getHint());
+    deleteEntry.setMulti(op->getMulti());
+    deleteEntry.setQ(op->getFilter());
+
+    std::vector<write_ops::DeleteOpEntry> deletes{deleteEntry};
+    write_ops::DeleteCommandRequest deleteRequest(nsInfoEntry.getNs(), deletes);
+    deleteRequest.setDollarTenant(req.getDollarTenant());
+    deleteRequest.setExpectPrefix(req.getExpectPrefix());
+    deleteRequest.setLet(req.getLet());
+    deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
+        nsInfoEntry.getEncryptionInformation());
+    deleteRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
+        req.getBypassDocumentValidation());
+
+    return deleteRequest;
 }
 
 }  // namespace bulk_write_common

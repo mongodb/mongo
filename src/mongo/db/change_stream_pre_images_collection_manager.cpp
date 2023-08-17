@@ -491,6 +491,10 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
     auto truncateStats = _truncateManager.truncateExpiredPreImages(
         opCtx, tenantId, preImagesColl.getCollectionPtr());
 
+    if (truncateStats.maxStartWallTime > _purgingJobStats.maxStartWallTime.loadRelaxed()) {
+        _purgingJobStats.maxStartWallTime.store(truncateStats.maxStartWallTime);
+    }
+
     _purgingJobStats.docsDeleted.fetchAndAddRelaxed(truncateStats.docsDeleted);
     _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(truncateStats.bytesDeleted);
     _purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(

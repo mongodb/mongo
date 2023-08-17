@@ -189,6 +189,7 @@ void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
     invariant(txnNumber);
 
     txnRouter.beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(opCtx);
 }
 
 BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx) {

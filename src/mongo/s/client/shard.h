@@ -271,10 +271,9 @@ public:
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none);
 
-    // This timeout will be used by default in operations against the shard and config server,
-    // unless explicitly overridden
+    // This timeout will be used by default in operations against the config server, unless
+    // explicitly overridden
     static const Milliseconds kDefaultConfigCommandTimeout;
-    static const Milliseconds kDefaultShardCommandTimeout;
 
     /**
      * Returns false if the error is a retriable error and/or causes a replset monitor update. These

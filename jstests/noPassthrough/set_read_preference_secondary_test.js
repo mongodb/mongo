@@ -1,3 +1,9 @@
+/**
+ * @tags: [requires_sharding]
+ *
+ * Tests that the runCommandWithReadPreferenceSecondary override refuses to duplicate a
+ * readPreference that already exists inside the top-level command object.
+ */
 import "jstests/libs/override_methods/set_read_preference_secondary.js";
 
 const st = new ShardingTest({shards: 1});

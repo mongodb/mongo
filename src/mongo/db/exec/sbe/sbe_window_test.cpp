@@ -60,23 +60,21 @@ public:
             window.lowBoundTestingSlot = lowBoundTestingSlot;
             window.lowBoundExpr = nullptr;
             if (lowerOffset) {
-                window.lowBoundExpr = makeBinaryOp(
-                    EPrimBinary::greaterEq,
-                    makeVariable(lowBoundTestingSlot),
-                    makeBinaryOp(EPrimBinary::add,
-                                 makeVariable(lowBoundSlot),
-                                 makeConstant(value::TypeTags::NumberInt32, *lowerOffset)));
+                window.lowBoundExpr = makeBinaryOp(EPrimBinary::greaterEq,
+                                                   makeVariable(lowBoundTestingSlot),
+                                                   makeBinaryOp(EPrimBinary::add,
+                                                                makeVariable(lowBoundSlot),
+                                                                makeInt32Constant(*lowerOffset)));
             }
             window.highBoundSlot = highBoundSlot;
             window.highBoundTestingSlot = highBoundTestingSlot;
             window.highBoundExpr = nullptr;
             if (higherOffset) {
-                window.highBoundExpr = makeBinaryOp(
-                    EPrimBinary::lessEq,
-                    makeVariable(highBoundTestingSlot),
-                    makeBinaryOp(EPrimBinary::add,
-                                 makeVariable(highBoundSlot),
-                                 makeConstant(value::TypeTags::NumberInt32, *higherOffset)));
+                window.highBoundExpr = makeBinaryOp(EPrimBinary::lessEq,
+                                                    makeVariable(highBoundTestingSlot),
+                                                    makeBinaryOp(EPrimBinary::add,
+                                                                 makeVariable(highBoundSlot),
+                                                                 makeInt32Constant(*higherOffset)));
             }
             window.initExpr = nullptr;
             window.addExpr = makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot));
@@ -100,7 +98,7 @@ public:
                 resultSlot,
                 makeE<EIf>(makeFunction("exists", makeVariable(windowSlot)),
                            makeFunction("doubleDoubleSumFinalize", makeVariable(windowSlot)),
-                           makeConstant(value::TypeTags::NumberInt32, 0)));
+                           makeInt32Constant(0)));
         }
         stage = makeS<ProjectStage>(std::move(stage), std::move(projects), kEmptyPlanNodeId);
         return {std::move(stage), std::move(resultSlots)};
@@ -136,6 +134,7 @@ TEST_F(WindowStageTest, WindowTest) {
         {boundSlot1, boundSlot1, 0, boost::none},
         {boundSlot1, boundSlot1, -6, -2},
         {boundSlot1, boundSlot1, 2, 6},
+        {boundSlot1, boundSlot1, boost::none, -3},
     };
     auto [resultStage, resultSlots] = createSimpleWindowStage(std::move(inputStage),
                                                               std::move(partitionSlots),
@@ -158,7 +157,9 @@ TEST_F(WindowStageTest, WindowTest) {
         {100, 300, 600, 1000, 1500, 100, 300, 600, 1000, 1500},
         {1500, 1400, 1200, 900, 500, 1500, 1400, 1200, 900, 500},
         {0, 100, 300, 600, 900, 0, 100, 300, 600, 900},
-        {900, 1200, 900, 500, 0, 900, 1200, 900, 500, 0}};
+        {900, 1200, 900, 500, 0, 900, 1200, 900, 500, 0},
+        {0, 0, 100, 300, 600, 0, 0, 100, 300, 600},
+    };
     for (size_t i = 0; i < expected[0].size(); i++) {
         auto planState = resultStage->getNext();
         ASSERT_EQ(PlanState::ADVANCED, planState);

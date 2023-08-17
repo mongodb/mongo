@@ -48,7 +48,7 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
     boost::intrusive_ptr<Expression> input,
     std::unique_ptr<WindowFunctionState> function,
     WindowBounds::DocumentBased bounds,
-    MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+    MemoryUsageTracker::Impl* memTracker)
     : WindowFunctionExecRemovable(iter,
                                   PartitionAccessor::Policy::kDefaultSequential,
                                   std::move(input),
@@ -74,7 +74,6 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
                     [&](const int& upperIndex) { _upperBound = upperIndex; },
                 },
                 bounds.upper);
-    _memTracker->set(sizeof(*this));
 }
 
 void WindowFunctionExecRemovableDocument::initialize() {

@@ -77,6 +77,7 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -86,49 +87,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo::optimizer {
-
-/*
- * This class uses a visitor to convert an ABT representing a path (e.g. "a" or "a.b") into a
- * string representation of the path. The ABT supplied to PathStringify::stringify should only
- * contain the node types EvalPath, PathGet, and PathIdentity. Otherwise, the visitor will
- * tassert.
- */
-class PathStringify {
-public:
-    void walk(const PathGet& n, const ABT&) {
-        if (_firstElement) {
-            // Append without a leading dot for the first path component.
-            _builder << n.name().value().toString();
-            _firstElement = false;
-        } else {
-            _builder << "." << n.name().value().toString();
-        }
-        algebra::walk<false>(n.getPath(), *this);
-    }
-
-    void walk(const PathIdentity& n) {
-        // no-op
-    }
-
-    template <typename T, typename... Ts>
-    void walk(const T& n, Ts&&...) {
-        tasserted(7814405, "Expected ABT to be of PathGet, or PathIdentity types.");
-    }
-
-    std::string str() {
-        return _builder.str();
-    }
-
-    static std::string stringify(const ABT& n) {
-        PathStringify stringifier;
-        algebra::walk<false>(n, stringifier);
-        return stringifier.str();
-    }
-
-private:
-    std::stringstream _builder;
-    bool _firstElement{true};
-};
 
 static sbe::EExpression::Vector toInlinedVector(
     std::vector<std::unique_ptr<sbe::EExpression>> args) {
@@ -272,7 +230,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
         boost::optional<sbe::value::SlotId> collatorSlot =
-            _runtimeEnv.getSlotIfExists("collator"_sd);
+            _namedSlots.getSlotIfExists("collator"_sd);
         if (collatorSlot) {
             return sbe::makeE<sbe::EPrimBinary>(
                 sbeOp, std::move(lhs), std::move(rhs), sbe::makeE<sbe::EVariable>(*collatorSlot));
@@ -331,8 +289,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             "The metadata must contain the scan definition specified by the "
             "IndexingAvailability property in order to perform shard filtering",
             _metadata->_scanDefs.contains(scanDefName));
-    const ABTVector& shardKeyPaths =
-        _metadata->_scanDefs.at(scanDefName).getDistributionAndPaths()._paths;
+    const auto& shardKeyPaths = _metadata->_scanDefs.at(scanDefName).shardingMetadata().shardKey();
 
     // Specify a BSONObj which will contain the shard key values.
     tassert(7814404,
@@ -343,7 +300,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     sbe::EExpression::Vector projectValues;
 
     for (auto& i : shardKeyPaths) {
-        projectFields.push_back(PathStringify::stringify(i));
+        projectFields.push_back(PathStringify::stringify(i._path));
     }
 
     // Fill out the values with SlotId variables. The specified slot will supply the values
@@ -356,7 +313,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             projectValues.push_back(sbe::makeE<sbe::EVariable>(slotId));
         } else {
             // Otherwise, lower the expression to be referenced by the 'shardFilter' function call.
-            SBEExpressionLowering exprLower{_env, _slotMap, _runtimeEnv};
+            SBEExpressionLowering exprLower{_env, _slotMap, _namedSlots};
             projectValues.push_back(exprLower.optimize(node));
         }
     }
@@ -378,7 +335,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
 
     // Prepare the FunctionCall expression.
     sbe::EExpression::Vector argVector;
-    argVector.push_back(sbe::makeE<sbe::EVariable>(_runtimeEnv.getSlot(kshardFiltererSlotName)));
+    argVector.push_back(sbe::makeE<sbe::EVariable>(_namedSlots.getSlot(kshardFiltererSlotName)));
     argVector.push_back(std::move(shardKeyBSONObjExpression));
     return sbe::makeE<sbe::EFunction>(name, std::move(argVector));
 }
@@ -434,8 +391,8 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
             "typeMatch",
             sbe::makeEs(std::move(args.at(0)),
                         sbe::makeE<sbe::EConstant>(
-                            sbe::value::TypeTags::NumberInt64,
-                            sbe::value::bitcastFrom<int64_t>(constPtr->getValueInt32()))));
+                            sbe::value::TypeTags::NumberInt32,
+                            sbe::value::bitcastFrom<int32_t>(constPtr->getValueInt32()))));
     }
 
     if (name == "shardFilter") {
@@ -885,7 +842,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
         aggs.push_back({slot, sbe::AggExprPair{nullptr, std::move(expr)}});
     }
 
-    boost::optional<sbe::value::SlotId> collatorSlot = _runtimeEnv.getSlotIfExists("collator"_sd);
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     // Unused
     sbe::value::SlotVector seekKeysSlots;
 
@@ -978,7 +935,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
     auto outerKeys = convertProjectionsToSlots(slotMap, n.getRightKeys());
     auto outerProjects = convertRequiredProjectionsToSlots(slotMap, rightProps, outerKeys);
 
-    boost::optional<sbe::value::SlotId> collatorSlot = _runtimeEnv.getSlotIfExists("collator"_sd);
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
                                           std::move(innerStage),

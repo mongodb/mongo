@@ -7,6 +7,7 @@ from threading import Lock
 from typing import Dict, List
 
 import yaml
+from buildscripts.antithesis_suite import get_antithesis_suite_config
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib.logging import loggers
@@ -274,12 +275,17 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     def process_overrides(cls, suite, overrides, suite_name):
         """Provide override key-value pairs for a given matrix suite."""
         base_suite_name = suite["base_suite"]
+        antithesis = suite.get("antithesis", None)
         override_names = suite.get("overrides", None)
         excludes_names = suite.get("excludes", None)
         eval_names = suite.get("eval", None)
         description = suite.get("description")
 
-        base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
+        if antithesis:
+            base_suite = get_antithesis_suite_config(base_suite_name)
+            base_suite["antithesis"] = True
+        else:
+            base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
 
         if base_suite is None:
             raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")

@@ -16,6 +16,7 @@ if (TestData.loadDepth >= 3) {
 }
 
 try {
+    /* eslint-disable-next-line no-restricted-syntax */
     load("jstests/noPassthrough/shell_load_file.js");
 } catch (e) {
     TestData.loadErrors.push(e);

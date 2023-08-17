@@ -88,7 +88,7 @@ configs:
             up both sharding and replication components use --maintenanceMode=standalone.
         arg_vartype: String 
         source: [ cli, ini ]
-        conflicts: [configsvr, shardsvr, replSet]
+        conflicts: [configsvr, shardsvr]
         validator:
             callback: validateMaintenanceModeSetting
     'net.internalPort':

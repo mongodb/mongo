@@ -21,8 +21,8 @@ print(`Metadata: ${tojson(dbMetadata)}\n`);
 // all chunks that must be loaded.
 const {chunkNames} = await import(`${dataDir}${dbName}.data`);
 
-runHistogramsTest(function() {
-    loadJSONDataset(testDB, chunkNames, dataDir, dbMetadata);
+await runHistogramsTest(async function() {
+    await loadJSONDataset(testDB, chunkNames, dataDir, dbMetadata);
 });
 
 for (const collMetadata of dbMetadata) {

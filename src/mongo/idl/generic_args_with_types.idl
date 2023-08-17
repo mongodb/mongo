@@ -217,10 +217,6 @@ structs:
                 cpp_name: "dollarTenant"
                 forward_to_shards: true
                 optional: true
-            placementConflictTime:
-                type: logicalTime
-                forward_to_shards: false
-                optional: true
 
     ClusterTimeSignature:
         description: "Structure used in '$clusterTime'."

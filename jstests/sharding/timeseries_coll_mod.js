@@ -2,10 +2,12 @@
  * Test $collMod command on a sharded timeseries collection.
  *
  * @tags: [
- *   requires_fcv_60,
+ *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to
+ *   # a time-series collection.
+ *   requires_fcv_71,
  * ]
  */
-
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
@@ -102,6 +104,16 @@ function runReadAfterWriteTest() {
     function assertDocumentOnShard(shard, _id) {
         const buckets =
             shard.getDB(dbName).getCollection(`system.buckets.${collName}`).find().toArray();
+
+        // If we are writing to time-series collections using the compressed format, the data fields
+        // will be compressed. We need to decompress the buckets on the shard in order to inspect
+        // the data._id field.
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            buckets.forEach(bucket => {
+                TimeseriesTest.decompressBucket(bucket);
+            });
+        }
+
         const _ids = [];
         buckets.forEach(bucket => {
             for (let key in bucket.data._id) {

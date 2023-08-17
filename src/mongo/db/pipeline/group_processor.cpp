@@ -212,7 +212,7 @@ void GroupProcessor::reset() {
 }
 
 bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
-    if (!_memoryTracker._allowDiskUse && !_memoryTracker.withinMemoryLimit()) {
+    if (!_memoryTracker.allowDiskUse() && !_memoryTracker.withinMemoryLimit()) {
         freeMemory();
     }
 
@@ -220,7 +220,7 @@ bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Exceeded memory limit for $group, but didn't allow external sort."
                 " Pass allowDiskUse:true to opt in.",
-                _memoryTracker._allowDiskUse);
+                _memoryTracker.allowDiskUse());
         return true;
     }
     return false;
@@ -229,8 +229,8 @@ bool GroupProcessor::shouldSpillWithAttemptToSaveMemory() {
 bool GroupProcessor::shouldSpillForDebugBuild(bool isNewGroup) {
     // In debug mode, spill every time we have a duplicate id to stress merge logic.
     return (kDebugBuild && !_expCtx->opCtx->readOnly() && !isNewGroup &&  // is not a new group
-            !_expCtx->inMongos &&            // can't spill to disk in mongos
-            _memoryTracker._allowDiskUse &&  // never spill when disk use is explicitly prohibited
+            !_expCtx->inMongos &&             // can't spill to disk in mongos
+            _memoryTracker.allowDiskUse() &&  // never spill when disk use is explicitly prohibited
             _sortedFiles.size() < 20);
 }
 

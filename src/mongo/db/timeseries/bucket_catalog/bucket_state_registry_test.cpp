@@ -662,7 +662,8 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     auto bucketId = bucket.bucketId;
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
-    auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
+    auto batch = std::make_shared<WriteBatch>(
+        BucketHandle{bucketId, info1.stripe}, 0, stats, bucket.timeField);
 
     internal::abort(*this, stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
@@ -678,7 +679,8 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
-    auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
+    auto batch = std::make_shared<WriteBatch>(
+        BucketHandle{bucketId, info1.stripe}, 0, stats, bucket.timeField);
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*this, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));

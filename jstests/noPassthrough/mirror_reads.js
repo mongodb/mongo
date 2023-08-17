@@ -7,13 +7,15 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 function setParameter({rst, value}) {
     return rst.getPrimary().adminCommand({setParameter: 1, mirrorReads: value});
 }
 
 const kBurstCount = 1000;
 const kDbName = "mirrored_reads_test";
-const kCollName = "test";
+const kCollName = "coll";
 // We use an arbitrarily large maxTimeMS to avoid timing out when processing the mirrored read
 // on slower builds. Otherwise, on slower builds, the primary.mirroredReads.sent metric could
 // be incremented but not the secondary.mirroredReads.processedAsSecondary metric.
@@ -23,7 +25,7 @@ function getMirroredReadsStats(node) {
     return node.getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
 }
 
-function sendAndCheckReads({rst, cmd, minRate, maxRate, burstCount}) {
+function sendAndCheckReads({rst, db, cmd, minRate, maxRate, burstCount}) {
     const primary = rst.getPrimary();
     const secondaries = rst.getSecondaries();
     let initialPrimaryStats = getMirroredReadsStats(primary);
@@ -36,12 +38,12 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate, burstCount}) {
     jsTestLog(`Sending ${burstCount} request burst of ${tojson(cmd)} to primary`);
 
     for (var i = 0; i < burstCount; ++i) {
-        rst.getPrimary().getDB(kDbName).runCommand(cmd);
+        rst.getPrimary().getDB(db).runCommand(cmd);
     }
 
     jsTestLog(`Verifying ${tojson(cmd)} was mirrored`);
 
-    // Verify that the commands have been observed on the primary
+    // Verify that the commands have been observed on the primary.
     {
         const currentPrimaryStats = getMirroredReadsStats(primary);
         assert.lte(initialPrimaryStats.seen + burstCount, currentPrimaryStats.seen);
@@ -105,7 +107,7 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate, burstCount}) {
     jsTestLog(`Verified ${tojson(cmd)} was mirrored`);
 }
 
-function verifyMirrorReads(rst, cmd) {
+function verifyMirrorReads(rst, db, cmd) {
     {
         jsTestLog(`Verifying disabled read mirroring with ${tojson(cmd)}`);
         let samplingRate = 0.0;
@@ -113,6 +115,7 @@ function verifyMirrorReads(rst, cmd) {
         assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
         sendAndCheckReads({
             rst: rst,
+            db: db,
             cmd: cmd,
             minRate: samplingRate,
             maxRate: samplingRate,
@@ -127,6 +130,7 @@ function verifyMirrorReads(rst, cmd) {
         assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
         sendAndCheckReads({
             rst: rst,
+            db: db,
             cmd: cmd,
             minRate: samplingRate,
             maxRate: samplingRate,
@@ -143,7 +147,7 @@ function verifyMirrorReads(rst, cmd) {
 
         assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
         sendAndCheckReads(
-            {rst: rst, cmd: cmd, minRate: min, maxRate: max, burstCount: kBurstCount});
+            {rst: rst, db: db, cmd: cmd, minRate: min, maxRate: max, burstCount: kBurstCount});
     }
 }
 
@@ -167,6 +171,7 @@ function verifyProcessedAsSecondary(rst) {
     // resolved.
     sendAndCheckReads({
         rst: rst,
+        db: kDbName,
         cmd: {find: kCollName, filter: {}},
         minRate: samplingRate,
         maxRate: samplingRate,
@@ -207,16 +212,16 @@ function verifyProcessedAsSecondary(rst) {
     }
 
     jsTestLog("Verifying mirrored reads for 'find' commands");
-    verifyMirrorReads(rst, {find: kCollName, filter: {}, maxTimeMS: kLargeMaxTimeMS});
+    verifyMirrorReads(rst, kDbName, {find: kCollName, filter: {}, maxTimeMS: kLargeMaxTimeMS});
 
     jsTestLog("Verifying mirrored reads for 'count' commands");
-    verifyMirrorReads(rst, {count: kCollName, query: {}, maxTimeMS: kLargeMaxTimeMS});
+    verifyMirrorReads(rst, kDbName, {count: kCollName, query: {}, maxTimeMS: kLargeMaxTimeMS});
 
     jsTestLog("Verifying mirrored reads for 'distinct' commands");
-    verifyMirrorReads(rst, {distinct: kCollName, key: "x", maxTimeMS: kLargeMaxTimeMS});
+    verifyMirrorReads(rst, kDbName, {distinct: kCollName, key: "x", maxTimeMS: kLargeMaxTimeMS});
 
     jsTestLog("Verifying mirrored reads for 'findAndModify' commands");
-    verifyMirrorReads(rst, {
+    verifyMirrorReads(rst, kDbName, {
         findAndModify: kCollName,
         query: {},
         update: {'$inc': {x: 1}},
@@ -224,7 +229,7 @@ function verifyProcessedAsSecondary(rst) {
     });
 
     jsTestLog("Verifying mirrored reads for 'update' commands");
-    verifyMirrorReads(rst, {
+    verifyMirrorReads(rst, kDbName, {
         update: kCollName,
         updates: [{q: {_id: 1}, u: {'$inc': {x: 1}}}],
         ordered: false,
@@ -233,6 +238,21 @@ function verifyProcessedAsSecondary(rst) {
 
     jsTestLog("Verifying processedAsSecondary field for 'find' commands");
     verifyProcessedAsSecondary(rst);
+
+    if (FeatureFlagUtil.isEnabled(rst.getPrimary(), "BulkWriteCommand")) {
+        jsTestLog("Verifying mirrored reads for 'bulkWrite' commands");
+        verifyMirrorReads(rst, "admin", {
+            bulkWrite: 1,
+            ops: [
+                {insert: 1, document: {_id: 0, x: 0}},
+                {update: 0, filter: {_id: 0}, updateMods: {'$inc': {x: 1}}, upsert: true},
+                {update: 1, filter: {_id: 1}, updateMods: {'$inc': {x: 1}}, upsert: true},
+            ],
+            nsInfo: [{ns: kDbName + ".coll1"}, {ns: kDbName + ".coll2"}],
+            ordered: false,
+            maxTimeMS: kLargeMaxTimeMS
+        });
+    }
 
     rst.stopSet();
 }
@@ -286,6 +306,7 @@ function verifyMirroringDistribution(rst) {
 
     sendAndCheckReads({
         rst: rst,
+        db: kDbName,
         cmd: {find: kCollName, filter: {}},
         minRate: min,
         maxRate: max,

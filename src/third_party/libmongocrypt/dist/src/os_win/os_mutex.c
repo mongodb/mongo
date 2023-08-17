@@ -18,28 +18,20 @@
 
 #ifdef _WIN32
 
-void
-_mongocrypt_mutex_init (mongocrypt_mutex_t *mutex)
-{
-   InitializeCriticalSection (mutex);
+void _mongocrypt_mutex_init(mongocrypt_mutex_t *mutex) {
+    InitializeCriticalSection(mutex);
 }
 
-void
-_mongocrypt_mutex_cleanup (mongocrypt_mutex_t *mutex)
-{
-   DeleteCriticalSection (mutex);
+void _mongocrypt_mutex_cleanup(mongocrypt_mutex_t *mutex) {
+    DeleteCriticalSection(mutex);
 }
 
-void
-_mongocrypt_mutex_lock (mongocrypt_mutex_t *mutex)
-{
-   EnterCriticalSection (mutex);
+void _mongocrypt_mutex_lock(mongocrypt_mutex_t *mutex) {
+    EnterCriticalSection(mutex);
 }
 
-void
-_mongocrypt_mutex_unlock (mongocrypt_mutex_t *mutex)
-{
-   LeaveCriticalSection (mutex);
+void _mongocrypt_mutex_unlock(mongocrypt_mutex_t *mutex) {
+    LeaveCriticalSection(mutex);
 }
 
 #endif /* _WIN32 */

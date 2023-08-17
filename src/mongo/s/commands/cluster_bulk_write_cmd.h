@@ -137,7 +137,14 @@ public:
                    BulkWriteCommandRequest bulkRequest)
             : CommandInvocation(command),
               _opMsgRequest{&request},
-              _request{std::move(bulkRequest)} {}
+              _request{std::move(bulkRequest)} {
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+
+            bulk_write_common::validateRequest(_request);
+        }
 
         const BulkWriteCommandRequest& getBulkRequest() const {
             return _request;
@@ -273,13 +280,6 @@ public:
                      BulkWriteCommandRequest& bulkRequest,
                      BSONObjBuilder& result) const {
             BulkWriteCommandReply response;
-
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
-
-            bulk_write_common::validateRequest(bulkRequest);
 
             auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest);
             response = _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));

@@ -245,6 +245,16 @@ def run_test(test: Test, client: DockerClient) -> Result:
             "yum -y install yum-utils epel-release",
             "yum-config-manager --enable epel",
         ]
+    if test.os_name.startswith('debian92'):
+        # Adapted from https://stackoverflow.com/questions/76094428/debian-stretch-repositories-404-not-found
+        # Debian92 renamed its repos to archive
+        # The first two sed commands are to replace debian92's sources list to archive repo
+        # The last sed command will delete all lines matching "stretch-updates"
+        commands += [
+            "sed -i -e 's/deb.debian.org/archive.debian.org/g' \
+                -e 's|security.debian.org|archive.debian.org/|g' \
+                -e '/stretch-updates/d' /etc/apt/sources.list",
+        ]
 
     commands += [
         test.update_command,

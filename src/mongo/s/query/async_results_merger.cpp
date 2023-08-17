@@ -900,7 +900,8 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
 
 bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
     return (remote.status.isOK() || remote.status == ErrorCodes::MaxTimeMSExpired ||
-            remote.status == ErrorCodes::Interrupted) &&
+            remote.status == ErrorCodes::Interrupted ||
+            ErrorCodes::isNotPrimaryError(remote.status.code())) &&
         remote.cursorId && !remote.exhausted();
 }
 

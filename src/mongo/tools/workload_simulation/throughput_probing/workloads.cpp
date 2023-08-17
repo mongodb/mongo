@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/tools/workload_simulation/simulation.h"
 #include "mongo/tools/workload_simulation/throughput_probing/throughput_probing_simulator.h"
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
@@ -42,7 +43,7 @@ namespace {
  * - Optimal load and throughput are moderate
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, OverloadBasic, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, OverloadBasic) {
     RWPair optimalConcurrency{10, 10};
     RWPair throughputAtOptimalConcurrency{5'000, 5'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -58,26 +59,9 @@ SIMULATION(ThroughputProbing, OverloadBasic, 4, 16, 128, Milliseconds{100}) {
  * - Throughput at optimal load is quite low
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, OverloadLowThroughput, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, OverloadLowThroughput) {
     RWPair optimalConcurrency{10, 10};
     RWPair throughputAtOptimalConcurrency{100, 100};
-    auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
-        optimalConcurrency, throughputAtOptimalConcurrency);
-
-    start(std::make_unique<TicketedWorkloadDriver>(queue(), std::move(characteristics)), 128, 128);
-    run(Seconds{20});
-}
-
-/**
- * - Offered load exceeds optimal
- * - Optimal load is moderate
- * - Throughput at optimal load is quite low
- * - Long monitoring interval
- */
-SIMULATION(
-    ThroughputProbing, OverloadLowThroughputLongPollingPeriod, 4, 16, 128, Milliseconds{500}) {
-    RWPair optimalConcurrency{10, 10};
-    RWPair throughputAtOptimalConcurrency{1'000, 1'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
         optimalConcurrency, throughputAtOptimalConcurrency);
 
@@ -91,7 +75,7 @@ SIMULATION(
  * - Throughput at optimal load is high
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, OverloadHighConcurrency, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, OverloadHighConcurrency) {
     RWPair optimalConcurrency{100, 100};
     RWPair throughputAtOptimalConcurrency{50'000, 50'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -108,7 +92,7 @@ SIMULATION(ThroughputProbing, OverloadHighConcurrency, 4, 16, 128, Milliseconds{
  *   - For second, optimal load and throughput are high
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, OverloadAdjustsUpToDifferentWorkload, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, OverloadAdjustsUpToDifferentWorkload) {
     RWPair initialOptimalConcurrency{10, 10};
     RWPair initialThroughputAtOptimalConcurrency{5'000, 5'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -133,12 +117,7 @@ SIMULATION(ThroughputProbing, OverloadAdjustsUpToDifferentWorkload, 4, 16, 128, 
  *   - For second, optimal load and throughput are half that in the first period
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing,
-           OverloadDoesNotAdjustDownToDifferentWorkload,
-           4,
-           16,
-           128,
-           Milliseconds{100}) {
+SIMULATION(ThroughputProbing, OverloadDoesNotAdjustDownToDifferentWorkload) {
     RWPair initialOptimalConcurrency{20, 20};
     RWPair initialThroughputAtOptimalConcurrency{20'000, 20'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -161,7 +140,7 @@ SIMULATION(ThroughputProbing,
  * - Optimal load and throughput are moderate
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, StableBasic, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, StableBasic) {
     RWPair optimalConcurrency{20, 20};
     RWPair throughputAtOptimalConcurrency{5'000, 5'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -182,7 +161,7 @@ SIMULATION(ThroughputProbing, StableBasic, 4, 16, 128, Milliseconds{100}) {
  *   - For second, offered load increases by 50%
  * - Standard monitoring interval
  */
-SIMULATION(ThroughputProbing, StableAdjustsUpToProvidedLoad, 4, 16, 128, Milliseconds{100}) {
+SIMULATION(ThroughputProbing, StableAdjustsUpToProvidedLoad) {
     RWPair optimalConcurrency{20, 20};
     RWPair throughputAtOptimalConcurrency{5'000, 5'000};
     auto characteristics = std::make_unique<ParabolicWorkloadCharacteristics>(
@@ -197,7 +176,7 @@ SIMULATION(ThroughputProbing, StableAdjustsUpToProvidedLoad, 4, 16, 128, Millise
     // Increase offered load by 50%, but keep it under optimal level.
     RWPair higherProvidedLoad{15, 15};
     resize(higherProvidedLoad.read, higherProvidedLoad.write);
-    run(Seconds(2));
+    run(Seconds(20));
 }
 
 }  // namespace

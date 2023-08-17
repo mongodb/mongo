@@ -11,9 +11,13 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to
+ *   # a time-series collection.
+ *   requires_fcv_71,
  * ]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
@@ -267,13 +271,18 @@ function testOplogCloning(ordered) {
     assert.eq(docs[0].stmtId.length, 3);
     assert.eq(docs[1].stmtId.length, 3);
 
-    // Verify that docs contain the right oplog entry.
-    getTagsFromOplog(docs[0]).forEach(tag => {
-        assert.eq(tag, insertTag);
-    });
-    getTagsFromOplog(docs[1]).forEach(tag => {
-        assert.eq(tag, updateTag);
-    });
+    // TODO SERVER-77347: Re-enable. Currently, not all the tags will match because some
+    // updates will be full replacements in the oplog (i.e. if we insert into a compressed bucket
+    // and the update decompresses the bucket), and some updates will have diffs (i.e. if we update
+    // an already-decompressed bucket).
+    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(donorPrimary.getDB("admin"))) {
+        getTagsFromOplog(docs[0]).forEach(tag => {
+            assert.eq(tag, insertTag);
+        });
+        getTagsFromOplog(docs[1]).forEach(tag => {
+            assert.eq(tag, updateTag);
+        });
+    }
 
     donorRst.stopSet();
     recipientRst.stopSet();

@@ -196,8 +196,22 @@ public:
                 stdx::unique_lock<Latch> lk(fsyncStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
+                Milliseconds deadline = Milliseconds::max();
+                if (forBackup &&
+                    feature_flags::gClusterFsyncLock.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    // Set a default deadline of 90s for the fsyncLock to be acquired.
+                    deadline = Milliseconds(90000);
+                    // Parse the cmdObj and update the deadline if
+                    // "fsyncLockAcquisitionTimeoutMillis" exists.
+                    for (const auto& elem : cmdObj) {
+                        if (elem.fieldNameStringData() == "fsyncLockAcquisitionTimeoutMillis") {
+                            deadline = Milliseconds{uassertStatusOK(parseMaxTimeMS(elem))};
+                        }
+                    }
+                }
                 globalFsyncLockThread = std::make_unique<FSyncLockThread>(
-                    opCtx->getServiceContext(), allowFsyncFailure);
+                    opCtx->getServiceContext(), allowFsyncFailure, deadline);
                 globalFsyncLockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {
@@ -403,8 +417,15 @@ void FSyncLockThread::run() {
     try {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
 
+        // If the deadline exists, set it on the opCtx and GlobalRead lock.
+        Date_t lockDeadline = Date_t::max();
+        if (_deadline < Milliseconds::max()) {
+            lockDeadline = Date_t::now() + _deadline;
+        }
+
+        opCtx.setDeadlineAfterNowBy(Milliseconds(_deadline), ErrorCodes::ExceededTimeLimit);
+        Lock::GlobalRead global(&opCtx, lockDeadline, Lock::InterruptBehavior::kThrow);
         StorageEngine* storageEngine = _serviceContext->getStorageEngine();
 
         try {
@@ -476,6 +497,16 @@ void FSyncLockThread::run() {
             }
         }
 
+    } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+        LOGV2_ERROR(204739, "Fsync timed out with ExceededTimeLimitError");
+        fsyncCmd.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
+        fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+        return;
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        LOGV2_ERROR(204740, "Fsync timed out with LockTimeout");
+        fsyncCmd.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
+        fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+        return;
     } catch (const std::exception& e) {
         LOGV2_FATAL(40350,
                     "FSyncLockThread exception: {error}",

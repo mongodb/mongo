@@ -38,6 +38,11 @@ timestamp_manager=
 ),
 workload_manager=
 (
+    background_compact_config=
+    (
+        thread_count=1,
+        free_space_target_mb=20,
+    ),
     checkpoint_config=
     (
         op_rate=5s,
