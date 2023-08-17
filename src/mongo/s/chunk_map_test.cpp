@@ -41,6 +41,7 @@ using chunks_test_util::assertEqualChunkInfo;
 using chunks_test_util::calculateCollVersion;
 using chunks_test_util::calculateIntermediateShardKey;
 using chunks_test_util::genChunkVector;
+using chunks_test_util::genRandomSplitPoints;
 using chunks_test_util::performRandomChunkOperations;
 
 namespace {
@@ -50,7 +51,7 @@ PseudoRandom _random{SecureRandom().nextInt64()};
 const ShardId kThisShard("testShard");
 
 ShardPlacementVersionMap getShardVersionMap(const ChunkMap& chunkMap) {
-    return chunkMap.constructShardPlacementVersionMap();
+    return chunkMap.getShardPlacementVersionMap();
 }
 
 std::map<ShardId, ChunkVersion> calculateShardVersions(
@@ -98,7 +99,10 @@ public:
     }
 
     ChunkMap makeChunkMap(const std::vector<std::shared_ptr<ChunkInfo>>& chunks) const {
-        return ChunkMap{collEpoch(), collTimestamp()}.createMerged(chunks);
+        const auto chunkBucketSize =
+            static_cast<size_t>(_random.nextInt64(chunks.size() * 1.2) + 1);
+        LOGV2(7162701, "Creating new chunk map", "chunkBucketSize"_attr = chunkBucketSize);
+        return ChunkMap{collEpoch(), collTimestamp(), chunkBucketSize}.createMerged(chunks);
     }
 
     std::vector<ChunkType> genRandomChunkVector(size_t maxNumChunks = 30,
@@ -153,6 +157,16 @@ TEST_F(ChunkMapTest, ConstructChunkMapRandom) {
     ASSERT_EQ(expectedShardVersions.size(), shardVersions.size());
     for (const auto& mapIt : shardVersions) {
         ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
+    }
+
+    // Check that vectors are balanced in size
+    auto maxVectorSize = static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() * 1.5));
+    auto minVectorSize = std::min(
+        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
+
+    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
+        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
+        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
     }
 }
 
@@ -212,6 +226,40 @@ TEST_F(ChunkMapTest, ConstructChunkMapMismatchingTimestamp) {
 
     ASSERT_THROWS_CODE(
         makeChunkMap(chunkVector), AssertionException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(ChunkMapTest, UpdateMapNotLeaveSmallVectors) {
+    const ChunkVersion initialVersion{{collEpoch(), collTimestamp()}, {1, 0}};
+    auto chunkVector = toChunkInfoPtrVector(
+        genChunkVector(uuid(), genRandomSplitPoints(8), initialVersion, 1 /*numShards*/));
+
+    const auto chunkBucketSize = 4;
+    LOGV2(7162703, "Constructing new chunk map", "chunkBucketSize"_attr = chunkBucketSize);
+    const auto initialChunkMap =
+        ChunkMap(collEpoch(), collTimestamp(), chunkBucketSize).createMerged(chunkVector);
+
+    // Check that it contains all the chunks
+    ASSERT_EQ(chunkVector.size(), initialChunkMap.size());
+
+    auto mergedVersion = initialChunkMap.getVersion();
+    mergedVersion.incMinor();
+
+    auto mergedChunk = std::make_shared<ChunkInfo>(ChunkType{
+        uuid(),
+        ChunkRange{chunkVector[4]->getRange().getMin(), chunkVector.back()->getRange().getMax()},
+        mergedVersion,
+        kThisShard});
+    const auto chunkMap = initialChunkMap.createMerged({mergedChunk});
+
+    // Check that vectors are balanced in size
+    auto maxVectorSize = std::lround(chunkMap.getMaxChunkVectorSize() * 1.5);
+    auto minVectorSize = std::min(
+        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
+
+    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
+        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
+        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
+    }
 }
 
 /*
@@ -303,6 +351,16 @@ TEST_F(ChunkMapTest, UpdateChunkMapRandom) {
     for (const auto& mapIt : shardVersions) {
         ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
     }
+
+    // Check that vectors are balanced in size
+    auto maxVectorSize = static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() * 1.5));
+    auto minVectorSize = std::min(
+        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
+
+    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
+        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
+        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
+    }
 }
 
 TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
@@ -337,6 +395,7 @@ TEST_F(ChunkMapTest, TestEnumerateAllChunks) {
 
     ASSERT_EQ(count, newChunkMap.size());
 }
+
 
 TEST_F(ChunkMapTest, TestIntersectingChunk) {
     ChunkVersion version{{collEpoch(), collTimestamp()}, {1, 0}};

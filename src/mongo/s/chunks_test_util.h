@@ -95,7 +95,8 @@ ChunkVersion calculateCollVersion(const std::map<ShardId, ChunkVersion>& shardVe
  */
 BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
                                       const BSONObj& rightKey,
-                                      double minKeyProb = 0.0);
+                                      double minKeyProb = 0.0,
+                                      double maxKeyProb = 0.0);
 
 /*
  * Perform a series of random operations on the given list of chunks.

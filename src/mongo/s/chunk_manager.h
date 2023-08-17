@@ -41,7 +41,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/read_through_cache.h"
 
 namespace mongo {
@@ -54,6 +53,9 @@ struct PlacementVersionTargetingInfo {
 
     // Max chunk version for the shard
     ChunkVersion placementVersion;
+
+    PlacementVersionTargetingInfo(const PlacementVersionTargetingInfo& info)
+        : isStale(info.isStale.load()), placementVersion(info.placementVersion) {}
 
     PlacementVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp);
 };
@@ -69,49 +71,128 @@ using ShardPlacementVersionMap =
  * underlying implementation.
  */
 class ChunkMap {
-    // Vector of chunks ordered by max key.
-    using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
-
 public:
-    ChunkMap(OID epoch, const Timestamp& timestamp, size_t initialCapacity = 0);
+    // Vector of chunks ordered by max key in ascending order.
+    using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
+    using ChunkVectorMap = std::map<std::string, std::shared_ptr<ChunkVector>>;
 
-    size_t size() const {
-        return _chunkMap.size();
-    }
+    explicit ChunkMap(OID epoch, const Timestamp& timestamp, size_t chunkVectorSize)
+        : _collectionPlacementVersion({epoch, timestamp}, {0, 0}),
+          _maxChunkVectorSize(chunkVectorSize) {}
 
+    size_t size() const;
+
+    // Max version across all chunks
     ChunkVersion getVersion() const {
         return _collectionPlacementVersion;
     }
 
+    size_t getMaxChunkVectorSize() const {
+        return _maxChunkVectorSize;
+    }
+
+    const ShardPlacementVersionMap& getShardPlacementVersionMap() const {
+        return _placementVersions;
+    }
+
+    const ChunkVectorMap& getChunkVectorMap() const {
+        return _chunkVectorMap;
+    }
+
+
+    /*
+     * Invoke the given handler for each std::shared_ptr<ChunkInfo> contained in this chunk map
+     * until either all matching chunks have been processed or @handler returns false.
+     *
+     * Chunks are yielded in ascending order of shardkey (e.g. minKey to maxKey);
+     *
+     * When shardKey is provided the function will start yileding from the chunk that contains the
+     * given shard key.
+     */
     template <typename Callable>
     void forEach(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
-        auto it = shardKey.isEmpty() ? _chunkMap.begin() : _findIntersectingChunk(shardKey);
+        if (shardKey.isEmpty()) {
+            for (const auto& mapIt : _chunkVectorMap) {
+                for (const auto& chunkInfoPtr : *(mapIt.second)) {
+                    if (!handler(chunkInfoPtr))
+                        return;
+                }
+            }
 
-        for (; it != _chunkMap.end(); ++it) {
-            if (!handler(*it))
-                break;
+            return;
+        }
+
+        auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+
+        const auto mapItBegin = _chunkVectorMap.upper_bound(shardKeyString);
+        for (auto mapIt = mapItBegin; mapIt != _chunkVectorMap.end(); mapIt++) {
+            const auto& chunkVector = *(mapIt->second);
+            auto it = mapIt == mapItBegin ? _findIntersectingChunkIterator(shardKeyString,
+                                                                           chunkVector.begin(),
+                                                                           chunkVector.end(),
+                                                                           true /*isMaxInclusive*/)
+                                          : chunkVector.begin();
+            for (; it != chunkVector.end(); ++it) {
+                if (!handler(*it))
+                    return;
+            }
         }
     }
 
+
+    /*
+     * Invoke the given @handler for each std::shared_ptr<ChunkInfo> that overlaps with range [@min,
+     * @max] until either all matching chunks have been processed or @handler returns false.
+     *
+     * Chunks are yielded in ascending order of shardkey (e.g. minKey to maxKey);
+     *
+     * When @isMaxInclusive is true also the chunk whose minKey is equal to @max will be yielded.
+     */
     template <typename Callable>
     void forEachOverlappingChunk(const BSONObj& min,
                                  const BSONObj& max,
                                  bool isMaxInclusive,
                                  Callable&& handler) const {
-        const auto bounds = _overlappingBounds(min, max, isMaxInclusive);
+        const auto minShardKeyStr = ShardKeyPattern::toKeyString(min);
+        const auto maxShardKeyStr = ShardKeyPattern::toKeyString(max);
+        const auto bounds =
+            _overlappingVectorSlotBounds(minShardKeyStr, maxShardKeyStr, isMaxInclusive);
+        for (auto mapIt = bounds.first; mapIt != bounds.second; ++mapIt) {
 
-        for (auto it = bounds.first; it != bounds.second; ++it) {
-            if (!handler(*it))
-                break;
+            const auto& chunkVector = *(mapIt->second);
+
+            const auto chunkItBegin = [&] {
+                if (mapIt == bounds.first) {
+                    // On first vector we need to start from chunk that contain the given minKey
+                    return _findIntersectingChunkIterator(minShardKeyStr,
+                                                          chunkVector.begin(),
+                                                          chunkVector.end(),
+                                                          true /* isMaxInclusive */);
+                }
+                return chunkVector.begin();
+            }();
+
+            const auto chunkItEnd = [&] {
+                if (mapIt == std::prev(bounds.second)) {
+                    // On last vector we need to skip all chunks that are greater than the give
+                    // maxKey
+                    auto it = _findIntersectingChunkIterator(
+                        maxShardKeyStr, chunkItBegin, chunkVector.end(), isMaxInclusive);
+                    return it == chunkVector.end() ? it : ++it;
+                }
+                return chunkVector.end();
+            }();
+
+            for (auto chunkIt = chunkItBegin; chunkIt != chunkItEnd; ++chunkIt) {
+                if (!handler(*chunkIt))
+                    return;
+            }
         }
     }
 
-    ShardPlacementVersionMap constructShardPlacementVersionMap() const;
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
-    void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
-
-    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const;
+    ChunkMap createMerged(ChunkVector changedChunks) const;
 
     BSONObj toBSON() const;
 
@@ -120,15 +201,41 @@ public:
     static bool allElementsAreOfType(BSONType type, const BSONObj& obj);
 
 private:
-    ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
-                                                       bool isMaxInclusive = true) const;
-    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator> _overlappingBounds(
-        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
+    ChunkVector::const_iterator _findIntersectingChunkIterator(const std::string& shardKeyString,
+                                                               ChunkVector::const_iterator first,
+                                                               ChunkVector::const_iterator last,
+                                                               bool isMaxInclusive) const;
 
-    ChunkVector _chunkMap;
+    std::pair<ChunkVectorMap::const_iterator, ChunkVectorMap::const_iterator>
+    _overlappingVectorSlotBounds(const std::string& minShardKeyStr,
+                                 const std::string& maxShardKeyStr,
+                                 bool isMaxInclusive) const;
+    ChunkMap _makeUpdated(ChunkVector&& changedChunks) const;
+
+    void _updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk);
+    void _updateShardVersionFromUpdateChunk(const ChunkInfo& chunk);
+    void _commitUpdatedChunkVector(std::shared_ptr<ChunkVector>&& chunkVectorPtr,
+                                   bool checkMaxKeyConsistency);
+    void _mergeAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator pos,
+                                           std::shared_ptr<ChunkVector>&& chunkVectorPtr);
+    void _splitAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator pos,
+                                           std::shared_ptr<ChunkVector>&& chunkVectorPtr);
+
+    ChunkVectorMap _chunkVectorMap;
 
     // Max version across all chunks
     ChunkVersion _collectionPlacementVersion;
+
+    // The representation of shard versions and staleness indicators for this namespace. If a
+    // shard does not exist, it will not have an entry in the map.
+    // Note: this declaration must not be moved before _chunkMap since it is initialized by using
+    // the _chunkVectorMap instance.
+    ShardPlacementVersionMap _placementVersions;
+
+    // Maximum size of chunk vectors stored in the chunk vector map.
+    // Bigger vectors will imply slower incremental refreshes (more chunks to copy) but
+    // faster map copy (less chunk vector pointers to copy).
+    size_t _maxChunkVectorSize;
 };
 
 /**

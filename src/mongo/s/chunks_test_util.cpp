@@ -169,11 +169,17 @@ std::vector<ChunkType> genRandomChunkVector(const UUID& uuid,
 
 BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
                                       const BSONObj& rightKey,
-                                      double minKeyProb) {
+                                      double minKeyProb,
+                                      double maxKeyProb) {
     invariant(0 <= minKeyProb && minKeyProb <= 1, "minKeyProb out of range [0, 1]");
+    invariant(0 <= maxKeyProb && maxKeyProb <= 1, "maxKeyProb out of range [0, 1]");
 
     if (_random.nextInt32(100) < minKeyProb * 100) {
         return leftKey;
+    }
+
+    if (_random.nextInt32(100) < maxKeyProb * 100) {
+        return rightKey;
     }
 
     const auto isMinKey = leftKey.woCompare(kShardKeyPattern.globalMin()) == 0;

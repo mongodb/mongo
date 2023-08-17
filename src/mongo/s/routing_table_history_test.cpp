@@ -32,11 +32,15 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunks_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -144,6 +148,13 @@ public:
     }
 
     RoutingTableHistory makeNewRt(const std::vector<ChunkType>& chunks) const {
+        const auto chunkBucketSize = llround(_random.nextInt64(chunks.size() * 1.2)) + 1;
+        LOGV2(7162710,
+              "Creating new RoutingTable",
+              "chunkBucketSize"_attr = chunkBucketSize,
+              "numChunks"_attr = chunks.size());
+        RAIIServerParameterControllerForTest chunkBucketSizeParameter(
+            "routingTableCacheChunkBucketSize", chunkBucketSize);
         return RoutingTableHistory::makeNew(kNss,
                                             _collUUID,
                                             _shardKeyPattern,
@@ -189,17 +200,11 @@ public:
         return *_rt;
     }
 
-    uint64_t getBytesInOriginalChunk() const {
-        return _bytesInOriginalChunk;
-    }
-
     std::vector<BSONObj> getInitialChunkBoundaryPoints() {
         return _initialChunkBoundaryPoints;
     }
 
 private:
-    uint64_t _bytesInOriginalChunk{4ull};
-
     boost::optional<RoutingTableHistory> _rt;
 
     std::vector<BSONObj> _initialChunkBoundaryPoints;
@@ -258,15 +263,6 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
 TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
     auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
 
-    {
-        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
-        // thus associate each chunk to a different shard.
-        // TODO SERVER-77090: stop forcing chunks on different shards
-        for (size_t i = 0; i < chunks.size(); i++) {
-            chunks[i].setShard(getShardId(i));
-        }
-    }
-
     // Remove one random chunk to simulate a gap in the shardkey
     chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
 
@@ -282,15 +278,6 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
  */
 TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
     auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
-
-    {
-        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
-        // thus associate each chunk to a different shard.
-        // TODO SERVER-77090: stop forcing chunks on different shards
-        for (size_t i = 0; i < chunks.size(); i++) {
-            chunks[i].setShard(getShardId(i));
-        }
-    }
 
     auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
     auto intermediateKey =
@@ -312,15 +299,6 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
  */
 TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
     auto chunks = genRandomChunkVector();
-
-    {
-        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
-        // thus associate each chunk to a different shard.
-        // TODO SERVER-77090: stop forcing chunks on different shards
-        for (size_t i = 0; i < chunks.size(); i++) {
-            chunks[i].setShard(getShardId(i));
-        }
-    }
 
     // Create a new routing table from the randomly generated chunks
     auto rt = makeNewRt(chunks);
@@ -355,22 +333,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
 TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
     auto chunks = genRandomChunkVector(2 /* minNumChunks */);
 
-    {
-        // Chunks overlaps are detected only if the overlap is between chunks belonging to different
-        // shards, thus associate each chunk to a different shard.
-        // TODO SERVER-77090: stop forcing chunks on different shards
-        for (size_t i = 0; i < chunks.size(); i++) {
-            chunks[i].setShard(getShardId(i));
-        }
-    }
-
     auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
-
-    // Current implementation does not fail if the overlap between two chunks is complete
-    // (e.g. [0, 5] and [0, 10])
-    // thus we need to generate a semi overlap between two chunks
-    // (e.g. [0, 5] and [3, 10])
-    // TODO SERVER-77090: extend check to cover for complete overlaps
 
     const auto canExtendLeft = chunkToExtendIt > chunks.begin();
     const auto extendRight =
@@ -378,15 +341,25 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
     const auto extendLeft = !extendRight;
     if (extendRight) {
         // extend right bound
-        chunkToExtendIt->setMax(calculateIntermediateShardKey(
-            chunkToExtendIt->getMax(), std::next(chunkToExtendIt)->getMax()));
+        chunkToExtendIt->setMax(calculateIntermediateShardKey(chunkToExtendIt->getMax(),
+                                                              std::next(chunkToExtendIt)->getMax(),
+                                                              0.0 /* minKeyProb */,
+                                                              0.1 /* maxKeyProb */));
+        auto newVersion = chunkToExtendIt->getVersion();
+        newVersion.incMajor();
+        std::next(chunkToExtendIt)->setVersion(newVersion);
     }
 
     if (extendLeft) {
         invariant(canExtendLeft);
         // extend left bound
         chunkToExtendIt->setMin(calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
-                                                              chunkToExtendIt->getMin()));
+                                                              chunkToExtendIt->getMin(),
+                                                              0.1 /* minKeyProb */,
+                                                              0.0 /* maxKeyProb */));
+        auto newVersion = chunkToExtendIt->getVersion();
+        newVersion.incMajor();
+        std::prev(chunkToExtendIt)->setVersion(newVersion);
     }
 
     // Create a new routing table from the randomly generated chunks
@@ -399,25 +372,11 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
 TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
     auto chunks = genRandomChunkVector(2 /* minNumChunks */);
 
-    {
-        // Chunks overlaps are detected only if the overlap is between chunks belonging to different
-        // shards, thus associate each chunk to a different shard.
-        // TODO SERVER-77090: stop forcing chunks on different shards
-        for (size_t i = 0; i < chunks.size(); i++) {
-            chunks[i].setShard(getShardId(i));
-        }
-    }
     // Create a new routing table from the randomly generated chunks
     auto rt = makeNewRt(chunks);
     auto collVersion = rt.getVersion();
 
     auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
-
-    // Current implementation does not fail if the overlap between two chunks is complete
-    // (e.g. [0, 5] and [0, 10])
-    // thus we need to generate a semi overlap between two chunks
-    // (e.g. [0, 5] and [3, 10])
-    // TODO SERVER-77090: extend check to cover for complete overlaps
 
     const auto canExtendLeft = chunkToExtendIt > chunks.begin();
     const auto extendRight =
