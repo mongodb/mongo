@@ -232,6 +232,9 @@ public:
      *
      * Returns a boolean (alongside the bucket-level predicate) describing if the result contains
      * a metric predicate.
+     *
+     * If fixedBuckets is true, the bounds for the bucket-level predicates can be tighter, and
+     * therefore match fewer irrelevant buckets.
      */
     static std::pair<bool, BSONObj> pushdownPredicate(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -240,7 +243,8 @@ public:
         bool haveComputedMetaField,
         bool includeMetaField,
         bool assumeNoMixedSchemaData,
-        IneligiblePredicatePolicy policy);
+        IneligiblePredicatePolicy policy,
+        bool fixedBuckets);
 
     /**
      * Splits out a predicate on the meta field from a predicate on the bucket metric field.
@@ -271,7 +275,8 @@ public:
         bool haveComputedMetaField,
         bool includeMetaField,
         bool assumeNoMixedSchemaData,
-        IneligiblePredicatePolicy policy);
+        IneligiblePredicatePolicy policy,
+        bool fixedBuckets);
 
     bool includeMinTimeAsMetadata = false;
     bool includeMaxTimeAsMetadata = false;

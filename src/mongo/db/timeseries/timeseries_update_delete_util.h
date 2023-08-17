@@ -89,7 +89,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
 TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
-    const BSONObj& writeQuery);
+    const BSONObj& writeQuery,
+    bool fixedBuckets);
 
 // Type requirement 1 for isTimeseries()
 template <typename T>

@@ -353,7 +353,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
 TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
-    const BSONObj& writeQuery) {
+    const BSONObj& writeQuery,
+    bool fixedBuckets) {
     auto [metaOnlyExpr, bucketMetricExpr, residualExpr] =
         BucketSpec::getPushdownPredicates(expCtx,
                                           tsOptions,
@@ -361,7 +362,8 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
                                           /*haveComputedMetaField*/ false,
                                           tsOptions.getMetaField().has_value(),
                                           /*assumeNoMixedSchemaData*/ true,
-                                          BucketSpec::IneligiblePredicatePolicy::kIgnore);
+                                          BucketSpec::IneligiblePredicatePolicy::kIgnore,
+                                          fixedBuckets);
 
     // Combine the closed bucket filter and the bucket metric filter and the meta-only filter into a
     // single filter by $and-ing them together.

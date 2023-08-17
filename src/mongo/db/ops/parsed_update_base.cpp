@@ -136,8 +136,11 @@ void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     // If we're updating documents in a time-series collection, splits the match expression into a
     // bucket-level match expression and a residual expression so that we can push down the
     // bucket-level match expression to the system bucket collection scan or fetch/ixscan.
-    *_timeseriesUpdateQueryExprs = timeseries::getMatchExprsForWrites(
-        _expCtx, *_collection->getTimeseriesOptions(), _request->getQuery());
+    *_timeseriesUpdateQueryExprs =
+        timeseries::getMatchExprsForWrites(_expCtx,
+                                           *_collection->getTimeseriesOptions(),
+                                           _request->getQuery(),
+                                           _collection->areTimeseriesBucketsFixed());
 
     // At this point, we parsed user-provided match expression. After this point, the new canonical
     // query is internal to the bucket SCAN or FETCH and will have additional internal match

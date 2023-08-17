@@ -388,7 +388,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
     bool haveComputedMetaField,
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
-    IneligiblePredicatePolicy policy) {
+    IneligiblePredicatePolicy policy,
+    bool fixedBuckets) {
     auto [metaOnlyPred, bucketMetricPred, residualPred] =
         getPushdownPredicates(expCtx,
                               tsOptions,
@@ -396,7 +397,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
                               haveComputedMetaField,
                               includeMetaField,
                               assumeNoMixedSchemaData,
-                              policy);
+                              policy,
+                              fixedBuckets);
     BSONObjBuilder result;
     if (metaOnlyPred)
         metaOnlyPred->serialize(&result, {});
@@ -428,7 +430,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     bool haveComputedMetaField,
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
-    IneligiblePredicatePolicy policy) {
+    IneligiblePredicatePolicy policy,
+    bool fixedBuckets) {
 
     auto allowedFeatures = MatchExpressionParser::kDefaultSpecialFeatures;
     auto matchExpr = uassertStatusOK(
@@ -437,26 +440,30 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     auto metaField = haveComputedMetaField ? boost::none : tsOptions.getMetaField();
     auto [metaOnlyPred, residualPred] = splitOutMetaOnlyPredicate(std::move(matchExpr), metaField);
 
-    std::unique_ptr<MatchExpression> bucketMetricPred = residualPred
-        ? createPredicatesOnBucketLevelField(
-              residualPred.get(),
-              BucketSpec{
-                  tsOptions.getTimeField().toString(),
-                  metaField.map([](StringData s) { return s.toString(); }),
-                  // Since we are operating on a collection, not a query-result,
-                  // there are no inclusion/exclusion projections we need to apply
-                  // to the buckets before unpacking. So we can use default values for the rest of
-                  // the arguments.
-              },
-              *tsOptions.getBucketMaxSpanSeconds(),
-              expCtx,
-              haveComputedMetaField,
-              includeMetaField,
-              assumeNoMixedSchemaData,
-              policy,
-              false /* fixedBuckets */)
-              .loosePredicate
-        : nullptr;
+    std::unique_ptr<MatchExpression> bucketMetricPred = nullptr;
+    if (residualPred) {
+        auto bucketPredicate = createPredicatesOnBucketLevelField(
+            residualPred.get(),
+            BucketSpec{
+                tsOptions.getTimeField().toString(),
+                metaField.map([](StringData s) { return s.toString(); }),
+                // Since we are operating on a collection, not a query-result,
+                // there are no inclusion/exclusion projections we need to apply
+                // to the buckets before unpacking. So we can use default values
+                // for the rest of the arguments.
+            },
+            *tsOptions.getBucketMaxSpanSeconds(),
+            expCtx,
+            haveComputedMetaField,
+            includeMetaField,
+            assumeNoMixedSchemaData,
+            policy,
+            fixedBuckets);
+        bucketMetricPred = std::move(bucketPredicate.loosePredicate);
+        if (bucketPredicate.rewriteProvidesExactMatchPredicate) {
+            residualPred = nullptr;
+        }
+    }
 
     return {.metaOnlyExpr = std::move(metaOnlyPred),
             .bucketMetricExpr = std::move(bucketMetricPred),

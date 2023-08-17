@@ -109,8 +109,11 @@ Status ParsedDelete::parseRequest() {
         // If we're deleting documents from a time-series collection, splits the match expression
         // into a bucket-level match expression and a residual expression so that we can push down
         // the bucket-level match expression to the system bucket collection SCAN or FETCH/IXSCAN.
-        *_timeseriesDeleteQueryExprs = timeseries::getMatchExprsForWrites(
-            _expCtx, *_collection->getTimeseriesOptions(), _request->getQuery());
+        *_timeseriesDeleteQueryExprs =
+            timeseries::getMatchExprsForWrites(_expCtx,
+                                               *_collection->getTimeseriesOptions(),
+                                               _request->getQuery(),
+                                               _collection->areTimeseriesBucketsFixed());
 
         // At this point, we parsed user-provided match expression. After this point, the new
         // canonical query is internal to the bucket SCAN or FETCH/IXSCAN and will have additional

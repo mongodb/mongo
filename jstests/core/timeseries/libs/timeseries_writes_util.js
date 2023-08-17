@@ -102,14 +102,19 @@ export function getTestDB() {
     return testDB;
 }
 
-export function prepareCollection({dbToUse, collName, initialDocList}) {
+export function prepareCollection({dbToUse, collName, initialDocList, timeseriesOptions}) {
     if (!dbToUse) {
         dbToUse = getTestDB();
     }
     const coll = dbToUse.getCollection(collName);
     coll.drop();
-    assert.commandWorked(dbToUse.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(dbToUse.createCollection(coll.getName(), {
+        timeseries: {
+            timeField: timeFieldName,
+            metaField: metaFieldName,
+            ...timeseriesOptions,
+        }
+    }));
     assert.commandWorked(coll.insert(initialDocList));
 
     return coll;
@@ -337,14 +342,15 @@ export function testUpdateOne({
     nModified = nMatched,
     upsert = false,
     upsertedDoc,
-    failCode
+    failCode,
+    timeseriesOptions
 }) {
     const collName = getCallerName();
     jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
 
     const testDB = getTestDB();
     const coll = testDB.getCollection(collName);
-    prepareCollection({collName, initialDocList});
+    prepareCollection({collName, initialDocList, timeseriesOptions});
 
     let upd = {q: updateQuery, u: updateObj, multi: false, upsert: upsert};
     if (c) {
@@ -434,6 +440,7 @@ export function testCollation(
  * - res.residualFilter: The expected residual filter of the TS_MODIFY stage.
  * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
  * - res.nReturned: The expected number of documents returned by the TS_MODIFY stage.
+ * - timeseriesOptions: A document that will hold other time-series create collection options.
  */
 export function testFindOneAndRemove({
     initialDocList,
@@ -449,11 +456,16 @@ export function testFindOneAndRemove({
         nBucketsUnpacked,
         nReturned,
     },
+    timeseriesOptions
 }) {
     const callerName = getCallerName();
     jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
 
-    const coll = prepareCollection({collName: callerName, initialDocList: initialDocList});
+    const coll = prepareCollection({
+        collName: callerName,
+        initialDocList: initialDocList,
+        timeseriesOptions: timeseriesOptions
+    });
 
     const findAndModifyCmd = makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation);
     jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
@@ -524,6 +536,7 @@ export function testFindOneAndRemove({
  * - res.nMatched: The expected number of documents matched by the TS_MODIFY stage.
  * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
  * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
+ * - timeseriesOptions: A document that will hold other time-series create collection options.
  */
 export function testFindOneAndUpdate({
     initialDocList,
@@ -540,13 +553,14 @@ export function testFindOneAndUpdate({
         nModified,
         nUpserted,
     },
+    timeseriesOptions
 }) {
     const collName = getCallerName();
     jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
 
     const testDB = getTestDB();
     const coll = testDB.getCollection(collName);
-    prepareCollection({collName, initialDocList});
+    prepareCollection({collName, initialDocList, timeseriesOptions});
 
     const findAndModifyCmd = makeFindOneAndUpdateCommand(
         coll, filter, update, returnNew, upsert, fields, sort, collation);

@@ -174,6 +174,10 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 // planner, this will be true.
                 bool assumeNoMixedSchemaData = true;
 
+                // Fixed buckets is dependent on the time-series collection options not changing,
+                // this can change throughout the lifetime of the index.
+                bool fixedBuckets = false;
+
                 auto [hasMetricPred, bucketPred] =
                     BucketSpec::pushdownPredicate(expCtx,
                                                   options,
@@ -181,7 +185,8 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                                   haveComputedMetaField,
                                                   includeMetaField,
                                                   assumeNoMixedSchemaData,
-                                                  BucketSpec::IneligiblePredicatePolicy::kError);
+                                                  BucketSpec::IneligiblePredicatePolicy::kError,
+                                                  fixedBuckets);
 
                 hasPartialFilterOnMetaField = !hasMetricPred;
 
