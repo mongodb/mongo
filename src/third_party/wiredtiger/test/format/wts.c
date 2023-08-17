@@ -107,7 +107,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
      * can be generated in the library when we don't have a session. There's a global session we can
      * use, but that requires locking.
      */
-    if ((sap = session->app_private) != NULL && sap->trace != NULL) {
+    if (g.trace_conn != NULL && (sap = session->app_private) != NULL && sap->trace != NULL) {
         testutil_check(sap->trace->log_printf(sap->trace, "%s", message));
         if (!printf_msg)
             return (0);

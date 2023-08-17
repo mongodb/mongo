@@ -414,7 +414,7 @@ wt_wrap_close_session(WT_SESSION *session)
     WT_SESSION *trace;
 
     trace = NULL;
-    if ((sap = session->app_private) != NULL) {
+    if (g.trace_conn != NULL && (sap = session->app_private) != NULL) {
         trace = sap->trace;
         if (trace != NULL)
             testutil_check(trace->close(trace, NULL));
