@@ -114,22 +114,6 @@ REGISTER_DOCUMENT_SOURCE(_internalSetWindowFields,
                          DocumentSourceInternalSetWindowFields::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
-// TODO SERVER-79565: Implement time range pushdown in SBE
-bool hasTimeUnit(const std::vector<WindowFunctionStatement>& outputFields) {
-    for (const auto& outputField : outputFields) {
-        auto found =
-            stdx::visit(OverloadedVisitor{[](const WindowBounds::DocumentBased&) { return false; },
-                                          [](const WindowBounds::RangeBased& range) {
-                                              return range.unit.has_value();
-                                          }},
-                        outputField.expr->bounds().bounds);
-        if (found) {
-            return true;
-        }
-    }
-    return false;
-}
-
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(ErrorCodes::FailedToParse,
@@ -169,9 +153,6 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
-    if (hasTimeUnit(outputFields)) {
-        sbeCompatibility = SbeCompatibility::notCompatible;
-    }
 
     return create(std::move(expCtx),
                   std::move(partitionBy),
@@ -406,9 +387,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
-    if (hasTimeUnit(outputFields)) {
-        sbeCompatibility = SbeCompatibility::notCompatible;
-    }
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
         expCtx,

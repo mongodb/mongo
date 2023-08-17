@@ -1,6 +1,8 @@
 /**
  * Test time-based window bounds.
  */
+import "jstests/libs/sbe_assert_error_override.js";
+
 const coll = db.setWindowFields_time;
 coll.drop();
 

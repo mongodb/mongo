@@ -81,6 +81,7 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
@@ -3436,11 +3437,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return *documentBoundSlot;
     };
 
-    // Calculate slot for range based window bounds, and add corresponding stages.
+    // Calculate slot for range and time range based window bounds, and add corresponding stages.
     boost::optional<sbe::value::SlotId> rangeBoundSlot;
-    auto getRangeBoundSlot = [&]() {
-        if (!rangeBoundSlot) {
-            rangeBoundSlot = _slotIdGenerator.generate();
+    boost::optional<sbe::value::SlotId> timeRangeBoundSlot;
+    auto getRangeBoundSlot = [&](boost::optional<TimeUnit> unit) {
+        auto projectRangeBoundSlot = [&](StringData typeCheckFn, optimizer::ABT failABT) {
+            auto slot = _slotIdGenerator.generate();
             tassert(7914602,
                     "Range window should have a single sort component",
                     windowNode->sortBy && windowNode->sortBy->size() == 1);
@@ -3457,16 +3459,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 sortByName,
                 makeFillEmptyNull(std::move(sortByABT)),
                 optimizer::make<optimizer::If>(
-                    makeABTFunction("isNumber"_sd, makeVariable(sortByName)),
+                    makeABTFunction(typeCheckFn, makeVariable(sortByName)),
                     makeVariable(sortByName),
-                    makeABTFail(ErrorCodes::Error{7993103},
-                                "Invalid range: Expected the sortBy field to be a number")));
+                    std::move(failABT)));
             auto sortExpr = abtToExpr(sortByABT, _state.slotVarMap, _state);
-            stage = makeProjectStage(
-                std::move(stage), windowNode->nodeId(), *rangeBoundSlot, std::move(sortExpr));
-            forwardSlots.push_back(*rangeBoundSlot);
+            stage =
+                makeProjectStage(std::move(stage), windowNode->nodeId(), slot, std::move(sortExpr));
+            forwardSlots.push_back(slot);
+            return slot;
+        };
+        if (unit) {
+            if (!timeRangeBoundSlot) {
+                timeRangeBoundSlot = projectRangeBoundSlot(
+                    "isDate",
+                    makeABTFail(ErrorCodes::Error{7956500},
+                                "Invalid range: Expected the sortBy field to be a date"));
+            }
+            return *timeRangeBoundSlot;
+        } else {
+            if (!rangeBoundSlot) {
+                rangeBoundSlot = projectRangeBoundSlot(
+                    "isNumber",
+                    makeABTFail(ErrorCodes::Error{7993103},
+                                "Invalid range: Expected the sortBy field to be a number"));
+            }
+            return *rangeBoundSlot;
         }
-        return *rangeBoundSlot;
     };
 
     // Create window function input arguments.
@@ -3599,31 +3617,52 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             window.addExpr = std::move(addExprs[i]);
             window.removeExpr = std::move(removeExprs[i]);
 
-            auto makeOffsetBoundExpr =
-                [&](sbe::value::SlotId boundSlot,
-                    std::pair<sbe::value::TypeTags, sbe::value::Value> offset) {
-                    if (offset.first == sbe::value::TypeTags::Nothing) {
-                        return makeVariable(boundSlot);
-                    }
+            auto makeOffsetBoundExpr = [&](sbe::value::SlotId boundSlot,
+                                           std::pair<sbe::value::TypeTags, sbe::value::Value>
+                                               offset = {sbe::value::TypeTags::Nothing, 0},
+                                           boost::optional<TimeUnit> unit = boost::none) {
+                if (offset.first == sbe::value::TypeTags::Nothing) {
+                    return makeVariable(boundSlot);
+                }
+                if (unit) {
+                    auto [unitTag, unitVal] = sbe::value::makeNewString(serializeTimeUnit(*unit));
+                    sbe::value::ValueGuard unitGuard{unitTag, unitVal};
+                    auto [timezoneTag, timezoneVal] = sbe::value::makeNewString("UTC");
+                    sbe::value::ValueGuard timezoneGuard{timezoneTag, timezoneVal};
+                    auto [longOffsetOwned, longOffsetTag, longOffsetVal] = genericNumConvert(
+                        offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
+                    unitGuard.reset();
+                    timezoneGuard.reset();
+                    return makeFunction("dateAdd",
+                                        makeVariable(*_state.getTimeZoneDBSlot()),
+                                        makeVariable(boundSlot),
+                                        makeConstant(unitTag, unitVal),
+                                        makeConstant(longOffsetTag, longOffsetVal),
+                                        makeConstant(timezoneTag, timezoneVal));
+                } else {
                     return makeBinaryOp(sbe::EPrimBinary::add,
                                         makeVariable(boundSlot),
                                         makeConstant(offset.first, offset.second));
-                };
+                }
+            };
             auto makeLowBoundExpr = [&](sbe::value::SlotId boundTestingSlot,
                                         sbe::value::SlotId boundSlot,
-                                        std::pair<sbe::value::TypeTags, sbe::value::Value> offset) {
+                                        std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
+                                            {sbe::value::TypeTags::Nothing, 0},
+                                        boost::optional<TimeUnit> unit = boost::none) {
                 return makeBinaryOp(sbe::EPrimBinary::greaterEq,
                                     makeVariable(boundTestingSlot),
-                                    makeOffsetBoundExpr(boundSlot, offset));
+                                    makeOffsetBoundExpr(boundSlot, offset, unit));
             };
-            auto makeHighBoundExpr =
-                [&](sbe::value::SlotId boundTestingSlot,
-                    sbe::value::SlotId boundSlot,
-                    std::pair<sbe::value::TypeTags, sbe::value::Value> offset) {
-                    return makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                        makeVariable(boundTestingSlot),
-                                        makeOffsetBoundExpr(boundSlot, offset));
-                };
+            auto makeHighBoundExpr = [&](sbe::value::SlotId boundTestingSlot,
+                                         sbe::value::SlotId boundSlot,
+                                         std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
+                                             {sbe::value::TypeTags::Nothing, 0},
+                                         boost::optional<TimeUnit> unit = boost::none) {
+                return makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                    makeVariable(boundTestingSlot),
+                                    makeOffsetBoundExpr(boundSlot, offset, unit));
+            };
             auto makeLowUnboundedExpr = [&](const WindowBounds::Unbounded&) {
                 window.lowBoundSlot = boost::none;
                 window.lowBoundTestingSlot = boost::none;
@@ -3637,16 +3676,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto makeLowCurrentExpr = [&](const WindowBounds::Current&) {
                 window.lowBoundSlot = getDocumentBoundSlot();
                 window.lowBoundTestingSlot = _slotIdGenerator.generate();
-                window.lowBoundExpr = makeLowBoundExpr(*window.lowBoundTestingSlot,
-                                                       *window.lowBoundSlot,
-                                                       {sbe::value::TypeTags::Nothing, 0});
+                window.lowBoundExpr =
+                    makeLowBoundExpr(*window.lowBoundTestingSlot, *window.lowBoundSlot);
             };
             auto makeHighCurrentExpr = [&](const WindowBounds::Current&) {
                 window.highBoundSlot = getDocumentBoundSlot();
                 window.highBoundTestingSlot = _slotIdGenerator.generate();
-                window.highBoundExpr = makeHighBoundExpr(*window.highBoundTestingSlot,
-                                                         *window.highBoundSlot,
-                                                         {sbe::value::TypeTags::Nothing, 0});
+                window.highBoundExpr =
+                    makeHighBoundExpr(*window.highBoundTestingSlot, *window.highBoundSlot);
             };
             auto documentCase = [&](const WindowBounds::DocumentBased& document) {
                 auto makeLowValueExpr = [&](const int& v) {
@@ -3674,20 +3711,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                             document.upper);
             };
             auto rangeCase = [&](const WindowBounds::RangeBased& range) {
-                auto rangeBoundSlot = getRangeBoundSlot();
+                auto rangeBoundSlot = getRangeBoundSlot(range.unit);
                 auto makeLowValueExpr = [&](const Value& v) {
                     window.lowBoundSlot = rangeBoundSlot;
                     window.lowBoundTestingSlot = _slotIdGenerator.generate();
                     window.lowBoundExpr = makeLowBoundExpr(*window.lowBoundTestingSlot,
                                                            *window.lowBoundSlot,
-                                                           sbe::value::makeValue(v));
+                                                           sbe::value::makeValue(v),
+                                                           range.unit);
                 };
                 auto makeHighValueExpr = [&](const Value& v) {
                     window.highBoundSlot = rangeBoundSlot;
                     window.highBoundTestingSlot = _slotIdGenerator.generate();
                     window.highBoundExpr = makeHighBoundExpr(*window.highBoundTestingSlot,
                                                              *window.highBoundSlot,
-                                                             sbe::value::makeValue(v));
+                                                             sbe::value::makeValue(v),
+                                                             range.unit);
                 };
                 stdx::visit(
                     OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
