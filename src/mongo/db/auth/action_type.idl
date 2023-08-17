@@ -142,6 +142,7 @@ enums:
            logRotate :  "logRotate"
            updateSearchIndex : "updateSearchIndex"
            moveChunk :  "moveChunk"
+           moveCollection :  "moveCollection"
            netstat :  "netstat"
            oidcListKeys :  "oidcListKeys"
            oidcRefreshKeys :  "oidcRefreshKeys"

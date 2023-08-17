@@ -80,6 +80,7 @@ env.Library(
         'cluster_lock_info_cmd.cpp',
         'cluster_map_reduce_agg.cpp',
         'cluster_map_reduce_cmd.cpp',
+        'cluster_move_collection_cmd.cpp',
         'cluster_multicast_cmd.cpp',
         'cluster_netstat_cmd.cpp',
         'cluster_oplog_note_cmd.cpp',

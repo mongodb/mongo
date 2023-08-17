@@ -138,6 +138,7 @@ roles:
               actions:
                 - analyzeShardKey
                 - enableSharding
+                - moveCollection
                 - refineCollectionShardKey
                 - reshardCollection
 
@@ -375,6 +376,7 @@ roles:
                   - clearJumboFlag
                   - splitChunk
                   - moveChunk
+                  - moveCollection
                   - enableSharding
                   - splitVector
                   - refineCollectionShardKey

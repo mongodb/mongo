@@ -148,6 +148,7 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
         ActionType::clearJumboFlag,
         ActionType::splitChunk,
         ActionType::moveChunk,
+        ActionType::moveCollection,
         ActionType::enableSharding,
         ActionType::splitVector,
         ActionType::refineCollectionShardKey,

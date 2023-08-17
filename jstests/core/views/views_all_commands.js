@@ -555,6 +555,17 @@ let viewsCommandTests = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
+    moveCollection: {
+        // TODO(SERVER-80156): update test case to succeed on unsharded collections
+        command: {moveCollection: "test.view", toShard: "move_collection-rs"},
+        setup: function(conn) {
+            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+        },
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+    },
     movePrimary: {skip: "Tested in sharding/movePrimary1.js"},
     moveRange: {skip: isUnrelated},
     multicast: {skip: isUnrelated},

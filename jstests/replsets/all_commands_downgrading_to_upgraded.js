@@ -1078,6 +1078,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    moveCollection: {skip: cannotRunWhileDowngrading},
     movePrimary: {
         skip: cannotRunWhileDowngrading,
     },

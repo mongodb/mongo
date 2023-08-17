@@ -16,6 +16,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "createUnsplittableCollection",
     "fsyncUnlock",
     "lockInfo",
+    "moveCollection",
     "setQuerySettings",
     "removeQuerySettings",
 ];

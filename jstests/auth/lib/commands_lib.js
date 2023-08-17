@@ -5769,6 +5769,22 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "moveCollection",
+          command: {moveCollection: "test.x", toShard: "move_collection-rs"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                    [{resource: {db: "test", collection: "x"}, actions: ["moveCollection"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "s_moveRange",
           command: {moveRange: "test.x", min: {x:1}, toShard:"a"},
           skipUnlessSharded: true,

@@ -622,6 +622,7 @@ let testCases = {
         skip:
             "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
     },
+    moveCollection: {skip: "does not accept read or write concern"},
     movePrimary: {skip: "does not accept read or write concern"},
     moveRange: {
         skip:

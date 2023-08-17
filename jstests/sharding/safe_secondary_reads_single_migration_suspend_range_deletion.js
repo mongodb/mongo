@@ -361,6 +361,7 @@ let testCases = {
     mergeAllChunksOnShard: {skip: "primary only"},
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
+    moveCollection: {skip: "primary only"},
     movePrimary: {skip: "primary only"},
     moveRange: {skip: "primary only"},
     multicast: {skip: "does not return user data"},

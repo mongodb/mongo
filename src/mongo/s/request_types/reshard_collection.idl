@@ -140,3 +140,16 @@ commands:
         type: string
         description: "The source operation that called this resharding operation."
         optional: true
+
+  moveCollection:
+    description: "The public command on mongos that moves one unsharded collection from source to destination shard."
+    command_name: moveCollection
+    strict: false
+    namespace: type
+    api_version: ""
+    type: namespacestring
+    fields:
+      toShard:
+        type: shard_id
+        description: "The id specification of the destination shard."
+        optional: false

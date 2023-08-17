@@ -641,6 +641,7 @@ let testCases = {
     mergeAllChunksOnShard: {skip: "does not forward command to primary shard"},
     mergeChunks: {skip: "does not forward command to primary shard"},
     moveChunk: {skip: "does not forward command to primary shard"},
+    moveCollection: {skip: "does not forward command to primary shard"},
     movePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},
     moveRange: {skip: "does not forward command to primary shard"},
     multicast: {skip: "does not forward command to primary shard"},
