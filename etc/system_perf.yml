@@ -54,23 +54,23 @@ variables:
       - name: schedule_global_auto_tasks
         variant: task_generation
   _skip_expansions: &_expansion_updates
-      # ARM compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_a61fcc4e7502928746f4f62c7846b5bccffa7c88_23_08_08_20_41_36/files?execution=0
+      # ARM compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
       - key: mdb_binary_for_client
-        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_a61fcc4e7502928746f4f62c7846b5bccffa7c88/a61fcc4e7502928746f4f62c7846b5bccffa7c88/linux/mongodb-arm64-sys_perf_a61fcc4e7502928746f4f62c7846b5bccffa7c88.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-arm64-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       - key: mdb_binary_for_server
-        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_a61fcc4e7502928746f4f62c7846b5bccffa7c88/a61fcc4e7502928746f4f62c7846b5bccffa7c88/linux/mongodb-arm64-sys_perf_a61fcc4e7502928746f4f62c7846b5bccffa7c88.tar.gz
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-arm64-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       #
-      # # Intel compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon2_compile_6a82e4262717c24bd088141369921a5ae0ec2d82_23_08_05_23_26_11/files?execution=0
+      # # Intel compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon2_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
       # - key: mdb_binary_for_client
-      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82/6a82e4262717c24bd088141369921a5ae0ec2d82/linux/mongodb-sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82.tar.gz
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       # - key: mdb_binary_for_server
-      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82/6a82e4262717c24bd088141369921a5ae0ec2d82/linux/mongodb-sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82.tar.gz
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       #
-      # # Atlas-like compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_rhel70_compile_6a82e4262717c24bd088141369921a5ae0ec2d82_23_08_05_23_26_11/files?execution=1
+      # # Atlas-like compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_rhel70_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
       # - key: mdb_binary_for_client
-      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82/6a82e4262717c24bd088141369921a5ae0ec2d82/linux/mongodb-rhel70-sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82.tar.gz
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-rhel70-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       # - key: mdb_binary_for_server
-      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82/6a82e4262717c24bd088141369921a5ae0ec2d82/linux/mongodb-rhel70-sys_perf_6a82e4262717c24bd088141369921a5ae0ec2d82.tar.gz
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-rhel70-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
       #
 ###
 
