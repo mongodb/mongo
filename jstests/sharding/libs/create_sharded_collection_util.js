@@ -2,7 +2,8 @@
 
 var CreateShardedCollectionUtil = (function() {
     /**
-     * Shards a non-existing collection using the specified shard key and chunk ranges.
+     * Shards a non-existing collection (or an unsharded empty collection) using
+     * the specified shard key and chunk ranges.
      *
      * @param collection - a DBCollection object with an underlying Mongo connection to a mongos.
      * @param chunks - an array of
@@ -19,7 +20,9 @@ var CreateShardedCollectionUtil = (function() {
         assert.eq(null,
                   configDB.collections.findOne({ns: collection.getFullName()}),
                   "collection already exists as sharded");
-        assert.eq(null, collection.exists(), "collection already exists as unsharded");
+        assert.eq([],
+                  collection.aggregate([{$limit: 1}, {$replaceWith: {}}]).toArray(),
+                  "collection already exists as non-empty unsharded collection");
 
         // We include a UUID in the temporary zone names being generated to avoid conflicting with
         // the names of any existing zones.
