@@ -6,7 +6,11 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   requires_timeseries,
  *   serverless,
+ *   # The validation hook in this suite enforces that all time-series buckets are compressed. This
+ *   # will not be the case in multiversion suites.
+ *   requires_fcv_71,
  * ]
  */
 

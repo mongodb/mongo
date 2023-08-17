@@ -762,9 +762,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 nNonCompliantDocuments++;
                 schemaValidationFailed(_validateState, result.first, results);
             } else if (coll->getTimeseriesOptions()) {
+                BSONObj recordBson = record->data.toBson();
+                _enforceTimeseriesBucketsAreAlwaysCompressed(recordBson, results);
+
                 // Checks for time-series collection consistency.
-                Status bucketStatus =
-                    _validateTimeSeriesBucketRecord(coll, record->data.toBson(), results);
+                Status bucketStatus = _validateTimeSeriesBucketRecord(coll, recordBson, results);
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
                 if (!bucketStatus.isOK()) {
@@ -898,6 +900,27 @@ void ValidateAdaptor::repairIndexEntries(OperationContext* opCtx, ValidateResult
 void ValidateAdaptor::addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results) {
     _columnIndexConsistency.addIndexEntryErrors(opCtx, results);
     _keyBasedIndexConsistency.addIndexEntryErrors(opCtx, results);
+}
+
+void ValidateAdaptor::_enforceTimeseriesBucketsAreAlwaysCompressed(const BSONObj& recordBson,
+                                                                   ValidateResults* results) {
+    if (!_validateState->enforceTimeseriesBucketsAreAlwaysCompressed()) {
+        return;
+    }
+
+    int bucketVersion = recordBson.getField(timeseries::kBucketControlFieldName)
+                            .Obj()
+                            .getIntField(timeseries::kBucketControlVersionFieldName);
+
+    if (bucketVersion != timeseries::kTimeseriesControlCompressedVersion) {
+        LOGV2(7735100,
+              "Expected time-series bucket to be compressed",
+              "bucket"_attr = recordBson.toString());
+        results->errors.push_back(
+            "Expected time-series bucket to be compressed. Search logs for message "
+            "with id 7735100.");
+        results->valid = false;
+    }
 }
 
 }  // namespace mongo

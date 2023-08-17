@@ -67,11 +67,13 @@ protected:
         const CollectionOptions defaultCollectionOptions;
         ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, defaultCollectionOptions));
 
+        CollectionValidation::AdditionalOptions additionalOptions;
         _validateState = std::make_unique<CollectionValidation::ValidateState>(
             opCtx,
             kNss,
             CollectionValidation::ValidateMode::kForeground,
             CollectionValidation::RepairMode::kNone,
+            additionalOptions,
             /*logDiagnostics=*/false);
     };
 

@@ -12,6 +12,9 @@ executor:
     - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
   config:
     shell_options:
+      global_vars:
+        TestData:
+          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ''
 matrix_suite: true
 selector:

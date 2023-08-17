@@ -1,7 +1,11 @@
 /**
  * Tests $sample pushdown on sharded time-series collections for a small collection size.
  *
- * @tags: [requires_fcv_51]
+ * @tags: [
+ *   # The validation hook in this suite enforces that all time-series buckets are compressed. This
+ *   # will not be the case in multiversion suites.
+ *   requires_fcv_71,
+ * ]
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {planHasStage} from "jstests/libs/analyze_plan.js";

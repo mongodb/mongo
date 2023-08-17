@@ -27,3 +27,8 @@ executor:
   config:
     shell_options:
       nodb: ''
+      global_vars:
+        TestData:
+           # Skip enforcing this check in multiversion as time-series buckets are not always
+           # compressed in older versions.
+          skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true

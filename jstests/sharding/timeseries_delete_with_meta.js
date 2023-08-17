@@ -3,7 +3,9 @@
  * document by targeting them with their meta field value.
  *
  * @tags: [
- *   requires_fcv_51,
+ *   # The validation hook in this suite enforces that all time-series buckets are compressed. This
+ *   # will not be the case in multiversion suites.
+ *   requires_fcv_71,
  * ]
  */
 

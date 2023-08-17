@@ -6,8 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
@@ -34,6 +33,21 @@ const bucketDoc = {
         "time": {"0": ISODate("2023-08-16T22:17:13.749Z")}
     }
 };
+const compressedBucketDoc = {
+    "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
+    "control": {
+        "version": 2,
+        "min":
+            {"_id": ObjectId("64dd4ae9a2c44e75d1151285"), "time": ISODate("2023-08-16T22:17:00Z")},
+        "max": {
+            "_id": ObjectId("64dd4ae9a2c44e75d1151285"),
+            "time": ISODate("2023-08-16T22:17:13.749Z")
+        },
+        "count": 1
+    },
+    "meta": 1,
+    "data": {"_id": BinData(7, "BwBk3UrposROddEVEoUA"), "time": BinData(7, "CQAVoWwAigEAAAA=")}
+};
 
 function runTest(cmd, validateFn) {
     const coll = testDB.getCollection(collName);
@@ -57,7 +71,9 @@ function runTest(cmd, validateFn) {
     }));
 
     // Tests the command works for the unsharded collection.
-    assert.commandWorked(bucketsColl.insert(bucketDoc));
+    assert.commandWorked(bucketsColl.insert(
+        TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB) ? compressedBucketDoc
+                                                                           : bucketDoc));
     assert.commandWorked(testDB.runCommand(cmd));
     validateFn(bucketsColl);
 }
@@ -87,4 +103,3 @@ runTest({
         updateValidateFn)
 
 st.stop();
-})();

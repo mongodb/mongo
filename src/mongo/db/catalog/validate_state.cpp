@@ -61,6 +61,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -76,6 +77,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              ValidateMode mode,
                              RepairMode repairMode,
+                             const AdditionalOptions& additionalOptions,
                              bool logDiagnostics)
     : _nss(nss),
       _mode(mode),
@@ -127,6 +129,17 @@ ValidateState::ValidateState(OperationContext* opCtx,
                     "Cannot validate a time-series collection without its bucket collection {}.",
                     _nss.toStringForErrorMsg()),
                 _collection);
+        }
+    }
+
+    // Test-only check to ensure time-series buckets are always compressed.
+    if (additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed) {
+        if (TestingProctor::instance().isEnabled() &&
+            feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            _enforceTimeseriesBucketsAreAlwaysCompressed = true;
+        } else {
+            LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
         }
     }
 

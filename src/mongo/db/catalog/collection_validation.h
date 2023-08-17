@@ -96,6 +96,13 @@ enum class RepairMode {
 };
 
 /**
+ * Additional validation options that can run in any mode.
+ */
+struct AdditionalOptions {
+    bool enforceTimeseriesBucketsAreAlwaysCompressed = false;
+};
+
+/**
  * Expects the caller to hold no locks.
  *
  * @return OK if the validate run successfully
@@ -106,6 +113,7 @@ Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidateMode mode,
                 RepairMode repairMode,
+                const AdditionalOptions& additionalOptions,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool logDiagnostics);

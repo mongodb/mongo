@@ -422,8 +422,24 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
         nss, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
-    return makeNewDocumentForWrite(
+    auto bucket = makeNewDocumentForWrite(
         oid, measurements, res.first.metadata.toBSON(), options, comparator);
+
+    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return bucket;
+    }
+
+    const bool validateCompression = gValidateTimeseriesCompression.load();
+    auto compressed = timeseries::compressBucket(
+        bucket, options.getTimeField(), nss.getTimeseriesViewNamespace(), validateCompression);
+    if (compressed.compressedBucket) {
+        return *compressed.compressedBucket;
+    } else {
+        tasserted(7735101,
+                  fmt::format("Couldn't compress time-series bucket {}", bucket.toString()));
+        return bucket;
+    }
 }
 
 stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(

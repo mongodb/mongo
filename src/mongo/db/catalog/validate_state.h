@@ -77,6 +77,7 @@ public:
                   const NamespaceString& nss,
                   ValidateMode mode,
                   RepairMode repairMode,
+                  const AdditionalOptions& additionalOptions,
                   bool logDiagnostics);
 
     const NamespaceString& nss() const {
@@ -209,6 +210,10 @@ public:
         return _logDiagnostics;
     }
 
+    bool enforceTimeseriesBucketsAreAlwaysCompressed() const {
+        return _enforceTimeseriesBucketsAreAlwaysCompressed;
+    }
+
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -254,6 +259,7 @@ private:
     bool _collectionSchemaViolated = false;
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
+    bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
 
     boost::optional<Lock::GlobalLock> _globalLock;
     boost::optional<AutoGetDb> _databaseLock;
