@@ -1643,10 +1643,36 @@ private:
      * not appear before F1 in 'root', -OR- if both F1 and F2 are not in 'root' and F2 does not
      * appear before F1 in the "computed" list, then F2 will appear after F1 in the output object.
      */
-    std::pair<value::TypeTags, value::Value> produceBsonObject(const MakeObjSpec* mos,
-                                                               value::TypeTags rootTag,
-                                                               value::Value rootVal,
-                                                               int stackOffset);
+    void produceBsonObject(const MakeObjSpec* spec,
+                           value::TypeTags rootTag,
+                           value::Value rootVal,
+                           int stackOffset,
+                           const CodeFragment* code,
+                           UniqueBSONObjBuilder& bob);
+
+    /**
+     * This struct is used by traverseAndProduceBsonObj() to hold args that stay the same across
+     * each level of recursion. Also, by making use of this struct, on most common platforms we
+     * will be able to pass all of traverseAndProduceBsonObj()'s args via CPU registers (rather
+     * than passing them via the native stack).
+     */
+    struct TraverseAndProduceBsonObjContext {
+        const MakeObjSpec* spec;
+        int stackStartOffset;
+        const CodeFragment* code;
+    };
+
+    void traverseAndProduceBsonObj(const TraverseAndProduceBsonObjContext& ctx,
+                                   value::TypeTags tag,
+                                   value::Value val,
+                                   int64_t maxDepth,
+                                   UniqueBSONArrayBuilder& bab);
+
+    void traverseAndProduceBsonObj(const TraverseAndProduceBsonObjContext& ctx,
+                                   value::TypeTags tag,
+                                   value::Value val,
+                                   StringData fieldName,
+                                   UniqueBSONObjBuilder& bob);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
@@ -1784,7 +1810,8 @@ private:
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorToArray(
         ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity,
+                                                                      const CodeFragment* code);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
@@ -1866,7 +1893,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushFinalize(ArityType arity);
 
-    FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
+                                                                   ArityType arity,
+                                                                   const CodeFragment* code);
 
     static constexpr size_t offsetOwned = 0;
     static constexpr size_t offsetTag = 1;

@@ -58,7 +58,6 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
@@ -1081,22 +1080,41 @@ public:
     using ExpressionASTNode = projection_ast::ExpressionASTNode;
     using ProjectionSliceASTNode = projection_ast::ProjectionSliceASTNode;
 
-    using SliceInfo = std::pair<int32_t, boost::optional<int32_t>>;
+    enum class Type { kBool, kExpr, kSbExpr, kSlice };
 
-    enum class Type { kBool, kExpr, kSlice };
+    struct Bool {
+        bool value;
+    };
+    struct Expr {
+        Expression* expr;
+    };
+    using Slice = std::pair<int32_t, boost::optional<int32_t>>;
+
+    using VariantType = stdx::variant<Bool, Expr, SbExpr, Slice>;
 
     struct Keep {};
     struct Drop {};
 
     ProjectionNode() = default;
-    ProjectionNode(const BooleanConstantASTNode* n) : _type(Type::kBool), _boolVal(n->value()) {}
-    ProjectionNode(const ExpressionASTNode* n) : _type(Type::kExpr), _node(n) {}
-    ProjectionNode(const ProjectionSliceASTNode* n) : _type(Type::kSlice), _node(n) {}
-    ProjectionNode(Keep) : _type(Type::kBool), _boolVal(true) {}
-    ProjectionNode(Drop) : _type(Type::kBool), _boolVal(false) {}
+
+    ProjectionNode(Keep) : _data(Bool{true}) {}
+    ProjectionNode(Drop) : _data(Bool{false}) {}
+    ProjectionNode(Expression* expr) : _data(Expr{expr}) {}
+    ProjectionNode(SbExpr sbExpr) : _data(std::move(sbExpr)) {}
+    ProjectionNode(Slice slice) : _data(slice) {}
+
+    ProjectionNode(const BooleanConstantASTNode* n) : _data(Bool{n->value()}) {}
+    ProjectionNode(const ExpressionASTNode* n) : _data(Expr{n->expressionRaw()}) {}
+    ProjectionNode(const ProjectionSliceASTNode* n) : _data(Slice{n->limit(), n->skip()}) {}
 
     Type type() const {
-        return _type;
+        return stdx::visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
+                                             [](const Expr&) { return Type::kExpr; },
+                                             [](const SbExpr&) { return Type::kSbExpr; },
+                                             [](const Slice&) {
+                                                 return Type::kSlice;
+                                             }},
+                           _data);
     }
 
     bool isBool() const {
@@ -1105,28 +1123,36 @@ public:
     bool isExpr() const {
         return type() == Type::kExpr;
     }
+    bool isSbExpr() const {
+        return type() == Type::kSbExpr;
+    }
     bool isSlice() const {
         return type() == Type::kSlice;
     }
 
     bool getBool() const {
         tassert(7580702, "getBool() expected type() to be kBool", isBool());
-        return _boolVal;
+        return stdx::get<Bool>(_data).value;
     }
     Expression* getExpr() const {
         tassert(7580703, "getExpr() expected type() to be kExpr", isExpr());
-        return static_cast<const ExpressionASTNode*>(_node)->expressionRaw();
+        return stdx::get<Expr>(_data).expr;
     }
-    SliceInfo getSlice() const {
+    SbExpr getSbExpr() const {
+        tassert(7580715, "getSbExpr() expected type() to be kSbExpr", isSbExpr());
+        return stdx::get<SbExpr>(_data).clone();
+    }
+    SbExpr extractSbExpr() {
+        tassert(7580716, "getSbExpr() expected type() to be kSbExpr", isSbExpr());
+        return std::move(stdx::get<SbExpr>(_data));
+    }
+    Slice getSlice() const {
         tassert(7580704, "getSlice() expected type() to be kSlice", isSlice());
-        auto sliceNode = static_cast<const ProjectionSliceASTNode*>(_node);
-        return SliceInfo{sliceNode->limit(), sliceNode->skip()};
+        return stdx::get<Slice>(_data);
     }
 
 private:
-    Type _type{};
-    bool _boolVal{false};
-    const ASTNode* _node{nullptr};
+    VariantType _data{};
 };
 
 /**

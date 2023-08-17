@@ -80,9 +80,9 @@ std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
     return makeBalancedBooleanOpTreeImpl(logicOp, leaves, 0, leaves.size());
 }
 
-EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
-                                   std::vector<EvalExpr> leaves,
-                                   StageBuilderState& state) {
+SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
+                                 std::vector<SbExpr> leaves,
+                                 StageBuilderState& state) {
     if (std::all_of(leaves.begin(), leaves.end(), [](auto&& e) { return e.hasABT(); })) {
         std::vector<optimizer::ABT> abtExprs;
         abtExprs.reserve(leaves.size());
@@ -100,7 +100,7 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     for (auto&& e : leaves) {
         exprs.emplace_back(e.extractExpr(state));
     }
-    return EvalExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
+    return SbExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }
 
 optimizer::ABT makeFillEmptyFalse(optimizer::ABT e) {

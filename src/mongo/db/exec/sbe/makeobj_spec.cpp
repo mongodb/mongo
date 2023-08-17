@@ -31,18 +31,107 @@
 #include <iterator>
 
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+
 #include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo::sbe {
-IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string> fields,
-                                                         std::vector<std::string> projects) {
-    std::move(projects.begin(), projects.end(), std::back_inserter(fields));
-    return IndexedStringVector(std::move(fields));
+IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string> names) {
+    if (fieldInfos.empty()) {
+        numKeepOrDrops = names.size();
+        numValueArgs = 0;
+        numMandatoryLambdas = 0;
+        numMandatoryMakeObjs = 0;
+        totalNumArgs = 0;
+
+        fieldInfos = std::vector<FieldInfo>{};
+        fieldInfos.resize(numKeepOrDrops);
+
+        return IndexedStringVector(std::move(names));
+    }
+
+    tassert(7103500,
+            "Expected 'names' and 'fieldsInfos' to be the same size",
+            names.size() == fieldInfos.size());
+
+    std::vector<std::string> keepOrDrops;
+
+    numKeepOrDrops = 0;
+    numValueArgs = 0;
+    numMandatoryLambdas = 0;
+    numMandatoryMakeObjs = 0;
+    totalNumArgs = 0;
+
+    size_t endPos = 0;
+
+    for (size_t i = 0; i < names.size(); ++i) {
+        if (fieldInfos[i].isKeepOrDrop()) {
+            ++numKeepOrDrops;
+            keepOrDrops.emplace_back(std::move(names[i]));
+        } else {
+            if (fieldInfos[i].isValueArg()) {
+                ++numValueArgs;
+            } else if (fieldInfos[i].isLambdaArg() &&
+                       !fieldInfos[i].getLambdaArg().returnsNothingOnMissingInput) {
+                ++numMandatoryLambdas;
+            } else if (fieldInfos[i].isMakeObj() &&
+                       !fieldInfos[i].getMakeObjSpec()->returnsNothingOnMissingInput()) {
+                ++numMandatoryMakeObjs;
+            }
+
+            if (fieldInfos[i].isValueArg() || fieldInfos[i].isLambdaArg()) {
+                ++totalNumArgs;
+            } else if (fieldInfos[i].isMakeObj()) {
+                totalNumArgs += fieldInfos[i].getMakeObjSpec()->totalNumArgs;
+            }
+
+            if (i != endPos) {
+                names[endPos] = std::move(names[i]);
+                fieldInfos[endPos] = std::move(fieldInfos[i]);
+            }
+            ++endPos;
+        }
+    }
+
+    if (endPos != names.size()) {
+        names.erase(names.begin() + endPos, names.end());
+        fieldInfos.erase(fieldInfos.begin() + endPos, fieldInfos.end());
+    }
+
+    std::vector<FieldInfo> newFieldInfos;
+    newFieldInfos.resize(numKeepOrDrops);
+
+    std::move(fieldInfos.begin(), fieldInfos.end(), std::back_inserter(newFieldInfos));
+    fieldInfos = std::move(newFieldInfos);
+
+    std::vector<std::string> newNames = std::move(keepOrDrops);
+    std::move(names.begin(), names.end(), std::back_inserter(newNames));
+
+    return IndexedStringVector(std::move(newNames));
 }
 
 size_t MakeObjSpec::getApproximateSize() const {
     auto size = sizeof(MakeObjSpec);
-    size += size_estimator::estimate(fieldNames);
+
+    size += size_estimator::estimate(fields);
+
+    size += size_estimator::estimateContainerOnly(fieldInfos);
+
+    for (size_t i = 0; i < fieldInfos.size(); ++i) {
+        if (fieldInfos[i].isMakeObj()) {
+            size += fieldInfos[i].getMakeObjSpec()->getApproximateSize();
+        }
+    }
+
     return size;
+}
+
+MakeObjSpec::FieldInfo MakeObjSpec::FieldInfo::clone() const {
+    return stdx::visit(OverloadedVisitor{[](KeepOrDrop kd) -> FieldInfo { return kd; },
+                                         [](ValueArg va) -> FieldInfo { return va; },
+                                         [](LambdaArg la) -> FieldInfo { return la; },
+                                         [](const MakeObj& makeObj) -> FieldInfo {
+                                             return MakeObj{makeObj.spec->clone()};
+                                         }},
+                       _data);
 }
 }  // namespace mongo::sbe

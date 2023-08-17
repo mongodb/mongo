@@ -55,9 +55,9 @@ namespace mongo::stage_builder {
 std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
     sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
 
-EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
-                                   std::vector<EvalExpr> leaves,
-                                   StageBuilderState& state);
+SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
+                                 std::vector<SbExpr> leaves,
+                                 StageBuilderState& state);
 
 inline auto makeABTFunction(StringData name, optimizer::ABTVector args) {
     return optimizer::make<optimizer::FunctionCall>(name.toString(), std::move(args));

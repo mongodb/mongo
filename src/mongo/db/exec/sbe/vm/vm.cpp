@@ -5367,207 +5367,44 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     }
 }
 
-std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const MakeObjSpec* spec,
-                                                                     value::TypeTags rootTag,
-                                                                     value::Value rootVal,
-                                                                     int stackOffset) {
-    auto& fieldNames = spec->fieldNames;
-
-    const bool isInclusion = spec->fieldBehavior == MakeObjSpec::FieldBehavior::keep;
-    const size_t numFields = fieldNames.size();
-    const size_t numKeepOrDrops = spec->numKeepOrDrops;
-    const size_t numComputedFields = numFields - numKeepOrDrops;
-
-    // The "visited" array keeps track of which computed fields have been visited so far so that
-    // later we can append the non-visited computed fields to the end of the object.
-    char* visited = nullptr;
-    char localVisitedArr[64];
-    std::unique_ptr<char[]> allocatedVisitedArr;
-    if (MONGO_unlikely(numComputedFields > 64)) {
-        allocatedVisitedArr = std::make_unique<char[]>(numComputedFields);
-        visited = allocatedVisitedArr.get();
-    } else {
-        visited = &localVisitedArr[0];
-    }
-
-    memset(visited, 0, numComputedFields);
-
-    UniqueBSONObjBuilder bob;
-
-    size_t numFieldsRemaining = numFields;
-    size_t numComputedFieldsRemaining = numComputedFields;
-
-    const size_t numFieldsRemainingThreshold = isInclusion ? 1 : 0;
-
-    if (value::isObject(rootTag)) {
-        if (rootTag == value::TypeTags::bsonObject) {
-            auto be = value::bitcastTo<const char*>(rootVal);
-            const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-
-            // Skip document length.
-            be += 4;
-
-            // Let N = the # of "computed" fields, and let K = (isInclusion && N > 0 ? N-1 : N).
-            //
-            // When we have seen all of the "keepOrDrop" fields and when we have seen K of the
-            // "computed" fields, we can break out of this loop, ignore or copy the remaining
-            // fields from 'rootVal' (depending on whether 'isInclusion' is true or false), and
-            // then finally append the remaining computed field (if there is one) to the output
-            // object.
-            //
-            // (When isInclusion == true and a single "computed" field remains, it's okay to stop
-            // scanning 'rootVal' and append the remaining computed field to the end of the output
-            // object because it will have no observable effect on field order.)
-            if (numFieldsRemaining > numFieldsRemainingThreshold ||
-                numFieldsRemaining != numComputedFieldsRemaining) {
-                while (be != end - 1) {
-                    auto sv = bson::fieldNameAndLength(be);
-                    auto nextBe = bson::advance(be, sv.size());
-                    size_t pos = fieldNames.findPos(sv);
-
-                    if (pos == IndexedStringVector::npos) {
-                        if (!isInclusion) {
-                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-                        }
-                    } else if (pos < numKeepOrDrops) {
-                        --numFieldsRemaining;
-
-                        if (isInclusion) {
-                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-                        }
-                    } else {
-                        --numFieldsRemaining;
-                        --numComputedFieldsRemaining;
-
-                        auto projectIdx = pos - numKeepOrDrops;
-                        visited[projectIdx] = 1;
-
-                        size_t argIdx = stackOffset + projectIdx;
-                        auto [_, tag, val] = getFromStack(argIdx);
-                        bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
-                    }
-
-                    be = nextBe;
-
-                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
-                        numFieldsRemaining == numComputedFieldsRemaining) {
-                        break;
-                    }
-                }
-            }
-
-            // If isInclusion == false and 'be' has not reached the end of 'rootVal', copy over
-            // the remaining fields from 'rootVal' to the output object.
-            if (!isInclusion) {
-                while (be != end - 1) {
-                    auto sv = bson::fieldNameAndLength(be);
-                    auto nextBe = bson::advance(be, sv.size());
-                    bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-
-                    be = nextBe;
-                }
-            }
-        } else if (rootTag == value::TypeTags::Object) {
-            auto objRoot = value::getObjectView(rootVal);
-            size_t idx = 0;
-
-            // Let N = number of "computed" fields, and let K = (isInclusion && N > 0 ? N-1 : N).
-            //
-            // When we have seen all of the "keepOrDrop" fields and when we have seen K of the
-            // "computed" fields, we can break out of this loop, ignore or copy the remaining
-            // fields from 'rootVal' (depending on whether 'isInclusion' is true or false), and
-            // then finally append the remaining computed field (if there is one) to the output
-            // object.
-            //
-            // (When isInclusion == true and a single "computed" field remains, it's okay to stop
-            // scanning 'rootVal' and append the remaining computed field to the end of the output
-            // object because it will have no observable effect on field order.)
-            if (numFieldsRemaining > numFieldsRemainingThreshold ||
-                numFieldsRemaining != numComputedFieldsRemaining) {
-                for (; idx < objRoot->size(); ++idx) {
-                    auto sv = StringData(objRoot->field(idx));
-                    size_t pos = fieldNames.findPos(sv);
-
-                    if (pos == IndexedStringVector::npos) {
-                        if (!isInclusion) {
-                            auto [tag, val] = objRoot->getAt(idx);
-                            bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                        }
-                    } else if (pos < numKeepOrDrops) {
-                        --numFieldsRemaining;
-
-                        if (isInclusion) {
-                            auto [tag, val] = objRoot->getAt(idx);
-                            bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                        }
-                    } else {
-                        --numFieldsRemaining;
-                        --numComputedFieldsRemaining;
-
-                        auto projectIdx = pos - numKeepOrDrops;
-                        visited[projectIdx] = 1;
-
-                        size_t argIdx = stackOffset + projectIdx;
-                        auto [_, tag, val] = getFromStack(argIdx);
-                        bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
-                    }
-
-                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
-                        numFieldsRemaining == numComputedFieldsRemaining) {
-                        ++idx;
-                        break;
-                    }
-                }
-            }
-
-            // If isInclusion == false and 'be' has not reached the end of 'rootVal', copy over
-            // the remaining fields from 'rootVal' to the output object.
-            if (!isInclusion) {
-                for (; idx < objRoot->size(); ++idx) {
-                    auto sv = StringData(objRoot->field(idx));
-                    auto [fieldTag, fieldVal] = objRoot->getAt(idx);
-                    bson::appendValueToBsonObj(bob, sv, fieldTag, fieldVal);
-                }
-            }
-        }
-    }
-
-    // Append the remaining computed fields (if any) to the output object.
-    if (numComputedFieldsRemaining > 0) {
-        for (size_t pos = numKeepOrDrops; pos < fieldNames.size(); ++pos) {
-            auto projectIdx = pos - numKeepOrDrops;
-            if (!visited[projectIdx]) {
-                size_t argIdx = stackOffset + projectIdx;
-                auto [_, tag, val] = getFromStack(argIdx);
-                bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
-            }
-        }
-    }
-
-    bob.doneFast();
-    char* data = bob.bb().release().release();
-    return {value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
-}
-
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
+    ArityType arity, const CodeFragment* code) {
     tassert(6897002,
             str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
             arity >= 2);
 
-    auto [mosOwned, mosTag, mosVal] = getFromStack(0);
+    auto [specOwned, specTag, specVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
 
-    if (mosTag != value::TypeTags::makeObjSpec) {
+    if (specTag != value::TypeTags::makeObjSpec) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto mos = value::getMakeObjSpecView(mosVal);
+    auto spec = value::getMakeObjSpecView(specVal);
 
-    const int stackOffset = 2;
+    if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
+        !value::isObject(objTag)) {
+        if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnNothing', then return Nothing.
+            return {false, value::TypeTags::Nothing, 0};
+        } else if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnInput', then return the input.
+            topStack(false, value::TypeTags::Nothing, 0);
+            return {objOwned, objTag, objVal};
+        }
+    }
 
-    auto [tag, val] = produceBsonObject(mos, objTag, objVal, stackOffset);
+    const int stackStartOffset = 2;
 
-    return {true, tag, val};
+    UniqueBSONObjBuilder bob;
+
+    produceBsonObject(spec, objTag, objVal, stackStartOffset, code, bob);
+
+    bob.doneFast();
+    char* data = bob.bb().release().release();
+    return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {
@@ -8005,7 +7842,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
-                                                                         ArityType arity) {
+                                                                         ArityType arity,
+                                                                         const CodeFragment* code) {
     switch (f) {
         case Builtin::dateDiff:
             return builtinDateDiff(arity);
@@ -8244,7 +8082,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::sortKeyComponentVectorToArray:
             return builtinSortKeyComponentVectorToArray(arity);
         case Builtin::makeBsonObj:
-            return builtinMakeBsonObj(arity);
+            return builtinMakeBsonObj(arity, code);
         case Builtin::tsSecond:
             return builtinTsSecond(arity);
         case Builtin::tsIncrement:
@@ -9721,7 +9559,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     pcPointer += sizeof(SmallArityType);
                 }
 
-                auto [owned, tag, val] = dispatchBuiltin(f, arity);
+                auto [owned, tag, val] = dispatchBuiltin(f, arity, code);
 
                 for (ArityType cnt = 0; cnt < arity; ++cnt) {
                     popAndReleaseStack();

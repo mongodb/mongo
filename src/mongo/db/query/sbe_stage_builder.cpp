@@ -1963,7 +1963,8 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
 
     auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 
-    auto projectionExpr = generateProjection(_state, &projection, outputs.get(kResult), &outputs);
+    auto inputSlot = outputs.get(kResult);
+    auto projectionExpr = generateProjection(_state, &projection, inputSlot, inputSlot, &outputs);
     auto [resultSlot, resultStage] = projectEvalExpr(std::move(projectionExpr),
                                                      EvalStage{std::move(stage), {}},
                                                      root->nodeId(),
@@ -3786,34 +3787,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::move(stage), std::move(windowFinalProjects), windowNode->nodeId());
 
     if (reqs.has(kResult)) {
-        // For a nested field output "a.b" with final slot s1, we will create a temporary field
-        // "tmp" and create a projection {a: {b: $tmp}}. The actual slot that holds "$tmp" will be
-        // kept in a temporary PlanStageSlots to generate the correct expression.
-        PlanStageSlots tmpFieldSlots;
-        projection_ast::ProjectionPathASTNode topLevelProjection;
+        std::vector<ProjectionNode> nodes;
         for (size_t i = 0; i < windowFields.size(); ++i) {
-            std::string tmpField = str::stream() << "tmp" << i;
-            auto expCtx = _cq.getExpCtxRaw();
-            auto tmpExpr = ExpressionFieldPath::createPathFromString(
-                expCtx, tmpField, expCtx->variablesParseState);
-            projection_ast::addNodeAtPath(
-                &topLevelProjection,
-                FieldPath{windowFields[i]},
-                std::make_unique<projection_ast::ExpressionASTNode>(tmpExpr));
-            tmpFieldSlots.set(std::make_pair(PlanStageSlots::kField, std::move(tmpField)),
-                              windowFinalSlots[i]);
+            nodes.emplace_back(EvalExpr{windowFinalSlots[i]});
         }
-        projection_ast::Projection projection{std::move(topLevelProjection),
-                                              projection_ast::ProjectType::kAddition};
-        auto projectionExpr =
-            generateProjection(_state, &projection, outputs.get(kResult), &tmpFieldSlots);
-        auto [resultSlot, resultStage] = projectEvalExpr(std::move(projectionExpr),
+
+        auto resultSlot = outputs.get(kResult);
+        auto projType = projection_ast::ProjectType::kAddition;
+        auto projectionExpr = generateProjection(
+            _state, projType, std::move(windowFields), std::move(nodes), resultSlot, resultSlot);
+
+        auto [outResultSlot, outStage] = projectEvalExpr(std::move(projectionExpr),
                                                          EvalStage{std::move(stage), {}},
                                                          windowNode->nodeId(),
                                                          &_slotIdGenerator,
                                                          _state);
-        stage = resultStage.extractStage(windowNode->nodeId());
-        outputs.set(kResult, resultSlot);
+        stage = outStage.extractStage(windowNode->nodeId());
+        outputs.set(kResult, outResultSlot);
     }
 
     outputs.clearNonRequiredSlots(reqs);

@@ -269,11 +269,15 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             "The number of fields passed to shardFilter does not match the number of fields in "
             "the shard key",
             fn.nodes().size() == shardKeyPaths.size());
-    std::vector<std::string> projectFields;
+    std::vector<std::string> fields;
+    std::vector<sbe::MakeObjSpec::FieldInfo> fieldInfos;
     sbe::EExpression::Vector projectValues;
 
+    size_t argIdx = 0;
     for (auto& i : shardKeyPaths) {
-        projectFields.push_back(PathStringify::stringify(i._path));
+        fields.emplace_back(PathStringify::stringify(i._path));
+        fieldInfos.emplace_back(argIdx);
+        ++argIdx;
     }
 
     // Fill out the values with SlotId variables. The specified slot will supply the values
@@ -290,10 +294,11 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
         }
     }
 
-    auto makeObjSpec = sbe::makeE<sbe::EConstant>(
-        sbe::value::TypeTags::makeObjSpec,
-        sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-            sbe::MakeObjSpec::FieldBehavior::drop, {} /* fields */, std::move(projectFields))));
+    auto fieldBehavior = sbe::MakeObjSpec::FieldBehavior::kOpen;
+    auto makeObjSpec =
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::makeObjSpec,
+                                   sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                                       fieldBehavior, std::move(fields), std::move(fieldInfos))));
 
     auto makeObjRoot = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
     sbe::EExpression::Vector makeObjArgs;

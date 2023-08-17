@@ -36,7 +36,6 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/indexed_string_vector.h"
@@ -46,45 +45,224 @@ namespace mongo::sbe {
  * MakeObjSpec is a wrapper around a FieldBehavior value and a list of field names / project names.
  */
 struct MakeObjSpec {
-    using FieldBehavior = MakeObjFieldBehavior;
+    enum class FieldBehavior { kClosed, kOpen };
+    enum class NonObjInputBehavior { kReturnNothing, kReturnInput, kNewObj };
 
-    static IndexedStringVector buildIndexedFieldVector(std::vector<std::string> fields,
-                                                       std::vector<std::string> projects);
+    struct KeepOrDrop {};
+    struct ValueArg {
+        size_t argIdx;
+    };
+    struct LambdaArg {
+        size_t argIdx;
+        bool returnsNothingOnMissingInput;
+    };
+    struct MakeObj {
+        std::unique_ptr<MakeObjSpec> spec;
+    };
+
+    /**
+     * This class holds info about what action should be taken for a given field. Each FieldInfo
+     * can be one of the following:
+     *   1) KeepOrDrop: If 'fieldBehavior == kClosed' is true then copy the field, otherwise ignore
+     *                  the field.
+     *   2) ValueArg:   If the field exists then overwrite it with the corresponding argument,
+     *                  otherwise add a new field set to the corresponding argument.
+     *   3) LambdaArg:  Pass the current value of the field (or Nothing if the field doesn't exist)
+     *                  to the corresponding lambda arg, and then replace the field with the return
+     *                  value of the lambda.
+     *   4) MakeObj:    Recursively invoke makeBsonObj() passing in the field as the input object,
+     *                  and replace the field with output produced.
+     */
+    class FieldInfo {
+    public:
+        using VariantType = stdx::variant<KeepOrDrop, ValueArg, LambdaArg, MakeObj>;
+
+        FieldInfo() = default;
+        FieldInfo(size_t valueArgIdx) : _data(ValueArg{valueArgIdx}) {}
+        FieldInfo(std::unique_ptr<MakeObjSpec> spec) : _data(MakeObj{std::move(spec)}) {}
+
+        FieldInfo(KeepOrDrop) : _data(KeepOrDrop{}) {}
+        FieldInfo(ValueArg valueArg) : _data(valueArg) {}
+        FieldInfo(LambdaArg lambdaArg) : _data(lambdaArg) {}
+        FieldInfo(MakeObj makeObj) : _data(std::move(makeObj)) {}
+
+        FieldInfo clone() const;
+
+        bool isKeepOrDrop() const {
+            return stdx::holds_alternative<KeepOrDrop>(_data);
+        }
+        bool isValueArg() const {
+            return stdx::holds_alternative<ValueArg>(_data);
+        }
+        bool isLambdaArg() const {
+            return stdx::holds_alternative<LambdaArg>(_data);
+        }
+        bool isMakeObj() const {
+            return stdx::holds_alternative<MakeObj>(_data);
+        }
+
+        size_t getValueArgIdx() const {
+            return stdx::get<ValueArg>(_data).argIdx;
+        }
+        const LambdaArg& getLambdaArg() const {
+            return stdx::get<LambdaArg>(_data);
+        }
+        MakeObjSpec* getMakeObjSpec() const {
+            return stdx::get<MakeObj>(_data).spec.get();
+        }
+
+    private:
+        VariantType _data;
+    };
 
     MakeObjSpec(FieldBehavior fieldBehavior,
                 std::vector<std::string> fields,
-                std::vector<std::string> projects)
+                std::vector<FieldInfo> fieldInfos = {},
+                NonObjInputBehavior nonObjInputBehavior = NonObjInputBehavior::kNewObj,
+                boost::optional<int32_t> traversalDepth = boost::none)
         : fieldBehavior(fieldBehavior),
-          numKeepOrDrops(fields.size()),
-          fieldNames(buildIndexedFieldVector(std::move(fields), std::move(projects))) {}
+          nonObjInputBehavior(nonObjInputBehavior),
+          traversalDepth(traversalDepth),
+          fieldInfos(std::move(fieldInfos)),
+          fields(buildIndexedFieldVector(std::move(fields))) {}
+
+    MakeObjSpec(const MakeObjSpec& other)
+        : numKeepOrDrops(other.numKeepOrDrops),
+          numValueArgs(other.numValueArgs),
+          numMandatoryMakeObjs(other.numMandatoryMakeObjs),
+          numMandatoryLambdas(other.numMandatoryLambdas),
+          totalNumArgs(other.totalNumArgs),
+          fieldBehavior(other.fieldBehavior),
+          nonObjInputBehavior(other.nonObjInputBehavior),
+          traversalDepth(other.traversalDepth),
+          fieldInfos(other.cloneFieldInfos()),
+          fields(other.fields) {}
+
+    MakeObjSpec(MakeObjSpec&& other)
+        : numKeepOrDrops(other.numKeepOrDrops),
+          numValueArgs(other.numValueArgs),
+          numMandatoryMakeObjs(other.numMandatoryMakeObjs),
+          numMandatoryLambdas(other.numMandatoryLambdas),
+          totalNumArgs(other.totalNumArgs),
+          fieldBehavior(other.fieldBehavior),
+          nonObjInputBehavior(other.nonObjInputBehavior),
+          traversalDepth(other.traversalDepth),
+          fieldInfos(std::move(other.fieldInfos)),
+          fields(std::move(other.fields)) {}
+
+    MakeObjSpec& operator=(const MakeObjSpec& other) = delete;
+
+    MakeObjSpec& operator=(MakeObjSpec&&) = delete;
+
+    std::unique_ptr<MakeObjSpec> clone() const {
+        return std::make_unique<MakeObjSpec>(*this);
+    }
+
+    bool returnsNothingOnMissingInput() const {
+        return nonObjInputBehavior != NonObjInputBehavior::kNewObj;
+    }
+
+    std::vector<FieldInfo> cloneFieldInfos() const {
+        std::vector<FieldInfo> fieldInfosCopy;
+        for (auto&& info : fieldInfos) {
+            fieldInfosCopy.emplace_back(info.clone());
+        }
+
+        return fieldInfosCopy;
+    }
 
     std::string toString() const {
-        StringBuilder builder;
-        builder << (fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
+        const bool isClosed = fieldBehavior == FieldBehavior::kClosed;
 
-        for (size_t i = 0; i < fieldNames.size(); ++i) {
-            if (i == numKeepOrDrops) {
-                builder << "], [";
-            } else if (i != 0) {
+        StringBuilder builder;
+        builder << "[";
+
+        for (size_t i = 0; i < fields.size(); ++i) {
+            auto& info = fieldInfos[i];
+
+            if (i != 0) {
                 builder << ", ";
             }
 
-            builder << '"' << fieldNames[i] << '"';
+            builder << "\"" << fields[i] << "\"";
+
+            if (info.isKeepOrDrop()) {
+                continue;
+            } else {
+                builder << " = ";
+            }
+
+            if (info.isValueArg()) {
+                builder << "Arg(" << info.getValueArgIdx() << ")";
+            } else if (info.isLambdaArg()) {
+                const auto& lambdaArg = info.getLambdaArg();
+                builder << "LambdaArg(" << lambdaArg.argIdx
+                        << (lambdaArg.returnsNothingOnMissingInput ? "" : ", false") << ")";
+            } else if (info.isMakeObj()) {
+                auto spec = info.getMakeObjSpec();
+                builder << "MakeObj(" << spec->toString() << ")";
+            }
         }
 
-        if (fieldNames.size() == numKeepOrDrops) {
-            builder << "], [";
+        builder << "], " << (isClosed ? "Closed" : "Open");
+
+        if (nonObjInputBehavior == NonObjInputBehavior::kReturnNothing) {
+            builder << ", ReturnNothing";
+        } else if (nonObjInputBehavior == NonObjInputBehavior::kReturnInput) {
+            builder << ", ReturnInput";
+        } else if (traversalDepth.has_value()) {
+            builder << ", NewObj";
         }
 
-        builder << "]";
+        if (traversalDepth.has_value()) {
+            builder << ", " << *traversalDepth;
+        }
 
         return builder.str();
     }
 
+    IndexedStringVector buildIndexedFieldVector(std::vector<std::string> names);
+
     size_t getApproximateSize() const;
 
-    FieldBehavior fieldBehavior;
+    // Number of 'fields' that are simple "keeps" or "drops".
     size_t numKeepOrDrops = 0;
-    IndexedStringVector fieldNames;
+
+    // Number of 'fields' that are ValueArgs.
+    size_t numValueArgs = 0;
+
+    // Number of 'fields' that are MakeObjs where 'returnsNothingOnMissingInput()' is false.
+    size_t numMandatoryMakeObjs = 0;
+
+    // Number of 'fields' that are LambdaArgs where 'returnsNothingOnMissingInput' is false.
+    size_t numMandatoryLambdas = 0;
+
+    // The total number of ValueArgs and LamdbaArgs in this MakeObjSpec and all of its descendents.
+    size_t totalNumArgs = 0;
+
+    // 'fieldBehavior' indicates how other fields not present in 'fields' should be handled.
+    // If 'fieldBehavior == kOpen', then other fields not present in 'fields' should be copied
+    // to the output object. If 'fieldBehavior == kClosed', then other fields not present in
+    // 'fields' should be ignored/dropped.
+    FieldBehavior fieldBehavior = FieldBehavior::kOpen;
+
+    // 'nonObjInputBehavior' indicates how makeBsonObj() should behave if the input value is not an
+    // object. If 'nonObjInputBehavior == kNewObj', then makeBsonObj() should replace the input
+    // with an empty object and proceed as usual. If 'nonObjInputBehavior == kReturnNothing', then
+    // makeBsonObj() should return Nothing. If 'nonObjInputBehavior == kReturnInput', makeBsonObj()
+    // should return the input value.
+    NonObjInputBehavior nonObjInputBehavior = NonObjInputBehavior::kNewObj;
+
+    // If this MakeObjSpec is part of a "MakeObj" FieldInfo, 'traversalDepth' indicates what
+    // the array traversal depth limit should be. By default 'traversalDepth' is 'boost::none'
+    // (i.e. by default there is no depth limit).
+    boost::optional<int32_t> traversalDepth;
+
+    // Contains info about each field of interest. 'fields' and 'fieldInfos' are parallel vectors
+    // (i.e. the info corresponding to field[i] is stored in fieldInfos[i]).
+    std::vector<FieldInfo> fieldInfos;
+
+    // Searchable vector of fields of interest.
+    IndexedStringVector fields;
 };
 }  // namespace mongo::sbe

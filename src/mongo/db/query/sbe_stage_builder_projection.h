@@ -42,12 +42,21 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Generates an EvalExpr implementing a query projection. The 'inputSlot' defines a slot to read
+ * Generates an SbExpr implementing a query projection. The 'inputSlot' defines a slot to read
  * the input document from. 'slots' can optionaly be provided as well so that generateExpression()
  * can make use of kField slots when appropriate.
  */
-EvalExpr generateProjection(StageBuilderState& state,
-                            const projection_ast::Projection* proj,
-                            sbe::value::SlotId inputSlot,
-                            const PlanStageSlots* slots = nullptr);
+SbExpr generateProjection(StageBuilderState& state,
+                          const projection_ast::Projection* proj,
+                          SbExpr inputExpr,
+                          boost::optional<sbe::value::SlotId> rootSlot = boost::none,
+                          const PlanStageSlots* slots = nullptr);
+
+SbExpr generateProjection(StageBuilderState& state,
+                          projection_ast::ProjectType type,
+                          std::vector<std::string> paths,
+                          std::vector<ProjectionNode> nodes,
+                          SbExpr inputExpr,
+                          boost::optional<sbe::value::SlotId> rootSlot = boost::none,
+                          const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder

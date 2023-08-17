@@ -272,18 +272,27 @@ EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit) {
     return {makeLimitCoScanTree(planNodeId, limit), sbe::makeSV()};
 }
 
-std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> projectFields,
-                                                    sbe::EExpression::Vector projectValues) {
+std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fields,
+                                                    sbe::EExpression::Vector values) {
+    tassert(7103507,
+            "Expected 'fields' and 'values' to be the same size",
+            fields.size() == values.size());
+
+    std::vector<sbe::MakeObjSpec::FieldInfo> fieldInfos;
+    for (size_t i = 0; i < fields.size(); ++i) {
+        fieldInfos.emplace_back(i);
+    }
+
     auto makeObjSpec = makeConstant(
         sbe::value::TypeTags::makeObjSpec,
         sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-            sbe::MakeObjSpec::FieldBehavior::drop, {} /* fields */, std::move(projectFields))));
+            sbe::MakeObjSpec::FieldBehavior::kOpen, std::move(fields), std::move(fieldInfos))));
     auto makeObjRoot = makeNothingConstant();
     sbe::EExpression::Vector makeObjArgs;
-    makeObjArgs.reserve(2 + projectValues.size());
+    makeObjArgs.reserve(2 + values.size());
     makeObjArgs.push_back(std::move(makeObjSpec));
     makeObjArgs.push_back(std::move(makeObjRoot));
-    std::move(projectValues.begin(), projectValues.end(), std::back_inserter(makeObjArgs));
+    std::move(values.begin(), values.end(), std::back_inserter(makeObjArgs));
 
     return sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));
 }
@@ -325,7 +334,7 @@ std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
 }
 
 std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
-    EvalExpr expr,
+    SbExpr expr,
     EvalStage stage,
     PlanNodeId planNodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
@@ -997,8 +1006,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
 
     // Handle the case where 'fields' contains at least one dotted path. We begin by creating a
     // path tree from 'fields'.
-    using Node = PathTreeNode<EvalExpr>;
-    auto treeRoot = buildPathTree<EvalExpr>(fields, BuildPathTreeMode::AllowConflictingPaths);
+    using Node = PathTreeNode<SbExpr>;
+    auto treeRoot = buildPathTree<SbExpr>(fields, BuildPathTreeMode::AllowConflictingPaths);
 
     std::vector<Node*> fieldNodes;
     for (const auto& field : fields) {
