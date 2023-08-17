@@ -2939,7 +2939,7 @@ buildvariants:
   # - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer !.cqf_only
+  - name: .aggfuzzer !.cqf_only !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
   - name: audit
