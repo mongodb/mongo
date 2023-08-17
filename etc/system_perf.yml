@@ -297,7 +297,9 @@ functions:
           source "${workdir}/compile_venv/bin/activate"
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
+          # And append "-sys-perf" at the end
           export MONGO_VERSION=$(git describe --abbrev=7)
+          MONGO_VERSION="$MONGO_VERSION-sys-perf"
 
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
