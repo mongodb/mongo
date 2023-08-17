@@ -35,7 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/rate_limiting.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 #include <climits>

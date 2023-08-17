@@ -40,7 +40,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/query/async_results_merger.h"

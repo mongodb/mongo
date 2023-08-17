@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 
 #include <absl/container/node_hash_map.h>
 #include <absl/hash/hash.h>
@@ -48,8 +48,8 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stats_util.h"
-#include "mongo/db/query/rate_limiting.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
+#include "mongo/db/query/query_stats/util.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/server_options.h"

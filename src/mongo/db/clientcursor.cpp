@@ -47,7 +47,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"

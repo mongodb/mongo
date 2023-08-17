@@ -49,7 +49,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/util/intrusive_counter.h"
 

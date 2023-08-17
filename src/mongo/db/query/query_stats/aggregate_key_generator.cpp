@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats_aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/aggregate_key_generator.h"
 
 #include <absl/container/node_hash_set.h>
 #include <boost/cstdint.hpp>

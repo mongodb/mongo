@@ -31,7 +31,7 @@ global:
     - "mongo/db/pipeline/document_source_query_stats_validators.h"
 imports:
   - "mongo/db/basic_types.idl"
-  - "mongo/db/query/query_stats_transform_algorithm.idl"
+  - "mongo/db/query/query_stats/transform_algorithm.idl"
 
 structs:
     TransformIdentifiersSpec:

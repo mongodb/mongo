@@ -5,7 +5,7 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="query_stats",
+    target="stats",
     source=[
         'collection_statistics_impl.cpp',
         'stats_catalog.cpp',
