@@ -84,6 +84,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
                                                       const boost::optional<UUID>& collectionUUID,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
+                                                      ScopeEnum scope,
                                                       OplogEntriesEnum operation,
                                                       const boost::optional<BSONObj>& data);
 
@@ -94,6 +95,7 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
+    ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err,
     const BSONObj& context = BSONObj());
@@ -147,6 +149,7 @@ public:
                   const CollectionPtr& collection,
                   const BSONKey& start,
                   const BSONKey& end,
+                  boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
@@ -155,7 +158,9 @@ public:
     /**
      * Hash all documents up to the deadline.
      */
-    Status hashAll(OperationContext* opCtx, Date_t deadline = Date_t::max());
+    Status hashAll(OperationContext* opCtx,
+                   const CollectionPtr& collPtr,
+                   Date_t deadline = Date_t::max());
 
     /**
      * Return the total hash of all documents seen so far.
@@ -175,7 +180,7 @@ public:
 
 private:
     /**
-     * Can we hash `obj` without going over our limits?
+     * Checks if we can hash `obj` without going over our limits.
      */
     bool _canHash(const BSONObj& obj);
 
@@ -194,6 +199,8 @@ private:
 
     DataCorruptionDetectionMode _previousDataCorruptionMode;
     PrepareConflictBehavior _previousPrepareConflictBehavior;
+
+    boost::optional<SecondaryIndexCheckParameters> _secondaryIndexCheckParameters;
 };
 
 namespace repl {

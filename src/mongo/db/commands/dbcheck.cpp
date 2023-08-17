@@ -174,6 +174,7 @@ public:
                                                         boost::none /*collectionUUID*/,
                                                         SeverityEnum::Info,
                                                         "",
+                                                        ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Start,
                                                         boost::none /*data*/);
             if (_info && _info.value().secondaryIndexCheckParameters) {
@@ -201,6 +202,7 @@ public:
                                                         boost::none /*collectionUUID*/,
                                                         SeverityEnum::Info,
                                                         "",
+                                                        ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Stop,
                                                         boost::none /*data*/);
             if (_info && _info.value().secondaryIndexCheckParameters) {
@@ -422,7 +424,7 @@ protected:
 
         // DbCheckRun will be empty in a fullDatabaseRun where all collections are not replicated.
         // TODO SERVER-79132: Remove this logic once dbCheck no longer allows for a full database
-        // run
+        // run.
         boost::optional<DbCheckCollectionInfo> info = boost::none;
         if (!_run->empty()) {
             info = _run->front();
@@ -433,8 +435,12 @@ protected:
             try {
                 _doCollection(opCtx, coll);
             } catch (const DBException& e) {
-                auto logEntry = dbCheckErrorHealthLogEntry(
-                    coll.nss, coll.uuid, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
+                auto logEntry = dbCheckErrorHealthLogEntry(coll.nss,
+                                                           coll.uuid,
+                                                           "dbCheck failed",
+                                                           ScopeEnum::Cluster,
+                                                           OplogEntriesEnum::Batch,
+                                                           e.toStatus());
                 HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*logEntry);
                 return;
             }
@@ -551,6 +557,7 @@ private:
                     entry = dbCheckErrorHealthLogEntry(info.nss,
                                                        info.uuid,
                                                        "dbCheck batch failed",
+                                                       ScopeEnum::Cluster,
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
                 }
@@ -687,6 +694,7 @@ private:
                            collectionPtr,
                            first,
                            info.end,
+                           info.secondaryIndexCheckParameters,
                            std::min(batchDocs, info.maxCount),
                            std::min(batchBytes, info.maxSize));
         } catch (const DBException& e) {
@@ -694,7 +702,7 @@ private:
         }
 
         const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
-        Status status = hasher->hashAll(opCtx, batchDeadline);
+        Status status = hasher->hashAll(opCtx, collectionPtr, batchDeadline);
 
         if (!status.isOK()) {
             return status;
