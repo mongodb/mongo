@@ -124,7 +124,7 @@ public:
                            "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
         }
     }
-
-} currentOpCommand;
+};
+MONGO_REGISTER_COMMAND(CurrentOpCommand);
 
 }  // namespace mongo

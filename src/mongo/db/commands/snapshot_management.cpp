@@ -93,7 +93,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdMakeSnapshot);
+MONGO_REGISTER_COMMAND(CmdMakeSnapshot).testOnly();
 
 class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
@@ -135,5 +135,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
+MONGO_REGISTER_COMMAND(CmdSetCommittedSnapshot).testOnly();
 }  // namespace mongo

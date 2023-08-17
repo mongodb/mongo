@@ -136,8 +136,8 @@ public:
         uassertStatusOK(cmdResponseStatus.commandStatus);
         return true;
     }
-
-} addShardToZoneCmd;
+};
+MONGO_REGISTER_COMMAND(AddShardToZoneCmd);
 
 }  // namespace
 }  // namespace mongo

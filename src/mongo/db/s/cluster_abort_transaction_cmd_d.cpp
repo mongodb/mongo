@@ -78,7 +78,7 @@ struct ClusterAbortTransactionCmdD {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
-ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdD> clusterAbortTransactionD;
+MONGO_REGISTER_COMMAND(ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdD>);
 
 }  // namespace
 }  // namespace mongo

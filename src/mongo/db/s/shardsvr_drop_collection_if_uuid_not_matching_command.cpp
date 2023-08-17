@@ -106,6 +106,7 @@ public:
                             ActionType::dropCollection));
         }
     };
-} shardSvrDropCollectionIfUUIDNotMatchingWithWriteConcern;
+};
+MONGO_REGISTER_COMMAND(ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand);
 }  // namespace
 }  // namespace mongo

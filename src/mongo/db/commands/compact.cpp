@@ -119,5 +119,5 @@ public:
         return true;
     }
 };
-static CompactCmd compactCmd;
+MONGO_REGISTER_COMMAND(CompactCmd);
 }  // namespace mongo

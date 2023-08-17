@@ -97,8 +97,8 @@ public:
                             ActionType::dropConnections));
         }
     };
-
-} dropConnectionsCmd;
+};
+MONGO_REGISTER_COMMAND(DropConnectionsCmd);
 
 }  // namespace
 }  // namespace mongo

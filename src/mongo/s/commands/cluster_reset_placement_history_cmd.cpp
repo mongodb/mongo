@@ -114,7 +114,8 @@ public:
                                                            ActionType::moveChunk));
         }
     };
-} resetPlacementHistory;
+};
+MONGO_REGISTER_COMMAND(ClusterResetPlacementHistoryCommand);
 
 }  // namespace
 }  // namespace mongo

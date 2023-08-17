@@ -84,7 +84,7 @@ struct ClusterCountCmdD {
                   "Cannot explain a cluster count command on a mongod");
     }
 };
-ClusterCountCmdBase<ClusterCountCmdD> clusterCountCmdD;
+MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdD>);
 
 }  // namespace
 }  // namespace mongo

@@ -104,7 +104,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
-} clusterCompactStructuredEncryptionDataCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterCompactStructuredEncryptionDataCmd);
 
 using Cmd = ClusterCompactStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {

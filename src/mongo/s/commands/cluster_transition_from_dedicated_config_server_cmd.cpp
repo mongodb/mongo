@@ -117,7 +117,8 @@ public:
                             ActionType::transitionFromDedicatedConfigServer));
         }
     };
-} transitionFromDedicatedConfigServerCommand;
+};
+MONGO_REGISTER_COMMAND(TransitionFromDedicatedConfigServerCommand);
 
 }  // namespace
 }  // namespace mongo

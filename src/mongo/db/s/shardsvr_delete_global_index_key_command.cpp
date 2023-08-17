@@ -107,8 +107,8 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrDeleteGlobalIndexKeyCmd,
-                                       mongo::gFeatureFlagGlobalIndexes);
+MONGO_REGISTER_COMMAND(ShardsvrDeleteGlobalIndexKeyCmd)
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo

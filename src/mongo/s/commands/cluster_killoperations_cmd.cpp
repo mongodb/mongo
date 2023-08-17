@@ -80,6 +80,7 @@ public:
         LOGV2(
             4664806, "_killOperations command killed cursors", "numKilled"_attr = numCursorsKilled);
     }
-} clusterKillOperationsCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterKillOperationsCmd);
 
 }  // namespace mongo

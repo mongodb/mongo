@@ -64,6 +64,7 @@ public:
     bool allowedWithSecurityToken() const final {
         return true;
     }
-} killOpCmd;
+};
+MONGO_REGISTER_COMMAND(KillOpCommand);
 
 }  // namespace mongo

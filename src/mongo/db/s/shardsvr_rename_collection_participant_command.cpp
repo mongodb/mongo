@@ -159,8 +159,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrRenameCollectionParticipantCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrRenameCollectionParticipantCommand);
 
 class ShardsvrRenameCollectionUnblockParticipantCommand final
     : public TypedCommand<ShardsvrRenameCollectionUnblockParticipantCommand> {
@@ -250,8 +250,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrRenameCollectionUnblockParticipantCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrRenameCollectionUnblockParticipantCommand);
 
 }  // namespace
 }  // namespace mongo

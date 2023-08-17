@@ -162,8 +162,8 @@ public:
 
         return true;
     }
-
-} cloneCatalogDataCmd;
+};
+MONGO_REGISTER_COMMAND(CloneCatalogDataCommand);
 
 }  // namespace
 }  // namespace mongo

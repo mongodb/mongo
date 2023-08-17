@@ -139,7 +139,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} refineCollectionShardKeyCmd;
+};
+MONGO_REGISTER_COMMAND(RefineCollectionShardKeyCommand);
 
 }  // namespace
 }  // namespace mongo

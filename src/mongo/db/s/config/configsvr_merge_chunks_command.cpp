@@ -134,8 +134,8 @@ public:
             }
         }
     };
-
-} configsvrMergeChunksCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrMergeChunksCommand);
 
 }  // namespace
 }  // namespace mongo

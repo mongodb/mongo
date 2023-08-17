@@ -132,7 +132,8 @@ private:
     bool adminOnly() const override {
         return true;
     }
-} configsvrCreateDatabaseCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrCreateDatabaseCommand);
 
 }  // namespace
 }  // namespace mongo

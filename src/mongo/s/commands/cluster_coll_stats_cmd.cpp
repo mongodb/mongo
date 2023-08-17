@@ -423,8 +423,8 @@ public:
 
         return true;
     }
-
-} collectionStatsCmd;
+};
+MONGO_REGISTER_COMMAND(CollectionStats);
 
 }  // namespace
 }  // namespace mongo

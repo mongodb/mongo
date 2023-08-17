@@ -112,7 +112,8 @@ public:
             return NamespaceString(request().getDbName());
         }
     };
-} getClusterParameterCommand;
+};
+MONGO_REGISTER_COMMAND(GetClusterParameterCommand);
 
 }  // namespace
 }  // namespace mongo

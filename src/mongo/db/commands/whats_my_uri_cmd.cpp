@@ -77,8 +77,8 @@ public:
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
         return true;
     }
-
-} cmdWhatsMyUri;
+};
+MONGO_REGISTER_COMMAND(CmdWhatsMyUri);
 
 }  // namespace
 }  // namespace mongo

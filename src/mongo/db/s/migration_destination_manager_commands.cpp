@@ -198,8 +198,8 @@ public:
         result.appendBool("started", true);
         return true;
     }
-
-} recvChunkStartCmd;
+};
+MONGO_REGISTER_COMMAND(RecvChunkStartCommand);
 
 class RecvChunkStatusCommand : public BasicCommand {
 public:
@@ -246,8 +246,8 @@ public:
         MigrationDestinationManager::get(opCtx)->report(result, opCtx, waitForSteadyOrDone);
         return true;
     }
-
-} recvChunkStatusCommand;
+};
+MONGO_REGISTER_COMMAND(RecvChunkStatusCommand);
 
 class RecvChunkCommitCommand : public BasicCommand {
 public:
@@ -305,8 +305,8 @@ public:
         }
         return true;
     }
-
-} recvChunkCommitCommand;
+};
+MONGO_REGISTER_COMMAND(RecvChunkCommitCommand);
 
 class RecvChunkAbortCommand : public BasicCommand {
 public:
@@ -371,8 +371,8 @@ public:
         uassertStatusOK(migrationSessionIdStatus.getStatus());
         return true;
     }
-
-} recvChunkAbortCommand;
+};
+MONGO_REGISTER_COMMAND(RecvChunkAbortCommand);
 
 class RecvChunkReleaseCritSecCommand : public BasicCommand {
 public:
@@ -429,8 +429,8 @@ public:
         }
         return true;
     }
-
-} recvChunkReleaseCritSecCommand;
+};
+MONGO_REGISTER_COMMAND(RecvChunkReleaseCritSecCommand);
 
 }  // namespace
 }  // namespace mongo

@@ -343,7 +343,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
-} cleanupStructuredEncryptionDataCmd;
+};
+MONGO_REGISTER_COMMAND(CleanupStructuredEncryptionDataCmd);
 
 
 }  // namespace

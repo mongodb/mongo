@@ -184,7 +184,8 @@ public:
     bool supportsRetryableWrite() const final {
         return true;
     }
-} configsvrSetAllowMigrationsCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrSetAllowMigrationsCommand);
 
 }  // namespace
 }  // namespace mongo

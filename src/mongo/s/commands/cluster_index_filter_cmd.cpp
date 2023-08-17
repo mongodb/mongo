@@ -172,16 +172,32 @@ private:
     const std::string _helpText;
 };
 
-ClusterIndexFilterCmd clusterPlanCacheListFiltersCmd(
-    "planCacheListFilters", "Displays index filters for all query shapes in a collection.");
+class PlanCacheListFiltersCmd : public ClusterIndexFilterCmd {
+public:
+    PlanCacheListFiltersCmd()
+        : ClusterIndexFilterCmd{"planCacheListFilters",
+                                "Displays index filters for all query shapes in a collection."} {}
+};
 
-ClusterIndexFilterCmd clusterPlanCacheClearFiltersCmd(
-    "planCacheClearFilters",
-    "Clears index filter for a single query shape or, "
-    "if the query shape is omitted, all filters for the collection.");
+class PlanCacheClearFiltersCmd : public ClusterIndexFilterCmd {
+public:
+    PlanCacheClearFiltersCmd()
+        : ClusterIndexFilterCmd{"planCacheClearFilters",
+                                "Clears index filter for a single query shape or, "
+                                "if the query shape is omitted, all filters for the collection."} {}
+};
 
-ClusterIndexFilterCmd clusterPlanCacheSetFilterCmd(
-    "planCacheSetFilter", "Sets index filter for a query shape. Overrides existing index filter.");
+class PlanCacheSetFiltersCmd : public ClusterIndexFilterCmd {
+public:
+    PlanCacheSetFiltersCmd()
+        : ClusterIndexFilterCmd{
+              "planCacheSetFilter",
+              "Sets index filter for a query shape. Overrides existing index filter."} {}
+};
+
+MONGO_REGISTER_COMMAND(PlanCacheListFiltersCmd);
+MONGO_REGISTER_COMMAND(PlanCacheClearFiltersCmd);
+MONGO_REGISTER_COMMAND(PlanCacheSetFiltersCmd);
 
 }  // namespace
 }  // namespace mongo

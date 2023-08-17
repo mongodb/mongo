@@ -242,8 +242,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} configsvrCheckMetadataConsistencyCommand;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrCheckMetadataConsistencyCommand);
 
 }  // namespace
 }  // namespace mongo

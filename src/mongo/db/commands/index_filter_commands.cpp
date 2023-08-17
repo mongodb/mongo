@@ -78,26 +78,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
-namespace {
-
-using std::string;
-using std::vector;
-using namespace mongo;
-
-//
-// Command instances.
-// Registers commands with the command system and make commands
-// available to the client.
-//
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, ())
-(InitializerContext* context) {
-    new ListFilters();
-    new ClearFilters();
-    new SetFilter();
-}
-}  // namespace
-
 namespace mongo {
 
 using std::string;
@@ -410,5 +390,9 @@ Status SetFilter::set(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+MONGO_REGISTER_COMMAND(ListFilters);
+MONGO_REGISTER_COMMAND(ClearFilters);
+MONGO_REGISTER_COMMAND(SetFilter);
 
 }  // namespace mongo

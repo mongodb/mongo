@@ -110,6 +110,7 @@ public:
                             ActionType::setUserWriteBlockMode}));
         }
     };
-} setUserWriteBlockModeCommand;
+};
+MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand);
 }  // namespace
 }  // namespace mongo

@@ -269,7 +269,8 @@ public:
                             ActionType::querySettings}));
         }
     };
-} setChangeStreamStateCommand;
+};
+MONGO_REGISTER_COMMAND(SetQuerySettingsCommand);
 
 class RemoveQuerySettingsCommand final : public TypedCommand<RemoveQuerySettingsCommand> {
 public:
@@ -360,6 +361,7 @@ public:
                             ActionType::querySettings}));
         }
     };
-} removeChangeStreamStateCommand;
+};
+MONGO_REGISTER_COMMAND(RemoveQuerySettingsCommand);
 }  // namespace
 }  // namespace mongo

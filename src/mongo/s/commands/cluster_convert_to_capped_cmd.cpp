@@ -155,8 +155,8 @@ public:
             Shard::RetryPolicy::kIdempotent,
             &result);
     }
-
-} convertToCappedCmd;
+};
+MONGO_REGISTER_COMMAND(ConvertToCappedCmd);
 
 }  // namespace
 }  // namespace mongo

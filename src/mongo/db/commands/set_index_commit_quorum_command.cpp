@@ -117,8 +117,8 @@ public:
                             ActionType::createIndex));
         }
     };
-
-} setCommitQuorumCmd;
+};
+MONGO_REGISTER_COMMAND(SetIndexCommitQuorumCommand);
 
 }  // namespace
 }  // namespace mongo

@@ -48,8 +48,8 @@ public:
     }
 
     static void beginShutdown(OperationContext* opCtx, bool force, Milliseconds timeout) {}
-
-} clusterShutdownCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterShutdownCmd);
 
 }  // namespace
 }  // namespace mongo

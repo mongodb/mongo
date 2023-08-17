@@ -65,7 +65,7 @@ struct ClusterGetMoreCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterGetMoreCmdBase<ClusterGetMoreCmdS> clusterGetMoreCmdS;
+MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdS>);
 
 }  // namespace
 }  // namespace mongo

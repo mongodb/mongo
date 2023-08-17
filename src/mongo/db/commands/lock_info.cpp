@@ -108,5 +108,6 @@ public:
             }
         }
     };
-} cmdLockInfo;
+};
+MONGO_REGISTER_COMMAND(CmdLockInfo);
 }  // namespace mongo

@@ -71,7 +71,8 @@ private:
         response.addToBSON(&result);
         return true;
     }
-} cmdReplSetRequestVotes;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetRequestVotes);
 
 }  // namespace repl
 }  // namespace mongo

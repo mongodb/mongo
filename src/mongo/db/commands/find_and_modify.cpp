@@ -303,7 +303,8 @@ public:
 private:
     // Update related command execution metrics.
     static UpdateMetrics _updateMetrics;
-} cmdFindAndModify;
+};
+MONGO_REGISTER_COMMAND(CmdFindAndModify);
 
 UpdateMetrics CmdFindAndModify::_updateMetrics{"findAndModify"};
 

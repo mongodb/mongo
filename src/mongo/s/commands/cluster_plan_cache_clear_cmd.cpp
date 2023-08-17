@@ -112,7 +112,8 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result);
-} clusterPlanCacheClearCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterPlanCacheClearCmd);
 
 bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
                                    const DatabaseName& dbName,

@@ -157,11 +157,9 @@ public:
                                  false /* do not log cmd */) {}
 };
 
-MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
-    new BalancerStartCommand();
-    new BalancerStopCommand();
-    new BalancerStatusCommand();
-}
+MONGO_REGISTER_COMMAND(BalancerStartCommand);
+MONGO_REGISTER_COMMAND(BalancerStopCommand);
+MONGO_REGISTER_COMMAND(BalancerStatusCommand);
 
 }  // namespace
 }  // namespace mongo

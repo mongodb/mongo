@@ -154,6 +154,7 @@ public:
             return reply;
         }
     };
-} validateDBMetadataCmd;
+};
+MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd);
 }  // namespace
 }  // namespace mongo

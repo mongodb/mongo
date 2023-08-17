@@ -343,8 +343,8 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
-
-} pipelineCmd;
+};
+MONGO_REGISTER_COMMAND(PipelineCommand);
 
 }  // namespace
 }  // namespace mongo

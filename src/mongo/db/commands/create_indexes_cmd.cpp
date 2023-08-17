@@ -852,8 +852,8 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
-
-} cmdCreateIndex;
+};
+MONGO_REGISTER_COMMAND(CmdCreateIndexes);
 
 }  // namespace
 }  // namespace mongo

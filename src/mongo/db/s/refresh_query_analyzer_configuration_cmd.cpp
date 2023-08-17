@@ -120,7 +120,8 @@ public:
     std::string help() const override {
         return "Refreshes the query analyzer configurations for all collections.";
     }
-} refreshQueryAnalyzerConfigurationCmd;
+};
+MONGO_REGISTER_COMMAND(RefreshQueryAnalyzerConfigurationCmd);
 
 }  // namespace
 

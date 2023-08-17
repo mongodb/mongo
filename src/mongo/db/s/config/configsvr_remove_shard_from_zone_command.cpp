@@ -128,8 +128,8 @@ public:
 
         return true;
     }
-
-} configsvrRemoveShardFromZoneCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrRemoveShardFromZoneCommand);
 
 }  // namespace
 }  // namespace mongo

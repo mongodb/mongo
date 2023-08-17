@@ -140,9 +140,8 @@ public:
 
         return true;
     }
-
-} splitVectorCmd;
-
+};
+MONGO_REGISTER_COMMAND(SplitVectorCmd);
 
 }  // namespace
 }  // namespace mongo

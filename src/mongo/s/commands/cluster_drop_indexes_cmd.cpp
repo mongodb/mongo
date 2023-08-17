@@ -168,7 +168,8 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::DropIndexes::kAuthorizationContract;
     }
-} dropIndexesCmd;
+};
+MONGO_REGISTER_COMMAND(DropIndexesCmd);
 
 }  // namespace
 }  // namespace mongo

@@ -135,8 +135,8 @@ public:
             return true;
         }
     };
-
-} clusterSetFeatureCompatibilityVersionCmd;
+};
+MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCmd);
 
 }  // namespace
 }  // namespace mongo

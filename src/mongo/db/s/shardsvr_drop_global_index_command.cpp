@@ -115,8 +115,8 @@ public:
     };
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrDropGlobalIndexCommand,
-                                       mongo::gFeatureFlagGlobalIndexes);
+MONGO_REGISTER_COMMAND(ShardsvrDropGlobalIndexCommand)
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo

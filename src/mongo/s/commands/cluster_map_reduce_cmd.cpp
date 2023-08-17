@@ -65,7 +65,8 @@ public:
              BSONObjBuilder& result) override {
         return runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
-} clusterMapReduceCommand;
+};
+MONGO_REGISTER_COMMAND(ClusterMapReduceCommand);
 
 }  // namespace
 }  // namespace mongo

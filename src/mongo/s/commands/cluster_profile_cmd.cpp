@@ -90,10 +90,10 @@ protected:
 
         return oldSettings;
     }
+};
 
-} profileCmd;
-
-SetProfilingFilterGloballyCmd setProfilingFilterGloballyCmd;
+MONGO_REGISTER_COMMAND(ProfileCmd);
+MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd);
 
 }  // namespace
 }  // namespace mongo

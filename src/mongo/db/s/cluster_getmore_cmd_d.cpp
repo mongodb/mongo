@@ -76,7 +76,7 @@ struct ClusterGetMoreCmdD {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
-ClusterGetMoreCmdBase<ClusterGetMoreCmdD> clusterGetMoreCmdD;
+MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdD>);
 
 }  // namespace
 }  // namespace mongo

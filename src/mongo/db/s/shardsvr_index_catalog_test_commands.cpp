@@ -146,7 +146,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_TEST_COMMAND(ShardsvrRegisterIndexTestCommand);
+MONGO_REGISTER_COMMAND(ShardsvrRegisterIndexTestCommand).testOnly();
 
 class ShardsvrUnregisterIndexTestCommand final
     : public TypedCommand<ShardsvrUnregisterIndexTestCommand> {
@@ -227,6 +227,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_TEST_COMMAND(ShardsvrUnregisterIndexTestCommand);
+MONGO_REGISTER_COMMAND(ShardsvrUnregisterIndexTestCommand).testOnly();
 }  // namespace
 }  // namespace mongo

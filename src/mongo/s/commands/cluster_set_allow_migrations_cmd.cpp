@@ -115,7 +115,8 @@ public:
             return true;
         }
     };
-} setAllowMigrationsCmd;
+};
+MONGO_REGISTER_COMMAND(SetAllowMigrationsCmd);
 
 }  // namespace
 }  // namespace mongo

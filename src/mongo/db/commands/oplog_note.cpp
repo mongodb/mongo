@@ -182,9 +182,6 @@ public:
         return true;
     }
 };
-
-MONGO_INITIALIZER(RegisterAppendOpLogNoteCmd)(InitializerContext* context) {
-    new AppendOplogNoteCmd();
-}
+MONGO_REGISTER_COMMAND(AppendOplogNoteCmd);
 
 }  // namespace mongo

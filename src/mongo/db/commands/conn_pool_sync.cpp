@@ -82,8 +82,8 @@ public:
         globalConnPool.flush();
         return true;
     }
-
-} poolFlushCmd;
+};
+MONGO_REGISTER_COMMAND(PoolFlushCmd);
 
 }  // namespace
 }  // namespace mongo

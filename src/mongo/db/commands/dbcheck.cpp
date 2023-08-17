@@ -845,7 +845,8 @@ public:
         (new DbCheckJob(dbName, std::move(job)))->go();
         return true;
     }
-} dbCheckCmd;
+};
+MONGO_REGISTER_COMMAND(DbCheckCmd);
 
 }  // namespace
 }  // namespace mongo

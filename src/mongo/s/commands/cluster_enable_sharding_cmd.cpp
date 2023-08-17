@@ -141,8 +141,8 @@ public:
                         ResourcePattern::forDatabaseName(getDbName()), ActionType::enableSharding));
         }
     };
-
-} enableShardingCmd;
+};
+MONGO_REGISTER_COMMAND(EnableShardingCmd);
 
 }  // namespace
 }  // namespace mongo

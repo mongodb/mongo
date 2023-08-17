@@ -129,7 +129,8 @@ public:
             return {};
         }
     };
-} clusterDropDatabaseCmd;
+};
+MONGO_REGISTER_COMMAND(DropDatabaseCmd);
 
 }  // namespace
 }  // namespace mongo

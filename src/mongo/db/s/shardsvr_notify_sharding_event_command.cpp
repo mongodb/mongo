@@ -124,7 +124,7 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrNotifyShardingEventCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrNotifyShardingEventCommand);
 
 }  // namespace mongo

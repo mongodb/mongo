@@ -123,7 +123,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrSetUserWriteBlockModeCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrSetUserWriteBlockModeCommand);
 
 }  // namespace
 }  // namespace mongo

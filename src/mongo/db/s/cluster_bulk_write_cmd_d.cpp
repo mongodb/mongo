@@ -59,7 +59,7 @@ struct ClusterBulkWriteCmdD {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
-ClusterBulkWriteCmd<ClusterBulkWriteCmdD> clusterBulkWriteCmdD{ClusterBulkWriteCmdD::kName};
+MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdD>);
 
 }  // namespace
 }  // namespace mongo

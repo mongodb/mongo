@@ -348,7 +348,8 @@ public:
             throw;
         }
     };
-} cmdInsert;
+};
+MONGO_REGISTER_COMMAND(CmdInsert);
 
 class CmdUpdate final : public write_ops::UpdateCmdVersion1Gen<CmdUpdate> {
 public:
@@ -635,7 +636,8 @@ public:
 
     // Update related command execution metrics.
     static UpdateMetrics updateMetrics;
-} cmdUpdate;
+};
+MONGO_REGISTER_COMMAND(CmdUpdate);
 
 UpdateMetrics CmdUpdate::updateMetrics{"update"};
 
@@ -811,7 +813,8 @@ public:
 
         const BSONObj& _commandObj;
     };
-} cmdDelete;
+};
+MONGO_REGISTER_COMMAND(CmdDelete);
 
 }  // namespace
 }  // namespace mongo

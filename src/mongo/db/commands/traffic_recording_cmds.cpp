@@ -91,7 +91,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-} startRecordingTrafficCommand;
+};
+MONGO_REGISTER_COMMAND(StartRecordingCommand);
 
 class StopRecordingCommand final : public TypedCommand<StopRecordingCommand> {
 public:
@@ -127,7 +128,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-} stopRecordingTrafficCommand;
+};
+MONGO_REGISTER_COMMAND(StopRecordingCommand);
 
 }  // namespace
 }  // namespace mongo

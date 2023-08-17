@@ -1507,6 +1507,10 @@ public:
         return std::move(*this);
     }
 
+    /**
+     * A command object will be created only if the featureFlag is enabled,
+     * regardless of the current FCV.
+     */
     EntryBuilder requiresFeatureFlag(const FeatureFlag* featureFlag) && {
         _entry->featureFlag = featureFlag;
         return std::move(*this);
@@ -1550,34 +1554,5 @@ private:
 #define MONGO_REGISTER_COMMAND(...)                                              \
     static auto MONGO_COMMAND_DUMMY_ID_(mongoRegisterCommand_dummy_, __LINE__) = \
         *CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()
-
-/**
- * Creates a test command object of type CmdType if test commands are enabled
- * for this process. Prefer this syntax to using MONGO_INITIALIZER directly.
- * The created Command object is "leaked" intentionally, since it will register
- * itself.
- *
- * The command objects will be created after the "default" initializer, and all
- * startup option processing happens prior to "default" (see base/init.h).
- *
- * Add `.testOnly()` to the registration instead of using this macro:
- *     MONGO_REGISTER_COMMAND(MyCommandType).testOnly();
- */
-#define MONGO_REGISTER_TEST_COMMAND(CmdType) MONGO_REGISTER_COMMAND(CmdType).testOnly()
-
-/**
- * Creates a command object of type CmdType if the featureFlag is enabled for
- * this process, regardless of the current FCV. Prefer this syntax to using
- * MONGO_INITIALIZER directly. The created Command object is "leaked"
- * intentionally, since it will register itself.
- *
- * The command objects will be created after the "default" initializer, and all
- * startup option processing happens prior to "default" (see base/init.h).
- *
- * Add `.requiresFeatureFlag(&featureFlag)` to the registration instead of using this macro:
- *     MONGO_REGISTER_COMMAND(MyCommandType).requiresFeatureFlag(&featureFlag);
- */
-#define MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CmdType, featureFlag) \
-    MONGO_REGISTER_COMMAND(CmdType).requiresFeatureFlag(&featureFlag)
 
 }  // namespace mongo

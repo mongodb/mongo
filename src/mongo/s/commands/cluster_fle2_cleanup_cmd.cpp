@@ -104,7 +104,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
-} clusterCleanupStructuredEncryptionDataCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterCleanupStructuredEncryptionDataCmd);
 
 using Cmd = ClusterCleanupStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {

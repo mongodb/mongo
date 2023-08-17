@@ -147,7 +147,8 @@ public:
                             ActionType::internal));
         }
     };
-} shardsvrDropDatabaseCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrDropDatabaseCommand);
 
 }  // namespace
 }  // namespace mongo

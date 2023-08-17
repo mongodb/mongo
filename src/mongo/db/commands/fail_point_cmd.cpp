@@ -175,8 +175,8 @@ public:
     bool requiresAuth() const override {
         return false;
     }
+};
 
-} WaitForFailPointCmd;
-
-MONGO_REGISTER_TEST_COMMAND(FaultInjectCmd);
+MONGO_REGISTER_COMMAND(WaitForFailPointCommand);
+MONGO_REGISTER_COMMAND(FaultInjectCmd).testOnly();
 }  // namespace mongo

@@ -178,9 +178,9 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(TestVersion2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestVersions1And2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestDeprecationInVersion2Cmd);
-MONGO_REGISTER_TEST_COMMAND(TestRemovalCmd);
+MONGO_REGISTER_COMMAND(TestVersion2Cmd).testOnly();
+MONGO_REGISTER_COMMAND(TestVersions1And2Cmd).testOnly();
+MONGO_REGISTER_COMMAND(TestDeprecationInVersion2Cmd).testOnly();
+MONGO_REGISTER_COMMAND(TestRemovalCmd).testOnly();
 
 }  // namespace mongo

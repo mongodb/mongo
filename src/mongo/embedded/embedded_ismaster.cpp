@@ -108,7 +108,8 @@ public:
 
         return true;
     }
-} CmdIsMaster;
+};
+MONGO_REGISTER_COMMAND(CmdIsMaster);
 
 }  // namespace
 }  // namespace mongo

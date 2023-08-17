@@ -438,7 +438,7 @@ BSONObj prepareCmdObjForPassthrough(
     return newCmdObj;
 }
 
-FindAndModifyCmd findAndModifyCmd;
+MONGO_REGISTER_COMMAND(FindAndModifyCmd);
 
 }  // namespace
 

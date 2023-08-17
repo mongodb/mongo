@@ -242,8 +242,8 @@ public:
         mergeChunks(opCtx, nss, minKey, maxKey, epoch, timestamp);
         return true;
     }
-
-} mergeChunksCmd;
+};
+MONGO_REGISTER_COMMAND(MergeChunksCommand);
 
 BSONField<std::string> MergeChunksCommand::nsField("mergeChunks");
 BSONField<std::vector<BSONObj>> MergeChunksCommand::boundsField("bounds");

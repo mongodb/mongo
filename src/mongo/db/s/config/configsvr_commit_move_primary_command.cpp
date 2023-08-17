@@ -119,7 +119,8 @@ private:
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrCommitMovePrimaryCommand;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrCommitMovePrimaryCommand);
 
 }  // namespace
 }  // namespace mongo

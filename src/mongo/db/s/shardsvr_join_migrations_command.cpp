@@ -113,7 +113,8 @@ public:
                             ActionType::internal));
         }
     };
-} _shardsvrJoinMigrationsCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrJoinMigrationsCommand);
 
 }  // namespace
 }  // namespace mongo

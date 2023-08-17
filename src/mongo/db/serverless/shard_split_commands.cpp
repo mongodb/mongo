@@ -146,7 +146,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} commitShardSplitCmd;
+};
+MONGO_REGISTER_COMMAND(CommitShardSplitCmd);
 
 class AbortShardSplitCmd : public TypedCommand<AbortShardSplitCmd> {
 public:
@@ -221,7 +222,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} abortShardSplitCmd;
+};
+MONGO_REGISTER_COMMAND(AbortShardSplitCmd);
 
 class ForgetShardSplitCmd : public TypedCommand<ForgetShardSplitCmd> {
 public:
@@ -295,7 +297,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} forgetShardSplitCmd;
+};
+MONGO_REGISTER_COMMAND(ForgetShardSplitCmd);
 
 
 }  // namespace

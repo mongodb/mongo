@@ -165,8 +165,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrDropIndexesCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrDropIndexesCommand);
 
 ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Invocation::typedRun(
     OperationContext* opCtx) {

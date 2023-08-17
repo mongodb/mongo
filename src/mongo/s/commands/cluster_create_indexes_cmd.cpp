@@ -216,7 +216,8 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::CreateIndexesCommand::kAuthorizationContract;
     }
-} createIndexesCmd;
+};
+MONGO_REGISTER_COMMAND(CreateIndexesCmd);
 
 }  // namespace
 }  // namespace mongo

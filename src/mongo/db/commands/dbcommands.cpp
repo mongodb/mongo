@@ -180,7 +180,8 @@ public:
             return {};
         }
     };
-} cmdDropDatabase;
+};
+MONGO_REGISTER_COMMAND(CmdDropDatabase);
 
 /* drop collection */
 class CmdDrop : public DropCmdVersion1Gen<CmdDrop> {
@@ -246,7 +247,8 @@ public:
             return reply;
         }
     };
-} cmdDrop;
+};
+MONGO_REGISTER_COMMAND(CmdDrop);
 
 class CmdDataSize final : public TypedCommand<CmdDataSize> {
 public:
@@ -433,8 +435,8 @@ public:
     std::string help() const final {
         return Request::kCommandDescription.toString();
     }
-
-} cmdDatasize;
+};
+MONGO_REGISTER_COMMAND(CmdDataSize);
 
 Rarely _collStatsSampler;
 
@@ -506,7 +508,8 @@ public:
             }
         }
     };
-} cmdCollStats;
+};
+MONGO_REGISTER_COMMAND(CmdCollStats);
 
 class CollectionModCommand : public TypedCommand<CollectionModCommand> {
 public:
@@ -617,7 +620,8 @@ public:
             coll_mod_reply_validation::validateReply(reply);
         }
     };
-} collectionModCommand;
+};
+MONGO_REGISTER_COMMAND(CollectionModCommand);
 
 class CmdDbStats final : public TypedCommand<CmdDbStats> {
 public:
@@ -728,8 +732,8 @@ public:
     std::string help() const final {
         return Request::kCommandDescription.toString();
     }
-
-} cmdDBStats;
+};
+MONGO_REGISTER_COMMAND(CmdDbStats);
 
 // Provides the means to asynchronously run `buildinfo` commands.
 class BuildInfoExecutor final : public AsyncRequestExecutor {
@@ -806,8 +810,8 @@ public:
         auto opCtx = rec->getOpCtx();
         return BuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }
-
-} cmdBuildInfo;
+};
+MONGO_REGISTER_COMMAND(CmdBuildInfo);
 
 }  // namespace
 }  // namespace mongo

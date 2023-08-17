@@ -183,7 +183,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(ReshardingCloneCollectionTestCommand);
+MONGO_REGISTER_COMMAND(ReshardingCloneCollectionTestCommand).testOnly();
 
 }  // namespace
 }  // namespace mongo

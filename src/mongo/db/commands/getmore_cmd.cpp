@@ -929,7 +929,8 @@ public:
     bool adminOnly() const override {
         return false;
     }
-} getMoreCmd;
+};
+MONGO_REGISTER_COMMAND(GetMoreCmd);
 
 }  // namespace
 }  // namespace mongo

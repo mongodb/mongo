@@ -85,7 +85,7 @@ namespace mongo {
 template <typename Impl>
 class ClusterBulkWriteCmd : public Command {
 public:
-    ClusterBulkWriteCmd(StringData name) : Command(name) {}
+    ClusterBulkWriteCmd() : Command(Impl::kName) {}
 
     bool adminOnly() const final {
         return true;

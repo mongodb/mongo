@@ -116,8 +116,8 @@ public:
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
-
-} addShardCmd;
+};
+MONGO_REGISTER_COMMAND(AddShardCmd);
 
 }  // namespace
 }  // namespace mongo

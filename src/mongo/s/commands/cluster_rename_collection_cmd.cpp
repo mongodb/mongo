@@ -191,8 +191,8 @@ public:
             return true;
         }
     };
-
-} renameCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(RenameCollectionCmd);
 
 }  // namespace
 }  // namespace mongo

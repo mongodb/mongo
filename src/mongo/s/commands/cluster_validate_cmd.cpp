@@ -174,8 +174,8 @@ public:
         uassertStatusOK(firstFailedShardStatus);
         return true;
     }
-
-} validateCmd;
+};
+MONGO_REGISTER_COMMAND(ValidateCmd);
 
 }  // namespace
 }  // namespace mongo

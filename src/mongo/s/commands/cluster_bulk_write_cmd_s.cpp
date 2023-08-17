@@ -53,7 +53,8 @@ struct ClusterBulkWriteCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterBulkWriteCmd<ClusterBulkWriteCmdS> clusterBulkWriteCmdS{ClusterBulkWriteCmdS::kName};
+
+MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdS>);
 
 }  // namespace
 }  // namespace mongo

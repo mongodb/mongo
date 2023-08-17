@@ -121,8 +121,8 @@ public:
             return request().getNamespace();
         }
     };
-
-} ClusterGetQueryableEncryptionCountInfoCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterGetQueryableEncryptionCountInfoCmd);
 
 ClusterGetQueryableEncryptionCountInfoCmd::Reply
 ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext* opCtx) {

@@ -210,6 +210,7 @@ public:
 
         return true;
     }
-} configsvrAddShardCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrAddShardCommand);
 
 }  // namespace mongo

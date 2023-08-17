@@ -424,7 +424,8 @@ public:
                 SerializationContext::stateCommandReply(serializationContext));
         }
     };
-} cmdListIndexes;
+};
+MONGO_REGISTER_COMMAND(CmdListIndexes);
 
 }  // namespace
 }  // namespace mongo

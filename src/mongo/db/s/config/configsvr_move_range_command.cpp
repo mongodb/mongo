@@ -124,7 +124,8 @@ public:
                             ActionType::internal));
         }
     };
-} _cfgsvrMoveRange;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrMoveRangeCommand);
 
 }  // namespace
 }  // namespace mongo

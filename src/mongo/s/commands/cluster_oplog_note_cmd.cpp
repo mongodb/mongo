@@ -109,9 +109,6 @@ public:
         return appendRawResponses(opCtx, &errmsg, &result, shardResponses).responseOK;
     }
 };
-
-MONGO_INITIALIZER(RegisterAppendOpLogNoteCmd)(InitializerContext* context) {
-    new AppendOplogNoteCmd();
-}
+MONGO_REGISTER_COMMAND(AppendOplogNoteCmd);
 
 }  // namespace mongo

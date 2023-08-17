@@ -141,8 +141,8 @@ public:
 
         return true;
     }
-
-} clusterFsyncCmd;
+};
+MONGO_REGISTER_COMMAND(FsyncCommand);
 
 }  // namespace
 }  // namespace mongo

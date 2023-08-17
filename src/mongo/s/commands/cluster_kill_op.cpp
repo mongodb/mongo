@@ -136,8 +136,8 @@ private:
         // whether the shard reported success or not.
         return true;
     }
-
-} clusterKillOpCommand;
+};
+MONGO_REGISTER_COMMAND(ClusterKillOpCommand);
 
 }  // namespace
 }  // namespace mongo

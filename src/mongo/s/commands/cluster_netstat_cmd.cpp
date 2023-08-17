@@ -89,8 +89,8 @@ public:
         result.append("isdbgrid", 1);
         return true;
     }
-
-} netstat;
+};
+MONGO_REGISTER_COMMAND(NetStatCmd);
 
 }  // namespace
 }  // namespace mongo

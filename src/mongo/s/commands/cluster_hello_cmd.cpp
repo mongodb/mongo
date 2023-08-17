@@ -338,8 +338,8 @@ protected:
     virtual bool useLegacyResponseFields() const {
         return false;
     }
-
-} hello;
+};
+MONGO_REGISTER_COMMAND(CmdHello);
 
 class CmdIsMaster : public CmdHello {
 public:
@@ -353,7 +353,8 @@ protected:
     bool useLegacyResponseFields() const final {
         return true;
     }
-} isMaster;
+};
+MONGO_REGISTER_COMMAND(CmdIsMaster);
 
 }  // namespace
 }  // namespace mongo

@@ -80,7 +80,8 @@ public:
              BSONObjBuilder& result) override {
         return map_reduce_agg::runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
-} mapReduceCommand;
+};
+MONGO_REGISTER_COMMAND(MapReduceCommand);
 
 }  // namespace
 }  // namespace mongo

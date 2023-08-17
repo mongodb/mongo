@@ -157,7 +157,8 @@ public:
             }
         }
     };
-} clusterDropCmd;
+};
+MONGO_REGISTER_COMMAND(DropCmd);
 
 }  // namespace
 }  // namespace mongo

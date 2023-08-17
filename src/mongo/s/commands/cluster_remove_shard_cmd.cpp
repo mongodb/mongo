@@ -117,8 +117,8 @@ public:
 
         return true;
     }
-
-} removeShardCmd;
+};
+MONGO_REGISTER_COMMAND(RemoveShardCmd);
 
 }  // namespace
 }  // namespace mongo

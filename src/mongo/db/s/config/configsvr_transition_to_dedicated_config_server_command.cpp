@@ -153,8 +153,8 @@ public:
 
         return true;
     }
-
-} configSvrTransitionToDedicatedConfigCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrTransitionToDedicatedConfigCommand);
 
 }  // namespace
 }  // namespace mongo

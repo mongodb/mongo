@@ -111,7 +111,8 @@ public:
                "as possible. This may mean a longer critical interval "
                "during which writes are blocked.";
     }
-} commitReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(CommitReshardCollectionCmd);
 
 }  // namespace
 }  // namespace mongo

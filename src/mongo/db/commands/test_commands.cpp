@@ -155,7 +155,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(GodInsert);
+MONGO_REGISTER_COMMAND(GodInsert).testOnly();
 
 // Testing only, enabled via command-line.
 class CapTrunc : public BasicCommand {
@@ -235,7 +235,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CapTrunc);
+MONGO_REGISTER_COMMAND(CapTrunc).testOnly();
 
 // Testing-only, enabled via command line.
 class EmptyCapped : public BasicCommand {
@@ -267,7 +267,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(EmptyCapped);
+MONGO_REGISTER_COMMAND(EmptyCapped).testOnly();
 
 class DurableHistoryReplicatedTestCmd : public BasicCommand {
 public:
@@ -351,7 +351,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(DurableHistoryReplicatedTestCmd);
+MONGO_REGISTER_COMMAND(DurableHistoryReplicatedTestCmd).testOnly();
 
 }  // namespace
 

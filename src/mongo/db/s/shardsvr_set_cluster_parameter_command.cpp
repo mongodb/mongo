@@ -152,7 +152,8 @@ public:
     bool supportsRetryableWrite() const final {
         return true;
     }
-} shardsvrSetClusterParameterCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrSetClusterParameterCommand);
 
 }  // namespace
 }  // namespace mongo

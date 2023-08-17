@@ -197,7 +197,8 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MockReplReconfigCommand::_mutex");
     bool _hasBeenCalled{false};
     BSONObj _msg;
-} mockReplSetReconfigCmd;
+};
+MONGO_REGISTER_COMMAND(MockReplReconfigCommand);
 
 std::ostream& operator<<(std::ostream& builder, mongo::ShardSplitDonorStateEnum state) {
     switch (state) {
@@ -477,6 +478,15 @@ protected:
         _net->exitNetwork();
     }
 
+    BSONObj getLatestConfig(OperationContext* opCtx) {
+        CommandRegistry* reg = getCommandRegistry(opCtx);
+        Command* baseCmd = reg->findCommand("replSetReconfig");
+        invariant(baseCmd);
+        auto mock = dynamic_cast<MockReplReconfigCommand*>(baseCmd);
+        invariant(mock);
+        return mock->getLatestConfig();
+    }
+
     const repl::ReplSettings _replSettings = repl::createServerlessReplSettings();
     UUID _uuid = UUID::gen();
     MockReplicaSet _replSet{
@@ -680,7 +690,7 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     (*fpPtr)->waitForTimesEntered(initialTimesEntered + 1);
 
     // Validate we currently have a splitConfig and set it as the mock's return value.
-    BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
+    BSONObj splitConfigBson = getLatestConfig(&*opCtx);
     auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
     ASSERT(splitConfig.isSplitConfig());
     auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
@@ -698,7 +708,7 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     auto completionFuture = serviceInstance->completionFuture();
     completionFuture.wait();
 
-    BSONObj finalConfigBson = mockReplSetReconfigCmd.getLatestConfig();
+    BSONObj finalConfigBson = getLatestConfig(&*opCtx);
     ASSERT_TRUE(finalConfigBson.hasField("replSetReconfig"));
     auto finalConfig = repl::ReplSetConfig::parse(finalConfigBson["replSetReconfig"].Obj());
     ASSERT(!finalConfig.isSplitConfig());

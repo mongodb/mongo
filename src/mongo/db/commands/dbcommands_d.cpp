@@ -189,10 +189,7 @@ protected:
 
         return oldSettings;
     }
-
-} cmdProfile;
-
-SetProfilingFilterGloballyCmd cmdSetProfilingFilterGlobally;
+};
 
 class CmdFileMD5 : public BasicCommand {
 public:
@@ -398,8 +395,11 @@ public:
             LOGV2(20454, "Chunk: {chunk}", "Dumping chunks", "chunk"_attr = c->nextSafe());
         }
     }
+};
 
-} cmdFileMD5;
+MONGO_REGISTER_COMMAND(CmdProfile);
+MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd);
+MONGO_REGISTER_COMMAND(CmdFileMD5);
 
 }  // namespace
 }  // namespace mongo

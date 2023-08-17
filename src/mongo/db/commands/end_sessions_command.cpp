@@ -102,8 +102,8 @@ public:
             return Reply();
         }
     };
-
-} endSessionsCommand;
+};
+MONGO_REGISTER_COMMAND(EndSessionsCommand);
 
 }  // namespace
 }  // namespace mongo

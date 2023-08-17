@@ -153,8 +153,8 @@ public:
         uassertStatusOK(cmdResponseStatus.commandStatus);
         return true;
     }
-
-} updateZoneKeyRangeCmd;
+};
+MONGO_REGISTER_COMMAND(UpdateZoneKeyRangeCmd);
 
 }  // namespace
 }  // namespace mongo

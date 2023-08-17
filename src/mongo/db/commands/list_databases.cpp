@@ -162,6 +162,7 @@ public:
             return reply;
         }
     };
-} cmdListDatabases;
+};
+MONGO_REGISTER_COMMAND(CmdListDatabases);
 }  // namespace
 }  // namespace mongo

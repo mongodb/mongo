@@ -168,7 +168,8 @@ private:
     bool supportsRetryableWrite() const {
         return true;
     }
-} shardsvrMovePrimaryExitCriticalSectionCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryExitCriticalSectionCommand);
 
 }  // namespace
 }  // namespace mongo

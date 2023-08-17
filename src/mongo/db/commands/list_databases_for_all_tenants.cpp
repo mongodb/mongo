@@ -151,6 +151,7 @@ public:
             return reply;
         }
     };
-} CmdListDatabasesForAllTenants;
+};
+MONGO_REGISTER_COMMAND(CmdListDatabasesForAllTenants);
 }  // namespace
 }  // namespace mongo

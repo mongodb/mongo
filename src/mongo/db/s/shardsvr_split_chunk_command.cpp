@@ -208,8 +208,8 @@ public:
 
         return true;
     }
-
-} cmdSplitChunk;
+};
+MONGO_REGISTER_COMMAND(SplitChunkCommand);
 
 }  // namespace
 }  // namespace mongo

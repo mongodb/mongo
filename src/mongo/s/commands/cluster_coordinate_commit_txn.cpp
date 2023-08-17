@@ -89,6 +89,7 @@ public:
             uasserted(ErrorCodes::Unauthorized, "Unauthorized");
         }
     };
-} coordinateCommitTransactionCmd;
+};
+MONGO_REGISTER_COMMAND(CoordinateCommitTransactionCmd);
 
 }  // namespace mongo

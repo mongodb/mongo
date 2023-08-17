@@ -185,8 +185,8 @@ public:
         result.append("splitKeys", splitKeys);
         return true;
     }
-
-} cmdSplitVector;
+};
+MONGO_REGISTER_COMMAND(SplitVector);
 
 }  // namespace
 }  // namespace mongo

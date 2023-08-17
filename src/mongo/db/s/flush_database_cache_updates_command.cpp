@@ -240,8 +240,8 @@ public:
     static bool supportsWriteConcern() {
         return false;
     }
-
-} _flushDatabaseCacheUpdates;
+};
+MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesCmd);
 
 class FlushDatabaseCacheUpdatesWithWriteConcernCmd final
     : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesWithWriteConcernCmd> {
@@ -251,8 +251,8 @@ public:
     static bool supportsWriteConcern() {
         return true;
     }
-
-} _flushDatabaseCacheUpdatesWithWriteConcern;
+};
+MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesWithWriteConcernCmd);
 
 }  // namespace
 }  // namespace mongo

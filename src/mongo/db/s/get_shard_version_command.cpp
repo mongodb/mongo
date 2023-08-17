@@ -197,8 +197,8 @@ public:
 
         return true;
     }
-
-} getShardVersionCmd;
+};
+MONGO_REGISTER_COMMAND(GetShardVersion);
 
 }  // namespace
 }  // namespace mongo

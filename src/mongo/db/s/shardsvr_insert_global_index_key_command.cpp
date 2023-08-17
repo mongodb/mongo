@@ -107,8 +107,8 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrInsertGlobalIndexKeyCmd,
-                                       mongo::gFeatureFlagGlobalIndexes);
+MONGO_REGISTER_COMMAND(ShardsvrInsertGlobalIndexKeyCmd)
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo

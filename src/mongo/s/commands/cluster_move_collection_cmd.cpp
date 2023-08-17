@@ -124,8 +124,8 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterMoveCollectionCmd,
-                                       mongo::resharding::gFeatureFlagMoveCollection);
+MONGO_REGISTER_COMMAND(ClusterMoveCollectionCmd)
+    .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection);
 
 }  // namespace
 }  // namespace mongo

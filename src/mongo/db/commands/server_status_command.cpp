@@ -212,11 +212,7 @@ private:
     const Date_t _started;
 };
 
-Command* serverStatusCommand;
-
-MONGO_INITIALIZER(CreateCmdServerStatus)(InitializerContext* context) {
-    serverStatusCommand = new CmdServerStatus();
-}
+MONGO_REGISTER_COMMAND(CmdServerStatus);
 
 }  // namespace
 

@@ -66,7 +66,7 @@ struct ClusterCountCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterCountCmdBase<ClusterCountCmdS> clusterCountCmdS;
+MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>);
 
 }  // namespace
 }  // namespace mongo

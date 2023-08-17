@@ -217,8 +217,8 @@ public:
 
         return true;
     }
-
-} initialCloneCommand;
+};
+MONGO_REGISTER_COMMAND(InitialCloneCommand);
 
 class TransferModsCommand : public BasicCommand {
 public:
@@ -269,8 +269,8 @@ public:
         uassertStatusOK(autoCloner.getCloner()->nextModsBatch(opCtx, &result));
         return true;
     }
-
-} transferModsCommand;
+};
+MONGO_REGISTER_COMMAND(TransferModsCommand);
 
 /**
  * Command for extracting the oplog entries that needs to be migrated for the given migration
@@ -401,8 +401,8 @@ public:
 
         return true;
     }
-
-} migrateSessionCommand;
+};
+MONGO_REGISTER_COMMAND(MigrateSessionCommand);
 
 }  // namespace
 }  // namespace mongo

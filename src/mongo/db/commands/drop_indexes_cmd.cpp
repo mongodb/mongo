@@ -139,7 +139,8 @@ public:
                                request().getIndex());
         }
     };
-} cmdDropIndexes;
+};
+MONGO_REGISTER_COMMAND(CmdDropIndexes);
 
 class CmdReIndex : public BasicCommand {
 public:
@@ -313,7 +314,8 @@ public:
 
         return true;
     }
-} cmdReIndex;
+};
+MONGO_REGISTER_COMMAND(CmdReIndex);
 
 }  // namespace
 }  // namespace mongo

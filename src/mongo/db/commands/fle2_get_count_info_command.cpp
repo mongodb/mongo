@@ -230,7 +230,7 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {GetQueryableEncryptionCountInfo::kTokensFieldName};
     }
-} getQueryableEncryptionCountInfoCmd;
-
+};
+MONGO_REGISTER_COMMAND(GetQueryableEncryptionCountInfoCmd);
 }  // namespace
 }  // namespace mongo

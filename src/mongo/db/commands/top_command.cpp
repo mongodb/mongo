@@ -96,14 +96,5 @@ public:
         return true;
     }
 };
-
-//
-// Command instance.
-// Registers command with the command system and make command
-// available to the client.
-//
-
-MONGO_INITIALIZER(RegisterTopCommand)(InitializerContext* context) {
-    new TopCommand();
-}
+MONGO_REGISTER_COMMAND(TopCommand);
 }  // namespace

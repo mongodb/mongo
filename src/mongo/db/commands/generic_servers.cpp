@@ -157,7 +157,7 @@ FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
     reply.setOidMachine(static_cast<long>(OID::getMachineId()));
     return reply;
 }
-FeaturesCmd featuresCmd;
+MONGO_REGISTER_COMMAND(FeaturesCmd);
 
 struct AnyDbNoTenant {
     static constexpr bool kAdminOnly = false;
@@ -208,7 +208,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext*) {
 
     return reply;
 }
-HostInfoCmd hostInfoCmd;
+MONGO_REGISTER_COMMAND(HostInfoCmd);
 
 // { getCmdLineOpts: 1}
 using GetCmdLineOptsCmd = GenericTC<GetCmdLineOptsCommand>;
@@ -228,7 +228,7 @@ GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext*) {
     reply.setParsed(serverGlobalParams.parsedOpts);
     return reply;
 }
-GetCmdLineOptsCmd getCmdLineOptsCmd;
+MONGO_REGISTER_COMMAND(GetCmdLineOptsCmd);
 
 // { logRotate: 1 || string }
 using LogRotateCmd = GenericTC<LogRotateCommand>;
@@ -269,7 +269,7 @@ OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     return OkReply();
 }
-LogRotateCmd logRotateCmd;
+MONGO_REGISTER_COMMAND(LogRotateCmd);
 
 // { getLog: '*' or 'logName' }
 // We use BasicCommand here instead of TypedCommand
@@ -346,7 +346,8 @@ public:
 
         return true;
     }
-} getLogCmd;
+};
+MONGO_REGISTER_COMMAND(GetLogCmd);
 
 // { clearLog: 'name' }
 using ClearLogCmd = GenericTC<ClearLogCommand>;
@@ -368,7 +369,7 @@ OkReply ClearLogCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     return OkReply();
 }
-MONGO_REGISTER_TEST_COMMAND(ClearLogCmd);
+MONGO_REGISTER_COMMAND(ClearLogCmd).testOnly();
 
 }  // namespace
 }  // namespace mongo

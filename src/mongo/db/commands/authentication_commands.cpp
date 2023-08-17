@@ -163,7 +163,8 @@ public:
             }
         }
     };
-} cmdLogout;
+};
+MONGO_REGISTER_COMMAND(CmdLogout);
 
 #ifdef MONGO_CONFIG_SSL
 }  // namespace
@@ -399,8 +400,8 @@ public:
     HandshakeRole handshakeRole() const final {
         return HandshakeRole::kAuth;
     }
-
-} cmdAuthenticate;
+};
+MONGO_REGISTER_COMMAND(CmdAuthenticate);
 
 }  // namespace
 

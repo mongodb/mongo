@@ -148,8 +148,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrRenameCollectionCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrRenameCollectionCommand);
 
 }  // namespace
 }  // namespace mongo

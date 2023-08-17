@@ -236,9 +236,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-
-} recipientSyncDataCmd;
-
+};
+MONGO_REGISTER_COMMAND(RecipientSyncDataCmd);
 
 class RecipientVoteImportedFilesCommand final
     : public TypedCommand<RecipientVoteImportedFilesCommand> {
@@ -307,7 +306,8 @@ public:
                             ActionType::internal));
         }
     };
-} recipientVoteImportedFilesCommand;
+};
+MONGO_REGISTER_COMMAND(RecipientVoteImportedFilesCommand);
 
 class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigrationCmd> {
 public:
@@ -469,8 +469,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-
-} recipientForgetMigrationCmd;
+};
+MONGO_REGISTER_COMMAND(RecipientForgetMigrationCmd);
 
 }  // namespace
 }  // namespace mongo

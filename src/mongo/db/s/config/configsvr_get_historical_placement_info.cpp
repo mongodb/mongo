@@ -134,7 +134,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrGetHistoricalPlacementCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrGetHistoricalPlacementCommand);
 
 }  // namespace
 }  // namespace mongo

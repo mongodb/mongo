@@ -130,8 +130,8 @@ public:
 
         return true;
     }
-
-} repairShardedCollectionChunksHistoryCommand;
+};
+MONGO_REGISTER_COMMAND(RepairShardedCollectionChunksHistoryCommand);
 
 }  // namespace
 }  // namespace mongo

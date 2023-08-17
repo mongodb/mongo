@@ -125,8 +125,8 @@ public:
                 opCtx->getClient(), request()));
         }
     };
-
-} cmdrenamecollection;
+};
+MONGO_REGISTER_COMMAND(CmdRenameCollection);
 
 }  // namespace
 }  // namespace mongo

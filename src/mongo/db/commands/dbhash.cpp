@@ -458,8 +458,8 @@ private:
 
         return hash;
     }
-
-} dbhashCmd;
+};
+MONGO_REGISTER_COMMAND(DBHashCmd);
 
 }  // namespace
 }  // namespace mongo

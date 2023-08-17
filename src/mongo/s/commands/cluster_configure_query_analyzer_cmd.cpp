@@ -143,7 +143,8 @@ public:
         return "Starts or stops collecting metrics about read and write queries against "
                "collection.";
     }
-} configureQueryAnalyzerCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigureQueryAnalyzerCmd);
 
 }  // namespace
 

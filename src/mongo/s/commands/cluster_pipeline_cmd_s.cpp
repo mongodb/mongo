@@ -93,7 +93,7 @@ struct ClusterPipelineCommandS {
             apiStrict);
     }
 };
-ClusterPipelineCommandBase<ClusterPipelineCommandS> clusterPipelineCmdS;
+MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>);
 
 }  // namespace
 }  // namespace mongo

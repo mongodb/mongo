@@ -253,9 +253,8 @@ public:
             result->getBodyBuilder().appendElements(resultbson.obj());
         }
     };
-
-
-} clusterMoveChunk;
+};
+MONGO_REGISTER_COMMAND(MoveChunkCmd);
 
 }  // namespace
 }  // namespace mongo

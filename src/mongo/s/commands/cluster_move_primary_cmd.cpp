@@ -133,7 +133,8 @@ private:
     std::string help() const override {
         return "Reassigns the primary shard holding all un-sharded collections in the database";
     }
-} movePrimaryCommand;
+};
+MONGO_REGISTER_COMMAND(MovePrimaryCommand);
 
 }  // namespace
 }  // namespace mongo

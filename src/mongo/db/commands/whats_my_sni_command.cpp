@@ -89,5 +89,5 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdWhatsMySNI);
+MONGO_REGISTER_COMMAND(CmdWhatsMySNI).testOnly();
 }  // namespace mongo

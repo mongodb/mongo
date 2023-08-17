@@ -108,5 +108,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdHashElt);
+MONGO_REGISTER_COMMAND(CmdHashElt).testOnly();
 }  // namespace mongo

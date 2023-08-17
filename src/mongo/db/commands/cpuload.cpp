@@ -110,7 +110,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CPULoadCommand);
+MONGO_REGISTER_COMMAND(CPULoadCommand).testOnly();
 
 
 }  // namespace mongo

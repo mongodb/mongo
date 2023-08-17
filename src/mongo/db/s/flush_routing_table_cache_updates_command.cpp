@@ -171,8 +171,8 @@ public:
     static bool supportsWriteConcern() {
         return false;
     }
-
-} _flushRoutingTableCacheUpdatesCmd;
+};
+MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmd);
 
 class FlushRoutingTableCacheUpdatesCmdWithWriteConcern
     : public FlushRoutingTableCacheUpdatesCmdBase<
@@ -183,8 +183,8 @@ public:
     static bool supportsWriteConcern() {
         return true;
     }
-
-} _flushRoutingTableCacheUpdatesWithWriteConcernCmd;
+};
+MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmdWithWriteConcern);
 
 }  // namespace
 }  // namespace mongo

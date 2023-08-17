@@ -210,7 +210,8 @@ public:
                             ActionType::internal));
         }
     };
-} shardsvrCollModParticipantCommand;
+};
+MONGO_REGISTER_COMMAND(ShardSvrCollModParticipantCommand);
 
 }  // namespace
 }  // namespace mongo

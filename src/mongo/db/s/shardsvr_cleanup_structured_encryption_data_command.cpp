@@ -175,8 +175,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrCleanupStructuredEncryptionDataCommand;
+};
+MONGO_REGISTER_COMMAND(_shardsvrCleanupStructuredEncryptionDataCommand);
 
 }  // namespace
 }  // namespace mongo

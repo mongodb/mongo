@@ -139,7 +139,8 @@ public:
                     authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
         }
     };
-} clusterAnalyzeCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterAnalyzeCmd);
 
 }  // namespace
 }  // namespace mongo

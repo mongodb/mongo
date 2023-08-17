@@ -81,7 +81,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ReapLogicalSessionCacheNowCommand);
+MONGO_REGISTER_COMMAND(ReapLogicalSessionCacheNowCommand).testOnly();
 
 }  // namespace
 }  // namespace mongo

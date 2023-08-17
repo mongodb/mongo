@@ -187,7 +187,8 @@ public:
     void validateResult(const BSONObj& resultObj) final {
         DBStats::parse(IDLParserContext{"dbstats.reply"}, resultObj);
     }
-} clusterDBStatsCmd;
+};
+MONGO_REGISTER_COMMAND(CmdDBStats);
 
 }  // namespace
 }  // namespace mongo

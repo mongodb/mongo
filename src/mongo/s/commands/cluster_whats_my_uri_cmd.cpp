@@ -77,8 +77,8 @@ public:
         result << "you" << cc().getRemote().toString();
         return true;
     }
-
-} whatsMyUriCmd;
+};
+MONGO_REGISTER_COMMAND(WhatsMyUriCmd);
 
 }  // namespace
 }  // namespace mongo

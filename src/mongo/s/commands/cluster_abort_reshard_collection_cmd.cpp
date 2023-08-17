@@ -112,7 +112,8 @@ public:
     std::string help() const override {
         return "Abort any in-progress resharding operations for this collection.";
     }
-} abortReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(AbortReshardCollectionCommand);
 
 }  // namespace
 }  // namespace mongo

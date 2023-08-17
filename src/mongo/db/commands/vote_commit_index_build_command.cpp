@@ -134,8 +134,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} voteCommitIndexBuildCmd;
+};
+MONGO_REGISTER_COMMAND(VoteCommitIndexBuildCommand);
 
 }  // namespace
 }  // namespace mongo

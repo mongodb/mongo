@@ -87,8 +87,8 @@ public:
 
         return false;
     }
-
-} cmdReplSetGetStatus;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetGetStatus);
 
 }  // namespace
 }  // namespace mongo

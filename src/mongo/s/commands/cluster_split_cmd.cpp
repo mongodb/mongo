@@ -314,8 +314,8 @@ public:
 
         return true;
     }
-
-} splitChunk;
+};
+MONGO_REGISTER_COMMAND(SplitCollectionCmd);
 
 }  // namespace
 }  // namespace mongo

@@ -125,8 +125,8 @@ public:
 
         return true;
     }
-
-} poolStatsCmd;
+};
+MONGO_REGISTER_COMMAND(PoolStats);
 
 }  // namespace
 }  // namespace mongo

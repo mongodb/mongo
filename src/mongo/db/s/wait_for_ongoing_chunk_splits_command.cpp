@@ -88,6 +88,6 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(WaitForOngoingChunksSplitsCommand);
+MONGO_REGISTER_COMMAND(WaitForOngoingChunksSplitsCommand).testOnly();
 }  // namespace
 }  // namespace mongo

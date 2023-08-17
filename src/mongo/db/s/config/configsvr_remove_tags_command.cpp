@@ -167,7 +167,8 @@ public:
     bool supportsRetryableWrite() const final {
         return true;
     }
-} configsvrRemoveTagsCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrRemoveTagsCommand);
 
 }  // namespace
 }  // namespace mongo

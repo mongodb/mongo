@@ -398,8 +398,8 @@ public:
 
         return true;
     }
-
-} runRestoreCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrRunRestoreCommand);
 
 }  // namespace
 }  // namespace mongo

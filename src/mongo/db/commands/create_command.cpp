@@ -462,7 +462,8 @@ public:
             return reply;
         }
     };
-} cmdCreate;
+};
+MONGO_REGISTER_COMMAND(CmdCreate);
 
 }  // namespace
 }  // namespace mongo

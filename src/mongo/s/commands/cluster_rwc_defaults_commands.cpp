@@ -144,7 +144,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} clusterSetDefaultRWConcernCommand;
+};
+MONGO_REGISTER_COMMAND(ClusterSetDefaultRWConcernCommand);
 
 /**
  * Implements the getDefaultRWConcern command on mongos.
@@ -217,7 +218,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} clusterGetDefaultRWConcernCommand;
+};
+MONGO_REGISTER_COMMAND(ClusterGetDefaultRWConcernCommand);
 
 }  // namespace
 }  // namespace mongo

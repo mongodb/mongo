@@ -129,7 +129,8 @@ public:
                             ActionType::splitVector));
         }
     };
-} autoSplitVectorCommand;
+};
+MONGO_REGISTER_COMMAND(AutoSplitVectorCommand);
 
 }  // namespace
 }  // namespace mongo

@@ -207,8 +207,8 @@ public:
         CommandHelpers::filterCommandReplyForPassthrough(response.response, &result);
         return true;
     }
-
-} clusterMergeChunksCommand;
+};
+MONGO_REGISTER_COMMAND(ClusterMergeChunksCommand);
 
 BSONField<std::string> ClusterMergeChunksCommand::nsField("mergeChunks");
 BSONField<std::vector<BSONObj>> ClusterMergeChunksCommand::boundsField("bounds");

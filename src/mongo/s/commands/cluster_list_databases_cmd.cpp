@@ -231,7 +231,8 @@ public:
             return reply;
         }
     };
-} listDatabasesCmd;
+};
+MONGO_REGISTER_COMMAND(ListDatabasesCmd);
 
 }  // namespace
 }  // namespace mongo

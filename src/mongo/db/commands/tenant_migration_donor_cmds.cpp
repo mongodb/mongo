@@ -222,8 +222,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-
-} donorStartMigrationCmd;
+};
+MONGO_REGISTER_COMMAND(DonorStartMigrationCmd);
 
 class DonorForgetMigrationCmd : public TypedCommand<DonorForgetMigrationCmd> {
 public:
@@ -302,7 +302,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} donorForgetMigrationCmd;
+};
+MONGO_REGISTER_COMMAND(DonorForgetMigrationCmd);
 
 class DonorAbortMigrationCmd : public TypedCommand<DonorAbortMigrationCmd> {
 public:
@@ -391,7 +392,8 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} donorAbortMigrationCmd;
+};
+MONGO_REGISTER_COMMAND(DonorAbortMigrationCmd);
 
 }  // namespace
 }  // namespace mongo

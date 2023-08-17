@@ -225,7 +225,8 @@ public:
     std::string help() const override {
         return "Returns metrics for evaluating a shard key for a collection.";
     }
-} analyzeShardKeyCmd;
+};
+MONGO_REGISTER_COMMAND(AnalyzeShardKeyCmd);
 
 }  // namespace
 

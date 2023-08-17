@@ -146,7 +146,8 @@ public:
             resharding::doNoopWrite(opCtx, "_flushReshardingStateChange no-op", ns());
         }
     };
-} _flushReshardingStateChange;
+};
+MONGO_REGISTER_COMMAND(FlushReshardingStateChangeCmd);
 
 }  // namespace
 }  // namespace mongo

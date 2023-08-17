@@ -127,7 +127,8 @@ public:
                                                            ActionType::splitChunk));
         }
     };
-} clusterMergeAllChunksOnShard;
+};
+MONGO_REGISTER_COMMAND(ClusterMergeAllChunksOnShardCommand);
 
 }  // namespace
 }  // namespace mongo

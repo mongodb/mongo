@@ -109,7 +109,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrEnsureChunkVersionIsGreaterThanCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrEnsureChunkVersionIsGreaterThanCommand);
 
 }  // namespace
 }  // namespace mongo

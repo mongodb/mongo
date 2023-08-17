@@ -306,7 +306,8 @@ public:
         uassert(ErrorCodes::InvalidOptions, "no option found to get", before != result.len());
         return true;
     }
-} cmdGet;
+};
+MONGO_REGISTER_COMMAND(CmdGet);
 
 class CmdSet : public BasicCommand {
 public:
@@ -486,7 +487,8 @@ public:
 
         return true;
     }
-} cmdSet;
+};
+MONGO_REGISTER_COMMAND(CmdSet);
 
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder* builder,

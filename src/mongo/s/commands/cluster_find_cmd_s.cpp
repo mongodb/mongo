@@ -72,7 +72,7 @@ struct ClusterFindCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterFindCmdBase<ClusterFindCmdS> clusterFindCmdS;
+MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdS>);
 
 }  // namespace
 }  // namespace mongo

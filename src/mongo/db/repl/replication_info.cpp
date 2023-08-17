@@ -652,8 +652,8 @@ private:
               "desc"_attr = opCtx->getClient()->desc());
         waitInHello.pauseWhileSet(opCtx);
     }
-
-} cmdhello;
+};
+MONGO_REGISTER_COMMAND(CmdHello);
 
 class CmdIsMaster : public CmdHello {
 public:
@@ -675,8 +675,8 @@ protected:
     bool useLegacyResponseFields() const final {
         return true;
     }
-
-} cmdIsMaster;
+};
+MONGO_REGISTER_COMMAND(CmdIsMaster);
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 

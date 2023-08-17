@@ -138,8 +138,8 @@ public:
         result.append("collectionsharded", NamespaceStringUtil::serialize(nss));
         return true;
     }
-
-} shardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ShardCollectionCmd);
 
 }  // namespace
 }  // namespace mongo

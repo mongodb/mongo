@@ -161,7 +161,8 @@ private:
     std::string help() const override {
         return "Internal command. Do not call directly.";
     }
-} shardsvrMovePrimaryCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryCommand);
 
 }  // namespace
 }  // namespace mongo

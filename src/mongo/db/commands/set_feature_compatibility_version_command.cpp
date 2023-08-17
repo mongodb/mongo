@@ -1454,8 +1454,8 @@ private:
         }
         _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
     }
-
-} setFeatureCompatibilityVersionCommand;
+};
+MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand);
 
 }  // namespace
 }  // namespace mongo

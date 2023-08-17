@@ -134,8 +134,8 @@ public:
         result.appendBool("flushed", true);
         return true;
     }
-
-} flushRouterConfigCmd;
+};
+MONGO_REGISTER_COMMAND(FlushRouterConfigCmd);
 
 }  // namespace
 }  // namespace mongo

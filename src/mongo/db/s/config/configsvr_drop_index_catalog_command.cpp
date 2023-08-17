@@ -234,8 +234,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} configsvrDropIndexCatalogEntryCommand;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrDropIndexCatalogEntryCommand);
 
 }  // namespace
 }  // namespace mongo

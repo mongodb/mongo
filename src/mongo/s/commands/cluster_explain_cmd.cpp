@@ -219,7 +219,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }
 
-ClusterExplainCmd cmdExplainCluster;
+MONGO_REGISTER_COMMAND(ClusterExplainCmd);
 
 }  // namespace
 }  // namespace mongo

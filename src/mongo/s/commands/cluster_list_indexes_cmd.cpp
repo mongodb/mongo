@@ -165,7 +165,8 @@ public:
                 {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});
         }
     };
-} cmdListIndexes;
+};
+MONGO_REGISTER_COMMAND(CmdListIndexes);
 
 }  // namespace
 }  // namespace mongo

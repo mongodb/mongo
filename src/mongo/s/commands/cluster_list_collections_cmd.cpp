@@ -306,7 +306,8 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::ListCollections::kAuthorizationContract;
     }
-} cmdListCollections;
+};
+MONGO_REGISTER_COMMAND(CmdListCollections);
 
 }  // namespace
 }  // namespace mongo

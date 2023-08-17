@@ -183,11 +183,9 @@ private:
     }
 };
 
-MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
-    new ConfigSvrBalancerStartCommand();
-    new ConfigSvrBalancerStopCommand();
-    new ConfigSvrBalancerStatusCommand();
-}
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStartCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStopCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStatusCommand);
 
 }  // namespace
 }  // namespace mongo

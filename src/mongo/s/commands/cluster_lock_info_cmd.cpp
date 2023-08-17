@@ -156,7 +156,8 @@ public:
             }
         }
     }
-} clusterLockInfoCmd;
+};
+MONGO_REGISTER_COMMAND(ClusterLockInfoCmd);
 
 }  // namespace
 }  // namespace mongo

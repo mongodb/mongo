@@ -138,7 +138,8 @@ public:
                                      resultObj.removeFields(ignorableFields));
         coll_mod_reply_validation::validateReply(reply);
     }
-} shardsvrCollModCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrCollModCommand);
 
 }  // namespace
 }  // namespace mongo

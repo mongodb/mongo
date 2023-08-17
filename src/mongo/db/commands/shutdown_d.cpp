@@ -127,8 +127,8 @@ public:
 
         uassertStatusOK(stepDownForShutdown(opCtx, timeout, force));
     }
-
-} cmdShutdownMongoD;
+};
+MONGO_REGISTER_COMMAND(CmdShutdownMongoD);
 
 }  // namespace
 }  // namespace mongo

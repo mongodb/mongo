@@ -86,7 +86,8 @@ private:
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetGetStatus};
     }
-} cmdReplSetGetStatus;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetGetStatus);
 
 }  // namespace repl
 }  // namespace mongo

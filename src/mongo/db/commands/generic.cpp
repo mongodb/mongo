@@ -112,7 +112,8 @@ public:
             return Reply{};
         }
     };
-} pingCmd;
+};
+MONGO_REGISTER_COMMAND(PingCommand);
 
 class EchoCommand final : public TypedCommand<EchoCommand> {
 public:
@@ -163,7 +164,7 @@ public:
 };
 constexpr StringData EchoCommand::Request::kCommandName;
 
-MONGO_REGISTER_TEST_COMMAND(EchoCommand);
+MONGO_REGISTER_COMMAND(EchoCommand).testOnly();
 
 class ListCommandsCmd : public BasicCommand {
 public:
@@ -232,8 +233,8 @@ public:
 
         return 1;
     }
-
-} listCommandsCmd;
+};
+MONGO_REGISTER_COMMAND(ListCommandsCmd);
 
 class CmdLogMessage : public TypedCommand<CmdLogMessage> {
 public:
@@ -317,7 +318,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdLogMessage);
+MONGO_REGISTER_COMMAND(CmdLogMessage).testOnly();
 
 }  // namespace
 }  // namespace mongo

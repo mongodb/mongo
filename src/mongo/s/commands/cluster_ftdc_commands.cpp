@@ -108,12 +108,7 @@ public:
         return true;
     }
 };
-
-Command* ftdcCommand;
-
-MONGO_INITIALIZER(CreateDiagnosticDataCommand)(InitializerContext* context) {
-    ftdcCommand = new GetDiagnosticDataCommand();
-}
+MONGO_REGISTER_COMMAND(GetDiagnosticDataCommand);
 
 }  // namespace
 }  // namespace mongo

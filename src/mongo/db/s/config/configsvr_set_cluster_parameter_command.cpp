@@ -158,7 +158,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} configsvrSetClusterParameterCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrSetClusterParameterCommand);
 
 }  // namespace
 }  // namespace mongo

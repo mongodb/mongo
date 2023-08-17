@@ -149,8 +149,8 @@ public:
     bool adminOnly() const final {
         return false;
     }
-
-} dataSizeCmd;
+};
+MONGO_REGISTER_COMMAND(DataSizeCmd);
 
 }  // namespace
 }  // namespace mongo

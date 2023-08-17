@@ -105,8 +105,8 @@ public:
             return request().getNamespace();
         }
     };
-
-} shardsvrRefineCollectionShardKeyCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrRefineCollectionShardKeyCommand);
 
 }  // namespace
 }  // namespace mongo

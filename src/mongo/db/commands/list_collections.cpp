@@ -608,7 +608,8 @@ public:
                                                     std::move(firstBatch));
         }
     };
-} cmdListCollections;
+};
+MONGO_REGISTER_COMMAND(CmdListCollections);
 
 }  // namespace
 }  // namespace mongo

@@ -229,8 +229,8 @@ public:
 
         MONGO_UNREACHABLE;
     }
-
-} fileMD5Cmd;
+};
+MONGO_REGISTER_COMMAND(FileMD5Cmd);
 
 }  // namespace
 }  // namespace mongo

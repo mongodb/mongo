@@ -125,8 +125,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrSetAllowMigrationsCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrSetAllowMigrationsCommand);
 
 }  // namespace
 }  // namespace mongo

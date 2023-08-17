@@ -154,8 +154,8 @@ public:
 
         return ok;
     }
-
-} setCommitQuorumCmd;
+};
+MONGO_REGISTER_COMMAND(SetIndexCommitQuorumCommand);
 
 }  // namespace
 }  // namespace mongo

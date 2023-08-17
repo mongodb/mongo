@@ -275,7 +275,8 @@ public:
                     authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
         }
     };
-} cmdAnalyze;
+};
+MONGO_REGISTER_COMMAND(CmdAnalyze);
 
 }  // namespace
 }  // namespace mongo

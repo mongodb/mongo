@@ -128,8 +128,8 @@ public:
         auto opCtx = rec->getOpCtx();
         return ClusterBuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }
-
-} cmdBuildInfo;
+};
+MONGO_REGISTER_COMMAND(ClusterCmdBuildInfo);
 
 }  // namespace
 }  // namespace mongo

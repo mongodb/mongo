@@ -169,7 +169,8 @@ public:
     std::string help() const override {
         return "Drops one or all plan cache entries in a collection.";
     }
-} planCacheClearCommand;
+};
+MONGO_REGISTER_COMMAND(PlanCacheClearCommand);
 
 Status PlanCacheClearCommand::checkAuthForOperation(OperationContext* opCtx,
                                                     const DatabaseName& dbName,

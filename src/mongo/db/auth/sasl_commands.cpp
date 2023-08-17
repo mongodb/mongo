@@ -117,7 +117,8 @@ public:
     HandshakeRole handshakeRole() const final {
         return HandshakeRole::kAuth;
     }
-} cmdSaslStart;
+};
+MONGO_REGISTER_COMMAND(CmdSaslStart);
 
 class CmdSaslContinue : public SaslContinueCmdVersion1Gen<CmdSaslContinue> {
 public:
@@ -155,7 +156,8 @@ public:
     HandshakeRole handshakeRole() const final {
         return HandshakeRole::kAuth;
     }
-} cmdSaslContinue;
+};
+MONGO_REGISTER_COMMAND(CmdSaslContinue);
 
 SaslReply doSaslStep(OperationContext* opCtx,
                      const SaslPayload& payload,

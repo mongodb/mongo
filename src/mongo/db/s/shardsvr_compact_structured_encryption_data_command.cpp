@@ -175,8 +175,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrCompactStructuredEncryptionDataCommand;
+};
+MONGO_REGISTER_COMMAND(_shardsvrCompactStructuredEncryptionDataCommand);
 
 }  // namespace
 }  // namespace mongo

@@ -77,8 +77,8 @@ public:
              BSONObjBuilder& result) override {
         uasserted(ErrorCodes::CommandNotSupported, "compact not allowed through mongos");
     }
-
-} compactCmd;
+};
+MONGO_REGISTER_COMMAND(CompactCmd);
 
 }  // namespace
 }  // namespace mongo

@@ -241,5 +241,5 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdSleep);
+MONGO_REGISTER_COMMAND(CmdSleep).testOnly();
 }  // namespace mongo

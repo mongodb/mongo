@@ -136,7 +136,8 @@ public:
                             metrics.getHighEstimateRemainingTimeMillis()};
         }
     };
-} _shardsvrReshardingOperationTime;
+};
+MONGO_REGISTER_COMMAND(ShardsvrReshardingOperationTimeCmd);
 
 }  // namespace
 }  // namespace mongo

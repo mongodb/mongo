@@ -66,6 +66,7 @@ public:
             }
         }
     }
-} killOperationsCmd;
+};
+MONGO_REGISTER_COMMAND(KillOperationsCmd);
 
 }  // namespace mongo

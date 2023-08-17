@@ -143,7 +143,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-
-} cmdConnectionStatus;
+};
+MONGO_REGISTER_COMMAND(CmdConnectionStatus);
 
 }  // namespace mongo

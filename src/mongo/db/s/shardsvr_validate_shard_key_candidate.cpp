@@ -121,8 +121,8 @@ public:
             return request().getCommandParameter();
         }
     };
-
-} shardsvrValidateShardKeyCandidateCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrValidateShardKeyCandidateCommand);
 
 }  // namespace
 }  // namespace mongo

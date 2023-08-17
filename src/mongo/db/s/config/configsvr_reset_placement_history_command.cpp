@@ -109,7 +109,8 @@ public:
                             ActionType::internal));
         }
     };
-} _cfgsvrResetPlacementHistory;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrResetPlacementHistoryCommand);
 
 }  // namespace
 }  // namespace mongo

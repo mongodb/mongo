@@ -122,8 +122,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-} configureCollectionBalancingCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigCollectionBalancingCmd);
 
 }  // namespace
 }  // namespace mongo

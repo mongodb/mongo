@@ -148,7 +148,8 @@ public:
                             ActionType::setClusterParameter}));
         }
     };
-} setClusterParameterCommand;
+};
+MONGO_REGISTER_COMMAND(SetClusterParameterCommand);
 
 auto setClusterParameterRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(setClusterParameter, setClusterParameterImpl);

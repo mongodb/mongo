@@ -100,8 +100,8 @@ public:
 
         return true;
     }
-
-} listShardsCmd;
+};
+MONGO_REGISTER_COMMAND(ListShardsCmd);
 
 }  // namespace
 }  // namespace mongo

@@ -197,7 +197,8 @@ public:
             return NamespaceString(request().getDbName());
         }
     };
-} setDefaultRWConcernCommand;
+};
+MONGO_REGISTER_COMMAND(SetDefaultRWConcernCommand);
 
 class GetDefaultRWConcernCommand : public TypedCommand<GetDefaultRWConcernCommand> {
 public:
@@ -250,7 +251,8 @@ public:
             return NamespaceString(request().getDbName());
         }
     };
-} getDefaultRWConcernCommand;
+};
+MONGO_REGISTER_COMMAND(GetDefaultRWConcernCommand);
 
 }  // namespace
 }  // namespace mongo

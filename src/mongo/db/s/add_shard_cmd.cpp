@@ -140,7 +140,8 @@ public:
     bool adminOnly() const override {
         return true;
     }
-} addShardCmd;
+};
+MONGO_REGISTER_COMMAND(AddShardCommand);
 
 }  // namespace
 }  // namespace mongo

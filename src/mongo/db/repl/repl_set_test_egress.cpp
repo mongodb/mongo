@@ -169,7 +169,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdReplSetTestEgress);
+MONGO_REGISTER_COMMAND(CmdReplSetTestEgress).testOnly();
 
 }  // namespace
 }  // namespace repl

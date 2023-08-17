@@ -312,8 +312,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-} configsvrReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand);
 
 std::shared_ptr<const ReshardingCoordinator>
 ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(

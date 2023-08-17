@@ -171,8 +171,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} configsvrCommitChunkMigrationCommand;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrCommitChunkMigrationCommand);
 
 }  // namespace
 }  // namespace mongo

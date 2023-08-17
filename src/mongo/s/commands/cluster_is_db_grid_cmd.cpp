@@ -70,8 +70,8 @@ public:
         result.append("hostname", getHostNameCached());
         return true;
     }
-
-} isdbGrid;
+};
+MONGO_REGISTER_COMMAND(IsDbGridCmd);
 
 }  // namespace
 }  // namespace mongo

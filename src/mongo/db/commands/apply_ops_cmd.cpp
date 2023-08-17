@@ -273,8 +273,8 @@ public:
 
         return applyOpsStatus;
     }
-
-} applyOpsCmd;
+};
+MONGO_REGISTER_COMMAND(ApplyOpsCmd);
 
 }  // namespace
 }  // namespace mongo

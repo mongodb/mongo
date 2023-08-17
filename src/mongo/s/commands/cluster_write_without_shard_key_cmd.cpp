@@ -430,8 +430,8 @@ public:
     }
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterWriteWithoutShardKeyCmd,
-                                       feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
+MONGO_REGISTER_COMMAND(ClusterWriteWithoutShardKeyCmd)
+    .requiresFeatureFlag(&feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
 
 }  // namespace
 }  // namespace mongo

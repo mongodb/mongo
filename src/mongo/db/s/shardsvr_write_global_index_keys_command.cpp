@@ -133,8 +133,8 @@ void ShardsvrWriteGlobalIndexKeysCmd::Invocation::typedRun(OperationContext* opC
     }
 }
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ShardsvrWriteGlobalIndexKeysCmd,
-                                       mongo::gFeatureFlagGlobalIndexes);
+MONGO_REGISTER_COMMAND(ShardsvrWriteGlobalIndexKeysCmd)
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
 
 }  // namespace
 }  // namespace mongo

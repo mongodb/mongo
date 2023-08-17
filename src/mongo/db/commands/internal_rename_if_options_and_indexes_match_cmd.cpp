@@ -194,8 +194,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
-} internalRenameIfOptionsAndIndexesMatchCmd;
+};
+MONGO_REGISTER_COMMAND(InternalRenameIfOptionsAndIndexesMatchCmd);
 
 }  // namespace
 }  // namespace mongo

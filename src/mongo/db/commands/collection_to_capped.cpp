@@ -150,8 +150,8 @@ public:
         cloneCollectionAsCapped(opCtx, db, fromNs, toNs, size, temp);
         return true;
     }
-
-} cmdCloneCollectionAsCapped;
+};
+MONGO_REGISTER_COMMAND(CmdCloneCollectionAsCapped);
 
 /**
  * Converts the given collection to a capped collection w/ the specified size. This command is not
@@ -199,8 +199,8 @@ public:
         convertToCapped(opCtx, nss, size);
         return true;
     }
-
-} cmdConvertToCapped;
+};
+MONGO_REGISTER_COMMAND(CmdConvertToCapped);
 
 }  // namespace
 }  // namespace mongo

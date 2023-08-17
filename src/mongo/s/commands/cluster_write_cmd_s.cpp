@@ -63,7 +63,7 @@ struct ClusterInsertCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterInsertCmdBase<ClusterInsertCmdS> clusterInsertCmdS;
+MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdS>);
 
 struct ClusterUpdateCmdS {
     static constexpr StringData kName = "update"_sd;
@@ -86,7 +86,7 @@ struct ClusterUpdateCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterUpdateCmdBase<ClusterUpdateCmdS> clusterUpdateCmdS;
+MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdS>);
 
 struct ClusterDeleteCmdS {
     static constexpr StringData kName = "delete"_sd;
@@ -109,7 +109,7 @@ struct ClusterDeleteCmdS {
         // Can always run on a mongos.
     }
 };
-ClusterDeleteCmdBase<ClusterDeleteCmdS> clusterDeleteCmdS;
+MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdS>);
 
 }  // namespace
 }  // namespace mongo

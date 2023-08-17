@@ -92,8 +92,8 @@ public:
         grid->shardRegistry()->toBSON(&result);
         return true;
     }
-
-} getShardMapCmd;
+};
+MONGO_REGISTER_COMMAND(CmdGetShardMap);
 
 }  // namespace
 }  // namespace mongo

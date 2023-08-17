@@ -78,7 +78,7 @@ struct ClusterInsertCmdD {
                   "Cannot explain a cluster insert command on a mongod");
     }
 };
-ClusterInsertCmdBase<ClusterInsertCmdD> clusterInsertCmdD;
+MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdD>);
 
 struct ClusterUpdateCmdD {
     static constexpr StringData kName = "clusterUpdate"_sd;
@@ -109,7 +109,7 @@ struct ClusterUpdateCmdD {
         uasserted(ErrorCodes::CommandNotSupported, "Explain on a clusterDelete is not supported");
     }
 };
-ClusterUpdateCmdBase<ClusterUpdateCmdD> clusterUpdateCmdD;
+MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdD>);
 
 struct ClusterDeleteCmdD {
     static constexpr StringData kName = "clusterDelete"_sd;
@@ -141,7 +141,7 @@ struct ClusterDeleteCmdD {
                   "Cannot explain a cluster delete command on a mongod");
     }
 };
-ClusterDeleteCmdBase<ClusterDeleteCmdD> clusterDeleteCmdD;
+MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdD>);
 
 }  // namespace
 }  // namespace mongo

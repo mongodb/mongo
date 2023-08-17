@@ -132,6 +132,7 @@ public:
     bool adminOnly() const override {
         return true;
     }
-} getDatabaseVersionCmd;
+};
+MONGO_REGISTER_COMMAND(GetDatabaseVersionCmd);
 
 }  // namespace mongo

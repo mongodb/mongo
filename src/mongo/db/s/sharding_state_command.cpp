@@ -102,8 +102,8 @@ public:
 
         return true;
     }
-
-} shardingStateCmd;
+};
+MONGO_REGISTER_COMMAND(ShardingStateCmd);
 
 }  // namespace
 }  // namespace mongo

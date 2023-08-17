@@ -137,8 +137,8 @@ public:
     };
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(VoteAbortIndexBuildCommand,
-                                       feature_flags::gIndexBuildGracefulErrorHandling);
+MONGO_REGISTER_COMMAND(VoteAbortIndexBuildCommand)
+    .requiresFeatureFlag(&feature_flags::gIndexBuildGracefulErrorHandling);
 
 }  // namespace
 }  // namespace mongo

@@ -127,7 +127,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CreateUnsplittableCollectionCommand);
+MONGO_REGISTER_COMMAND(CreateUnsplittableCollectionCommand).testOnly();
 
 }  // namespace
 }  // namespace mongo

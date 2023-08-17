@@ -148,6 +148,7 @@ public:
         killSessionsReport(opCtx, cmdObj);
         return true;
     }
-} killSessionsCommand;
+};
+MONGO_REGISTER_COMMAND(KillSessionsCommand);
 
 }  // namespace mongo

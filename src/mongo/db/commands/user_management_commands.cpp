@@ -1107,7 +1107,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {kPwdField};
     }
-} cmdCreateUser;
+};
+MONGO_REGISTER_COMMAND(CmdCreateUser);
 
 template <>
 void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
@@ -1219,7 +1220,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {kPwdField};
     }
-} cmdUpdateUser;
+};
+MONGO_REGISTER_COMMAND(CmdUpdateUser);
 
 template <>
 void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
@@ -1318,7 +1320,7 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<DropUserCommand> cmdDropUser;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<DropUserCommand>);
 template <>
 void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1346,7 +1348,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
             numMatched > 0);
 }
 
-CmdUMCTyped<DropAllUsersFromDatabaseCommand> cmdDropAllUsersFromDatabase;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<DropAllUsersFromDatabaseCommand>);
 template <>
 DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
@@ -1374,7 +1376,7 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     return reply;
 }
 
-CmdUMCTyped<GrantRolesToUserCommand> cmdGrantRolesToUser;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<GrantRolesToUserCommand>);
 template <>
 void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1409,7 +1411,7 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<RevokeRolesFromUserCommand> cmdRevokeRolesFromUser;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<RevokeRolesFromUserCommand>);
 template <>
 void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1444,7 +1446,7 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<UsersInfoCommand, UMCInfoParams> cmdUsersInfo;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<UsersInfoCommand, UMCInfoParams>);
 template <>
 UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRun(
     OperationContext* opCtx) {
@@ -1604,7 +1606,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     return reply;
 }
 
-CmdUMCTyped<CreateRoleCommand> cmdCreateRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<CreateRoleCommand>);
 template <>
 void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1662,7 +1664,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     uassertStatusOK(insertRoleDocument(opCtx, roleObjBuilder.done(), roleName.getTenant()));
 }
 
-CmdUMCTyped<UpdateRoleCommand> cmdUpdateRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<UpdateRoleCommand>);
 template <>
 void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1744,7 +1746,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<GrantPrivilegesToRoleCommand> cmdGrantPrivilegesToRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<GrantPrivilegesToRoleCommand>);
 template <>
 void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1797,7 +1799,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<RevokePrivilegesFromRoleCommand> cmdRevokePrivilegesFromRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<RevokePrivilegesFromRoleCommand>);
 template <>
 void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1855,7 +1857,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<GrantRolesToRoleCommand> cmdGrantRolesToRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<GrantRolesToRoleCommand>);
 template <>
 void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -1895,7 +1897,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     uassertStatusOK(status);
 }
 
-CmdUMCTyped<RevokeRolesFromRoleCommand> cmdRevokeRolesFromRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<RevokeRolesFromRoleCommand>);
 template <>
 void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -2001,7 +2003,7 @@ Status retryTransactionOps(OperationContext* opCtx,
     return status;
 }
 
-CmdUMCTyped<DropRoleCommand> cmdDropRole;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<DropRoleCommand>);
 template <>
 void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
@@ -2068,7 +2070,7 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     }
 }
 
-CmdUMCTyped<DropAllRolesFromDatabaseCommand> cmdDropAllRolesFromDatabase;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<DropAllRolesFromDatabaseCommand>);
 template <>
 DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
@@ -2163,7 +2165,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
  *   "asUserFragment" Render results as a partial user document as-if a user existed which possessed
  *                    these roles. This format may change over time with changes to the auth schema.
  */
-CmdUMCTyped<RolesInfoCommand, UMCInfoParams> cmdRolesInfo;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<RolesInfoCommand, UMCInfoParams>);
 template <>
 RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRun(
     OperationContext* opCtx) {
@@ -2213,7 +2215,7 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     return reply;
 }
 
-CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams> cmdInvalidateUserCache;
+MONGO_REGISTER_COMMAND(CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>);
 template <>
 void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invocation::typedRun(
     OperationContext* opCtx) {
@@ -2222,8 +2224,7 @@ void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invo
     authzManager->invalidateUsersByTenant(opCtx, request().getDbName().tenantId());
 }
 
-CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams> cmdGetUserCacheGeneration;
-
+MONGO_REGISTER_COMMAND(CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>);
 template <>
 GetUserCacheGenerationReply
 CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>::Invocation::typedRun(
@@ -2232,7 +2233,7 @@ CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>::Invocation
             "_getUserCacheGeneration can only be run on config servers",
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-    cmdGetUserCacheGeneration.skipApiVersionCheck();
+    definition()->skipApiVersionCheck();
     GetUserCacheGenerationReply reply;
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     reply.setCacheGeneration(authzManager->getCacheGeneration());
@@ -2284,7 +2285,8 @@ public:
         // TODO (SERVER-TBD) Support mergeAuthzCollections in multitenancy
         return false;
     }
-} cmdMergeAuthzCollections;
+};
+MONGO_REGISTER_COMMAND(CmdMergeAuthzCollections);
 
 UserName _extractUserNameFromBSON(const BSONObj& userObj) {
     std::string name;

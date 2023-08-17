@@ -409,6 +409,6 @@ public:
 
         return true;
     }
-
-} validateCmd;
+};
+MONGO_REGISTER_COMMAND(ValidateCmd);
 }  // namespace mongo

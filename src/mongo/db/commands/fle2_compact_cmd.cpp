@@ -294,7 +294,8 @@ public:
     std::set<StringData> sensitiveFieldNames() const final {
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
-} compactStructuredEncryptionDataCmd;
+};
+MONGO_REGISTER_COMMAND(CompactStructuredEncryptionDataCmd);
 
 }  // namespace
 }  // namespace mongo

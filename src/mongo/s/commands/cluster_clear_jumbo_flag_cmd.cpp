@@ -166,8 +166,8 @@ public:
         return "clears the jumbo flag of the chunk that contains the key\n"
                "   { clearJumboFlag : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n";
     }
-
-} clusterClearJumboFlag;
+};
+MONGO_REGISTER_COMMAND(ClearJumboFlagCommand);
 
 }  // namespace
 }  // namespace mongo

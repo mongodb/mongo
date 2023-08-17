@@ -130,8 +130,8 @@ public:
             return true;
         });
     }
-
-} cmdReplSetResizeOplog;
+};
+MONGO_REGISTER_COMMAND(CmdReplSetResizeOplog);
 
 }  // namespace
 }  // namespace mongo

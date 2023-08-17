@@ -104,8 +104,8 @@ public:
                             ActionType::rotateCertificates));
         }
     };
-
-} rotateCertificatesCmd;
+};
+MONGO_REGISTER_COMMAND(RotateCertificatesCmd);
 
 }  // namespace
 }  // namespace mongo

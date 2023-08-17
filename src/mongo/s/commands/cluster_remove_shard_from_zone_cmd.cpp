@@ -141,8 +141,8 @@ public:
         uassertStatusOK(cmdResponseStatus.commandStatus);
         return true;
     }
-
-} removeShardFromZoneCmd;
+};
+MONGO_REGISTER_COMMAND(RemoveShardFromZoneCmd);
 
 }  // namespace
 }  // namespace mongo

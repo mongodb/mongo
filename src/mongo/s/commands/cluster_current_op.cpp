@@ -101,8 +101,8 @@ private:
 
         return CursorResponse::parseFromBSON(responseBuilder.obj());
     }
+};
 
-} clusterCurrentOpCmd;
-
+MONGO_REGISTER_COMMAND(ClusterCurrentOpCommand);
 }  // namespace
 }  // namespace mongo

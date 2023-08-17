@@ -123,8 +123,8 @@ public:
             return CreateCommandReply();
         }
     };
-
-} createCmd;
+};
+MONGO_REGISTER_COMMAND(CreateCmd);
 
 }  // namespace
 }  // namespace mongo

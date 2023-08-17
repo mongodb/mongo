@@ -220,7 +220,8 @@ public:
     bool supportsRetryableWrite() const final {
         return true;
     }
-} shardsvrSetUserWriteBlockModeCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrSetUserWriteBlockCommand);
 
 }  // namespace
 }  // namespace mongo

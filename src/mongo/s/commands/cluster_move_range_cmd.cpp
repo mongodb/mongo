@@ -127,7 +127,8 @@ public:
                                                            ActionType::moveChunk));
         }
     };
-} moveRange;
+};
+MONGO_REGISTER_COMMAND(ClusterMoveRangeCommand);
 
 }  // namespace
 }  // namespace mongo

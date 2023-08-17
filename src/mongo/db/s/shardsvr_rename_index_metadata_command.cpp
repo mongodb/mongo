@@ -208,8 +208,8 @@ public:
                             ActionType::internal));
         }
     };
-
-} shardsvrRenameIndexMetadataCommand;
+};
+MONGO_REGISTER_COMMAND(ShardsvrRenameIndexMetadataCommand);
 
 }  // namespace
 }  // namespace mongo

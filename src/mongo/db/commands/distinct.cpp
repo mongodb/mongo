@@ -482,9 +482,8 @@ public:
         // Filter the keys that can be mirrored
         cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
     }
-
-
-} distinctCmd;
+};
+MONGO_REGISTER_COMMAND(DistinctCommand);
 
 }  // namespace
 }  // namespace mongo

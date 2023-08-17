@@ -374,8 +374,8 @@ public:
         }
         return true;
     }
-
-} disinctCmd;
+};
+MONGO_REGISTER_COMMAND(DistinctCmd);
 
 }  // namespace
 }  // namespace mongo

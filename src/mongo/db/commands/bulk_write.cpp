@@ -1317,8 +1317,8 @@ public:
 
         const mongo::BulkWriteUpdateOp* _firstUpdateOp{nullptr};
     };
-
-} bulkWriteCmd;
+};
+MONGO_REGISTER_COMMAND(BulkWriteCmd);
 
 }  // namespace
 

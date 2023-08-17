@@ -962,8 +962,8 @@ public:
             return findCommand;
         }
     };
-
-} findCmd;
+};
+MONGO_REGISTER_COMMAND(FindCmd);
 
 }  // namespace
 }  // namespace mongo

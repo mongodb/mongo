@@ -268,5 +268,6 @@ public:
         std::vector<ErrorReplyElement> apiVersionErrors;
         ValidateDBMetadataCommandReply _reply;
     };
-} validateDBMetadataCmd;
+};
+MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd);
 }  // namespace mongo

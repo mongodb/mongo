@@ -136,7 +136,8 @@ public:
                             ActionType::setChangeStreamState}));
         }
     };
-} setChangeStreamStateCommand;
+};
+MONGO_REGISTER_COMMAND(SetChangeStreamStateCommand);
 
 class GetChangeStreamStateCommand final : public TypedCommand<GetChangeStreamStateCommand> {
 public:
@@ -203,7 +204,8 @@ public:
                             ActionType::getChangeStreamState}));
         }
     };
-} getChangeStreamStateCommand;
+};
+MONGO_REGISTER_COMMAND(GetChangeStreamStateCommand);
 
 }  // namespace
 }  // namespace mongo

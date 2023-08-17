@@ -166,7 +166,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ClusterMulticastCmd);
+MONGO_REGISTER_COMMAND(ClusterMulticastCmd).testOnly();
 
 }  // namespace
 }  // namespace mongo

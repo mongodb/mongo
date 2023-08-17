@@ -284,8 +284,8 @@ public:
                   "cloneTime"_attr = cloneTime);
         }
     };
-
-} _shardsvrMoveRangeCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrMoveRangeCommand);
 
 }  // namespace
 }  // namespace mongo

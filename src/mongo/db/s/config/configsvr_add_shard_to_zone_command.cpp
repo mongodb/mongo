@@ -125,8 +125,8 @@ public:
 
         return true;
     }
-
-} configsvrAddShardToZoneCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigSvrAddShardToZoneCommand);
 
 }  // namespace
 }  // namespace mongo

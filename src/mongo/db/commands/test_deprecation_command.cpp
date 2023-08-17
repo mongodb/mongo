@@ -90,7 +90,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(TestDeprecationCmd);
+MONGO_REGISTER_COMMAND(TestDeprecationCmd).testOnly();
 
 
 }  // namespace mongo

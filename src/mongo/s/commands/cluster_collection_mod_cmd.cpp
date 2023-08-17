@@ -208,7 +208,8 @@ public:
     const AuthorizationContract* getAuthorizationContract() const final {
         return &::mongo::CollMod::kAuthorizationContract;
     }
-} collectionModCmd;
+};
+MONGO_REGISTER_COMMAND(CollectionModCmd);
 
 }  // namespace
 }  // namespace mongo

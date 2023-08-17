@@ -137,8 +137,8 @@ public:
 
         return true;
     }
-
-} configsvrUpdateZoneKeyRangeCmd;
+};
+MONGO_REGISTER_COMMAND(ConfigsvrUpdateZoneKeyRangeCommand);
 
 }  // namespace
 }  // namespace mongo

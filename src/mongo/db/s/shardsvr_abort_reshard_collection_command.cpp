@@ -189,7 +189,8 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-} shardsvrAbortReshardCollectionCmd;
+};
+MONGO_REGISTER_COMMAND(ShardsvrAbortReshardCollectionCommand);
 
 }  // namespace
 }  // namespace mongo
