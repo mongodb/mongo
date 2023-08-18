@@ -99,6 +99,7 @@ public:
                                              const OpMsgRequest& request) final {
         auto parsedRequest =
             BulkWriteCommandRequest::parse(IDLParserContext{"clusterBulkWriteParse"}, request);
+        bulk_write_exec::addIdsForInserts(parsedRequest);
         return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 

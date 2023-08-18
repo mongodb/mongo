@@ -763,6 +763,33 @@ int BulkWriteOp::getBaseBatchCommandSizeEstimate() const {
     return builder.obj().objsize();
 }
 
+void addIdsForInserts(BulkWriteCommandRequest& origCmdRequest) {
+    std::vector<
+        stdx::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
+        newOps;
+    newOps.reserve(origCmdRequest.getOps().size());
+
+    for (const auto& op : origCmdRequest.getOps()) {
+        auto crudOp = BulkWriteCRUDOp(op);
+        if (crudOp.getType() == BulkWriteCRUDOp::kInsert &&
+            crudOp.getInsert()->getDocument()["_id"].eoo()) {
+            auto insert = crudOp.getInsert();
+            auto doc = insert->getDocument();
+            BSONObjBuilder idInsertB;
+            idInsertB.append("_id", OID::gen());
+            idInsertB.appendElements(doc);
+            auto newDoc = idInsertB.obj();
+            auto newOp = BulkWriteInsertOp(insert->getInsert(), std::move(newDoc));
+            newOps.push_back(std::move(newOp));
+        } else {
+            newOps.push_back(std::move(op));
+        }
+    }
+
+    origCmdRequest.setOps(newOps);
+}
+
+
 }  // namespace bulk_write_exec
 
 }  // namespace mongo

@@ -199,5 +199,14 @@ private:
     const bool _isRetryableWrite{false};
 };
 
+/**
+ * Adds an _id field to any document to insert that is missing one. It is necessary to add _id on
+ * mongos so that, if _id is in the shard key pattern, we can correctly route the insert based on
+ * that _id.
+ * If we did not set it on mongos, mongod would generate an _id, but that generated _id might
+ * actually mean the document belongs on a different shard. See SERVER-79914 for details.
+ */
+void addIdsForInserts(BulkWriteCommandRequest& origCmdRequest);
+
 }  // namespace bulk_write_exec
 }  // namespace mongo
