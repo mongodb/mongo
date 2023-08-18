@@ -359,13 +359,6 @@ add_option('gcov',
     nargs=0,
 )
 
-add_option('enable-free-mon',
-    choices=["auto", "on", "off"],
-    default="auto",
-    help='Disable support for Free Monitoring to avoid HTTP client library dependencies',
-    type='choice',
-)
-
 add_option('enable-http-client',
     choices=["auto", "on", "off"],
     default="auto",
@@ -2694,7 +2687,6 @@ if has_ninja_module:
 
 # --- check system ---
 ssl_provider = None
-free_monitoring = get_option("enable-free-mon")
 http_client = get_option("enable-http-client")
 
 def isSanitizerEnabled(self, sanitizerName):
@@ -2709,7 +2701,6 @@ env.AddMethod(isSanitizerEnabled, 'IsSanitizerEnabled')
 def doConfigure(myenv):
     global wiredtiger
     global ssl_provider
-    global free_monitoring
     global http_client
 
     # Check that the compilers work.
@@ -4413,16 +4404,6 @@ def doConfigure(myenv):
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
 
-    # Resolve --enable-free-mon
-    if free_monitoring == "auto":
-        if 'enterprise' not in conf.env['MONGO_MODULES']:
-            free_monitoring = "on"
-        else:
-            free_monitoring = "off"
-
-    if free_monitoring == "on":
-        checkHTTPLib(required=True)
-
     # Resolve --enable-http-client
     if http_client == "auto":
         if checkHTTPLib():
@@ -4432,12 +4413,6 @@ def doConfigure(myenv):
             http_client = "off"
     elif http_client == "on":
         checkHTTPLib(required=True)
-
-    # Sanity check.
-    # We know that http_client was explicitly disabled here,
-    # because the free_monitoring check would have failed if no http lib were available.
-    if (free_monitoring == "on") and (http_client == "off"):
-        env.ConfError("FreeMonitoring requires an HTTP client which has been explicitly disabled")
 
     if env['TARGET_ARCH'] == "ppc64le":
         # This checks for an altivec optimization we use in full text search.
@@ -5247,7 +5222,6 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 Export([
     'debugBuild',
     'endian',
-    'free_monitoring',
     'get_option',
     'has_option',
     'http_client',

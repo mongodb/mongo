@@ -2347,7 +2347,6 @@ tasks:
         task_compile_flags: &embedded_sdk_compile_flags >-
           --allocator=system
           --dbg=off
-          --enable-free-mon=off
           --enable-http-client=off
           --js-engine=none
           --opt=size
@@ -2487,7 +2486,6 @@ tasks:
         task_compile_flags: >-
           --dbg=off
           --link-model=dynamic-sdk
-          --enable-free-mon=off
           --ssl=off
           --enable-http-client=off
           --modules=
@@ -2520,7 +2518,6 @@ tasks:
         compiling_for_test: true
         task_compile_flags: >-
           --dbg=off
-          --enable-free-mon=off
           --ssl=off
           --enable-http-client=off
           --modules=
@@ -5815,15 +5812,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: free_monitoring
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=free_monitoring --storageEngine=wiredTiger
-      resmoke_jobs_max: 1
-
-- <<: *task_template
   name: client_encrypt
   tags: ["ssl", "encrypt"]
   commands:
@@ -7230,7 +7218,7 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off
     test_flags: >-
       --excludeWithAnyTags=requires_http_client
       --repeatSuites=10
@@ -7269,7 +7257,7 @@ buildvariants:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=on --link-model=dynamic
     scons_cache_scope: shared
     scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
@@ -7298,7 +7286,6 @@ buildvariants:
   - name: .change_streams !.secondary_reads
   - name: .misc_js
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -7333,7 +7320,7 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &linux-64-required-duroff-expansions
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-http-client=off
     multiversion_platform: rhel80
     multiversion_edition: targeted
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
@@ -7393,7 +7380,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jepsen
     distros:
     - ubuntu1804-build
@@ -7441,7 +7427,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -7702,7 +7687,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -7729,7 +7713,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: generate_buildid_to_debug_symbols_mapping
@@ -7765,7 +7748,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -7901,7 +7883,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -7994,7 +7975,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -8096,7 +8076,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -8195,7 +8174,6 @@ buildvariants:
       - amazon2-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -8277,7 +8255,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
@@ -8517,7 +8494,6 @@ buildvariants:
       - windows-vsCurrent-large
   - name: .concurrency .common
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.auth
   - name: jsonSchema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
@@ -8659,7 +8635,6 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth
   - name: jsCore_txns_large_txns_format
@@ -9813,7 +9788,6 @@ buildvariants:
       - rhel70
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -9860,7 +9834,6 @@ buildvariants:
       - rhel80-build
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -9906,7 +9879,6 @@ buildvariants:
       - rhel82-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10306,7 +10278,6 @@ buildvariants:
       - suse12-sp5-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: multiversion_gen
@@ -10393,7 +10364,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10489,7 +10459,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10579,7 +10548,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10669,7 +10637,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -10865,7 +10832,7 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -10887,7 +10854,6 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: .encrypt
-  - name: free_monitoring
   - name: external_auth
   - name: external_auth_aws
   - name: initial_sync_fuzzer_gen
@@ -10944,7 +10910,6 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
   - name: .aggfuzzer .common
-  - name: free_monitoring
   - name: .jstestfuzz !.initsync
 
 - &ubuntu1804-debug-ubsan-template
@@ -10961,7 +10926,7 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -10982,7 +10947,6 @@ buildvariants:
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
   - name: .encrypt
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
@@ -11096,12 +11060,8 @@ buildvariants:
     # TODO SERVER-48490: report_thread_leaks=0 suppresses reporting
     # thread leaks, which we have because we don't do a clean shutdown
     # of the ServiceContext.
-    #
-    san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    # TODO: Remove some of the excluded tags when the ephemeralForTest storage engine is
-    # further along in development: https://jira.mongodb.org/browse/SERVER-48325
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read,requires_majority_read_concern
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --enable-free-mon=on --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=thread --ssl --use-libunwind=off -j$(grep -c ^processor /proc/cpuinfo)
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared

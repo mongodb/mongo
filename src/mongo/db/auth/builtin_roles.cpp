@@ -176,7 +176,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
 
     // clusterMonitor role actions that target the cluster resource
     clusterMonitorRoleClusterActions
-        << ActionType::checkFreeMonitoringStatus
         << ActionType::connPoolStats
         << ActionType::getCmdLineOpts
         << ActionType::getDefaultRWConcern // clusterManager gets this also
@@ -251,8 +250,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::getDefaultRWConcern // clusterMonitor gets this also
         << ActionType::runTenantMigration
         << ActionType::setDefaultRWConcern
-        << ActionType::setFeatureCompatibilityVersion
-        << ActionType::setFreeMonitoring;
+        << ActionType::setFeatureCompatibilityVersion;
 
     clusterManagerRoleDatabaseActions
         << ActionType::clearJumboFlag

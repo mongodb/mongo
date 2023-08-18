@@ -1210,11 +1210,6 @@ let MongosAPIParametersUtil = (function() {
             }
         },
         {
-            commandName: "setFreeMonitoring",
-            skip: "explicitly fails for mongos, primary mongod only",
-            conditional: true
-        },
-        {
             commandName: "setProfilingFilterGlobally",
             skip: "executes locally on mongos (not sent to any remote node)",
         },

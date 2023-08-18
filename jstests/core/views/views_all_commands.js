@@ -317,7 +317,6 @@ let viewsCommandTests = {
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},
-    getFreeMonitoringStatus: {skip: isUnrelated},
     getLastError: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
     getMore: {
@@ -566,7 +565,6 @@ let viewsCommandTests = {
     setCommittedSnapshot: {skip: isAnInternalCommand},
     setDefaultRWConcern: {skip: isUnrelated},
     setFeatureCompatibilityVersion: {skip: isUnrelated},
-    setFreeMonitoring: {skip: isUnrelated},
     setProfilingFilterGlobally: {skip: isUnrelated},
     setParameter: {skip: isUnrelated},
     setShardVersion: {skip: isUnrelated},
