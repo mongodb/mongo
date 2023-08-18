@@ -1049,6 +1049,12 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     ASSERT_THROWS(txnParticipant.checkStatementExecuted(opCtx(), 2), AssertionException);
 }
 
+TEST_F(TransactionParticipantRetryableWritesTest, RefreshFromStorageAsSecondary) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    TransactionParticipant::get(opCtx()).refreshFromStorageIfNeeded(opCtx());
+}
+
 /**
  * Test fixture for a transaction participant running on a shard server.
  */
