@@ -70,7 +70,7 @@ public:
         };
 
         PartialSchemaRequirementsCardinalityEstimator estimator(entrySelFn, childResult);
-        return estimator.estimateCE(node.getReqMap());
+        return estimator.estimateCE(node.getReqMap().getRoot());
     }
 
     template <typename T, typename... Ts>

@@ -609,18 +609,22 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
         }
     };
     struct IntervalSimplifier {
-        using DefaultSimplifier = DefaultSimplifyAndCreateNode<IntervalRequirement>;
+        boost::optional<IntervalReqExpr::Node> operator()(
+            const BuilderNodeType type, std::vector<IntervalReqExpr::Node> v) const {
+            if (v.empty()) {
+                return boost::optional<IntervalReqExpr::Node>();
+            }
 
-        DefaultSimplifier::Result operator()(const BuilderNodeType type,
-                                             std::vector<IntervalReqExpr::Node> v,
-                                             const bool hasTrue,
-                                             const bool hasFalse) const {
             // Deduplicate via sort + unique.
             std::sort(v.begin(), v.end(), IntervalComparator{});
             auto end = std::unique(v.begin(), v.end());
             v.erase(end, v.end());
 
-            return DefaultSimplifier{}(type, std::move(v), hasTrue, hasFalse);
+            if (type == BuilderNodeType::Conj) {
+                return IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(v));
+            } else {
+                return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(v));
+            }
         }
     };
 

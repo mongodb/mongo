@@ -248,14 +248,14 @@ CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& r
                                         const ProjectionNameSet& rightProjections);
 
 struct PartialSchemaReqConversion {
-    PartialSchemaReqConversion(PSRExpr::Node reqMap);
+    PartialSchemaReqConversion(PartialSchemaRequirements reqMap);
     PartialSchemaReqConversion(ABT bound);
 
     // If set, contains a Constant or Variable bound of an (yet unknown) interval.
     boost::optional<ABT> _bound;
 
     // Requirements we have built so far. May be trivially true.
-    PSRExpr::Node _reqMap;
+    PartialSchemaRequirements _reqMap;
 
     // Have we added a PathComposeM.
     bool _hasIntersected;
@@ -294,7 +294,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 [[nodiscard]] bool simplifyPartialSchemaReqPaths(
     const boost::optional<ProjectionName>& scanProjName,
     const MultikeynessTrie& multikeynessTrie,
-    PSRExpr::Node& reqMap,
+    PartialSchemaRequirements& reqMap,
     ProjectionRenames& projectionRenames,
     const ConstFoldFn& constFold,
     const PathToIntervalFn& pathToInterval);
@@ -309,7 +309,8 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
  * - Not a subset: there is a counterexample.
  * - Not sure: this function was unable to determine one way or the other.
  */
-bool isSubsetOfPartialSchemaReq(const PSRExpr::Node& lhs, const PSRExpr::Node& rhs);
+bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
+                                const PartialSchemaRequirements& rhs);
 
 /**
  * Computes the intersection of two PartialSchemeRequirements objects.
@@ -329,9 +330,11 @@ bool isSubsetOfPartialSchemaReq(const PSRExpr::Node& lhs, const PSRExpr::Node& r
  * - The resulting predicate is always false.
  * - 'source' reads from a projection bound by 'target'.
  */
-bool intersectPartialSchemaReq(PSRExpr::Node& target, const PSRExpr::Node& source);
+bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
+                               const PartialSchemaRequirements& source);
 
-PSRExpr::Node unionPartialSchemaReq(PSRExpr::Node&& left, PSRExpr::Node&& right);
+PartialSchemaRequirements unionPartialSchemaReq(PartialSchemaRequirements&& left,
+                                                PartialSchemaRequirements&& right);
 
 
 /**
@@ -351,7 +354,7 @@ size_t decodeIndexKeyName(const std::string& fieldName);
  */
 CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
-                                         const PSRExpr::Node& reqMap,
+                                         const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
                                          const ConstFoldFn& constFold,
@@ -361,7 +364,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
  * Computes a set of residual predicates which will be applied on top of a Scan.
  */
 boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
-                                              const PSRExpr::Node& reqMap,
+                                              const PartialSchemaRequirements& reqMap,
                                               const ProjectionName& rootProj);
 
 /**

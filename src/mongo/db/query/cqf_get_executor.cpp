@@ -283,7 +283,7 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
-        PSRExpr::Node partialIndexReqMap = psr::makeNoOp();
+        PartialSchemaRequirements partialIndexReqMap;
         if (descriptor.isPartial() &&
             disableIndexOptions != DisableIndexOptions::DisablePartialOnly) {
             auto expr = MatchExpressionParser::parseAndNormalize(
@@ -319,7 +319,7 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
                                  std::move(partialIndexReqMap));
         // Skip partial indexes. A path could be non-multikey on a partial index (subset of the
         // collection), but still be multikey on the overall collection.
-        if (psr::isNoop(indexDef.getPartialReqMap())) {
+        if (indexDef.getPartialReqMap().isNoop()) {
             for (const auto& component : indexDef.getCollationSpec()) {
                 result.second.add(component._path.ref());
             }

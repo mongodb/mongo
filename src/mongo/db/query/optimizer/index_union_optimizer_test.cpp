@@ -71,7 +71,7 @@ TEST(LogicalRewriter, MakeSargableNodeWithTopLevelDisjunction) {
         return PartialSchemaKey("ptest",
                                 make<PathGet>(FieldNameType{pathName}, make<PathIdentity>()));
     };
-    PSRExprBuilder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})
@@ -81,7 +81,7 @@ TEST(LogicalRewriter, MakeSargableNodeWithTopLevelDisjunction) {
         .atom({makeKey("c"), req})
         .atom({makeKey("d"), req})
         .pop();
-    auto reqs = builder.finish().get();
+    auto reqs = PartialSchemaRequirements(builder.finish().get());
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode = make<SargableNode>(
@@ -449,7 +449,7 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     };
 
     // Create three SargableNodes with top-level disjunctions.
-    PSRExprBuilder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})
@@ -459,7 +459,7 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
         .atom({makeKey("c"), req})
         .atom({makeKey("d"), req})
         .pop();
-    auto reqs1 = builder.finish().get();
+    auto reqs1 = PartialSchemaRequirements(builder.finish().get());
 
     builder.pushDisj()
         .pushConj()
@@ -468,7 +468,7 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
         .pushConj()
         .atom({makeKey("f"), req})
         .pop();
-    auto reqs2 = builder.finish().get();
+    auto reqs2 = PartialSchemaRequirements(builder.finish().get());
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode1 = make<SargableNode>(
@@ -493,11 +493,15 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
                    {"ab",
                     IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                      {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                    false /*isMultiKey*/}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
                    {"cd",
                     IndexDefinition{{{makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
                                      {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
-                                    false /*isMultiKey*/}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
                    {"e", makeIndexDefinition("e", CollationOp::Ascending, false /*isMultiKey*/)},
                    {"f", makeIndexDefinition("f", CollationOp::Ascending, false /*isMultiKey*/)},
                    {"g", makeIndexDefinition("g", CollationOp::Ascending, false /*isMultiKey*/)},
@@ -545,7 +549,7 @@ TEST(PhysRewriter, ThreeWayIndexUnion) {
     };
 
     // Create three SargableNodes with a 3-argument disjunction.
-    PSRExprBuilder builder;
+    BoolExprBuilder<PartialSchemaEntry> builder;
     builder.pushDisj()
         .pushConj()
         .atom({makeKey("a"), req})
@@ -556,7 +560,7 @@ TEST(PhysRewriter, ThreeWayIndexUnion) {
         .pushConj()
         .atom({makeKey("c"), req})
         .pop();
-    auto reqs = builder.finish().get();
+    auto reqs = PartialSchemaRequirements(builder.finish().get());
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode = make<SargableNode>(
@@ -580,13 +584,19 @@ TEST(PhysRewriter, ThreeWayIndexUnion) {
                {
                    {"a",
                     IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
-                                    false /*isMultiKey*/}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
                    {"b",
                     IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                    false /*isMultiKey*/}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
                    {"c",
                     IndexDefinition{{{makeNonMultikeyIndexPath("c"), CollationOp::Ascending}},
-                                    false /*isMultiKey*/}},
+                                    false /*isMultiKey*/,
+                                    {DistributionType::Centralized},
+                                    {}}},
                })}}},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests,

@@ -168,9 +168,9 @@ static size_t computeHash(const PartialSchemaEntry& entry) {
     return result;
 }
 
-static size_t computePartialSchemaReqHash(const PSRExpr::Node& reqMap) {
+static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMap) {
     BoolExprHasher<PSRExpr> psrHasher;
-    return psrHasher.compute(reqMap);
+    return psrHasher.compute(reqMap.getRoot());
 }
 
 /**

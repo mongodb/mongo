@@ -1000,7 +1000,9 @@ TEST(PhysRewriter, FilterIndexing3) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1046,7 +1048,9 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
                          {{"index1",
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
                                             {makeIndexPath("b"), CollationOp::Ascending}},
-                                           true /*isMultiKey*/}}})}}},
+                                           true /*isMultiKey*/,
+                                           {DistributionType::Centralized},
+                                           {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1125,7 +1129,9 @@ TEST(PhysRewriter, FilterIndexing4) {
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1216,7 +1222,9 @@ TEST(PhysRewriter, FilterIndexing5) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1284,7 +1292,9 @@ TEST(PhysRewriter, FilterIndexing6) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1336,14 +1346,20 @@ TEST(PhysRewriter, FilterIndexingStress) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("field0"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("field1"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}},
                 {"index2",
                  IndexDefinition{{{makeNonMultikeyIndexPath("field2"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}},
                 {"index3",
                  IndexDefinition{{{makeNonMultikeyIndexPath("field3"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("field4"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1556,7 +1572,9 @@ TEST(PhysRewriter, FilterIndexingRIN) {
                                   {makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("e"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1645,7 +1663,9 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -1715,7 +1735,9 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 

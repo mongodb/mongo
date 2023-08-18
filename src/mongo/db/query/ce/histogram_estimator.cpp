@@ -312,7 +312,7 @@ public:
 
         SelectivityTreeBuilder selTreeBuilder;
         selTreeBuilder.pushDisj();
-        PSRExpr::visitDisjuncts(node.getReqMap(),
+        PSRExpr::visitDisjuncts(node.getReqMap().getRoot(),
                                 [&](const PSRExpr::Node& n, const PSRExpr::VisitorContext&) {
                                     estimateConjunct(n, selTreeBuilder, childResult);
                                 });

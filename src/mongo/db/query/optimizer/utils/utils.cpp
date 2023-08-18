@@ -209,7 +209,7 @@ CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& r
     return {true /*validSplit*/, std::move(leftCollationSpec), std::move(rightCollationSpec)};
 }
 
-PartialSchemaReqConversion::PartialSchemaReqConversion(PSRExpr::Node reqMap)
+PartialSchemaReqConversion::PartialSchemaReqConversion(PartialSchemaRequirements reqMap)
     : _bound(),
       _reqMap(std::move(reqMap)),
       _hasIntersected(false),
@@ -218,7 +218,7 @@ PartialSchemaReqConversion::PartialSchemaReqConversion(PSRExpr::Node reqMap)
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
     : _bound(std::move(bound)),
-      _reqMap(psr::makeNoOp()),
+      _reqMap(),
       _hasIntersected(false),
       _hasTraversed(false),
       _retainPredicate(false) {}
@@ -243,7 +243,7 @@ public:
         if (!pathResult || !inputResult) {
             return {};
         }
-        if (pathResult->_bound || !inputResult->_bound || !psr::isNoop(inputResult->_reqMap)) {
+        if (pathResult->_bound || !inputResult->_bound || !inputResult->_reqMap.isNoop()) {
             return {};
         }
 
@@ -252,7 +252,7 @@ public:
             // Fill it in with 'inputVar'.
 
             const ProjectionName& inputVarName = inputVar->name();
-            PSRExpr::visitAnyShape(pathResult->_reqMap,
+            PSRExpr::visitAnyShape(pathResult->_reqMap.getRoot(),
                                    [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
                                        tassert(7453903,
                                                "Expected PartialSchemaReqConversion for a path to "
@@ -342,7 +342,7 @@ public:
         size_t perfOnlyCount = 0;
         for (const auto* reqs : {&leftReqMap, &rightReqMap}) {
             PSRExpr::visitAnyShape(
-                *reqs, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& /*ctx*/) {
+                reqs->getRoot(), [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
                     const auto& [key, req] = e;
                     // Additive composition should only have predicates; no projections.
                     tassert(7155021,
@@ -355,7 +355,9 @@ public:
                 });
         }
         if (perfOnlyCount != 0 &&
-            perfOnlyCount != PSRExpr::numLeaves(leftReqMap) + PSRExpr::numLeaves(rightReqMap)) {
+            perfOnlyCount !=
+                PSRExpr::numLeaves(leftReqMap.getRoot()) +
+                    PSRExpr::numLeaves(rightReqMap.getRoot())) {
             // For now allow only predicates with the same perf-only flag.
             return {};
         }
@@ -381,42 +383,42 @@ public:
      * When this function returns a nonempty optional, it may modify or move from the arguments.
      * When it returns boost::none the arguments are unchanged.
      *
-     * TODO SERVER-74879: Generalize boolean minimization.
+     * TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
      * Instead of handling these special cases, construct a disjunction and then simplify; and
      * remove this function.
      */
     static ResultType createSameFieldDisjunction(ResultType& leftResult, ResultType& rightResult) {
         auto& leftReqMap = leftResult->_reqMap;
         auto& rightReqMap = rightResult->_reqMap;
-        if (!PSRExpr::isSingletonDisjunction(leftReqMap) ||
-            !PSRExpr::isSingletonDisjunction(rightReqMap)) {
+        if (!PSRExpr::isSingletonDisjunction(leftReqMap.getRoot()) ||
+            !PSRExpr::isSingletonDisjunction(rightReqMap.getRoot())) {
             return {};
         }
 
-        auto& leftPair = PSRExpr::firstDNFLeaf(leftReqMap);
+        auto& leftPair = PSRExpr::firstDNFLeaf(leftReqMap.getRoot());
         auto& leftKey = leftPair.first;
         auto& leftReq = leftPair.second;
-        auto& [rightKey, rightReq] = PSRExpr::firstDNFLeaf(rightReqMap);
+        auto& [rightKey, rightReq] = PSRExpr::firstDNFLeaf(rightReqMap.getRoot());
 
         // Do all reqs from both sides use the same key?
         auto hasDiffKey = [&](const PartialSchemaEntry& e) {
             return e.first != leftKey;
         };
-        const bool allSameKey =
-            !PSRExpr::any(leftReqMap, hasDiffKey) && !PSRExpr::any(rightReqMap, hasDiffKey);
+        const bool allSameKey = !PSRExpr::any(leftReqMap.getRoot(), hasDiffKey) &&
+            !PSRExpr::any(rightReqMap.getRoot(), hasDiffKey);
         if (allSameKey) {
             // All reqs from both sides use the same key (input binding + path).
 
             // Each side is a conjunction, and we're taking a disjunction.
             // Use the fact that OR distributes over AND to build a new conjunction:
             //     (a & b) | (x & y) == (a | x) & (a | y) & (b | x) & (b | y)
-            PSRExprBuilder resultReqs;
+            BoolExprBuilder<PartialSchemaEntry> resultReqs;
             resultReqs.pushDisj().pushConj();
             PSRExpr::visitDNF(
-                rightReqMap,
+                rightReqMap.getRoot(),
                 [&](const PartialSchemaEntry& rightEntry, const PSRExpr::VisitorContext&) {
                     PSRExpr::visitDNF(
-                        leftReqMap,
+                        leftReqMap.getRoot(),
                         [&](const PartialSchemaEntry& leftEntry, const PSRExpr::VisitorContext&) {
                             auto& [leftKey1, leftReq1] = leftEntry;
                             auto& rightReq1 = rightEntry.second;
@@ -434,12 +436,13 @@ public:
                         });
                 });
 
-            leftReqMap = std::move(*resultReqs.finish());
+            leftReqMap = PartialSchemaRequirements{std::move(*resultReqs.finish())};
             return leftResult;
         }
         // Left and right don't all use the same key.
 
-        if (PSRExpr::numLeaves(leftReqMap) != 1 || PSRExpr::numLeaves(rightReqMap) != 1) {
+        if (PSRExpr::numLeaves(leftReqMap.getRoot()) != 1 ||
+            PSRExpr::numLeaves(rightReqMap.getRoot()) != 1) {
             return {};
         }
         // Left and right don't all use the same key, but they both have exactly 1 entry.
@@ -553,11 +556,11 @@ public:
 
             auto intervalExpr = IntervalReqExpr::makeSingularDNF(IntervalRequirement{
                 {true /*inclusive*/, Constant::null()}, {true /*inclusive*/, Constant::null()}});
-            return {{PSRExpr::makeSingularDNF(
+            return {{PartialSchemaRequirements{PSRExpr::makeSingularDNF(
                 PartialSchemaKey{make<PathIdentity>()},
                 PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                          std::move(intervalExpr),
-                                         false /*isPerfOnly*/})}};
+                                         false /*isPerfOnly*/})}}};
         }
 
         return handleComposition<false /*isMultiplicative*/>(std::move(leftResult),
@@ -582,7 +585,7 @@ public:
             return {};
         }
 
-        PSRExpr::visitAnyShape(inputResult->_reqMap,
+        PSRExpr::visitAnyShape(inputResult->_reqMap.getRoot(),
                                [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
                                    ABT path = entry.first._path;
 
@@ -606,7 +609,7 @@ public:
             return {};
         }
 
-        if (!PSRExpr::isSingularDNF(inputResult->_reqMap)) {
+        if (!PSRExpr::isSingularDNF(inputResult->_reqMap.getRoot())) {
             // More than one requirement means we may have a conjunction inside a traverse.
             // We can change it to a traverse inside a conjunction, but that's an
             // over-approximation, so we have to keep the original predicate.
@@ -660,18 +663,18 @@ public:
         }
         auto unionedInterval = std::move(*builder.finish());
 
-        return {
-            {PSRExpr::makeSingularDNF(PartialSchemaKey{make<PathIdentity>()},
-                                      PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                                               std::move(unionedInterval),
-                                                               false /*isPerfOnly*/})}};
+        return {{PartialSchemaRequirements{
+            PSRExpr::makeSingularDNF(PartialSchemaKey{make<PathIdentity>()},
+                                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                              std::move(unionedInterval),
+                                                              false /*isPerfOnly*/})}}};
     }
 
     ResultType transport(const ABT& n, const PathCompare& pathCompare, ResultType inputResult) {
         if (!inputResult) {
             return {};
         }
-        if (!inputResult->_bound || !psr::isNoop(inputResult->_reqMap)) {
+        if (!inputResult->_bound || !inputResult->_reqMap.isNoop()) {
             return {};
         }
 
@@ -710,19 +713,19 @@ public:
 
         auto intervalExpr = IntervalReqExpr::makeSingularDNF(IntervalRequirement{
             {lowBoundInclusive, std::move(lowBound)}, {highBoundInclusive, std::move(highBound)}});
-        return {
-            {PSRExpr::makeSingularDNF(PartialSchemaKey{make<PathIdentity>()},
-                                      PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                                               std::move(intervalExpr),
-                                                               false /*isPerfOnly*/})}};
+        return {{PartialSchemaRequirements{
+            PSRExpr::makeSingularDNF(PartialSchemaKey{make<PathIdentity>()},
+                                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                              std::move(intervalExpr),
+                                                              false /*isPerfOnly*/})}}};
     }
 
     ResultType transport(const ABT& n, const PathIdentity& pathIdentity) {
-        return {
-            {PSRExpr::makeSingularDNF(PartialSchemaKey{n},
-                                      PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                                               IntervalReqExpr::makeSingularDNF(),
-                                                               false /*isPerfOnly*/})}};
+        return {{PartialSchemaRequirements{
+            PSRExpr::makeSingularDNF(PartialSchemaKey{n},
+                                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                              IntervalReqExpr::makeSingularDNF(),
+                                                              false /*isPerfOnly*/})}}};
     }
 
     ResultType transport(const ABT& n, const Constant& c) {
@@ -743,11 +746,11 @@ public:
         if (_pathToInterval) {
             // If we have a path converter, attempt to convert directly into bounds.
             if (auto conversion = _pathToInterval(n); conversion) {
-                return {{PSRExpr::makeSingularDNF(
+                return {{PartialSchemaRequirements{PSRExpr::makeSingularDNF(
                     PartialSchemaKey{make<PathIdentity>()},
                     PartialSchemaRequirement{boost::none /*boundProjectionName*/,
                                              std::move(*conversion),
-                                             false /*isPerfOnly*/})}};
+                                             false /*isPerfOnly*/})}}};
             }
         }
 
@@ -773,16 +776,18 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     }
 
     auto& reqMap = result->_reqMap;
-    if (psr::isNoop(reqMap)) {
+    if (reqMap.isNoop()) {
         return {};
     }
 
     // We need to determine either path or interval (or both).
     {
-        const bool trivialAtom = PSRExpr::any(reqMap, [](const PartialSchemaEntry& entry) {
-            auto&& [key, req] = entry;
-            return key._path.is<PathIdentity>() && isIntervalReqFullyOpenDNF(req.getIntervals());
-        });
+        const bool trivialAtom =
+            PSRExpr::any(reqMap.getRoot(), [](const PartialSchemaEntry& entry) {
+                auto&& [key, req] = entry;
+                return key._path.is<PathIdentity>() &&
+                    isIntervalReqFullyOpenDNF(req.getIntervals());
+            });
         if (trivialAtom) {
             return {};
         }
@@ -790,86 +795,52 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 
     // If we over-approximate, we need to switch all requirements to perf-only.
     if (result->_retainPredicate) {
-        PSRExpr::visitDNF(reqMap, [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
-            auto& [key, req] = entry;
-            if (!req.getIsPerfOnly()) {
-                req = {req.getBoundProjectionName(), req.getIntervals(), true /*isPerfOnly*/};
-            }
-        });
+        PSRExpr::visitDNF(
+            reqMap.getRoot(), [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
+                auto& [key, req] = entry;
+                if (!req.getIsPerfOnly()) {
+                    req = {req.getBoundProjectionName(), req.getIntervals(), true /*isPerfOnly*/};
+                }
+            });
     }
     return result;
 }
 
-/**
- * Attempt to simplify the intervals of a requirement using constant folding. Also check if they are
- * unsatisfiable because they encode a test for array on a non-multikey path.
- */
-static void simplifyPSREntry(const ConstFoldFn& constFold,
-                             const PathToIntervalFn& pathToInterval,
-                             const MultikeynessTrie& multikeynessTrie,
-                             const PartialSchemaKey& key,
-                             PartialSchemaRequirement& req) {
-    if (!constFold) {
-        return;
-    }
-
-    const auto resetIntervals = [](PartialSchemaRequirement& req1,
-                                   IntervalReqExpr::Node intervals) {
-        req1 = {req1.getBoundProjectionName(), std::move(intervals), req1.getIsPerfOnly()};
-    };
-
-    auto intervals = req.getIntervals();
-
-    normalizeIntervals(intervals);
-    if (auto simplified = simplifyDNFIntervals(intervals, constFold)) {
-        intervals = std::move(*simplified);
-    } else {
-        // Intervals are unsatisfiable.
-        resetIntervals(req,
-                       IntervalReqExpr::makeSingularDNF(BoundRequirement::makePlusInf(),
-                                                        BoundRequirement::makeMinusInf()));
-        return;
-    }
-
-    normalizeIntervals(intervals);
-    if (pathToInterval &&
-        requiresArrayOnNonMultikeyPath(key._path, intervals, multikeynessTrie, pathToInterval)) {
-        // We have array predicate on non-multikey path: convert to unsatisfiable
-        // intervals.
-        resetIntervals(req,
-                       IntervalReqExpr::makeSingularDNF(BoundRequirement::makePlusInf(),
-                                                        BoundRequirement::makeMinusInf()));
-        return;
-    }
-
-    resetIntervals(req, std::move(intervals));
-};
-
 bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanProjName,
                                    const MultikeynessTrie& multikeynessTrie,
-                                   PSRExpr::Node& reqMap,
+                                   PartialSchemaRequirements& reqMap,
                                    ProjectionRenames& projectionRenames,
                                    const ConstFoldFn& constFold,
                                    const PathToIntervalFn& pathToInterval) {
-    PSRExprBuilder resultReqs;
+    const auto simplifyFn = [&constFold](IntervalReqExpr::Node& intervals) -> bool {
+        normalizeIntervals(intervals);
+        auto simplified = simplifyDNFIntervals(intervals, constFold);
+        if (simplified) {
+            intervals = std::move(*simplified);
+        }
+        return simplified.has_value();
+    };
+
+    BoolExprBuilder<PartialSchemaEntry> resultReqs;
     resultReqs.pushDisj();
 
+    // TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
+    // If any one conjunction is empty, the overall disjunction is trivially true.
+    bool hasEmptyConjunction = false;
+
     PSRExpr::visitDisjuncts(
-        reqMap, [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext&) {
+        reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext&) {
             resultReqs.pushConj();
             boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
 
+            // Track whether this conjunction has any arguments.
+            bool hasAnyConjunct = false;
+
             const auto nextEntryFn = [&](PartialSchemaKey newKey,
                                          const PartialSchemaRequirement& req) {
-                if (prevEntry) {
-                    resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
-                }
+                resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
                 prevEntry.reset({std::move(newKey), req});
-                simplifyPSREntry(constFold,
-                                 pathToInterval,
-                                 multikeynessTrie,
-                                 prevEntry->first,
-                                 prevEntry->second);
+                hasAnyConjunct = true;
             };
 
             // Simplify paths by eliminating unnecessary Traverse elements.
@@ -887,7 +858,11 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
                     }
                     // At this point we have simplified the path in newKey.
 
-                    if (!prevEntry || prevEntry->first != newKey) {
+                    if (!prevEntry) {
+                        prevEntry.reset({std::move(newKey), req});
+                        return;
+                    }
+                    if (prevEntry->first != newKey) {
                         nextEntryFn(std::move(newKey), req);
                         return;
                     }
@@ -919,58 +894,73 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
                         }
                     }
 
+                    if (constFold && !simplifyFn(resultIntervals)) {
+                        // TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
+
+                        // An always-false conjunct means the whole conjunction is always-false.
+                        // However, there can be other disjuncts, so we can't short-circuit the
+                        // whole tree. Create an explicit always-false atom.
+                        resultIntervals = IntervalReqExpr::makeSingularDNF(
+                            BoundRequirement::makePlusInf(), BoundRequirement::makeMinusInf());
+                    }
                     prevReq = {std::move(resultBoundProjName),
                                std::move(resultIntervals),
                                req.getIsPerfOnly() && prevReq.getIsPerfOnly()};
-                    simplifyPSREntry(
-                        constFold, pathToInterval, multikeynessTrie, prevEntry->first, prevReq);
                 });
             if (prevEntry) {
                 resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
+                hasAnyConjunct = true;
             }
 
             resultReqs.pop();
+            if (!hasAnyConjunct) {
+                hasEmptyConjunction = true;
+            }
         });
 
-    PSRExpr::Node newReqs{std::move(*resultReqs.finish())};
-    if (psr::isAlwaysFalse(newReqs)) {
-        // We have an empty disjunction -> trivially false.
-        return true;
+    boost::optional<PSRExpr::Node> builderResult = resultReqs.finish();
+    if (!builderResult) {
+        // TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
+        if (hasEmptyConjunction) {
+            // We have an empty conjunction -> trivially true.
+            reqMap = PartialSchemaRequirements{};
+            return false;
+        } else {
+            // We have an empty disjunction -> trivially false.
+            return true;
+        }
+    }
+    PartialSchemaRequirements newReqs{std::move(*builderResult)};
+
+    if (constFold) {
+        // Intersect and normalize intervals.
+        const bool representable = newReqs.simplify([&](const PartialSchemaKey& key,
+                                                        PartialSchemaRequirement& req) -> bool {
+            auto resultIntervals = req.getIntervals();
+            if (!simplifyFn(resultIntervals)) {
+                return false;
+            }
+
+            normalizeIntervals(resultIntervals);
+
+            if (pathToInterval &&
+                requiresArrayOnNonMultikeyPath(
+                    key._path, resultIntervals, multikeynessTrie, pathToInterval)) {
+                return false;
+            }
+
+            req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
+            return true;
+        });
+        if (!representable) {
+            // It simplifies to an always-false predicate, which we do not represent
+            // as PartialSchemaRequirements.
+            return true;
+        }
     }
 
     reqMap = std::move(newReqs);
     return false;
-}
-
-bool isSubsetOfPartialSchemaReq(const PSRExpr::Node& lhs, const PSRExpr::Node& rhs) {
-    // We can use set intersection to calculate set containment:
-    //   lhs <= rhs  iff  (lhs ^ rhs) == lhs
-
-    // However, we're assuming that 'rhs' has no projections.
-    // If it did have projections, the result (lhs ^ rhs) would have projections
-    // and wouldn't match 'lhs'.
-    PSRExpr::visitAnyShape(rhs, [](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-        tassert(7155010,
-                "isSubsetOfPartialSchemaReq expects 'rhs' to have no projections",
-                !e.second.getBoundProjectionName());
-    });
-
-    PSRExpr::Node intersection = lhs;
-    const bool success = intersectPartialSchemaReq(intersection, rhs);
-    tassert(6624172, "Intersection should succeed since 'rhs' has no projections", success);
-
-    ProjectionRenames renames_unused;
-    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(boost::none /*scanProjName*/,
-                                                                {} /*multikeynessTrie*/,
-                                                                intersection,
-                                                                renames_unused,
-                                                                {} /*constFold*/,
-                                                                {} /*pathToInterval*/);
-    tassert(6624169,
-            "Cannot detect empty intervals without providing a constant folder",
-            !hasEmptyInterval);
-
-    return intersection == lhs;
 }
 
 /**
@@ -988,112 +978,117 @@ bool isSubsetOfPartialSchemaReq(const PSRExpr::Node& lhs, const PSRExpr::Node& r
  *        visible in the input of the existing requirements) and retry. We will either
  *        add a new requirement or combine with an existing one.
  */
-bool intersectPartialSchemaReq(PSRExpr::Node& target, const PSRExpr::Node& source) {
-    if (!PSRExpr::isSingletonDisjunction(target) || !PSRExpr::isSingletonDisjunction(source)) {
+static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
+                                      PartialSchemaKey key,
+                                      PartialSchemaRequirement req) {
+    for (;;) {
+        bool merged = false;
+        bool canIntersect = true;
+        const bool reqHasBoundProj = req.getBoundProjectionName().has_value();
+        PSRExpr::visitSingletonDNF(
+            reqMap.getRoot(), [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
+                const auto& [existingKey, existingReq] = e;
+
+                uassert(6624150,
+                        "Existing key referring to new requirement.",
+                        !reqHasBoundProj ||
+                            existingKey._projectionName != *req.getBoundProjectionName());
+
+                if (const auto& boundProjName = existingReq.getBoundProjectionName();
+                    boundProjName && key._projectionName == *boundProjName) {
+                    // The new key is referring to a projection the existing requirement binds.
+                    if (reqHasBoundProj) {
+                        canIntersect = false;
+                    } else {
+                        key = PartialSchemaKey{
+                            existingKey._projectionName,
+                            PathAppender::append(existingKey._path, std::move(key._path)),
+                        };
+                        merged = true;
+                    }
+                    ctx.returnEarly();
+                }
+            });
+
+        if (!canIntersect) {
+            return false;
+        } else if (merged) {
+            // continue around the loop
+        } else {
+            reqMap.add(std::move(key), std::move(req));
+            return true;
+        }
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
+                                const PartialSchemaRequirements& rhs) {
+    // We can use set intersection to calculate set containment:
+    //   lhs <= rhs  iff  (lhs ^ rhs) == lhs
+
+    // However, we're assuming that 'rhs' has no projections.
+    // If it did have projections, the result (lhs ^ rhs) would have projections
+    // and wouldn't match 'lhs'.
+    PSRExpr::visitAnyShape(
+        rhs.getRoot(), [](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+            tassert(7155010,
+                    "isSubsetOfPartialSchemaReq expects 'rhs' to have no projections",
+                    !e.second.getBoundProjectionName());
+        });
+
+    PartialSchemaRequirements intersection = lhs;
+    const bool success = intersectPartialSchemaReq(intersection, rhs);
+    tassert(6624172, "Intersection should succeed since 'rhs' has no projections", success);
+
+    ProjectionRenames renames_unused;
+    const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(boost::none /*scanProjName*/,
+                                                                {} /*multikeynessTrie*/,
+                                                                intersection,
+                                                                renames_unused,
+                                                                {} /*constFold*/,
+                                                                {} /*pathToInterval*/);
+    tassert(6624169,
+            "Cannot detect empty intervals without providing a constant folder",
+            !hasEmptyInterval);
+
+    return intersection == lhs;
+}
+
+bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
+                               const PartialSchemaRequirements& source) {
+    if (!PSRExpr::isSingletonDisjunction(target.getRoot()) ||
+        !PSRExpr::isSingletonDisjunction(source.getRoot())) {
         return false;
     }
 
-    struct IntersectSimplifier {
-        PSRSimplifier::Result operator()(const BuilderNodeType type,
-                                         std::vector<PSRExpr::Node> reqs,
-                                         const bool hasTrue,
-                                         const bool hasFalse) {
-            switch (type) {
-                case BuilderNodeType::Conj: {
-                    // Map used to speed up finding entries which bind a given projection.
-                    ProjectionNameMap<size_t> boundProjMap;
+    bool performedIntersection = true;
 
-                    for (size_t i = 0; i < reqs.size(); i++) {
-                        auto& [key, req] = reqs.at(i).cast<PSRExpr::Atom>()->getExpr();
-                        if (!key._projectionName) {
-                            continue;
-                        }
-
-                        const auto& reqBoundProj = req.getBoundProjectionName();
-                        if (i < _sourceIndex) {
-                            if (reqBoundProj) {
-                                boundProjMap.emplace(*reqBoundProj, i);
-                            }
-                            continue;
-                        }
-
-                        for (;;) {
-                            bool merged = false;
-                            if (auto it = boundProjMap.find(*key._projectionName);
-                                it != boundProjMap.cend()) {
-                                // The new key is referring to a projection the existing requirement
-                                // binds.
-                                const auto& existingKey =
-                                    reqs.at(it->second).cast<PSRExpr::Atom>()->getExpr().first;
-                                if (reqBoundProj) {
-                                    _resultRepresentable = false;
-                                    return {boost::none};
-                                }
-
-                                key = {
-                                    existingKey._projectionName,
-                                    PathAppender::append(existingKey._path, std::move(key._path))};
-                                merged = true;
-                            }
-
-                            if (merged) {
-                                // Continue around the loop.
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                case BuilderNodeType::Disj:
-                    if (!_resultRepresentable) {
-                        return {boost::none};
-                    }
-                    break;
-            }
-
-            return PSRSimplifier{}(type, std::move(reqs), hasTrue, hasFalse);
-        }
-
-        // First index of entries added from the source tree. Before that are the entries from the
-        // target tree.
-        size_t _sourceIndex = 0;
-        // Set to false if we discover we cannot represent the result.
-        bool _resultRepresentable = true;
-    };
-    BoolExprBuilder<PartialSchemaEntry, IntersectSimplifier> builder;
-    auto& instance = builder.getSimplifier();
-
-    builder.pushDisj().pushConj();
-    PSRExpr::visitDNF(target,
+    PSRExpr::visitDNF(source.getRoot(),
                       [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
-                          builder.atom(entry);
-                          instance._sourceIndex++;
-                      });
-    PSRExpr::visitDNF(source,
-                      [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
-                          builder.atom(entry);
+                          if (!intersectPartialSchemaReq(target, entry.first, entry.second)) {
+                              performedIntersection = false;
+                              ctx.returnEarly();
+                          }
                       });
 
-    if (auto result = builder.finish()) {
-        target = std::move(*result);
-        return true;
-    }
-    return false;
+    return performedIntersection;
 }
 
-PSRExpr::Node unionPartialSchemaReq(PSRExpr::Node&& left, PSRExpr::Node&& right) {
-    tassert(7453911, "unionPartialSchemaReq assumes DNF", left.is<PSRExpr::Disjunction>());
-    tassert(7453910, "unionPartialSchemaReq assumes DNF", right.is<PSRExpr::Disjunction>());
+PartialSchemaRequirements unionPartialSchemaReq(PartialSchemaRequirements&& left,
+                                                PartialSchemaRequirements&& right) {
+    tassert(
+        7453911, "unionPartialSchemaReq assumes DNF", left.getRoot().is<PSRExpr::Disjunction>());
+    tassert(
+        7453910, "unionPartialSchemaReq assumes DNF", right.getRoot().is<PSRExpr::Disjunction>());
 
-    PSRExpr::Disjunction& leftDisj = *left.cast<PSRExpr::Disjunction>();
-    PSRExpr::Disjunction& rightDisj = *right.cast<PSRExpr::Disjunction>();
+    PSRExpr::Disjunction& leftDisj = *left.getRoot().cast<PSRExpr::Disjunction>();
+    PSRExpr::Disjunction& rightDisj = *right.getRoot().cast<PSRExpr::Disjunction>();
     auto resultNodes = std::move(leftDisj.nodes());
     resultNodes.insert(resultNodes.end(),
                        std::make_move_iterator(rightDisj.nodes().begin()),
                        std::make_move_iterator(rightDisj.nodes().end()));
-    return PSRExpr::make<PSRExpr::Disjunction>(std::move(resultNodes));
+    return PartialSchemaRequirements{PSRExpr::make<PSRExpr::Disjunction>(std::move(resultNodes))};
 }
 
 std::string encodeIndexKeyName(const size_t indexField) {
@@ -1202,7 +1197,7 @@ static bool extendCompoundInterval(PrefixId& prefixId,
 }
 
 static bool computeCandidateIndexEntry(PrefixId& prefixId,
-                                       const PSRExpr::Node& reqMap,
+                                       const PartialSchemaRequirements& reqMap,
                                        const size_t maxIndexEqPrefixes,
                                        PartialSchemaKeySet unsatisfiedKeys,
                                        const ProjectionName& scanProjName,
@@ -1226,11 +1221,10 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         bool foundSuitableField = false;
 
         PartialSchemaKey indexKey{scanProjName, indexCollationEntry._path};
-        if (auto result = PSRExpr::findFirst(
-                reqMap, [&](const PartialSchemaEntry& entry) { return entry.first == indexKey; })) {
+        if (auto result = reqMap.findFirstConjunct(indexKey)) {
             if (const auto& [queryPredPos, req] = *result; hints._fastIndexNullHandling ||
-                !req->second.getIsPerfOnly() || !req->second.mayReturnNull(constFold)) {
-                const auto& requiredInterval = req->second.getIntervals();
+                !req.getIsPerfOnly() || !req.mayReturnNull(constFold)) {
+                const auto& requiredInterval = req.getIntervals();
                 const bool success = extendCompoundInterval(prefixId,
                                                             indexCollationSpec,
                                                             maxIndexEqPrefixes,
@@ -1260,7 +1254,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
                 eqPrefixes.back()._predPosSet.insert(queryPredPos);
 
-                if (const auto& boundProjName = req->second.getBoundProjectionName()) {
+                if (const auto& boundProjName = req.getBoundProjectionName()) {
                     // Include bounds projection into index spec.
                     const bool inserted =
                         fieldProjMap._fieldProjections
@@ -1299,25 +1293,22 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
             if (const auto fusedPath =
                     fuseIndexPath(queryKey._path, indexCollationSpec.at(indexField)._path);
                 fusedPath._suffix) {
-                auto result = PSRExpr::findFirst(reqMap, [&](const PartialSchemaEntry& entry) {
-                    return entry.first == queryKey;
-                });
+                auto result = reqMap.findFirstConjunct(queryKey);
                 tassert(6624158, "QueryKey must exist in the requirements map", result);
                 const auto& [index, req] = *result;
 
                 if (hints._forceIndexScanForPredicates &&
-                    !isIntervalReqFullyOpenDNF(req->second.getIntervals())) {
+                    !isIntervalReqFullyOpenDNF(req.getIntervals())) {
                     // We need to cover all predicates with index scans.
                     break;
                 }
 
-                if (!req->second.getIsPerfOnly()) {
+                if (!req.getIsPerfOnly()) {
                     // Only regular requirements are added to residual predicates.
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                         prefixId, FieldNameType{encodeIndexKeyName(indexField)}, fieldProjMap);
-                    residualReqs.atom(PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)},
-                                      req->second,
-                                      index);
+                    residualReqs.atom(
+                        PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)}, req, index);
                 }
 
                 satisfied = true;
@@ -1376,7 +1367,7 @@ static bool checkCanFuse(const MultikeynessTrie& tree1, const MultikeynessTrie& 
 
 CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
-                                         const PSRExpr::Node& reqMap,
+                                         const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
                                          const ConstFoldFn& constFold,
@@ -1384,7 +1375,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
     // A candidate index is one that can directly satisfy the SargableNode, without using
     // any other indexes. Typically a disjunction would require unioning two different indexes,
     // so we bail out if there's a nontrivial disjunction here.
-    if (!PSRExpr::isSingletonDisjunction(reqMap)) {
+    if (!PSRExpr::isSingletonDisjunction(reqMap.getRoot())) {
         return {};
     }
 
@@ -1404,7 +1395,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
     bool prohibitIndexUsage = false;
 
     PSRExpr::visitSingletonDNF(
-        reqMap, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
+        reqMap.getRoot(), [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
             const auto& [key, req] = e;
 
             if (req.getIsPerfOnly()) {
@@ -1473,7 +1464,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
 }
 
 boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
-                                              const PSRExpr::Node& reqMap,
+                                              const PartialSchemaRequirements& reqMap,
                                               const ProjectionName& rootProj) {
     ScanParams result;
     auto& fieldProjMap = result._fieldProjectionMap;
@@ -1483,7 +1474,8 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
     size_t entryIndex = 0;
     residReqs.pushDisj();
     PSRExpr::visitDisjuncts(
-        reqMap, [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext& disjCtx) {
+        reqMap.getRoot(),
+        [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext& disjCtx) {
             residReqs.pushConj();
             PSRExpr::visitConjuncts(
                 disjunct,

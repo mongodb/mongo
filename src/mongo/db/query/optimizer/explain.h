@@ -120,6 +120,8 @@ public:
 
     static BSONObj explainMemoBSONObj(const cascades::MemoExplainInterface& memoInterface);
 
+    static std::string explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap);
+
     static std::string explainPartialSchemaReqExpr(const PSRExpr::Node& reqs);
 
     static std::string explainResidualRequirements(const ResidualRequirements::Node& resReqs);
