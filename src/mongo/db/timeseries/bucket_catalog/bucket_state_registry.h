@@ -79,7 +79,7 @@ enum class BucketState : uint8_t {
  * on the same bucket. Conflicts between multiple simultaneous direct writes are mediated by the
  * storage engine.
  */
-using DirectWriteCounter = std::int8_t;
+using DirectWriteCounter = std::int32_t;
 
 /**
  * A helper struct to hold and synchronize both individual bucket states and global state about the

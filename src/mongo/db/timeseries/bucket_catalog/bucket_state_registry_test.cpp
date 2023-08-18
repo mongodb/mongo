@@ -724,5 +724,28 @@ TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
     ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
+TEST_F(BucketStateRegistryTest, LargeNumberOfDirectWritesInTransaction) {
+    // If a single transaction contains many direct writes to the same bucket, we should handle
+    // it gracefully.
+    BucketId bucketId{ns1, OID()};
+    auto state = getBucketState(bucketStateRegistry, bucketId);
+    ASSERT_FALSE(state.has_value());
+
+    int numDirectWrites = 100'000;
+
+    for (int i = 0; i < numDirectWrites; ++i) {
+        directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
+        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+    }
+
+    for (int i = 0; i < numDirectWrites; ++i) {
+        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+        directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
+    }
+
+    ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
+}
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
