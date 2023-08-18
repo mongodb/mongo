@@ -40,7 +40,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
@@ -65,11 +64,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo {
-
-namespace query_stats {
-
-CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
+namespace mongo::query_stats {
 
 namespace {
 
@@ -252,16 +247,6 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     return true;
 }
 
-std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
-    auto hashed = SHA256Block::computeHmac(
-        (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
-    return hashed.toString();
-}
-
-std::size_t hash(const BSONObj& obj) {
-    return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
-}
-
 }  // namespace
 
 /**
@@ -278,17 +263,6 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
         (!requiresFullQueryStatsFeatureFlag &&
          feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(
              serverGlobalParams.featureCompatibility));
-}
-
-BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithmEnum algorithm,
-                                              std::string hmacKey) const {
-    return keyGenerator->generate(
-        opCtx,
-        algorithm == TransformAlgorithmEnum::kHmacSha256
-            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
-                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
-            : boost::none);
 }
 
 void registerRequest(OperationContext* opCtx,
@@ -379,5 +353,4 @@ void writeQueryStats(OperationContext* opCtx,
     metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
-}  // namespace query_stats
-}  // namespace mongo
+}  // namespace mongo::query_stats

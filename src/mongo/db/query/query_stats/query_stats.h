@@ -44,7 +44,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
@@ -53,144 +52,11 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats/key_generator.h"
-#include "mongo/db/query/query_stats/transform_algorithm_gen.h"
-#include "mongo/db/query/util/memory_util.h"
+#include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view.h"
-#include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::query_stats {
 
-namespace {
-/**
- * Type we use to render values to BSON.
- */
-using BSONNumeric = long long;
-}  // namespace
-
-namespace query_stats {
-/**
- * An aggregated metric stores a compressed view of data. It balances the loss of information
- * with the reduction in required storage.
- */
-struct AggregatedMetric {
-
-    /**
-     * Aggregate an observed value into the metric.
-     */
-    void aggregate(uint64_t val) {
-        sum += val;
-        max = std::max(val, max);
-        min = std::min(val, min);
-        sumOfSquares += val * val;
-    }
-
-    void appendTo(BSONObjBuilder& builder, const StringData& fieldName) const {
-        BSONObjBuilder metricsBuilder = builder.subobjStart(fieldName);
-        metricsBuilder.append("sum", (BSONNumeric)sum);
-        metricsBuilder.append("max", (BSONNumeric)max);
-        metricsBuilder.append("min", (BSONNumeric)min);
-        metricsBuilder.append("sumOfSquares", (BSONNumeric)sumOfSquares);
-        metricsBuilder.done();
-    }
-
-    uint64_t sum = 0;
-    // Default to the _signed_ maximum (which fits in unsigned range) because we cast to
-    // BSONNumeric when serializing.
-    uint64_t min = (uint64_t)std::numeric_limits<int64_t>::max;
-    uint64_t max = 0;
-
-    /**
-     * The sum of squares along with (an externally stored) count will allow us to compute the
-     * variance/stddev.
-     */
-    uint64_t sumOfSquares = 0;
-};
-
-extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
-const auto kKeySize = sizeof(std::size_t);
-// Used to aggregate the metrics for one query stats key over all its executions.
-class QueryStatsEntry {
-public:
-    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
-        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {
-        // Increment by size of query stats store key (hash returns size_t) and value
-        // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
-    }
-
-    ~QueryStatsEntry() {
-        // Decrement by size of query stats store key (hash returns size_t) and value
-        // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.decrement(kKeySize + size());
-    }
-
-    BSONObj toBSON() const {
-        BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
-        builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
-        builder.append("execCount", (BSONNumeric)execCount);
-        totalExecMicros.appendTo(builder, "totalExecMicros");
-        firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
-        docsReturned.appendTo(builder, "docsReturned");
-        builder.append("firstSeenTimestamp", firstSeenTimestamp);
-        builder.append("latestSeenTimestamp", latestSeenTimestamp);
-        return builder.obj();
-    }
-
-    int64_t size() {
-        return sizeof(*this) + (keyGenerator ? keyGenerator->size() : 0);
-    }
-
-    /**
-     * Generate the queryStats key for this entry's request. If algorithm is not
-     * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
-     * anonymized.
-     */
-    BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 TransformAlgorithmEnum algorithm,
-                                 std::string hmacKey) const;
-
-    BSONObj getRepresentativeQueryShapeForDebug() const {
-        return keyGenerator->getRepresentativeQueryShapeForDebug();
-    }
-
-    /**
-     * Timestamp for when this query shape was added to the store. Set on construction.
-     */
-    const Date_t firstSeenTimestamp;
-
-    /**
-     * Timestamp for when the latest time this query shape was seen.
-     */
-    Date_t latestSeenTimestamp;
-
-    /**
-     * Last execution time in microseconds.
-     */
-    uint64_t lastExecutionMicros = 0;
-
-    /**
-     * Number of query executions.
-     */
-    uint64_t execCount = 0;
-
-    /**
-     * Aggregates the total time for execution including getMore requests.
-     */
-    AggregatedMetric totalExecMicros;
-
-    /**
-     * Aggregates the time for execution for first batch only.
-     */
-    AggregatedMetric firstResponseExecMicros;
-
-    AggregatedMetric docsReturned;
-
-    /**
-     * The KeyGenerator that can generate the query stats key for this request.
-     */
-    const std::shared_ptr<const KeyGenerator> keyGenerator;
-};
 struct QueryStatsPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
     std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
@@ -273,5 +139,4 @@ void writeQueryStats(OperationContext* opCtx,
                      uint64_t queryExecMicros,
                      uint64_t firstResponseExecMicros,
                      uint64_t docsReturned);
-}  // namespace query_stats
-}  // namespace mongo
+}  // namespace mongo::query_stats
