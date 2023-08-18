@@ -172,10 +172,22 @@ public:
             auto durableState = donor->getDurableState();
 
             auto response = Response(durableState->state);
-            if (durableState->abortReason) {
-                BSONObjBuilder bob;
-                durableState->abortReason->serializeErrorToBSON(&bob);
-                response.setAbortReason(bob.obj());
+            switch (durableState->state) {
+                case TenantMigrationDonorStateEnum::kUninitialized:
+                case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
+                case TenantMigrationDonorStateEnum::kDataSync:
+                    break;
+                case TenantMigrationDonorStateEnum::kBlocking:
+                case TenantMigrationDonorStateEnum::kCommitted: {
+                    invariant(durableState->blockTimestamp);
+                    response.setBlockTimestamp(durableState->blockTimestamp);
+                } break;
+                case TenantMigrationDonorStateEnum::kAborted: {
+                    invariant(durableState->abortReason);
+                    response.setAbortReason(durableState->abortReason);
+                } break;
+                default:
+                    MONGO_UNREACHABLE;
             }
 
             return response;

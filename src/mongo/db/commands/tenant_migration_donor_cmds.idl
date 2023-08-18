@@ -51,6 +51,12 @@ structs:
                 type: object
                 description: "The error that caused the migration to abort."
                 optional: true
+            blockTimestamp:
+                type: timestamp
+                description: >-
+                    The timestamp at which writes and causal reads against the data being migrated
+                    started blocking.
+                optional: true
 
 commands:
   donorStartMigration:

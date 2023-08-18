@@ -414,7 +414,10 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
             auto errmsg = abortReasonBson["errmsg"].String();
             _abortReason = Status(ErrorCodes::Error(code), errmsg);
         }
-        _durableState = DurableState{_stateDoc.getState(), _abortReason, _stateDoc.getExpireAt()};
+        _durableState = DurableState{_stateDoc.getState(),
+                                     _stateDoc.getAbortReason(),
+                                     _stateDoc.getExpireAt(),
+                                     _stateDoc.getBlockTimestamp()};
 
         _initialDonorStateDurablePromise.emplaceValue();
 
@@ -833,7 +836,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
-            boost::optional<Status> abortReason;
             switch (_stateDoc.getState()) {
                 case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
                     setPromiseOkIfNotReady(lg, _initialDonorStateDurablePromise);
@@ -841,17 +843,16 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
                 case TenantMigrationDonorStateEnum::kDataSync:
                 case TenantMigrationDonorStateEnum::kBlocking:
                 case TenantMigrationDonorStateEnum::kCommitted:
-                    break;
                 case TenantMigrationDonorStateEnum::kAborted:
-                    invariant(_abortReason);
-                    abortReason = _abortReason;
                     break;
                 default:
                     MONGO_UNREACHABLE;
             }
 
-            _durableState =
-                DurableState{_stateDoc.getState(), std::move(abortReason), _stateDoc.getExpireAt()};
+            _durableState = DurableState{_stateDoc.getState(),
+                                         _stateDoc.getAbortReason(),
+                                         _stateDoc.getExpireAt(),
+                                         _stateDoc.getBlockTimestamp()};
         });
 }
 

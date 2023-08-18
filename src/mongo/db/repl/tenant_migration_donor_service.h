@@ -110,8 +110,9 @@ public:
     public:
         struct DurableState {
             TenantMigrationDonorStateEnum state;
-            boost::optional<Status> abortReason;
+            boost::optional<BSONObj> abortReason;
             boost::optional<mongo::Date_t> expireAt;
+            boost::optional<Timestamp> blockTimestamp;
         };
 
         explicit Instance(ServiceContext* serviceContext,
