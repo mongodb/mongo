@@ -76,11 +76,11 @@ Welcome to MongoDB!
 
 ## Forums
 
-  - https://community.mongodb.com
+  - https://www.mongodb.com/community/forums/
 
       Technical questions about using MongoDB.
 
-  - https://community.mongodb.com/c/server-dev
+  - https://www.mongodb.com/community/forums/c/server-dev
 
       Technical questions about building and developing MongoDB.
 
