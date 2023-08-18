@@ -385,7 +385,6 @@ mongod = env.Program(
         'db/dbdirectclient',
         'db/dbhelpers',
         'db/exec/working_set',
-        'db/free_mon/free_mon_mongod',
         'db/ftdc/ftdc_mongod',
         'db/fts/ftsmongod',
         'db/index_builds_coordinator_mongod',

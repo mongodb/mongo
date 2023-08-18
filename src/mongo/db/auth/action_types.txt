@@ -20,7 +20,7 @@
 "changeOwnPassword",
 "changeOwnCustomData",
 "changeStream",
-"checkFreeMonitoringStatus",
+"checkFreeMonitoringStatus",  # Deprecated, needs to stay around for backwards compatibility
 "cleanupOrphaned",
 "clearJumboFlag",
 "closeAllDatabases",  # Deprecated, needs to stay around for backwards compatibility
@@ -114,7 +114,7 @@
 "setAuthenticationRestriction",
 "setDefaultRWConcern",
 "setFeatureCompatibilityVersion",
-"setFreeMonitoring",
+"setFreeMonitoring",  # Deprecated, needs to stay around for backwards compatibility
 "setParameter",
 "shardCollection",  # Not used for permissions checks, but to id the event in logs.
 "shardingState",
