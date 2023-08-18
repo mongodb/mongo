@@ -22,10 +22,6 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-  # This test concurrently creates views and collections on the same namespace, which causes issues
-  # for dbCheck. TODO (SERVER-63951): Remove this exclusion.
-  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
-
   exclude_with_any_tags:
   - requires_sharding
 

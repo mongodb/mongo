@@ -973,6 +973,8 @@ last-lts:
     ticket: SERVER-61475
   - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
     ticket: SERVER-78650
+  - test_file: jstests/replsets/dbcheck_dropped_collection.js
+    ticket: SERVER-79490
   - test_file: jstests/sharding/query/sharded_graph_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_lookup_execution.js

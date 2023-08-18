@@ -89,11 +89,6 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-  # This test concurrently creates views and collections on the same namespace, which causes issues
-  # for dbCheck. TODO (SERVER-63951): Remove this exclusion.
-  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
-
-
   exclude_with_any_tags:
   - requires_replication
   - assumes_balancer_on

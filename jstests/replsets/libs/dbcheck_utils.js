@@ -59,14 +59,14 @@ export const runDbCheck = (replSet,
                            collName,
                            parameters = {},
                            awaitCompletion = false,
-                           withClearedHealthLog = true) => {
+                           withClearedHealthLog = true,
+                           allowedErrorCodes = []) => {
     let dbCheckCommand = {dbCheck: collName};
     for (let parameter in parameters) {
         dbCheckCommand[parameter] = parameters[parameter];
     }
-    // Disregard the error when the collection is not replicated, for example, 'system.profile'.
-    assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand),
-                                         40619 /* collection is not replicated error.*/);
+
+    assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand), allowedErrorCodes);
     if (awaitCompletion) {
         awaitDbCheckCompletion(replSet, db, withClearedHealthLog);
     }
@@ -97,7 +97,20 @@ function listCollectionsWithoutViews(database) {
 export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
     listCollectionsWithoutViews(db)
         .map(c => c.name)
-        .forEach(collName => runDbCheck(replSet, db, collName, false /*awaitCompletion*/));
+        .forEach(collName => runDbCheck(
+                     replSet,
+                     db,
+                     collName,
+                     {} /* parameters */,
+                     false /* awaitCompletion */,
+                     false /* withClearedHealthLog */,
+                     [
+                         ErrorCodes.NamespaceNotFound /* collection got dropped. */,
+                         ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
+                                                                 got created with the same name. */
+                         ,
+                         40619 /* collection is not replicated error. */
+                     ] /* allowedErrorCodes */));
 
     if (awaitCompletion) {
         awaitDbCheckCompletion(replSet, db, false /*withClearedHealthLog*/);
@@ -140,7 +153,7 @@ export const assertForDbCheckErrors = (node,
                     errorsFound.push(err);
                     jsTestLog(tojson(err));
                 }
-                assert(false, err);
+                assert(false, errMsg);
             }
             return true;
         } catch (e) {

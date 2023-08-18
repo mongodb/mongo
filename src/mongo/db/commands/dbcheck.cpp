@@ -98,6 +98,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/time_support.h"
@@ -109,6 +110,8 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
+MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 
 repl::OpTime _logOp(OperationContext* opCtx,
                     const NamespaceString& nss,
@@ -258,11 +261,22 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     }
     NamespaceString nss(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, invocation.getColl()));
-    AutoGetCollectionForRead agc(opCtx, nss);
 
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Collection " + invocation.getColl() + " not found",
-            agc.getCollection());
+    boost::optional<UUID> uuid;
+    try {
+        AutoGetCollectionForRead agc(opCtx, nss);
+        uassert(ErrorCodes::NamespaceNotFound,
+                "Collection " + invocation.getColl() + " not found",
+                agc.getCollection());
+        uuid = agc->uuid();
+    } catch (const DBException& ex) {
+        // 'AutoGetCollectionForRead' fails with 'CommandNotSupportedOnView' if the namespace is
+        // referring to a view.
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                invocation.getColl() + " is a view hence 'dbcheck' is not supported.",
+                ex.code() != ErrorCodes::CommandNotSupportedOnView);
+        throw;
+    }
 
     uassert(40619,
             "Cannot run dbCheck on " + nss.toStringForErrorMsg() + " because it is not replicated",
@@ -292,7 +306,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
         }
     }
     const auto info = DbCheckCollectionInfo{nss,
-                                            agc->uuid(),
+                                            uuid.get(),
                                             start,
                                             end,
                                             maxCount,
@@ -429,6 +443,11 @@ protected:
         }
         DbCheckStartAndStopLogger startStop(opCtx, info);
 
+        if (MONGO_unlikely(hangBeforeProcessingDbCheckRun.shouldFail())) {
+            LOGV2(7949000, "Hanging dbcheck due to failpoint 'hangBeforeProcessingDbCheckRun'");
+            hangBeforeProcessingDbCheckRun.pauseWhileSet();
+        }
+
         for (const auto& coll : *_run) {
             try {
                 _doCollection(opCtx, coll);
@@ -456,23 +475,43 @@ private:
             "Scanning namespace " + NamespaceStringUtil::serialize(info.nss);
         ProgressMeterHolder progress;
         {
-            AutoGetCollection coll(opCtx, info.nss, MODE_IS);
-            if (coll) {
-                stdx::unique_lock<Client> lk(*opCtx->getClient());
-                progress.set(lk,
-                             CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
-                                                                   coll->numRecords(opCtx)),
-                             opCtx);
-            } else {
+            bool collectionFound = false;
+            std::string collNotFoundMsg = "Collection under dbCheck no longer exists";
+            try {
+                AutoGetCollection coll(opCtx, info.nss, MODE_IS);
+                if (coll) {
+                    stdx::unique_lock<Client> lk(*opCtx->getClient());
+                    progress.set(lk,
+                                 CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
+                                                                       coll->numRecords(opCtx)),
+                                 opCtx);
+                    collectionFound = true;
+                }
+            } catch (const DBException& ex) {
+                // 'AutoGetCollection' fails with 'CommandNotSupportedOnView' if the namespace is
+                // referring to a view. This case can happen if the collection got dropped and then
+                // a view got created with the same name before calling 'AutoGetCollection'.
+                if (ex.code() != ErrorCodes::CommandNotSupportedOnView) {
+                    throw;
+                }
+                collNotFoundMsg += ", but there is a view with the identical name";
+            }
+
+            if (!collectionFound) {
                 const auto entry = dbCheckWarningHealthLogEntry(
                     info.nss,
                     info.uuid,
                     "abandoning dbCheck batch because collection no longer exists",
                     OplogEntriesEnum::Batch,
-                    Status(ErrorCodes::NamespaceNotFound, "collection not found"));
+                    Status(ErrorCodes::NamespaceNotFound, collNotFoundMsg));
                 HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*entry);
                 return;
             }
+        }
+
+        if (MONGO_unlikely(hangBeforeProcessingFirstBatch.shouldFail())) {
+            LOGV2(7949001, "Hanging dbcheck due to failpoint 'hangBeforeProcessingFirstBatch'");
+            hangBeforeProcessingFirstBatch.pauseWhileSet();
         }
 
         // Parameters for the hasher.

@@ -45,7 +45,6 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex.js
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
   exclude_with_any_tags:
   - requires_sharding
   roots:
