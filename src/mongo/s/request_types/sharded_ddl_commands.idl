@@ -210,27 +210,6 @@ structs:
                     false then it won't.
                 type: optionalBool
 
-    CommitRefineCollectionShardKeyRequest:
-        description: "Parameters sent to commit refineCollectionShardKey"
-        strict: false
-        fields:
-            key:
-                type: KeyPattern
-                description: "Index specification to use as the new shard key."
-                optional: false
-            newEpoch:
-                type: objectid
-                description: "The new epoch for the namespace."
-                optional: false
-            newTimestamp:
-                type: timestamp
-                description: "The new timestamp in the collection"
-                optional: false
-            oldTimestamp:
-                type: timestamp
-                description: "Previous collection timestamp, necessary to make the command idempotent"
-                optional: false
-
     ReshardCollectionRequest:
         description: "Parameters for the reshard collection command"
         strict: false
@@ -478,18 +457,6 @@ commands:
                 description: >-
                     Verifies that the shard key index has the same unique setting as the command.
                 type: optionalBool
-        reply_type: OkReply
-
-    _configsvrCommitRefineCollectionShardKey:
-        command_name: _configsvrCommitRefineCollectionShardKey
-        cpp_name: ConfigsvrCommitRefineCollectionShardKey
-        description: "Internal refineCollectionShardKey commit command on the configsvr."
-        strict: false
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        chained_structs:
-            CommitRefineCollectionShardKeyRequest: CommitRefineCollectionShardKeyRequest
 
     _shardsvrDropIndexes:
         description: "Parser for the _shardsvrDropIndexes command"

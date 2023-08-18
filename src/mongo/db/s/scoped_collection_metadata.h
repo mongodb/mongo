@@ -110,10 +110,6 @@ public:
         return _impl->get().getTimeseriesFields();
     }
 
-    bool isUniqueShardKey() const {
-        return _impl->get().isUniqueShardKey();
-    }
-
 protected:
     std::shared_ptr<Impl> _impl;
 };

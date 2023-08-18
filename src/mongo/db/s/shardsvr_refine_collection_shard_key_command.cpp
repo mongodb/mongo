@@ -33,7 +33,6 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 
@@ -82,47 +80,23 @@ public:
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            auto refineCoordinator = [&] {
-                // TODO SERVER-79064: remove once 8.0 is last LTS.
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                const DDLCoordinatorTypeEnum coordType =
-                    feature_flags::gAuthoritativeRefineCollectionShardKey.isEnabled(*fixedFcvRegion)
-                    ? DDLCoordinatorTypeEnum::kRefineCollectionShardKey
-                    : DDLCoordinatorTypeEnum::kRefineCollectionShardKeyPre71Compatible;
+            auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kRefineCollectionShardKey}});
+            coordinatorDoc.setRefineCollectionShardKeyRequest(
+                request().getRefineCollectionShardKeyRequest());
 
-                auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
-                coordinatorDoc.setRefineCollectionShardKeyRequest(
-                    request().getRefineCollectionShardKeyRequest());
-
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-
-                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                if (coordType == DDLCoordinatorTypeEnum::kRefineCollectionShardKey) {
-                    return checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
-                               service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()))
-                        ->getCompletionFuture();
-                } else {
-                    return checked_pointer_cast<RefineCollectionShardKeyCoordinatorPre71Compatible>(
-                               service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()))
-                        ->getCompletionFuture();
-                }
-            }();
-
-            refineCoordinator.get(opCtx);
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto refineCoordinator = checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            refineCoordinator->getCompletionFuture().get(opCtx);
         }
 
         bool supportsWriteConcern() const override {
             return true;
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::internal));
-        }
+        void doCheckAuthorization(OperationContext*) const override {}
 
         /**
          * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".

@@ -266,7 +266,6 @@ export const TenantMigrationConcurrentWriteUtil = {
         _configsvrCommitMergeAllChunksOnShard: {skip: isNotRunOnUserDatabase},
         _configsvrCommitMovePrimary:
             {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
-        _configsvrCommitRefineCollectionShardKey: {skip: isNotRunOnUserDatabase},
         _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
         _configsvrDropIndexCatalogEntry: {skip: isNotRunOnUserDatabase},
         _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},

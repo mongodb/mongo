@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include <memory>
 #include <string>
 
@@ -34,7 +35,6 @@
 #include <boost/none.hpp>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
@@ -43,8 +43,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/shard_role.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -84,27 +86,24 @@ public:
             const ShardKeyPattern keyPattern(request().getKey());
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
+            const auto [cm, _] = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns()));
             {
-                const auto coll =
-                    acquireCollection(opCtx,
-                                      CollectionAcquisitionRequest::fromOpCtx(
-                                          opCtx, ns(), AcquisitionPrerequisites::kRead),
-                                      MODE_IS);
-
-                uassert(ErrorCodes::NamespaceNotSharded,
-                        str::stream() << "Collection " << redact(ns().toStringForErrorMsg())
-                                      << " is not sharded",
-                        coll.getShardingDescription().isSharded());
+                AutoGetCollectionForReadCommandMaybeLockFree coll{
+                    opCtx,
+                    ns(),
+                    AutoGetCollection::Options{}.viewMode(
+                        auto_get_collection::ViewMode::kViewsForbidden)};
 
                 shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                     opCtx,
                     ns(),
                     keyPattern,
                     boost::none,
-                    coll.getShardingDescription().isUniqueShardKey(),
+                    cm.isUnique(),
                     request().getEnforceUniquenessCheck().value_or(true),
                     shardkeyutil::ValidationBehaviorsLocalRefineShardKey(opCtx,
-                                                                         coll.getCollectionPtr()));
+                                                                         coll.getCollection()));
             }
             shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, ns(), keyPattern);
         }
@@ -113,14 +112,7 @@ public:
             return false;
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::internal));
-        }
+        void doCheckAuthorization(OperationContext*) const override {}
 
         /**
          * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".

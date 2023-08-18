@@ -120,7 +120,7 @@ public:
                     ShardingCatalogClient::kLocalWriteConcern));
             }
 
-            // Since no write happened on this txnNumber, we need to make a dummy write so that
+            // Since we no write happened on this txnNumber, we need to make a dummy write so that
             // secondaries can be aware of this txn.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace,

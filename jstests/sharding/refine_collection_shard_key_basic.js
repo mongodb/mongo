@@ -296,7 +296,8 @@ assert.commandFailedWithCode(
 
 assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: 1}));
 
-// Should fail because namespace 'db.foo' is not sharded.
+// Should fail because namespace 'db.foo' is not sharded. NOTE: This NamespaceNotSharded error
+// is thrown in RefineCollectionShardKeyCommand by 'getShardedCollectionRoutingInfoWithRefresh'.
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotSharded);

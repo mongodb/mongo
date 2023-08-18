@@ -2532,7 +2532,7 @@ export const authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
-       },
+        },
         {
           testname: "cloneCollectionAsCapped",
           command: {cloneCollectionAsCapped: "x", toCollection: "y", size: 1000},
@@ -6108,27 +6108,6 @@ export const authCommandsLib = {
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "_configsvrCommitRefineCollectionShardKey",
-          command: {
-            _configsvrCommitRefineCollectionShardKey: "test.x",
-            key: {aKey: 1},
-            newEpoch: new ObjectId(),
-            newTimestamp: Timestamp(),
-            oldTimestamp: Timestamp()
-          },
-          skipSharded: true,
-          testcases: [
-            {
-              runOnDb: adminDbName,
-              roles: {__system: 1},
-              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-              expectFail: true
-            },
-            {runOnDb: firstDbName, roles: {}},
-            {runOnDb: secondDbName, roles: {}}
           ]
         },
         {

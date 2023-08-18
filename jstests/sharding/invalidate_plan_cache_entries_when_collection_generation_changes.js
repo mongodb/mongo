@@ -93,10 +93,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     st.shard0.adminCommand(
         {_flushRoutingTableCacheUpdates: collA.getFullName(), syncFromConfig: true});
 
-    // TODO SERVER-79064: Remove once 8.0 becomes last LTS.
-    const isMultiversion = jsTest.options().shardMixedBinVersions ||
-        jsTest.options().useRandomBinVersionsWithinReplicaSet;
-    if (TestData.configShard && isMultiversion) {
+    if (TestData.configShard) {
         // Refining a shard key runs a "noop" find on the refined namespace, which runs locally on
         // the config server without a shard version, so it generates a plan key cache on collA that
         // is not cleared.

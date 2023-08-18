@@ -47,7 +47,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -101,12 +100,6 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto handleRecoverableCriticalSection = [this](auto opCtx) {
-                if (request().getClearFilteringMetadata().value_or(false)) {
-                    AutoGetCollection autoColl(opCtx, ns(), MODE_IX);
-                    auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                        opCtx, ns());
-                    csr->clearFilteringMetadata(opCtx);
-                }
                 const auto reason = request().getReason().get_value_or(
                     BSON("command"
                          << "ShardSvrParticipantBlockCommand"
