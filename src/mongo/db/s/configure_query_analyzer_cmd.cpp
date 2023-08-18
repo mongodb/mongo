@@ -112,8 +112,7 @@ public:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that
             // we are targeting the primary shard for this database.
-            _collDDLLock.emplace(
-                opCtx, nss, "configureQueryAnalyzer", MODE_X, DDLLockManager::kDefaultLockTimeout);
+            _collDDLLock.emplace(opCtx, nss, "configureQueryAnalyzer", MODE_X);
         } else {
             _autoColl.emplace(opCtx,
                               nss,

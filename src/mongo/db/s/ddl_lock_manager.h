@@ -55,25 +55,12 @@ class DDLLockManager {
      * ScopedBaseDDLLock will hold a DDL lock for the given resource without performing any check.
      */
     class ScopedBaseDDLLock {
-        ScopedBaseDDLLock(const ScopedBaseDDLLock&) = delete;
-        ScopedBaseDDLLock& operator=(const ScopedBaseDDLLock&) = delete;
-
-        ScopedBaseDDLLock(OperationContext* opCtx,
-                          Locker* locker,
-                          StringData resName,
-                          const ResourceId& resId,
-                          StringData reason,
-                          LockMode mode,
-                          Date_t deadline,
-                          bool waitForRecovery);
-
     public:
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
                           const NamespaceString& ns,
                           StringData reason,
                           LockMode mode,
-                          Date_t deadline,
                           bool waitForRecovery);
 
         ScopedBaseDDLLock(OperationContext* opCtx,
@@ -81,7 +68,6 @@ class DDLLockManager {
                           const DatabaseName& db,
                           StringData reason,
                           LockMode mode,
-                          Date_t deadline,
                           bool waitForRecovery);
 
         virtual ~ScopedBaseDDLLock();
@@ -96,6 +82,21 @@ class DDLLockManager {
         }
 
     protected:
+        ScopedBaseDDLLock(const ScopedBaseDDLLock&) = delete;
+        ScopedBaseDDLLock& operator=(const ScopedBaseDDLLock&) = delete;
+
+        ScopedBaseDDLLock(OperationContext* opCtx,
+                          Locker* locker,
+                          StringData resName,
+                          const ResourceId& resId,
+                          StringData reason,
+                          LockMode mode,
+                          bool waitForRecovery);
+
+        static const Minutes kDefaultLockTimeout;
+        static Milliseconds _getTimeout();
+
+        // Attributes
         const std::string _resourceName;
         const ResourceId _resourceId;
         const std::string _reason;
@@ -106,9 +107,6 @@ class DDLLockManager {
     };
 
 public:
-    // Default timeout which will be used if one is not passed to the lock method.
-    static const Minutes kDefaultLockTimeout;
-
     // Timeout value, which specifies that if the lock is not available immediately, no attempt
     // should be made to wait for it to become free.
     static const Milliseconds kSingleLockAttemptTimeout;
@@ -122,13 +120,11 @@ public:
          * @db      Database to lock.
          * @reason 	Reason for which the lock is being acquired (e.g. 'createCollection').
          * @mode    Lock mode.
-         * @timeout Time after which this acquisition attempt will give up in case of lock
-         * contention. A timeout value of -1 means the acquisition will be retried forever.
          *
          * Throws:
          *     ErrorCodes::LockBusy in case the timeout is reached.
-         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
-         *         is reached.
+         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and the internal
+         *            timeout is reached.
          *     ErrorCategory::Interruption in case the operation context is interrupted.
          *     ErrorCodes::IllegalOperation in case of not being on the db primary shard.
          *
@@ -138,8 +134,7 @@ public:
         ScopedDatabaseDDLLock(OperationContext* opCtx,
                               const DatabaseName& db,
                               StringData reason,
-                              LockMode mode,
-                              Milliseconds timeout = kDefaultLockTimeout);
+                              LockMode mode);
     };
 
     // RAII-style class to acquire a DDL lock on the given collection. The database DDL lock will
@@ -152,13 +147,11 @@ public:
          * @ns      Collection to lock.
          * @reason 	Reason for which the lock is being acquired (e.g. 'createCollection').
          * @mode    Lock mode.
-         * @timeout Time after which this acquisition attempt will give up in case of lock
-         * contention. A timeout value of -1 means the acquisition will be retried forever.
          *
          * Throws:
          *     ErrorCodes::LockBusy in case the timeout is reached.
-         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
-         *         is reached.
+         *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and the internal
+         *            timeout is reached.
          *     ErrorCategory::Interruption in case the operation context is interrupted.
          *     ErrorCodes::IllegalOperation in case of not being on the db primary shard.
          *
@@ -168,8 +161,7 @@ public:
         ScopedCollectionDDLLock(OperationContext* opCtx,
                                 const NamespaceString& ns,
                                 StringData reason,
-                                LockMode mode,
-                                Milliseconds timeout = kDefaultLockTimeout);
+                                LockMode mode);
 
     private:
         // Make sure _dbLock is instantiated before _collLock to don't break the hierarchy locking
@@ -236,16 +228,17 @@ protected:
     // that moment.
     stdx::unordered_map<ResourceId, int32_t> _numHoldersPerResource;
 
-    /*
+    /**
      * Register/Unregister a resourceName into the ResourceCatalog for debuggability purposes.
      */
     void _registerResourceName(WithLock lk, ResourceId resId, StringData resName);
     void _unregisterResourceNameIfNoLongerNeeded(WithLock lk, ResourceId resId, StringData resName);
 
-    friend class ShardingDDLCoordinatorService;
-    friend class ShardingDDLCoordinator;
-    friend class ShardingDDLCoordinatorServiceTest;
+
     friend class ShardingCatalogManager;
+    friend class ShardingDDLCoordinator;
+    friend class ShardingDDLCoordinatorService;
+    friend class ShardingDDLCoordinatorServiceTest;
 };
 
 }  // namespace mongo

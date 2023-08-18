@@ -181,23 +181,10 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     DropIndexes dropIdxCmd(ns());
     dropIdxCmd.setDropIndexesRequest(request().getDropIndexesRequest());
 
-    const auto lockTimeout = [&]() -> Milliseconds {
-        if (auto sfp = globalFailPointRegistry().find("overrideDDLLockTimeout")->scoped();
-            MONGO_unlikely(sfp.isActive())) {
-            if (auto timeoutElem = sfp.getData()["timeoutMillisecs"]; timeoutElem.ok()) {
-                const auto timeoutMillisecs = Milliseconds(timeoutElem.safeNumberLong());
-                LOGV2(649100, "Overriding DDL lock timeout", "timeout"_attr = timeoutMillisecs);
-                return timeoutMillisecs;
-            }
-        }
-        return DDLLockManager::kDefaultLockTimeout;
-    }();
-
     // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that we are
     // targeting the primary shard for this database.
     static constexpr StringData lockReason{"dropIndexes"_sd};
-    const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
-        opCtx, ns(), lockReason, MODE_X, lockTimeout};
+    const DDLLockManager::ScopedCollectionDDLLock collDDLLock{opCtx, ns(), lockReason, MODE_X};
 
     auto resolvedNs = ns();
     auto dropIdxBSON = dropIdxCmd.toBSON({});
@@ -215,7 +202,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
         // If it is a timeseries collection, we actually need to acquire the bucket namespace DDL
         // lock
-        timeseriesCollDDLLock.emplace(opCtx, resolvedNs, lockReason, MODE_X, lockTimeout);
+        timeseriesCollDDLLock.emplace(opCtx, resolvedNs, lockReason, MODE_X);
     }
 
     StaleConfigRetryState retryState;

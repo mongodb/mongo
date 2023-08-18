@@ -140,15 +140,15 @@ protected:
         const NamespaceString& ns,
         StringData reason,
         LockMode mode,
-        Milliseconds timeout,
+        int32_t timeoutMillisecs,
         bool waitForRecovery = true) {
 
-        const Date_t deadline = Date_t::now() + timeout;
+        FailPointEnableBlock fp("overrideDDLLockTimeout",
+                                BSON("timeoutMillisecs" << timeoutMillisecs));
         return std::make_pair(
             ScopedBaseDDLLock{
-                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, deadline, waitForRecovery},
-            ScopedBaseDDLLock{
-                opCtx, opCtx->lockState(), ns, reason, mode, deadline, waitForRecovery});
+                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, waitForRecovery},
+            ScopedBaseDDLLock{opCtx, opCtx->lockState(), ns, reason, mode, waitForRecovery});
     }
 
     /**
@@ -160,9 +160,9 @@ protected:
                                                       const NamespaceString& ns,
                                                       StringData reason,
                                                       LockMode mode,
-                                                      Milliseconds timeout) {
+                                                      int32_t timeoutMillisecs) {
         return acquireDbAndCollDDLLocks(
-            opCtx, ns, reason, mode, timeout, false /*waitForRecovery*/);
+            opCtx, ns, reason, mode, timeoutMillisecs, false /*waitForRecovery*/);
     }
 
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
@@ -201,12 +201,12 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
         ErrorCodes::LockTimeout);
 
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()));
+        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 
     // 2- Stepping up and pausing on Recovery state
     // Only DDL coordinators can acquire DDL locks during recovery, otherwise trying to acquire a
@@ -218,11 +218,11 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
         ErrorCodes::LockTimeout);
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()));
+        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 
     // 3- Ending Recovery and enter on Recovered state
     // Once ShardingDDLCoordinatorService is recovered, anyone can aquire a DDL lock
@@ -230,9 +230,9 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     ddlService()->waitForRecoveryCompletion(opCtx.get());
 
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()));
+        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 }
 
 TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
@@ -247,7 +247,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, Milliseconds::zero()),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
         DBException,
         ErrorCodes::LockTimeout);
 
@@ -268,7 +268,8 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
         pauseOnRecoveryFailPoint->setMode(FailPoint::off);
     });
 
-    ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, Seconds(1)));
+    ASSERT_DOES_NOT_THROW(
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 1000 /*timeoutMillisec*/));
 
     // Lock should be acquired after step up conclusion
     ASSERT(stepUpFuture.isReady());

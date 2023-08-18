@@ -274,11 +274,7 @@ public:
 
             // Take a DDL lock on the database
             const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                opCtx,
-                nss.dbName(),
-                "checkMetadataConsistency",
-                MODE_S,
-                DDLLockManager::kDefaultLockTimeout};
+                opCtx, nss.dbName(), "checkMetadataConsistency", MODE_S};
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

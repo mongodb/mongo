@@ -59,6 +59,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
+MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
 
 namespace mongo {
 namespace {
@@ -67,7 +68,7 @@ const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockMa
 
 }  // namespace
 
-const Minutes DDLLockManager::kDefaultLockTimeout(5);
+const Minutes DDLLockManager::ScopedBaseDDLLock::kDefaultLockTimeout(5);
 const Milliseconds DDLLockManager::kSingleLockAttemptTimeout(0);
 
 DDLLockManager* DDLLockManager::get(ServiceContext* service) {
@@ -192,18 +193,13 @@ void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(WithLock lk,
     }
 }
 
+
 DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* opCtx,
                                                              const DatabaseName& db,
                                                              StringData reason,
-                                                             LockMode mode,
-                                                             Milliseconds timeout)
-    : DDLLockManager::ScopedBaseDDLLock(opCtx,
-                                        opCtx->lockState(),
-                                        db,
-                                        reason,
-                                        mode,
-                                        Date_t::now() + timeout,
-                                        true /*waitForRecovery*/) {
+                                                             LockMode mode)
+    : DDLLockManager::ScopedBaseDDLLock(
+          opCtx, opCtx->lockState(), db, reason, mode, true /*waitForRecovery*/) {
 
     // Check under the DDL dbLock if this is the primary shard for the database
     DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, db);
@@ -212,25 +208,20 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* o
 DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContext* opCtx,
                                                                  const NamespaceString& ns,
                                                                  StringData reason,
-                                                                 LockMode mode,
-                                                                 Milliseconds timeout) {
-    const Date_t deadline = Date_t::now() + timeout;
-
+                                                                 LockMode mode) {
     // Acquire implicitly the db DDL lock
     _dbLock.emplace(opCtx,
                     opCtx->lockState(),
                     ns.dbName(),
                     reason,
                     isSharedLockMode(mode) ? MODE_IS : MODE_IX,
-                    deadline,
                     true /*waitForRecovery*/);
 
     // Check under the DDL db lock if this is the primary shard for the database
     DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns.dbName());
 
     // Finally, acquire the collection DDL lock
-    _collLock.emplace(
-        opCtx, opCtx->lockState(), ns, reason, mode, deadline, true /*waitForRecovery*/);
+    _collLock.emplace(opCtx, opCtx->lockState(), ns, reason, mode, true /*waitForRecovery*/);
 }
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
@@ -239,7 +230,6 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      const ResourceId& resId,
                                                      StringData reason,
                                                      LockMode mode,
-                                                     Date_t deadline,
                                                      bool waitForRecovery)
     : _resourceName(resName.toString()),
       _resourceId(resId),
@@ -250,8 +240,14 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
       _lockManager(DDLLockManager::get(opCtx)) {
 
     invariant(_lockManager);
-    _lockManager->_lock(
-        opCtx, _locker, _resourceName, _resourceId, _reason, _mode, deadline, waitForRecovery);
+    _lockManager->_lock(opCtx,
+                        _locker,
+                        _resourceName,
+                        _resourceId,
+                        _reason,
+                        _mode,
+                        Date_t::now() + _getTimeout(),
+                        waitForRecovery);
     _result = LockResult::LOCK_OK;
 }
 
@@ -260,7 +256,6 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      const NamespaceString& ns,
                                                      StringData reason,
                                                      LockMode mode,
-                                                     Date_t deadline,
                                                      bool waitForRecovery)
     : ScopedBaseDDLLock(opCtx,
                         locker,
@@ -268,7 +263,6 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                         ResourceId{RESOURCE_DDL_COLLECTION, NamespaceStringUtil::serialize(ns)},
                         reason,
                         mode,
-                        deadline,
                         waitForRecovery) {}
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
@@ -276,7 +270,6 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      const DatabaseName& db,
                                                      StringData reason,
                                                      LockMode mode,
-                                                     Date_t deadline,
                                                      bool waitForRecovery)
     : ScopedBaseDDLLock(opCtx,
                         locker,
@@ -284,7 +277,6 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                         ResourceId{RESOURCE_DDL_DATABASE, DatabaseNameUtil::serialize(db)},
                         reason,
                         mode,
-                        deadline,
                         waitForRecovery) {}
 
 DDLLockManager::ScopedBaseDDLLock::~ScopedBaseDDLLock() {
@@ -303,6 +295,17 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(ScopedBaseDDLLock&& other)
       _lockManager(other._lockManager) {
     other._locker = nullptr;
     other._lockManager = nullptr;
+}
+
+Milliseconds DDLLockManager::ScopedBaseDDLLock::_getTimeout() {
+    if (auto sfp = overrideDDLLockTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
+        if (auto timeoutElem = sfp.getData()["timeoutMillisecs"]; timeoutElem.ok()) {
+            const auto timeoutMillisecs = Milliseconds(timeoutElem.safeNumberLong());
+            LOGV2(6320700, "Overriding DDL lock timeout", "timeout"_attr = timeoutMillisecs);
+            return timeoutMillisecs;
+        }
+    }
+    return kDefaultLockTimeout;
 }
 
 }  // namespace mongo
