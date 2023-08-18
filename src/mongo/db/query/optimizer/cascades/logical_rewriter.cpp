@@ -55,6 +55,7 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_cnf_dnf_convert.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
@@ -435,8 +436,7 @@ struct SubstituteReorder<SargableNode, SargableNode> {
                     ABT::reference_type belowNode,
                     RewriteContext& ctx) const {
         auto isSingletonDisjunction = [](const ABT::reference_type& node) {
-            return PSRExpr::isSingletonDisjunction(
-                node.cast<SargableNode>()->getReqMap().getRoot());
+            return PSRExpr::isSingletonDisjunction(node.cast<SargableNode>()->getReqMap());
         };
         // Prefer to keep conjunction-only PSRs closer to the scan, because (at time of writing)
         // those are the only ones that we merge together.
@@ -601,7 +601,7 @@ static boost::optional<ABT> mergeSargableNodes(
         return {};
     }
 
-    PartialSchemaRequirements mergedReqs = belowNode.getReqMap();
+    PSRExpr::Node mergedReqs = belowNode.getReqMap();
     if (!intersectPartialSchemaReq(mergedReqs, aboveNode.getReqMap())) {
         return {};
     }
@@ -618,7 +618,7 @@ static boost::optional<ABT> mergeSargableNodes(
         return createEmptyValueScanNode(ctx);
     }
 
-    if (PSRExpr::numLeaves(mergedReqs.getRoot()) > SargableNode::kMaxPartialSchemaReqs) {
+    if (PSRExpr::numLeaves(mergedReqs) > SargableNode::kMaxPartialSchemaReqs) {
         return {};
     }
 
@@ -704,17 +704,16 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    // Remove any partial schema requirements which do not constrain their input.
-
-    conversion->_reqMap.simplify([](const PartialSchemaKey& key, PartialSchemaRequirement& req) {
-        uassert(6624111,
-                "Filter partial schema requirement must contain a variable name.",
-                key._projectionName);
-        uassert(6624112,
-                "Filter partial schema requirement cannot bind.",
-                !req.getBoundProjectionName());
-        return true;
-    });
+    PSRExpr::visitDNF(conversion->_reqMap,
+                      [](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& /*ctx*/) {
+                          const auto& [key, req] = entry;
+                          uassert(6624111,
+                                  "Filter partial schema requirement must contain a variable name.",
+                                  key._projectionName);
+                          uassert(6624112,
+                                  "Filter partial schema requirement cannot bind.",
+                                  !req.getBoundProjectionName());
+                      });
 
     ProjectionRenames projectionRenames_unused;
     const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
@@ -731,11 +730,11 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         addEmptyValueScanNode(ctx);
         return;
     }
-    if (PSRExpr::numLeaves(conversion->_reqMap.getRoot()) > SargableNode::kMaxPartialSchemaReqs) {
+    if (PSRExpr::numLeaves(conversion->_reqMap) > SargableNode::kMaxPartialSchemaReqs) {
         // Too many requirements.
         return;
     }
-    if (conversion->_reqMap.isNoop()) {
+    if (psr::isNoop(conversion->_reqMap)) {
         // If the filter has no constraints after removing no-ops, then replace with its child. We
         // need to copy the child since we hold it by reference from the memo, and during
         // subtitution the current group will be erased.
@@ -1206,26 +1205,25 @@ struct SubstituteConvert<EvaluationNode> {
         uassert(6624165,
                 "Should not be getting retainPredicate set for EvalNodes",
                 !conversion->_retainPredicate);
-        if (PSRExpr::numLeaves(conversion->_reqMap.getRoot()) != 1) {
+        if (PSRExpr::numLeaves(conversion->_reqMap) != 1) {
             // For evaluation nodes we expect to create a single entry.
             return;
         }
 
-        PSRExpr::visitDNF(conversion->_reqMap.getRoot(),
-                          [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
-                              auto& [key, req] = entry;
-                              req = {evalNode.getProjectionName(),
-                                     std::move(req.getIntervals()),
-                                     req.getIsPerfOnly()};
+        PSRExpr::visitDNF(
+            conversion->_reqMap, [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
+                auto& [key, req] = entry;
+                req = {evalNode.getProjectionName(),
+                       std::move(req.getIntervals()),
+                       req.getIsPerfOnly()};
 
-                              uassert(
-                                  6624114,
-                                  "Eval partial schema requirement must contain a variable name.",
-                                  key._projectionName);
-                              uassert(6624115,
-                                      "Eval partial schema requirement cannot have a range",
-                                      isIntervalReqFullyOpenDNF(req.getIntervals()));
-                          });
+                uassert(6624114,
+                        "Eval partial schema requirement must contain a variable name.",
+                        key._projectionName);
+                uassert(6624115,
+                        "Eval partial schema requirement cannot have a range",
+                        isIntervalReqFullyOpenDNF(req.getIntervals()));
+            });
 
         ProjectionRenames projectionRenames_unused;
         const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
@@ -1262,7 +1260,7 @@ static void lowerSargableNode(const SargableNode& node, RewriteContext& ctx) {
     lowerPartialSchemaRequirements(boost::none /*scanGroupCE*/,
                                    boost::none /*baseCE*/,
                                    {} /*indexPredSels*/,
-                                   createResidualReqsWithEmptyCE(reqMap.getRoot()),
+                                   createResidualReqsWithEmptyCE(reqMap),
                                    ctx.getPathToInterval(),
                                    builder);
     ctx.addNode(builder._node, true /*substitute*/);
@@ -1344,10 +1342,6 @@ struct SplitRequirementsFetchTransport {
                                                             : req.getIntervals();
 
         if (outputBinding || !isIntervalReqFullyOpenDNF(intervals)) {
-            builder.atom(key,
-                         PartialSchemaRequirement{
-                             std::move(outputBinding), std::move(intervals), false /*isPerfOnly*/});
-
             if (left && indexFieldPrefixMap) {
                 if (auto pathPtr = key._path.cast<PathGet>();
                     pathPtr != nullptr && indexFieldPrefixMap->count(pathPtr->name()) == 0) {
@@ -1355,11 +1349,16 @@ struct SplitRequirementsFetchTransport {
                     // index.
                     hasFieldCoverage = false;
                 }
+            } else {
+                // The whole predicate/projection is trivial and its indexability doesn't
+                // matter.
             }
-        } else {
-            // The whole predicate/projection is trivial and its indexability doesn't
-            // matter.
         }
+
+        // Always add atom (even if trivially true). Builder will remove it as needed.
+        builder.atom(key,
+                     PartialSchemaRequirement{
+                         std::move(outputBinding), std::move(intervals), false /*isPerfOnly*/});
     }
 
     const bool left;
@@ -1395,8 +1394,8 @@ static SplitRequirementsResult splitRequirementsFetch(
     const std::vector<RequirementProps>& reqProps,
     const boost::optional<FieldNameSet>& indexFieldPrefixMap,
     const PSRExpr::Node& reqs) {
-
-    SplitRequirementsResult result;
+    // Builder left and right sides in CNF.
+    SplitRequirementsResult result{{{._isDNF = false}}, {{._isDNF = false}}};
     result._leftReqsBuilder.pushConj();
     result._rightReqsBuilder.pushConj();
 
@@ -1467,7 +1466,7 @@ static SplitRequirementsResult splitRequirementsFetch(
 static SplitRequirementsResult splitRequirementsIndex(const size_t mask,
                                                       const PSRExpr::Node& reqs,
                                                       const bool disjunctive) {
-    SplitRequirementsResult result;
+    SplitRequirementsResult result{{{._isDNF = disjunctive}}, {{._isDNF = disjunctive}}};
     PSRExprBuilder& leftReqs = result._leftReqsBuilder;
     PSRExprBuilder& rightReqs = result._rightReqsBuilder;
 
@@ -1579,8 +1578,8 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
                                               RewriteContext& ctx
 
 ) {
-    PSRExprBuilder leftReqsBuilder;
-    PSRExprBuilder rightReqsBuilder;
+    PSRExprBuilder leftReqsBuilder{{._isDNF = false}};
+    PSRExprBuilder rightReqsBuilder{{._isDNF = false}};
     leftReqsBuilder.pushConj();
     rightReqsBuilder.pushConj();
 
@@ -1614,16 +1613,18 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
     auto leftReqExpr = leftReqsBuilder.finish();
     auto rightReqExpr = rightReqsBuilder.finish();
     // Convert everything back to DNF.
-    leftReqExpr = PSRExpr::convertToDNF(std::move(*leftReqExpr));
+    leftReqExpr = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(std::move(*leftReqExpr),
+                                                                   {{._isDNF = true}});
     if (!leftReqExpr) {
         return;
     }
-    rightReqExpr = PSRExpr::convertToDNF(std::move(*rightReqExpr));
+    rightReqExpr = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(std::move(*rightReqExpr),
+                                                                    {{._isDNF = true}});
     if (!rightReqExpr) {
         return;
     }
-    PartialSchemaRequirements leftReqs{std::move(*leftReqExpr)};
-    PartialSchemaRequirements rightReqs{std::move(*rightReqExpr)};
+    PSRExpr::Node leftReqs{std::move(*leftReqExpr)};
+    PSRExpr::Node rightReqs{std::move(*rightReqExpr)};
     auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                         scanProjectionName,
                                                         leftReqs,
@@ -1712,12 +1713,13 @@ struct ExploreConvert<SargableNode> {
         // - CNF if we want a conjunctive split.
         boost::optional<PSRExpr::Node> splittable;
         {
-            const auto& reqMap = sargableNode.getReqMap().getRoot();
+            const auto& reqMap = sargableNode.getReqMap();
             if (isIndex) {
                 // When targeting an index, do a disjunctive split if possible.
                 if (PSRExpr::isSingletonDisjunction(reqMap)) {
                     // Trivial disjunction means we can only do a conjunctive split.
-                    splittable = PSRExpr::convertToCNF(reqMap, SargableNode::kMaxPartialSchemaReqs);
+                    splittable = convertToCNF<PartialSchemaEntry, PSRExprBuilder>(
+                        reqMap, {{._isDNF = false}}, SargableNode::kMaxPartialSchemaReqs);
                     tassert(6902602,
                             "converting DNF with only trivial disjunction to CNF should never fail",
                             splittable);
@@ -1730,7 +1732,8 @@ struct ExploreConvert<SargableNode> {
                 // to avoid redundant fetching.
 
                 // Index/fetch is a conjunctive split.
-                splittable = PSRExpr::convertToCNF(reqMap);
+                splittable =
+                    convertToCNF<PartialSchemaEntry, PSRExprBuilder>(reqMap, {{._isDNF = false}});
             }
         }
         if (!splittable) {
@@ -1799,49 +1802,52 @@ struct ExploreConvert<SargableNode> {
                 // Reject rewrite. No suitable indexes.
                 continue;
             }
-            auto leftReqExpr = splitResult._leftReqsBuilder.finish();
-            auto rightReqExpr = splitResult._rightReqsBuilder.finish();
+            auto leftReqs = *splitResult._leftReqsBuilder.finish();
+            auto rightReqs = *splitResult._rightReqsBuilder.finish();
+            tassert(6624264,
+                    "Unexpected always-false result for left requirements",
+                    !psr::isAlwaysFalse(leftReqs));
+            tassert(6624265,
+                    "Unexpected always-false result for right requirements",
+                    !psr::isAlwaysFalse(rightReqs));
 
-            if (!leftReqExpr) {
+            if (psr::isNoop(leftReqs)) {
                 // Can happen if we have intervals containing null.
                 invariant(!hints._fastIndexNullHandling && !isIndex);
                 continue;
             }
             // Convert everything back to DNF.
-            if (!PSRExpr::isDNF(*leftReqExpr)) {
-                leftReqExpr = PSRExpr::convertToDNF(std::move(*leftReqExpr));
-                if (!leftReqExpr) {
+            if (!PSRExpr::isDNF(leftReqs)) {
+                auto conversion = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(
+                    std::move(leftReqs), {{._isDNF = true}});
+                if (!conversion) {
                     continue;
                 }
+                leftReqs = std::move(*conversion);
             }
-            if (rightReqExpr && !PSRExpr::isDNF(*rightReqExpr)) {
-                rightReqExpr = PSRExpr::convertToDNF(std::move(*rightReqExpr));
-                if (!rightReqExpr) {
+            if (!PSRExpr::isDNF(rightReqs)) {
+                auto conversion = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(
+                    std::move(rightReqs), {{._isDNF = true}});
+                if (!conversion) {
                     continue;
                 }
-            }
-            boost::optional<PartialSchemaRequirements> leftReqs;
-            if (leftReqExpr) {
-                leftReqs.emplace(std::move(*leftReqExpr));
-            }
-            boost::optional<PartialSchemaRequirements> rightReqs;
-            if (rightReqExpr) {
-                rightReqs.emplace(std::move(*rightReqExpr));
+                rightReqs = std::move(*conversion);
             }
 
             // DNF / CNF conversions can create redundant predicates; try to simplify.
             // If the reqs are too big, even after simplification, creating a SargableNode will
             // fail, so bail out.
-            const auto isTooBig = [&](const PSRExpr::Node& reqs) -> bool {
-                return PSRExpr::numLeaves(reqs) > SargableNode::kMaxPartialSchemaReqs;
-            };
-            if (leftReqs) {
-                PartialSchemaRequirements::simplifyRedundantDNF(leftReqs->getRoot());
+            const auto simplifyFn = [&](PSRExpr::Node& reqs) {
+                if (psr::isNoop(reqs)) {
+                    return true;
+                }
+
+                psr::simplifyRedundantDNF(reqs);
                 ProjectionRenames renames;
                 const bool hasEmptyInterval =
                     simplifyPartialSchemaReqPaths(scanProjectionName,
                                                   scanDef.getMultikeynessTrie(),
-                                                  *leftReqs,
+                                                  reqs,
                                                   renames,
                                                   ctx.getConstFold(),
                                                   ctx.getPathToInterval());
@@ -1849,35 +1855,22 @@ struct ExploreConvert<SargableNode> {
                         "Did not expect projection renames from CNF -> DNF conversion",
                         renames.empty());
                 if (hasEmptyInterval) {
-                    continue;
+                    return false;
                 }
-                if (isTooBig(leftReqs->getRoot())) {
-                    continue;
+                if (PSRExpr::numLeaves(reqs) > SargableNode::kMaxPartialSchemaReqs) {
+                    return false;
                 }
+                return true;
+            };
+            if (!simplifyFn(leftReqs)) {
+                continue;
             }
-            if (rightReqs) {
-                PartialSchemaRequirements::simplifyRedundantDNF(rightReqs->getRoot());
-                ProjectionRenames renames;
-                const bool hasEmptyInterval =
-                    simplifyPartialSchemaReqPaths(scanProjectionName,
-                                                  scanDef.getMultikeynessTrie(),
-                                                  *rightReqs,
-                                                  renames,
-                                                  ctx.getConstFold(),
-                                                  ctx.getPathToInterval());
-                tassert(6902604,
-                        "Did not expect projection renames from CNF -> DNF conversion",
-                        renames.empty());
-                if (hasEmptyInterval) {
-                    continue;
-                }
-                if (isTooBig(rightReqs->getRoot())) {
-                    continue;
-                }
+            if (!simplifyFn(rightReqs)) {
+                continue;
             }
 
-            const bool hasLeftintervals = hasProperIntervals(leftReqs->getRoot());
-            const bool hasRightIntervals = rightReqs && hasProperIntervals(rightReqs->getRoot());
+            const bool hasLeftintervals = hasProperIntervals(leftReqs);
+            const bool hasRightIntervals = !psr::isNoop(rightReqs) && hasProperIntervals(rightReqs);
             if (isIndex) {
                 if (!hasLeftintervals || !hasRightIntervals) {
                     // Reject. Must have at least one proper interval on either side.
@@ -1890,23 +1883,23 @@ struct ExploreConvert<SargableNode> {
 
             auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                 scanProjectionName,
-                                                                *leftReqs,
+                                                                leftReqs,
                                                                 scanDef,
                                                                 hints,
                                                                 ctx.getConstFold(),
                                                                 isIndex);
             if (isIndex && leftCandidateIndexes.empty() &&
-                PSRExpr::isSingletonDisjunction(leftReqs->getRoot())) {
+                PSRExpr::isSingletonDisjunction(leftReqs)) {
                 // Reject rewrite, because further splitting can only be conjunctive,
                 // which does not increase the set of candidate indexes.
                 continue;
             }
 
             CandidateIndexes rightCandidateIndexes;
-            if (rightReqs) {
+            if (!psr::isNoop(rightReqs)) {
                 rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
                                                                 scanProjectionName,
-                                                                *rightReqs,
+                                                                rightReqs,
                                                                 scanDef,
                                                                 hints,
                                                                 ctx.getConstFold(),
@@ -1914,32 +1907,32 @@ struct ExploreConvert<SargableNode> {
             }
 
             if (isIndex && rightCandidateIndexes.empty() &&
-                PSRExpr::isSingletonDisjunction(rightReqs->getRoot())) {
+                PSRExpr::isSingletonDisjunction(rightReqs)) {
                 // Reject rewrite, because further splitting can only be conjunctive,
                 // which does not increase the set of candidate indexes.
                 continue;
             }
 
             ABT scanDelegator = make<MemoLogicalDelegatorNode>(scanGroupId);
-            ABT leftChild = make<SargableNode>(std::move(*leftReqs),
+            ABT leftChild = make<SargableNode>(std::move(leftReqs),
                                                std::move(leftCandidateIndexes),
                                                boost::none,
                                                IndexReqTarget::Index,
                                                scanDelegator);
 
             boost::optional<ScanParams> rightScanParams;
-            if (rightReqs) {
+            if (!psr::isNoop(rightReqs)) {
                 rightScanParams =
-                    computeScanParams(ctx.getPrefixId(), *rightReqs, scanProjectionName);
+                    computeScanParams(ctx.getPrefixId(), rightReqs, scanProjectionName);
             }
 
-            ABT rightChild = rightReqs
-                ? make<SargableNode>(std::move(*rightReqs),
+            ABT rightChild = psr::isNoop(rightReqs)
+                ? scanDelegator
+                : make<SargableNode>(std::move(rightReqs),
                                      std::move(rightCandidateIndexes),
                                      std::move(rightScanParams),
                                      isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
-                                     scanDelegator)
-                : scanDelegator;
+                                     scanDelegator);
 
             ABT newRoot = disjunctive ? make<RIDUnionNode>(scanProjectionName,
                                                            ProjectionNameVector{scanProjectionName},

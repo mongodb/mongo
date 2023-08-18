@@ -145,14 +145,14 @@ public:
     IndexDefinition(IndexCollationSpec collationSpec,
                     bool isMultiKey,
                     DistributionAndPaths distributionAndPaths,
-                    PartialSchemaRequirements partialReqMap);
+                    PSRExpr::Node partialReqMap);
 
     IndexDefinition(IndexCollationSpec collationSpec,
                     int64_t version,
                     uint32_t orderingBits,
                     bool isMultiKey,
                     DistributionAndPaths distributionAndPaths,
-                    PartialSchemaRequirements partialReqMap);
+                    PSRExpr::Node partialReqMap);
 
     const IndexCollationSpec& getCollationSpec() const;
 
@@ -162,8 +162,8 @@ public:
 
     const DistributionAndPaths& getDistributionAndPaths() const;
 
-    const PartialSchemaRequirements& getPartialReqMap() const;
-    PartialSchemaRequirements& getPartialReqMap();
+    const PSRExpr::Node& getPartialReqMap() const;
+    PSRExpr::Node& getPartialReqMap();
 
 private:
     const IndexCollationSpec _collationSpec;
@@ -175,7 +175,7 @@ private:
     const DistributionAndPaths _distributionAndPaths;
 
     // Requirements map for partial filter expression. May be trivially true.
-    PartialSchemaRequirements _partialReqMap;
+    PSRExpr::Node _partialReqMap;
 };
 
 using IndexDefinitions = opt::unordered_map<std::string, IndexDefinition>;

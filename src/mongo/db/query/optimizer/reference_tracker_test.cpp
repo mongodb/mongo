@@ -238,7 +238,7 @@ TEST(ReferenceTrackerTest, GetDefinitionsForRIDUnion) {
              .atom({{scanProjectionName, make<PathGet>("b", make<PathIdentity>())},
                     {boost::none /*boundProjectionName*/, interval, false /*isPerfOnly*/}})
              .finish();
-    PartialSchemaRequirements leftReqs(std::move(leftNode));
+    PSRExpr::Node leftReqs(std::move(leftNode));
     ABT leftChild = make<SargableNode>(std::move(leftReqs),
                                        std::vector<CandidateIndexEntry>{} /*candidateIndexes*/,
                                        boost::none /*scanParams*/,
@@ -253,7 +253,7 @@ TEST(ReferenceTrackerTest, GetDefinitionsForRIDUnion) {
              .atom({{scanProjectionName, make<PathGet>("b", make<PathIdentity>())},
                     {ProjectionName{"pRightOnly"}, interval, false /*isPerfOnly*/}})
              .finish();
-    PartialSchemaRequirements rightReqs(std::move(rightNode));
+    PSRExpr::Node rightReqs(std::move(rightNode));
     ABT rightChild = make<SargableNode>(std::move(rightReqs),
                                         std::vector<CandidateIndexEntry>{} /*candidateIndexes*/,
                                         boost::none /*scanParams*/,

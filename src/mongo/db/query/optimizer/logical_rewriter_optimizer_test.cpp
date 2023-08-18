@@ -1344,9 +1344,7 @@ TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
                    IndexDefinition{// collation
                                    {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
                                      CollationOp::Ascending}},
-                                   false /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -1399,9 +1397,7 @@ TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
                    IndexDefinition{// collation
                                    {{makeIndexPath(FieldPathType{"a", "b"}, true /*isMultiKey*/),
                                      CollationOp::Ascending}},
-                                   true /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   true /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -1839,9 +1835,7 @@ TEST(LogicalRewriter, PlanSimpliificationWithArrayTraversalLambdaAndInequalityEx
                    IndexDefinition{// collation
                                    {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
                                      CollationOp::Ascending}},
-                                   false /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -1882,9 +1876,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
                    IndexDefinition{// collation
                                    {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
                                      CollationOp::Ascending}},
-                                   false /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -1948,9 +1940,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
                                                        PathTraverse::kSingleLevel,
                                                        make<PathGet>("b", make<PathIdentity>()))),
                                      CollationOp::Ascending}},
-                                   false /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -2223,9 +2213,7 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
                    IndexDefinition{// collation
                                    {{makeIndexPath(FieldPathType{"a", "b"}, false /*isMultiKey*/),
                                      CollationOp::Ascending}},
-                                   false /*isMultiKey*/,
-                                   {DistributionType::Centralized},
-                                   {} /*partialReqMap*/}}})},
+                                   false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -2291,9 +2279,7 @@ TEST(LogicalRewriter, TraverseComposeMTraverse) {
                                                      // 'a' is multikey, but 'a.b' is non-multikey.
                                                      make<PathGet>("b", make<PathIdentity>()))),
                                    CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {} /*partialReqMap*/}}})},
+                                 false /*isMultiKey*/}}})},
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
@@ -2434,9 +2420,7 @@ TEST(LogicalRewriter, UnboundCandidateIndexInSingleIndexScan) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {}}}})}}},
+                                 false /*isMultiKey*/}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -2533,15 +2517,11 @@ TEST(LogicalRewriter, DiscardUnboundCandidateIndexInMultiIndexScan) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {}}},
+                                 false /*isMultiKey*/}},
                 {"index2",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a1"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b1"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {}}}})}}},
+                                 false /*isMultiKey*/}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -2584,9 +2564,7 @@ TEST(LogicalRewriter, SargableNodeRIN) {
                                   {makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("e"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {}}}})}}},
+                                 false /*isMultiKey*/}}})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -2610,7 +2588,7 @@ TEST(LogicalRewriter, SargableNodeRIN) {
         "     ^ \n"
         "        {root, 'PathGet [e] PathIdentity []', {{{=Const [3]}}}}\n"
         "    }}\n",
-        ExplainGenerator::explainPartialSchemaReqMap(node.getReqMap()));
+        ExplainGenerator::explainPartialSchemaReqExpr(node.getReqMap()));
 
     const auto& ci = node.getCandidateIndexes();
 

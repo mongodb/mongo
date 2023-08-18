@@ -129,6 +129,12 @@ struct BoolExpr {
             makeSeq(make<Conjunction>(makeSeq(make<Atom>(T{std::forward<Args>(args)...})))));
     }
 
+    template <typename... Args>
+    static Node makeSingularCNF(Args&&... args) {
+        return make<Conjunction>(
+            makeSeq(make<Disjunction>(makeSeq(make<Atom>(T{std::forward<Args>(args)...})))));
+    }
+
     static boost::optional<const T&> getSingularDNF(const Node& n) {
         if (auto disjunction = n.template cast<Disjunction>();
             disjunction != nullptr && disjunction->nodes().size() == 1) {
@@ -143,8 +149,26 @@ struct BoolExpr {
         return {};
     }
 
+    static boost::optional<const T&> getSingularCNF(const Node& n) {
+        if (auto disjunction = n.template cast<Conjunction>();
+            disjunction != nullptr && disjunction->nodes().size() == 1) {
+            if (auto conjunction = disjunction->nodes().front().template cast<Disjunction>();
+                conjunction != nullptr && conjunction->nodes().size() == 1) {
+                if (auto atom = conjunction->nodes().front().template cast<Atom>();
+                    atom != nullptr) {
+                    return {atom->getExpr()};
+                }
+            }
+        }
+        return {};
+    }
+
     static bool isSingularDNF(const Node& n) {
         return getSingularDNF(n).has_value();
+    }
+
+    static bool isSingularCNF(const Node& n) {
+        return getSingularCNF(n).has_value();
     }
 
     /**
@@ -336,23 +360,25 @@ struct BoolExpr {
     }
 
     /**
-     * Converts a BoolExpr to DNF. Assumes 'n' is in CNF. Returns boost::none if the resulting
-     * formula would have more than 'maxClauses' clauses.
+     * Pick the first conjunct matching the condition specified by the provided lambda. Assert on
+     * non-trivial expression. Result includes the index of the conjunct.
      */
-    static boost::optional<Node> convertToDNF(const Node& n,
-                                              boost::optional<size_t> maxClauses = boost::none) {
-        tassert(7115100, "Expected Node to be a Conjunction", n.template is<Conjunction>());
-        return convertTo<false /*toCNF*/>(n, maxClauses);
-    }
+    static auto findFirst(const Node& n, const std::function<bool(const T& entry)>& fn) {
+        tassert(7453907,
+                "Expected expression to be a singleton disjunction",
+                isSingletonDisjunction(n));
 
-    /**
-     * Converts a BoolExpr to CNF. Assumes 'n' is in DNF. Returns boost::none if the resulting
-     * formula would have more than 'maxClauses' clauses.
-     */
-    static boost::optional<Node> convertToCNF(const Node& n,
-                                              boost::optional<size_t> maxClauses = boost::none) {
-        tassert(7115101, "Expected Node to be a Disjunction", n.template is<Disjunction>());
-        return convertTo<true /*toCNF*/>(n, maxClauses);
+        size_t i = 0;
+        boost::optional<std::pair<size_t, const T*>> res;
+        visitDNF(n, [&](const T& entry, const VisitorContext& ctx) {
+            if (fn(entry)) {
+                res = {{i, &entry}};
+                ctx.returnEarly();
+                return;
+            }
+            ++i;
+        });
+        return res;
     }
 
 private:
@@ -374,48 +400,6 @@ private:
             return algebra::transport<false>(expr, *this);
         }
     };
-
-    template <bool toCNF,
-              class TopLevel = std::conditional_t<toCNF, Conjunction, Disjunction>,
-              class SecondLevel = std::conditional_t<toCNF, Disjunction, Conjunction>>
-    static boost::optional<Node> convertTo(const Node& n, boost::optional<size_t> maxClauses) {
-        std::vector<NodeVector> newChildren;
-        newChildren.push_back({});
-
-        // Process the children of 'n' in order. Suppose the input (in CNF) was (a+b).(c+d). After
-        // the first child, we have [[a], [b]] in 'newChildren'. After the second child, we have
-        // [[a, c], [b, c], [a, d], [b, d]].
-        for (const auto& child : n.template cast<SecondLevel>()->nodes()) {
-            auto childNode = child.template cast<TopLevel>();
-            auto numGrandChildren = childNode->nodes().size();
-            auto frontierSize = newChildren.size();
-
-            if (maxClauses.has_value() && frontierSize * numGrandChildren > maxClauses) {
-                return boost::none;
-            }
-
-            // Each child (literal) under 'child' is added to a new copy of the existing vectors...
-            for (size_t grandChild = 1; grandChild < numGrandChildren; grandChild++) {
-                for (size_t i = 0; i < frontierSize; i++) {
-                    NodeVector newNodeVec = newChildren.at(i);
-                    newNodeVec.push_back(childNode->nodes().at(grandChild));
-                    newChildren.push_back(newNodeVec);
-                }
-            }
-
-            // Except the first child under 'child', which can modify the vectors in place.
-            for (size_t i = 0; i < frontierSize; i++) {
-                NodeVector& nv = newChildren.at(i);
-                nv.push_back(childNode->nodes().front());
-            }
-        }
-
-        NodeVector res;
-        for (size_t i = 0; i < newChildren.size(); i++) {
-            res.push_back(make<SecondLevel>(std::move(newChildren[i])));
-        }
-        return make<TopLevel>(res);
-    }
 };
 
 }  // namespace mongo::optimizer

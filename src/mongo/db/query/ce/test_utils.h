@@ -132,7 +132,7 @@ bool isSargableNode(const ABT& n) {
     // for a SargableNode with a specific number of predicates. For tests, we only care about
     // verifying the cardinality of that one.
     if (auto* sargable = n.cast<optimizer::SargableNode>()) {
-        return PSRExpr::numLeaves(sargable->getReqMap().getRoot()) == NumReq;
+        return PSRExpr::numLeaves(sargable->getReqMap()) == NumReq;
     }
     return false;
 }

@@ -50,10 +50,6 @@
 
 namespace mongo::optimizer {
 
-using PartialSchemaEntry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
-using PSRExpr = BoolExpr<PartialSchemaEntry>;
-using PSRExprBuilder = BoolExprBuilder<PartialSchemaEntry>;
-
 /**
  * Represents a set of predicates and projections composed in a boolean expression in CNF or DNF.
  * Cannot represent all predicates/projections, only those that can typically be answered
@@ -78,89 +74,89 @@ using PSRExprBuilder = BoolExprBuilder<PartialSchemaEntry>;
  *
  * The default / empty state represents a conjunction of zero predicates, which means always true.
  */
-class PartialSchemaRequirements {
-public:
-    // Default PartialSchemaRequirements is a singular DNF of an empty PartialSchemaKey and
-    // fully-open PartialSchemaRequirement which does not bind.
-    PartialSchemaRequirements();
+using PartialSchemaEntry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
+using PSRExpr = BoolExpr<PartialSchemaEntry>;
 
-    explicit PartialSchemaRequirements(PSRExpr::Node requirements);
+/**
+ * A no-op entry has a default key and a requirement that is fully open and does not bind.
+ */
+PartialSchemaEntry makeNoopPartialSchemaEntry();
 
-    bool operator==(const PartialSchemaRequirements& other) const;
+/**
+ * An always false entry has a default key and a requirement that is unsatisfiable (MaxKey to
+ * MinKey) and does not bind.
+ */
+PartialSchemaEntry makeAlwaysFalsePartialSchemaEntry();
 
-    /**
-     * Return true if there are zero predicates and zero projections, or if there is a single
-     * fully-open predicate with no projections.
-     */
-    bool isNoop() const;
-
-    /**
-     * Return the bound projection name corresponding to the first conjunct matching the given key.
-     * Assert on non-DNF requirements.
-     */
-    boost::optional<ProjectionName> findProjection(const PartialSchemaKey&) const;
-
-    /**
-     * Pick the first conjunct matching the given key. Assert on non-DNF requirements.
-     *
-     * Result includes the index of the conjunct.
-     */
-    boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
-        const PartialSchemaKey&) const;
-
-    /**
-     * Conjunctively combine 'this' with another PartialSchemaRequirement.
-     * Asserts that 'this' is in DNF.
-     *
-     * For now, we assert that we have only one disjunct. This means we avoid applying
-     * the distributive law, which would duplicate the new requirement into each disjunct.
-     */
-    void add(PartialSchemaKey, PartialSchemaRequirement);
-
-    /**
-     * Apply a simplification to each PartialSchemaRequirement.
-     *
-     * The callback can return false if an individual PartialSchemaRequirement
-     * simplifies to an always-false predicate.
-     *
-     * This method returns false if the overall result is an always-false predicate.
-     *
-     * This method will also remove any predicates that are trivially true (those will
-     * a fully open DNF interval).
-     *
-     * TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
-     */
-    bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
-    static bool simplify(PSRExpr::Node& expr,
-                         std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
-    static void normalize(PSRExpr::Node& expr);
-
-    /**
-     * Given a DNF, try to detect and remove redundant terms.
-     *
-     * For example, in ((a ^ b) U (z) U (a ^ b ^ c)) the (a ^ b) is redundant because
-     * (a ^ b ^ c) implies (a ^ b).
-     *
-     * TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
-     */
-    static void simplifyRedundantDNF(PSRExpr::Node& expr);
-
-    const auto& getRoot() const {
-        return _expr;
-    }
-
-    auto& getRoot() {
-        return _expr;
-    }
-
-private:
-    // Restore the invariant that the entries are sorted by key.
-    // TODO SERVER-79620: Incorporate PSR simplifications into BoolExpr builder.
-    void normalize();
-
-    // _expr is currently always in DNF.
-    PSRExpr::Node _expr;
+struct PSRComparator {
+    bool operator()(const PSRExpr::Node& n1, const PSRExpr::Node& n2) const;
 };
+struct PSRSimplifier {
+    using DefaultSimplifier = DefaultSimplifyAndCreateNode<PartialSchemaEntry>;
+    using Result = DefaultSimplifier::Result;
+
+    Result operator()(BuilderNodeType type,
+                      std::vector<PSRExpr::Node> v,
+                      bool hasTrue,
+                      bool hasFalse) const;
+
+    // Informs the simplifier to construct a tree of particular shape when simplifying corner cases.
+    bool _isDNF = true;
+};
+using PSRExprBuilder = BoolExprBuilder<PartialSchemaEntry, PSRSimplifier>;
+
+namespace psr {
+/**
+ * Default PSRExpr is a singular DNF of an empty PartialSchemaKey and fully-open
+ * PartialSchemaRequirement which does not bind.
+ */
+PSRExpr::Node makeNoOp();
+
+/**
+ * Default PSRExpr is a singular CNF of an empty PartialSchemaKey and fully-open
+ * PartialSchemaRequirement which does not bind.
+ */
+PSRExpr::Node makeNoOpCNF();
+
+/**
+ * This is a singular DNF partialSchemaRequirements with an empty PartialSchemaKey and always-false
+ * PartialSchemaRequirement.
+ */
+PSRExpr::Node makeAlwaysFalse();
+
+/**
+ * This is a singular CNF partialSchemaRequirements with an empty PartialSchemaKey and always-false
+ * PartialSchemaRequirement.
+ */
+PSRExpr::Node makeAlwaysFalseCNF();
+
+/**
+ * Return true if there are zero predicates and zero projections, or if there is a single
+ * fully-open predicate with no projections.
+ */
+bool isNoop(const PSRExpr::Node& expr);
+
+/**
+ * Returns true if the expression is always false: it has a single always false PSR.
+ */
+bool isAlwaysFalse(const PSRExpr::Node& expr);
+
+/**
+ * Return the bound projection name corresponding to the first conjunct matching the given key.
+ * Assert on non-DNF requirements.
+ */
+boost::optional<ProjectionName> findProjection(const PSRExpr::Node& expr,
+                                               const PartialSchemaKey& key);
+
+/**
+ * Given a DNF, try to detect and remove redundant terms.
+ *
+ * For example, in ((a ^ b) U (z) U (a ^ b ^ c)) the (a ^ b) is redundant because
+ * (a ^ b ^ c) implies (a ^ b).
+ *
+ * TODO SERVER-74879: Generalize boolean minimization.
+ */
+void simplifyRedundantDNF(PSRExpr::Node& expr);
 
 /**
  * Returns a vector of ((input binding, path), output binding). The output binding names
@@ -168,6 +164,7 @@ private:
  * available.
  */
 std::vector<std::pair<PartialSchemaKey, ProjectionName>> getBoundProjections(
-    const PartialSchemaRequirements& reqs);
+    const PSRExpr::Node& expr);
 
+}  // namespace psr
 }  // namespace mongo::optimizer

@@ -185,7 +185,7 @@ public:
                 _metadata._scanDefs.at(node.getScanDefName()).getDistributionAndPaths(),
                 node.getProjectionName(),
                 _logicalProps,
-                {},
+                psr::makeNoOp(),
                 canUseParallelScan)) {
             return;
         }
@@ -489,14 +489,14 @@ public:
         const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
         const CandidateIndexes& candidateIndexes = node.getCandidateIndexes();
         const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
-        const PartialSchemaRequirements& reqMap = node.getReqMap();
+        const PSRExpr::Node& reqMap = node.getReqMap();
 
         switch (indexReqTarget) {
             case IndexReqTarget::Complete:
                 if (_hints._disableScan) {
                     return;
                 }
-                if (_hints._forceIndexScanForPredicates && hasProperIntervals(reqMap.getRoot())) {
+                if (_hints._forceIndexScanForPredicates && hasProperIntervals(reqMap)) {
                     return;
                 }
                 break;
@@ -527,7 +527,7 @@ public:
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
 
         // We can only satisfy partial schema requirements using our root projection.
-        if (PSRExpr::any(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+        if (PSRExpr::any(reqMap, [&](const PartialSchemaEntry& e) {
                 return e.first._projectionName != scanProjectionName;
             })) {
             return;
@@ -547,7 +547,7 @@ public:
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
             }
 
-            for (const auto& [key, boundProjName] : getBoundProjections(reqMap)) {
+            for (const auto& [key, boundProjName] : psr::getBoundProjections(reqMap)) {
                 projectionsLeftToSatisfy.erase(boundProjName);
             }
             if (!projectionsLeftToSatisfy.getVector().empty()) {
@@ -583,7 +583,7 @@ public:
                 const auto& indexDefName = candidateIndexEntry._indexDefName;
                 const auto& indexDef = scanDef.getIndexDefs().at(indexDefName);
 
-                if (!indexDef.getPartialReqMap().isNoop() &&
+                if (!psr::isNoop(indexDef.getPartialReqMap()) &&
                     (_hints._disableIndexes == DisableIndexOptions::DisablePartialOnly ||
                      satisfiedPartialIndexes.count(indexDefName) == 0)) {
                     // Consider only indexes for which we satisfy partial requirements.
@@ -639,7 +639,7 @@ public:
                         std::vector<SelectivityType> atomSels;
                         std::vector<SelectivityType> conjuctionSels;
                         PSRExpr::visitDisjuncts(
-                            reqMap.getRoot(),
+                            reqMap,
                             [&](const PSRExpr::Node& child, const PSRExpr::VisitorContext&) {
                                 atomSels.clear();
 
@@ -1690,7 +1690,7 @@ private:
                                  const DistributionAndPaths& distributionAndPaths,
                                  const ProjectionName& scanProjection,
                                  const LogicalProps& scanLogicalProps,
-                                 const PartialSchemaRequirements& reqMap,
+                                 const PSRExpr::Node& reqMap,
                                  bool& canUseParallelScan) {
         const DistributionRequirement& required =
             getPropertyConst<DistributionRequirement>(_physProps);
@@ -1741,8 +1741,8 @@ private:
                     distribAndProjections._projectionNames;
 
                 for (const ABT& partitioningPath : distributionAndPaths._paths) {
-                    if (auto proj = reqMap.findProjection(
-                            PartialSchemaKey{scanProjection, partitioningPath});
+                    if (auto proj = psr::findProjection(
+                            reqMap, PartialSchemaKey{scanProjection, partitioningPath});
                         proj && *proj == requiredProjections.at(distributionPartitionIndex)) {
                         distributionPartitionIndex++;
                     } else {

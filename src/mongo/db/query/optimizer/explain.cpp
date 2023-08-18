@@ -1501,9 +1501,9 @@ public:
         return printer;
     }
 
-    void printPartialSchemaReqMap(ExplainPrinter& parent, const PartialSchemaRequirements& reqMap) {
+    void printPartialSchemaReqMap(ExplainPrinter& parent, const PSRExpr::Node& reqMap) {
         ExplainPrinter reqs =
-            reqMap.isNoop() ? ExplainPrinter() : printPartialSchemaRequirements(reqMap.getRoot());
+            psr::isNoop(reqMap) ? ExplainPrinter() : printPartialSchemaRequirements(reqMap);
         parent.fieldName("requirements").print(reqs);
     }
 
@@ -3150,16 +3150,11 @@ BSONObj ExplainGenerator::explainMemoBSONObj(const cascades::MemoExplainInterfac
     return convertSbeValToBSONObj(explainMemoBSON(memoInterface));
 }
 
-std::string ExplainGenerator::explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap) {
-    ExplainGeneratorV2 gen;
-    ExplainGeneratorV2::ExplainPrinter result;
-    gen.printPartialSchemaReqMap(result, reqMap);
-    return result.str();
-}
-
 std::string ExplainGenerator::explainPartialSchemaReqExpr(const PSRExpr::Node& reqs) {
     ExplainGeneratorV2 gen;
-    return gen.printPartialSchemaRequirements(reqs).str();
+    ExplainGeneratorV2::ExplainPrinter result;
+    gen.printPartialSchemaReqMap(result, reqs);
+    return result.str();
 }
 
 std::string ExplainGenerator::explainResidualRequirements(

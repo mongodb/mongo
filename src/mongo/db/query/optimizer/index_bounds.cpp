@@ -80,12 +80,23 @@ bool IntervalRequirement::isFullyOpen() const {
     return _lowBound.isMinusInf() && _highBound.isPlusInf();
 }
 
+bool IntervalRequirement::isAlwaysFalse() const {
+    return _lowBound.isPlusInf() && _highBound.isMinusInf();
+}
+
 bool IntervalRequirement::isConstant() const {
     return getLowBound().getBound().is<Constant>() && getHighBound().getBound().is<Constant>();
 }
 
 bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
     if (auto singular = IntervalReqExpr::getSingularDNF(n); singular && singular->isFullyOpen()) {
+        return true;
+    }
+    return false;
+}
+
+bool isIntervalReqAlwaysFalseDNF(const IntervalReqExpr::Node& n) {
+    if (auto singular = IntervalReqExpr::getSingularDNF(n); singular && singular->isAlwaysFalse()) {
         return true;
     }
     return false;

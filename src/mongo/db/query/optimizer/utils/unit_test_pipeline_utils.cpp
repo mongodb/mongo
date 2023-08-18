@@ -208,7 +208,7 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
             serializeDistributionAndPaths(stream, indexDef.getDistributionAndPaths(), "\t\t\t\t\t");
 
             std::string serializedReqMap =
-                ExplainGenerator::explainPartialSchemaReqMap(indexDef.getPartialReqMap());
+                ExplainGenerator::explainPartialSchemaReqExpr(indexDef.getPartialReqMap());
             explainPreserveIndentation(stream, "\t\t\t\t\t", serializedReqMap);
         }
 

@@ -129,12 +129,13 @@ IndexCollationEntry::IndexCollationEntry(ABT path, CollationOp op)
     : _path(std::move(path)), _op(op) {}
 
 IndexDefinition::IndexDefinition(IndexCollationSpec collationSpec, bool isMultiKey)
-    : IndexDefinition(std::move(collationSpec), isMultiKey, {DistributionType::Centralized}, {}) {}
+    : IndexDefinition(
+          std::move(collationSpec), isMultiKey, {DistributionType::Centralized}, psr::makeNoOp()) {}
 
 IndexDefinition::IndexDefinition(IndexCollationSpec collationSpec,
                                  bool isMultiKey,
                                  DistributionAndPaths distributionAndPaths,
-                                 PartialSchemaRequirements partialReqMap)
+                                 PSRExpr::Node partialReqMap)
     : IndexDefinition(std::move(collationSpec),
                       1 /*version*/,
                       0 /*orderingBits*/,
@@ -147,7 +148,7 @@ IndexDefinition::IndexDefinition(IndexCollationSpec collationSpec,
                                  uint32_t orderingBits,
                                  bool isMultiKey,
                                  DistributionAndPaths distributionAndPaths,
-                                 PartialSchemaRequirements partialReqMap)
+                                 PSRExpr::Node partialReqMap)
     : _collationSpec(std::move(collationSpec)),
       _version(version),
       _orderingBits(orderingBits),
@@ -175,11 +176,11 @@ const DistributionAndPaths& IndexDefinition::getDistributionAndPaths() const {
     return _distributionAndPaths;
 }
 
-const PartialSchemaRequirements& IndexDefinition::getPartialReqMap() const {
+const PSRExpr::Node& IndexDefinition::getPartialReqMap() const {
     return _partialReqMap;
 }
 
-PartialSchemaRequirements& IndexDefinition::getPartialReqMap() {
+PSRExpr::Node& IndexDefinition::getPartialReqMap() {
     return _partialReqMap;
 }
 

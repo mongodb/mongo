@@ -418,27 +418,25 @@ const ProjectionName& RIDUnionNode::getScanProjectionName() const {
     return _scanProjectionName;
 }
 
-static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
+static ProjectionNameVector createSargableBindings(const PSRExpr::Node& reqMap) {
     ProjectionNameVector result;
-    PSRExpr::visitDNF(reqMap.getRoot(),
-                      [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-                          if (auto binding = e.second.getBoundProjectionName()) {
-                              result.push_back(*binding);
-                          }
-                      });
+    PSRExpr::visitDNF(reqMap, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+        if (auto binding = e.second.getBoundProjectionName()) {
+            result.push_back(*binding);
+        }
+    });
     return result;
 }
 
-static ProjectionNameVector createSargableReferences(const PartialSchemaRequirements& reqMap) {
+static ProjectionNameVector createSargableReferences(const PSRExpr::Node& reqMap) {
     ProjectionNameOrderPreservingSet result;
-    PSRExpr::visitDNF(reqMap.getRoot(),
-                      [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-                          result.emplace_back(*e.first._projectionName);
-                      });
+    PSRExpr::visitDNF(reqMap, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+        result.emplace_back(*e.first._projectionName);
+    });
     return result.getVector();
 }
 
-SargableNode::SargableNode(PartialSchemaRequirements reqMap,
+SargableNode::SargableNode(PSRExpr::Node reqMap,
                            CandidateIndexes candidateIndexes,
                            boost::optional<ScanParams> scanParams,
                            const IndexReqTarget target,
@@ -451,11 +449,9 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
       _scanParams(std::move(scanParams)),
       _target(target) {
     assertNodeSort(getChild());
-    tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.isNoop());
-    tassert(
-        7447500, "SargableNode requirements should be in DNF", PSRExpr::isDNF(_reqMap.getRoot()));
-    if (const size_t numLeaves = PSRExpr::numLeaves(_reqMap.getRoot());
-        numLeaves > kMaxPartialSchemaReqs) {
+    tassert(6624085, "SargableNode requires at least one predicate", !psr::isNoop(_reqMap));
+    tassert(7447500, "SargableNode requirements should be in DNF", PSRExpr::isDNF(_reqMap));
+    if (const size_t numLeaves = PSRExpr::numLeaves(_reqMap); numLeaves > kMaxPartialSchemaReqs) {
         tasserted(6624086,
                   str::stream() << "SargableNode has too many predicates: " << numLeaves
                                 << ". We allow at most " << kMaxPartialSchemaReqs);
@@ -464,7 +460,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     auto bindings = createSargableBindings(_reqMap);
     tassert(7410100,
             "SargableNode with top-level OR cannot bind",
-            bindings.empty() || PSRExpr::isSingletonDisjunction(_reqMap.getRoot()));
+            bindings.empty() || PSRExpr::isSingletonDisjunction(_reqMap));
 
     ProjectionNameSet boundsProjectionNameSet(bindings.begin(), bindings.end());
 
@@ -473,7 +469,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     // a conjunction 1) non-multikey paths have at most one req and 2) there are no duplicate bound
     // projection names.
     PSRExpr::visitDisjuncts(
-        _reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext&) {
+        _reqMap, [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext&) {
             PartialSchemaKeySet seenKeys;
             ProjectionNameSet seenProjNames;
             PSRExpr::visitConjuncts(
@@ -523,7 +519,7 @@ bool SargableNode::operator==(const SargableNode& other) const {
     return _reqMap == other._reqMap && _target == other._target && getChild() == other.getChild();
 }
 
-const PartialSchemaRequirements& SargableNode::getReqMap() const {
+const PSRExpr::Node& SargableNode::getReqMap() const {
     return _reqMap;
 }
 

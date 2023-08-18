@@ -39,6 +39,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_cnf_dnf_convert.h"
 #include "mongo/db/query/optimizer/utils/bool_expression_printer.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
@@ -59,7 +60,7 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
             "{{{[Variable [v1], Variable [v2]]}}}\n",  // NOLINT (test auto-update)
             interval);
 
-        auto res = BoolExpr<IntervalRequirement>::convertToCNF(interval);
+        auto res = convertToCNF<IntervalRequirement>(interval);
         ASSERT(res.has_value());
         ASSERT_INTERVAL_AUTO(                          // NOLINT
             "{{{[Variable [v1], Variable [v2]]}}}\n",  // NOLINT (test auto-update)
@@ -78,7 +79,7 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
             "}\n",
             interval);
 
-        auto res = BoolExpr<IntervalRequirement>::convertToCNF(interval);
+        auto res = convertToCNF<IntervalRequirement>(interval);
         ASSERT(res.has_value());
         ASSERT_INTERVAL_AUTO(  // NOLINT
             "{{\n"
@@ -112,7 +113,7 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
             "}\n",
             interval);
 
-        auto res = BoolExpr<IntervalRequirement>::convertToDNF(interval);
+        auto res = convertToDNF<IntervalRequirement>(interval);
         ASSERT(res.has_value());
         ASSERT_INTERVAL_AUTO(  // NOLINT
             "{\n"
@@ -144,8 +145,8 @@ TEST(BoolExpr, IntervalCNFtoDNF) {
 
         // Test conversion clause limit: the same conversion succeeds with a max limit of 4 clauses
         // but fails with a limit of 3.
-        ASSERT(BoolExpr<IntervalRequirement>::convertToDNF(interval, 4).has_value());
-        ASSERT_FALSE(BoolExpr<IntervalRequirement>::convertToDNF(interval, 3).has_value());
+        ASSERT(convertToDNF<IntervalRequirement>(interval, {} /*builder*/, 4).has_value());
+        ASSERT_FALSE(convertToDNF<IntervalRequirement>(interval, {} /*builder*/, 3).has_value());
     }
 }
 
@@ -225,7 +226,7 @@ TEST(BoolExpr, BoolExprPermutations) {
             {
                 auto [expr, numVars] =
                     buildExpr<false /*CNF*/>(rootNumChildren, permutation, maxBranching);
-                auto transformed = IntBoolExpr::convertToCNF(expr);
+                auto transformed = convertToCNF<int>(expr);
                 ASSERT(transformed.has_value());
                 assertEquiv(expr, *transformed, numVars);
             }
@@ -234,7 +235,7 @@ TEST(BoolExpr, BoolExprPermutations) {
             {
                 auto [expr, numVars] =
                     buildExpr<true /*CNF*/>(rootNumChildren, permutation, maxBranching);
-                auto transformed = IntBoolExpr::convertToDNF(expr);
+                auto transformed = convertToDNF<int>(expr);
                 ASSERT(transformed.has_value());
                 assertEquiv(expr, *transformed, numVars);
             }
