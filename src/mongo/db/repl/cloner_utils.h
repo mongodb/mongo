@@ -72,11 +72,6 @@ public:
     static bool isDatabaseForTenant(const DatabaseName& db,
                                     const boost::optional<TenantId>& prefix,
                                     MigrationProtocolEnum protocol);
-
-    /**
-     * Checks if the collection belongs to the given tenant.
-     */
-    static bool isNamespaceForTenant(NamespaceString nss, StringData prefix);
 };
 
 

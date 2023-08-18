@@ -85,12 +85,5 @@ bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
     }
 }
 
-bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
-    if (gMultitenancySupport && nss.tenantId() != boost::none) {
-        return nss.tenantId()->toString() == prefix;
-    }
-    return nss.db_deprecated().startsWith(prefix + "_");
-}
-
 }  // namespace repl
 }  // namespace mongo

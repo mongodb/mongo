@@ -446,7 +446,7 @@ void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
         return;
 
     auto checkNsAndUuid = [&](const OplogEntry& op) {
-        if (!op.getNss().isEmpty() && !ClonerUtils::isNamespaceForTenant(op.getNss(), *_tenantId)) {
+        if (!op.getNss().isEmpty() && !op.getNss().isNamespaceForTenant(*_tenantId)) {
             LOGV2_ERROR(4886015,
                         "Namespace does not belong to tenant being migrated",
                         "tenant"_attr = *_tenantId,
@@ -460,7 +460,7 @@ void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
             return;
         try {
             auto nss = OplogApplierUtils::parseUUIDOrNs(opCtx, op);
-            if (!ClonerUtils::isNamespaceForTenant(nss, *_tenantId)) {
+            if (!nss.isNamespaceForTenant(*_tenantId)) {
                 LOGV2_ERROR(4886013,
                             "UUID does not belong to tenant being migrated",
                             "tenant"_attr = *_tenantId,
