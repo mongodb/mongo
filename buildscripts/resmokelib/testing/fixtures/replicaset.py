@@ -677,7 +677,17 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.logger.info("Waiting for the old primary on port %d of replica set '%s' to exit.",
                          chosen.port, self.replset_name)
 
-        chosen.mongod.wait()
+        exit_code = chosen.mongod.wait()
+        # This function is called after stop_primary() which could kill or cleanly shutdown the
+        # process. We therefore also allow an exit code of -9.
+        if exit_code in (0, -interface.TeardownMode.KILL.value):
+            self.logger.info("Successfully stopped the mongod on port {:d}.".format(chosen.port))
+        else:
+            self.logger.warning("Stopped the mongod on port {:d}. "
+                                "Process exited with code {:d}.".format(chosen.port, exit_code))
+            raise self.fixturelib.ServerFailure(
+                "mongod on port {:d} with pid {:d} exited with code {:d}".format(
+                    chosen.port, chosen.mongod.pid, exit_code))
 
         self.logger.info("Attempting to restart the old primary on port %d of replica set '%s'.",
                          chosen.port, self.replset_name)
