@@ -28,17 +28,17 @@
  */
 
 #include "mongo/db/s/sharding_ready.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_util.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -70,34 +70,36 @@ void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
     if (getShards.getValue().value.empty()) {
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        // TODO SERVER-79109: Expose readiness future via 'isReady' function.
-        auto f = ExecutorFuture(executor).then([this, serviceContext = opCtx->getServiceContext()] {
-            transitionToConfigShard(serviceContext);
-        });
+        // TODO SERVER-79109: Expose readiness future via 'isReady' function. The caller will
+        // need to handle the error case.
+        auto f = AsyncTry([this, serviceContext = opCtx->getServiceContext()] {
+                     transitionToConfigShard(serviceContext);
+                 })
+                     .until([](Status status) {
+                         if (!status.isOK()) {
+                             LOGV2_WARNING(7910801,
+                                           "Failed to transition to config shard during "
+                                           "autobootstrap due to {error}. Retrying.",
+                                           "error"_attr = status);
+                         }
+                         // Keep retrying until the transition to config shard succeeds, the node is
+                         // shutting down, or is no longer primary.
+                         return status.isOK() || ErrorCodes::isShutdownError(status) ||
+                             ErrorCodes::isNotPrimaryError(status);
+                     })
+                     .withDelayBetweenIterations(Milliseconds(500))
+                     .on(executor, CancellationToken::uncancelable());
     }
 }
 
-// TODO SERVER-80111: Add retry loop to 'transitionFromDedicatedConfigServer' local command.
 void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
-    BSONObjBuilder builder;
-    // TODO SERVER-80110: Allow 'transitionFromDedicatedConfigSever' to succeed with
-    // {w: 1} during auto-bootstrap.
-    const WriteConcernOptions wc(WriteConcernOptions::kMajority,
-                                 WriteConcernOptions::SyncMode::NONE,
-                                 WriteConcernOptions::kNoTimeout);
-    builder.append("_configsvrTransitionFromDedicatedConfigServer", 1);
-    builder.append(WriteConcernOptions::kWriteConcernField, wc.toBSON());
-
     // Since this function is async, we need to create a new client and operation context to run
     // 'transitionFromDedicatedConfigServer'.
-    auto clientStrand = ClientStrand::make(serviceContext->makeClient("ShardingReady"));
-    auto clientGuard = clientStrand->bind();
+    auto clientGuard = ClientStrand::make(serviceContext->makeClient("ShardingReady"))->bind();
     auto uniqueOpCtx = clientGuard->makeOperationContext();
-    DBDirectClient client(uniqueOpCtx.get());
-    BSONObj result;
-    client.runCommand(DatabaseName::kAdmin, builder.obj(), result);
-    uassertStatusOK(getStatusFromWriteCommandReply(result));
-
+    uniqueOpCtx.get()->setWriteConcern(WriteConcernOptions{
+        1, WriteConcernOptions::SyncMode::JOURNAL, WriteConcernOptions::kNoTimeout});
+    ShardingCatalogManager::get(uniqueOpCtx.get())->addConfigShard(uniqueOpCtx.get());
     LOGV2(7910800, "Auto-bootstrap to config shard complete.");
 }
 

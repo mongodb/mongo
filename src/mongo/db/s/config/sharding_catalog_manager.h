@@ -520,6 +520,15 @@ public:
                                      const ConnectionString& shardConnectionString,
                                      bool isConfigShard);
 
+
+    /**
+     *
+     * Adds the config server as a shard. Thin wrapper around 'addShard' that retrieves and uses the
+     * config server connection string as the shard connection string.
+     *
+     */
+    void addConfigShard(OperationContext* opCtx);
+
     /**
      * Inserts the config server shard identity document using a sentinel shard id. Requires the
      * config server's ShardingState has not already been enabled. Throws on errors.

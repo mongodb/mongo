@@ -1822,7 +1822,7 @@ var ShardingTest = function ShardingTest(params) {
                     var n = z.name || z.host || z;
 
                     var name;
-                    // TODO: SERVER-79108 Don't transition when auto-bootstrapping.
+                    // TODO: SERVER-80010 Don't transition when auto-bootstrapping.
                     if (isConfigShardMode && idx == 0) {
                         name = "config";
 

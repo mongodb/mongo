@@ -95,20 +95,7 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            // Set the operation context read concern level to local for reads into the config
-            // database.
-            repl::ReadConcernArgs::get(opCtx) =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-            auto configConnString =
-                repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString();
-
-            auto shardingState = ShardingState::get(opCtx);
-            uassert(7368500, "sharding state not enabled", shardingState->enabled());
-
-            std::string shardName = shardingState->shardId().toString();
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->addShard(
-                opCtx, &shardName, configConnString, true));
+            ShardingCatalogManager::get(opCtx)->addConfigShard(opCtx);
         }
 
     private:
