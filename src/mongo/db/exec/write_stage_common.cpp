@@ -63,14 +63,15 @@ namespace write_stage_common {
 
 PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
     : _opCtx(opCtx), _nss(std::move(nss)), _skipFiltering([&] {
-          // Always allow writes on replica sets.
+          // Allow writes on standalone and replica set.
           if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
               return true;
           }
 
-          // Always allow writes on standalone and secondary nodes.
-          const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-          return !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+          // Only the primary node of a shard that is a replica set should run this filter.
+          const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+          return !replCoord->getSettings().isReplSet() ||
+              !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
