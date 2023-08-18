@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/health_log_gen.h"
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <utility>
@@ -58,10 +57,8 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"
-#include "mongo/db/repl/dbcheck_idl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
@@ -71,8 +68,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/uuid.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 
@@ -172,7 +167,6 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
                                                       const boost::optional<UUID>& collectionUUID,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
-                                                      const ScopeEnum scope,
                                                       OplogEntriesEnum operation,
                                                       const boost::optional<BSONObj>& data) {
     auto entry = std::make_unique<HealthLogEntry>();
@@ -184,7 +178,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
     }
     entry->setTimestamp(Date_t::now());
     entry->setSeverity(severity);
-    entry->setScope(scope);
+    entry->setScope(ScopeEnum::Cluster);
     entry->setMsg(msg);
     entry->setOperation(renderForHealthLog(operation));
     if (data) {
@@ -200,7 +194,6 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
-    const ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err,
     const BSONObj& context) {
@@ -209,7 +202,6 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
         collectionUUID,
         SeverityEnum::Error,
         msg,
-        scope,
         operation,
         BSON("success" << false << "error" << err.toString() << "context" << context));
 }
@@ -224,7 +216,6 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
                                  collectionUUID,
                                  SeverityEnum::Warning,
                                  msg,
-                                 ScopeEnum::Cluster,
                                  operation,
                                  BSON("success" << false << "error" << err.toString()));
 }
@@ -279,30 +270,22 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     std::string msg =
         "dbCheck batch " + (hashesMatch ? std::string("consistent") : std::string("inconsistent"));
 
-    return dbCheckHealthLogEntry(nss,
-                                 collectionUUID,
-                                 severity,
-                                 msg,
-                                 ScopeEnum::Cluster,
-                                 OplogEntriesEnum::Batch,
-                                 builder.obj());
+    return dbCheckHealthLogEntry(
+        nss, collectionUUID, severity, msg, OplogEntriesEnum::Batch, builder.obj());
 }
 
-DbCheckHasher::DbCheckHasher(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const BSONKey& start,
-    const BSONKey& end,
-    boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
-    int64_t maxCount,
-    int64_t maxBytes)
+DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
+                             const CollectionPtr& collection,
+                             const BSONKey& start,
+                             const BSONKey& end,
+                             int64_t maxCount,
+                             int64_t maxBytes)
     : _opCtx(opCtx),
       _maxKey(end),
       _maxCount(maxCount),
       _maxBytes(maxBytes),
       _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
-      _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()),
-      _secondaryIndexCheckParameters(secondaryIndexCheckParameters) {
+      _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()) {
 
     // Get the MD5 hasher set up.
     md5_init(&_state);
@@ -332,7 +315,7 @@ DbCheckHasher::DbCheckHasher(
                                            BoundInclusion::kIncludeEndKeyOnly,
                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                            InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_DEFAULT);
+                                           InternalPlanner::IXSCAN_FETCH);
     } else {
         CollectionScanParams params;
         params.minRecord = RecordIdBound(uassertStatusOK(
@@ -368,54 +351,17 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
-Status DbCheckHasher::hashAll(OperationContext* opCtx,
-                              const CollectionPtr& collPtr,
-                              Date_t deadline) {
-    BSONObj currentObjId;
-    RecordId currentRecordId;
+Status DbCheckHasher::hashAll(OperationContext* opCtx, Date_t deadline) {
+    BSONObj currentObj;
 
     PlanExecutor::ExecState lastState;
-    while (PlanExecutor::ADVANCED ==
-           (lastState = _exec->getNext(&currentObjId, &currentRecordId))) {
+    while (PlanExecutor::ADVANCED == (lastState = _exec->getNext(&currentObj, nullptr))) {
 
         SleepDbCheckInBatch.execute([opCtx](const BSONObj& data) {
             int sleepMs = data["sleepMs"].safeNumberInt();
             opCtx->sleepFor(Milliseconds(sleepMs));
         });
 
-        RecordData record;
-        if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
-            return Status(ErrorCodes::NoSuchKey,
-                          "Could not find record ID: " + currentRecordId.toString());
-        }
-        int currentObjSize = record.size();
-        const char* currentObjData = record.data();
-
-        // BSON is validated at the record level because invalid BSON can be structurally
-        // corrupt. For records with invalid length, parsing as a BSONObj will use the full
-        // length of the data which can cause memory unsafety.
-        if (_secondaryIndexCheckParameters &&
-            _secondaryIndexCheckParameters.value().getValidateMode() ==
-                DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
-            const auto status =
-                validateBSON(currentObjData, currentObjSize, BSONValidateMode::kDefault);
-            if (!status.isOK()) {
-                const auto msg = "Document is not well-formed BSON";
-                const auto logEntry =
-                    dbCheckErrorHealthLogEntry(collPtr->ns(),
-                                               collPtr->uuid(),
-                                               msg,
-                                               ScopeEnum::Document,
-                                               OplogEntriesEnum::Batch,
-                                               status,
-                                               BSON("recordID" << currentRecordId.toString()));
-                HealthLogInterface::get(opCtx)->log(*logEntry);
-            }
-        }
-
-        // If _id is corrupt, getNext() will throw an exception and we'll fail the batch. If any
-        // other field is invalid, toBson() will still parse the raw record data and get the hash.
-        BSONObj currentObj = record.toBson();
         if (!currentObj.hasField("_id")) {
             return Status(ErrorCodes::NoSuchKey, "Document missing _id");
         }
@@ -425,13 +371,12 @@ Status DbCheckHasher::hashAll(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // Update `last` every time. currentObjId is a BSON Object with 1 field in the form {"":
-        // _id}.
+        // Update `last` every time.
         _last = BSONKey::parseFromBSON(currentObj["_id"]);
+        _bytesSeen += currentObj.objsize();
         _countSeen += 1;
-        _bytesSeen += currentObjSize;
 
-        md5_append(&_state, md5Cast(currentObjData), currentObjSize);
+        md5_append(&_state, md5Cast(currentObj.objdata()), currentObj.objsize());
 
         if (Date_t::now() > deadline) {
             break;
@@ -511,19 +456,14 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                                   boost::none,
                                                   SeverityEnum::Info,
                                                   "dbCheck failed",
-                                                  ScopeEnum::Cluster,
                                                   OplogEntriesEnum::Batch,
                                                   BSON("success" << false << "info" << msg));
             HealthLogInterface::get(opCtx)->log(*logEntry);
             return Status::OK();
         }
 
-        hasher.emplace(opCtx,
-                       collection,
-                       entry.getMinKey(),
-                       entry.getMaxKey(),
-                       entry.getSecondaryIndexCheckParameters());
-        uassertStatusOK(hasher->hashAll(opCtx, collection));
+        hasher.emplace(opCtx, collection, entry.getMinKey(), entry.getMaxKey());
+        uassertStatusOK(hasher->hashAll(opCtx));
 
         std::string expected = entry.getMd5().toString();
         std::string found = hasher->total();
@@ -552,7 +492,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         auto logEntry = dbCheckErrorHealthLogEntry(entry.getNss(),
                                                    boost::none,
                                                    msg,
-                                                   ScopeEnum::Cluster,
                                                    OplogEntriesEnum::Batch,
                                                    exception.toStatus(),
                                                    entry.toBSON());
@@ -596,7 +535,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                                                                boost::none /*collectionUUID*/,
                                                                SeverityEnum::Info,
                                                                "",
-                                                               ScopeEnum::Cluster,
                                                                type,
                                                                boost::none /*data*/);
             const auto secondaryIndexCheckParameters =
