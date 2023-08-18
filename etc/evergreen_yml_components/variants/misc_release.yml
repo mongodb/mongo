@@ -35,7 +35,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -137,7 +136,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -243,7 +241,6 @@ buildvariants:
     - amazon2-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -409,7 +406,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -509,7 +505,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -604,7 +599,6 @@ buildvariants:
     - rhel70
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -689,7 +683,6 @@ buildvariants:
     - rhel80-build
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -850,7 +843,6 @@ buildvariants:
     - rhel82-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -952,7 +944,6 @@ buildvariants:
     - rhel90-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common !.multiversion
   - name: .logical_session_cache .one_sec
@@ -1072,7 +1063,6 @@ buildvariants:
     - rhel90-arm64-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -1177,7 +1167,6 @@ buildvariants:
     - suse12-sp5-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: multiversion_gen
@@ -1316,7 +1305,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.decimal
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -1363,7 +1351,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jepsen
     distros:
     - ubuntu1804-build
@@ -1526,7 +1513,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -1565,7 +1551,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -1613,7 +1598,6 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -1806,7 +1790,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -1888,7 +1871,6 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
@@ -1934,7 +1916,6 @@ buildvariants:
     - windows-vsCurrent-large
   - name: .concurrency .common
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.auth
   - name: json_schema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
@@ -2045,7 +2026,6 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth
   - name: jsCore_txns_large_txns_format
@@ -2093,7 +2073,6 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.auth
   - name: jsCore_txns_large_txns_format

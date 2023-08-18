@@ -167,7 +167,7 @@ enums:
            setClusterParameter: "setClusterParameter"
            setDefaultRWConcern :  "setDefaultRWConcern"
            setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
-           setFreeMonitoring :  "setFreeMonitoring"
+           setFreeMonitoring :  "setFreeMonitoring"  # Removed (backwards compatibility)
            setParameter :  "setParameter"
            setUserWriteBlockMode: "setUserWriteBlockMode"
            shardCollection :  "shardCollection"  # ID only

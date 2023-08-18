@@ -1005,12 +1005,6 @@ int mongo_main(int argc, char* argv[]) {
                             true,
                             false);
 
-                scope->exec("shellHelper( 'show', 'freeMonitoring' )",
-                            "(freeMonitoring)",
-                            false,
-                            true,
-                            false);
-
                 scope->exec("shellHelper( 'show', 'automationNotices' )",
                             "(automationnotices)",
                             false,

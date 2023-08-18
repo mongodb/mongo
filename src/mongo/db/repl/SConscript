@@ -1476,7 +1476,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/free_mon/free_mon_mongod',
         '$BUILD_DIR/mongo/db/kill_sessions_local',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
