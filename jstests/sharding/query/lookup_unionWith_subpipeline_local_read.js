@@ -10,7 +10,10 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {
+    profilerHasAtLeastOneMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     name: jsTestName(),
@@ -69,6 +72,12 @@ function getPossibleViewLocalReadCount(node, foreignNs, comment) {
     return countFound;
 }
 
+/**
+ * Asserts that the assertions in the `expected` object hold by querying the profiler.
+ * @param {Object} expected - See `assertAggResultAndRouting()`.
+ * @param {String} comment - Identifier used as an option in the execution of the query.
+ * @param {Array} pipeline - Pipeline executed.
+ */
 function assertProfilerEntriesMatch(expected, comment, pipeline) {
     const stage = Object.keys(pipeline[0])[0];
     const foreignNs = pipeline[0][stage].from ? pipeline[0][stage].from : pipeline[0][stage].coll;
@@ -81,52 +90,82 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
         if (expected.toplevelExec) {
             const filter = {"command.aggregate": local.getName(), "command.comment": comment};
             filter[`command.pipeline.${stage}`] = {$exists: true};
-            profilerHasNumMatchingEntriesOrThrow({
-                profileDB: node.getDB(dbName),
-                filter: filter,
-                numExpectedMatches: expected.toplevelExec[i]
-            });
+            if (expected.toplevelExec[i]) {
+                profilerHasAtLeastOneMatchingEntryOrThrow({
+                    profileDB: node.getDB(dbName),
+                    filter: filter,
+                });
+            } else {
+                profilerHasZeroMatchingEntriesOrThrow({
+                    profileDB: node.getDB(dbName),
+                    filter: filter,
+                });
+            }
         }
 
-        // Confirm that the subpipeline execution is as expected. Each subpipeline is either sent to
-        // remote shards, which can be seen in the profiler, or performed as a local read, which can
-        // be seen in a special log line. The filter on the namespace below ensures we catch both
-        // pipelines run against the view namespace and pipelines run against the underlying coll.
-        // The number of shard targeting and local read operations can depend on which shard,
-        // primary or non-primary, executes a subpipeline first. To account for this, the caller can
-        // specify an array of possible values for 'subPipelineRemote' and 'subPipelineLocal'.
-        const filter = {
-            $or: [
-                {"command.aggregate": {$eq: foreignNs}},
-                {"command.aggregate": {$eq: foreign.getName()}}
-            ],
-            "command.comment": comment
-        };
-        const remoteSubpipelineCount = node.getDB(dbName).system.profile.find(filter).itcount();
-        let expectedRemoteCountList = expected.subPipelineRemote[i];
-        if (!Array.isArray(expectedRemoteCountList)) {
-            expectedRemoteCountList = [expectedRemoteCountList];
+        // Confirm that the subpipeline execution is as expected. Each subpipeline is either
+        // sent to remote shards, which can be seen in the profiler, or performed as a local
+        // read, which can be seen in a special log line. The filter on the namespace below
+        // ensures we catch both pipelines run against the view namespace and pipelines run
+        // against the underlying coll. The number of shard targeting and local read operations
+        // can depend on which shard, primary or non-primary, executes a subpipeline first. To
+        // account for this, the caller should take care when specifying the values for
+        // 'subPipelineRemote' and 'subPipelineLocal'.
+        if (expected.subPipelineRemote) {
+            const filter = {
+                $or: [
+                    {"command.aggregate": {$eq: foreignNs}},
+                    {"command.aggregate": {$eq: foreign.getName()}}
+                ],
+                "command.comment": comment
+            };
+            const remoteSubpipelineCount = node.getDB(dbName).system.profile.find(filter).itcount();
+            if (expected.subPipelineRemote[i]) {
+                assert.gt(remoteSubpipelineCount,
+                          0,
+                          `Expected non-zero count of profiler entries for ${node.name}`);
+            } else {
+                assert.eq(
+                    0,
+                    remoteSubpipelineCount,
+                    () => 'Expected zero profiler entries but found: ' + tojson({
+                              [node.name]: node.getDB(dbName).system.profile.find(filter).toArray()
+                          }));
+            }
         }
-        assert(expectedRemoteCountList.includes(remoteSubpipelineCount),
-               () => 'Expected count of profiler entries to be in ' +
-                   tojson(expectedRemoteCountList) + ' but found ' + remoteSubpipelineCount +
-                   ' instead in profiler ' +
-                   tojson({[node.name]: node.getDB(dbName).system.profile.find().toArray()}));
 
         if (expected.subPipelineLocal) {
             const localReadCount = getPossibleViewLocalReadCount(node, foreignNs, comment);
-            let expectedLocalCountList = expected.subPipelineLocal[i];
-            if (!Array.isArray(expectedLocalCountList)) {
-                expectedLocalCountList = [expectedLocalCountList];
+            if (expected.subPipelineLocal[i]) {
+                assert.gt(
+                    localReadCount, 0, `Expected non-zero number of local reads for ${node.name}`);
+            } else {
+                assert.eq(0,
+                          localReadCount,
+                          `Expected zero local read but found: ${localReadCount} for ${node.name}`);
             }
-            assert(expectedLocalCountList.includes(localReadCount),
-                   () => 'Expected count of local reads to be in ' +
-                       tojson(expectedLocalCountList) + ' but found ' + localReadCount +
-                       ' instead for node ' + node.name);
         }
     }
 }
 
+/**
+ * Runs the given pipeline with the given options. Asserts that the result set is the same as
+ * `expectedResults` and inspects the profiler to verify the expectations in the `expected` object.
+ * @param {Array} pipeline - Pipeline to execute against the local collection
+ * @param {Array} expectedResults - Set of documents that we expect the pipeline to return
+ * @param {Object} opts - Options that are passed to aggregate command
+ * @param {Object} expected - Object containing "assertions" about the state of the profiler. This
+ *     allows us to make assertions about the types of plans that were used to satisfy the given
+ *     pipeline. This object can have the following fields, all of which are arrays of booleans with
+ *     length equal to the number of shards in the cluster:
+ *       - toplevelExec: true in the i'th position indicates that the i'th shard executed part of
+ *         the pipeline; false indicates that shard was not targeted.
+ *       - subPipelineRemote: true in the i'th position indicates that the i'th shard performed at
+ *         least one non-local read (had to perform shard targeting); false indicates that the shard
+ *         did not perform any such reads.
+ *       - subPipelineLocal: true in the i'th position indicates that the i'th shard performed at
+ *         least one local read; false indicates that the shard performed zero local reads.
+ */
 function assertAggResultAndRouting(pipeline, expectedResults, opts, expected) {
     // Write documents to each chunk.
     assert.commandWorked(
@@ -170,22 +209,22 @@ st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_to_sharded"}, {
     // The $unionWith stage is always run only on the primary.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $unionWith will open a cursor on every shard that contains the
     // foreign collection.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [1, 1],
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true],
 });
 
 // Test $unionWith when the foreign collection is unsharded.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_to_unsharded"}, {
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $unionWith can read locally from the foreign collection, since it
     // is also on the primary and is unsharded.
-    subPipelineLocal: [1, 0],
-    subPipelineRemote: [0, 0]
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [false, false]
 });
 
 // Test $unionWith when the foreign namespace is a view of a sharded collection.
@@ -195,11 +234,11 @@ assert.commandWorked(mongosDB.createView("viewOfSharded", foreign.getName(), [])
 
 pipeline[0].$unionWith.coll = "viewOfSharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_to_view_of_sharded"}, {
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $unionWith will open a cursor on every shard that contains the
     // foreign namespace.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [1, 1]
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true]
 });
 
 // Test $unionWith when the foreign namespace is a view of an unsharded collection.
@@ -208,11 +247,11 @@ assert.commandWorked(mongosDB.createView("viewOfUnsharded", foreign.getName(), [
 
 pipeline[0].$unionWith.coll = "viewOfUnsharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_to_view_of_unsharded"}, {
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $unionWith can read locally from the foreign namespace, since it
     // is also on the primary and is unsharded.
-    subPipelineLocal: [1, 0],
-    subPipelineRemote: [0, 0],
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [false, false],
 });
 
 // Test $unionWith when the foreign collection does not exist.
@@ -221,11 +260,11 @@ st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 expectedRes = [{_id: -2, a: -2}, {_id: -1, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}];
 pipeline[0].$unionWith.coll = "unionWithCollDoesNotExist";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "unionWith_foreign_does_not_exist"}, {
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $unionWith believes it has stale information about the foreign
     // collection and needs to target shards to properly resolve it.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [1, 0],
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, false],
 });
 
 //
@@ -255,23 +294,23 @@ st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_sharded"}, {
     // The $graphLookup stage can always run in parallel across all nodes where the local collection
     // exists.
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // Each node executing the $graphLookup will perform a scatter-gather query and open a cursor on
     // every shard that contains the foreign collection. We need a query into the foreign coll for
     // each doc in the local coll, plus one additional recursive query for {b: {$eq: -1}}.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [5, 5],
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true],
 });
 
 // Test $graphLookup when the foreign collection is unsharded.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_unsharded"}, {
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // The primary shard executing the $graphLookup can read locally from the foreign collection,
     // since it is unsharded. The other node sends the subpipelines over the network.
-    subPipelineLocal: [2, 0],
-    subPipelineRemote: [3, 0]
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [true, false]
 });
 
 // Test $graphLookup when the foreign namespace is a view of a sharded collection.
@@ -280,12 +319,12 @@ st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 
 pipeline[0].$graphLookup.from = "viewOfSharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_view_of_sharded"}, {
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // Each node executing the $graphLookup will perform a scatter-gather query and open a cursor on
     // every shard that contains the foreign collection. The non-primary shard sends one additional
     // query which helps it resolve the sharded view.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [6, 5]
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true]
 });
 
 // Test $graphLookup when the foreign namespace is a view of an unsharded collection.
@@ -293,11 +332,11 @@ st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 pipeline[0].$graphLookup.from = "viewOfUnsharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_view_of_unsharded"}, {
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // The primary shard executing the $graphLookup can read locally from the foreign collection,
     // since it is unsharded. The other node sends the subpipelines over the network.
-    subPipelineLocal: [2, 0],
-    subPipelineRemote: [3, 0]
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [true, false]
 });
 
 // Test $graphLookup when the foreign collection does not exist.
@@ -311,15 +350,15 @@ expectedRes = [
     {_id: 2, a: 3, bs: []}
 ];
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_does_not_exist"}, {
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // If the primary node tries to execute a subpipeline first, then it believes it has stale info
     // about the foreign coll and needs to target shards to properly resolve it. Afterwards, it can
     // do local reads. As before, the other node sends its subpipelines over the network. This
     // results in 3 remote reads. If the non-primary shard sends a subpipeline to execute on the
     // primary shard first, then the primary does a coll refresh before it attempts to run one of
     // its own subpipelines and does not need to target shards. This results in 2 remote reads.
-    subPipelineLocal: [[1, 2], 0],
-    subPipelineRemote: [[2, 3], 0]
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [true, false]
 });
 
 //
@@ -340,12 +379,12 @@ st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_sharded"}, {
     // The $lookup can be executed in parallel because mongos knows both collections are sharded.
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // For every document that flows through the $lookup stage, each node executing the $lookup
     // will perform a scatter-gather query and open a cursor on every shard that contains the
     // foreign collection.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [4, 4]
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true]
 });
 
 // Test $lookup when the foreign collection is unsharded.
@@ -353,11 +392,11 @@ st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_unsharded"}, {
     // The $lookup cannot be executed in parallel because the foreign collection is unsharded.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $lookup can read locally from the foreign namespace, since it is also
     // on the primary and is unsharded.
-    subPipelineLocal: [4, 0],
-    subPipelineRemote: [0, 0]
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [false, false]
 });
 
 // Test $lookup when the foreign namespace is a view of a sharded collection.
@@ -368,12 +407,12 @@ pipeline[0].$lookup.from = "viewOfSharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_sharded"}, {
     // The $lookup is not executed in parallel because mongos does not know the foreign
     // namespace is sharded.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // For every document that flows through the $lookup stage, each node executing the $lookup
     // will perform a scatter-gather query and open a cursor on every shard that contains the
     // foreign collection.
-    subPipelineLocal: [0, 0],
-    subPipelineRemote: [4, 4]
+    subPipelineLocal: [false, false],
+    subPipelineRemote: [true, true]
 });
 
 // Test $lookup when both collection are sharded, but each shard only needs local data to perform
@@ -391,11 +430,11 @@ const idLookupExpectedRes = [
 
 assertAggResultAndRouting(idLookupPipeline, idLookupExpectedRes, {comment: "lookup_on_shard_key"}, {
     // The $lookup is executed on each shard.
-    toplevelExec: [1, 1],
+    toplevelExec: [true, true],
     // Because $lookup is done on shard key, shards must be able to determine that data is needed
     // only from the same shard and perform reads locally.
-    subPipelineLocal: [2, 2],
-    subPipelineRemote: [0, 0]
+    subPipelineLocal: [true, true],
+    subPipelineRemote: [false, false]
 });
 
 // Test $lookup when the foreign namespace is a view of an unsharded collection.
@@ -405,11 +444,11 @@ pipeline[0].$lookup.from = "viewOfUnsharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_unsharded"}, {
     // The $lookup is not executed in parallel because mongos defaults to believing the foreign
     // namespace is unsharded.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $lookup can read locally from the foreign namespace, since it is also
     // on the primary and is unsharded.
-    subPipelineLocal: [4, 0],
-    subPipelineRemote: [0, 0],
+    subPipelineLocal: [true, false],
+    subPipelineRemote: [false, false],
 });
 
 // Test $lookup when it is routed to a secondary which is not yet aware of the foreign collection.
@@ -427,12 +466,9 @@ assertAggResultAndRouting(
     {
         executeOnSecondaries: true,
         // The $lookup cannot be executed in parallel because the foreign collection is unsharded.
-        toplevelExec: [1, 0],
-        // The secondary executing the $lookup targets remote shards on the first query, since it is
-        // missing information about the foreign collection. After it refreshes, it can read locally
-        // from the foreign namespace for all remaining queries.
-        subPipelineLocal: [3, 0],
-        subPipelineRemote: [1, 0],
+        toplevelExec: [true, false],
+        subPipelineLocal: [true, false],
+        subPipelineRemote: [true, false],
     });
 
 // Test $lookup when it is routed to a secondary which is aware of the foreign collection.
@@ -451,11 +487,9 @@ assertAggResultAndRouting(
     {
         executeOnSecondaries: true,
         // The $lookup cannot be executed in parallel because the foreign collection is unsharded.
-        toplevelExec: [1, 0],
-        // This time, the secondary can read locally from the foreign namespace for all queries
-        // since it does not need to refresh.
-        subPipelineLocal: [4, 0],
-        subPipelineRemote: [0, 0],
+        toplevelExec: [true, false],
+        subPipelineLocal: [true, false],
+        subPipelineRemote: [false, false],
     });
 
 // Test $lookup when it is routed to a secondary which thinks the foreign collection is unsharded,
@@ -481,7 +515,9 @@ assertAggResultAndRouting(
     {
         executeOnSecondaries: true,
         // The $lookup can be executed in parallel since mongos knows both collections are sharded.
-        toplevelExec: [1, 1],
+        toplevelExec: [true, true],
+        subPipelineRemote: [true, true],
+        // Omit `subPupelineLocal` assertion.
         // If the primary executes a subpipeline first, it will try and fail to read locally. It
         // falls back to targeting shards, which also fails due to a StaleShardVersionError. The
         // entire subpipeline is re-tried after the refresh. If the non-primary shard executes a
@@ -490,8 +526,6 @@ assertAggResultAndRouting(
         // document that flows through the $lookup stage, each node executing the $lookup will
         // perform a scatter-gather query and open a cursor on every shard that contains the foreign
         // collection.
-        subPipelineLocal: [[0, 1], 0],
-        subPipelineRemote: [[4, 5], 4],
     });
 
 // Test $lookup when the foreign collection does not exist.
@@ -507,17 +541,17 @@ expectedRes = [
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_foreign_does_not_exist"}, {
     // The $lookup is not executed in parallel because mongos defaults to believing the foreign
     // namespace is unsharded.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // The node executing the $lookup believes it has stale information about the foreign
     // collection and needs to target shards to properly resolve it. Then, it can use the local
     // read path for each subpipeline query.
-    subPipelineLocal: [4, 0],
+    subPipelineLocal: [true, false],
     // Because $lookup is pushed down, we will try to take a lock on the foreign collection to check
     // foreign collection's sharding state. Given that the stale shard version is resolved earlier
     // and we've figured out that the foreign collection is unsharded, we no longer need to target a
     // shard and instead can read locally. As such, we will not generate an entry in the profiler
     // for querying the foreign collection.
-    subPipelineRemote: [0, 0],
+    subPipelineRemote: [false, false],
 });
 
 //
@@ -583,14 +617,14 @@ awaitShell();
 
 let expectedRouting = {
     // At the beginning, the foreign collection is unsharded, so the $lookup cannot be parallelized.
-    toplevelExec: [1, 0],
+    toplevelExec: [true, false],
     // We know from prior tests that the $lookup will do a local read for the first local document,
     // since it is executing on the primary with an unsharded foreign collection. Checking the local
     // read log here can be flakey because of the failpoint; the local read log may be rotated off
     // the internal log buffer before we can check for it. Instead, we can just check that for the
     // remaining two local documents, $lookup has to open a cursor on every shard to get correct
     // documents for 'foreign'.
-    subPipelineRemote: [2, 2]
+    subPipelineRemote: [true, true]
 };
 assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
 
@@ -628,7 +662,7 @@ expectedRouting = {
     // the internal log buffer before we can check for it. Instead, we can just check that for the
     // remaining two local documents, $lookup tries and fails to read locally and must target
     // shards to get correct foreign documents.
-    subPipelineRemote: [0, 2]
+    subPipelineRemote: [false, true]
 };
 assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
 

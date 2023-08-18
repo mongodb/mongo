@@ -385,6 +385,8 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/sharding/query/lookup_unionWith_subpipeline_local_read.js
+    ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_graph_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
@@ -928,6 +930,8 @@ last-lts:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/sharding/query/lookup_unionWith_subpipeline_local_read.js
+    ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_graph_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
