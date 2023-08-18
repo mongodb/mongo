@@ -41,7 +41,6 @@ buildvariants:
   tasks:
     - name: compile_test_serial_TG
     - name: .aggfuzzer .common !.feature_flag_guarded
-    - name: free_monitoring
     - name: .jstestfuzz !.initsync
     - name: generate_buildid_to_debug_symbols_mapping
 
@@ -67,7 +66,6 @@ buildvariants:
       --sanitize=address
       --ssl
       --ocsp-stapling=off
-      --enable-free-mon=on
       -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: rhel80
@@ -93,7 +91,6 @@ buildvariants:
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: .encrypt
-  - name: free_monitoring
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
@@ -152,7 +149,6 @@ buildvariants:
       --sanitize=undefined
       --ssl
       --ocsp-stapling=off
-      --enable-free-mon=on
       -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: rhel80
@@ -177,7 +173,6 @@ buildvariants:
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
   - name: .encrypt
-  - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_min_batch_repeat_queries_ese_gsm

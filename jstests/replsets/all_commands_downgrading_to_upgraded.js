@@ -777,11 +777,6 @@ const allCommands = {
         isAdminCommand: true,
         command: {getDiagnosticData: 1},
     },
-    getFreeMonitoringStatus: {
-        isAdminCommand: true,
-        command: {getFreeMonitoringStatus: 1},
-        doesNotRunOnMongos: true,
-    },
     getLog: {
         isAdminCommand: true,
         command: {getLog: "global"},
@@ -1402,9 +1397,6 @@ const allCommands = {
     },
     setIndexCommitQuorum: {skip: requiresParallelShell},
     setFeatureCompatibilityVersion: {skip: "is tested through this test"},
-    setFreeMonitoring: {
-        skip: "requires cloudFreeMonitoringEndpointURL setup",
-    },
     setProfilingFilterGlobally: {
         command: {setProfilingFilterGlobally: 1, filter: {nreturned: 0}},
         expectFailure: true,

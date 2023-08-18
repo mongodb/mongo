@@ -273,7 +273,6 @@ const allCommands = {
     getDatabaseVersion: {skip: isNotAUserDataRead},
     getDefaultRWConcern: {skip: isNotAUserDataRead},
     getDiagnosticData: {skip: isNotAUserDataRead},
-    getFreeMonitoringStatus: {skip: isNotAUserDataRead},
     getLog: {skip: isNotAUserDataRead},
     getMore: {
         command: {getMore: NumberLong(123), collection: collName},
@@ -396,7 +395,6 @@ const allCommands = {
     setDefaultRWConcern: {skip: isPrimaryOnly},
     setIndexCommitQuorum: {skip: isPrimaryOnly},
     setFeatureCompatibilityVersion: {skip: isPrimaryOnly},
-    setFreeMonitoring: {skip: isPrimaryOnly},
     setProfilingFilterGlobally: {skip: isNotAUserDataRead},
     setParameter: {skip: isNotAUserDataRead},
     setShardVersion: {skip: isNotAUserDataRead},

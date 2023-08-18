@@ -148,13 +148,13 @@ inside the namespace defined by `globals.cpp_namespace`. Consider the following 
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/free_mon/free_mon_mongod.h"
+    - "mongo/util/net/ssl_parameters.h"
 
 server_parameters:
-  cloudFreeMonitoringEndpointURL:
+  opensslCipherConfig:
     ...
     validator:
-      callback: "onValidateFreeMonEndpointURL" # The callback is declared in "free_mon_mongod.h"
+      callback: "validateOpensslCipherConfig" # The callback is declared in "ssl_parameters.h"
 ```
 
 ### Specialized Server Parameters

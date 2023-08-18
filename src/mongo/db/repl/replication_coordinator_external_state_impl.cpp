@@ -66,7 +66,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -570,8 +569,6 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     _dropAllTempCollections(opCtx);
 
     IndexBuildsCoordinator::get(opCtx)->onStepUp(opCtx);
-
-    notifyFreeMonitoringOnTransitionToPrimary();
 
     // It is only necessary to check the system indexes on the first transition to primary.
     // On subsequent transitions to primary the indexes will have already been created.

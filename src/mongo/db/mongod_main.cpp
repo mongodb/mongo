@@ -105,7 +105,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/global_settings.h"
@@ -822,8 +821,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             logStartup(startupOpCtx.get());
         }
 
-        startFreeMonitoring(serviceContext);
-
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
 
@@ -1400,8 +1397,6 @@ void setUpObservers(ServiceContext* serviceContext) {
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
 
-    setupFreeMonitoringOpObserver(opObserverRegistry.get());
-
     if (audit::opObserverRegistrar) {
         audit::opObserverRegistrar(opObserverRegistry.get());
     }
@@ -1694,9 +1689,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                           "Service entry point did not shutdown within the time limit");
         }
     }
-
-    LOGV2(4784925, "Shutting down free monitoring");
-    stopFreeMonitoring();
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
         LOGV2(4784927, "Shutting down the HealthLog");

@@ -857,75 +857,6 @@ For usage examples, see:
 \fBConvert Command\-Line Options to YAML\f1
 .RE
 .RE
-.SS FREE MONITORING
-.PP
-\fBmongod \-\-enableFreeMonitoring\f1
-.RS
-.PP
-Enables or disables \fBfree MongoDB Cloud monitoring\f1\&. \fB\-\-enableFreeMonitoring\f1\f1 accepts the following
-values:
-.RS
-.IP \(bu 2
-.RS
-.IP \(bu 4
-Value
-.IP \(bu 4
-Description
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBruntime\f1
-.IP \(bu 4
-Default. You can enable or disable free monitoring during
-runtime.
-.IP
-To enable or disable free monitoring during runtime, see
-\fBdb.enableFreeMonitoring()\f1\f1 and
-\fBdb.disableFreeMonitoring()\f1\f1\&.
-.IP
-To enable or disable free monitoring during runtime when
-running with access control, users must have required
-privileges. See \fBdb.enableFreeMonitoring()\f1\f1 and
-\fBdb.disableFreeMonitoring()\f1\f1 for details.
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBon\f1
-.IP \(bu 4
-Enables free monitoring at startup; i.e. registers for free
-monitoring. When enabled at startup, you cannot disable free
-monitoring during runtime.
-.RE
-.IP \(bu 2
-.RS
-.IP \(bu 4
-\fBoff\f1
-.IP \(bu 4
-Disables free monitoring at startup, regardless of whether
-you have previously registered for free monitoring.  When disabled at startup,
-you cannot enable free monitoring during runtime.
-.RE
-.RE
-.PP
-Once enabled, the free monitoring state remains enabled until
-explicitly disabled. That is, you do not need to re\-enable each time
-you start the server.
-.PP
-For the corresponding configuration file setting, see
-\fBcloud.monitoring.free.state\f1\f1\&.
-.RE
-.PP
-\fBmongod \-\-freeMonitoringTag\f1
-.RS
-.PP
-Optional tag to describe environment context. The tag can be sent as
-part of the \fBfree MongoDB Cloud monitoring\f1 registration at start up.
-.PP
-For the corresponding configuration file setting, see
-\fBcloud.monitoring.free.tags\f1\f1\&.
-.RE
 .SS LDAP AUTHENTICATION OR AUTHORIZATION OPTIONS
 .PP
 \fBmongod \-\-ldapServers\f1
@@ -1344,9 +1275,9 @@ anything preceeding the suffix into a regex capture group.
      {
         match: "(.+)@DBA.EXAMPLE.COM",
         ldapQuery: "ou=dba,dc=example,dc=com??one?(user={0})"
-  
+
      }
-  
+
   ]"
 .EE
 .PP
