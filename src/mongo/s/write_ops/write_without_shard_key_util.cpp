@@ -320,6 +320,16 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 docs.push_back(queryResponse.getTargetDoc().get());
                 write_ops::InsertCommandRequest insertRequest(sharedBlock->nss, docs);
 
+                // Append "encryptionInformation" if the original command is an encrypted command.
+                boost::optional<EncryptionInformation> encryptionInformation;
+                if (sharedBlock->cmdObj.hasField(
+                        write_ops::WriteCommandRequestBase::kEncryptionInformationFieldName)) {
+                    encryptionInformation = EncryptionInformation(BSONObj());
+                    encryptionInformation->setCrudProcessed(true);
+                }
+                insertRequest.getWriteCommandRequestBase().setEncryptionInformation(
+                    encryptionInformation);
+
                 auto writeRes = txnClient.runCRUDOpSync(insertRequest,
                                                         std::vector<StmtId>{kUninitializedStmtId});
 

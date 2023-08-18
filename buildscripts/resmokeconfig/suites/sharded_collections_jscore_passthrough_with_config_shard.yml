@@ -69,8 +69,6 @@ selector:
   - jstests/core/**/index_multikey.js
   - jstests/core/**/optimized_match_explain.js
   - jstests/core/**/sort_array.js
-  # TODO SERVER-79520: investigate if this is a bug around update with upsert and FLE2.
-  - src/mongo/db/modules/enterprise/jstests/fle2/bulk_write_update.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

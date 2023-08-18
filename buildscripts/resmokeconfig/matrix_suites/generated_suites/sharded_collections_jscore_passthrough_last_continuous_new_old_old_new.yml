@@ -84,7 +84,6 @@ selector:
   - jstests/core/**/index_multikey.js
   - jstests/core/**/optimized_match_explain.js
   - jstests/core/**/sort_array.js
-  - src/mongo/db/modules/enterprise/jstests/fle2/bulk_write_update.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
