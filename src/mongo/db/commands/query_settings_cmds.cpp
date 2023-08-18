@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/query_settings_cmds_gen.h"
+#include "mongo/db/commands/query_settings_utils.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
@@ -122,8 +123,12 @@ public:
         using InvocationBase::InvocationBase;
 
         SetQuerySettingsCommandReply insertQuerySettings(
-            OperationContext* opCtx, QueryShapeConfiguration queryShapeConfiguration) {
-            // TODO: SERVER-77466 Implement validation rules for setQuerySettings command.
+            OperationContext* opCtx,
+            QueryShapeConfiguration queryShapeConfiguration,
+            const RepresentativeQueryInfo& representativeQueryInfo) {
+            // Assert querySettings command is valid.
+            utils::validateQuerySettings(
+                queryShapeConfiguration, representativeQueryInfo, request().getDbName().tenantId());
 
             // Build the new 'settingsArray' by appending 'newConfig' to the list of all
             // QueryShapeConfigurations for the given tenant.
@@ -182,12 +187,17 @@ public:
             OperationContext* opCtx, const query_shape::QueryShapeHash& queryShapeHash) {
             auto& querySettingsManager = QuerySettingsManager::get(opCtx);
             auto tenantId = request().getDbName().tenantId();
+
             auto querySettings = querySettingsManager.getQuerySettingsForQueryShapeHash(
                 opCtx, queryShapeHash, tenantId);
             uassert(7746401,
                     "New query settings can only be created with a query instance, but a query "
                     "hash was given.",
                     querySettings.has_value());
+
+            auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
+            auto representativeQueryInfo =
+                createRepresentativeInfo(querySettings->second, expCtx, tenantId);
             return updateQuerySettings(opCtx,
                                        request().getSettings(),
                                        QueryShapeConfiguration(queryShapeHash,
@@ -200,12 +210,9 @@ public:
             auto& querySettingsManager = QuerySettingsManager::get(opCtx);
             auto tenantId = request().getDbName().tenantId();
             auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
-            auto queryShape = query_shape::extractQueryShape(
-                queryInstance,
-                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                std::move(expCtx),
-                tenantId);
-            auto queryShapeHash = query_shape::hash(std::move(queryShape));
+            auto representativeQueryInfo =
+                createRepresentativeInfo(queryInstance, expCtx, tenantId);
+            auto& queryShapeHash = representativeQueryInfo.queryShapeHash;
 
             // If there is already an entry for a given QueryShapeHash, then perform
             // an update, otherwise insert.
@@ -222,7 +229,8 @@ public:
                     opCtx,
                     QueryShapeConfiguration(std::move(queryShapeHash),
                                             std::move(request().getSettings()),
-                                            queryInstance));
+                                            queryInstance),
+                    representativeQueryInfo);
             }
         }
 
@@ -293,24 +301,24 @@ public:
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility));
             auto tenantId = request().getDbName().tenantId();
-            auto queryShapeHash = stdx::visit(
-                OverloadedVisitor{
-                    [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                        return queryShapeHash;
-                    },
-                    [&](const QueryInstance& queryInstance) {
-                        // Converts 'queryInstance' into QueryShapeHash, for convenient comparison
-                        // during search for the matching QueryShapeConfiguration.
-                        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
-                        auto queryShape = query_shape::extractQueryShape(
-                            queryInstance,
-                            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                            std::move(expCtx),
-                            tenantId);
-                        return query_shape::hash(std::move(queryShape));
-                    },
-                },
-                request().getCommandParameter());
+            auto queryShapeHash =
+                stdx::visit(OverloadedVisitor{
+                                [&](const query_shape::QueryShapeHash& queryShapeHash) {
+                                    return queryShapeHash;
+                                },
+                                [&](const QueryInstance& queryInstance) {
+                                    // Converts 'queryInstance' into QueryShapeHash, for convenient
+                                    // comparison during search for the matching
+                                    // QueryShapeConfiguration.
+                                    auto expCtx =
+                                        make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
+                                    auto representativeQueryInfo =
+                                        createRepresentativeInfo(queryInstance, expCtx, tenantId);
+
+                                    return representativeQueryInfo.queryShapeHash;
+                                },
+                            },
+                            request().getCommandParameter());
             auto& querySettingsManager = QuerySettingsManager::get(opCtx);
 
             // Build the new 'settingsArray' by removing the QueryShapeConfiguration with a matching

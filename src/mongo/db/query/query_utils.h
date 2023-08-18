@@ -45,6 +45,12 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
  */
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);
 
+/**
+ * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
+ * without taking into account the collators.
+ */
+bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& query);
+
 bool isSortSbeCompatible(const SortPattern& sortPattern);
 
 /**

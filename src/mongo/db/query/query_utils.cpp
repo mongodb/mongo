@@ -68,12 +68,15 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
 }
 
 bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query) {
-    const auto& findCommand = query.getFindCommandRequest();
+    return isIdHackEligibleQueryWithoutCollator(query.getFindCommandRequest()) &&
+        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
+}
+
+bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand) {
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
         !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
-        !findCommand.getTailable() &&
-        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
+        !findCommand.getTailable();
 }
 
 bool isSortSbeCompatible(const SortPattern& sortPattern) {

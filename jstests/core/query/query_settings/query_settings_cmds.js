@@ -7,24 +7,19 @@
 // ]
 //
 
+import {QuerySettingsUtils} from "jstests/core/libs/query_settings_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const adminDB = db.getSiblingDB("admin");
 const coll = db[jsTestName()];
-const nonExistentQueryShapeHash =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+
 const querySettingsAggPipeline = [
     {$querySettings: {}},
     {$project: {queryShapeHash: 0}},
     {$sort: {representativeQuery: 1}},
 ];
 
-/**
- * Makes an query instance of the find command with an optional filter clause.
- */
-function makeQueryInstance(filter = {}) {
-    return {find: coll.getName(), $db: db.getName(), filter};
-}
+const utils = new QuerySettingsUtils(db, coll)
 
 /**
  * Makes a QueryShapeConfiguration object without the QueryShapeHash.
@@ -33,8 +28,8 @@ function makeQueryShapeConfiguration(settings, representativeQuery) {
     return {settings, representativeQuery};
 }
 
-const queryA = makeQueryInstance({a: 1});
-const queryB = makeQueryInstance({b: "string"});
+const queryA = utils.makeQueryInstance({a: 1});
+const queryB = utils.makeQueryInstance({b: "string"});
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
@@ -69,19 +64,6 @@ if (FixtureHelpers.isMongos(db)) {
 
 // Ensure that query settings cluster parameter is empty.
 { assertQueryShapeConfiguration([]); }
-
-// Ensure that setQuerySettings command fails for invalid input.
-{
-    assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: nonExistentQueryShapeHash, settings: querySettingsA}),
-        7746401);
-    assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: {notAValid: "query"}, settings: querySettingsA}),
-        7746402);
-    assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: makeQueryInstance(), settings: {notAValid: "settings"}}),
-        40415);
-}
 
 // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after invoking
 // setQuerySettings command.
@@ -119,25 +101,18 @@ if (FixtureHelpers.isMongos(db)) {
 // by passing a different QueryInstance with the same QueryShape.
 {
     assert.commandWorked(db.adminCommand(
-        {setQuerySettings: makeQueryInstance({b: "test"}), settings: querySettingsA}));
+        {setQuerySettings: utils.makeQueryInstance({b: "test"}), settings: querySettingsA}));
     assertQueryShapeConfiguration([
         makeQueryShapeConfiguration(querySettingsB, queryA),
         makeQueryShapeConfiguration(querySettingsA, queryB)
     ]);
 }
 
-// Ensure that removeQuerySettings command fails for invalid input.
-{
-    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: nonExistentQueryShapeHash}),
-                                 7746701);
-    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: {notAValid: "query"}}),
-                                 7746402);
-}
-
 // Ensure that removeQuerySettings command removes one query settings from the 'settingsArray' of
 // the 'querySettings' cluster parameter by providing a query instance.
 {
-    assert.commandWorked(db.adminCommand({removeQuerySettings: makeQueryInstance({b: "shape"})}));
+    assert.commandWorked(
+        db.adminCommand({removeQuerySettings: utils.makeQueryInstance({b: "shape"})}));
     assertQueryShapeConfiguration([makeQueryShapeConfiguration(querySettingsB, queryA)]);
 }
 
@@ -147,15 +122,6 @@ if (FixtureHelpers.isMongos(db)) {
     const queryShapeHashA = adminDB.aggregate([{$querySettings: {}}]).toArray()[0].queryShapeHash;
     assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
     assertQueryShapeConfiguration([]);
-}
-
-// Ensure that $querySettings agg stage inherits the constraints from the underlying alias stages,
-// including $queue.
-{
-    assert.commandFailedWithCode(
-        db.adminCommand(
-            {aggregate: 1, pipeline: [{$documents: []}, {$querySettings: {}}], cursor: {}}),
-        40602);
 }
 
 // Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
