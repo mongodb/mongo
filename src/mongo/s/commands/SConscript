@@ -93,7 +93,6 @@ env.Library(
         'cluster_set_allow_migrations_cmd.cpp',
         'cluster_set_cluster_parameter_cmd.cpp',
         'cluster_set_feature_compatibility_version_cmd.cpp',
-        'cluster_set_free_monitoring_cmd.cpp' if get_option("enable-free-mon") == 'on' else [],
         'cluster_set_index_commit_quorum_cmd.cpp',
         'cluster_set_user_write_block_mode_command.cpp',
         'cluster_shard_collection_cmd.cpp',

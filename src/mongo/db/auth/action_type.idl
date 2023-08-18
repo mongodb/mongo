@@ -63,7 +63,7 @@ enums:
            changeOwnPassword :  "changeOwnPassword"
            changeOwnCustomData :  "changeOwnCustomData"
            changeStream :  "changeStream"
-           checkFreeMonitoringStatus :  "checkFreeMonitoringStatus"
+           checkFreeMonitoringStatus :  "checkFreeMonitoringStatus"  # Removed (backwards compatibility)
            checkMetadataConsistency :  "checkMetadataConsistency"
            cleanupOrphaned :  "cleanupOrphaned"
            clearJumboFlag :  "clearJumboFlag"
@@ -177,7 +177,7 @@ enums:
            setClusterParameter: "setClusterParameter"
            setDefaultRWConcern :  "setDefaultRWConcern"
            setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
-           setFreeMonitoring :  "setFreeMonitoring"
+           setFreeMonitoring :  "setFreeMonitoring"  # Removed (backwards compatibility)
            setParameter :  "setParameter"
            setUserWriteBlockMode: "setUserWriteBlockMode"
            shardCollection :  "shardCollection"  # ID only

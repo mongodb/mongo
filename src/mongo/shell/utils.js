@@ -1149,52 +1149,6 @@ shellHelper.show = function(what) {
         }
     }
 
-    if (what == "freeMonitoring") {
-        var dbDeclared, ex;
-        try {
-            // !!db essentially casts db to a boolean
-            // Will throw a reference exception if db hasn't been declared.
-            dbDeclared = !!globalThis.db;
-        } catch (ex) {
-            dbDeclared = false;
-        }
-
-        if (dbDeclared) {
-            const freemonStatus = globalThis.db.adminCommand({getFreeMonitoringStatus: 1});
-
-            if (freemonStatus.ok) {
-                if (freemonStatus.state == 'enabled' &&
-                    freemonStatus.hasOwnProperty('userReminder')) {
-                    print("---");
-                    print(freemonStatus.userReminder);
-                    print("---");
-                } else if (freemonStatus.state === 'undecided') {
-                    print(
-                        "---\n" + messageIndent +
-                        "Enable MongoDB's free cloud-based monitoring service, which will then receive and display\n" +
-                        messageIndent +
-                        "metrics about your deployment (disk utilization, CPU, operation statistics, etc).\n" +
-                        "\n" + messageIndent +
-                        "The monitoring data will be available on a MongoDB website with a unique URL accessible to you\n" +
-                        messageIndent +
-                        "and anyone you share the URL with. MongoDB may use this information to make product\n" +
-                        messageIndent +
-                        "improvements and to suggest MongoDB products and deployment options to you.\n" +
-                        "\n" + messageIndent +
-                        "To enable free monitoring, run the following command: db.enableFreeMonitoring()\n" +
-                        messageIndent +
-                        "To permanently disable this reminder, run the following command: db.disableFreeMonitoring()\n" +
-                        "---\n");
-                }
-            }
-
-            return "";
-        } else {
-            print("Cannot show freeMonitoring, \"db\" is not set");
-            return "";
-        }
-    }
-
     if (what == "nonGenuineMongoDBCheck") {
         let matchesKnownImposterSignature = false;
 

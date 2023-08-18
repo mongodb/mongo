@@ -79,7 +79,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/global_settings.h"
@@ -747,17 +746,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             logStartup(startupOpCtx.get());
         }
 
-        startFreeMonitoring(serviceContext);
-
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-            if (!replCoord->isReplEnabled()) {
-                if (ShardingState::get(startupOpCtx.get())->enabled()) {
-                    uassertStatusOK(ShardingStateRecovery_DEPRECATED::recover(startupOpCtx.get()));
-                }
-            }
-        }
-
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
 
@@ -1308,8 +1296,6 @@ void setUpObservers(ServiceContext* serviceContext) {
     opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
 
-    setupFreeMonitoringOpObserver(opObserverRegistry.get());
-
     if (audit::opObserverRegistrar) {
         audit::opObserverRegistrar(opObserverRegistry.get());
     }
@@ -1588,9 +1574,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                           "Service entry point did not shutdown within the time limit");
         }
     }
-
-    LOGV2(4784925, "Shutting down free monitoring");
-    stopFreeMonitoring();
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
         LOGV2(4784927, "Shutting down the HealthLog");

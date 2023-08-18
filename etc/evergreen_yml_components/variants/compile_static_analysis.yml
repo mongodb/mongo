@@ -103,7 +103,6 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --enable-free-mon=on
       --enable-http-client=on
       --link-model=dynamic
     num_scons_link_jobs_available: 0.99
@@ -144,7 +143,6 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
-      --enable-free-mon=on
     compile_variant: *linux-debug-aubsan-compile-required
 
 - <<: *linux-x86-dynamic-compile-params

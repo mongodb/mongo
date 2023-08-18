@@ -299,9 +299,9 @@ error_codes:
     - {code: 250,name: StaleChunkHistory,categories: [SnapshotError]}
     - {code: 251,name: NoSuchTransaction,categories: [VoteAbortError]}
     - {code: 252,name: ReentrancyNotAllowed}
-    - {code: 253,name: FreeMonHttpInFlight}
-    - {code: 254,name: FreeMonHttpTemporaryFailure}
-    - {code: 255,name: FreeMonHttpPermanentFailure}
+    # - {code: 253,name: FreeMonHttpInFlight} # Removed in 7.1
+    # - {code: 254,name: FreeMonHttpTemporaryFailure} # Removed in 7.1
+    # - {code: 255,name: FreeMonHttpPermanentFailure} # Removed in 7.1
     - {code: 256,name: TransactionCommitted}
     - {code: 257,name: TransactionTooLarge}
     - {code: 258,name: UnknownFeatureCompatibilityVersion}

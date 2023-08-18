@@ -1624,7 +1624,6 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --use-diagnostic-latches=off
         --allocator=system
-        --enable-free-mon=off
         --enterprise-features=fle,search
         --js-engine=none
         --link-model=dynamic-sdk

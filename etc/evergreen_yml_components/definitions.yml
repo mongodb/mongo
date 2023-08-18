@@ -3150,7 +3150,6 @@ tasks:
       targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
       task_compile_flags: >-
         --link-model=dynamic-sdk
-        --enable-free-mon=off
         --ssl=off
         --enable-http-client=off
         --modules=
@@ -3182,7 +3181,6 @@ tasks:
       targets: install-stitch-support-test
       compiling_for_test: true
       task_compile_flags: >-
-        --enable-free-mon=off
         --ssl=off
         --enable-http-client=off
         --modules=
@@ -3214,7 +3212,6 @@ tasks:
       targets: archive-mongo-crypt-dev
       task_compile_flags: >-
         --allocator=system
-        --enable-free-mon=off
         --enterprise-features=fle,search
         --js-engine=none
         --link-model=dynamic-sdk
@@ -3252,7 +3249,6 @@ tasks:
         --dbg=on
         --opt=off
         --allocator=system
-        --enable-free-mon=off
         --enterprise-features=fle,search
         --js-engine=none
         --link-model=dynamic-sdk
@@ -3290,7 +3286,6 @@ tasks:
       compiling_for_test: true
       task_compile_flags: >-
         --allocator=system
-        --enable-free-mon=off
         --enterprise-features=fle,search
         --js-engine=none
         --link-model=static
@@ -6677,15 +6672,6 @@ tasks:
     vars:
       suite: watchdog
       resmoke_args: --storageEngine=inMemory
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: free_monitoring
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
       resmoke_jobs_max: 1
 
 - <<: *task_template

@@ -1680,57 +1680,6 @@ DB.prototype.watch = function(pipeline, options) {
     return this._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
 };
 
-DB.prototype.getFreeMonitoringStatus = function() {
-    'use strict';
-    return assert.commandWorked(this.adminCommand({getFreeMonitoringStatus: 1}));
-};
-
-DB.prototype.enableFreeMonitoring = function() {
-    'use strict';
-    let reply, isPrimary;
-    if (this.getMongo().getApiParameters().apiVersion) {
-        reply = this.hello();
-        isPrimary = reply.isWritablePrimary;
-    } else {
-        reply = this.isMaster();
-        isPrimary = reply.ismaster;
-    }
-
-    if (!isPrimary) {
-        print("ERROR: db.enableFreeMonitoring() may only be run on a primary");
-        return;
-    }
-
-    assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
-
-    const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
-    if (!cmd.ok && (cmd.code == ErrorCode.Unauthorized)) {
-        // Edge case: It's technically possible that a user can change free-mon state,
-        // but is not allowed to inspect it.
-        print("Successfully initiated free monitoring, but unable to determine status " +
-              "as you lack the 'checkFreeMonitoringStatus' privilege.");
-        return;
-    }
-    assert.commandWorked(cmd);
-
-    if (cmd.state !== 'enabled') {
-        const url = this.adminCommand({'getParameter': 1, 'cloudFreeMonitoringEndpointURL': 1})
-                        .cloudFreeMonitoringEndpointURL;
-
-        print("Unable to get immediate response from the Cloud Monitoring service. We will" +
-              "continue to retry in the background. Please check your firewall " +
-              "settings to ensure that mongod can communicate with \"" + url + "\"");
-        return;
-    }
-
-    print(tojson(cmd));
-};
-
-DB.prototype.disableFreeMonitoring = function() {
-    'use strict';
-    assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'disable'}));
-};
-
 // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the
 // DB's getProperty() handler in C++ takes precedence when a property isn't defined on the DB
 // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must
