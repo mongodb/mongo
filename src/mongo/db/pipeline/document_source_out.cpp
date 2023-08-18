@@ -91,12 +91,6 @@ DocumentSourceOut::~DocumentSourceOut() {
             auto cleanupClient =
                 pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
 
-            // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*cleanupClient.get());
-                cleanupClient.get()->setSystemOperationUnkillableByStepdown(lk);
-            }
-
             AlternativeClientRegion acr(cleanupClient);
             // Create a new operation context so that any interrupts on the current operation will
             // not affect the dropCollection operation below.
@@ -105,7 +99,15 @@ DocumentSourceOut::~DocumentSourceOut() {
             DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
 
             auto deleteNs = _tempNs.size() ? _tempNs : makeBucketNsIfTimeseries(getOutputNs());
-            pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), deleteNs);
+            try {
+                pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), deleteNs);
+            } catch (const DBException& e) {
+                LOGV2_WARNING(7466203,
+                              "Unexpected error dropping temporary collection; drop will complete ",
+                              "on next server restart",
+                              "error"_attr = e.toString(),
+                              "coll"_attr = deleteNs);
+            }
         });
 }
 

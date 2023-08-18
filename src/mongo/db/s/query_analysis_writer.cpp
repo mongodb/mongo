@@ -340,11 +340,18 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
                 return;
             }
             auto opCtx = client->makeOperationContext();
-            _flushQueries(opCtx.get());
+            try {
+                _flushQueries(opCtx.get());
+            } catch (const DBException& e) {
+                LOGV2_WARNING(
+                    7466204,
+                    "Query Analysis Query Writer encountered unexpected error, will retry after"
+                    "gQueryAnalysisWriterIntervalSecs",
+                    "error"_attr = e.toString());
+            }
         },
         Seconds(gQueryAnalysisWriterIntervalSecs.load()),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
     _periodicQueryWriter =
         std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(queryWriterJob)));
     _periodicQueryWriter->start();
@@ -357,10 +364,17 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             }
             auto opCtx = client->makeOperationContext();
             _flushDiffs(opCtx.get());
+            try {
+                _flushDiffs(opCtx.get());
+            } catch (const DBException& e) {
+                LOGV2_WARNING(7466201,
+                              "Query Analysis Diff Writer encountered unexpected error, will retry "
+                              "after gQueryAnalysisWriterIntervalSecs",
+                              "error"_attr = e.toString());
+            }
         },
         Seconds(gQueryAnalysisWriterIntervalSecs.load()),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
     _periodicDiffWriter =
         std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(diffWriterJob)));
     _periodicDiffWriter->start();
@@ -386,10 +400,6 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     threadPoolOptions.poolName = "QueryAnalysisWriterThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-
-        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
     };
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),

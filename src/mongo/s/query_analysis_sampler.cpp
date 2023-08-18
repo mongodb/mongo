@@ -154,11 +154,13 @@ void QueryAnalysisSampler::onStartup() {
 
     stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
 
+    // setting isKillableByStepdown to false as _freshQueryStats has no OperationContext.
+    // Holds only _queryStatsMutex and no other resources, updates only in memory states and
+    // is gauranteed to complete. Can therefore trivially set isKillableByStepdown to false
     PeriodicRunner::PeriodicJob queryStatsRefresherJob(
         "QueryAnalysisQueryStatsRefresher",
         [this](Client* client) { _refreshQueryStats(); },
         Seconds(1),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
         false /*isKillableByStepdown*/);
     _periodicQueryStatsRefresher = periodicRunner->makeJob(std::move(queryStatsRefresherJob));
     _periodicQueryStatsRefresher.start();
@@ -170,15 +172,15 @@ void QueryAnalysisSampler::onStartup() {
             try {
                 _refreshConfigurations(opCtx.get());
             } catch (DBException& ex) {
-                LOGV2(7012500,
-                      "Failed to refresh query analysis configurations, will try again at the next "
-                      "interval",
-                      "error"_attr = redact(ex));
+                LOGV2_WARNING(
+                    7012500,
+                    "Failed to refresh query analysis configurations, will try again at the next "
+                    "interval",
+                    "error"_attr = redact(ex));
             }
         },
         Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs.load()),
-        // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
     _periodicConfigurationsRefresher = std::make_shared<PeriodicJobAnchor>(
         periodicRunner->makeJob(std::move(configurationsRefresherJob)));
     _periodicConfigurationsRefresher->start();

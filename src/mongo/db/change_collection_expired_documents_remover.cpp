@@ -228,12 +228,11 @@ class ChangeCollectionExpiredDocumentsRemover {
 public:
     ChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext) {
         const auto period = Seconds{gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds.load()};
-        _jobAnchor = serviceContext->getPeriodicRunner()->makeJob(
-            {"ChangeCollectionExpiredDocumentsRemover",
-             removeExpiredDocuments,
-             period,
-             // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
-             false /*isKillableByStepdown*/});
+        _jobAnchor =
+            serviceContext->getPeriodicRunner()->makeJob({"ChangeCollectionExpiredDocumentsRemover",
+                                                          removeExpiredDocuments,
+                                                          period,
+                                                          true /*isKillableByStepdown*/});
         _jobAnchor.start();
     }
 

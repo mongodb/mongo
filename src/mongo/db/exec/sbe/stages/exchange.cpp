@@ -58,12 +58,6 @@ MONGO_INITIALIZER(s_globalThreadPool)(InitializerContext* context) {
     options.maxThreads = 128;
     options.onCreateThread = [](const std::string& name) {
         Client::initThread(name);
-
-        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
     };
     s_globalThreadPool = std::make_unique<ThreadPool>(options);
     s_globalThreadPool->startup();
@@ -530,6 +524,9 @@ void ExchangeProducer::start(OperationContext* opCtx,
     ExchangeProducer* p = static_cast<ExchangeProducer*>(producer.get());
 
     // TODO: SERVER-62925. Rationalize this lock.
+    // Also review if the threads should remain killable. Currently threads with IS mode global
+    // lock would not be made kill target but if this lock mode changes, the initialization of
+    // s_globalThreadPool should be reviewed.
     Lock::GlobalLock lock(opCtx, MODE_IS);
 
     p->attachToOperationContext(opCtx);

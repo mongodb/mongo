@@ -371,12 +371,6 @@ void MozJSProxyScope::shutdownThread() {
 void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
     if (hasGlobalServiceContext()) {
         Client::initThread("js");
-
-        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
     }
 
     std::unique_ptr<MozJSImplScope> scope;

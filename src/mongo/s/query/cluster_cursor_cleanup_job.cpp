@@ -45,6 +45,8 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/time_support.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 
 ClusterCursorCleanupJob clusterCursorCleanupJob;
@@ -55,13 +57,6 @@ std::string ClusterCursorCleanupJob::name() const {
 
 void ClusterCursorCleanupJob::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
-
-    // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     auto* const client = Client::getCurrent();
     auto* const manager = Grid::get(client->getServiceContext())->getCursorManager();
     invariant(manager);
@@ -74,7 +69,14 @@ void ClusterCursorCleanupJob::run() {
         Date_t cutoff = (cursorTimeoutValue > 0)
             ? (Date_t::now() - Milliseconds(cursorTimeoutValue))
             : Date_t::now();
-        manager->killMortalCursorsInactiveSince(opCtx.get(), cutoff);
+        try {
+            manager->killMortalCursorsInactiveSince(opCtx.get(), cutoff);
+        } catch (const DBException& e) {
+            LOGV2_WARNING(7466200,
+                          "Cursor clean up encountered unexpected error, will retry after cursor "
+                          "monitor interval",
+                          "error"_attr = e.toString());
+        }
 
         MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(getClientCursorMonitorFrequencySecs());

@@ -54,6 +54,8 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 namespace mongo {
 
 using std::string;
@@ -368,18 +370,20 @@ public:
     void run() {
         ThreadClient tc("clientcursormon", getGlobalServiceContext());
 
-        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
-
         while (!globalInShutdownDeprecated()) {
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
                 auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
-                cursorStatsTimedOut.increment(
-                    CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
+                try {
+                    cursorStatsTimedOut.increment(
+                        CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
+                } catch (const DBException& e) {
+                    LOGV2_WARNING(
+                        7466202,
+                        "Cursor Time Out job encountered unexpected error, will retry after cursor "
+                        "time out interval",
+                        "error"_attr = e.toString());
+                }
             }
             MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(getClientCursorMonitorFrequencySecs());
