@@ -117,14 +117,13 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const DatabaseName& dbName,
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        const NamespaceString nss(
-            parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         // Check whether parameters passed to splitChunk are sound
         BSONObj keyPatternObj;

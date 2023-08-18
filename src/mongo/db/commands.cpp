@@ -1084,7 +1084,7 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
                                   const BSONObj& cmdObj,
                                   BSONObjBuilder& result) {
     std::string errmsg;
-    auto ok = errmsgRun(opCtx, DatabaseNameUtil::serialize(dbName), cmdObj, errmsg, result);
+    auto ok = errmsgRun(opCtx, dbName, cmdObj, errmsg, result);
     if (!errmsg.empty()) {
         CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
     }

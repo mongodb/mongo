@@ -101,10 +101,11 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const DatabaseName& dbName,
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+        const auto dbname = DatabaseNameUtil::serialize(dbName);
         BSONObj fsyncCmdObj = cmdObj;
         if (cmdObj["lock"].trueValue() &&
             !feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {

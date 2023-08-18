@@ -90,12 +90,11 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const DatabaseName& dbName,
                    const BSONObj& jsobj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss(
-            parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), jsobj));
+        const NamespaceString nss(parseNs(dbName, jsobj));
 
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         if (keyPattern.isEmpty()) {

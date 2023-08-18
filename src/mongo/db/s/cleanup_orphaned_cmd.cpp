@@ -211,7 +211,7 @@ public:
     static BSONField<BSONObj> startingFromKeyField;
 
     bool errmsgRun(OperationContext* opCtx,
-                   std::string const& db,
+                   const DatabaseName& dbName,
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {

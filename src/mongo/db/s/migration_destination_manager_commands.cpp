@@ -141,14 +141,14 @@ public:
     }
 
     bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
+                   const DatabaseName& dbName,
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        auto nss = parseNs(DatabaseNameUtil::deserialize(boost::none, dbname), cmdObj);
+        auto nss = parseNs(dbName, cmdObj);
 
         auto cloneRequest = uassertStatusOK(StartChunkCloneRequest::createFromCommand(nss, cmdObj));
 

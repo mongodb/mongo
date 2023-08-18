@@ -1216,7 +1216,7 @@ class ErrmsgCommandDeprecated : public BasicCommand {
              BSONObjBuilder& result) final;
 
     virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& db,
+                           const DatabaseName& dbName,
                            const BSONObj& cmdObj,
                            std::string& errmsg,
                            BSONObjBuilder& result) = 0;
