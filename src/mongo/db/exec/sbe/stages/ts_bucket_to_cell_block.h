@@ -35,7 +35,7 @@
 namespace mongo::sbe {
 /**
  * Given an input stage with a single slot containing a time series bucket BSON document, produces a
- * CellBlock for each path in 'paths' into the output slots 'blocksOut'.
+ * CellBlock for each path in 'pathReqs' into the output slots 'blocksOut'.
  *
  * Debug string representations:
  *
@@ -46,7 +46,7 @@ class TsBucketToCellBlockStage final : public PlanStage {
 public:
     TsBucketToCellBlockStage(std::unique_ptr<PlanStage> input,
                              value::SlotId bucketSlot,
-                             std::vector<std::string> topLevelPaths,
+                             std::vector<value::CellBlock::PathRequest> pathReqs,
                              value::SlotVector blocksOut,
                              boost::optional<value::SlotId> metaOut,
                              bool hasMetaField,
@@ -76,16 +76,16 @@ private:
     void initCellBlocks();
 
     const value::SlotId _bucketSlotId;
-    const std::vector<std::string> _topLevelPaths;
+    const std::vector<value::CellBlock::PathRequest> _pathReqs;
     const value::SlotVector _blocksOutSlotId;
     const boost::optional<value::SlotId> _metaOutSlotId;
     const bool _hasMetaField;
     const std::string _timeField;
 
+    value::TsBucketPathExtractor _pathExtractor;
+
     value::SlotAccessor* _bucketAccessor = nullptr;
     std::vector<value::OwnedValueAccessor> _blocksOutAccessor;
     value::OwnedValueAccessor _metaOutAccessor;
-
-    std::vector<std::unique_ptr<value::TsCellBlock>> _tsCellBlocks;
 };
 }  // namespace mongo::sbe

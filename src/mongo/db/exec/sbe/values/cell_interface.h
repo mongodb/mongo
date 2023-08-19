@@ -44,6 +44,48 @@ namespace mongo::sbe::value {
  * definition is the top-level field name.
  */
 struct CellBlock {
+    /**
+     * Limited version of the path language supporting only Get, Traverse, and Id.  For now paths
+     * consisting of these operations can be evaluated below the query layer.
+     */
+
+    /**
+     * Tries to get 'field' from the object and run the remainder of the path on the value at that
+     * field.
+     */
+    struct Get {
+        std::string field;
+    };
+
+    /**
+     * Indicates that an array should be traversed.
+     * If the input IS an array, this applies the remainder of the path on every element.
+     * If the input IS NOT an array this applies the remainder of the path to the input directly.
+     */
+    struct Traverse {
+        // Nothing
+    };
+
+    /**
+     * Id component that returns its input (an identity function).
+     */
+    struct Id {
+        // Nothing.
+    };
+
+    using Component = std::variant<Get, Traverse, Id>;
+    using Path = std::vector<Component>;
+
+    struct PathRequest {
+        // The path requested (ie which fields).
+        Path path;
+
+        // TODO: May want some other information here, like if we know we can omit certain values
+        // etc etc or if we want to specify which type of position info will be needed.
+
+        std::string toString() const;
+    };
+
     virtual ~CellBlock() = default;
 
     /**

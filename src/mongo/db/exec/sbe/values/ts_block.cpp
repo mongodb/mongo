@@ -37,11 +37,56 @@
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/util/itoa.h"
 
 namespace mongo::sbe::value {
+
+std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks(
+    const BSONObj& bucketObj) {
+    const int noOfMeasurements =
+        BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+
+    BSONElement bucketControl = bucketObj[timeseries::kBucketControlFieldName];
+    invariant(!bucketControl.eoo());
+    BSONElement data = bucketObj[timeseries::kBucketDataFieldName];
+    invariant(!data.eoo());
+    invariant(data.type() == BSONType::Object);
+
+    std::vector<std::unique_ptr<CellBlock>> out(_paths.size());
+    for (auto elt : data.embeddedObject()) {
+        auto it = _topLevelFieldToIdxes.find(elt.fieldNameStringData());
+        if (it != _topLevelFieldToIdxes.end()) {
+            auto [blockTag, blockVal] = bson::convertFrom<true>(elt);
+            tassert(7796400,
+                    "Unsupported type for timeseries bucket data",
+                    blockTag == value::TypeTags::bsonObject ||
+                        blockTag == value::TypeTags::bsonBinData);
+
+            for (auto idx : it->second) {
+                out[idx] = std::make_unique<value::TsCellBlock>(
+                    noOfMeasurements, /*owned*/ false, blockTag, blockVal);
+            }
+        }
+    }
+
+    // TODO: Dotted path support! For any dotted path, we'll have to materialize the top-level
+    // path and then walk the result to create the subfield's CellBlock.
+
+    for (auto& cellBlock : out) {
+        if (!cellBlock) {
+            auto emptyBlock = std::make_unique<value::ScalarMonoCellBlock>(
+                noOfMeasurements, value::TypeTags::Nothing, value::Value(0));
+            cellBlock = std::move(emptyBlock);
+        }
+    }
+
+    return out;
+}
+
 TsBlock::TsBlock(size_t ncells, bool owned, TypeTags blockTag, Value blockVal)
     : _blockOwned(owned), _blockTag(blockTag), _blockVal(blockVal), _count(ncells) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);

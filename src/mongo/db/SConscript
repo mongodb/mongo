@@ -1671,6 +1671,7 @@ env.Library(
     source=[
         'exec/sbe/values/arith_common.cpp',
         'exec/sbe/values/bson.cpp',
+        'exec/sbe/values/cell_interface.cpp',
         'exec/sbe/values/row.cpp',
         'exec/sbe/values/slot_printer.cpp',
         'exec/sbe/values/ts_block.cpp',
