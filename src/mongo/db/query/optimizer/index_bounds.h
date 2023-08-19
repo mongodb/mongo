@@ -146,6 +146,13 @@ public:
     IntervalRequirement(BoundRequirement lowBound, BoundRequirement highBound);
 
     bool isFullyOpen() const;
+
+    /**
+     * Checks whether the interval is exactly [MaxKey, MinKey]. Although this is not the
+     * only always-false interval, it is the canonical one we use after simplifying.
+     */
+    bool isAlwaysFalse() const;
+
     bool isConstant() const;
 };
 
@@ -154,7 +161,18 @@ public:
  * interval.
  */
 using IntervalReqExpr = BoolExpr<IntervalRequirement>;
+
+/**
+ * Checks if the interval is always true: it contains all possible values. This is encoded as
+ * [MinKey, MaxKey].
+ */
 bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n);
+
+/**
+ * Checks if the interval is always false: it does not contain any values. This is encoded as
+ * [MaxKey, MinKey]
+ */
+bool isIntervalReqAlwaysFalseDNF(const IntervalReqExpr::Node& n);
 
 /**
  * Represents a bound in a compound interval, which encodes an equality prefix. It consists of a

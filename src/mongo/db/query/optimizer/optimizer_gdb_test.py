@@ -45,6 +45,14 @@ verify_type_lookup(
         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Conjunction, " +
         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Disjunction>"),
 )
+
+verify_type_lookup("mongo::optimizer::PartialSchemaEntry")
+verify_type_lookup(
+    ("mongo::optimizer::algebra::PolyValue<" +
+     "mongo::optimizer::BoolExpr<std::pair<mongo::optimizer::PartialSchemaKey, mongo::optimizer::PartialSchemaRequirement>>::Atom, " +
+     "mongo::optimizer::BoolExpr<std::pair<mongo::optimizer::PartialSchemaKey, mongo::optimizer::PartialSchemaRequirement>>::Conjunction, " +
+     "mongo::optimizer::BoolExpr<std::pair<mongo::optimizer::PartialSchemaKey, mongo::optimizer::PartialSchemaRequirement>>::Disjunction>"),
+)
+
 verify_type_lookup("mongo::optimizer::cascades::Memo")
-verify_type_lookup("mongo::optimizer::PartialSchemaRequirements")
 verify_type_lookup("mongo::optimizer::CandidateIndexEntry")

@@ -506,7 +506,7 @@ public:
      */
     static constexpr size_t kMaxPartialSchemaReqs = 10;
 
-    SargableNode(PartialSchemaRequirements reqMap,
+    SargableNode(PSRExpr::Node reqMap,
                  CandidateIndexes candidateIndexes,
                  boost::optional<ScanParams> scanParams,
                  IndexReqTarget target,
@@ -527,14 +527,14 @@ public:
         return get<0>();
     }
 
-    const PartialSchemaRequirements& getReqMap() const;
+    const PSRExpr::Node& getReqMap() const;
     const CandidateIndexes& getCandidateIndexes() const;
     const boost::optional<ScanParams>& getScanParams() const;
 
     IndexReqTarget getTarget() const;
 
 private:
-    const PartialSchemaRequirements _reqMap;
+    const PSRExpr::Node _reqMap;
 
     CandidateIndexes _candidateIndexes;
     boost::optional<ScanParams> _scanParams;

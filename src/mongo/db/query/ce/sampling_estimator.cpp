@@ -113,8 +113,7 @@ public:
 
         // Retain only output bindings without applying filters.
         PSRExpr::visitAnyShape(
-            node.getReqMap().getRoot(),
-            [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
+            node.getReqMap(), [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
                 const auto& [key, req] = e;
                 if (const auto& boundProjName = req.getBoundProjectionName()) {
                     lowerPartialSchemaRequirement(
@@ -225,7 +224,7 @@ public:
         };
 
         PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
-        return estimator.estimateCE(node.getReqMap().getRoot());
+        return estimator.estimateCE(node.getReqMap());
     }
 
     /**

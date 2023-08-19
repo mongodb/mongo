@@ -465,13 +465,13 @@ boost::optional<MemoLogicalNodeId> Memo::findNode(const GroupIdVector& groups, c
 // Returns true if n is a sargable node with exactly one predicate on _id.
 static bool isSimpleIdLookup(ABT::reference_type n) {
     const SargableNode* node = n.cast<SargableNode>();
-    if (!node || PSRExpr::numLeaves(node->getReqMap().getRoot()) != 1) {
+    if (!node || PSRExpr::numLeaves(node->getReqMap()) != 1) {
         return false;
     }
 
     bool isIdLookup = false;
     PSRExpr::visitAnyShape(
-        node->getReqMap().getRoot(),
+        node->getReqMap(),
         [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
             if (const auto interval = IntervalReqExpr::getSingularDNF(entry.second.getIntervals());
                 !interval || !interval->isEquality()) {
@@ -514,14 +514,13 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         invariant(partialSchemaKeyCE.empty());
 
         // Cache estimation for each individual requirement.
-        PSRExpr::visitDNF(sargablePtr->getReqMap().getRoot(),
+        PSRExpr::visitDNF(sargablePtr->getReqMap(),
                           [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-                              ABT singularReq = make<SargableNode>(
-                                  PartialSchemaRequirements{PSRExpr::makeSingularDNF(e)},
-                                  CandidateIndexes{},
-                                  ScanParams{},
-                                  sargablePtr->getTarget(),
-                                  sargablePtr->getChild());
+                              ABT singularReq = make<SargableNode>(PSRExpr::makeSingularDNF(e),
+                                                                   CandidateIndexes{},
+                                                                   ScanParams{},
+                                                                   sargablePtr->getTarget(),
+                                                                   sargablePtr->getChild());
                               const CEType singularEst = simpleIdLookup
                                   ? CEType{1.0}
                                   : ctx._cardinalityEstimator->deriveCE(

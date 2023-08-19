@@ -96,7 +96,7 @@ static void populateInitialDistributions(const DistributionAndPaths& distributio
  * This is used to populate metadata in a SargableNode, so we know what distributions
  * it can provide, and what projection names matter for each one.
  */
-static void populateDistributionPaths(const PartialSchemaRequirements& req,
+static void populateDistributionPaths(const PSRExpr::Node& req,
                                       const ProjectionName& scanProjectionName,
                                       const DistributionAndPaths& distributionAndPaths,
                                       DistributionSet& distributions) {
@@ -106,7 +106,7 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
             ProjectionNameVector distributionProjections;
 
             for (const ABT& path : distributionAndPaths._paths) {
-                if (auto binding = req.findProjection({scanProjectionName, path})) {
+                if (auto binding = psr::findProjection(req, {scanProjectionName, path})) {
                     distributionProjections.push_back(*binding);
                 } else {
                     break;
@@ -128,10 +128,10 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
 /**
  * Check that every predicate in 'reqMap' is either an equality predicate, or fully open.
  */
-static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
+static bool computeEqPredsOnly(const PSRExpr::Node& reqMap) {
     bool eqPredsOnly = true;
     PSRExpr::visitDisjuncts(
-        reqMap.getRoot(), [&](const PSRExpr::Node& child, const PSRExpr::VisitorContext& disjCtx) {
+        reqMap, [&](const PSRExpr::Node& child, const PSRExpr::VisitorContext& disjCtx) {
             PartialSchemaKeySet equalityKeys;
             PartialSchemaKeySet fullyOpenKeys;
 
@@ -279,14 +279,14 @@ public:
 
         auto& satisfiedPartialIndexes = indexingAvailability.getSatisfiedPartialIndexes();
         for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
-            if (!indexDef.getPartialReqMap().isNoop()) {
+            if (!psr::isNoop(indexDef.getPartialReqMap())) {
                 if (isSubsetOfPartialSchemaReq(node.getReqMap(), indexDef.getPartialReqMap())) {
                     satisfiedPartialIndexes.insert(indexDefName);
                 }
             }
         }
 
-        indexingAvailability.setHasProperInterval(hasProperIntervals(node.getReqMap().getRoot()));
+        indexingAvailability.setHasProperInterval(hasProperIntervals(node.getReqMap()));
 
         return maybeUpdateNodePropsMap(node, std::move(result));
     }

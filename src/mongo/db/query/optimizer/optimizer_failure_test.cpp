@@ -250,7 +250,7 @@ DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") 
                      {{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
                      false /*isMultiKey*/,
                      {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("a"))},
-                     {}}}},
+                     psr::makeNoOp()}}},
                ConstEval::constFold,
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},

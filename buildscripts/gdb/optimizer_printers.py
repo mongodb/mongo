@@ -89,12 +89,12 @@ class IntervalExprPrinter(OptimizerTypePrinter):
         super().__init__(val, "ExplainGenerator::explainIntervalExpr")
 
 
-class PartialSchemaReqMapPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::PartialSchemaRequirements."""
+class PSRExprPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::PSRExpr::Node."""
 
     def __init__(self, val):
-        """Initialize PartialSchemaReqMapPrinter."""
-        super().__init__(val, "ExplainGenerator::explainPartialSchemaReqMap")
+        """Initialize PSRExprPrinter."""
+        super().__init__(val, "ExplainGenerator::explainPartialSchemaReqExpr")
 
 
 class StrongStringAliasPrinter(object):
@@ -1186,12 +1186,22 @@ def register_abt_printers(pp):
         IntervalExprPrinter,
     )
 
+    # PSRExpr printer.
+    pp.add(
+        "PSRExpr",
+        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
+         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Atom, "
+         +
+         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Conjunction, "
+         +
+         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Disjunction>"
+         ),
+        False,
+        PSRExprPrinter,
+    )
+
     # Memo printer.
     pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
-
-    # PartialSchemaRequirements printer.
-    pp.add("PartialSchemaRequirements", f"{OPTIMIZER_NS}::PartialSchemaRequirements", False,
-           PartialSchemaReqMapPrinter)
 
     # ResidualRequirement printer.
     pp.add("ResidualRequirement", f"{OPTIMIZER_NS}::ResidualRequirement", False,

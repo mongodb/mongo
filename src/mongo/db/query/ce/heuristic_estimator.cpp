@@ -255,7 +255,7 @@ public:
         };
 
         PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
-        const CEType estimate = estimator.estimateCE(node.getReqMap().getRoot());
+        const CEType estimate = estimator.estimateCE(node.getReqMap());
 
         const CEType card = std::max(estimate, kMinCard);
         uassert(6716602, "Invalid cardinality.", validCardinality(card));
