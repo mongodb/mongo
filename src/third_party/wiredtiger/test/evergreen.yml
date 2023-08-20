@@ -2629,6 +2629,8 @@ tasks:
             done
 
   - name: csuite-long-running
+    # Set 5 hours timeout (60 * 60 * 5)
+    exec_timeout_secs: 18000
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
