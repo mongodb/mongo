@@ -242,8 +242,8 @@ typedef struct {
 
     char *config_open; /* Command-line configuration */
 
-    TABLE *base_mirror;  /* First mirrored table */
-    bool mirror_fix_var; /* Special case if mirroring both FIX and VAR tables */
+    TABLE *base_mirror;    /* First mirrored table */
+    bool mirror_col_store; /* Special case if mirroring column store table */
 
     bool background_compaction_running; /* Background compaction running */
 

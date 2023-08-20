@@ -1156,18 +1156,15 @@ config_mirrors(void)
 {
     u_int available_tables, i, mirrors;
     char buf[100];
-    bool already_set, explicit_mirror, fix, var;
+    bool already_set, explicit_mirror;
 
-    fix = var = false;
-    g.mirror_fix_var = false;
+    g.mirror_col_store = false;
     /* Check for a CONFIG file that's already set up for mirroring. */
     for (already_set = false, i = 1; i <= ntables; ++i)
         if (NTV(tables[i], RUNS_MIRROR)) {
             already_set = tables[i]->mirror = true;
-            if (tables[i]->type == FIX)
-                fix = true;
-            if (tables[i]->type == VAR)
-                var = true;
+            if (tables[i]->type == FIX || tables[i]->type == VAR)
+                g.mirror_col_store = true;
             if (g.base_mirror == NULL && tables[i]->type != FIX)
                 g.base_mirror = tables[i];
         }
@@ -1181,8 +1178,6 @@ config_mirrors(void)
          * it lets us avoid a bunch of extra logic around figuring out whether we have an acceptable
          * minimum number of tables.
          */
-        if (fix && var)
-            g.mirror_fix_var = true;
         return;
     }
 
@@ -1260,7 +1255,7 @@ config_mirrors(void)
     config_single(tables[i], "runs.mirror=1", false);
     g.base_mirror = tables[i];
     if (tables[i]->type == VAR)
-        var = true;
+        g.mirror_col_store = true;
     /*
      * Pick some number of tables to mirror, then turn on mirroring the next (n-1) tables, where
      * allowed.
@@ -1271,21 +1266,13 @@ config_mirrors(void)
         if (tables[i] != g.base_mirror) {
             tables[i]->mirror = true;
             config_single(tables[i], "runs.mirror=1", false);
-            if (tables[i]->type == FIX)
-                fix = true;
-            if (tables[i]->type == VAR)
-                var = true;
+            if (tables[i]->type == FIX || tables[i]->type == VAR)
+                g.mirror_col_store = true;
             if (--mirrors == 0)
                 break;
         }
     }
 
-    /*
-     * There is an edge case that is possible only when we are mirroring both VLCS and FLCS tables.
-     * Note if that is true now.
-     */
-    if (fix && var)
-        g.mirror_fix_var = true;
     /*
      * Give each mirror the same number of rows (it's not necessary, we could treat end-of-table on
      * a mirror as OK, but this lets us assert matching rows).
