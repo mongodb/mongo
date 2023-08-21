@@ -2197,8 +2197,8 @@ static const char *confchk_checkpoint_cleanup2_choices[] = {"none", "reclaim_spa
 static const char *confchk_type_choices[] = {"FILE", "DRAM", NULL};
 
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_chunk_cache_subconfigs[] = {
-  {"capacity", "int", NULL, "min=0,max=100TB", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT, 0,
-    100LL * WT_TERABYTE, NULL},
+  {"capacity", "int", NULL, "min=512KB,max=100TB", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT,
+    512LL * WT_KILOBYTE, 100LL * WT_TERABYTE, NULL},
   {"chunk_cache_evict_trigger", "int", NULL, "min=0,max=100", NULL, 0, NULL,
     WT_CONFIG_COMPILED_TYPE_INT, 0, 100, NULL},
   {"chunk_size", "int", NULL, "min=512KB,max=100GB", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT,

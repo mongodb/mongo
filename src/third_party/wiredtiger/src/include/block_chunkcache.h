@@ -60,6 +60,8 @@ struct __wt_chunkcache_pinned_list {
  *     chunks are placed into a linked list. There is a per-bucket spinlock.
  */
 #define WT_CHUNKCACHE_MAX_RETRIES 32 * 1024
+#define WT_CHUNKCACHE_BITMAP_SIZE(capacity, chunk_size) \
+    (WT_CEIL_POS((double)((capacity) / (chunk_size)) / 8.0))
 struct __wt_chunkcache {
     /* Cache-wide. */
 #define WT_CHUNKCACHE_FILE 1

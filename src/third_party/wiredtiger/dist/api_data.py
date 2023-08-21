@@ -1060,7 +1060,7 @@ wiredtiger_open_chunk_cache_configuration = [
         chunk_cache_configuration_common + [
         Config('capacity', '10GB', r'''
             maximum memory or storage to use for the chunk cache''',
-            min='0', max='100TB'),
+            min='512KB', max='100TB'),
         Config('chunk_cache_evict_trigger', '90', r'''
             chunk cache percent full that triggers eviction''',
             min='0', max='100'),

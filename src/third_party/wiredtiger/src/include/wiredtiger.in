@@ -2935,7 +2935,7 @@ struct __wt_connection {
  * @config{chunk_cache = (, chunk cache configuration options., a set of related configuration
  * options defined as follows.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;capacity, maximum memory or storage
- * to use for the chunk cache., an integer between \c 0 and \c 100TB; default \c 10GB.}
+ * to use for the chunk cache., an integer between \c 512KB and \c 100TB; default \c 10GB.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_cache_evict_trigger, chunk cache percent full that triggers
  * eviction., an integer between \c 0 and \c 100; default \c 90.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;

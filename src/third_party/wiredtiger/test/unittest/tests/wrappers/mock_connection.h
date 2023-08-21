@@ -32,6 +32,7 @@ public:
     };
 
     static std::shared_ptr<MockConnection> buildTestMockConnection();
+    int setupChunkCache(WT_SESSION_IMPL *, uint64_t, size_t, WT_CHUNKCACHE *&);
 
 private:
     explicit MockConnection(WT_CONNECTION_IMPL *connectionImpl);

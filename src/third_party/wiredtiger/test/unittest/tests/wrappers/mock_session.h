@@ -21,6 +21,11 @@ public:
     {
         return _sessionImpl;
     };
+    std::shared_ptr<MockConnection>
+    getMockConnection()
+    {
+        return _mockConnection;
+    };
 
     static std::shared_ptr<MockSession> buildTestMockSession();
 

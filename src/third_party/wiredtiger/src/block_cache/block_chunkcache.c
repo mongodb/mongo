@@ -32,6 +32,8 @@ __chunkcache_bitmap_find_free(WT_SESSION_IMPL *session, size_t *bit_index)
     uint8_t map_byte;
 
     chunkcache = &S2C(session)->chunkcache;
+
+    /* The bitmap size accounts for full bytes only, remainder bits are iterated separately. */
     bitmap_size = (chunkcache->capacity / chunkcache->chunk_size) / 8;
 
     /* Iterate through the bytes and bits of the bitmap to find free chunks. */
@@ -55,7 +57,62 @@ __chunkcache_bitmap_find_free(WT_SESSION_IMPL *session, size_t *bit_index)
             *bit_index = ((bitmap_size * 8) + j);
             return (0);
         }
-    WT_RET_MSG(session, ENOMEM, "Bitmap has no free chunks as cache is full.");
+    return (ENOSPC);
+}
+
+/*
+ * __chunkcache_bitmap_alloc --
+ *     Find the bit index to allocate.
+ */
+static int
+__chunkcache_bitmap_alloc(WT_SESSION_IMPL *session, size_t *bit_index)
+{
+    WT_CHUNKCACHE *chunkcache;
+    uint8_t map_byte_expected, map_byte_mask;
+
+    chunkcache = &S2C(session)->chunkcache;
+
+retry:
+    /* Use the bitmap to find a free slot for a chunk in the cache. */
+    WT_RET(__chunkcache_bitmap_find_free(session, bit_index));
+
+    /* Bit index should be less than the maximum number of chunks that can be allocated. */
+    WT_ASSERT(session, *bit_index < (chunkcache->capacity / chunkcache->chunk_size));
+
+    /*
+     * Cast to volatile to prevent multiple reads. FIXME WT-11285 Use the WT_READ_ONCE macro
+     * instead.
+     */
+    map_byte_expected = *(volatile uint8_t *)&chunkcache->free_bitmap[*bit_index / 8];
+    map_byte_mask = (uint8_t)(0x01 << (*bit_index % 8));
+    if (((map_byte_expected & map_byte_mask) != 0) ||
+      !__wt_atomic_cas8(&chunkcache->free_bitmap[*bit_index / 8], map_byte_expected,
+        map_byte_expected | map_byte_mask))
+        goto retry;
+
+    return (0);
+}
+
+/*
+ * __chunkcache_bitmap_free --
+ *     Free the bit index.
+ */
+static void
+__chunkcache_bitmap_free(WT_SESSION_IMPL *session, size_t index)
+{
+    WT_CHUNKCACHE *chunkcache;
+    uint8_t map_byte_expected, map_byte_mask;
+
+    chunkcache = &S2C(session)->chunkcache;
+
+    do {
+        map_byte_expected = chunkcache->free_bitmap[index / 8];
+        map_byte_mask = (uint8_t)(0x01 << (index % 8));
+
+        /* Assert to verify that the bit is allocated. */
+        WT_ASSERT(session, (map_byte_expected & map_byte_mask) != 0);
+    } while (!__wt_atomic_cas8(&chunkcache->free_bitmap[index / 8], map_byte_expected,
+      map_byte_expected & (uint8_t) ~(map_byte_mask)));
 }
 
 /*
@@ -88,7 +145,6 @@ __chunkcache_alloc(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 {
     WT_CHUNKCACHE *chunkcache;
     size_t bit_index;
-    uint8_t *map_byte;
 
     chunkcache = &S2C(session)->chunkcache;
     bit_index = 0;
@@ -96,14 +152,7 @@ __chunkcache_alloc(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
     if (chunkcache->type == WT_CHUNKCACHE_IN_VOLATILE_MEMORY)
         WT_RET(__wt_malloc(session, chunk->chunk_size, &chunk->chunk_memory));
     else {
-retry:
-        /* Use the bitmap to find a free slot for a chunk in the cache. */
-        WT_RET(__chunkcache_bitmap_find_free(session, &bit_index));
-
-        /* Mark the free chunk in the bitmap as in use. */
-        map_byte = &chunkcache->free_bitmap[bit_index / 8];
-        if (!__wt_atomic_cas8(map_byte, *map_byte, *map_byte | (uint8_t)(0x01 << (bit_index % 8))))
-            goto retry;
+        WT_RET(__chunkcache_bitmap_alloc(session, &bit_index));
 
         /* Allocate the free memory in the chunk cache. */
         chunk->chunk_memory = chunkcache->memory + chunkcache->chunk_size * bit_index;
@@ -221,7 +270,6 @@ __chunkcache_free_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 {
     WT_CHUNKCACHE *chunkcache;
     size_t index;
-    uint8_t *map_byte;
 
     chunkcache = &S2C(session)->chunkcache;
 
@@ -239,9 +287,7 @@ __chunkcache_free_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
     else {
         /* Update the bitmap, then free the chunk memory. */
         index = (size_t)(chunk->chunk_memory - chunkcache->memory) / chunkcache->chunk_size;
-        do {
-            map_byte = &chunkcache->free_bitmap[index / 8];
-        } while (!__wt_atomic_cas8(map_byte, *map_byte, *map_byte & ~(0x01 << (index % 8))));
+        __chunkcache_bitmap_free(session, index);
     }
     __wt_free(session, chunk);
 }
@@ -815,7 +861,8 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[])
               "Storage size mapping %lu does not equal capacity of chunk cache %" PRIu64,
               mapped_size, chunkcache->capacity);
 
-        WT_RET(__wt_calloc(session, 1, ((chunkcache->capacity / chunkcache->chunk_size) / 8),
+        WT_RET(__wt_calloc(session,
+          WT_CHUNKCACHE_BITMAP_SIZE(chunkcache->capacity, chunkcache->chunk_size), sizeof(uint8_t),
           &chunkcache->free_bitmap));
     }
 
@@ -867,8 +914,27 @@ __wt_chunkcache_teardown(WT_SESSION_IMPL *session)
     __chunkcache_arr_free(session, &chunkcache->pinned_objects.array);
     __wt_rwlock_destroy(session, &chunkcache->pinned_objects.array_lock);
 
-    if (chunkcache->type != WT_CHUNKCACHE_IN_VOLATILE_MEMORY)
+    if (chunkcache->type != WT_CHUNKCACHE_IN_VOLATILE_MEMORY) {
         WT_TRET(__wt_close(session, &chunkcache->fh));
+        __wt_free(session, chunkcache->storage_path);
+        __wt_free(session, chunkcache->free_bitmap);
+    }
 
     return (ret);
 }
+
+#ifdef HAVE_UNITTEST
+
+int
+__ut_chunkcache_bitmap_alloc(WT_SESSION_IMPL *session, size_t *bit_index)
+{
+    return (__chunkcache_bitmap_alloc(session, bit_index));
+}
+
+void
+__ut_chunkcache_bitmap_free(WT_SESSION_IMPL *session, size_t bit_index)
+{
+    __chunkcache_bitmap_free(session, bit_index);
+}
+
+#endif

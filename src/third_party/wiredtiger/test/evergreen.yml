@@ -4384,6 +4384,22 @@ tasks:
             for i in $(seq 5); do
                 ${test_env_vars|} ${python_binary|python3} skiplist_stress.py
             done
+  
+  - name: chunkcache-test
+    exec_timeout_secs: 1200 # 20 minutes
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/bench/workgen/runner"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} ${python_binary|python3} chunkcache.py
 
   - name: skiplist-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
@@ -6003,6 +6019,7 @@ buildvariants:
     - name: bench-tiered-push-pull-s3
     - name: csuite-timestamp-abort-test-s3
     - name: unit-test-hook-tiered-s3
+    - name: chunkcache-test
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -6525,6 +6542,7 @@ buildvariants:
     - name: configure-combinations
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
+    - name: chunkcache-test
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
