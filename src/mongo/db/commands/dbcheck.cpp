@@ -60,6 +60,7 @@
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -69,7 +70,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/dbcheck.h"
@@ -84,6 +87,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -105,7 +109,8 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
+MONGO_FAIL_POINT_DEFINE(hangBeforeReverseLookupCatalogSnapshot);
+MONGO_FAIL_POINT_DEFINE(hangAfterReverseLookupCatalogSnapshot);
 
 namespace mongo {
 
@@ -317,7 +322,6 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxBatchTimeMillis,
                                             invocation.getBatchWriteConcern(),
                                             secondaryIndexCheckParameters};
-
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -466,11 +470,538 @@ protected:
     }
 
 private:
+    /**
+     * For organizing the results of batches for collection-level db check.
+     */
+    struct DbCheckCollectionBatchStats {
+        int64_t nDocs;
+        int64_t nBytes;
+        BSONKey lastKey;
+        std::string md5;
+        repl::OpTime time;
+        boost::optional<Timestamp> readTimestamp;
+    };
+
+    /**
+     * For organizing the results of batches for extra index keys check.
+     */
+    struct DbCheckExtraIndexKeysBatchStats {
+        int64_t nDocs;
+        int64_t nBytes;
+        key_string::Value lastIndexKey;
+        key_string::Value nextLookupStart;
+        bool finishedIndexBatch;
+        bool finishedIndexCheck;
+    };
+
     void _doCollection(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
         if (_done) {
             return;
         }
 
+        // TODO SERVER-78399: Clean up this check once feature flag is removed.
+        boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
+            info.secondaryIndexCheckParameters;
+        if (secondaryIndexCheckParameters) {
+            mongo::DbCheckValidationModeEnum validateMode =
+                secondaryIndexCheckParameters.get().getValidateMode();
+            switch (validateMode) {
+                case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
+                    _extraIndexKeysCheck(opCtx, info);
+                    return;
+                }
+                case mongo::DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
+                case mongo::DbCheckValidationModeEnum::dataConsistency:
+                    // _dataConsistencyCheck will check whether to do missingIndexKeysCheck.
+                    _dataConsistencyCheck(opCtx, info);
+                    return;
+            }
+            MONGO_UNREACHABLE;
+        } else {
+            _dataConsistencyCheck(opCtx, info);
+        }
+    }
+
+    boost::optional<key_string::Value> getExtraIndexKeysCheckLookupStart(
+        OperationContext* opCtx, const DbCheckCollectionInfo& info) {
+        StringData indexName = info.secondaryIndexCheckParameters.get().getSecondaryIndex();
+        const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, info.nss, AcquisitionPrerequisites::OperationType::kRead));
+        const CollectionPtr& collection = collAcquisition.getCollectionPtr();
+        const IndexDescriptor* index =
+            collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+
+        if (!index) {
+            Status status = Status(ErrorCodes::IndexNotFound,
+                                   str::stream() << "cannot find index " << indexName << " for ns "
+                                                 << info.nss.toStringForErrorMsg() << " and uuid "
+                                                 << info.uuid.toString());
+            const auto logEntry = dbCheckWarningHealthLogEntry(
+                info.nss,
+                info.uuid,
+                "abandoning dbCheck extra index keys check because index no longer exists",
+                OplogEntriesEnum::Batch,
+                status);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            return boost::none;
+        }
+
+        // TODO SERVER-79846: Add testing for progress meter
+        // {
+        //     const std::string curOpMessage = "Scanning index " + indexName +
+        //         " for namespace " + NamespaceStringUtil::serialize(info.nss);
+        //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+        //     progress.set(lk,
+        //                  CurOp::get(opCtx)->setProgress_inlock(
+        //                      StringData(curOpMessage), collection->numRecords(opCtx)),
+        //                  opCtx);
+        // }
+
+        const IndexCatalogEntry* indexCatalogEntry =
+            collection.get()->getIndexCatalog()->getEntry(index);
+        auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+        const auto ordering = iam->getSortedDataInterface()->getOrdering();
+        const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
+
+        key_string::Builder firstKeyString(
+            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
+        return firstKeyString.getValueCopy();
+    }
+
+    void _extraIndexKeysCheck(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
+        StringData indexName = info.secondaryIndexCheckParameters.get().getSecondaryIndex();
+
+        // TODO SERVER-79846: Add testing for progress meter
+        // ProgressMeterHolder progress;
+
+        // Get catalog snapshot to look up the firstKey in the index.
+        boost::optional<key_string::Value> maybeLookupStart =
+            getExtraIndexKeysCheckLookupStart(opCtx, info);
+        // If no first key was returned that means the index was not found, and we should exit the
+        // dbCheck.
+        if (!maybeLookupStart) {
+            return;
+        }
+        key_string::Value lookupStart = maybeLookupStart.get();
+
+        bool reachedEnd = false;
+
+        int64_t totalBytesSeen = 0;
+        int64_t totalKeysSeen = 0;
+        using Clock = stdx::chrono::system_clock;
+        using TimePoint = stdx::chrono::time_point<Clock>;
+        TimePoint lastStart = Clock::now();
+        int64_t docsInCurrentInterval = 0;
+
+        do {
+            using namespace std::literals::chrono_literals;
+
+            if (Clock::now() - lastStart > 1s) {
+                lastStart = Clock::now();
+                docsInCurrentInterval = 0;
+            }
+
+            DbCheckExtraIndexKeysBatchStats batchStats = {0};
+
+            // 1. Get batch bounds (stored in batchStats) and run reverse lookup if
+            // skipLookupForExtraKeys is not set.
+            // TODO SERVER-78449: Revisit case where skipLookupForExtraKeys is true, if we can
+            // avoid doing two index walks (one for batching and one for hashing).
+            auto batchFirst = lookupStart;
+            _getExtraIndexKeysBatchAndRunReverseLookup(
+                opCtx, info, indexName, lookupStart, batchStats);
+
+
+            // 2. Get the last entry processed from reverse lookup.
+            auto batchLast = batchStats.lastIndexKey;
+
+            // 3. TODO SERVER-78449: Run hashing algorithm.
+
+            // TODO SERVER-78449: Log batch into health log with range with correct info.
+            _batchesProcessed++;
+            BSONObjBuilder builder;
+            builder.append("success", true);
+            auto logEntry = dbCheckHealthLogEntry(info.nss,
+                                                  info.uuid,
+                                                  SeverityEnum::Info,
+                                                  "db check batch",
+                                                  OplogEntriesEnum::Batch,
+                                                  builder.obj());
+
+            if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||
+                (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+                // On debug builds, health-log every batch result; on release builds, health-log
+                // every N batches.
+                HealthLogInterface::get(opCtx)->log(*logEntry);
+            }
+
+            // 4. Update lookupStart to resume the next batch.
+            lookupStart = batchStats.nextLookupStart;
+
+            // TODO SERVER-79846: Add testing for progress meter
+            // {
+            //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+            //     progress.get(lk)->hit(batchStats.nDocs);
+            // }
+
+            // 5. Check if we've exceeded any limits.
+            totalBytesSeen += batchStats.nBytes;
+            totalKeysSeen += batchStats.nDocs;
+            docsInCurrentInterval += batchStats.nDocs;
+
+            bool tooManyDocs = totalKeysSeen >= info.maxCount;
+            bool tooManyBytes = totalBytesSeen >= info.maxSize;
+            reachedEnd = batchStats.finishedIndexCheck || tooManyDocs || tooManyBytes;
+
+            if (docsInCurrentInterval > info.maxRate && info.maxRate > 0) {
+                // If an extremely low max rate has been set (substantially smaller than the
+                // batch size) we might want to sleep for multiple seconds between batches.
+                int64_t timesExceeded = docsInCurrentInterval / info.maxRate;
+
+                stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
+            }
+
+        } while (!reachedEnd);
+
+        // TODO SERVER-79846: Add testing for progress meter
+        // {
+        //     stdx::unique_lock<Client> lk(*opCtx->getClient());
+        //     progress.get(lk)->finished();
+        // }
+    }
+
+
+    /**
+     * Gets batch bounds for extra index keys check and stores the info in batchStats. Runs
+     * reverse lookup if skipLookupForExtraKeys is not set.
+     */
+    void _getExtraIndexKeysBatchAndRunReverseLookup(OperationContext* opCtx,
+                                                    const DbCheckCollectionInfo& info,
+                                                    const StringData& indexName,
+                                                    key_string::Value& lookupStart,
+                                                    DbCheckExtraIndexKeysBatchStats& batchStats) {
+
+        bool reachedBatchEnd = false;
+        do {
+            auto status = _getCatalogSnapshotAndRunReverseLookup(
+                opCtx, info, indexName, lookupStart, batchStats);
+            if (!status.isOK()) {
+                LOGV2_DEBUG(7844807,
+                            3,
+                            "found one or more index inconsistencies with reverse lookup",
+                            "status"_attr = status.reason(),
+                            "indexName"_attr = indexName,
+                            logAttrs(info.nss),
+                            "uuid"_attr = info.uuid);
+            }
+
+            if (MONGO_unlikely(hangAfterReverseLookupCatalogSnapshot.shouldFail())) {
+                LOGV2_DEBUG(
+                    7844810, 3, "Hanging due to hangAfterReverseLookupCatalogSnapshot failpoint");
+                hangAfterReverseLookupCatalogSnapshot.pauseWhileSet(opCtx);
+            }
+
+            reachedBatchEnd = batchStats.finishedIndexBatch;
+            lookupStart = batchStats.nextLookupStart;
+        } while (!reachedBatchEnd && !batchStats.finishedIndexCheck);
+    }
+
+
+    /**
+     * Acquires a consistent catalog snapshot and iterates through the secondary index in order
+     * to get the batch bounds. Runs reverse lookup if skipLookupForExtraKeys is not set.
+     *
+     * We release the snapshot by exiting the function. This occurs when we've either finished
+     * the whole extra index keys check, finished one batch, or the number of keys we've looked
+     * at has met or exceeded dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.
+     */
+    Status _getCatalogSnapshotAndRunReverseLookup(OperationContext* opCtx,
+                                                  const DbCheckCollectionInfo& info,
+                                                  const StringData& indexName,
+                                                  const key_string::Value& lookupStart,
+                                                  DbCheckExtraIndexKeysBatchStats& batchStats) {
+        if (MONGO_unlikely(hangBeforeReverseLookupCatalogSnapshot.shouldFail())) {
+            LOGV2_DEBUG(
+                7844804, 3, "Hanging due to hangBeforeReverseLookupCatalogSnapshot failpoint");
+            hangBeforeReverseLookupCatalogSnapshot.pauseWhileSet(opCtx);
+        }
+
+        Status status = Status::OK();
+        const CollectionAcquisition collAcquisition = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, info.nss, AcquisitionPrerequisites::OperationType::kRead));
+        const CollectionPtr& collection = collAcquisition.getCollectionPtr();
+        const IndexDescriptor* index =
+            collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+
+        if (!index) {
+            status = Status(ErrorCodes::IndexNotFound,
+                            str::stream() << "cannot find index " << indexName << " for ns "
+                                          << info.nss.toStringForErrorMsg() << " and uuid "
+                                          << info.uuid.toString());
+            const auto logEntry = dbCheckWarningHealthLogEntry(
+                info.nss,
+                info.uuid,
+                "abandoning dbCheck extra index keys check because index no longer exists",
+                OplogEntriesEnum::Batch,
+                status);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            batchStats.finishedIndexBatch = true;
+            batchStats.finishedIndexCheck = true;
+
+            return status;
+        }
+
+        const IndexCatalogEntry* indexCatalogEntry =
+            collection.get()->getIndexCatalog()->getEntry(index);
+        auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+        const auto ordering = iam->getSortedDataInterface()->getOrdering();
+
+
+        std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
+            iam->newCursor(opCtx, true /* forward */);
+
+        // TODO SERVER-80158: Handle when user specifies a maxKey for extra index key check.
+
+        // Creates a key greater than all other keys to set as the index cursor's end position.
+        BSONObjBuilder builder;
+        builder.appendMaxKey("");
+        auto maxKey = Helpers::toKeyFormat(builder.obj());
+        indexCursor->setEndPosition(maxKey, true /*inclusive*/);
+        int64_t numKeys = 0;
+        int64_t numBytes = 0;
+
+
+        LOGV2_DEBUG(7844800,
+                    3,
+                    "starting extra index keys batch at",
+                    "lookupStartKeyStringBson"_attr =
+                        key_string::toBsonSafe(lookupStart.getBuffer(),
+                                               lookupStart.getSize(),
+                                               ordering,
+                                               lookupStart.getTypeBits()),
+                    "indexName"_attr = indexName,
+                    logAttrs(info.nss),
+                    "uuid"_attr = info.uuid);
+
+        auto currIndexKey = indexCursor->seekForKeyString(lookupStart);
+
+        // Note that if we can't find lookupStart (e.g. it was deleted in between snapshots),
+        // seekForKeyString will automatically return the next adjacent keystring in the storage
+        // engine. It will only return a null entry if there are no entries at all in the index.
+        // Log for debug/testing purposes.
+        if (!currIndexKey) {
+            LOGV2_DEBUG(7844803,
+                        3,
+                        "could not find lookupStartKeyStringBson in index",
+                        "lookupStartKeyStringBson"_attr =
+                            key_string::toBsonSafe(lookupStart.getBuffer(),
+                                                   lookupStart.getSize(),
+                                                   ordering,
+                                                   lookupStart.getTypeBits()),
+                        "indexName"_attr = indexName,
+                        logAttrs(info.nss),
+                        "uuid"_attr = info.uuid);
+        }
+
+        while (currIndexKey) {
+            const auto keyString = currIndexKey.get().keyString;
+            const BSONObj keyStringBson = key_string::toBsonSafe(
+                keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+
+            if (!info.secondaryIndexCheckParameters.get().getSkipLookupForExtraKeys()) {
+                status = _reverseLookup(opCtx,
+                                        info,
+                                        indexName,
+                                        batchStats,
+                                        collection,
+                                        keyString,
+                                        keyStringBson,
+                                        iam,
+                                        indexCatalogEntry);
+            }
+
+            batchStats.lastIndexKey = keyString;
+            numBytes += keyString.getSize();
+            numKeys++;
+            batchStats.nBytes += keyString.getSize();
+            batchStats.nDocs++;
+
+            currIndexKey = indexCursor->nextKeyString();
+
+            // Set nextLookupStart.
+            if (currIndexKey) {
+                batchStats.nextLookupStart = currIndexKey.get().keyString;
+            }
+
+            // TODO SERVER-79800: Fix handling of identical index keys.
+            // If the next key is the same value as this one, we must look at them in the same
+            // snapshot/batch, so skip this check.
+            if (!(currIndexKey && (keyString == currIndexKey.get().keyString))) {
+                // Check if we should finish this batch.
+                if (batchStats.nBytes >= info.maxBytesPerBatch ||
+                    batchStats.nDocs >= info.maxDocsPerBatch) {
+                    batchStats.finishedIndexBatch = true;
+                    break;
+                }
+                // Check if we should release snapshot.
+                if (numKeys >= repl::dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot.load()) {
+                    break;
+                }
+            }
+        }
+
+
+        batchStats.finishedIndexCheck = !currIndexKey.is_initialized();
+        LOGV2_DEBUG(7844808,
+                    3,
+                    "Catalog snapshot for extra index keys check ending",
+                    "numKeys"_attr = numKeys,
+                    "numBytes"_attr = numBytes,
+                    "finishedIndexCheck"_attr = batchStats.finishedIndexCheck,
+                    "finishedIndexBatch"_attr = batchStats.finishedIndexBatch,
+                    logAttrs(info.nss),
+                    "uuid"_attr = info.uuid);
+        return status;
+    }
+
+
+    Status _reverseLookup(OperationContext* opCtx,
+                          const DbCheckCollectionInfo& info,
+                          const StringData& indexName,
+                          DbCheckExtraIndexKeysBatchStats& batchStats,
+                          const CollectionPtr& collection,
+                          const key_string::Value& keyString,
+                          const BSONObj& keyStringBson,
+                          const SortedDataIndexAccessMethod* iam,
+                          const IndexCatalogEntry* indexCatalogEntry) {
+        // Check that the recordId exists in the record store.
+        auto recordId = [&] {
+            switch (collection->getRecordStore()->keyFormat()) {
+                case KeyFormat::Long:
+                    return key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(),
+                                                               keyString.getSize());
+                case KeyFormat::String:
+                    return key_string::decodeRecordIdStrAtEnd(keyString.getBuffer(),
+                                                              keyString.getSize());
+            }
+            MONGO_UNREACHABLE;
+        }();
+        RecordData record;
+        bool res = collection->getRecordStore()->findRecord(opCtx, recordId, &record);
+        if (!res) {
+            LOGV2_DEBUG(7844802,
+                        3,
+                        "reverse lookup failed to find record data",
+                        "recordId"_attr = recordId.toStringHumanReadable(),
+                        "keyString"_attr = keyStringBson,
+                        "indexName"_attr = indexName,
+                        logAttrs(info.nss),
+                        "uuid"_attr = info.uuid);
+
+            Status status =
+                Status(ErrorCodes::KeyNotFound,
+                       str::stream() << "cannot find document from recordId "
+                                     << recordId.toStringHumanReadable() << " from index "
+                                     << indexName << " for ns " << info.nss.toStringForErrorMsg());
+            BSONObjBuilder context;
+            context.append("indexName", indexName);
+            context.append("keyString", keyStringBson);
+            context.append("recordId", recordId.toStringHumanReadable());
+
+            // TODO SERVER-79301: Update scope enums for health log entries.
+            auto logEntry = dbCheckErrorHealthLogEntry(
+                info.nss,
+                info.uuid,
+                "found extra index key entry without corresponding document",
+                OplogEntriesEnum::Batch,
+                status,
+                context.done());
+            HealthLogInterface::get(opCtx)->log(*logEntry);
+            return status;
+        }
+
+        // Found record in record store.
+        auto recordBson = record.toBson();
+
+        // Generate the set of keys for the record data and check that it includes the
+        // index key.
+        // TODO SERVER-80278: Make sure wildcard/multikey indexes are handled correctly here.
+        KeyStringSet foundKeys;
+        KeyStringSet multikeyMetadataKeys;
+        MultikeyPaths multikeyPaths;
+        SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+        // A potential inefficiency with getKeys is that it generates all of the index keys
+        // for this record for this secondary index, which means that if this index is a
+        // multikey index, it could potentially be inefficient to generate all of them and only
+        // check that it includes one specific keystring.
+        iam->getKeys(opCtx,
+                     collection,
+                     indexCatalogEntry,
+                     pool,
+                     recordBson,
+                     InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                     SortedDataIndexAccessMethod::GetKeysContext::kValidatingKeys,
+                     &foundKeys,
+                     &multikeyMetadataKeys,
+                     &multikeyPaths,
+                     recordId);
+
+        LOGV2_DEBUG(7844801,
+                    3,
+                    "reverse lookup found record data",
+                    "recordData"_attr = recordBson,
+                    "recordId"_attr = recordId.toStringHumanReadable(),
+                    "expectedKeyString"_attr = keyStringBson,
+                    "indexName"_attr = indexName,
+                    logAttrs(info.nss),
+                    "uuid"_attr = info.uuid);
+
+        if (foundKeys.contains(keyString)) {
+            return Status::OK();
+        }
+
+        LOGV2_DEBUG(7844809,
+                    3,
+                    "found index key entry with corresponding document/keystring set that "
+                    "does not contain expected keystring",
+                    "recordData"_attr = recordBson,
+                    "recordId"_attr = recordId.toStringHumanReadable(),
+                    "expectedKeyString"_attr = keyStringBson,
+                    "indexName"_attr = indexName,
+                    logAttrs(info.nss),
+                    "uuid"_attr = info.uuid);
+        Status status =
+            Status(ErrorCodes::KeyNotFound,
+                   str::stream() << "found index key entry with corresponding document and "
+                                    "key string set that does not contain expected keystring "
+                                 << keyStringBson << " from index " << indexName << " for ns "
+                                 << info.nss.toStringForErrorMsg());
+        BSONObjBuilder context;
+        context.append("indexName", indexName);
+        context.append("expectedKeyString", keyStringBson);
+        context.append("recordId", recordId.toStringHumanReadable());
+        context.append("recordData", recordBson);
+
+        // TODO SERVER-79301: Update scope enums for health log entries.
+        auto logEntry = dbCheckErrorHealthLogEntry(info.nss,
+                                                   info.uuid,
+                                                   "found index key entry with corresponding "
+                                                   "document/keystring set that does not "
+                                                   "contain the expected key string",
+                                                   OplogEntriesEnum::Batch,
+                                                   status,
+                                                   context.done());
+        HealthLogInterface::get(opCtx)->log(*logEntry);
+        return status;
+    }
+
+
+    void _dataConsistencyCheck(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
         const std::string curOpMessage =
             "Scanning namespace " + NamespaceStringUtil::serialize(info.nss);
         ProgressMeterHolder progress;
@@ -663,27 +1194,15 @@ private:
         }
     }
 
-    /**
-     * For organizing the results of batches.
-     */
-    struct BatchStats {
-        int64_t nDocs;
-        int64_t nBytes;
-        BSONKey lastKey;
-        std::string md5;
-        repl::OpTime time;
-        boost::optional<Timestamp> readTimestamp;
-    };
-
     // Set if the job cannot proceed.
     bool _done;
     std::unique_ptr<DbCheckRun> _run;
 
-    StatusWith<BatchStats> _runBatch(OperationContext* opCtx,
-                                     const DbCheckCollectionInfo& info,
-                                     const BSONKey& first,
-                                     int64_t batchDocs,
-                                     int64_t batchBytes) {
+    StatusWith<DbCheckCollectionBatchStats> _runBatch(OperationContext* opCtx,
+                                                      const DbCheckCollectionInfo& info,
+                                                      const BSONKey& first,
+                                                      int64_t batchDocs,
+                                                      int64_t batchBytes) {
         // Each batch will read at the latest no-overlap point, which is the all_durable
         // timestamp on primaries. We assume that the history window on secondaries is always
         // longer than the time it takes between starting and replicating a batch on the
@@ -753,7 +1272,7 @@ private:
         }
 
         // Send information on this batch over the oplog.
-        BatchStats result;
+        DbCheckCollectionBatchStats result;
         result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
         result.readTimestamp = readTimestamp;
 

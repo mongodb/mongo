@@ -6,7 +6,7 @@
  * ]
  */
 
-import {checkHealthlog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const dbName = "dbCheckParametersInHealthLog";
 const colName = "dbCheckParametersInHealthLog-collection";
@@ -40,8 +40,8 @@ function testParametersInHealthlog() {
     let query = {
         data: {validateMode: "dataConsistency", secondaryIndex: "", skipLookupForExtraKeys: false}
     };
-    checkHealthlog(primaryHealthlog, query, 2);
-    checkHealthlog(secondaryHealthlog, query, 2);
+    checkHealthLog(primaryHealthlog, query, 2);
+    checkHealthLog(secondaryHealthlog, query, 2);
 
     // The start and stop health log entries on the primary and secondary nodes should contain the
     // validateMode parameter.
@@ -59,8 +59,8 @@ function testParametersInHealthlog() {
             skipLookupForExtraKeys: false
         }
     };
-    checkHealthlog(primaryHealthlog, query, 2);
-    checkHealthlog(secondaryHealthlog, query, 2);
+    checkHealthLog(primaryHealthlog, query, 2);
+    checkHealthLog(secondaryHealthlog, query, 2);
 
     // The start and stop health log entries on the primary and secondary nodes should contain the
     // secondaryIndex parameter when validateMode is extraIndexKeysCheck
@@ -80,8 +80,8 @@ function testParametersInHealthlog() {
             skipLookupForExtraKeys: true
         }
     };
-    checkHealthlog(primaryHealthlog, query, 2);
-    checkHealthlog(secondaryHealthlog, query, 2);
+    checkHealthLog(primaryHealthlog, query, 2);
+    checkHealthLog(secondaryHealthlog, query, 2);
 }
 
 testParametersInHealthlog();

@@ -8,7 +8,7 @@
  * ]
  */
 
-import {checkHealthlog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const replSet = new ReplSetTest({
     name: "dbCheckWriteConcern",
@@ -41,12 +41,12 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm there are no warnings or errors.
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
 })();
 
 // Validate that w:2 behaves normally.
@@ -65,12 +65,12 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm there are no warnings or errors.
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
 })();
 
 // Validate that dbCheck completes with w:majority even when the secondary is down and a wtimeout is
@@ -92,15 +92,15 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm dbCheck logs a warning for every batch.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "warning"}, nDocs / maxDocsPerBatch);
 
     // There should be no errors.
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
 
     replSet.start(secondaryNodeId, {}, true /*restart*/);
     replSet.awaitNodesAgreeOnPrimaryNoAuth();
@@ -126,15 +126,15 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm dbCheck logs a warning for every batch.
-    checkHealthlog(
+    checkHealthLog(
         healthlog, {operation: "dbCheckBatch", severity: "warning"}, nDocs / maxDocsPerBatch);
 
     // There should be no errors.
-    checkHealthlog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "error"}, 0);
 })();
 
 replSet.stopSet();

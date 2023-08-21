@@ -12,7 +12,7 @@
 
 import {
     awaitDbCheckCompletion,
-    checkHealthlog,
+    checkHealthLog,
     clearHealthLog,
     dbCheckCompleted,
     forEachNonArbiterNode,
@@ -304,10 +304,10 @@ function testDbCheckParameters() {
         let query = {"operation": "dbCheckBatch"};
         const expectedBatches = multiBatchSimpleCollSize / maxDocsPerBatch +
             (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
-        checkHealthlog(healthlog, query, expectedBatches);
+        checkHealthLog(healthlog, query, expectedBatches);
 
         query = {"operation": "dbCheckBatch", "data.count": maxDocsPerBatch};
-        checkHealthlog(healthlog, query, multiBatchSimpleCollSize / maxDocsPerBatch);
+        checkHealthLog(healthlog, query, multiBatchSimpleCollSize / maxDocsPerBatch);
     }
     {
         // Validate custom maxBytesPerBatch
@@ -327,10 +327,10 @@ function testDbCheckParameters() {
 
         // Confirm dbCheck logs nDocs batches.
         let query = {"operation": "dbCheckBatch"};
-        checkHealthlog(healthlog, query, nDocs);
+        checkHealthLog(healthlog, query, nDocs);
 
         query = {"operation": "dbCheckBatch", "data.count": 1};
-        checkHealthlog(healthlog, query, nDocs);
+        checkHealthLog(healthlog, query, nDocs);
     }
 }
 
@@ -447,7 +447,7 @@ function simpleTestCatchesExtra() {
 
     let query = {"operation": "dbCheckStop"};
     const healthlog = replSet.getSecondary().getDB("local").system.healthlog;
-    checkHealthlog(healthlog, query, 1);
+    checkHealthLog(healthlog, query, 1);
     const errors = healthlog.find({operation: /dbCheck.*/, severity: "error"});
 
     assert.eq(errors.count(),

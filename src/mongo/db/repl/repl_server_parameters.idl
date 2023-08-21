@@ -763,6 +763,17 @@ server_parameters:
         cpp_varname: unsupportedSyncSource
         default: ""
         validator: { callback: 'validateHostAndPort' }
+    
+    dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot:
+        description: >-
+            The maximum number of index keys to be checked in reverse lookup in one storage catalog
+            snapshot during dbcheck's extraIndexKeys mode.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot
+        default: 1000
+        validator:
+            gt: 0 
 
 feature_flags:
     featureFlagShardMerge:

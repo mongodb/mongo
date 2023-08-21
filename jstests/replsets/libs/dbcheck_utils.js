@@ -20,6 +20,7 @@ export const forEachNonArbiterNode = (replSet, f) => {
 // Clear local.system.healthlog.
 export const clearHealthLog = (replSet) => {
     forEachNonArbiterNode(replSet, conn => conn.getDB("local").system.healthlog.drop());
+    replSet.awaitReplication();
 };
 
 export const dbCheckCompleted = (db) => {
@@ -72,16 +73,23 @@ export const runDbCheck = (replSet,
     }
 };
 
-export const checkHealthlog = (healthlog, query, numExpected, timeout = 60 * 1000) => {
+export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 1000) => {
     let query_count;
+
     assert.soon(
         function() {
-            query_count = healthlog.find(query).itcount();
+            query_count = healthlog.find(query).count();
+            if (query_count != numExpected) {
+                jsTestLog("dbCheck command didn't complete, health log query returned " +
+                          query_count + " entries, expected " + numExpected +
+                          "  query: " + tojson(query) +
+                          " found: " + JSON.stringify(healthlog.find(query).toArray()));
+            }
             return query_count == numExpected;
         },
-        `dbCheck command didn't complete, health log query returned ${
-            query_count} entries, expected ${numExpected}: ` +
-            query,
+        "dbCheck command didn't complete, health log query returned " + query_count +
+            " entries, expected " + numExpected + "  query: " + tojson(query) +
+            " found: " + JSON.stringify(healthlog.find(query).toArray()),
         timeout);
 };
 

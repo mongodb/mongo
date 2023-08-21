@@ -6,7 +6,7 @@
  * ]
  */
 
-import {checkHealthlog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const replSet = new ReplSetTest({
     name: jsTestName(),
@@ -36,13 +36,13 @@ function healthLogCollectionUUID() {
     const collUUID = db.getCollectionInfos({name: collName})[0].info.uuid;
     const numExpected = nDocs / maxDocsPerBatch;
     let query = {operation: "dbCheckBatch", collectionUUID: collUUID};
-    checkHealthlog(primaryHealthlog, query, numExpected);
-    checkHealthlog(secondaryHealthlog, query, numExpected);
+    checkHealthLog(primaryHealthlog, query, numExpected);
+    checkHealthLog(secondaryHealthlog, query, numExpected);
 
     // There are no dbCheckBatch health log entries without a collectionUUID.
     query = {operation: "dbCheckBatch", collectionUUID: {$exists: false}};
-    checkHealthlog(primaryHealthlog, query, 0);
-    checkHealthlog(secondaryHealthlog, query, 0);
+    checkHealthLog(primaryHealthlog, query, 0);
+    checkHealthLog(secondaryHealthlog, query, 0);
 }
 healthLogCollectionUUID();
 
