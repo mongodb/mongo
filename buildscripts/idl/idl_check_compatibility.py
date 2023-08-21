@@ -422,7 +422,7 @@ def get_new_commands(
             with open(new_idl_file_path) as new_file:
                 new_idl_file = parser.parse(
                     new_file, new_idl_file_path,
-                    CompilerImportResolver(import_directories + [new_idl_dir]))
+                    CompilerImportResolver(import_directories + [new_idl_dir]), False)
                 if new_idl_file.errors:
                     new_idl_file.errors.dump_errors()
                     raise ValueError(f"Cannot parse {new_idl_file_path}")
@@ -1310,9 +1310,11 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
     ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
     with open(old_basic_types_path) as old_file:
         old_idl_file = parser.parse(old_file, old_basic_types_path,
-                                    CompilerImportResolver(old_import_directories))
+                                    CompilerImportResolver(old_import_directories), False)
         if old_idl_file.errors:
             old_idl_file.errors.dump_errors()
+            # If parsing old IDL files fails, it might be because the parser has been recently
+            # updated to require something that isn't present in older IDL files.
             raise ValueError(f"Cannot parse {old_basic_types_path}")
 
         old_error_reply_struct = old_idl_file.spec.symbols.get_struct("ErrorReply")
@@ -1322,7 +1324,7 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
         else:
             with open(new_basic_types_path) as new_file:
                 new_idl_file = parser.parse(new_file, new_basic_types_path,
-                                            CompilerImportResolver(new_import_directories))
+                                            CompilerImportResolver(new_import_directories), False)
                 if new_idl_file.errors:
                     new_idl_file.errors.dump_errors()
                     raise ValueError(f"Cannot parse {new_basic_types_path}")
@@ -1490,9 +1492,11 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directori
             with open(old_idl_file_path) as old_file:
                 old_idl_file = parser.parse(
                     old_file, old_idl_file_path,
-                    CompilerImportResolver(old_import_directories + [old_idl_dir]))
+                    CompilerImportResolver(old_import_directories + [old_idl_dir]), False)
                 if old_idl_file.errors:
                     old_idl_file.errors.dump_errors()
+                    # If parsing old IDL files fails, it might be because the parser has been
+                    # recently updated to require something that isn't present in older IDL files.
                     raise ValueError(f"Cannot parse {old_idl_file_path}")
 
                 for old_cmd in old_idl_file.spec.symbols.commands:
@@ -1559,7 +1563,7 @@ def get_generic_arguments(gen_args_file_path: str, includes: str) -> Tuple[Set[s
 
     with open(gen_args_file_path) as gen_args_file:
         parsed_idl_file = parser.parse(gen_args_file, gen_args_file_path,
-                                       CompilerImportResolver(includes))
+                                       CompilerImportResolver(includes), False)
         if parsed_idl_file.errors:
             parsed_idl_file.errors.dump_errors()
             raise ValueError(f"Cannot parse {gen_args_file_path}")

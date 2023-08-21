@@ -1059,10 +1059,12 @@ def _propagate_globals(spec):
         idltype.cpp_type = _prefix_with_namespace(cpp_namespace, idltype.cpp_type)
 
 
-def parse_file(stream, error_file_name):
-    # type: (Any, str) -> syntax.IDLParsedSpec
+def parse_file(stream, error_file_name, parse_feature_flags=True):
+    # type: (Any, str, bool) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
+
+    If parse_feature_flags is False, don't attempt to parse the feature flag type.
 
     stream: is a io.Stream.
     error_file_name: just a file name for error messages to use.
@@ -1116,8 +1118,10 @@ def parse_file(stream, error_file_name):
             _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
         elif first_name == "configs":
             _parse_mapping(ctxt, spec, second_node, "configs", _parse_config_option)
-        elif first_name == "feature_flags":
+        elif parse_feature_flags and first_name == "feature_flags":
             _parse_mapping(ctxt, spec, second_node, "feature_flags", _parse_feature_flag)
+        elif not parse_feature_flags and first_name == "feature_flags":
+            continue
         else:
             ctxt.add_unknown_root_node_error(first_node)
 
@@ -1152,16 +1156,18 @@ class ImportResolverBase(object, metaclass=ABCMeta):
         pass
 
 
-def parse(stream, input_file_name, resolver):
-    # type: (Any, str, ImportResolverBase) -> syntax.IDLParsedSpec
+def parse(stream, input_file_name, resolver, parse_feature_flags=True):
+    # type: (Any, str, ImportResolverBase, bool) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
+
+    If parse_feature_flags is False, don't attempt to parse the feature flag type.
 
     stream: is a io.Stream.
     input_file_name: a file name for error messages to use, and to help resolve imported files.
     """
 
-    root_doc = parse_file(stream, input_file_name)
+    root_doc = parse_file(stream, input_file_name, parse_feature_flags)
 
     if root_doc.errors:
         return root_doc
@@ -1198,7 +1204,7 @@ def parse(stream, input_file_name, resolver):
 
         # Parse imported file
         with resolver.open(resolved_file_name) as file_stream:
-            parsed_doc = parse_file(file_stream, resolved_file_name)
+            parsed_doc = parse_file(file_stream, resolved_file_name, parse_feature_flags)
 
         # Check for errors
         if parsed_doc.errors:
