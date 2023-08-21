@@ -36,12 +36,17 @@ cc_toolchain_config(
         "--verbose",
         "-std=c++20",
         "-nostdinc++",
+        # These flags are necessary to get system includes properly available for compilation:
         "-isystem",
         "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include",
         "-isystem",
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
         "-isystem",
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
+        # These flags are necessary for the link step to work remotely:
+        "-Bexternal/mongo_toolchain/v4/bin",
+        "-Bexternal/mongo_toolchain/v4/lib",
+        "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
     ],
     compiler = "gcc",
     cpu = "arm64",
@@ -49,6 +54,14 @@ cc_toolchain_config(
         "/usr/include",
     ],
     host_system_name = "local",
+    link_flags = [
+        # These flags are necessary for the link step to work remotely:
+        "-nostdinc++",
+        "-Lexternal/mongo_toolchain/v4/lib",
+        "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
+        "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
+        "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
+    ],
     target_libc = "unknown",
     target_system_name = "local",
     tool_paths = {

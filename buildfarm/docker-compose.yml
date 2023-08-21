@@ -1,0 +1,29 @@
+version: "3"
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: toolchain.dockerfile
+    ports:
+      # Note: This value must correspond to the value specified in `config.yml` for worker.publicName
+      - "8981:8981"
+    depends_on:
+      - redis
+    network_mode: host
+    command: ./bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:/bazel-buildfarm/logging.properties /bazel-buildfarm/config.yml
+  server:
+    build:
+      context: .
+      dockerfile: toolchain.dockerfile
+    ports:
+      - "8980:8980"
+    network_mode: host
+    depends_on:
+      - redis
+    command: ./bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:/bazel-buildfarm/logging.properties /bazel-buildfarm/config.yml
+  redis:
+    image: "redis:5.0.9"
+    network_mode: host
+    ports:
+      # Note: This value must correspond to the value specified in `config.yml` for backplane.redisUri
+      - "6379:6379"
