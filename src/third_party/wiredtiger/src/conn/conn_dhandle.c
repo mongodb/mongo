@@ -725,12 +725,12 @@ done:
             F_CLR(conn, WT_CONN_CKPT_GATHER);
             time_stop = __wt_clock(session);
             time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_applied, conn->ckpt_apply);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_skipped, conn->ckpt_skip);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_walked, conn->dhandle_count);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_duration, time_diff);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_duration_apply, conn->ckpt_apply_time);
-            WT_STAT_CONN_SET(session, txn_checkpoint_handle_duration_skip, conn->ckpt_skip_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_applied, conn->ckpt_apply);
+            WT_STAT_CONN_SET(session, checkpoint_handle_skipped, conn->ckpt_skip);
+            WT_STAT_CONN_SET(session, checkpoint_handle_walked, conn->dhandle_count);
+            WT_STAT_CONN_SET(session, checkpoint_handle_duration, time_diff);
+            WT_STAT_CONN_SET(session, checkpoint_handle_duration_apply, conn->ckpt_apply_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_duration_skip, conn->ckpt_skip_time);
         }
         return (0);
     }

@@ -56,7 +56,7 @@ get_stat_field(const std::string &name)
     if (name == CACHE_HS_INSERT)
         return (WT_STAT_CONN_CACHE_HS_INSERT);
     else if (name == CC_PAGES_REMOVED)
-        return (WT_STAT_CONN_CC_PAGES_REMOVED);
+        return (WT_STAT_CONN_CHECKPOINT_CLEANUP_PAGES_REMOVED);
     testutil_die(EINVAL, "get_stat_field: Stat \"%s\" is unrecognized", name.c_str());
 }
 

@@ -2349,7 +2349,8 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    WT_STAT_CONN_INCR(session, txn_checkpoint);
+    WT_STAT_CONN_INCR(session, checkpoints);
+    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_RUNNING);
     SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, checkpoint, config, cfg);
 
     WT_ERR(__wt_inmem_unsupported_op(session, NULL));
@@ -2375,6 +2376,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
     WT_TRET(__wt_session_release_resources(session));
 
 err:
+    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_INACTIVE);
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

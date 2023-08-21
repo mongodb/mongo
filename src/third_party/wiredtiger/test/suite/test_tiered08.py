@@ -89,7 +89,7 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
             for i in range(nkeys, nkeys + self.batch_size):
                 c[self.key_gen(i)] = self.value_gen(i)
             nkeys += self.batch_size
-            ckpt_count = self.get_stat(stat.conn.txn_checkpoint)
+            ckpt_count = self.get_stat(stat.conn.checkpoints)
             flush_count = self.get_stat(stat.conn.flush_tier)
             self.pr('Populating: ckpt {}, flush {}'.format(str(ckpt_count), str(flush_count)))
         c.close()

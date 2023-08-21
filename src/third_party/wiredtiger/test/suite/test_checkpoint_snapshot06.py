@@ -220,7 +220,7 @@ class test_checkpoint_snapshot06(wttest.WiredTigerTestCase):
             while not ckpt_snapshot:
                 time.sleep(1)
                 stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_snapshot = stat_cursor[stat.conn.txn_checkpoint_snapshot_acquired][2]
+                ckpt_snapshot = stat_cursor[stat.conn.checkpoint_snapshot_acquired][2]
                 stat_cursor.close()
 
             # commit the operations in out of order. Insert followed by truncate.

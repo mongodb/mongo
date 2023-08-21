@@ -112,7 +112,7 @@ class test_checkpoint08(wttest.WiredTigerTestCase):
         self.assertEqual(hsval, 0)
 
         stat_cursor = self.session.open_cursor('statistics:file:WiredTigerHS.wt', None, None)
-        obsolete_applied = stat_cursor[stat.dsrc.txn_checkpoint_obsolete_applied][2]
+        obsolete_applied = stat_cursor[stat.dsrc.checkpoint_obsolete_applied][2]
         self.assertEqual(obsolete_applied, 1)
         stat_cursor.close()
 

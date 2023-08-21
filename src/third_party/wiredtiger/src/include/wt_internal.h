@@ -457,6 +457,7 @@ typedef uint64_t wt_timestamp_t;
 #include "cache.h"
 #include "capacity.h"
 #include "cell.h"
+#include "checkpoint.h"
 #include "compact.h"
 #include "config.h"
 #include "cursor.h"

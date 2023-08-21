@@ -87,7 +87,7 @@ class test_truncate11(wttest.WiredTigerTestCase):
             while not ckpt_started:
                 time.sleep(1)
                 stat_cursor = self.session.open_cursor('statistics:', None, None)
-                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                ckpt_started = stat_cursor[stat.conn.checkpoint_state][2] != 0
                 stat_cursor.close()
 
             # Start a transaction.

@@ -191,7 +191,7 @@ __sync_page_skip(
           !F_ISSET(S2BT(session), WT_BTREE_LOGGED)))) {
         __wt_verbose_debug2(
           session, WT_VERB_CHECKPOINT_CLEANUP, "%p: page walk skipped", (void *)ref);
-        WT_STAT_CONN_DATA_INCR(session, cc_pages_walk_skipped);
+        WT_STAT_CONN_DATA_INCR(session, checkpoint_cleanup_pages_walk_skipped);
         *skipp = true;
     }
     return (0);
@@ -214,7 +214,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
     uint64_t oldest_id, saved_pinned_id, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, internal_cleanup, is_hs, tried_eviction;
+    bool dirty, internal_cleanup, is_hs, is_internal, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
@@ -352,12 +352,18 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             if (walk == NULL)
                 break;
 
-            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL) && internal_cleanup) {
+            is_internal = F_ISSET(walk, WT_REF_FLAG_INTERNAL);
+            if (is_internal && internal_cleanup) {
                 WT_WITH_PAGE_INDEX(session, ret = __wt_sync_obsolete_cleanup(session, walk));
                 WT_ERR(ret);
             }
 
             page = walk->page;
+
+            if (is_internal)
+                WT_STAT_CONN_INCR(session, checkpoint_pages_visited_internal);
+            else
+                WT_STAT_CONN_INCR(session, checkpoint_pages_visited_leaf);
 
             /*
              * Check if the page is dirty. Add a barrier between the check and taking a reference to
@@ -387,7 +393,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 continue;
             }
 
-            if (F_ISSET(walk, WT_REF_FLAG_INTERNAL)) {
+            if (is_internal) {
                 internal_bytes += page->memory_footprint;
                 ++internal_pages;
                 /* Slow down checkpoints. */
@@ -414,7 +420,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              * Once the transaction has given up it's snapshot it is no longer safe to reconcile
              * pages. That happens prior to the final metadata checkpoint.
              */
-            if (F_ISSET(walk, WT_REF_FLAG_LEAF) &&
+            if (!is_internal &&
               (page->read_gen == WT_READGEN_WONT_NEED ||
                 FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) &&
               !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
@@ -428,6 +434,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 continue;
             }
             tried_eviction = false;
+
+            WT_STAT_CONN_INCR(session, checkpoint_pages_reconciled);
+            if (FLD_ISSET(rec_flags, WT_REC_HS))
+                WT_STAT_CONN_INCR(session, checkpoint_hs_pages_reconciled);
 
             WT_ERR(__wt_reconcile(session, walk, NULL, rec_flags));
 
