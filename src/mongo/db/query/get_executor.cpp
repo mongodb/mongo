@@ -135,6 +135,7 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -1638,12 +1639,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                 return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     std::move(exec));
             } else {
-                const auto queryControl =
-                    ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-                        "internalQueryFrameworkControl");
+                auto queryControl = QueryKnobConfiguration::decoration(opCtx)
+                                        .getInternalQueryFrameworkControlForOp();
                 tassert(7319400,
                         "Optimization failed either with forceBonsai set, or without a hint.",
-                        queryControl->_data.get() != QueryFrameworkControlEnum::kForceBonsai &&
+                        queryControl != QueryFrameworkControlEnum::kForceBonsai &&
                             !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
                             !fastIndexNullHandling);
             }

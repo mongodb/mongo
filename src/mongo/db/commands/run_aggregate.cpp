@@ -112,6 +112,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats/aggregate_key_generator.h"
@@ -1231,12 +1232,11 @@ Status runAggregate(OperationContext* opCtx,
             } else {
                 // If we had an optimization failure, only error if we're not in tryBonsai.
                 bonsaiExecSuccess = false;
-                const auto queryControl =
-                    ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-                        "internalQueryFrameworkControl");
+                auto queryControl = QueryKnobConfiguration::decoration(opCtx)
+                                        .getInternalQueryFrameworkControlForOp();
                 tassert(7319401,
                         "Optimization failed either without tryBonsai set, or without a hint.",
-                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
+                        queryControl == QueryFrameworkControlEnum::kTryBonsai &&
                             request.getHint() && !request.getHint()->isEmpty() &&
                             !fastIndexNullHandling);
             }

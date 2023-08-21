@@ -121,10 +121,12 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -370,8 +372,9 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         ? SbeCompatibility::flagGuarded
         : SbeCompatibility::fullyCompatible;
 
+    auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
     CompatiblePipelineStages allowedStages = {
-        .group = !internalQuerySlotBasedExecutionDisableGroupPushdown.load(),
+        .group = !queryKnob.getSbeDisableGroupPushdownForOp(),
 
         // If lookup pushdown isn't enabled or the main collection is sharded or any of the
         // secondary namespaces are sharded or are a view, then no $lookup stage will be eligible
@@ -381,8 +384,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // whether any secondary collection is a view or is sharded, not which ones are a view or
         // are sharded and which ones aren't. As such, if any secondary collection is a view or is
         // sharded, no $lookup will be eligible for pushdown.
-        .lookup = !internalQuerySlotBasedExecutionDisableLookupPushdown.load() &&
-            !isMainCollectionSharded && !collections.isAnySecondaryNamespaceAViewOrSharded(),
+        .lookup = !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
+            !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
         // TODO (SERVER-72549): SBE execution of 'transform' and 'match' stages requires
         // 'featureFlagSbeFull' to be enabled.
@@ -1053,12 +1056,9 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
     // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
     // node.
     auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe();
-
-    // TODO SERVER-78998: This check should be modified once we've refactored checking
-    // 'internalQueryFrameworkControl'.
-    auto forceClassicEngine = ServerParameterSet::getNodeParameterSet()
-                                  ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                  ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+    auto forceClassicEngine =
+        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
+        QueryFrameworkControlEnum::kForceClassicEngine;
 
     bool skipRequiresInputDocSourceCheck =
         firstStageIsSearch && searchInSbeEnabled && !forceClassicEngine;

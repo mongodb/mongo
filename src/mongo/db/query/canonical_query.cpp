@@ -50,6 +50,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/server_parameter.h"
@@ -168,9 +169,9 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
     _expCtx = expCtx;
     _findCommand = std::move(parsedFind->findCommandRequest);
 
-    _forceClassicEngine = ServerParameterSet::getNodeParameterSet()
-                              ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                              ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+    _forceClassicEngine =
+        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
+        QueryFrameworkControlEnum::kForceClassicEngine;
 
     _root = MatchExpression::normalize(std::move(parsedFind->filter));
     if (parsedFind->proj) {

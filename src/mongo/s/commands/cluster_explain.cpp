@@ -352,7 +352,7 @@ Status ClusterExplain::buildExplainResult(
     buildPlannerInfo(opCtx, shardResponses, mongosStageName, out);
     buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
     explain_common::generateServerInfo(out);
-    explain_common::generateServerParameters(out);
+    explain_common::generateServerParameters(opCtx, out);
     appendIfRoom(out, command, "command");
 
     return Status::OK();

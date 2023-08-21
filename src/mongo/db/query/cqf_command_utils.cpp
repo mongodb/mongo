@@ -107,6 +107,7 @@
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/server_parameter.h"
@@ -1228,9 +1229,8 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
                          const Pipeline& pipeline,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
-                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                ->_data.get();
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
 
     if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
@@ -1263,9 +1263,8 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
 bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
-                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                ->_data.get();
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
     if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
     }
@@ -1300,16 +1299,14 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
 }
 
 bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
-    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
-                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                ->_data.get();
+    const auto frameworkControl =
+        QueryKnobConfiguration::decoration(cq.getOpCtx()).getInternalQueryFrameworkControlForOp();
     return isEligibleForBonsai(cq, frameworkControl);
 }
 
 bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline) {
-    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
-                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                                ->_data.get();
+    const auto frameworkControl = QueryKnobConfiguration::decoration(pipeline.getContext()->opCtx)
+                                      .getInternalQueryFrameworkControlForOp();
     return isEligibleForBonsai(
         serviceCtx, pipeline, frameworkControl, false /* queryHasNaturalHint */);
 }
