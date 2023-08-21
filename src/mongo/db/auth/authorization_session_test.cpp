@@ -94,13 +94,9 @@ public:
         RestrictionEnvironment::set(
             _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _opCtx = _client->makeOperationContext();
-        auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
-        managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
-        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(localManagerState));
-        authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
+
+        authzManager = AuthorizationManager::get(getServiceContext());
         auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
         sessionState = localSessionState.get();
         authzSession = std::make_unique<AuthorizationSessionForTest>(
@@ -178,8 +174,19 @@ public:
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(resource, action));
     }
 
+private:
+    static Options createServiceContextOptions() {
+        Options o;
+        return o.useMockClock(true).useMockAuthzManagerExternalState(
+            std::make_unique<FailureCapableAuthzManagerExternalStateMock>());
+    }
+
 protected:
-    AuthorizationSessionTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    AuthorizationSessionTest() : ServiceContextMongoDTest(createServiceContextOptions()) {
+        managerState =
+            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(_authzExternalState);
+        invariant(managerState);
+    }
 
     ClockSourceMock* clockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());

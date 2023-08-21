@@ -2088,6 +2088,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        'auth/auth_impl_internal',
         'catalog/catalog_impl',
         'catalog/database_holder',
         'commands/mongod',
