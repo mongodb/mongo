@@ -1,5 +1,5 @@
 /**
- * Tests deleteOne works correctly on time-series buckets collections.
+ * Tests deleteOne and updateOne works correctly on time-series buckets collections.
  * @tags: [
  *   # TODO (SERVER-80195): Remove the tag.
  *   requires_fcv_71,
@@ -63,7 +63,11 @@ function runTest(cmd, validateFn) {
 }
 
 function removeValidateFn(coll) {
-    assert.eq(coll.count(), 0);
+    assert.eq(coll.find().itcount(), 0);
+}
+
+function updateValidateFn(coll) {
+    assert.eq(coll.find({"control.closed": true}).itcount(), 1);
 }
 
 runTest({
@@ -71,6 +75,16 @@ runTest({
     deletes: [{q: {_id: ObjectId("64dd4adcac4fd7e3ebbd9af3")}, limit: 1}]
 },
         removeValidateFn);
+
+runTest({
+    update: bucketsCollName,
+    updates: [{
+        q: {_id: ObjectId("64dd4adcac4fd7e3ebbd9af3")},
+        u: {$set: {"control.closed": true}},
+        multi: false
+    }]
+},
+        updateValidateFn)
 
 st.stop();
 })();

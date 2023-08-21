@@ -528,8 +528,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                                 "Failed to target upsert by query");
     }
 
-    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
-    auto isExactId = _isExactIdQuery(*cq, _cri.cm);
+    auto isExactId = _isExactIdQuery(*cq, _cri.cm) && !_isRequestOnTimeseriesViewNamespace;
 
     // We first try to target based on the update's query. It is always valid to forward any update
     // or upsert to a single shard, so return immediately if we are able to target a single shard.
@@ -557,7 +556,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // write without shard key protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        (isExactId && !isShardedTimeseriesCollection)) {
+        isExactId) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
@@ -573,16 +572,21 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // If we are here then this is an op-style update, and we were not able to target a single
     // shard. Non-multi updates must target a single shard or an exact _id. Time-series single
     // updates must target a single shard.
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream()
-                << "A {multi:false} update on a sharded collection must contain an "
-                   "exact match on _id (and have the collection default collation) or target a "
-                   "single shard (and have the simple collation), but this update targeted "
-                << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
-                << ", shard key pattern: " << shardKeyPattern.toString(),
-            isMulti || (isExactId && !isShardedTimeseriesCollection) ||
-                feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+    uassert(
+        ErrorCodes::InvalidOptions,
+        fmt::format("A {{multi:false}} update on a sharded {} contain the shard key (and have the "
+                    "simple collation), but this update targeted {} shards. Update request: {}, "
+                    "shard key pattern: {}",
+                    _isRequestOnTimeseriesViewNamespace
+                        ? "time-series collection must"
+                        : "collection must contain an exact match on _id (and have the "
+                          "collection default collation) or",
+                    endPoints.size(),
+                    updateOp.toBSON().toString(),
+                    shardKeyPattern.toString()),
+        isMulti || isExactId ||
+            feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                serverGlobalParams.featureCompatibility));
 
     if (!isMulti) {
         // If the request is {multi:false} and it's not a write without shard key, then this is a
@@ -590,7 +594,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         // this event in our serverStatus metrics. If the query requests an upsert, then we will use
         // the two phase write protocol anyway.
         updateOneNonTargetedShardedCount.increment(1);
-        if (isExactId && !isShardedTimeseriesCollection) {
+        if (isExactId) {
             updateOneOpStyleBroadcastWithExactIDCount.increment(1);
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
