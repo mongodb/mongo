@@ -81,7 +81,7 @@ public:
      * decremented and if it reaches to zero, orphan cleanup may proceed.
      */
     std::shared_ptr<ScopedCollectionDescription::Impl> getActiveMetadata(
-        const boost::optional<LogicalTime>& atClusterTime);
+        const boost::optional<LogicalTime>& atClusterTime, bool preserveRange);
 
     /**
      * Returns the placement version of the active metadata object.

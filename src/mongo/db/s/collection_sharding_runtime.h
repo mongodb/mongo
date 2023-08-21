@@ -330,7 +330,7 @@ private:
      * atClusterTime if specified.
      */
     std::shared_ptr<ScopedCollectionDescription::Impl> _getCurrentMetadataIfKnown(
-        const boost::optional<LogicalTime>& atClusterTime) const;
+        const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) const;
 
     /**
      * Returns the latest version of collection metadata with filtering configured for
@@ -341,6 +341,7 @@ private:
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
         const boost::optional<ShardVersion>& optReceivedShardVersion,
+        bool preserveRange,
         bool supportNonVersionedOperations = false) const;
 
     /**
