@@ -57,7 +57,7 @@ void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
 
 AccumulatorCovariance::AccumulatorCovariance(ExpressionContext* const expCtx, bool isSamp)
     : AccumulatorForWindowFunctions(expCtx), _covarianceWF(expCtx, isSamp) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorCovarianceSamp::create(

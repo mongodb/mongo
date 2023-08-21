@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 
 namespace mongo {
 
@@ -44,19 +45,27 @@ namespace mongo {
  */
 class WindowFunctionState {
 public:
-    WindowFunctionState(ExpressionContext* const expCtx) : _expCtx(expCtx) {}
+    WindowFunctionState(ExpressionContext* const expCtx,
+                        int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
+        : _expCtx(expCtx), _memUsageTracker(nullptr /* base*/, maxAllowedMemoryUsageBytes) {}
     virtual ~WindowFunctionState() = default;
+
+    WindowFunctionState(const WindowFunctionState&) = delete;
+    WindowFunctionState& operator=(const WindowFunctionState&) = delete;
+
     virtual void add(Value) = 0;
     virtual void remove(Value) = 0;
     virtual Value getValue() const = 0;
     virtual void reset() = 0;
     size_t getApproximateSize() {
-        tassert(5414200, "_memUsageBytes not set for function", _memUsageBytes != 0);
-        return _memUsageBytes;
+        tassert(5414200,
+                "_memUsageTracker is not set for function",
+                _memUsageTracker.currentMemoryBytes() != 0);
+        return _memUsageTracker.currentMemoryBytes();
     }
 
 protected:
     ExpressionContext* _expCtx;
-    size_t _memUsageBytes = 0;
+    MemoryUsageTracker::Impl _memUsageTracker;
 };
 }  // namespace mongo

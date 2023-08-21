@@ -59,7 +59,7 @@ public:
                                     boost::optional<long long> unitMillis = boost::none,
                                     bool isNonremovable = false)
         : WindowFunctionState(expCtx), _integral(expCtx), _unitMillis(unitMillis) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     void add(Value value) override;
@@ -74,9 +74,9 @@ public:
         _nanCount = 0;
         _integral.reset();
         // AccumulatorIntegral's reset() depends on the fact that WindowFunctionIntegral's reset()
-        // will set '_memUsageBytes' to sizeof(*this). If you want to reset '_memUsageBytes' to
+        // will set '_memUsageTracker' to sizeof(*this). If you want to reset '_memUsageTracker' to
         // other value, please update AccumulatorIntegral's reset() as well.
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     Value getValue() const override {
@@ -103,7 +103,7 @@ private:
     void assertValueType(const Value& value);
 
     WindowFunctionSum _integral;
-    std::deque<Value> _values;
+    std::deque<MemoryTokenWith<Value>> _values;
     boost::optional<long long> _unitMillis;
     int _nanCount = 0;
     bool isNonremovable = false;

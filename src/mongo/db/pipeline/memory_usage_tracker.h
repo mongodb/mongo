@@ -75,10 +75,10 @@ public:
 
         void update(int64_t diff) {
             // TODO SERVER-80149: Re-enable this tassert checking for memory underflow.
-            // tassert(6128100,
-            //         str::stream() << "Underflow in memory tracking, attempting to add " << diff
-            //                       << " but only " << _currentMemoryBytes << " available",
-            //         _currentMemoryBytes + diff >= 0);
+            tassert(6128100,
+                    str::stream() << "Underflow in memory tracking, attempting to add " << diff
+                                  << " but only " << _currentMemoryBytes << " available",
+                    _currentMemoryBytes + diff >= 0);
             _currentMemoryBytes += diff;
             if (_currentMemoryBytes > _maxMemoryBytes) {
                 _maxMemoryBytes = _currentMemoryBytes;
@@ -278,6 +278,12 @@ public:
 
     MemoryTokenWith(MemoryToken token, T value)
         : _token(std::move(token)), _value(std::move(value)) {}
+
+    MemoryTokenWith(const MemoryTokenWith&) = delete;
+    MemoryTokenWith& operator=(const MemoryTokenWith&) = delete;
+
+    MemoryTokenWith(MemoryTokenWith&& other) = default;
+    MemoryTokenWith& operator=(MemoryTokenWith&& other) = default;
 
     const T& value() const {
         return _value;

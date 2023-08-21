@@ -47,7 +47,7 @@ void AccumulatorFirst::processInternal(const Value& input, bool merging) {
         // can't use pValue.missing() since we want the first value even if missing
         _haveFirst = true;
         _first = input;
-        _memUsageBytes = sizeof(*this) + input.getApproximateSize() - sizeof(Value);
+        _memUsageTracker.set(sizeof(*this) + input.getApproximateSize() - sizeof(Value));
         _needsInput = false;
     }
 }
@@ -58,13 +58,13 @@ Value AccumulatorFirst::getValue(bool toBeMerged) {
 
 AccumulatorFirst::AccumulatorFirst(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _haveFirst(false) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorFirst::reset() {
     _haveFirst = false;
     _first = Value();
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 

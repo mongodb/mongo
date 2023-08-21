@@ -46,7 +46,7 @@ public:
             return;
         }
         _values.insert(value.coerceToDouble());
-        _memUsageBytes += sizeof(double);
+        _memUsageTracker.update(sizeof(double));
     }
 
     void remove(Value value) override {
@@ -59,13 +59,13 @@ public:
         tassert(7455904,
                 "Cannot remove a value not tracked by WindowFunctionPercentile",
                 iter != _values.end());
-        _memUsageBytes -= sizeof(double);
+        _memUsageTracker.update(-static_cast<int64_t>(sizeof(double)));
         _values.erase(iter);
     }
 
     void reset() override {
         _values.clear();
-        // updating _memUsageBytes is the responsibility of the derived classes.
+        // resetting _memUsageTracker is the responsibility of the derived classes.
     }
 
 protected:
@@ -104,7 +104,7 @@ public:
     explicit WindowFunctionPercentile(ExpressionContext* const expCtx,
                                       const std::vector<double>& ps)
         : WindowFunctionPercentileCommon(expCtx), _ps(ps) {
-        _memUsageBytes = sizeof(*this) + _ps.capacity() * sizeof(double);
+        _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
     }
 
     Value getValue() const final {
@@ -125,7 +125,7 @@ public:
 
     void reset() final {
         WindowFunctionPercentileCommon::reset();
-        _memUsageBytes = sizeof(*this) + _ps.capacity() * sizeof(double);
+        _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
     }
 
 private:
@@ -140,7 +140,7 @@ public:
 
     explicit WindowFunctionMedian(ExpressionContext* const expCtx)
         : WindowFunctionPercentileCommon(expCtx) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     Value getValue() const final {
@@ -152,7 +152,7 @@ public:
 
     void reset() final {
         WindowFunctionPercentileCommon::reset();
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 };
 

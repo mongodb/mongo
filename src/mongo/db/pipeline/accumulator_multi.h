@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_token_container_util.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -115,15 +116,12 @@ protected:
     static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
         ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);
 
-    // Utility to check that '_maxMemUsageBytes' isn't exceeded after 'memAdded' is counted
-    // towards the total memory consumed.
-    void updateAndCheckMemUsage(size_t memAdded);
+    // Utility to check that memory limit isn't exceeded.
+    void checkMemUsage();
 
     // Stores the limit of how many values we will return. This value is initialized to
     // 'boost::none' on construction and is only set during 'startNewGroup'.
     boost::optional<long long> _n;
-
-    int _maxMemUsageBytes = 0;
 
 private:
     virtual void _processValue(const Value& val) = 0;
@@ -172,7 +170,11 @@ public:
 private:
     void _processValue(const Value& val) final;
 
-    ValueMultiset _set;
+    using MultiSet = std::multiset<MemoryTokenWith<Value>, MemoryTokenValueComparator>;
+
+    MultiSet createMultiSet() const;
+
+    MultiSet _set;
     MinMaxSense _sense;
 };
 
@@ -254,7 +256,7 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    std::deque<Value> _deque;
+    std::deque<MemoryTokenWith<Value>> _deque;
     Sense _variant;
 };
 
@@ -391,7 +393,8 @@ private:
     // initialized.
     boost::optional<SortKeyGenerator> _sortKeyGenerator;
     boost::optional<SortKeyComparator> _sortKeyComparator;
-    boost::optional<std::multimap<Value, Value, std::function<bool(Value, Value)>>> _map;
+    boost::optional<std::multimap<Value, MemoryTokenWith<Value>, std::function<bool(Value, Value)>>>
+        _map;
 };
 
 extern template class AccumulatorTopBottomN<TopBottomSense::kBottom, false>;

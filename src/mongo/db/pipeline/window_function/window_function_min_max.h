@@ -56,45 +56,46 @@ class WindowFunctionMinMaxCommon : public WindowFunctionState {
 public:
     void add(Value value) final {
         // Ignore nullish values.
-        if (value.nullish())
+        if (value.nullish()) {
             return;
-        _memUsageBytes += value.getApproximateSize();
-        _values.insert(std::move(value));
+        }
+        _values.emplace(MemoryToken{value.getApproximateSize(), &_memUsageTracker},
+                        std::move(value));
     }
 
     void remove(Value value) final {
         // Ignore nullish values.
-        if (value.nullish())
+        if (value.nullish()) {
             return;
+        }
         // std::multiset::insert is guaranteed to put the element after any equal elements
         // already in the container. So find() / erase() will remove the oldest equal element,
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
         auto iter = _values.find(value);
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
-        _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
 
     void reset() final {
         _values.clear();
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
 protected:
     // Constructor hidden so that only instances of the derived types can be created.
     explicit WindowFunctionMinMaxCommon(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx),
-          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
+          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {}
 
     // Holds all the values in the window, in order, with constant-time access to both ends.
-    ValueMultiset _values;
+    std::multiset<MemoryTokenWith<Value>, MemoryTokenValueComparator> _values;
 };
 
 template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMax : public WindowFunctionMinMaxCommon<sense> {
 public:
     using WindowFunctionMinMaxCommon<sense>::_values;
-    using WindowFunctionMinMaxCommon<sense>::_memUsageBytes;
+    using WindowFunctionMinMaxCommon<sense>::_memUsageTracker;
 
     static inline const Value kDefault = Value{BSONNULL};
 
@@ -104,16 +105,16 @@ public:
 
     explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
         : WindowFunctionMinMaxCommon<sense>(expCtx) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     Value getValue() const final {
         if (_values.empty())
             return kDefault;
         if constexpr (sense == AccumulatorMinMax::Sense::kMin) {
-            return *_values.begin();
+            return _values.begin()->value();
         } else {
-            return *_values.rbegin();
+            return _values.rbegin()->value();
         }
         MONGO_UNREACHABLE_TASSERT(5371401);
     }
@@ -123,7 +124,7 @@ template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMaxN : public WindowFunctionMinMaxCommon<sense> {
 public:
     using WindowFunctionMinMaxCommon<sense>::_values;
-    using WindowFunctionMinMaxCommon<sense>::_memUsageBytes;
+    using WindowFunctionMinMaxCommon<sense>::_memUsageTracker;
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
                                                        long long n) {
@@ -146,7 +147,7 @@ public:
 
     explicit WindowFunctionMinMaxN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionMinMaxCommon<sense>(expCtx), _n(n) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     Value getValue() const final {
@@ -155,20 +156,14 @@ public:
         }
 
         auto processVal = [&](auto begin, auto end, size_t size) -> Value {
-            auto n = static_cast<size_t>(_n);
-
-            // If 'n' is greater than the size of the current window, then return all the values.
-            if (n >= size) {
-                return Value(std::vector(begin, end));
-            } else {
-                std::vector<Value> result;
-                result.reserve(n);
-                auto it = begin;
-                for (size_t i = 0; i < n; ++i, ++it) {
-                    result.push_back(*it);
-                }
-                return Value(std::move(result));
+            auto n = std::min(static_cast<size_t>(_n), size);
+            std::vector<Value> result;
+            result.reserve(n);
+            auto it = begin;
+            for (size_t i = 0; i < n; ++i, ++it) {
+                result.push_back(it->value());
             }
+            return Value(std::move(result));
         };
 
         auto size = _values.size();

@@ -67,7 +67,7 @@ public:
 };
 
 TEST_F(WindowFunctionMinMaxNTest, EmptyWindow) {
-    auto test = [](auto windowFunction) {
+    auto test = [](auto& windowFunction) {
         ASSERT_VALUE_EQ(windowFunction.getValue(), Value{BSONArray()});
 
         // No matter how many nullish values we insert, we should still get back the empty array.

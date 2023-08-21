@@ -87,7 +87,7 @@ Value convertNonFiniteInputValue(Value value) {
 
 WindowFunctionCovariance::WindowFunctionCovariance(ExpressionContext* const expCtx, bool isSamp)
     : WindowFunctionState(expCtx), _isSamp(isSamp), _meanX(expCtx), _meanY(expCtx), _cXY(expCtx) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 Value WindowFunctionCovariance::getValue() const {

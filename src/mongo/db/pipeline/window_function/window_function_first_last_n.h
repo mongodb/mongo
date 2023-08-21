@@ -59,13 +59,13 @@ public:
 
     WindowFunctionFirstLastN(ExpressionContext* const expCtx, long long n)
         : WindowFunctionState(expCtx), _n(n) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     void add(Value value) final {
-        auto valToInsert = value.missing() ? Value(BSONNULL) : value;
-        _memUsageBytes += valToInsert.getApproximateSize();
-        _values.emplace_back(std::move(valToInsert));
+        auto valToInsert = value.missing() ? Value(BSONNULL) : std::move(value);
+        _values.emplace_back(MemoryToken{valToInsert.getApproximateSize(), &_memUsageTracker},
+                             std::move(valToInsert));
     }
 
     void remove(Value value) final {
@@ -76,34 +76,35 @@ public:
                 str::stream() << "Attempted to remove an element other than the first element from "
                                  "window function "
                               << getName(),
-                _expCtx->getValueComparator().compare(*iter, valToRemove) == 0);
-        _memUsageBytes -= iter->getApproximateSize();
+                _expCtx->getValueComparator().compare(iter->value(), valToRemove) == 0);
         _values.erase(iter);
     }
 
     Value getValue() const final {
-        if (_values.empty())
+        if (_values.empty()) {
             return Value(std::vector<Value>{});
+        }
         auto n = static_cast<size_t>(_n);
 
         if (n >= _values.size()) {
-            return Value(std::vector<Value>(_values.begin(), _values.end()));
+            return convertToValueFromMemoryTokenWithValue(
+                _values.begin(), _values.end(), _values.size());
         }
 
         if constexpr (S == FirstLastSense::kFirst) {
-            return Value(std::vector<Value>(_values.begin(), _values.begin() + n));
+            return convertToValueFromMemoryTokenWithValue(_values.begin(), _values.begin() + n, n);
         } else {
-            return Value(std::vector<Value>(_values.end() - n, _values.end()));
+            return convertToValueFromMemoryTokenWithValue(_values.end() - n, _values.end(), n);
         }
     }
 
     void reset() final {
         _values.clear();
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
 private:
-    std::vector<Value> _values;
+    std::vector<MemoryTokenWith<Value>> _values;
     long long _n;
 };
 using WindowFunctionFirstN = WindowFunctionFirstLastN<FirstLastSense::kFirst>;

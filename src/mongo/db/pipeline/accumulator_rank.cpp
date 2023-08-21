@@ -64,7 +64,7 @@ void AccumulatorRank::processInternal(const Value& input, bool merging) {
         _lastRank += _numSameRank;
         _numSameRank = 1;
         _lastInput = input;
-        _memUsageBytes = sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value);
+        _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
     } else {
         ++_numSameRank;
     }
@@ -82,7 +82,7 @@ void AccumulatorDenseRank::processInternal(const Value& input, bool merging) {
         getExpressionContext()->getValueComparator().compare(_lastInput.value(), input) != 0) {
         ++_lastRank;
         _lastInput = input;
-        _memUsageBytes = sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value);
+        _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
     }
 }
 
@@ -100,17 +100,19 @@ intrusive_ptr<AccumulatorState> AccumulatorDocumentNumber::create(ExpressionCont
 
 AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx)
     : AccumulatorForWindowFunctions(expCtx) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorRankBase::reset() {
     _lastInput = boost::none;
     _lastRank = 0;
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorRank::reset() {
     _lastInput = boost::none;
     _numSameRank = 1;
     _lastRank = 0;
+    _memUsageTracker.set(sizeof(*this));
 }
 }  // namespace mongo

@@ -60,7 +60,7 @@ void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
         int cmp = getExpressionContext()->getValueComparator().compare(_val, input) * _sense;
         if (cmp > 0 || _val.missing()) {  // missing is lower than all other values
             _val = input;
-            _memUsageBytes = sizeof(*this) + input.getApproximateSize() - sizeof(Value);
+            _memUsageTracker.set(sizeof(*this) + input.getApproximateSize() - sizeof(Value));
         }
     }
 }
@@ -74,12 +74,12 @@ Value AccumulatorMinMax::getValue(bool toBeMerged) {
 
 AccumulatorMinMax::AccumulatorMinMax(ExpressionContext* const expCtx, Sense sense)
     : AccumulatorState(expCtx), _sense(sense) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorMinMax::reset() {
     _val = Value();
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorMin::create(ExpressionContext* const expCtx) {

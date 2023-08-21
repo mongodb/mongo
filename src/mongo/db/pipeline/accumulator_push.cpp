@@ -61,12 +61,12 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
             _array.push_back(input);
-            _memUsageBytes += input.getApproximateSize();
+            _memUsageTracker.update(input.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+                        << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                    _memUsageTracker.withinMemoryLimit());
         }
     } else {
         // If we're merging, we need to take apart the arrays we receive and put their elements into
@@ -76,12 +76,12 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
 
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {
-            _memUsageBytes += val.getApproximateSize();
+            _memUsageTracker.update(val.getApproximateSize());
             uassert(ErrorCodes::ExceededMemoryLimit,
                     str::stream()
                         << "$push used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+                        << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                    _memUsageTracker.withinMemoryLimit());
         }
         _array.insert(_array.end(), vec.begin(), vec.end());
     }
@@ -93,14 +93,13 @@ Value AccumulatorPush::getValue(bool toBeMerged) {
 
 AccumulatorPush::AccumulatorPush(ExpressionContext* const expCtx,
                                  boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx),
-      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPushBytes.load())) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorPush::reset() {
     vector<Value>().swap(_array);
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorPush::create(ExpressionContext* const expCtx) {

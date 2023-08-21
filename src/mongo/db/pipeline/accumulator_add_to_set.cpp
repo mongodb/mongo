@@ -63,12 +63,13 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     auto addValue = [this](auto&& val) {
         bool inserted = _set.insert(val).second;
         if (inserted) {
-            _memUsageBytes += val.getApproximateSize();
-            uassert(ErrorCodes::ExceededMemoryLimit,
-                    str::stream()
-                        << "$addToSet used too much memory and cannot spill to disk. Memory limit: "
-                        << _maxMemUsageBytes << " bytes",
-                    _memUsageBytes < _maxMemUsageBytes);
+            _memUsageTracker.update(val.getApproximateSize());
+            uassert(
+                ErrorCodes::ExceededMemoryLimit,
+                str::stream() << "$addToSet used too much memory and cannot spill to disk. Used: "
+                              << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
+                              << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                _memUsageTracker.withinMemoryLimit());
         }
     };
     if (!merging) {
@@ -93,15 +94,14 @@ Value AccumulatorAddToSet::getValue(bool toBeMerged) {
 
 AccumulatorAddToSet::AccumulatorAddToSet(ExpressionContext* const expCtx,
                                          boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx),
-      _set(expCtx->getValueComparator().makeUnorderedValueSet()),
-      _maxMemUsageBytes(maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxAddToSetBytes.load())),
+      _set(expCtx->getValueComparator().makeUnorderedValueSet()) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorAddToSet::reset() {
     _set = getExpressionContext()->getValueComparator().makeUnorderedValueSet();
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorAddToSet::create(ExpressionContext* const expCtx) {

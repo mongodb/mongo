@@ -187,7 +187,7 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
         return;
     }
     _algo->incorporate(input.coerceToDouble());
-    _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
+    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
 }
 
 Value AccumulatorPercentile::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
@@ -227,12 +227,12 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
       _percentiles(ps),
       _algo(createPercentileAlgorithm(method)),
       _method(method) {
-    _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
+    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
 }
 
 void AccumulatorPercentile::reset() {
     _algo = createPercentileAlgorithm(_method);
-    _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
+    _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
 }
 
 Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initializer,

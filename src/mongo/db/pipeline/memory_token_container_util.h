@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,40 +27,47 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 
 namespace mongo {
 
-using boost::intrusive_ptr;
+class MemoryTokenValueComparator {
+public:
+    using is_transparent = std::true_type;
 
-REGISTER_ACCUMULATOR(last, genericParseSingleExpressionAccumulator<AccumulatorLast>);
+    explicit MemoryTokenValueComparator(const ValueComparator* comparator)
+        : _comparator(comparator) {}
 
-void AccumulatorLast::processInternal(const Value& input, bool merging) {
-    /* always remember the last value seen */
-    _last = input;
-    _memUsageTracker.set(sizeof(*this) + _last.getApproximateSize() - sizeof(Value));
+    template <typename LHS, typename RHS>
+    bool operator()(const LHS& lhs, const RHS& rhs) const {
+        return _comparator->compare(_getValue(lhs), _getValue(rhs)) < 0;
+    }
+
+private:
+    const Value& _getValue(const Value& v) const {
+        return v;
+    }
+    const Value& _getValue(const MemoryTokenWith<Value>& v) const {
+        return v.value();
+    }
+
+    const ValueComparator* _comparator;
+};
+
+/**
+ * Helper function to convert container of MemoryTokenWith<Value> to a Value, containing an array of
+ * Values.
+ */
+template <typename Iterator>
+Value convertToValueFromMemoryTokenWithValue(Iterator begin, Iterator end, size_t size) {
+    std::vector<Value> result;
+    result.reserve(size);
+    std::transform(begin, end, std::back_inserter(result), [](const auto& v) { return v.value(); });
+    return Value{std::move(result)};
 }
 
-Value AccumulatorLast::getValue(bool toBeMerged) {
-    return _last;
-}
-
-AccumulatorLast::AccumulatorLast(ExpressionContext* const expCtx) : AccumulatorState(expCtx) {
-    _memUsageTracker.set(sizeof(*this));
-}
-
-void AccumulatorLast::reset() {
-    _memUsageTracker.set(sizeof(*this));
-    _last = Value();
-}
-
-intrusive_ptr<AccumulatorState> AccumulatorLast::create(ExpressionContext* const expCtx) {
-    return new AccumulatorLast(expCtx);
-}
 }  // namespace mongo

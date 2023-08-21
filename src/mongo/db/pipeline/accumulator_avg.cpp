@@ -149,7 +149,7 @@ Value AccumulatorAvg::getValue(bool toBeMerged) {
 AccumulatorAvg::AccumulatorAvg(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx), _count(0) {
     // This is a fixed size AccumulatorState so we never need to update this
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorAvg::reset() {
