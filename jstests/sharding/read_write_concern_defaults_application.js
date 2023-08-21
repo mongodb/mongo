@@ -924,6 +924,11 @@ function createProfileFilterForTestCase(test, targetId, explicitRWC) {
 function runScenario(
     desc, conn, regularCheckConn, configSvrCheckConn, {explicitRWC, explicitProvenance = false}) {
     let runCommandTest = function(cmdName, test) {
+        // These commands were removed but break this test in multiversion
+        if (cmdName === "getFreeMonitoringStatus" || cmdName === "setFreeMonitoring") {
+            return;
+        }
+
         assert(test !== undefined,
                "coverage failure: must define a RWC defaults application test for " + cmdName);
 
