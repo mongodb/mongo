@@ -61,7 +61,8 @@ public:
         return {queueTag, queueVal};
     }
 
-    std::pair<value::TypeTags, value::Value> initState(boost::optional<int64_t> unitMillis) {
+    std::pair<value::TypeTags, value::Value> initState(boost::optional<int64_t> unitMillis,
+                                                       bool isNonRemovable) {
         auto [stateTag, stateVal] = value::makeNewArray();
         auto state = value::getArrayView(stateVal);
 
@@ -103,6 +104,9 @@ public:
             state->push_back(value::TypeTags::Null, 0);
         }
 
+        // isNonRemovable
+        state->push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(isNonRemovable));
+
         return {stateTag, stateVal};
     }
 
@@ -110,7 +114,8 @@ public:
                                 std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                 std::vector<IntegralOp>& operations,
-                                std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
+                                std::vector<std::pair<value::TypeTags, value::Value>>& expValues,
+                                bool isNonRemovable = false) {
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -134,7 +139,7 @@ public:
             "aggIntegralFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledIntegralFinalize = compileExpression(*aggIntegralFinalize);
 
-        auto [stateTag, stateVal] = initState(unitMillis);
+        auto [stateTag, stateVal] = initState(unitMillis, isNonRemovable);
         aggAccessor.reset(stateTag, stateVal);
 
         // call IntegralOp (integralAdd/Remove) on the inputs and call finalize() method after each
@@ -175,7 +180,8 @@ public:
                                std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
                                std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                std::vector<IntegralOp>& operations,
-                               int expErrCode) {
+                               int expErrCode,
+                               bool isNonRemovable = false) {
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -199,7 +205,7 @@ public:
             "aggIntegralFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
         auto compiledIntegralFinalize = compileExpression(*aggIntegralFinalize);
 
-        auto [stateTag, stateVal] = initState(unitMillis);
+        auto [stateTag, stateVal] = initState(unitMillis, isNonRemovable);
         aggAccessor.reset(stateTag, stateVal);
 
         Status status = [&]() {
@@ -322,6 +328,48 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
     };
 
     runAndAssertExpression(boost::none, inputValues, sortByValues, integralOps, expValues);
+}
+
+TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
+    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{10.0}).second},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
+    };
+
+    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0)},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{4.0}).second},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(5.0)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6ll)},
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(7)},
+    };
+
+    std::vector<IntegralOp> integralOps = {IntegralOp::kAdd,
+                                           IntegralOp::kAdd,
+                                           IntegralOp::kAdd,
+                                           IntegralOp::kAdd,
+                                           IntegralOp::kAdd,
+                                           IntegralOp::kAdd,
+                                           IntegralOp::kAdd};
+
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        {value::TypeTags::NumberInt32, 0},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(20.0)},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{30.0}).second},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{40.0}).second},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{50.0}).second},
+        {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{60.0}).second},
+    };
+
+    runAndAssertExpression(boost::none, inputValues, sortByValues, integralOps, expValues, true);
 }
 
 TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
@@ -456,5 +504,22 @@ TEST_F(SBEIntegralTest, IntegralWithIncorrectTypes2) {
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd};
 
     runAndAssertErrorCode(boost::none, inputValues, sortByValues, integralOps, 7821111);
+}
+
+TEST_F(SBEIntegralTest, IntegralRemoveWithNonRemovable) {
+    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
+    };
+
+    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
+        {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
+    };
+
+    std::vector<IntegralOp> integralOps = {
+        IntegralOp::kAdd, IntegralOp::kAdd, IntegralOp::kRemove, IntegralOp::kRemove};
+
+    runAndAssertErrorCode(boost::none, inputValues, sortByValues, integralOps, 7996801, true);
 }
 }  // namespace mongo::sbe

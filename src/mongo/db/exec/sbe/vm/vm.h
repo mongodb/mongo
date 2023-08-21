@@ -813,9 +813,11 @@ enum class Builtin : uint8_t {
     aggRemovableSumAdd,
     aggRemovableSumRemove,
     aggRemovableSumFinalize,
+    aggIntegralInit,
     aggIntegralAdd,
     aggIntegralRemove,
     aggIntegralFinalize,
+    aggDerivativeInit,
     aggDerivativeAdd,
     aggDerivativeRemove,
     aggDerivativeFinalize,
@@ -995,6 +997,7 @@ enum class AggRemovableSumElems {
  * Element at `kIntegral` stores the integral over the current window
  * Element at `kNanCount` stores the count of NaN values encountered
  * Element at `kunitMillis` stores the date unit (Null if not valid)
+ * Element at `kIsNonRemovable` stores whether it belongs to a non-removable window
  */
 enum class AggIntegralElems {
     kInputQueue,
@@ -1002,6 +1005,7 @@ enum class AggIntegralElems {
     kIntegral,
     kNanCount,
     kUnitMillis,
+    kIsNonRemovable,
     kMaxSizeOfArray
 };
 
@@ -1869,6 +1873,7 @@ private:
     void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
                                              value::TypeTags rhsTag,
                                              value::Value rhsVal);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralInit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggIntegralFinalize(ArityType arity);
@@ -1877,6 +1882,7 @@ private:
         std::pair<value::TypeTags, value::Value> prevSortByVal,
         std::pair<value::TypeTags, value::Value> newInput,
         std::pair<value::TypeTags, value::Value> newSortByVal);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeInit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeFinalize(ArityType arity);

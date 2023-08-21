@@ -7120,7 +7120,8 @@ std::tuple<value::Array*,
            value::Array*,
            value::Array*,
            int64_t,
-           boost::optional<int64_t>>
+           boost::optional<int64_t>,
+           bool>
 getIntegralState(value::TypeTags stateTag, value::Value stateVal) {
     uassert(
         7821103, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
@@ -7164,7 +7165,14 @@ getIntegralState(value::TypeTags stateTag, value::Value stateVal) {
         unitMillis = value::bitcastTo<int64_t>(unitMillisVal);
     }
 
-    return {state, inputQueue, sortByQueue, integral, nanCount, unitMillis};
+    auto [isNonRemovableTag, isNonRemovableVal] =
+        state->getAt(static_cast<size_t>(AggIntegralElems::kIsNonRemovable));
+    uassert(7996800,
+            "isNonRemovable should be of boolean type",
+            isNonRemovableTag == value::TypeTags::Boolean);
+    auto isNonRemovable = value::bitcastTo<bool>(isNonRemovableVal);
+
+    return {state, inputQueue, sortByQueue, integral, nanCount, unitMillis, isNonRemovable};
 }
 
 void updateNaNCount(value::Array* state, int64_t nanCount) {
@@ -7221,6 +7229,46 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::integralOfTwoPointsByTr
     }
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralInit(ArityType arity) {
+    auto [unitOwned, unitTag, unitVal] = getFromStack(0);
+    auto [isNonRemovableOwned, isNonRemovableTag, isNonRemovableVal] = getFromStack(1);
+
+    tassert(7996820,
+            "Invalid unit type",
+            unitTag == value::TypeTags::Null || unitTag == value::TypeTags::NumberInt64);
+    tassert(7996821, "Invalid isNonRemovable type", isNonRemovableTag == value::TypeTags::Boolean);
+
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto state = value::getArrayView(stateVal);
+    state->reserve(static_cast<size_t>(AggIntegralElems::kMaxSizeOfArray));
+
+    // AggIntegralElems::kInputQueue
+    auto [inputQueueTag, inputQueueVal] = arrayQueueInit();
+    state->push_back(inputQueueTag, inputQueueVal);
+
+    // AggIntegralElems::kSortByQueue
+    auto [sortByQueueTag, sortByQueueVal] = arrayQueueInit();
+    state->push_back(sortByQueueTag, sortByQueueVal);
+
+    // AggIntegralElems::kIntegral
+    auto [integralTag, integralVal] = initializeRemovableSumState();
+    state->push_back(integralTag, integralVal);
+
+    // AggIntegralElems::kNanCount
+    state->push_back(value::TypeTags::NumberInt64, 0);
+
+    // AggIntegralElems::kUnitMillis
+    state->push_back(unitTag, unitVal);
+
+    // AggIntegralElems::kIsNonRemovable
+    state->push_back(isNonRemovableTag, isNonRemovableVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralAdd(ArityType arity) {
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     auto [inputTag, inputVal] = moveOwnedFromStack(1);
@@ -7230,7 +7278,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralAdd(A
     value::ValueGuard inputGuard{inputTag, inputVal};
     value::ValueGuard sortByGuard{sortByTag, sortByVal};
 
-    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis] =
+    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis, isNonRemovable] =
         getIntegralState(stateTag, stateVal);
 
     assertTypesForIntegeral(inputTag, sortByTag, unitMillis);
@@ -7254,6 +7302,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralAdd(A
         aggRemovableSumImpl<1>(integral, integralDeltaTag, integralDeltaVal);
     }
 
+    if (isNonRemovable) {
+        auto [tag, val] = arrayQueuePop(inputQueue);
+        value::releaseValue(tag, val);
+        std::tie(tag, val) = arrayQueuePop(sortByQueue);
+        value::releaseValue(tag, val);
+    }
+
     inputGuard.reset();
     arrayQueuePush(inputQueue, inputTag, inputVal);
 
@@ -7271,8 +7326,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralRemov
 
     value::ValueGuard stateGuard{stateTag, stateVal};
 
-    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis] =
+    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis, isNonRemovable] =
         getIntegralState(stateTag, stateVal);
+    uassert(7996801, "Expected integral window to be removable", !isNonRemovable);
 
     assertTypesForIntegeral(inputTag, sortByTag, unitMillis);
 
@@ -7319,7 +7375,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggIntegralFinal
     ArityType arity) {
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
 
-    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis] =
+    auto [state, inputQueue, sortByQueue, integral, nanCount, unitMillis, isNonRemovable] =
         getIntegralState(stateTag, stateVal);
 
     auto queueSize = arrayQueueSize(inputQueue);
@@ -7385,6 +7441,34 @@ getDerivativeState(value::TypeTags stateTag, value::Value stateVal) {
     }
 
     return {state, inputQueue, sortByQueue, unitMillis};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDerivativeInit(ArityType arity) {
+    auto [unitOwned, unitTag, unitVal] = getFromStack(0);
+
+    tassert(7996822,
+            "Invalid unit type",
+            unitTag == value::TypeTags::Null || unitTag == value::TypeTags::NumberInt64);
+
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto state = value::getArrayView(stateVal);
+    state->reserve(static_cast<size_t>(AggIntegralElems::kMaxSizeOfArray));
+
+    // AggDerivativeElems::kInputQueue
+    auto [inputQueueTag, inputQueueVal] = arrayQueueInit();
+    state->push_back(inputQueueTag, inputQueueVal);
+
+    // AggDerivativeElems::kSortByQueue
+    auto [sortByQueueTag, sortByQueueVal] = arrayQueueInit();
+    state->push_back(sortByQueueTag, sortByQueueVal);
+
+    // AggDerivativeElems::kUnitMillis
+    state->push_back(unitTag, unitVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDerivativeAdd(ArityType arity) {
@@ -8176,12 +8260,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableSum<-1 /*sign*/>(arity);
         case Builtin::aggRemovableSumFinalize:
             return builtinAggRemovableSumFinalize(arity);
+        case Builtin::aggIntegralInit:
+            return builtinAggIntegralInit(arity);
         case Builtin::aggIntegralAdd:
             return builtinAggIntegralAdd(arity);
         case Builtin::aggIntegralRemove:
             return builtinAggIntegralRemove(arity);
         case Builtin::aggIntegralFinalize:
             return builtinAggIntegralFinalize(arity);
+        case Builtin::aggDerivativeInit:
+            return builtinAggDerivativeInit(arity);
         case Builtin::aggDerivativeAdd:
             return builtinAggDerivativeAdd(arity);
         case Builtin::aggDerivativeRemove:
@@ -8542,12 +8630,16 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableSumRemove";
         case Builtin::aggRemovableSumFinalize:
             return "aggRemovableSumFinalize";
+        case Builtin::aggIntegralInit:
+            return "aggIntegralInit";
         case Builtin::aggIntegralAdd:
             return "aggIntegralAdd";
         case Builtin::aggIntegralRemove:
             return "aggIntegralRemove";
         case Builtin::aggIntegralFinalize:
             return "aggIntegralFinalize";
+        case Builtin::aggDerivativeInit:
+            return "aggDerivativeInit";
         case Builtin::aggDerivativeAdd:
             return "aggDerivativeAdd";
         case Builtin::aggDerivativeRemove:

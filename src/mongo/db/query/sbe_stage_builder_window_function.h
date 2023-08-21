@@ -39,8 +39,10 @@ namespace mongo::stage_builder {
 /**
  * Build a list of window function init functions.
  */
-std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(StageBuilderState& state,
-                                                               const WindowFunctionStatement& stmt);
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg);
 
 /**
  * Build a list of window function add functions.

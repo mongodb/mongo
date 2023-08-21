@@ -153,6 +153,10 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    // TODO: (SERVER-78708) Add collation support to window stage in sbe
+    if (expCtx->getCollator()) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     return create(std::move(expCtx),
                   std::move(partitionBy),
@@ -387,6 +391,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
+    // TODO: (SERVER-78708) Add collation support to window stage in sbe
+    if (expCtx->getCollator()) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
         expCtx,

@@ -328,7 +328,8 @@ public:
                                               boost::intrusive_ptr<::mongo::Expression> input,
                                               WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,
@@ -490,7 +491,8 @@ public:
                                   boost::intrusive_ptr<::mongo::Expression> input,
                                   WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
@@ -527,7 +529,8 @@ public:
                            long long nValue)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _N(nValue) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     ExpressionExpMovingAvg(ExpressionContext* expCtx,
@@ -537,7 +540,8 @@ public:
                            Decimal128 alpha)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _alpha(alpha) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
@@ -570,6 +574,14 @@ public:
         return outerObj.freezeToValue();
     }
 
+    boost::optional<long long> getN() {
+        return _N;
+    }
+
+    boost::optional<Decimal128> getAlpha() {
+        return _alpha;
+    }
+
 protected:
     boost::optional<long long> _N;
     boost::optional<Decimal128> _alpha;
@@ -589,6 +601,18 @@ public:
 
     boost::optional<TimeUnit> unit() const {
         return _unit;
+    }
+
+    boost::optional<long long> unitInMillis() const {
+        if (!_unit)
+            return boost::none;
+
+        auto milliseconds = timeUnitTypicalMilliseconds(*_unit);
+        tassert(7823402,
+                "TimeUnit must be less than or equal to a 'week' ",
+                milliseconds <= timeUnitTypicalMilliseconds(TimeUnit::week));
+
+        return milliseconds;
     }
 
     Value serialize(const SerializationOptions& opts) const final {
@@ -645,29 +669,19 @@ protected:
                 !sortBy->begin()->expression);
     }
 
-    boost::optional<long long> convertTimeUnitToMillis(boost::optional<TimeUnit> unit) const {
-        if (!unit)
-            return boost::none;
-
-        auto milliseconds = timeUnitTypicalMilliseconds(*unit);
-        tassert(7823402,
-                "TimeUnit must be less than or equal to a 'week' ",
-                milliseconds <= timeUnitTypicalMilliseconds(TimeUnit::week));
-
-        return milliseconds;
-    }
-
     boost::optional<TimeUnit> _unit;
 };
 
 class ExpressionDerivative : public ExpressionWithUnit {
 public:
+    static constexpr StringData kName = "$derivative"_sd;
     ExpressionDerivative(ExpressionContext* expCtx,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds,
                          boost::optional<TimeUnit> unit)
         : ExpressionWithUnit(expCtx, "$derivative", std::move(input), std::move(bounds), unit) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
@@ -744,7 +758,8 @@ public:
                        WindowBounds bounds,
                        boost::optional<TimeUnit> unit)
         : ExpressionWithUnit(expCtx, "$integral", std::move(input), std::move(bounds), unit) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
@@ -806,11 +821,11 @@ public:
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return AccumulatorIntegral::create(_expCtx, convertTimeUnitToMillis(_unit));
+        return AccumulatorIntegral::create(_expCtx, unitInMillis());
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
-        return WindowFunctionIntegral::create(_expCtx, convertTimeUnitToMillis(_unit));
+        return WindowFunctionIntegral::create(_expCtx, unitInMillis());
     }
 };
 
