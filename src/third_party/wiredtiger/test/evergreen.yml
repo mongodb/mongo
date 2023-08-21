@@ -430,6 +430,7 @@ functions:
         set -o verbose
         . test/evergreen/find_cmake.sh
         cd cmake_build
+        echo "Using smp_command '${smp_command}' for 'make check all'"
         ${test_env_vars|} $CTEST -L check ${smp_command|} --output-on-failure ${check_args|} 2>&1
 
   "cppsuite test":
@@ -529,6 +530,7 @@ functions:
         set -o errexit
         set -o verbose
         cd cmake_build
+        echo "Using smp_command '${smp_command}' for 'unit test'"
         if [ ${check_coverage|false} = true ]; then
             ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1 || echo "Ignoring failed test as we are checking test coverage"
         else
@@ -1157,7 +1159,7 @@ variables:
       # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
       CMAKE_TOOLCHAIN_FILE:
       CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-      smp_command: -j $(sysctl -n hw.logicalcpu)
+      smp_command: -j $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
       cmake_generator: "Unix Makefiles"
       make_command: make
       test_env_vars:
@@ -2473,8 +2475,6 @@ tasks:
       - func: "fetch artifacts"
       - func: "python config check"
       - func: "unit test"
-        vars:
-           smp_command: -j $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
 
   - name: unit-test-nonstandalone
     tags: ["python"]
