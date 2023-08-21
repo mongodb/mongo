@@ -261,3 +261,11 @@ export function asFieldPath(str) {
 export function asVarRef(str) {
     return "$$" + str;
 }
+
+export function resetQueryStatsStore(conn, queryStatsStoreSize) {
+    // Set the cache size to 0MB to clear the queryStats store, and then reset to
+    // queryStatsStoreSize.
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: queryStatsStoreSize}));
+}
