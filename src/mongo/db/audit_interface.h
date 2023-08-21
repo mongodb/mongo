@@ -450,6 +450,24 @@ public:
     };
 };
 
+struct TryLogEventParams {
+    TryLogEventParams(Client* client,
+                      ErrorCodes::Error code,
+                      AuditInterface::AuditEvent::Serializer serializer)
+        : client(client), code(code), serializer(serializer){};
+
+    TryLogEventParams(Client* client,
+                      ErrorCodes::Error code,
+                      AuditInterface::AuditEvent::Serializer serializer,
+                      boost::optional<TenantId> tenantId)
+        : client(client), code(code), serializer(serializer), tenantId(tenantId){};
+
+    Client* client;
+    ErrorCodes::Error code;
+    AuditInterface::AuditEvent::Serializer serializer;
+    boost::optional<TenantId> tenantId;
+};
+
 
 class AuditNoOp : public AuditInterface {
 public:

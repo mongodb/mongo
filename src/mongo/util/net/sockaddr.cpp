@@ -333,6 +333,8 @@ constexpr auto kIPField = "ip"_sd;
 constexpr auto kPortField = "port"_sd;
 constexpr auto kUnixField = "unix"_sd;
 constexpr auto kAnonymous = "anonymous"_sd;
+
+constexpr auto kOCSFInterfaceNameField = "interface_name"_sd;
 }  // namespace
 
 void SockAddr::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
