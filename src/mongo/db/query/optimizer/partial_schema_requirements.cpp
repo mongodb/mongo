@@ -31,6 +31,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -42,9 +43,24 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
+#include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
+
+int PartialSchemaEntryComparator::Cmp3W::operator()(const PartialSchemaEntry& e1,
+                                                    const PartialSchemaEntry& e2) const {
+    const int keyCmp = PartialSchemaKeyComparator::Cmp3W{}(e1.first, e2.first);
+    if (keyCmp != 0) {
+        return keyCmp;
+    }
+    return PartialSchemaRequirementComparator::Cmp3W{}(e1.second, e2.second);
+}
+
+bool PartialSchemaEntryComparator::Less::operator()(const PartialSchemaEntry& e1,
+                                                    const PartialSchemaEntry& e2) const {
+    return PartialSchemaEntryComparator::Cmp3W{}(e1, e2) < 0;
+}
 
 bool PSRComparator::operator()(const PSRExpr::Node& n1, const PSRExpr::Node& n2) const {
     return comparePartialSchemaRequirementsExpr(n1, n2) < 0;
@@ -172,7 +188,7 @@ static bool isInSpecialForm(const PSRExpr::Node& expr, PartialSchemaEntry specia
     };
     if (PSRExpr::isCNF(expr)) {
         PSRExpr::visitCNF(expr, checkFn);
-    } else {
+    } else if (PSRExpr::isDNF(expr)) {
         PSRExpr::visitDNF(expr, checkFn);
     }
     return result;
@@ -208,59 +224,61 @@ boost::optional<ProjectionName> findProjection(const PSRExpr::Node& expr,
 void simplifyRedundantDNF(PSRExpr::Node& expr) {
     tassert(6902601, "simplifyRedundantDNF expects DNF", PSRExpr::isDNF(expr));
 
-    // Now remove terms that are subsumed by some other term. This means try to remove terms whose
-    // atoms are a superset of some other term: (a^b) subsumes (a^b^c), so remove (a^b^c). Since
-    // there are no duplicate atoms, we're looking to remove terms whose 'nodes().size()' is large.
-    PSRExpr::NodeVector& terms = expr.cast<PSRExpr::Disjunction>()->nodes();
+    struct TermSimplifier {
+        using DefaultSimplifier = DefaultSimplifyAndCreateNode<PartialSchemaEntry>;
+        using Mask = boost::dynamic_bitset<size_t>;
 
-    // First give each unique atom a label.
-    // Store each atom by value because 'remove_if' can move-from a 'PSRExpr::Node', which deletes
-    // the heap-allocated 'Atom'.
-    std::vector<PSRExpr::Atom> atoms;
-    const auto atomLabel = [&](const PSRExpr::Atom& atom) -> size_t {
-        size_t i = 0;
-        for (const auto& seen : atoms) {
-            if (atom == seen) {
-                return i;
+        DefaultSimplifier::Result operator()(const BuilderNodeType type,
+                                             std::vector<PSRExpr::Node> v,
+                                             const bool hasTrue,
+                                             const bool hasFalse) {
+            // Now remove terms that are subsumed by some other term. This means try to remove terms
+            // whose atoms are a superset of some other term: (a^b) subsumes (a^b^c), so remove
+            // (a^b^c). Since there are no duplicate atoms, we're looking to remove terms whose
+            // 'nodes().size()' is large.
+
+            if (type == BuilderNodeType::Conj) {
+                Mask mask;
+                mask.resize(_exprs.size());
+
+                for (const auto& n : v) {
+                    const size_t label = _exprs.at(n.cast<PSRExpr::Atom>()->getExpr());
+                    mask[label] = 1;
+                }
+
+                // Does any previously-seen mask subsume this one?
+                for (const auto& prev : _seenMasks) {
+                    if (prev.is_subset_of(mask)) {
+                        // Do not add to parent.
+                        return {boost::none};
+                    }
+                }
+                _seenMasks.push_back(std::move(mask));
             }
-            ++i;
+
+            return DefaultSimplifier{}(type, std::move(v), hasTrue, hasFalse);
         }
-        atoms.emplace_back(atom);
-        return i;
+
+        struct Hasher {
+            size_t operator()(const PartialSchemaEntry& entry) const {
+                return ABTHashGenerator::generate(entry);
+            }
+        };
+        opt::unordered_map<PartialSchemaEntry, size_t, Hasher> _exprs;
+
+        std::vector<Mask> _seenMasks;
     };
-    using Mask = size_t;
-    static constexpr size_t maxAtoms = sizeof(Mask) * CHAR_BIT;
-    for (const PSRExpr::Node& termNode : terms) {
-        for (const PSRExpr::Node& atomNode : termNode.cast<PSRExpr::Conjunction>()->nodes()) {
-            const PSRExpr::Atom& atom = *atomNode.cast<PSRExpr::Atom>();
-            atomLabel(atom);
-            if (atoms.size() > maxAtoms) {
-                return;
-            }
-        }
-    }
+    TermSimplifier instance;
 
-    std::vector<Mask> seen;
-    seen.reserve(terms.size());
-    auto last = std::remove_if(terms.begin(), terms.end(), [&](const PSRExpr::Node& term) -> bool {
-        Mask mask = 0;
-        for (const PSRExpr::Node& atomNode : term.cast<PSRExpr::Conjunction>()->nodes()) {
-            const PSRExpr::Atom& atom = *atomNode.cast<PSRExpr::Atom>();
-            mask |= Mask{1} << atomLabel(atom);
-        }
+    // First give each unique atom a label. Store each atom by value.
+    PSRExpr::visitAnyShape(
+        expr, [&](const PartialSchemaEntry& expr, const PSRExpr::VisitorContext& /*ctx*/) {
+            // Insert all atoms in the map to obtain the size of the bit vectors.
+            instance._exprs.emplace(expr, instance._exprs.size());
+        });
 
-        // Does any previously-seen mask subsume this one?
-        for (Mask prev : seen) {
-            const bool isSuperset = (prev & mask) == prev;
-            if (isSuperset) {
-                return true;
-            }
-        }
-
-        seen.push_back(mask);
-        return false;
-    });
-    terms.erase(last, terms.end());
+    BoolExprBuilder<PartialSchemaEntry, TermSimplifier> builder(std::move(instance));
+    expr = std::move(*builder.subtree(std::move(expr)).finish());
 }
 
 /**

@@ -426,14 +426,7 @@ public:
 
 private:
     int compare(const PSRExpr::Atom& node, const PSRExpr::Atom& other) {
-        const auto& [key1, req1] = node.getExpr();
-        const auto& [key2, req2] = other.getExpr();
-
-        int keyCmp = PartialSchemaKeyComparator::Cmp3W{}(key1, key2);
-        if (keyCmp != 0) {
-            return keyCmp;
-        }
-        return PartialSchemaRequirementComparator::Cmp3W{}(req1, req2);
+        return PartialSchemaEntryComparator::Cmp3W{}(node.getExpr(), other.getExpr());
     }
 
     int compare(const PSRExpr::Conjunction& node, const PSRExpr::Conjunction& other) {

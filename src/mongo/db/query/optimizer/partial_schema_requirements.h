@@ -77,6 +77,16 @@ namespace mongo::optimizer {
 using PartialSchemaEntry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
 using PSRExpr = BoolExpr<PartialSchemaEntry>;
 
+struct PartialSchemaEntryComparator {
+    struct Less {
+        bool operator()(const PartialSchemaEntry& e1, const PartialSchemaEntry& e2) const;
+    };
+
+    struct Cmp3W {
+        int operator()(const PartialSchemaEntry& e1, const PartialSchemaEntry& e2) const;
+    };
+};
+
 /**
  * A no-op entry has a default key and a requirement that is fully open and does not bind.
  */

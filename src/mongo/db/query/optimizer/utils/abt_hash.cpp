@@ -109,7 +109,7 @@ class BoolExprHasher {
 public:
     size_t transport(const typename T::Atom& node) {
         // Dispatch to one of the computeHash functions below.
-        return computeHash(node.getExpr());
+        return ABTHashGenerator::generate(node.getExpr());
     }
 
     size_t transport(const typename T::Conjunction& node, const std::vector<size_t> childResults) {
@@ -133,21 +133,21 @@ public:
     }
 };
 
-static size_t computeHash(const IntervalRequirement& req) {
+size_t ABTHashGenerator::generate(const IntervalRequirement& req) {
     size_t result = 17;
     updateBoundHash(result, req.getLowBound());
     updateBoundHash(result, req.getHighBound());
     return 17;
 }
 
-static size_t computeHash(const CompoundIntervalRequirement& req) {
+size_t ABTHashGenerator::generate(const CompoundIntervalRequirement& req) {
     size_t result = 19;
     updateCompoundBoundHash(result, req.getLowBound());
     updateCompoundBoundHash(result, req.getHighBound());
     return result;
 }
 
-static size_t computeHash(const PartialSchemaEntry& entry) {
+size_t ABTHashGenerator::generate(const PartialSchemaEntry& entry) {
     const auto& [key, req] = entry;
 
     size_t result = 17;
@@ -168,7 +168,7 @@ static size_t computeHash(const PartialSchemaEntry& entry) {
     return result;
 }
 
-static size_t computePartialSchemaReqHash(const PSRExpr::Node& reqMap) {
+size_t ABTHashGenerator::generate(const PSRExpr::Node& reqMap) {
     BoolExprHasher<PSRExpr> psrHasher;
     return psrHasher.compute(reqMap);
 }
@@ -230,7 +230,7 @@ public:
                      size_t /*refResult*/) {
         // Specifically not hashing the candidate indexes and ScanParams. Those are derivative of
         // the requirements, and can have temp projection names.
-        return computeHashSeq<44>(computePartialSchemaReqHash(node.getReqMap()),
+        return computeHashSeq<44>(ABTHashGenerator::generate(node.getReqMap()),
                                   std::hash<IndexReqTarget>()(node.getTarget()),
                                   childResult);
     }

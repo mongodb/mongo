@@ -42,6 +42,11 @@ public:
     static size_t generate(const ABT::reference_type& nodeRef);
 
     static size_t generateForPhysProps(const properties::PhysProps& props);
+
+    static size_t generate(const IntervalRequirement& req);
+    static size_t generate(const CompoundIntervalRequirement& req);
+    static size_t generate(const PartialSchemaEntry& entry);
+    static size_t generate(const PSRExpr::Node& reqMap);
 };
 
 }  // namespace mongo::optimizer
