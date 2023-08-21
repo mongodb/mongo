@@ -147,7 +147,7 @@ public:
         // Since we didn't actively authorize, we do not actively deauthorize.
     }
 
-    void logoutDatabase(Client*, StringData, StringData) override {
+    void logoutDatabase(Client*, const DatabaseName&, StringData) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

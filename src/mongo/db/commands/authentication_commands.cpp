@@ -147,19 +147,19 @@ public:
             auto dbname = request().getDbName();
             auto* as = AuthorizationSession::get(opCtx->getClient());
 
-            as->logoutDatabase(
-                opCtx->getClient(),
-                DatabaseNameUtil::serialize(dbname, request().getSerializationContext()),
-                "Logging out on user request");
+            as->logoutDatabase(opCtx->getClient(), dbname, "Logging out on user request");
             if (getTestCommandsEnabled() && (dbname.isAdminDB())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
                 // support the auth passthrough test framework on mongos (since you can't use the
                 // local database on a mongos, so you can't logout as the internal user
                 // without this).
-                as->logoutDatabase(opCtx->getClient(),
-                                   DatabaseName::kLocal.db(),
-                                   "Logging out from local database for test purposes");
+                as->logoutDatabase(
+                    opCtx->getClient(),
+                    DatabaseNameUtil::deserialize(dbname.tenantId(),
+                                                  DatabaseName::kLocal.db(),
+                                                  request().getSerializationContext()),
+                    "Logging out from local database for test purposes");
             }
         }
     };

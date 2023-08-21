@@ -201,7 +201,7 @@ public:
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.
-    virtual void logoutDatabase(Client* client, StringData dbname, StringData reason) = 0;
+    virtual void logoutDatabase(Client* client, const DatabaseName& dbname, StringData reason) = 0;
 
     // How the active session is authenticated.
     enum class AuthenticationMode {

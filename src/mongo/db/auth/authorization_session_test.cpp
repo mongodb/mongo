@@ -329,10 +329,13 @@ TEST_F(AuthorizationSessionTest, MultiAuthMultiDBDisallowed) {
     authzSession->logoutAllDatabases(_client.get(), "Test finished");
 }
 
-const UserName kSpencerTest("spencer"_sd, "test"_sd);
+const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const auto kAdminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd);
+
+const UserName kSpencerTest("spencer"_sd, kTestDB);
 const UserRequest kSpencerTestRequest(kSpencerTest, boost::none);
 
-const UserName kAdminAdmin("admin"_sd, "admin"_sd);
+const UserName kAdminAdmin("admin"_sd, kAdminDB);
 const UserRequest kAdminAdminRequest(kAdminAdmin, boost::none);
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
@@ -361,7 +364,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
         authzSession->isAuthorizedForActionsOnResource(testDBResource, ActionType::dbStats));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
     // Add an admin user with readWriteAnyDatabase
     ASSERT_OK(createUser({"admin", "admin"}, {{"readWriteAnyDatabase", "admin"}}));
@@ -387,7 +390,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::collMod));
 
-    authzSession->logoutDatabase(_client.get(), "admin", "Fire the admin!");
+    authzSession->logoutDatabase(_client.get(), kAdminDB, "Fire the admin!"_sd);
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_FALSE(
@@ -429,7 +432,7 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
         authzSession->isAuthorizedForActionsOnResource(testDBResource, ActionType::dbStats));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 const UserName kRWTest("rw"_sd, "test"_sd);
@@ -463,7 +466,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
     ASSERT_OK(
         authzSession->addAndAuthorizeUser(_opCtx.get(), kUserAdminAnyTestRequest, boost::none));
@@ -479,7 +482,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kRWTestRequest, boost::none));
 
@@ -495,7 +498,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUserAdminTestRequest, boost::none));
     ASSERT_FALSE(
@@ -510,7 +513,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 TEST_F(AuthorizationSessionTest, InvalidateUser) {
@@ -552,7 +555,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
     ASSERT_FALSE(authzSession->lookupUser(kSpencerTest));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
@@ -592,7 +595,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
@@ -628,7 +631,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
                                         SockAddr::create(serverAddress, 27017, AF_UNSPEC)));
         ASSERT_OK(
             authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
-        authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+        authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
     };
 
     auto assertFails = [this](StringData clientSource, StringData serverAddress) {
@@ -1211,7 +1214,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedNobody) {
     ASSERT_OK(createUser(kSpencerTest, {}));
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
     ASSERT_FALSE(authzSession->isCoauthorizedWith(boost::none));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIsDisabled) {
@@ -1219,7 +1222,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIs
     ASSERT_OK(createUser(kSpencerTest, {}));
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
     ASSERT_TRUE(authzSession->isCoauthorizedWith(kSpencerTest));
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
 const auto listTestCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
@@ -1375,13 +1378,13 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
                                                                             << "db"
                                                                             << "admin"))),
                                                     BSONObj()));
-    authzSession->logoutDatabase(_client.get(), "test", "End of test");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "End of test"_sd);
 
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kGMarksAdminRequest, boost::none));
     ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
 
     // Remove that user by logging out of the admin db and ensure we can't bypass anymore
-    authzSession->logoutDatabase(_client.get(), "admin", "");
+    authzSession->logoutDatabase(_client.get(), kAdminDB, ""_sd);
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user with the root role, which should confer restore role for cluster resource, and
@@ -1397,17 +1400,17 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
                                                                             << "db"
                                                                             << "admin"))),
                                                     BSONObj()));
-    authzSession->logoutDatabase(_client.get(), "admin", "");
+    authzSession->logoutDatabase(_client.get(), kAdminDB, ""_sd);
 
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest, boost::none));
     ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
 
     // Remove non-privileged user by logging out of test db and ensure we can still bypass
-    authzSession->logoutDatabase(_client.get(), "test", "");
+    authzSession->logoutDatabase(_client.get(), kTestDB, ""_sd);
     ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
 
     // Remove privileged user by logging out of admin db and ensure we cannot bypass
-    authzSession->logoutDatabase(_client.get(), "admin", "");
+    authzSession->logoutDatabase(_client.get(), kAdminDB, ""_sd);
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 }
 
@@ -1431,7 +1434,7 @@ TEST_F(AuthorizationSessionTest, NoExpirationTime) {
     assertActive(testFooCollResource, ActionType::insert);
 
     // Assert that logout occurs normally.
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
     assertLogout(testFooCollResource, ActionType::insert);
 }
 
@@ -1466,7 +1469,9 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out tenant 1 for test");
+    authzSession->logoutDatabase(_client.get(),
+                                 kTenant1UserTestRequest.name.getDatabaseName(),
+                                 "Log out tenant 1 for test"_sd);
     assertLogout(testTenant1FooCollResource, ActionType::insert);
 
     // User with tenant ID #2 with readWriteAny should be able to write to any of tenant ID #2's
@@ -1479,7 +1484,9 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out tenant 2 for test");
+    authzSession->logoutDatabase(_client.get(),
+                                 kTenant2UserTestRequest.name.getDatabaseName(),
+                                 "Log out tenant 2 for test"_sd);
     assertLogout(testTenant2FooCollResource, ActionType::insert);
 
     // User with no tenant ID with basic read/write privileges on "test" should be able to write to
@@ -1491,7 +1498,7 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out user 1 for test");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Log out user 1 for test"_sd);
     assertLogout(testFooCollResource, ActionType::insert);
 
     // User with no tenant ID with root should be able to write to any tenant's normal
@@ -1504,7 +1511,7 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out user 2 for test");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Log out user 2 for test"_sd);
     assertLogout(testFooCollResource, ActionType::insert);
 
     // User with no tenant ID with readWriteAnyDatabase should be able to write to normal
@@ -1518,7 +1525,8 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out read/write any DB user for test");
+    authzSession->logoutDatabase(
+        _client.get(), kTestDB, "Log out read/write any DB user for test"_sd);
     assertLogout(testFooCollResource, ActionType::insert);
 
     // User with tenant ID 2 with __system privileges should be able to write to any of tenant 2's
@@ -1531,7 +1539,9 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesResource, ActionType::insert);
     assertActive(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out tenant 2 system user for test");
+    authzSession->logoutDatabase(_client.get(),
+                                 tenant2SystemUserRequest.name.getDatabaseName(),
+                                 "Log out tenant 2 system user for test"_sd);
     assertLogout(testTenant2FooCollResource, ActionType::insert);
 
     // User with no tenant ID with __system privileges should be able to write to any tenant's
@@ -1543,7 +1553,7 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertActive(testSystemRolesResource, ActionType::insert);
     assertActive(testSystemRolesTenant2Resource, ActionType::insert);
 
-    authzSession->logoutDatabase(_client.get(), "test", "Log out system user for test");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Log out system user for test"_sd);
     assertLogout(testFooCollResource, ActionType::insert);
 }
 
@@ -1586,7 +1596,7 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
     assertExpired(testFooCollResource, ActionType::insert);
 
     // Check that explicit logout from an expired connection works as expected.
-    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
     assertLogout(ResourcePattern::forExactNamespace(
                      NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
                  ActionType::insert);
@@ -1647,7 +1657,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
         assertActive(kSomeCollRsrc, ActionType::insert);
 
         // Check that logout proceeds normally.
-        authzSession->logoutDatabase(_client.get(), "test", "Log out readWriteAny user for test");
+        authzSession->logoutDatabase(
+            _client.get(), kTestDB, "Log out readWriteAny user for test"_sd);
         assertLogout(kSomeCollRsrc, ActionType::insert);
     }
     // Create a new validated tenancy scope for the readWriteAny tenant user.

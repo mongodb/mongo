@@ -113,7 +113,7 @@ public:
 
     void logoutSecurityTokenUser(Client* client) override;
     void logoutAllDatabases(Client* client, StringData reason) override;
-    void logoutDatabase(Client* client, StringData dbname, StringData reason) override;
+    void logoutDatabase(Client* client, const DatabaseName& dbname, StringData reason) override;
 
     AuthenticationMode getAuthenticationMode() const override {
         return _authenticationMode;

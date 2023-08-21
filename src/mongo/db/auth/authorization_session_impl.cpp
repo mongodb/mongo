@@ -393,11 +393,11 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
 
 
 void AuthorizationSessionImpl::logoutDatabase(Client* client,
-                                              StringData dbname,
+                                              const DatabaseName& dbname,
                                               StringData reason) {
     bool isLoggedInOnDB =
-        (_authenticatedUser && _authenticatedUser.value()->getName().getDB() == dbname);
-    bool isExpiredOnDB = (_expiredUserName && _expiredUserName.value().getDB() == dbname);
+        (_authenticatedUser && _authenticatedUser.value()->getName().getDatabaseName() == dbname);
+    bool isExpiredOnDB = (_expiredUserName && _expiredUserName.value().getDatabaseName() == dbname);
 
     if (isLoggedInOnDB || isExpiredOnDB) {
         // The session either has an authenticated or expired user belonging to the database being
