@@ -1371,7 +1371,17 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
         // Output this as a pred that can use the index.
         indexedPreds->push_back(node);
     } else if (Indexability::isBoundsGeneratingNot(node)) {
-        getIndexedPreds(node->getChild(0), context, indexedPreds);
+        if (!context.elemMatchExpr) {
+            // Do not extract an index predicate which is a negation inside the $elemMatch. For
+            // example, do not extract {a.b: $ne: 2} from {a: {$elemMatch: {b: $ne: 2}}}. Due to
+            // potential presence of arrays at "b", the negation predicate itself is an
+            // "under-approximation" of the elemMatch predicate (it may admit less documents than
+            // the elemMatch). Predicates extracted from the elemMatch should be
+            // "over-approximations" (admit more documents). For example {a.b: $eq: 2} would be an
+            // over-approximation to {a: {$elemMatch: {b: {$eq: 2}}}}.
+
+            getIndexedPreds(node->getChild(0), context, indexedPreds);
+        }
     } else if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
         PrepMemoContext childContext;
         childContext.elemMatchExpr = node;
