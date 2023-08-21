@@ -391,13 +391,19 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewCollIn
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, wantedCollVersion, kShards[0]);
 
-    const auto status =
-        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
-            .getStatus();
+    {
+        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
 
-    ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
-    auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-    ASSERT(refreshInfo);
+        const auto status =
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+                .getStatus();
+
+        ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+        auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+        ASSERT(refreshInfo);
+    }
+    // Cancel ongoing refresh
+    _catalogCache->invalidateCollectionEntry_LINEARIZABLE(kNss);
 }
 
 TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo) {
@@ -412,13 +418,19 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo
     loadCollection(cachedCollVersion);
     _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.db_forTest());
 
-    const auto status =
-        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
-            .getStatus();
+    {
+        FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
 
-    ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
-    auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-    ASSERT(refreshInfo);
+        const auto status =
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+                .getStatus();
+
+        ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+        auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+        ASSERT(refreshInfo);
+    }
+    // Cancel ongoing refresh
+    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.db_forTest());
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {

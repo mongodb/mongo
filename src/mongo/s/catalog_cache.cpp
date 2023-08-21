@@ -93,6 +93,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
+MONGO_FAIL_POINT_DEFINE(blockDatabaseCacheLookup);
 
 // How many times to try refreshing the routing info or the index info of a collection if the
 // information loaded from the config server is found to be inconsistent.
@@ -864,6 +865,10 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
     const std::string& dbName,
     const DatabaseTypeValueHandle& previousDbType,
     const ComparableDatabaseVersion& previousDbVersion) {
+    if (MONGO_unlikely(blockDatabaseCacheLookup.shouldFail())) {
+        LOGV2(8023400, "Hanging before refreshing cached database entry");
+        blockDatabaseCacheLookup.pauseWhileSet();
+    }
     // TODO (SERVER-34164): Track and increment stats for database refreshes
 
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
