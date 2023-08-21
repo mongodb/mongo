@@ -69,3 +69,13 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
     default: false
+
+  routingTableCacheChunkBucketSize:
+    description: >-
+        Size of the routing table cache buckets used to implement chunk grouping optimization.
+    set_at: [ startup ]
+    cpp_vartype: long long
+    cpp_varname: "gRoutingTableCacheChunkBucketSize"
+    default: 500
+    validator:
+      gte: 0
