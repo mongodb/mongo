@@ -186,12 +186,6 @@ feature_flags:
         default: true
         version: 6.0
         shouldBeFCVGated: true
-    featureFlagSelectiveBackup:
-        description: "When enabled, support selective backups and restores on collections"
-        cpp_varname: feature_flags::gSelectiveBackup
-        default: true
-        version: 6.0
-        shouldBeFCVGated: true
     featureFlagLargeBatchedOperations:
         description:  >-
             Enable support for replicating batched operations over multiple applyOps oplog

@@ -87,12 +87,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                                                          const StorageEngineInitFlags initFlags) {
     ServiceContext* service = opCtx->getServiceContext();
 
-    if (storageGlobalParams.restore) {
-        uassert(6260400,
-                "Cannot use --restore when the 'featureFlagSelectiveBackup' is disabled",
-                feature_flags::gSelectiveBackup.isEnabledAndIgnoreFCVUnsafeAtStartup());
-    }
-
     // This should be set once.
     if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{})
         invariant(!service->getStorageEngine());
