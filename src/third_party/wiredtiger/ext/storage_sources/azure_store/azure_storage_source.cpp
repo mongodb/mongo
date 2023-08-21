@@ -433,7 +433,7 @@ azure_file_system_exists(
       "azure_file_system_exists: Checking object: " + std::string(name) + " exists in Azure.");
     // Check whether the object exists in the cloud.
     int ret;
-    if (ret = azure_fs->azure_conn->object_exists(name, *existp, size) != 0) {
+    if ((ret = azure_fs->azure_conn->object_exists(name, *existp, size)) != 0) {
         log->log_err_msg(
           "azure_file_system_exists: Error with searching for object: " + std::string(name));
         return ret;
