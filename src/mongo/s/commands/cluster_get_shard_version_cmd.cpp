@@ -117,7 +117,8 @@ public:
                       "Routing info requested by getShardVersion: {routingInfo}",
                       "Routing info requested by getShardVersion",
                       "routingInfo"_attr = redact(cm->toString()));
-                for (const auto& chunk : cm->chunks()) {
+
+                cm->forEachChunk([&](const auto& chunk) {
                     if (!exceedsSizeLimit) {
                         BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
                         chunkBB.append(chunk.getMin());
@@ -127,7 +128,9 @@ public:
                             exceedsSizeLimit = true;
                         }
                     }
-                }
+
+                    return true;
+                });
 
                 if (!exceedsSizeLimit) {
                     result.append("chunks", chunksArrBuilder.arr());

@@ -57,6 +57,10 @@ public:
         return _range.getMax();
     }
 
+    const std::string& getMaxKeyString() const {
+        return _maxKeyString;
+    }
+
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
     /**
@@ -104,6 +108,7 @@ public:
 
 private:
     const ChunkRange _range;
+    const std::string _maxKeyString;
 
     const ShardId _shardId;
 
