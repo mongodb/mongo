@@ -47,7 +47,7 @@ const rstOpts = {
     nodes: numNodes,
     keyFile
 };
-// TODO (SERVER-75472): Support transition from standalone replica set directly to config shard.
+
 if (TestData.configShard) {
     // Used to allow restarting config server as an independent replica set.
     rstOpts["nodeOptions"] = {setParameter: {skipShardingConfigurationChecks: true}};
