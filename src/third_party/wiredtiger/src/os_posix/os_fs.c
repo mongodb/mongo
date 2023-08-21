@@ -858,6 +858,7 @@ directory_open:
     WT_ERR(__wt_strdup(session, name, &file_handle->name));
 
     pfh->mmap_prot = LF_ISSET(WT_FS_OPEN_READONLY) ? PROT_READ : PROT_READ | PROT_WRITE;
+    pfh->mmap_flags = LF_ISSET(WT_FS_OPEN_READONLY) ? MAP_PRIVATE : MAP_SHARED;
     if (LF_ISSET(WT_FS_OPEN_FORCE_MMAP))
         pfh->mmap_file_mappable = true;
     if (conn->mmap_all) {

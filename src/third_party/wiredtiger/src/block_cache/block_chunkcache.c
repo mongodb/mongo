@@ -499,6 +499,10 @@ __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid
     if (!F_ISSET(chunkcache, WT_CHUNKCACHE_CONFIGURED))
         return (ENOTSUP);
 
+    /* Only cache read-only tiered objects. */
+    if (!block->readonly)
+        return (0);
+
     __wt_verbose(session, WT_VERB_CHUNKCACHE, "get: %s(%u), offset=%" PRId64 ", size=%u",
       (char *)block->name, objectid, offset, size);
     WT_STAT_CONN_INCR(session, chunk_cache_lookups);

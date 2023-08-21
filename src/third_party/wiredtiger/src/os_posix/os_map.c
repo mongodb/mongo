@@ -50,7 +50,7 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void **mapped_regionp
 #ifdef MAP_NOCORE
            MAP_NOCORE |
 #endif
-             MAP_PRIVATE,
+             pfh->mmap_flags,
            pfh->fd, (wt_off_t)0)) == MAP_FAILED)
         WT_RET_MSG(session, __wt_errno(), "%s: memory-map: mmap", fh->name);
 
