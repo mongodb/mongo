@@ -11,8 +11,6 @@ __wt_bloom_get
 __wt_bulk_insert_fix
 __wt_bulk_insert_row
 __wt_bulk_insert_var
-# FIXME-WT-11358: This function should be used after this ticket is done.
-__wt_compact_signal
 __wt_config_getone
 __wt_crc32c_le
 __wt_curhs_open
