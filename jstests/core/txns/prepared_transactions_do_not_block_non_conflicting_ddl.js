@@ -4,9 +4,9 @@
 //   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
-const dbName = "not_block_non_conflicting_ddl";
+const dbName = "prepared_transactions_do_not_block_non_conflicting_ddl";
 const collName = "transactions_collection";
-const otherDBName = "not_block_non_conflicting_ddl_other";
+const otherDBName = "prepared_transactions_do_not_block_non_conflicting_ddl_other";
 const otherCollName = "transactions_collection_other";
 const testDB = db.getSiblingDB(dbName);
 const otherDB = db.getSiblingDB(otherDBName);

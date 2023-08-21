@@ -12,8 +12,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Define two databases. We will conduct our tests by creating one collection in each.
-const testDB1 = db.getSiblingDB("whole_cluster_metadata"),
-      testDB2 = db.getSiblingDB("whole_cluster_metadata_other");
+const testDB1 = db.getSiblingDB(jsTestName());
+const testDB2 = db.getSiblingDB(jsTestName() + "_other");
 const adminDB = db.getSiblingDB("admin");
 
 assert.commandWorked(testDB1.dropDatabase());
@@ -154,7 +154,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         // passthrough suites since we cannot guarantee the primary shard of the target database
         // and renameCollection requires the source and destination to be on the same shard.
         if (!FixtureHelpers.isMongos(testDB)) {
-            const otherDB = testDB.getSiblingDB(testDB.getName() + "_target");
+            const otherDB = testDB.getSiblingDB(testDB.getName() + "_rename_target");
             // Ensure the target database exists.
             const collOtherDB = assertDropAndRecreateCollection(otherDB, "test");
             assertDropCollection(otherDB, collOtherDB.getName());

@@ -168,7 +168,7 @@ static const BSONObj kColumnStoreSpec = BSON("name"
 }  // namespace
 
 Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
-    const auto dbname = DatabaseNameUtil::serializeForCatalog(dbName);
+    const auto dbname = dbName.serializeWithoutTenantPrefix_UNSAFE();
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 

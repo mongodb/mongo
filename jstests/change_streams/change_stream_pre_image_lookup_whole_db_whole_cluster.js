@@ -8,7 +8,7 @@
  *   uses_change_streams,
  * ]
  */
-const testDB = db.getSiblingDB("preImage_lookup_whole_db_whole_cluster");
+const testDB = db.getSiblingDB(jsTestName());
 const adminDB = db.getSiblingDB("admin");
 const collWithPreImageName = "coll_with_pre_images";
 const collWithNoPreImageName = "coll_with_no_pre_images";

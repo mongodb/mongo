@@ -732,7 +732,7 @@ public:
      * valid.
      */
     bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
-        return validDBName(dbName(), behavior) && !coll().empty();
+        return validDBName(db_deprecated(), behavior) && !coll().empty();
     }
 
     static bool isValid(StringData ns,
@@ -780,7 +780,7 @@ public:
 
     static bool validDBName(const DatabaseName& dbName,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.toStringWithTenantId(), behavior);
+        return validDBName(dbName.db(), behavior);
     }
 
     /**

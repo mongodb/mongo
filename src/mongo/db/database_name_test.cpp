@@ -197,7 +197,6 @@ TEST(DatabaseNameTest, FromDataEquality) {
 
 TEST(DatabaseNameTest, Size) {
     const std::string kMaxSizeDb(DatabaseName::kMaxDatabaseNameLength, 'a');
-    const std::string kMaxSizeTenantDb(DatabaseName::kMaxTenantDatabaseNameLength, 'a');
 
     const auto checkDbSize = [](std::vector<std::string> dbs, boost::optional<TenantId> tenantId) {
         for (size_t i = 0; i < dbs.size(); i++) {
@@ -207,20 +206,7 @@ TEST(DatabaseNameTest, Size) {
     };
 
     checkDbSize({"", "myDb", kMaxSizeDb}, boost::none);
-    checkDbSize({"", "myDb", kMaxSizeTenantDb}, TenantId(OID::gen()));
-}
-
-TEST(DatabaseNameTest, ValidDbNameLength) {
-    const std::string kInvalidDbName(DatabaseName::kMaxDatabaseNameLength + 1, 'a');
-    ASSERT_THROWS_CODE(DatabaseName::createDatabaseName_forTest(boost::none, kInvalidDbName),
-                       DBException,
-                       ErrorCodes::InvalidNamespace);
-
-    const TenantId tenantId(OID::gen());
-    const std::string kInvalidTenantDbName(DatabaseName::kMaxTenantDatabaseNameLength + 1, 'a');
-    ASSERT_THROWS_CODE(DatabaseName::createDatabaseName_forTest(tenantId, kInvalidTenantDbName),
-                       DBException,
-                       ErrorCodes::InvalidNamespace);
+    checkDbSize({"", "myDb", kMaxSizeDb}, TenantId(OID::gen()));
 }
 }  // namespace
 }  // namespace mongo
