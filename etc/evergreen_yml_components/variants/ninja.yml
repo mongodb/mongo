@@ -73,16 +73,16 @@ buildvariants:
   tasks:
   - name: compile_ninja_default_profile_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: compile_ninja_opt_profile_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: compile_ninja_fast_profile_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: compile_ninja_compiledb_profile_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
 
 - name: ubuntu1804-ninja-build-profiles
   display_name: "Ninja Build Profiles: Ubuntu 18.04"
