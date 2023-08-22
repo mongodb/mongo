@@ -548,6 +548,16 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 ex.addContext(str::stream() << "Failed to apply operation: "
                                             << redact(entryOrGroupedInserts.toBSON()));
                 throw;
+            } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+                // This can happen in initial sync or unstable recovery mode when a time-series
+                // collection is created in place of a dropped regular collection and oplog entries
+                // are being applied that were originally performed on the regular collection.
+                if (oplogApplicationMode == OplogApplication::Mode::kInitialSync ||
+                    oplogApplicationMode == OplogApplication::Mode::kUnstableRecovering) {
+                    return Status::OK();
+                }
+
+                throw;
             }
         });
         return status;
