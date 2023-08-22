@@ -1069,9 +1069,12 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     auto merge = std::make_unique<MergeSortNode>();
     merge->sort = desiredSort;
 
-    // Exploded nodes all take different point prefix so they should produce disjoint results.
-    // We only deduplicate if some original index scans need to deduplicate.
-    merge->dedup = false;
+    // When there's a single IX_SCAN explodable, we're guaranteed that the exploded nodes all take
+    // different point prefixes so they should produce disjoint results. As such, there's no need to
+    // deduplicate. We don't have this guarantee if there're multiple explodable IX_SCAN under an OR
+    // node because the index bounds might intersect. Furthermore, we always need to deduplicate if
+    // some original index scans need to deduplicate, for example a multikey index.
+    merge->dedup = explodableNodes.size() > 1;
     for (size_t i = 0; i < explodableNodes.size(); ++i) {
         if (explodeNode(explodableNodes[i], i, desiredSort, fieldsToExplode[i], &merge->children)) {
             merge->dedup = true;

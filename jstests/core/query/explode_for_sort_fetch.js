@@ -115,6 +115,22 @@ const testCases = [
             {_id: 4, c: 2, d: 3, f: 5, e: 4},
         ]
     },
+    {
+        // Verifies that query produces correct results when the query plan passed to explode for
+        // sort contains an OR node with duplicate results.
+        name: "ExplodeForSortIxscanOrWithDuplicates",
+        indexes: [{a: 1, b: 1, e: 1}, {c: -1, d: 1, e: -1}],
+        filter: {$or: [{a: {$in: [1, 2]}, b: 3}, {c: {$in: [1, 2]}, d: 3}]},
+        sort: {e: 1},
+        inputDocuments: [
+            {_id: 1, a: 1, b: 3, c: 1, d: 3, f: 5, e: 1},
+            {_id: 3, a: 2, b: 3, c: 2, d: 3, f: 5, e: 3},
+        ],
+        expectedResults: [
+            {_id: 1, a: 1, b: 3, c: 1, d: 3, f: 5, e: 1},
+            {_id: 3, a: 2, b: 3, c: 2, d: 3, f: 5, e: 3},
+        ]
+    },
 ];
 testCases.forEach(executeQueryTestCase);
 }());
