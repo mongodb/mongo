@@ -426,7 +426,8 @@ public:
                         boost::intrusive_ptr<::mongo::Expression> input,
                         WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        StringDataSet compatibleAccumulators{"$sum", "$covarianceSamp", "$covariancePop", "$push"};
+        StringDataSet compatibleAccumulators{
+            "$sum", "$covarianceSamp", "$covariancePop", "$push", "$stdDevSamp", "$stdDevPop"};
         if (compatibleAccumulators.count(_accumulatorName)) {
             expCtx->sbeWindowCompatibility =
                 std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);

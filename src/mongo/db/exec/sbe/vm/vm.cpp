@@ -7925,6 +7925,175 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
     return {true, resultTag, resultVal};
 }
 
+std::tuple<value::Array*, value::Array*, value::Array*, int64_t, int64_t> removableStdDevState(
+    value::TypeTags stateTag, value::Value stateVal) {
+    uassert(8019600, "state should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    uassert(8019601,
+            "incorrect size of state array",
+            state->size() == static_cast<size_t>(AggRemovableStdDevElems::kSizeOfArray));
+
+    auto [sumTag, sumVal] = state->getAt(static_cast<size_t>(AggRemovableStdDevElems::kSum));
+    uassert(8019602, "sum elem should be of array type", sumTag == value::TypeTags::Array);
+    auto sum = value::getArrayView(sumVal);
+
+    auto [m2Tag, m2Val] = state->getAt(static_cast<size_t>(AggRemovableStdDevElems::kM2));
+    uassert(8019603, "m2 elem should be of array type", m2Tag == value::TypeTags::Array);
+    auto m2 = value::getArrayView(m2Val);
+
+    auto [countTag, countVal] = state->getAt(static_cast<size_t>(AggRemovableStdDevElems::kCount));
+    uassert(
+        8019604, "count elem should be of int64 type", countTag == value::TypeTags::NumberInt64);
+    auto count = value::bitcastTo<int64_t>(countVal);
+
+    auto [nonFiniteCountTag, nonFiniteCountVal] =
+        state->getAt(static_cast<size_t>(AggRemovableStdDevElems::kNonFiniteCount));
+    uassert(8019605,
+            "non finite count elem should be of int64 type",
+            nonFiniteCountTag == value::TypeTags::NumberInt64);
+    auto nonFiniteCount = value::bitcastTo<int64_t>(nonFiniteCountVal);
+
+    return {state, sum, m2, count, nonFiniteCount};
+}
+
+void updateRemovableStdDevState(value::Array* state, int64_t count, int64_t nonFiniteCount) {
+    state->setAt(static_cast<size_t>(AggRemovableStdDevElems::kCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(count));
+    state->setAt(static_cast<size_t>(AggRemovableStdDevElems::kNonFiniteCount),
+                 value::TypeTags::NumberInt64,
+                 value::bitcastFrom<int64_t>(nonFiniteCount));
+}
+
+template <int quantity>
+void ByteCode::aggRemovableStdDevImpl(value::TypeTags stateTag,
+                                      value::Value stateVal,
+                                      value::TypeTags inputTag,
+                                      value::Value inputVal) {
+    static_assert(quantity == 1 || quantity == -1);
+    auto [state, sumState, m2State, count, nonFiniteCount] =
+        removableStdDevState(stateTag, stateVal);
+    if (!value::isNumber(inputTag)) {
+        return;
+    }
+    if ((inputTag == value::TypeTags::NumberDouble &&
+         !std::isfinite(value::bitcastTo<double>(inputVal))) ||
+        (inputTag == value::TypeTags::NumberDecimal &&
+         !value::bitcastTo<Decimal128>(inputVal).isFinite())) {
+        count += quantity;
+        nonFiniteCount += quantity;
+        updateRemovableStdDevState(state, count, nonFiniteCount);
+        return;
+    }
+
+    if (count == 0) {
+        // Assuming we are adding value if count == 0.
+        aggDoubleDoubleSumImpl(sumState, inputTag, inputVal);
+        updateRemovableStdDevState(state, ++count, nonFiniteCount);
+        return;
+    } else if (count + quantity == 0) {
+        resetDoubleDoubleSumState(sumState);
+        resetDoubleDoubleSumState(m2State);
+        updateRemovableStdDevState(state, 0, 0);
+        return;
+    }
+
+    auto inputDouble = value::bitcastTo<double>(value::coerceToDouble(inputTag, inputVal).second);
+    auto [sumOwned, sumTag, sumVal] = aggDoubleDoubleSumFinalizeImpl(sumState);
+    value::ValueGuard sumGuard{sumOwned, sumTag, sumVal};
+    double x = count * inputDouble -
+        value::bitcastTo<double>(value::coerceToDouble(sumTag, sumVal).second);
+    count += quantity;
+    aggDoubleDoubleSumImpl(sumState,
+                           value::TypeTags::NumberDouble,
+                           value::bitcastFrom<double>(inputDouble * quantity));
+    aggDoubleDoubleSumImpl(
+        m2State,
+        value::TypeTags::NumberDouble,
+        value::bitcastFrom<double>(x * x * quantity / (count * (count - quantity))));
+    updateRemovableStdDevState(state, count, nonFiniteCount);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdDevAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    // Initialize the accumulator.
+    if (stateTag == value::TypeTags::Nothing) {
+        std::tie(stateTag, stateVal) = value::makeNewArray();
+        value::ValueGuard newStateGuard{stateTag, stateVal};
+        auto state = value::getArrayView(stateVal);
+        state->reserve(static_cast<size_t>(AggRemovableStdDevElems::kSizeOfArray));
+
+        auto [sumStateTag, sumStateVal] = initializeDoubleDoubleSumState();
+        state->push_back(sumStateTag, sumStateVal);  // kSum
+        auto [m2StateTag, m2StateVal] = initializeDoubleDoubleSumState();
+        state->push_back(m2StateTag, m2StateVal);                                        // kM2
+        state->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));  // kCount
+        state->push_back(value::TypeTags::NumberInt64,
+                         value::bitcastFrom<int64_t>(0));  // kNonFiniteCount
+        newStateGuard.reset();
+    }
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    aggRemovableStdDevImpl<1>(stateTag, stateVal, inputTag, inputVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdDevRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    aggRemovableStdDevImpl<-1>(stateTag, stateVal, inputTag, inputVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdDevFinalize(
+    ArityType arity, bool isSamp) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    auto [state, sumState, m2State, count, nonFiniteCount] =
+        removableStdDevState(stateTag, stateVal);
+    if (nonFiniteCount > 0) {
+        return {false, value::TypeTags::Null, 0};
+    }
+    const long long adjustedCount = isSamp ? count - 1 : count;
+    if (adjustedCount <= 0) {
+        return {false, value::TypeTags::Null, 0};
+    }
+    auto [m2Owned, m2Tag, m2Val] = aggDoubleDoubleSumFinalizeImpl(m2State);
+    value::ValueGuard m2Guard{m2Owned, m2Tag, m2Val};
+    auto squaredDifferences = value::bitcastTo<double>(value::coerceToDouble(m2Tag, m2Val).second);
+    if (squaredDifferences < 0 || (!isSamp && count == 1)) {
+        // m2 is the sum of squared differences from the mean, so it should always be
+        // nonnegative. It may take on a small negative value due to floating point error, which
+        // breaks the sqrt calculation. In this case, the closest valid value for _m2 is 0, so
+        // we reset _m2 and return 0 for the standard deviation.
+        // If we're doing a population std dev of one element, it is also correct to return 0.
+        resetDoubleDoubleSumState(m2State);
+        return {false, value::TypeTags::NumberInt32, 0};
+    }
+    return {false,
+            value::TypeTags::NumberDouble,
+            value::bitcastFrom<double>(sqrt(squaredDifferences / adjustedCount))};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdDevSampFinalize(
+    ArityType arity) {
+    return builtinAggRemovableStdDevFinalize(arity, true /* isSamp */);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdDevPopFinalize(
+    ArityType arity) {
+    return builtinAggRemovableStdDevFinalize(arity, false /* isSamp */);
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity,
                                                                          const CodeFragment* code) {
@@ -8290,6 +8459,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovablePushRemove(arity);
         case Builtin::aggRemovablePushFinalize:
             return builtinAggRemovablePushFinalize(arity);
+        case Builtin::aggRemovableStdDevAdd:
+            return builtinAggRemovableStdDevAdd(arity);
+        case Builtin::aggRemovableStdDevRemove:
+            return builtinAggRemovableStdDevRemove(arity);
+        case Builtin::aggRemovableStdDevSampFinalize:
+            return builtinAggRemovableStdDevSampFinalize(arity);
+        case Builtin::aggRemovableStdDevPopFinalize:
+            return builtinAggRemovableStdDevPopFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -8660,6 +8837,14 @@ std::string builtinToString(Builtin b) {
             return "aggRemovablePushRemove";
         case Builtin::aggRemovablePushFinalize:
             return "aggRemovablePushFinalize";
+        case Builtin::aggRemovableStdDevAdd:
+            return "aggRemovableStdDevAdd";
+        case Builtin::aggRemovableStdDevRemove:
+            return "aggRemovableStdDevRemove";
+        case Builtin::aggRemovableStdDevSampFinalize:
+            return "aggRemovableStdDevSampFinalize";
+        case Builtin::aggRemovableStdDevPopFinalize:
+            return "aggRemovableStdDevPopFinalize";
         default:
             MONGO_UNREACHABLE;
     }

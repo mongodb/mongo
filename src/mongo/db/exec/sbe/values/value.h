@@ -1669,6 +1669,32 @@ inline std::pair<TypeTags, Value> coerceToBool(TypeTags tag, Value val) {
 }
 
 /**
+ * Convert a numeric value to double, with potential precision loss.
+ */
+inline std::pair<TypeTags, Value> coerceToDouble(TypeTags tag, Value val) {
+    switch (tag) {
+        case value::TypeTags::NumberInt32: {
+            auto doubleVal = static_cast<double>(value::bitcastTo<int32_t>(val));
+            return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(doubleVal)};
+        }
+        case value::TypeTags::NumberInt64: {
+            auto doubleVal = static_cast<double>(value::bitcastTo<int64_t>(val));
+            return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(doubleVal)};
+        }
+        case value::TypeTags::NumberDouble: {
+            return {tag, val};
+        }
+        case value::TypeTags::NumberDecimal: {
+            auto doubleVal = value::bitcastTo<Decimal128>(val).toDouble();
+            return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(doubleVal)};
+        }
+        default: {
+            return {value::TypeTags::Nothing, 0};
+        }
+    }
+}
+
+/**
  * Implicit conversions of numerical types.
  */
 template <typename T>

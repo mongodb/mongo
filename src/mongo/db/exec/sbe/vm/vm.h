@@ -828,6 +828,10 @@ enum class Builtin : uint8_t {
     aggRemovablePushAdd,
     aggRemovablePushRemove,
     aggRemovablePushFinalize,
+    aggRemovableStdDevAdd,
+    aggRemovableStdDevRemove,
+    aggRemovableStdDevSampFinalize,
+    aggRemovableStdDevPopFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -1028,7 +1032,17 @@ enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSize
  */
 enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize, kSizeOfArray };
 
+/**
+ * This enum defines indices into an 'Array' that store state for the removable
+ * $covarianceSamp/$covariancePop expressions.
+ */
 enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
+
+/**
+ * This enum defines indices into an 'Array' that store state for the removable
+ * $stdDevSamp/$stdDevPop expressions.
+ */
+enum class AggRemovableStdDevElems { kSum, kM2, kCount, kNonFiniteCount, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1898,6 +1912,19 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovablePushFinalize(ArityType arity);
+    template <int quantity>
+    void aggRemovableStdDevImpl(value::TypeTags stateTag,
+                                value::Value stateVal,
+                                value::TypeTags inputTag,
+                                value::Value inputVal);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevRemove(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevFinalize(
+        ArityType arity, bool isSamp);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevSampFinalize(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevPopFinalize(
+        ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,

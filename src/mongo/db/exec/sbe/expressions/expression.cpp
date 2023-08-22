@@ -873,6 +873,15 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 0; }, vm::Builtin::aggRemovablePushRemove, true}},
     {"aggRemovablePushFinalize",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovablePushFinalize, false}},
+    {"aggRemovableStdDevAdd",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevAdd, true}},
+    {"aggRemovableStdDevRemove",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevRemove, true}},
+    {"aggRemovableStdDevSampFinalize",
+     BuiltinFn{
+         [](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevSampFinalize, false}},
+    {"aggRemovableStdDevPopFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevPopFinalize, false}},
 };
 
 /**

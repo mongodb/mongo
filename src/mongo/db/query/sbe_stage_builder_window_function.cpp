@@ -251,6 +251,46 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(StageBuilderStat
         state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddStdDev(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableStdDevAdd", std::move(arg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveStdDev(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableStdDevRemove", std::move(arg)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevSamp(StageBuilderState& state,
+                                                                const WindowFunctionStatement& stmt,
+                                                                sbe::value::SlotVector slots) {
+    tassert(8019606, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggRemovableStdDevSampFinalize", std::move(exprs));
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevPop(StageBuilderState& state,
+                                                               const WindowFunctionStatement& stmt,
+                                                               sbe::value::SlotVector slots) {
+    tassert(8019607, "Incorrect number of arguments", slots.size() == 1);
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+    return makeE<sbe::EFunction>("aggRemovableStdDevPopFinalize", std::move(exprs));
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -265,6 +305,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
         {"$push", &emptyInitializer<1>},
         {"$integral", &buildWindowInitializeIntegral},
         {"$derivative", &buildWindowInitializeDerivative},
+        {"$stdDevSamp", &emptyInitializer<1>},
+        {"$stdDevPop", &emptyInitializer<1>},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -285,6 +327,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
     static const StringDataMap<BuildAddFn> kWindowFunctionBuilders = {
         {"$sum", &buildWindowAddSum},
         {"$push", &buildWindowAddPush},
+        {"$stdDevSamp", &buildWindowAddStdDev},
+        {"$stdDevPop", &buildWindowAddStdDev},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -329,6 +373,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
     static const StringDataMap<BuildRemoveFn> kWindowFunctionBuilders = {
         {"$sum", &buildWindowRemoveSum},
         {"$push", &buildWindowRemovePush},
+        {"$stdDevSamp", &buildWindowRemoveStdDev},
+        {"$stdDevPop", &buildWindowRemoveStdDev},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -376,6 +422,8 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
         {"$push", &buildWindowFinalizePush},
         {"$integral", &buildWindowFinalizeIntegral},
         {"$derivative", &buildWindowFinalizeDerivative},
+        {"$stdDevSamp", &buildWindowFinalizeStdDevSamp},
+        {"$stdDevPop", &buildWindowFinalizeStdDevPop},
     };
 
     auto opName = stmt.expr->getOpName();
