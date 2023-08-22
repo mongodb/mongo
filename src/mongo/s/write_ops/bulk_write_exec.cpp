@@ -315,8 +315,8 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
                     ops.size() == 1);
 
             write_ops::UpdateCommandRequest updateCommand =
-                bulk_write_common::makeUpdateCommandRequestForFLE(
-                    opCtx, firstOp.getUpdate(), clientRequest, clientRequest.getNsInfo()[0]);
+                bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
+                    firstOp.getUpdate(), clientRequest, /*currentOpIdx=*/0);
 
             BatchedCommandRequest fleRequest(updateCommand);
             fleResult = processFLEBatch(

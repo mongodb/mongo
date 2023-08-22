@@ -786,6 +786,22 @@ UpdateResult performUpdate(OperationContext* opCtx,
             "Retryable findAndModify on a timeseries is not supported",
             !isTimeseriesUpdate || !opCtx->isRetryableWrite());
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangDuringBatchUpdate,
+        opCtx,
+        "hangDuringBatchUpdate",
+        [&nss]() {
+            LOGV2(7280400,
+                  "Batch update - hangDuringBatchUpdate fail point enabled for a namespace. "
+                  "Blocking until fail point is disabled",
+                  logAttrs(nss));
+        },
+        nss);
+
+    if (MONGO_unlikely(failAllUpdates.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
+    }
+
     auto collection =
         acquireCollection(opCtx,
                           CollectionAcquisitionRequest::fromOpCtx(
@@ -882,6 +898,9 @@ UpdateResult performUpdate(OperationContext* opCtx,
         metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
     }
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangAfterBatchUpdate, opCtx, "hangAfterBatchUpdate");
+
     return updateResult;
 }
 
@@ -897,7 +916,17 @@ long long performDelete(OperationContext* opCtx,
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesDelete || !opCtx->isRetryableWrite());
+            !isTimeseriesDelete || !deleteRequest.getReturnDeleted() || !opCtx->isRetryableWrite());
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangDuringBatchRemove, opCtx, "hangDuringBatchRemove", []() {
+            LOGV2(7280401,
+                  "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
+                  "point is disabled");
+        });
+    if (MONGO_unlikely(failAllRemoves.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
+    }
 
     const auto collection =
         acquireCollection(opCtx,
@@ -909,6 +938,10 @@ long long performDelete(OperationContext* opCtx,
     if (const auto& coll = collection.getCollectionPtr()) {
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
+    }
+
+    if (isTimeseriesDelete) {
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
     }
 
     ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
@@ -1406,12 +1439,6 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                                    const write_ops::UpdateCommandRequest& wholeOp,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply) {
-    ON_BLOCK_EXIT([&] {
-        // Increments the counter if the command contains retries.
-        if (!reply->retriedStmtIds.empty()) {
-            RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
-        }
-    });
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, nextOpIndex);

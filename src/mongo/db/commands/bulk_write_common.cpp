@@ -169,14 +169,15 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     return request;
 }
 
-write_ops::UpdateCommandRequest makeUpdateCommandRequestForFLE(
-    OperationContext* opCtx,
-    const BulkWriteUpdateOp* op,
-    const BulkWriteCommandRequest& req,
-    const mongo::NamespaceInfoEntry& nsInfoEntry) {
+write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
+    const BulkWriteUpdateOp* op, const BulkWriteCommandRequest& req, size_t currentOpIdx) {
     uassert(ErrorCodes::InvalidOptions,
             "BulkWrite update with Queryable Encryption does not support sort.",
             !op->getSort());
+    auto idx = op->getUpdate();
+    auto nsEntry = req.getNsInfo()[idx];
+
+    auto stmtId = bulk_write_common::getStatementId(req, currentOpIdx);
 
     write_ops::UpdateOpEntry update;
     update.setQ(op->getFilter());
@@ -191,16 +192,23 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestForFLE(
     update.setUpsert(op->getUpsert());
 
     std::vector<write_ops::UpdateOpEntry> updates{update};
-    write_ops::UpdateCommandRequest updateCommand(nsInfoEntry.getNs(), updates);
+    write_ops::UpdateCommandRequest updateCommand(nsEntry.getNs(), updates);
+
     updateCommand.setDollarTenant(req.getDollarTenant());
     updateCommand.setExpectPrefix(req.getExpectPrefix());
     updateCommand.setLet(req.getLet());
-    updateCommand.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+
+    updateCommand.getWriteCommandRequestBase().setIsTimeseriesNamespace(
+        nsEntry.getIsTimeseriesNamespace());
+    updateCommand.getWriteCommandRequestBase().setCollectionUUID(nsEntry.getCollectionUUID());
 
     updateCommand.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
+        nsEntry.getEncryptionInformation());
     updateCommand.getWriteCommandRequestBase().setBypassDocumentValidation(
         req.getBypassDocumentValidation());
+
+    updateCommand.getWriteCommandRequestBase().setStmtIds(std::vector<StmtId>{stmtId});
+    updateCommand.getWriteCommandRequestBase().setOrdered(req.getOrdered());
 
     return updateCommand;
 }

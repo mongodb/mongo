@@ -96,6 +96,9 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
 }
 
 function flushBatch(originalRunCommand, makeRunCommandArgs) {
+    if (BulkWriteUtils.getCurrentBatchSize() === 0) {
+        return;
+    }
     BulkWriteUtils.flushCurrentBulkWriteBatch(
         bulkWriteCluster, originalRunCommand, makeRunCommandArgs);
     validateClusterConsistency(originalRunCommand, makeRunCommandArgs);

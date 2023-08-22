@@ -91,6 +91,7 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
@@ -495,6 +496,16 @@ public:
                     ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
                           opCtx->getServiceContext())
                     : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                ON_BLOCK_EXIT([&] {
+                    // Increments the counter if the command contains retries. This is normally done
+                    // within write_ops_exec::performUpdates. But for retryable timeseries updates,
+                    // we should handle the metrics only once at the caller since each statement
+                    // will be run as a separate update command through the internal transaction
+                    // API. See write_ops_exec::performUpdates for more details.
+                    if (!reply.retriedStmtIds.empty()) {
+                        RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
+                    }
+                });
                 write_ops_exec::runTimeseriesRetryableUpdates(
                     opCtx, bucketNs, request(), executor, &reply);
             } else {

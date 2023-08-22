@@ -85,10 +85,6 @@ export const BulkWriteUtils = (function() {
 
     function flushCurrentBulkWriteBatch(
         conn, originalRunCommand, makeRunCommandArgs, additionalParameters = {}) {
-        if (bufferedOps.length == 0) {
-            return {};
-        }
-
         // Should not be possible to reach if bypassDocumentValidation is not set.
         assert(bypassDocumentValidation != null);
 

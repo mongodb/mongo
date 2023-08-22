@@ -96,6 +96,7 @@
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
@@ -131,6 +132,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -182,6 +184,32 @@ public:
                 replyItem.setN(writes.results[i].getValue().getN());
                 _replies.emplace_back(replyItem);
             }
+        }
+    }
+
+    void addUpdateReply(OperationContext* opCtx,
+                        size_t currentOpIdx,
+                        write_ops_exec::WriteResult& writeResult) {
+        invariant(writeResult.results.size() == 1);
+
+        // Copy over retriedStmtIds.
+        for (auto& stmtId : writeResult.retriedStmtIds) {
+            _retriedStmtIds.emplace_back(stmtId);
+        }
+
+        if (auto error = write_ops_exec::generateError(
+                opCtx, writeResult.results[0].getStatus(), currentOpIdx, _numErrors)) {
+            auto replyItem = BulkWriteReplyItem(currentOpIdx, error.get().getStatus());
+            _replies.emplace_back(replyItem);
+            _numErrors++;
+        } else {
+            auto replyItem = BulkWriteReplyItem(currentOpIdx);
+            replyItem.setN(writeResult.results[0].getValue().getN());
+            replyItem.setNModified(writeResult.results[0].getValue().getNModified());
+            if (auto idElement = writeResult.results[0].getValue().getUpsertedId().firstElement()) {
+                replyItem.setUpserted(write_ops::Upserted(0, idElement));
+            }
+            _replies.emplace_back(replyItem);
         }
     }
 
@@ -764,7 +792,7 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
     write_ops::UpdateCommandRequest updateCommand =
-        bulk_write_common::makeUpdateCommandRequestForFLE(opCtx, op, req, nsInfoEntry);
+        bulk_write_common::makeUpdateCommandRequestFromUpdateOp(op, req, currentOpIdx);
     write_ops::UpdateCommandReply updateReply = processFLEUpdate(opCtx, updateCommand);
 
     if (updateReply.getWriteErrors()) {
@@ -837,6 +865,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     BulkWriteReplies& responses) {
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getUpdate();
+    auto nsEntry = nsInfo[idx];
     try {
         if (op->getMulti()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -861,18 +890,37 @@ bool handleUpdateOp(OperationContext* opCtx,
         auto stmtId = opCtx->isRetryableWrite()
             ? bulk_write_common::getStatementId(req, currentOpIdx)
             : kUninitializedStmtId;
+
         if (opCtx->isRetryableWrite()) {
-            const auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
-                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            TimeseriesBucketNamespace tsNs(nsEntry.getNs(), nsEntry.getIsTimeseriesNamespace());
+            auto [isTimeseries, bucketNs] = timeseries::isTimeseries(opCtx, tsNs);
+            if (isTimeseries && !opCtx->inMultiDocumentTransaction()) {
+                // Handle retryable timeseries updates separately. Non-retryable-write timeseries
+                // updates should be handled by write_ops_exec::performUpdate.
+                write_ops_exec::WriteResult out;
+                auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
+                    ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
+                          opCtx->getServiceContext())
+                    : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                auto updateRequest =
+                    bulk_write_common::makeUpdateCommandRequestFromUpdateOp(op, req, currentOpIdx);
+                write_ops_exec::runTimeseriesRetryableUpdates(
+                    opCtx, bucketNs, updateRequest, executor, &out);
+                responses.addUpdateReply(opCtx, currentOpIdx, out);
+                return out.canContinue;
+            } else {
+                const auto txnParticipant = TransactionParticipant::get(opCtx);
+                if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
 
-                auto [numMatched, numDocsModified, upserted] =
-                    getRetryResultForUpdate(opCtx, nsString, op, entry);
+                    auto [numMatched, numDocsModified, upserted] =
+                        getRetryResultForUpdate(opCtx, nsString, op, entry);
 
-                responses.addUpdateReply(
-                    currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
+                    responses.addUpdateReply(
+                        currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
 
-                return true;
+                    return true;
+                }
             }
         }
 
@@ -979,9 +1027,13 @@ bool handleDeleteOp(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
         doTransactionValidationForWrites(opCtx, nsString);
 
+        // Handle FLE deletes.
         if (nsInfo[idx].getEncryptionInformation().has_value()) {
             return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
         }
+
+        // Non-FLE deletes (including timeseries deletes) will be handled by
+        // write_ops_exec::performDelete.
 
         OpDebug* opDebug = &curOp->debug();
 
