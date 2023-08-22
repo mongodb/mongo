@@ -44,6 +44,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/database_name.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/future.h"
@@ -167,7 +168,7 @@ Future<void> authenticateInternalClient(
  *     @passwordText: The std::string representing the user's password.
  *     @mechanism: The std::string authentication mechanism to be used
  */
-BSONObj buildAuthParams(StringData dbname,
+BSONObj buildAuthParams(const DatabaseName& dbname,
                         StringData username,
                         StringData passwordText,
                         StringData mechanism);

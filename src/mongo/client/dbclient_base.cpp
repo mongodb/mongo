@@ -427,11 +427,9 @@ void DBClientBase::auth(const BSONObj& params) {
     _auth(params);
 }
 
-bool DBClientBase::auth(const string& dbname,
-                        const string& username,
-                        const string& password_text,
-                        string& errmsg) {
-
+Status DBClientBase::auth(const DatabaseName& dbname,
+                          StringData username,
+                          StringData password_text) try {
     UserName user{username, dbname};
 
     StatusWith<string> mechResult =
@@ -445,16 +443,12 @@ bool DBClientBase::auth(const string& dbname,
     // negotiation does not succeeed for some reason.
     StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1"_sd;
 
-    try {
-        const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
-        auth(authParams);
-        return true;
-    } catch (const AssertionException& ex) {
-        if (ex.code() != ErrorCodes::AuthenticationFailed)
-            throw;
-        errmsg = ex.what();
-        return false;
-    }
+    const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
+    auth(authParams);
+
+    return Status::OK();
+} catch (const AssertionException& ex) {
+    return ex.toStatus();
 }
 
 void DBClientBase::logout(const string& dbname, BSONObj& info) {

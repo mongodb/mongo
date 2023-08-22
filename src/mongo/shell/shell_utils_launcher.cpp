@@ -409,11 +409,12 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
                 BSONElement authObj = opt["auth"];
 
                 if (!authObj.eoo()) {
-                    string errMsg;
-                    conn.auth("admin", authObj["user"].String(), authObj["pwd"].String(), errMsg);
+                    auto status = conn.auth(
+                        DatabaseName::kAdmin, authObj["user"].String(), authObj["pwd"].String());
 
-                    if (!errMsg.empty()) {
-                        cout << "Failed to authenticate before shutdown: " << errMsg << endl;
+                    if (!status.isOK()) {
+                        cout << "Failed to authenticate before shutdown: " << status.reason()
+                             << endl;
                     }
                 }
 

@@ -941,10 +941,9 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
     if (_config->username != "") {
-        std::string errmsg;
-        uassert(15931,
-                str::stream() << "Authenticating to connection for _benchThread failed: " << errmsg,
-                conn->auth("admin", _config->username, _config->password, errmsg));
+        uassertStatusOK(
+            conn->auth(DatabaseName::kAdmin, _config->username, _config->password)
+                .withContext("Authenticating to connection for _benchThread failed"_sd));
     }
 
     boost::optional<LogicalSessionIdToClient> lsid;
@@ -1397,10 +1396,9 @@ void BenchRunWorker::run() {
         auto conn(_config->createConnection());
 
         if (!_config->username.empty()) {
-            std::string errmsg;
-            if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
-            }
+            uassertStatusOK(
+                conn->auth(DatabaseName::kAdmin, _config->username, _config->password)
+                    .withContext("Authenticating to connection for benchThread failed"_sd));
         }
 
         BenchRunWorkerStateGuard workerStateGuard(_brState);
@@ -1430,14 +1428,11 @@ void BenchRunner::start() {
         std::unique_ptr<DBClientBase> conn(_config->createConnection());
         // Must authenticate to admin db in order to run serverStatus command
         if (_config->username != "") {
-            std::string errmsg;
-            if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(16704,
-                          str::stream()
-                              << "User " << _config->username
-                              << " could not authenticate to admin db; admin db access is "
-                                 "required to use benchRun with auth enabled");
-            }
+            uassertStatusOK(
+                conn->auth(DatabaseName::kAdmin, _config->username, _config->password)
+                    .withContext(
+                        "User {} could not authenticate to admin db, dbmin db access is required to use benchRun with auth enabled"_format(
+                            _config->username)));
         }
 
         // Start the worker threads.
@@ -1474,15 +1469,12 @@ void BenchRunner::stop() {
     {
         std::unique_ptr<DBClientBase> conn(_config->createConnection());
         if (_config->username != "") {
-            std::string errmsg;
             // this can only fail if admin access was revoked since start of run
-            if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                uasserted(16705,
-                          str::stream()
-                              << "User " << _config->username
-                              << " could not authenticate to admin db; admin db access is "
-                                 "still required to use benchRun with auth enabled");
-            }
+            uassertStatusOK(
+                conn->auth(DatabaseName::kAdmin, _config->username, _config->password)
+                    .withContext(
+                        "User {} could not authenticate to admin db; admin db access is still required to use benchRun with auth enabled"_format(
+                            _config->username)));
         }
     }
 

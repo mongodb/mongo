@@ -292,14 +292,16 @@ Future<void> authenticateInternalClient(
         });
 }
 
-BSONObj buildAuthParams(StringData dbname,
+BSONObj buildAuthParams(const DatabaseName& dbname,
                         StringData username,
                         StringData passwordText,
                         StringData mechanism) {
-
-    return BSON(saslCommandMechanismFieldName << mechanism << saslCommandUserDBFieldName << dbname
-                                              << saslCommandUserFieldName << username
-                                              << saslCommandPasswordFieldName << passwordText);
+    // Direct authentication expects no tenantId to be present.
+    fassert(8032000, dbname.tenantId() == boost::none);
+    return BSON(saslCommandMechanismFieldName
+                << mechanism << saslCommandUserDBFieldName << DatabaseNameUtil::serialize(dbname)
+                << saslCommandUserFieldName << username << saslCommandPasswordFieldName
+                << passwordText);
 }
 
 StringData getSaslCommandUserDBFieldName() {

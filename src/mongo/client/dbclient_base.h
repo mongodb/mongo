@@ -322,13 +322,8 @@ public:
      * Authentication is separate for each database on the server -- you may authenticate for any
      * number of databases on a single connection. The "admin" database is special and once
      * authenticated provides access to all databases on the server.
-     *
-     *   Returns true if successful.
      */
-    bool auth(const std::string& dbname,
-              const std::string& username,
-              const std::string& pwd,
-              std::string& errmsg);
+    Status auth(const DatabaseName& dbname, StringData username, StringData pwd);
 
     /**
      * Logs out the connection for the given database.
