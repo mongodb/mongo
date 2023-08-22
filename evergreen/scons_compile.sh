@@ -119,6 +119,14 @@ if [ -n "${build_patch_id}" ]; then
 fi
 
 set -o pipefail
+
+# Bind mount a new tmp directory to the real /tmp to circumvent "out of disk space" errors on ARM LTO compiles
+# the /tmp directory is limited to 32 GB while the home directory has 500 GB
+if [[ ${compile_flags} == *"--lto"* ]]; then
+  set_sudo
+  mkdir -p tmp && $sudo mount --bind ./tmp /tmp
+fi
+
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
   ${scons_cache_args} $extra_args \
