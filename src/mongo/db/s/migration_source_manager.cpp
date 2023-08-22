@@ -229,11 +229,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     invariant(!_opCtx->lockState()->isLocked());
 
     LOGV2(22016,
-          "Starting chunk migration donation {requestParameters} with expected collection epoch "
-          "{collectionEpoch}",
           "Starting chunk migration donation",
-          "requestParameters"_attr = redact(_args.toBSON({})),
-          "collectionEpoch"_attr = _args.getEpoch());
+          "requestParameters"_attr = redact(_args.toBSON({})));
 
     _moveTimingHelper.done(1);
     moveChunkHangAtStep1.pauseWhileSet();
@@ -264,8 +261,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
 
-        const auto [metadata, indexInfo] =
-            checkCollectionIdentity(_opCtx, nss(), _args.getEpoch(), boost::none);
+        const auto [metadata, indexInfo] = checkCollectionIdentity(
+            _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp());
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
@@ -328,6 +325,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     _collectionEpoch = _args.getEpoch();
     _collectionUUID = collectionUUID;
+    _collectionTimestamp = _args.getCollectionTimestamp();
 
     _chunkVersion = collectionMetadata.getChunkManager()
                         ->findIntersectingChunkWithSimpleCollation(*_args.getMin())
@@ -364,7 +362,7 @@ void MigrationSourceManager::startClone() {
     auto replEnabled = replCoord->getSettings().isReplSet();
 
     {
-        const auto metadata = _getCurrentMetadataAndCheckEpoch();
+        const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
 
         AutoGetCollection autoColl(_opCtx,
                                    nss(),
@@ -441,7 +439,7 @@ void MigrationSourceManager::enterCriticalSection() {
     _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
     _cloneAndCommitTimer.reset();
 
-    const auto& metadata = _getCurrentMetadataAndCheckEpoch();
+    const auto& metadata = _getCurrentMetadataAndCheckForConflictingErrors();
 
     // Check that there are no chunks on the recepient shard. Write an oplog event for change
     // streams if this is the first migration to the recipient.
@@ -528,7 +526,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     BSONObjBuilder builder;
 
     {
-        const auto metadata = _getCurrentMetadataAndCheckEpoch();
+        const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
 
         auto migratedChunk = MigratedChunkType(*_chunkVersion, *_args.getMin(), *_args.getMax());
 
@@ -622,7 +620,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     // Migration succeeded
 
-    const auto refreshedMetadata = _getCurrentMetadataAndCheckEpoch();
+    const auto refreshedMetadata = _getCurrentMetadataAndCheckForConflictingErrors();
     // Check if there are no chunks left on donor shard. Write an oplog event for change streams if
     // the last chunk migrated off the donor.
     if (!refreshedMetadata.getChunkManager()->getVersion(_args.getFromShard()).isSet()) {
@@ -724,7 +722,7 @@ SharedSemiFuture<void> MigrationSourceManager::abort() {
     return _completion.getFuture();
 }
 
-CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
+CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckForConflictingErrors() {
     auto metadata = [&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
@@ -738,16 +736,27 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
                 optMetadata);
         return *optMetadata;
     }();
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "The collection's epoch has changed since the migration began. "
-                             "Expected collection epoch: "
-                          << _collectionEpoch->toString() << ", but found: "
-                          << (metadata.isSharded()
-                                  ? metadata.getCollPlacementVersion().epoch().toString()
-                                  : "unsharded collection"),
-            metadata.isSharded() &&
-                metadata.getCollPlacementVersion().epoch() == *_collectionEpoch);
+    if (_collectionTimestamp) {
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream()
+                    << "The collection's timestamp has changed since the migration began. Expected "
+                       "timestamp: "
+                    << _collectionTimestamp->toStringPretty() << ", but found: "
+                    << (metadata.isSharded()
+                            ? metadata.getCollPlacementVersion().getTimestamp().toStringPretty()
+                            : "unsharded collection"),
+                metadata.isSharded() &&
+                    *_collectionTimestamp == metadata.getCollPlacementVersion().getTimestamp());
+    } else {
+        uassert(
+            ErrorCodes::ConflictingOperationInProgress,
+            str::stream()
+                << "The collection's epoch has changed since the migration began. Expected epoch: "
+                << _collectionEpoch->toString() << ", but found: "
+                << (metadata.isSharded() ? metadata.getCollPlacementVersion().toString()
+                                         : "unsharded collection"),
+            metadata.isSharded() && metadata.getCollPlacementVersion().epoch() == _collectionEpoch);
+    }
 
     return metadata;
 }

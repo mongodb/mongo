@@ -73,7 +73,7 @@ ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
 CollectionPlacementAndIndexInfo checkCollectionIdentity(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const OID& expectedEpoch,
+    const boost::optional<OID>& expectedEpoch,
     const boost::optional<Timestamp>& expectedTimestamp) {
     AutoGetCollection collection(opCtx, nss, MODE_IS);
 
@@ -114,7 +114,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
             str::stream() << "Collection " << nss.toStringForErrorMsg()
                           << " has changed since operation was sent (sent epoch: " << expectedEpoch
                           << ", current epoch: " << placementVersion.epoch() << ")",
-            expectedEpoch == placementVersion.epoch() &&
+            (!expectedEpoch || expectedEpoch == placementVersion.epoch()) &&
                 (!expectedTimestamp || expectedTimestamp == placementVersion.getTimestamp()));
 
     uassert(StaleConfigInfo(nss,

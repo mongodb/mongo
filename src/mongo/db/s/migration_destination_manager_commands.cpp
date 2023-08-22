@@ -172,28 +172,8 @@ public:
         onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
         const auto shardId = ShardingState::get(opCtx)->shardId();
 
-        const auto collectionEpoch = [&] {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            const auto scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-            auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
-            uassert(StaleConfigInfo(nss,
-                                    ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
-                                    boost::none /* wantedVersion */,
-                                    shardId,
-                                    boost::none),
-                    "The collection's sharding state was cleared by a concurrent operation",
-                    optMetadata);
-            return optMetadata->getShardPlacementVersion().epoch();
-        }();
-
-        uassertStatusOK(
-            MigrationDestinationManager::get(opCtx)->start(opCtx,
-                                                           nss,
-                                                           std::move(scopedReceiveChunk),
-                                                           cloneRequest,
-                                                           collectionEpoch,
-                                                           writeConcern));
+        uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(
+            opCtx, nss, std::move(scopedReceiveChunk), cloneRequest, writeConcern));
 
         result.appendBool("started", true);
         return true;

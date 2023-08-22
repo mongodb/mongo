@@ -149,7 +149,6 @@ public:
                  const NamespaceString& nss,
                  ScopedReceiveChunk scopedReceiveChunk,
                  const StartChunkCloneRequest& cloneRequest,
-                 const OID& epoch,
                  const WriteConcernOptions& writeConcern);
 
     /**
@@ -345,8 +344,6 @@ private:
     BSONObj _min;
     BSONObj _max;
     BSONObj _shardKeyPattern;
-
-    OID _epoch;
 
     WriteConcernOptions _writeConcern;
 

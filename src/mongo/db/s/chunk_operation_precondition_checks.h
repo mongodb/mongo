@@ -49,7 +49,7 @@ namespace mongo {
 CollectionPlacementAndIndexInfo checkCollectionIdentity(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const OID& expectedEpoch,
+    const boost::optional<OID>& expectedEpoch,
     const boost::optional<Timestamp>& expectedTimestamp);
 
 /**

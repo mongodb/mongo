@@ -221,7 +221,7 @@ private:
         kDone
     };
 
-    CollectionMetadata _getCurrentMetadataAndCheckEpoch();
+    CollectionMetadata _getCurrentMetadataAndCheckForConflictingErrors();
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
@@ -293,8 +293,10 @@ private:
     // The epoch of the collection being migrated and its UUID, as of the time the migration
     // started. Values are boost::optional only up until the constructor runs, because UUID doesn't
     // have a default constructor.
+    // TODO SERVER-80188: remove _collectionEpoch once 8.0 becomes last-lts.
     boost::optional<OID> _collectionEpoch;
     boost::optional<UUID> _collectionUUID;
+    boost::optional<Timestamp> _collectionTimestamp;
 
     // The version of the chunk at the time the migration started.
     boost::optional<ChunkVersion> _chunkVersion;

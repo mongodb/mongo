@@ -456,6 +456,7 @@ Status Balancer::moveRange(OperationContext* opCtx,
     shardSvrRequest.setMoveRangeRequestBase(request.getMoveRangeRequestBase());
     shardSvrRequest.setMaxChunkSizeBytes(maxChunkSize);
     shardSvrRequest.setFromShard(fromShardId);
+    shardSvrRequest.setCollectionTimestamp(coll.getTimestamp());
     shardSvrRequest.setEpoch(coll.getEpoch());
     const auto [secondaryThrottle, wc] =
         getSecondaryThrottleAndWriteConcern(request.getSecondaryThrottle());
@@ -1121,6 +1122,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         shardSvrRequest.setMoveRangeRequestBase(requestBase);
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
+        shardSvrRequest.setCollectionTimestamp(migrateInfo.version.getTimestamp());
         shardSvrRequest.setEpoch(migrateInfo.version.epoch());
         shardSvrRequest.setForceJumbo(migrateInfo.forceJumbo);
         const auto [secondaryThrottle, wc] =
