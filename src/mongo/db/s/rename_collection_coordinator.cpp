@@ -594,14 +594,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             opCtx,
                             toNss,
                             criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern,
-                            true /*allowViews*/);
+                            ShardingCatalogClient::kLocalWriteConcern);
                         criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             toNss,
                             criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern,
-                            true /*allowView*/);
+                            ShardingCatalogClient::kLocalWriteConcern);
 
                         // Make sure the target namespace is not a view
                         uassert(ErrorCodes::NamespaceExists,
