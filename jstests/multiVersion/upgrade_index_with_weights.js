@@ -56,7 +56,8 @@ rst.restart(secondaryNode, Object.assign({startClean: true}, secondaryNodeOption
 coll = rst.getPrimary().getDB(jsTestName()).coll;
 const index = coll.getIndexes().filter(index => (index["name"] == "a_1"));
 assert.eq(index.length, 1, index);
-assert.eq(index[0]["weights"], {d: 1}, index);
+// Verify that the synced index has been cleaned up of the bad option.
+assert.eq(index[0]["weights"], undefined, index);
 
 rst.awaitReplication();
 rst.stopSet();
