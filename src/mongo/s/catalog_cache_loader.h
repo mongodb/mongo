@@ -194,11 +194,6 @@ public:
      */
     static void clearForTests(ServiceContext* serviceContext);
 
-    /**
-     * TODO: SERVER-74105 remove
-     */
-    virtual void onFCVChanged() {}
-
 protected:
     CatalogCacheLoader() = default;
 };

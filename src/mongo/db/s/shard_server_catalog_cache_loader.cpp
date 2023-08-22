@@ -1597,10 +1597,4 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
     return collAndChunks;
 }
 
-void ShardServerCatalogCacheLoader::onFCVChanged() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    _contexts.interrupt(ErrorCodes::Interrupted);
-    ++_term;
-}
-
 }  // namespace mongo

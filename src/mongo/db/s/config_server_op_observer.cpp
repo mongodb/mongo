@@ -126,17 +126,6 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        std::vector<bool> fromMigrate,
                                        bool defaultFromMigrate,
                                        OpStateAccumulator* opAccumulator) {
-    if (coll->ns().isServerConfigurationCollection()) {
-        auto idElement = begin->doc["_id"];
-        if (idElement.type() == BSONType::String &&
-            idElement.String() == multiversion::kParameterName) {
-            opCtx->recoveryUnit()->onCommit(
-                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
-                    CatalogCacheLoader::get(opCtx).onFCVChanged();
-                });
-        }
-    }
-
     if (coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
@@ -173,17 +162,6 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
 void ConfigServerOpObserver::onUpdate(OperationContext* opCtx,
                                       const OplogUpdateEntryArgs& args,
                                       OpStateAccumulator* opAccumulator) {
-    if (args.coll->ns().isServerConfigurationCollection()) {
-        auto idElement = args.updateArgs->updatedDoc["_id"];
-        if (idElement.type() == BSONType::String &&
-            idElement.String() == multiversion::kParameterName) {
-            opCtx->recoveryUnit()->onCommit(
-                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
-                    CatalogCacheLoader::get(opCtx).onFCVChanged();
-                });
-        }
-    }
-
     if (args.coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
