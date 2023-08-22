@@ -499,3 +499,29 @@ assert.eq(res.cursor.firstBatch[0].errmsg,
 assert(!res.cursor.firstBatch[1]);
 
 coll.drop();
+
+// Test Upsert = True with UpsertSupplied = True (no match and constants.new is missing)
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {
+            update: 0,
+            filter: {_id: 1},
+            updateMods: [{$set: {skey: "MongoDB2"}}],
+            upsert: true,
+            upsertSupplied: true,
+            constants: {},
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 9});
+assert.eq(res.cursor.firstBatch[0].errmsg,
+          "the parameter 'upsertSupplied' is set to 'true', but no document was supplied");
+assert(!res.cursor.firstBatch[1]);
+
+coll.drop();

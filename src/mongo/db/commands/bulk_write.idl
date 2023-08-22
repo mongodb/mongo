@@ -103,7 +103,7 @@ structs:
             upsertSupplied:
                 description: "Only applicable when upsert is true. If set, and if no documents match
                               the query, the update subsystem will insert the document supplied as
-                              'let.new' rather than generating a new document from the update spec."
+                              'constants.new' rather than generating a new document from the update spec."
                 type: optionalBool
                 stability: unstable
             arrayFilters:
