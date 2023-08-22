@@ -580,6 +580,10 @@ void removeProjectSimpleBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     if (solnRoot->getType() == StageType::STAGE_GROUP) {
         auto groupNode = static_cast<GroupNode*>(solnRoot);
 
+        if (groupNode->needWholeDocument) {
+            // The sub expression needs the whole document.
+            return;
+        }
         auto projectNodeCandidate = groupNode->children[0];
         if (projectNodeCandidate->getType() == StageType::STAGE_GROUP) {
             // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.

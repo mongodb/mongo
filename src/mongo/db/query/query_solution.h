@@ -1394,11 +1394,13 @@ struct GroupNode : public QuerySolutionNode {
         for (auto& groupByExprField : groupByExpression->getDependencies().fields) {
             requiredFields.insert(groupByExprField);
         }
+        needWholeDocument = groupByExpression->getDependencies().needWholeDocument;
         for (auto&& acc : accumulators) {
             auto argExpr = acc.expr.argument;
             for (auto& argExprField : argExpr->getDependencies().fields) {
                 requiredFields.insert(argExprField);
             }
+            needWholeDocument |= argExpr->getDependencies().needWholeDocument;
         }
     }
 
@@ -1434,6 +1436,7 @@ struct GroupNode : public QuerySolutionNode {
     // the fields in the 'groupByExpressions' and the fields in the input Expressions of the
     // 'accumulators'.
     StringSet requiredFields;
+    bool needWholeDocument = false;
 
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.

@@ -656,6 +656,9 @@ assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum:
 assertProjectionIsNotRemoved(
     [{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
 
+// Test that an inclusion projection is NOT optimized away if group depends on the entire document.
+assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$$ROOT"}}]);
+
 // Spinoff on the one above: Without supporting this kind of prefixing analysis, we can confuse
 // ourselves with our dependency analysis. If the $group depends on both "path" and "path.subpath"
 // then it will generate a $project on only "path" to express its dependency set. We then fail to
