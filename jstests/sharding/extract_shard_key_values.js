@@ -173,9 +173,19 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.eq(1, res.nUpserted);
     docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
     assert.eq(1, docsArr.length);
+} else {
+    // When the updateOneWithoutShardKey feature flag is not enabled, upsert update operations
+    // require the entire shard key to be specified in the query.
+    assert.commandFailedWithCode(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}), 31025);
+    assert.writeErrorWithCode(
+        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+}
 
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s) ||
+    jsTestOptions().mongosBinVersion === "last-lts") {
     assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-    res = assert.commandWorked(sessionDB.runCommand(
+    let res = assert.commandWorked(sessionDB.runCommand(
         {findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}));
     assert.eq(1, res.lastErrorObject.n);
     assert.eq(0, res.lastErrorObject.updatedExisting);
@@ -183,13 +193,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     docsArr = mongos.getCollection(kNsName).find({a: 2}).toArray();
     assert.eq(1, docsArr.length);
 } else {
-    // When the updateOneWithouShardKey feature flag is not enabled, upsert operations require the
-    // entire shard key to be specified in the query.
-    assert.commandFailedWithCode(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}), 31025);
-    assert.writeErrorWithCode(
-        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}),
-        ErrorCodes.ShardKeyNotFound);
-
+    // When the updateOneWithouShardKey feature flag is not enabled or when mongos is not "last-lts"
+    // (as SERVER-44422 is only backported to "last-lts"), findAndModify operations require
+    // the entire shard key to be specified in the query.
     assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
     assert.commandFailedWithCode(sessionDB.runCommand({
         findAndModify: kCollName,

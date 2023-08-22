@@ -135,8 +135,10 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
     }
 
     // Sharded deleteOnes that do not directly target a shard can now use the two phase write
-    // protocol to execute.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // protocol to execute. Sharded deleteOnes that that target a single shard are also expected to
+    // work when mongos is "last-lts" (as SERVER-44422 was backported to "last-lts").
+    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s) ||
+        jsTestOptions().mongosBinVersion === "last-lts") {
         doRemove(emptyQuery, single, makeMongosStaleFunc);
     } else {
         // Not possible because single remove requires equality match on shard key.
@@ -148,8 +150,10 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
     doRemove(pointQuery, multi, makeMongosStaleFunc);
 
     // Sharded deleteOnes that do not directly target a shard can now use the two phase write
-    // protocol to execute.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // protocol to execute. Sharded deleteOnes that that target a single shard are also expected to
+    // work when mongos is "last-lts" (as SERVER-44422 was backported to "last-lts").
+    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s) ||
+        jsTestOptions().mongosBinVersion === "last-lts") {
         doRemove(rangeQuery, single, makeMongosStaleFunc);
         doRemove(rangeQuery, multi, makeMongosStaleFunc);
 
