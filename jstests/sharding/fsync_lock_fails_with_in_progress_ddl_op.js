@@ -19,8 +19,9 @@ const st = new ShardingTest({
     mongosOptions: {setParameter: {featureFlagClusterFsyncLock: true}},
     config: 1
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 const coll = st.s.getDB(dbName).getCollection(collName);
 coll.insert({x: 1});
 assert.eq(coll.count(), 1);
