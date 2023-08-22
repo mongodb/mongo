@@ -136,6 +136,11 @@ assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 const query = {
     "a.b.c.d": {$ne: null}
 };
+// $elemMatch object can only use the index when none of the paths below the $elemMatch is
+// not multikey.
+const elemMatchObjectQuery = {
+    "a.b": {$elemMatch: {"c.d": {$ne: null}}}
+};
 // $elemMatch value can always use the index.
 const elemMatchValueQuery = {
     "a.b.c.d": {$elemMatch: {$ne: null}}
@@ -145,6 +150,12 @@ const elemMatchValueQuery = {
 checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 2, indexKeyPattern: keyPattern});
 // Since the multikey portion is above the $elemMatch, the $elemMatch query may use the
 // index.
+checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 2,
+    indexKeyPattern: keyPattern
+});
 checkQuery({
     query: elemMatchValueQuery,
     shouldUseIndex: true,
@@ -158,6 +169,12 @@ checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPa
 // The only multikey paths are still above the $elemMatch, queries which use a $elemMatch
 // should still be able to use the index.
 checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: true,
+    nResultsExpected: 3,
+    indexKeyPattern: keyPattern
+});
+checkQuery({
     query: elemMatchValueQuery,
     shouldUseIndex: true,
     nResultsExpected: 0,
@@ -167,6 +184,12 @@ checkQuery({
 // Make the index multikey for 'a.b.c'. Now the $elemMatch query may not use the index.
 assert.commandWorked(coll.insert({a: {b: [{c: [{d: 1}]}]}}));
 checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
+checkQuery({
+    query: elemMatchObjectQuery,
+    shouldUseIndex: false,
+    nResultsExpected: 4,
+    indexKeyPattern: keyPattern
+});
 checkQuery({
     query: elemMatchValueQuery,
     shouldUseIndex: true,
