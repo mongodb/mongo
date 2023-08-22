@@ -315,11 +315,14 @@ public:
           _cancelSource(cancelToken),
           _factory(_cancelSource.token(), _executor),
           _dispatchResults(std::move(dispatchResults)),
-          _numWriteThreads(numWriteThreads) {
+          _numWriteThreads(numWriteThreads),
+          _queues(_numWriteThreads) {
         constexpr int kQueueDepthPerDonor = 2;
-        MultiProducerMultiConsumerQueue<QueueData>::Options qOptions;
+        MultiProducerSingleConsumerQueue<QueueData>::Options qOptions;
         qOptions.maxQueueDepth = _dispatchResults.remoteCursors.size() * kQueueDepthPerDonor;
-        _queue.emplace(qOptions);
+        for (auto& queue : _queues) {
+            queue.emplace(qOptions);
+        }
     }
 
     void setUpWriterThreads(WriteCallback cb) {
@@ -334,7 +337,7 @@ public:
                         TxnNumber txnNumber(0);
                         // This loop will end by interrupt when the producer end closes.
                         while (true) {
-                            auto qData = _queue->pop(opCtx.get());
+                            auto qData = _queues[i]->pop(opCtx.get());
                             auto cursorResponse = uassertStatusOK(
                                 CursorResponse::parseFromBSON(std::move(qData.data)));
                             cb(opCtx.get(),
@@ -358,7 +361,7 @@ public:
                             _cancelSource.cancel();
                             // If consumers fail, ensure that producers waiting on the queue
                             // exit rather than hanging.
-                            _queue->closeConsumerEnd();
+                            _queues[i]->closeConsumerEnd();
                         }
                     });
             _writerFutures.emplace_back(std::move(writerFuture));
@@ -368,11 +371,16 @@ public:
     void handleOneResponse(const executor::TaskExecutor::ResponseStatus& response,
                            const HostAndPort& hostAndPort,
                            int index) {
+        // To ensure that all batches from one donor are handled sequentially, we need to handle
+        // those requests by only one writer thread, which is determined by the shardId, which
+        // corresponds to the index here.
+        int consumerIdx = index % _numWriteThreads;
         LOGV2_DEBUG(7763602,
                     3,
                     "Resharding response",
                     "index"_attr = index,
                     "shardId"_attr = _shardIds[index],
+                    "consumerIndex"_attr = consumerIdx,
                     "host"_attr = hostAndPort,
                     "status"_attr = response.status,
                     "elapsed"_attr = response.elapsed,
@@ -393,7 +401,7 @@ public:
                 return data["donorShard"].eoo() ||
                     data["donorShard"].valueStringDataSafe() == _shardIds[index];
             });
-        _queue->push({index, hostAndPort, response.data.getOwned()});
+        _queues[consumerIdx]->push({index, hostAndPort, response.data.getOwned()});
     }
 
     void setupReaderThreads(OperationContext* opCtx) {
@@ -480,7 +488,9 @@ public:
                                 _cancelSource.cancel();
                             }
                             if (--_activeCursors == 0) {
-                                _queue->closeProducerEnd();
+                                for (auto& queue : _queues) {
+                                    queue->closeProducerEnd();
+                                }
                             }
                             return swResponseStatus;
                         });
@@ -518,7 +528,7 @@ private:
         HostAndPort donorHost;
         BSONObj data;
     };
-    boost::optional<MultiProducerMultiConsumerQueue<QueueData>> _queue;
+    std::vector<boost::optional<MultiProducerSingleConsumerQueue<QueueData>>> _queues;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCloneFetcher::_mutex");
     int _activeCursors;                  // (M)
