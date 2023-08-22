@@ -293,3 +293,34 @@ buildvariants:
     - name: clang_tidy_TG
       distros:
       - rhel80-xxlarge
+
+- name: &windows-dev-compile-suggested windows-dev-compile-suggested
+  display_name: "* Windows Dev Compile"
+  run_on:
+  - windows-vsCurrent-xlarge
+  modules:
+  - enterprise
+  expansions:
+    exe: ".exe"
+    ext: zip
+    content_type: application/zip
+    compile_flags: >-
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+    num_scons_link_jobs_available: 0.2
+    python: '/cygdrive/c/python/python39/python.exe'
+    scons_cache_scope: shared
+    compile_variant: *windows-dev-compile-suggested
+  tasks:
+    - name: scons_compile_smoke_test_TG
+    - name: ninja_compile_smoke_test_TG
+
+- <<: *linux-arm64-dynamic-compile-params
+  name: &amazon-linux2-arm64-dev-compile amazon-linux2-arm64-dev-compile
+  display_name: "* Amazon Linux 2 arm64 Dev Compile"
+  expansions:
+    <<: *linux-arm64-dynamic-compile-expansions
+    compile_variant: *amazon-linux2-arm64-compile
+  tasks:
+    - name: scons_compile_smoke_test_TG
+    - name: ninja_compile_smoke_test_TG

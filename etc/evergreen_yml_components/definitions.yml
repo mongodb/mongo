@@ -1341,6 +1341,25 @@ functions:
       args:
       - "src/evergreen/scons_compile.sh"
 
+# This is only used to simulate local dev compilation. Do NOT use for anything else.
+  "scons raw compile":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      background: true
+      continue_on_err: true
+      binary: bash
+      args:
+      - "./src/evergreen/scons_splunk.sh"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/scons_raw_compile.sh"
+
   "ninja compile":
   - *f_expansions_write
   - command: subprocess.exec
@@ -8649,6 +8668,56 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
+# Test a compilation without extra args from evergreen to simulate local dev compilation.
+- name: scons_dev_compile_smoke_test
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - func: "scons raw compile"
+    vars:
+      targets: >-
+        install-wiredtiger
+        compiledb
+      task_compile_flags: >-
+        --opt=off
+        --dbg=on
+  - func: "scons raw compile"
+    vars:
+      targets: >-
+        install-wiredtiger
+        compiledb
+      task_compile_flags: >-
+        --opt=on
+        --dbg=off
+
+# Test a ninja compilation without extra args from evergreen to simulate local dev compilation.
+- name: ninja_dev_compile_smoke_test
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - func: "scons raw compile"
+    vars:
+      targets: >-
+        install-wiredtiger
+        compiledb
+      task_compile_flags: >-
+        --ninja build.ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+      targets: "compiledb"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -9009,6 +9078,16 @@ task_groups:
   - integration_tests_replset
   - integration_tests_replset_ssl_auth
   - integration_tests_sharded
+
+- <<: *compile_task_group_template
+  name: scons_compile_smoke_test_TG
+  tasks:
+  - scons_dev_compile_smoke_test
+
+- <<: *compile_task_group_template
+  name: ninja_compile_smoke_test_TG
+  tasks:
+  - ninja_dev_compile_smoke_test
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
