@@ -272,8 +272,7 @@ void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const Use
         // Reset _ssmUserName since we have found a conflict.
         auto ssmUserName = std::exchange(_ssmUserName, {});
         auto event = audit::AuthenticateEvent(auth::kSaslSupportedMechanisms,
-                                              ssmUserName.getDB(),
-                                              ssmUserName.getUser(),
+                                              ssmUserName,
                                               makeAppender(_mech.get()),
                                               ErrorCodes::AuthenticationAbandoned);
         audit::logAuthentication(_client, event);
@@ -350,11 +349,8 @@ void AuthenticationSession::markSuccessful() {
         _mechCounter->incSpeculativeAuthenticateSuccessful();
     }
 
-    auto event = audit::AuthenticateEvent(_mechName,
-                                          _userName.getDB(),
-                                          _userName.getUser(),
-                                          makeAppender(_mech.get()),
-                                          ErrorCodes::OK);
+    auto event =
+        audit::AuthenticateEvent(_mechName, _userName, makeAppender(_mech.get()), ErrorCodes::OK);
     audit::logAuthentication(_client, event);
 
     BSONObj metrics = _metricsRecorder.capture();
@@ -383,11 +379,8 @@ void AuthenticationSession::markFailed(const Status& status) {
     _finish();
 
     if (!_isSpeculative) {
-        auto event = audit::AuthenticateEvent(_mechName,
-                                              _userName.getDB(),
-                                              _userName.getUser(),
-                                              makeAppender(_mech.get()),
-                                              status.code());
+        auto event = audit::AuthenticateEvent(
+            _mechName, _userName, makeAppender(_mech.get()), status.code());
         audit::logAuthentication(_client, event);
     }
 
