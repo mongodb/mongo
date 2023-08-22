@@ -1610,7 +1610,7 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
     // present, then $changeStream should immediately return an empty cursor just as other
     // aggregations do when the database does not exist.
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    if (shardIds.empty()) {
+    if (shardIds.empty() && !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 
@@ -1794,7 +1794,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
             LiteParsedPipeline liteParsedPipeline{aggRequest};
             const bool hasChangeStream = liteParsedPipeline.hasChangeStream();
-            boost::optional<CollectionRoutingInfo> targetingCri{cri};
+            // CRI, provided by CollectionRouter, contains the latest data. We call
+            // getCollectionRoutingInfoForTargeting to get CRI with historical data for transactions
+            // with snapshot isolations.
+            auto targetingCri = getCollectionRoutingInfoForTargeting(expCtx, hasChangeStream);
             TargetingResults targeting = targetPipeline(expCtx,
                                                         pipeline.get(),
                                                         hasChangeStream,
