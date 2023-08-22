@@ -48,8 +48,8 @@ LOGGER_NAME = 'checkout-idl'
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
-def get_release_tags() -> List[str]:
-    """Get a list of release git tags since API Version 1 was introduced."""
+def get_tags() -> List[str]:
+    """Get a list of git tags that the IDL compatibility script should check against."""
 
     def gen_versions_and_tags():
         for tag in check_output(['git', 'tag']).decode().split():
@@ -63,45 +63,51 @@ def get_release_tags() -> List[str]:
                 # Not a release tag.
                 pass
 
-    def gen_release_tags():
-        """Get the latest released tag for LATEST, LAST_CONTINUOUS and LAST_LTS versions."""
+    def gen_tags():
+        """
+        Get the latest released tag for LATEST, LAST_CONTINUOUS and LAST_LTS versions.
 
-        base_versions = [Version(x) for x in [LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV]]
-        min_version = None
-        max_version = None
+        If the version is not yet released, get the latest unreleased tag for that version.
+        """
 
+        fcvs = [Version(x) for x in [LAST_LTS_FCV, LAST_CONTINUOUS_FCV, LATEST_FCV]]
+        # Remove duplicates from our generic FCVs list. The potential duplicates are when last
+        # LTS is the same as last continuous.
+        fcvs = [*set(fcvs)]
+
+        # Initialize a results dict that points each FCV to a tuple of
+        # (candidate_tag, is_prerelease_version).
+        results = {fcv: (None, True) for fcv in fcvs}
+
+        # For each generic FCV, this algorithm fetches the latest released tag for that version. If
+        # there are no released versions for a FCV, this algorithm fetches the tag for the latest
+        # unreleased version.
         for version, tag in sorted(gen_versions_and_tags(), reverse=True):
-            if version.is_prerelease:
-                continue
+            major_minor_version = Version(f"{version.major}.{version.minor}")
+            if major_minor_version in results:
+                candidate_tag, candidate_is_prerelease_version = results[major_minor_version]
+                if candidate_tag is None:
+                    # This is the first tag we have seen for this version. Set our first
+                    # candidate tag and if this tag is a prerelease version.
+                    results[major_minor_version] = (tag, version.is_prerelease)
+                elif candidate_is_prerelease_version and not version.is_prerelease:
+                    # This version is the first released version we have seen and our previous
+                    # candidate tag is not a released version. Set the tag to point to this
+                    # version instead.
+                    results[major_minor_version] = (tag, version.is_prerelease)
 
-            while min_version is None or version < min_version:
-                # If we encounter a version smaller than the current min,
-                # replace the current min with FCV of the next reachable version.
-                #
-                # e.g. if we are looking for latest release of LAST_CONTINUOS_FCV (6.2.x
-                # and we encounter (6.1.13), update min/max version to match
-                # the latest release of LAST_LTS_FCV (6.0.x).
-
-                if not len(base_versions) > 0:
-                    return
-                min_version = base_versions.pop()
-                max_version = Version("{}.{}".format(min_version.major, min_version.minor + 1))
-
-            if version >= max_version:
-                continue
-
+        for tag, _ in results.values():
             yield tag
-            min_version = None
 
-    return list(gen_release_tags())
+    return list(gen_tags())
 
 
-def make_idl_directories(release_tags: List[str], destination: str) -> None:
-    """For each release, construct a source tree containing only its IDL files."""
+def make_idl_directories(tags: List[str], destination: str) -> None:
+    """For each tag, construct a source tree containing only its IDL files."""
     LOGGER.info("Clearing destination directory '%s'", destination)
     shutil.rmtree(destination, ignore_errors=True)
 
-    for tag in release_tags:
+    for tag in tags:
         LOGGER.info("Checking out IDL files in %s", tag)
         directory = os.path.join(destination, tag)
         for path in check_output(['git', 'ls-tree', '--name-only', '-r', tag]).decode().split():
@@ -126,8 +132,9 @@ def main():
     logging.basicConfig(level=logging.WARNING)
     logging.getLogger(LOGGER_NAME).setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    tags = get_release_tags()
-    LOGGER.debug("Fetching IDL files for %s past releases", len(tags))
+    tags = get_tags()
+    LOGGER.info("Fetching IDL files for past tags: %s", tags)
+    assert len(tags) >= 2, "we must always have at least two tags to check"
     make_idl_directories(tags, args.destination)
 
 
