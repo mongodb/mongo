@@ -304,7 +304,9 @@ variables:
   - enterprise-amazon2
   - enterprise-amazon2-arm64
   - enterprise-amazon2023
+  - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
+  - enterprise-amazon2023-arm64-lto
   - enterprise-debian10-64
   - enterprise-debian11-64
   - enterprise-linux-64-amazon-ami
@@ -351,7 +353,9 @@ variables:
   - enterprise-rhel-90-arm64
   - enterprise-amazon2-arm64
   - enterprise-amazon2023
+  - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
+  - enterprise-amazon2023-arm64-lto
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu2004-64
   - enterprise-ubuntu2204-64
@@ -750,6 +754,14 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/functions/added_and_modified_patch_files_get.sh"
+
+  "umount tmp directory":
+  - *f_expansions_write
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/functions/tmp_directory_umount.sh"
 
   "determine resmoke jobs": &determine_resmoke_jobs
     command: subprocess.exec
@@ -2386,6 +2398,7 @@ post:
 - func: "save system resource information"
 - func: "save UndoDB recordings"
 - func: "umount shared scons directory"
+- func: "umount tmp directory"
 - func: "cleanup FUSE watchdog"
 - func: "cleanup environment"
 - func: "cleanup jepsen docker test"
@@ -8400,6 +8413,19 @@ task_groups:
   - archive_dbtest
   - compile_all_but_not_unittests
   - package
+
+# TODO: SERVER-79886 Fix commented out tasks
+- <<: *compile_task_group_template
+  name: compile_test_and_package_serial_lto_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  # - run_dbtest
+  # - archive_dbtest
+  # - compile_all_but_not_unittests
+  # - package
 
 # SERVER-76006
 # This is a compile stream meant for non-cached and/or underpowered systems.

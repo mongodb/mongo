@@ -4653,6 +4653,17 @@ def doConfigure(myenv):
 
             if myenv.TargetOSIs('darwin'):
                 myenv.AddToLINKFLAGSIfSupported('-Wl,-object_path_lto,${TARGET}.lto')
+            else:
+                # According to intel benchmarks -fno-plt increases perf
+                # See PM-2215
+                if linker_ld != "gold":
+                    myenv.ConfError("lto compilation currently only works with the --linker=gold")
+                if link_model != "object":
+                    myenv.ConfError(
+                        "lto compilation currently only works with the --link-model=object")
+                if not myenv.AddToCCFLAGSIfSupported('-fno-plt') or \
+                    not myenv.AddToLINKFLAGSIfSupported('-fno-plt'):
+                    myenv.ConfError("-fno-plt is not supported by the compiler")
 
         else:
             myenv.ConfError("Don't know how to enable --lto on current toolchain")
