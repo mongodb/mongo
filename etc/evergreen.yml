@@ -147,6 +147,8 @@ variables:
     LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
+- ubsan_options: &ubsan_options UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
 - &enterprise-windows-nopush-template
@@ -2043,7 +2045,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    san_options: *aubsan_options
+    san_options: *ubsan_options
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
       --dbg=on
@@ -2085,7 +2087,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    san_options: *aubsan_options
+    san_options: *ubsan_options
     compile_variant: *rhel80-debug-ubsan-classic-engine
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
