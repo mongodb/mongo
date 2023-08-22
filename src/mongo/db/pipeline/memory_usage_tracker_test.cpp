@@ -91,20 +91,19 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-// TODO SERVER-80149: Re-enable these tests.
-// DEATH_TEST_F(MemoryUsageTrackerTest,
-//              UpdateFunctionUsageToNegativeIsDisallowed,
-//              "Underflow in memory tracking") {
-//     _funcTracker.set(50LL);
-//     _funcTracker.update(-100LL);
-// }
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateFunctionUsageToNegativeIsDisallowed,
+             "Underflow in memory tracking") {
+    _funcTracker.set(50LL);
+    _funcTracker.update(-100LL);
+}
 
-// DEATH_TEST_F(MemoryUsageTrackerTest,
-//              UpdateMemUsageToNegativeIsDisallowed,
-//              "Underflow in memory tracking") {
-//     _tracker.update(50LL);
-//     _tracker.update(-100LL);
-// }
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateMemUsageToNegativeIsDisallowed,
+             "Underflow in memory tracking") {
+    _tracker.update(50LL);
+    _tracker.update(-100LL);
+}
 
 TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
     {
