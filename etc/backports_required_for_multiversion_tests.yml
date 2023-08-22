@@ -443,6 +443,8 @@ last-continuous:
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-77506
+  - test_file: jstests/core/query/elemmatch/elemmatch_ne.js
+    ticket: SERVER-78260
   suites: null
 
 last-lts:
@@ -981,4 +983,6 @@ last-lts:
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-77506
+  - test_file: jstests/core/query/elemmatch/elemmatch_ne.js
+    ticket: SERVER-78260
   suites: null

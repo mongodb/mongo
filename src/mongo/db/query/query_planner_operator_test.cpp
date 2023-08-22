@@ -402,34 +402,6 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
         "bounds: {'x': [['MinKey', undefined, true, false], [null, 'MaxKey',false,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyAboveElemMatch) {
-    auto keyPattern = BSON("a.b.c.d" << 1);
-    IndexEntry ind(keyPattern,
-                   IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                   IndexDescriptor::kLatestIndexVersion,
-                   true,
-                   {},
-                   {},
-                   true,
-                   false,
-                   IndexEntry::Identifier{"ind"},
-                   nullptr,  // filterExpr
-                   BSONObj(),
-                   nullptr,
-                   nullptr);
-    ind.multikeyPaths = {{0U, 1U}};
-    addIndex(ind);
-
-    runQuery(fromjson("{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}"));
-
-    assertNumSolutions(2U);
-    assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1},"
-        "bounds: {'a.b.c.d': [['MinKey', undefined, true, false], [null, 'MaxKey',false,true]]"
-        "}}}}}");
-}
-
 TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
     // "a.b.c" being multikey will prevent us from using the index since $elemMatch doesn't do
     // implicit array traversal.
