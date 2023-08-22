@@ -3265,10 +3265,11 @@ tasks:
         vars:
           SPINLOCK_TYPE: -DSPINLOCK_TYPE=gcc
       - func: "make check all"
+      - func: "unit test"
       - func: "format test"
         vars:
           times: 3
-      - func: "unit test"
+          extra_args: runs.rows=1000000:2500000
 
   - name: spinlock-pthread-adaptive-test
     commands:
@@ -3277,10 +3278,11 @@ tasks:
         vars:
           SPINLOCK_TYPE: -DSPINLOCK_TYPE=pthread_adaptive
       - func: "make check all"
+      - func: "unit test"
       - func: "format test"
         vars:
           times: 3
-      - func: "unit test"
+          extra_args: runs.rows=1000000:2500000
 
   - name: wtperf-test
     depends_on:
