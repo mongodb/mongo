@@ -456,8 +456,7 @@ functions:
         # them and not run all of them, since activating all tasks is the default behavior for task
         # generation in a patch.
         script: |
-          if [[ "${is_patch}" == "true" ]] 
-          then
+          if [ "${is_patch|false}" = "true" ]; then
             ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --no-activate
           else
             ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml
