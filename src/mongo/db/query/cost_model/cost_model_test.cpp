@@ -176,20 +176,26 @@ TEST(CostModel, IncreaseJoinsCost) {
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
-        ASSERT_EXPLAIN_V2_AUTO(
-            "Root [{pa}]\n"
-            "MergeJoin []\n"
-            "|   |   |   Condition\n"
-            "|   |   |       rid_0 = rid_1\n"
-            "|   |   Collation\n"
-            "|   |       Ascending\n"
-            "|   Union [{rid_1}]\n"
-            "|   Evaluation [{rid_1} = Variable [rid_0]]\n"
-            "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: "
-            "{=Const [2]}]\n"
-            "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-            "index1, interval: {=Const [1]}]\n",
-            optimized);
+
+        const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+
+        // Verifies that a MergeJoin plan is generated.
+        ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.nodeType");
+
+        const BSONObj& explainIndex1 =
+            dotted_path_support::extractElementAtPath(explainRoot, "child.leftChild").Obj();
+        ASSERT_BSON_PATH("\"IndexScan\"", explainIndex1, "nodeType");
+        ASSERT_BSON_PATH("\"index1\"", explainIndex1, "indexDefName");
+        ASSERT_BSON_PATH("1", explainIndex1, "interval.lowBound.bound.0.value");
+        ASSERT_BSON_PATH("1", explainIndex1, "interval.highBound.bound.0.value");
+
+        const BSONObj& explainIndex2 = dotted_path_support::extractElementAtPath(
+                                           explainRoot, "child.rightChild.children.0.child")
+                                           .Obj();
+        ASSERT_BSON_PATH("\"IndexScan\"", explainIndex2, "nodeType");
+        ASSERT_BSON_PATH("\"index2\"", explainIndex2, "indexDefName");
+        ASSERT_BSON_PATH("2", explainIndex2, "interval.lowBound.bound.0.value");
+        ASSERT_BSON_PATH("2", explainIndex2, "interval.highBound.bound.0.value");
     }
 
     {

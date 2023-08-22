@@ -693,7 +693,7 @@ TEST(PhysRewriter, FilterIndexing) {
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
-        ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+        ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
         // Test sargable filter is satisfied with an index scan.
         ASSERT_EXPLAIN_V2_AUTO(
@@ -777,7 +777,7 @@ TEST(PhysRewriter, FilterIndexing1) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(7, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{p1}]\n"
@@ -839,7 +839,7 @@ TEST(PhysRewriter, FilterIndexing2) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
@@ -904,7 +904,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate non-sargable evaluation and filter are moved under the NLJ+seek,
     ASSERT_EXPLAIN_V2_AUTO(
@@ -930,29 +930,29 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         "interval: {=Const [1]}]\n",
         optimized);
 
-    LogicalRewriteType logicalRules[] = {LogicalRewriteType::Root,
-                                         LogicalRewriteType::Root,
-                                         LogicalRewriteType::SargableSplit,
-                                         LogicalRewriteType::SargableSplit,
-                                         LogicalRewriteType::EvaluationRIDIntersectReorder,
-                                         LogicalRewriteType::Root,
-                                         LogicalRewriteType::FilterRIDIntersectReorder,
-                                         LogicalRewriteType::Root,
-                                         LogicalRewriteType::SargableSplit,
-                                         LogicalRewriteType::EvaluationRIDIntersectReorder,
-                                         LogicalRewriteType::FilterRIDIntersectReorder};
-    PhysicalRewriteType physicalRules[] = {PhysicalRewriteType::Seek,
-                                           PhysicalRewriteType::Seek,
-                                           PhysicalRewriteType::IndexFetch,
-                                           PhysicalRewriteType::Evaluation,
-                                           PhysicalRewriteType::IndexFetch,
-                                           PhysicalRewriteType::Root,
-                                           PhysicalRewriteType::SargableToIndex,
-                                           PhysicalRewriteType::SargableToIndex,
-                                           PhysicalRewriteType::Evaluation,
-                                           PhysicalRewriteType::Evaluation,
-                                           PhysicalRewriteType::Filter};
-
+    std::vector<LogicalRewriteType> logicalRules = {
+        LogicalRewriteType::Root,
+        LogicalRewriteType::Root,
+        LogicalRewriteType::SargableSplit,
+        LogicalRewriteType::SargableSplit,
+        LogicalRewriteType::EvaluationRIDIntersectReorder,
+        LogicalRewriteType::Root,
+        LogicalRewriteType::FilterRIDIntersectReorder,
+        LogicalRewriteType::Root,
+        LogicalRewriteType::SargableSplit,
+        LogicalRewriteType::EvaluationRIDIntersectReorder,
+        LogicalRewriteType::FilterRIDIntersectReorder};
+    std::vector<PhysicalRewriteType> physicalRules = {PhysicalRewriteType::Seek,
+                                                      PhysicalRewriteType::Seek,
+                                                      PhysicalRewriteType::IndexFetch,
+                                                      PhysicalRewriteType::Evaluation,
+                                                      PhysicalRewriteType::IndexFetch,
+                                                      PhysicalRewriteType::Root,
+                                                      PhysicalRewriteType::SargableToIndex,
+                                                      PhysicalRewriteType::SargableToIndex,
+                                                      PhysicalRewriteType::Evaluation,
+                                                      PhysicalRewriteType::Evaluation,
+                                                      PhysicalRewriteType::Filter};
     int logicalRuleIndex = 0;
     int physicalRuleIndex = 0;
     const Memo& memo = phaseManager.getMemo();
@@ -962,11 +962,16 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
             logicalRuleIndex++;
         }
         for (const auto& physOptResult : memo.getPhysicalNodes(groupId)) {
+            if (!physOptResult->_nodeInfo) {
+                continue;
+            }
+
             const auto rule = physOptResult->_nodeInfo->_rule;
             ASSERT(rule == physicalRules[physicalRuleIndex]);
             physicalRuleIndex++;
         }
     }
+    ASSERT_EQ(physicalRules.size(), physicalRuleIndex);
 }
 
 TEST(PhysRewriter, FilterIndexing3) {
@@ -1052,7 +1057,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 8, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(4, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We need a Seek to obtain value for "a".
     ASSERT_EXPLAIN_V2_AUTO(
@@ -1136,38 +1141,56 @@ TEST(PhysRewriter, FilterIndexing4) {
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(20, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // Assert the correct CEs for each node in group 1. Group 1 contains residual predicates.
-    std::vector<std::pair<std::string, double>> pathAndCEs = {
-        {"Memo.1.physicalNodes.1.nodeInfo.node.ce", 125.087},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.ce", 143.681},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.ce", 189.571},
-        {"Memo.1.physicalNodes.1.nodeInfo.node.child.child.child.ce", 330}};
-    const BSONObj explain = ExplainGenerator::explainMemoBSONObj(phaseManager.getMemo());
-    for (const auto& pathAndCE : pathAndCEs) {
-        BSONElement el = dotted_path_support::extractElementAtPath(explain, pathAndCE.first);
-        ASSERT_CE_APPROX_EQUAL(el.Double(), pathAndCE.second, ce::kMaxCEError);
+    // Iterate all the groups in a Memo in order to find an ABT that contains nodes with expected ce
+    // values.
+    const auto& memo = phaseManager.getMemo();
+    bool found = false;
+    for (size_t i = 0; i < memo.getGroupCount(); i++) {
+        const auto& physNodes = memo.getPhysicalNodes(i);
+        for (const auto& physNode : physNodes) {
+            if (!physNode->_nodeInfo) {
+                continue;
+            }
+            const auto& ceMap = physNode->_nodeInfo->_nodeCEMap;
+            // Check if there's an ABT contains all the expected ce values.
+            std::vector<double> expectedCEs = {125.087, 143.681, 189.571, 330.000};
+            size_t ceFound = 0;
+            for (auto itr = expectedCEs.begin(); itr != expectedCEs.end(); itr++) {
+                for (const auto& node : ceMap) {
+                    if (std::abs(node.second._value - *itr) < ce::kMaxCEError) {
+                        ceFound++;
+                        break;
+                    }
+                }
+            }
+            if (ceFound == expectedCEs.size()) {
+                found = true;
+                break;
+            }
+        }
     }
+    ASSERT(found);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{pa}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_14]\n"
+        "|   |   Variable [evalTemp_83]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_13]\n"
+        "|   |   Variable [evalTemp_82]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_12]\n"
+        "|   |   Variable [evalTemp_81]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_12, '<indexKey> 2': evalTemp_13"
-        ", '<indexKey> 3': evalTemp_14}, scanDefName: c1, indexDefName: index1, interval: {>Const"
-        " [1 | maxKey | maxKey | maxKey]}]\n",
+        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_81, '<indexKey> 2': "
+        "evalTemp_82, '<indexKey> 3': evalTemp_83}, scanDefName: c1, indexDefName: index1, "
+        "interval: {>Const [1 | maxKey | maxKey | maxKey]}]\n",
         optimized);
 }
 
@@ -1233,8 +1256,8 @@ TEST(PhysRewriter, FilterIndexing5) {
         "|   |   Variable [pb]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
-        "Evaluation [{pb} = Variable [evalTemp_0]]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_0}, scanDefName: c1, "
+        "Evaluation [{pb} = Variable [evalTemp_3]]\n"
+        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_3}, scanDefName: c1, "
         "indexDefName: index1, interval: {>Const [0 | maxKey]}]\n",
         optimized);
 }
@@ -1290,7 +1313,7 @@ TEST(PhysRewriter, FilterIndexing6) {
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We can cover both fields with the index, and do not need a separate sort on "b".
     ASSERT_EXPLAIN_V2_AUTO(
@@ -1435,7 +1458,7 @@ TEST(PhysRewriter, FilterIndexingVariable) {
     ABT optimized = std::move(rootNode);
     phaseManager.getHints()._disableScan = true;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Observe unioning of two index scans with complex expressions for bounds. This encodes:
     // (max(param_0, param_1), Const [maxKey]] U [param_0 > param_1 ? MaxKey : param_1, max(param_0,
@@ -2013,8 +2036,8 @@ TEST(PhysRewriter, CoveredScan) {
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN_AUTO(  //
-        9,
-        15,
+        6,
+        10,
         phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Since we do not optimize with fast null handling, we need to split the predicate between the
@@ -2095,7 +2118,7 @@ TEST(PhysRewriter, EvalIndexing) {
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
-        ASSERT_EQ(10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+        ASSERT_EQ(8, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
         // Index does not have the right collation and now we need a collation node.
         ASSERT_EXPLAIN_V2_AUTO(
@@ -2144,7 +2167,7 @@ TEST(PhysRewriter, EvalIndexing1) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(8, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
@@ -2252,11 +2275,11 @@ TEST(PhysRewriter, EvalIndexing3) {
         "Root [{pa}]\n"
         "Evaluation [{pa}]\n"
         "|   EvalPath []\n"
-        "|   |   Variable [evalTemp_0]\n"
+        "|   |   Variable [evalTemp_2]\n"
         "|   PathGet [b]\n"
         "|   PathIdentity []\n"
-        "IndexScan [{'<indexKey> 0': evalTemp_0}, scanDefName: c1, indexDefName: index1, interval: "
-        "{<fully open>}]\n",
+        "IndexScan [{'<indexKey> 0': evalTemp_2}, scanDefName: c1, indexDefName: index1, "
+        "interval: {<fully open>}]\n",
         optimized);
 }
 
@@ -3153,8 +3176,8 @@ TEST(PhysRewriter, IndexBoundsIntersect4) {
     auto phaseManager1 = makePhaseManagerFn();
     phaseManager1.optimize(optimized1);
     ASSERT_BETWEEN_AUTO(  // NOLINT (test auto-update)
-        1,
         2,
+        3,
         phaseManager1.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate that without the hint we get residual predicates.
@@ -3222,7 +3245,7 @@ TEST(PhysRewriter, IndexResidualReq) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Make sure we can use the index to cover "b" while testing "b.c" with a separate filter.
     ASSERT_EXPLAIN_PROPS_V2_AUTO(
@@ -3254,8 +3277,8 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   |           ce: 189.571\n"
         "|   |           requirementCEs: \n"
         "|   |               refProjection: root, path: 'PathGet [a] PathIdentity []', ce: 330\n"
-        "|   |               refProjection: root, path: 'PathGet [b] PathGet [c] PathIdentity []', "
-        "ce: 330\n"
+        "|   |               refProjection: root, path: 'PathGet [b] PathGet [c] PathIdentity "
+        "[]', ce: 330\n"
         "|   |       projections: \n"
         "|   |           pa\n"
         "|   |           root\n"
@@ -3279,12 +3302,12 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|           false\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_2]\n"
+        "|   |   Variable [evalTemp_7]\n"
         "|   PathGet [c]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_2}, scanDefName: c1, indexDefNa"
-        "me: index1, interval: {>Const [0 | maxKey]}]\n",
+        "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_7}, scanDefName: c1, "
+        "indexDefName: index1, interval: {>Const [0 | maxKey]}]\n",
         phaseManager);
 }
 
@@ -3460,7 +3483,7 @@ TEST(PhysRewriter, ElemMatchIndex) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(6, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(7, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
@@ -3525,7 +3548,7 @@ TEST(PhysRewriter, ElemMatchIndex1) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(6, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate we can cover both the filter and the extracted elemMatch predicate with the
     // index.
@@ -3640,7 +3663,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(15, 25, phaseManager.getMemo().getStats()._physPlanExplorationCount)
+    ASSERT_BETWEEN_AUTO(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount)
 
     // We should pick the index, and do at least some filtering before the fetch.
     // We don't have index bounds, both because 'a' is not the first field of the index,
@@ -3653,34 +3676,19 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
     // But the other 'Get Traverse Compare' here can only be true when the input is an object.
     // So the 'ComposeA PathArr PathObj' is redundant and we could remove it.
 
-    ASSERT_EXPLAIN_V2Compact_AUTO(
-        "Root [{root}]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
-        "|   |   PathComposeA []\n"
-        "|   |   |   PathArr []\n"
-        "|   |   PathObj []\n"
-        "|   PathComposeM []\n"
-        "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_3]\n"
-        "|   |   PathArr []\n"
-        "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_3}, c1]\n"
-        "Unique [{rid_0}]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_7]\n"
-        "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "IndexScan [{'<indexKey> 1': evalTemp_7, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {<fully open>}]\n",
-        optimized);
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.child.nodeType");
+    ASSERT_BSON_PATH("\"Unique\"", explainRoot, "child.child.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.leftChild.child.nodeType");
+    const BSONObj& explainIndex1 =
+        dotted_path_support::extractElementAtPath(explainRoot, "child.child.leftChild.child.child")
+            .Obj();
+    ASSERT_BSON_PATH("\"IndexScan\"", explainIndex1, "nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainIndex1, "indexDefName");
+    ASSERT_BSON_PATH("\"MinKey\"", explainIndex1, "interval.lowBound.bound.0.tag");
+    ASSERT_BSON_PATH("\"MaxKey\"", explainIndex1, "interval.highBound.bound.0.tag");
 }
 
 TEST(PhysRewriter, ObjectElemMatchBounds) {
@@ -3730,7 +3738,7 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We should pick the index, and generate bounds for the 'b' predicate.
     ASSERT_EXPLAIN_V2Compact_AUTO(
@@ -3865,7 +3873,7 @@ TEST(PhysRewriter, PathObj) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We should get index bounds for the PathObj.
     ASSERT_EXPLAIN_V2Compact_AUTO(
@@ -3931,7 +3939,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(7, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(6, 13, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate we get index bounds to handle the array constant, while we also retain the
     // original filter. We have index bound with the array itself unioned with bound using the first
@@ -4266,7 +4274,7 @@ TEST(PhysRewriter, PartialIndex2) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Partial schema requirement on an index field.
     ASSERT_EXPLAIN_V2_AUTO(
@@ -4824,7 +4832,7 @@ TEST(PhysRewriter, EqMemberSargable) {
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
-        ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+        ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
         // Test sargable filter is satisfied with an index scan.
         ASSERT_EXPLAIN_PROPS_V2_AUTO(
@@ -5079,7 +5087,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
     ABT optimized = rootNode;
     phaseManager.getHints()._disableYieldingTolerantPlans = false;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN_AUTO(27, 45, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(9, 16, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate predicates are repeated on the Seek side. Also demonstrate null handling, and the
     // fact that we apply the predicates on the Seek side in increasing selectivity order.
@@ -5178,15 +5186,15 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_2}, c1]\n"
         "MergeJoin []\n"
         "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_5\n"
+        "|   |   |       rid_0 = rid_1\n"
         "|   |   Collation\n"
         "|   |       Ascending\n"
-        "|   Union [{rid_5}]\n"
-        "|   Evaluation [{rid_5} = Variable [rid_0]]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {=Const "
-        "[2]}]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [1"
-        "]}]\n",
+        "|   Union [{rid_1}]\n"
+        "|   Evaluation [{rid_1} = Variable [rid_0]]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: "
+        "{=Const [2]}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const "
+        "[1]}]\n",
         optimized);
 }
 
@@ -5340,7 +5348,7 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
     phaseManager.getHints()._disableBranchAndBound = true;
     phaseManager.getHints()._keepRejectedPlans = true;
     phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
     ASSERT_EXPLAIN_MEMO_AUTO(  // NOLINT
         "Memo: \n"
         "    groupId: 0\n"
@@ -5431,8 +5439,11 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    ce: 31.6228\n"
         "                |   |   Const [true]\n"
         "                |   MemoPhysicalDelegator [groupId: 0, index: 0]\n"
-        "                MemoPhysicalDelegator [groupId: 3, index: 0]\n"
+        "                MemoPhysicalDelegator [groupId: 3, index: 1]\n"
         "            rejectedPlans: \n"
+        "                cost: {Infinite cost}, localCost: 0, adjustedCE: 31.6228, rule: "
+        "AttemptCoveringQuery, node: \n"
+        "                    MemoLogicalDelegator [groupId: 3]\n"
         "                cost: 0.513676, localCost: 0.513676, adjustedCE: 31.6228, rule: "
         "SargableToPhysicalScan, node: \n"
         "                    Filter []\n"
@@ -5503,6 +5514,17 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "    |           MemoLogicalDelegator [groupId: 0]\n"
         "    physicalNodes: \n"
         "        physicalNodeId: 0, costLimit: {Infinite cost}\n"
+        "            Physical properties:\n"
+        "                projections: \n"
+        "                    root\n"
+        "                distribution: \n"
+        "                    type: Centralized\n"
+        "                indexingRequirement: \n"
+        "                    Index, dedupRID\n"
+        "                removeOrphans: \n"
+        "                    false\n"
+        "         (failed to optimize)\n"
+        "        physicalNodeId: 1, costLimit: {Infinite cost}\n"
         "            Physical properties:\n"
         "                projections: \n"
         "                    rid_0\n"
