@@ -111,23 +111,32 @@ const testColl = testDb.getCollection(kCollName);
         adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kTenant}));
     assert.eq(2, dbs.databases.length, tojson(dbs));
     // The 'admin' database is not expected because we do not create a tenant user in this test.
-    const expectedDbs = featureFlagRequireTenantId
-        ? [kDbName, kOtherDbName]
-        : [kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
-    assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)), tojson(dbs));
+    const expectedTenantDbs = [kDbName, kOtherDbName];
+    assert(arrayEq(expectedTenantDbs, dbs.databases.map(db => db.name)), tojson(dbs));
 
     // These databases should not be accessed with a different tenant.
     const dbsWithDiffTenant = assert.commandWorked(
         adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kOtherTenant}));
     assert.eq(0, dbsWithDiffTenant.databases.length, tojson(dbsWithDiffTenant));
 
+    // List all databases without $tenant. The tenant prefix is expected in response.
     const allDbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
-    expectedDbs.push("admin");
-    expectedDbs.push("config");
-    expectedDbs.push("local");
+    const expectedAllDbs =
+        [kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName, "admin", "config", "local"];
 
-    assert.eq(5, allDbs.databases.length, tojson(allDbs));
-    assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)), tojson(allDbs));
+    assert.eq(expectedAllDbs.length, allDbs.databases.length);
+    assert(arrayEq(expectedAllDbs, allDbs.databases.map(db => db.name)), tojson(allDbs));
+
+    // List all databases with tenant perfix filter. The tenant prefix is expected in response.
+    const dbsWithTenantFilter = assert.commandWorked(adminDb.runCommand(
+        {listDatabases: 1, nameOnly: true, filter: {"name": new RegExp("(^" + kTenant + ")")}}));
+    const expectedDbsWithTenantFilter = [kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
+
+    assert.eq(expectedDbsWithTenantFilter.length,
+              dbsWithTenantFilter.databases.length,
+              tojson(dbsWithTenantFilter));
+    assert(arrayEq(expectedDbsWithTenantFilter, dbsWithTenantFilter.databases.map(db => db.name)),
+           tojson(dbsWithTenantFilter));
 }
 
 // Test insert, agg, find, getMore, and explain commands.
@@ -407,7 +416,6 @@ const testColl = testDb.getCollection(kCollName);
         "collMod": kCollName,
         "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
     });
-
     assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
 
     // Modify the index with the tenantId
