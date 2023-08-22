@@ -16,28 +16,24 @@
  * ]
  */
 
-import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 (function() {
 "use strict";
 
 const coll = db.bucket_unpack_group_reorder_fixed_buckets;
 const timeField = "time";
-const controlMax = "control.max";
-const controlMin = "control.min";
 const accField = "b";
 const metaField = "mt";
 
-function checkResults(
-    {pipeline, checkExplain = true, rewriteOccur = true, expectedDocs, validateFullExplain}) {
-    // Only check the explain output if SBE is not enabled. SBE changes the explain output.
-    if (!checkSBEEnabled(db, ["featureFlagTimeSeriesInSbe"])) {
-        if (rewriteOccur && checkExplain) {
-            checkExplainForRewrite(pipeline);
-        } else if (checkExplain) {
-            checkExplainForNoRewrite(pipeline, validateFullExplain);
-        }
+function checkResults({
+    pipeline,
+    expectedDocs,
+    checkExplain = true,
+    rewriteExpected = true,
+}) {
+    if (checkExplain) {
+        validateExplain(pipeline, rewriteExpected);
     }
     let results = coll.aggregate(pipeline).toArray();
     if (expectedDocs) {
@@ -52,47 +48,13 @@ function checkResults(
             results);
 }
 
-function checkExplainForRewrite(pipeline) {
-    const explain =
-        getExplainedPipelineFromAggregation(db, coll, pipeline, {inhibitOptimization: false});
-    assert.eq(explain.length, 1, tojson(explain));
-    const groupStage = explain[0]["$group"];
-    assert(groupStage, "Expected group stage, but received: " + tojson(explain));
-    // Validate the "date" field in $dateTrunc was rewritten.
-    const dateField = groupStage["_id"]["t"]["$dateTrunc"]["date"];
-    assert.eq(dateField,
-              `$${controlMin}.${timeField}`,
-              "Expected date field to be rewritten, but received: " + groupStage);
-    // Validate the accumulators were rewritten.
-    assert.eq(groupStage["accmin"]["$min"], `$${controlMin}.${accField}`);
-    assert.eq(groupStage["accmax"]["$max"], `$${controlMax}.${accField}`);
-    // The unit test validates the entire rewrite of the $count accumulator, we will just validate
-    // part of the rewrite (that a $cond expression exists).
-    if (groupStage["count"]) {
-        assert(groupStage["count"]["$sum"]["$cond"]);
-    }
-}
-
-function checkExplainForNoRewrite(pipeline, validateFullExplain) {
-    const explain =
-        getExplainedPipelineFromAggregation(db, coll, pipeline, {inhibitOptimization: false});
-    assert.eq(explain.length, 2, tojson(explain));
-    const unpackStage = explain[0]["$_internalUnpackBucket"];
-    assert(unpackStage, tojson(explain));
-    const groupStage = explain[1]["$group"];
-    assert(groupStage, tojson(explain));
-    if (validateFullExplain) {
-        // If we passed in an explain object, we wanted to validate the entire explain output.
-        assert.docEq(groupStage, validateFullExplain, tojson(explain));
-    } else {
-        // If not, we can just validate the "date" field and accumulators were not rewritten.
-        const dateField = groupStage["_id"]["t"]["$dateTrunc"]["date"];
-        assert.eq(dateField,
-                  `$${timeField}`,
-                  "Expected date field to not be rewritten, but received: " + groupStage);
-        assert.eq(groupStage["accmin"]["$min"], `$${accField}`);
-        assert.eq(groupStage["accmax"]["$max"], `$${accField}`);
-    }
+function validateExplain(pipeline, rewriteExpected) {
+    // Since we have unit tests that validate the specific output of the rewrite, we can just
+    // validate if the rewrite occurred or not.
+    const explain = coll.explain().aggregate(pipeline);
+    const unpack = getAggPlanStages(explain, "$_internalUnpackBucket");
+    const expectedStageCount = rewriteExpected ? 0 : 1;
+    assert.eq(unpack.length, expectedStageCount);
 }
 
 let b, times = [];
@@ -269,7 +231,7 @@ checkResults({
         }
     }],
     expectedDocs: [{_id: {t: ISODate("2022-09-29T18:15:00Z")}, accmin: b[1], accmax: b[6]}],
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // The $dateTrunc expression doesn't align with bucket boundaries.
@@ -290,7 +252,7 @@ checkResults({
         {_id: {t: times[5]}, accmin: b[5], accmax: b[5]},
         {_id: {t: times[6]}, accmin: b[6], accmax: b[6]}
     ],
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // The $dateTrunc expression is not on the timeField.
@@ -303,12 +265,7 @@ checkResults({
         }
     }],
     expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7, accmin: 1}],
-    validateFullExplain: {
-        _id: {t: {$dateTrunc: {date: "$otherTime", unit: {"$const": "day"}}}},
-        accmax: {$max: `$${accField}`},
-        accmin: {$min: `$${accField}`},
-    },
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // There are other expressions in the '_id' field that are not on the meta nor time fields.
@@ -320,11 +277,7 @@ checkResults({
         }
     }],
     expectedDocs: [{_id: {"m": "MDB", t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7}],
-    validateFullExplain: {
-        _id: {m: `$${metaField}`, t: {$dateTrunc: {date: "$otherTime", unit: {"$const": "day"}}}},
-        accmax: {$max: `$${accField}`},
-    },
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // The fields in the $dateTrunc expression are not constant.
@@ -337,7 +290,7 @@ checkResults({
         }
     }],
     expectedDocs: [{_id: {t: null}, accmax: 7, accmin: 1}],
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // The parameters have changed, and thus the buckets are not fixed. This test must be run last,
@@ -355,7 +308,7 @@ checkResults({
         }
     }],
     expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmin: 1, accmax: 7}],
-    rewriteOccur: false
+    rewriteExpected: false
 });
 
 // Validate the rewrite does not apply for fixed buckets with a 'bucketMaxSpanSeconds' set to
@@ -375,7 +328,7 @@ checkResults({
                     accmax: {$max: `$${accField}`}
                 }
             }],
-            rewriteOccur: false
+            rewriteExpected: false
         });
     });
 })();
