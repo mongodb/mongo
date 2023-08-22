@@ -233,8 +233,8 @@ variables:
         src/build/scons/config.log
         src/*.gcda.gcov
         src/gcov-intermediate-files.tgz
-        src/*.core src/*.mdmp
-        mongo-coredumps.tgz
+        src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+        mongo-coredumps.json
         src/dist-unittests/bin/*
         src/dist-unittests/lib/*
         mongo-unittests.tgz
@@ -2067,25 +2067,35 @@ functions:
       - "./src/evergreen/gather_mongo_coredumps.sh"
 
   "tar mongo coredumps": &tar_mongo_coredumps
-    command: archive.targz_pack
+    command: subprocess.exec
     params:
-      target: "mongo-coredumps.tgz"
-      source_dir: "src"
-      include:
-      - "./**.core"
-      - "./**.mdmp" # Windows: minidumps
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/fast_archive.py"
+      - "-f=mongo-coredumps.json"
+      - "-p=./**.core"
+      - "-p=./**.mdmp" # Windows: minidumps
+      - "-n=Core Dump"
+      - "-t=720" # 12 minutes
 
   "archive mongo coredumps": &archive_mongo_coredumps
+    command: attach.artifacts
+    params:
+      files:
+        - src/mongo-coredumps.json
+
+  "upload mongo-coredumps.json": &upload_coredumps_json
     command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: mongo-coredumps.tgz
-      remote_file: ${project}/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
+      local_file: src/mongo-coredumps.json
+      remote_file: ${project}/${build_variant}/${version_id}/${revision}/${task_name}/mongo-coredumps.json
       bucket: mciuploads
       permissions: public-read
-      content_type: application/gzip
-      display_name: Core Dumps - Execution ${execution}
+      content_type: application/json
+      display_name: mongo-coredumps.json
       optional: true
 
   "save mongo coredumps":
@@ -2093,6 +2103,7 @@ functions:
   - *gather_mongo_coredumps
   - *tar_mongo_coredumps
   - *archive_mongo_coredumps
+  - *upload_coredumps_json
 
   ### Process & archive failed unittest artifacts ###
   "gather failed unittests": &gather_failed_unittests

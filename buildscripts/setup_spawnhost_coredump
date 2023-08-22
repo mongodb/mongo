@@ -43,14 +43,37 @@ if [[ "${machine}" = "Cygwin" ]]; then
         setx _NT_SYMBOL_PATH "${DBG_ARCHIVE_TARGET};srv*;"
         { set +x; } 2>/dev/null
 
-        echo -e "\n=> Extracting Core Dump to Desktop."
+        echo -e "\n=> Extracting Core Dumps to Desktop."
+        set -x
+
+        # logic for core dumps uploaded together in a .tar.gz file
         COREDUMP_ARCHIVE=$(readlink -f /cygdrive/z/data/mci/artifacts-*/mongo-coredumps*.tgz 2>/dev/null)
-        COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
-        COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
-        set -x;
-        mkdir -p ${COREDUMP_ARCHIVE_TARGET}
-        tar -xzvf ${COREDUMP_ARCHIVE} -C ${COREDUMP_ARCHIVE_TARGET}
-        cp -r ${COREDUMP_ARCHIVE_TARGET}/* ${desktop_dir}
+        if [[ -f "${COREDUMP_ARCHIVE}" ]]; then
+            COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
+            set -x;
+            mkdir -p ${COREDUMP_ARCHIVE_TARGET}
+            tar -xzvf ${COREDUMP_ARCHIVE} -C ${COREDUMP_ARCHIVE_TARGET}
+            cp -r ${COREDUMP_ARCHIVE_TARGET}/* ${desktop_dir}
+        fi
+
+        # logic for core dumps individually uploaded and gzipped
+        for filename in /cygdrive/z/data/mci/artifacts-*/dump_*.mdmp.gz;
+        do
+            COREDUMP_ARCHIVE=$(readlink -f ${filename} 2>/dev/null)
+            COREDUMP_ARCHIVE_BASENAME=$(basename ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_PARENT=$(dirname ${COREDUMP_ARCHIVE})
+            COREDUMP_ARCHIVE_TARGET="${COREDUMP_ARCHIVE_PARENT}/extracted_dump"
+            mkdir -p ${COREDUMP_ARCHIVE_TARGET}
+            mv ${COREDUMP_ARCHIVE} ${COREDUMP_ARCHIVE_TARGET}
+            gunzip ${COREDUMP_ARCHIVE_TARGET}/${COREDUMP_ARCHIVE_BASENAME}
+            DECOMPRESSED_NAME=$(basename ${COREDUMP_ARCHIVE_BASENAME} .gz)
+            cp ${COREDUMP_ARCHIVE_TARGET}/${DECOMPRESSED_NAME} ${desktop_dir}
+        done
+
+        if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
+            echo "No core dumps found."
+        fi
         { set +x; } 2>/dev/null
         echo "Copied to Desktop."
     } &> ${out_dir}
@@ -162,12 +185,29 @@ fi' >> .bash_profile
         archive_fail "src"
     fi
 
+
+    set -x
+
+    # logic for core dumps uploaded together in a .tar.gz file
     COREDUMP_ARCHIVE=$(ls /data/mci/artifacts-*/mongo-coredumps-*.tgz 2>/dev/null)
     if [[ -n $COREDUMP_ARCHIVE ]]; then
         tar -xzf $COREDUMP_ARCHIVE &
-    else
+    fi
+
+    # logic for core dumps individually uploaded and gzipped
+    COREDUMP_ARCHIVE_TARGET="./"
+    for filename in /data/mci/artifacts-*/dump_*.core.gz;
+    do
+        COREDUMP_ARCHIVE=$(readlink -f ${filename} 2>/dev/null)
+        COREDUMP_ARCHIVE_BASENAME=$(basename ${COREDUMP_ARCHIVE})
+        mv ${COREDUMP_ARCHIVE} ${COREDUMP_ARCHIVE_TARGET}
+        gunzip ${COREDUMP_ARCHIVE_TARGET}/${COREDUMP_ARCHIVE_BASENAME}
+    done
+
+    if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
         archive_fail "coredump"
     fi
+    set +x
 
     echo "Waiting for background processes to complete."
     wait

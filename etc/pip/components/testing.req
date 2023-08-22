@@ -26,3 +26,4 @@ pyjwt
 selenium
 geckodriver-autoinstaller
 pipx==1.2.0
+pigz-python
