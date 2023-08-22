@@ -231,6 +231,7 @@ const tests = [
                 shortDescription:
                     "Runs createIndexes expecting 'createdCollectionAutomatically' : true.",
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
+                testCaseDoesNotSupportWriteConcern: true,
             },
 
             {
