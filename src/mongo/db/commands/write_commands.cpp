@@ -456,6 +456,11 @@ public:
             extractQueryDetails(_updateOpObj, bob);
             bob->append("batchSize", 1);
             bob->append("singleBatch", true);
+
+            if (const auto& encryptionInfo = _commandObj.getField("encryptionInformation");
+                !encryptionInfo.eoo()) {
+                bob->append(encryptionInfo);
+            }
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {

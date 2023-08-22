@@ -119,6 +119,10 @@ public:
         if (shardVersion) {
             args.push_back(shardVersion.value());
         }
+        if (encryptionInformation) {
+            args.push_back(encryptionInformation.value());
+        }
+
         auto request = CommandMirroringTest::makeCommand(coll, args);
 
         // Directly add `updates` to `OpMsg::sequences` to emulate `OpMsg::parse()` behavior.
@@ -134,6 +138,7 @@ public:
     }
 
     boost::optional<BSONObj> shardVersion;
+    boost::optional<BSONObj> encryptionInformation;
 };
 
 TEST_F(UpdateCommandTest, NoQuery) {
@@ -210,6 +215,23 @@ TEST_F(UpdateCommandTest, ValidateShardVersion) {
     }
 }
 
+TEST_F(UpdateCommandTest, ValidateEncryptionInformation) {
+    auto update = BSON("q" << BSONObj() << "u" << BSON("$set" << BSON("_id" << 1)));
+    {
+        auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
+        ASSERT_FALSE(mirroredObj.hasField("encryptionInformation"));
+    }
+
+    const auto encInfoValue = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);
+    encryptionInformation = BSON("encryptionInformation" << encInfoValue);
+    {
+        auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
+
+        ASSERT_TRUE(mirroredObj.hasField("encryptionInformation"));
+        ASSERT(compareBSONObjs(mirroredObj["encryptionInformation"].Obj(), encInfoValue));
+    }
+}
+
 class FindCommandTest : public CommandMirroringTest {
 public:
     std::string commandName() override {
@@ -228,7 +250,8 @@ public:
                 "max",
                 "batchSize",
                 "singleBatch",
-                "shardVersion"};
+                "shardVersion",
+                "encryptionInformation"};
     }
 
     void checkFieldNamesAreAllowed(BSONObj& mirroredObj) {
@@ -263,7 +286,8 @@ TEST_F(FindCommandTest, MirrorableKeys) {
                      BSON("awaitData" << true),
                      BSON("allowPartialResults" << true),
                      BSON("collation" << BSONObj()),
-                     BSON("shardVersion" << BSONObj())};
+                     BSON("shardVersion" << BSONObj()),
+                     BSON("encryptionInformation" << BSONObj())};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -292,6 +316,7 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
     const auto max = BSONObj();
 
     const auto shardVersion = BSONObj();
+    const auto encryptionInformation = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);
 
     auto findArgs = {BSON("filter" << filter),
                      BSON("skip" << skip),
@@ -301,7 +326,8 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
                      BSON("collation" << collation),
                      BSON("min" << min),
                      BSON("max" << max),
-                     BSON("shardVersion" << shardVersion)};
+                     BSON("shardVersion" << shardVersion),
+                     BSON("encryptionInformation" << encryptionInformation)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
 
@@ -315,6 +341,7 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["min"].Obj(), min));
     ASSERT(compareBSONObjs(mirroredObj["max"].Obj(), max));
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["encryptionInformation"].Obj(), encryptionInformation));
 }
 
 TEST_F(FindCommandTest, ValidateShardVersion) {
@@ -340,23 +367,32 @@ public:
     }
 
     std::vector<std::string> getAllowedKeys() const override {
-        return {"sort", "collation", "find", "filter", "batchSize", "singleBatch", "shardVersion"};
+        return {"sort",
+                "collation",
+                "find",
+                "filter",
+                "batchSize",
+                "singleBatch",
+                "shardVersion",
+                "encryptionInformation"};
     }
 };
 
 TEST_F(FindAndModifyCommandTest, MirrorableKeys) {
-    auto findAndModifyArgs = {BSON("query" << BSONObj()),
-                              BSON("sort" << BSONObj()),
-                              BSON("remove" << false),
-                              BSON("update" << BSONObj()),
-                              BSON("new" << true),
-                              BSON("fields" << BSONObj()),
-                              BSON("upsert" << true),
-                              BSON("bypassDocumentValidation" << false),
-                              BSON("writeConcern" << BSONObj()),
-                              BSON("maxTimeMS" << 100),
-                              BSON("collation" << BSONObj()),
-                              BSON("arrayFilters" << BSONArray())};
+    auto findAndModifyArgs = {
+        BSON("query" << BSONObj()),
+        BSON("sort" << BSONObj()),
+        BSON("remove" << false),
+        BSON("update" << BSONObj()),
+        BSON("new" << true),
+        BSON("fields" << BSONObj()),
+        BSON("upsert" << true),
+        BSON("bypassDocumentValidation" << false),
+        BSON("writeConcern" << BSONObj()),
+        BSON("maxTimeMS" << 100),
+        BSON("collation" << BSONObj()),
+        BSON("arrayFilters" << BSONArray()),
+        BSON("encryptionInformation" << BSON("type" << 1 << "schema" << BSONObj::kEmptyObject))};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -381,12 +417,14 @@ TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
     constexpr auto upsert = true;
     const auto collation = BSON("locale"
                                 << "\"fr\"");
+    const auto encInfoValue = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);
 
     auto findAndModifyArgs = {BSON("query" << query),
                               BSON("sort" << sortObj),
                               BSON("update" << update),
                               BSON("upsert" << upsert),
-                              BSON("collation" << collation)};
+                              BSON("collation" << collation),
+                              BSON("encryptionInformation" << encInfoValue)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
 
@@ -395,6 +433,7 @@ TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["filter"].Obj(), query));
     ASSERT(compareBSONObjs(mirroredObj["sort"].Obj(), sortObj));
     ASSERT(compareBSONObjs(mirroredObj["collation"].Obj(), collation));
+    ASSERT(compareBSONObjs(mirroredObj["encryptionInformation"].Obj(), encInfoValue));
 }
 
 TEST_F(FindAndModifyCommandTest, ValidateShardVersion) {
@@ -489,7 +528,14 @@ public:
     }
 
     std::vector<std::string> getAllowedKeys() const override {
-        return {"count", "query", "skip", "limit", "hint", "collation", "shardVersion"};
+        return {"count",
+                "query",
+                "skip",
+                "limit",
+                "hint",
+                "collation",
+                "shardVersion",
+                "encryptionInformation"};
     }
 };
 
@@ -500,7 +546,8 @@ TEST_F(CountCommandTest, MirrorableKeys) {
                       BSON("hint" << BSONObj()),
                       BSON("readConcern" << BSONObj()),
                       BSON("collation" << BSONObj()),
-                      BSON("shardVersion" << BSONObj())};
+                      BSON("shardVersion" << BSONObj()),
+                      BSON("encryptionInformation" << BSONObj())};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -512,11 +559,13 @@ TEST_F(CountCommandTest, ValidateMirroredQuery) {
     const auto hint = BSON("status" << 1);
     constexpr auto limit = 1000;
     const auto shardVersion = BSONObj();
+    const auto encInfoValue = BSON("type" << 1 << "schema" << BSONObj::kEmptyObject);
 
     auto countArgs = {BSON("query" << query),
                       BSON("hint" << hint),
                       BSON("limit" << limit),
-                      BSON("shardVersion" << shardVersion)};
+                      BSON("shardVersion" << shardVersion),
+                      BSON("encryptionInformation" << encInfoValue)};
     auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
 
     ASSERT_EQ(mirroredObj["count"].String(), kCollection);
@@ -526,6 +575,7 @@ TEST_F(CountCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["hint"].Obj(), hint));
     ASSERT_EQ(mirroredObj["limit"].Int(), limit);
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["encryptionInformation"].Obj(), encInfoValue));
 }
 
 TEST_F(CountCommandTest, ValidateShardVersion) {

@@ -565,6 +565,10 @@ void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) 
         bob->append(write_ops::FindAndModifyCommandRequest::kCollationFieldName,
                     *req.getCollation());
     }
+    if (req.getEncryptionInformation()) {
+        bob->append(write_ops::FindAndModifyCommandRequest::kEncryptionInformationFieldName,
+                    req.getEncryptionInformation()->toBSON());
+    }
 
     const auto& rawCmd = unparsedRequest().body;
     if (const auto& shardVersion = rawCmd.getField("shardVersion"); !shardVersion.eoo()) {
