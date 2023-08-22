@@ -452,7 +452,16 @@ functions:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml ${activate_flag|}
+        # The script below makes sure that if we generate all tasks in a patch, we will only generate
+        # them and not run all of them, since activating all tasks is the default behavior for task
+        # generation in a patch.
+        script: |
+          if [[ "${is_patch}" == "true" ]] 
+          then
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml --no-activate
+          else
+            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/etc/system_perf.yml
+          fi
     - command: generate.tasks
       params:
         files:
@@ -471,12 +480,6 @@ tasks:
     priority: 5
     commands:
       - func: f_generate_all_variant_auto_tasks
-  - name: generate_all_variant_auto_tasks_no_activate
-    priority: 5
-    commands:
-      - func: f_generate_all_variant_auto_tasks
-        vars:
-          activate_flag: --no-activate
   - name: schedule_variant_auto_tasks
     priority: 5
     commands:
@@ -1529,8 +1532,6 @@ buildvariants:
       - amazon2-small
     tasks:
       - name: generate_all_variant_auto_tasks
-      - name: generate_all_variant_auto_tasks_no_activate
-        activate: false
 
   - &compile-amazon2
     name: compile-amazon2
@@ -1852,32 +1853,6 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
-  - name: linux-standalone-schedule.2022-11
-    display_name: Linux Standalone Schedule 2022-11
-    # TODO SERVER-74399 Reduce frequency back to baseline.
-    # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
-    modules: *modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
-      infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: "-arm64"
-      build_variant_override: linux-standalone.2022-11
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: 
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-    tasks: 
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-
   - name: linux-standalone.2022-11
     display_name: Linux Standalone 2022-11
     # TODO SERVER-74399 Reduce frequency back to baseline.
@@ -1923,30 +1898,6 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
-
-  - name: linux-standalone-all-feature-flags-schedule.2022-11
-    display_name: Linux Standalone (all feature flags) Schedule 2022-11
-    modules: *modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: standalone-all-feature-flags
-      infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: "-arm64"
-      build_variant_override: linux-standalone-all-feature-flags.2022-11
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: 
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
 
   - name: linux-standalone-all-feature-flags.2022-11
     display_name: Linux Standalone (all feature flags) 2022-11
@@ -2305,30 +2256,6 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: linkbench
       - name: linkbench2
-
-  - name: linux-1-node-replSet-schedule.2022-11
-    display_name: Linux 1-Node ReplSet Schedule 2022-11
-    modules: *modules
-    expansions:
-      mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
-      infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: single
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: "-arm64"
-      build_variant_override: linux-1-node-replSet.2022-11
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: 
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-    tasks: 
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
 
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
