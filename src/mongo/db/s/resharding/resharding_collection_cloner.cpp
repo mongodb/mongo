@@ -786,10 +786,15 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
                        serverGlobalParams.featureCompatibility)) {
                    auto opCtx = factory.makeOperationContext(&cc());
-                   _runOnceWithNaturalOrder(opCtx.get(),
-                                            MongoProcessInterface::create(opCtx.get()),
-                                            executor,
-                                            cancelToken);
+                   // We can run into StaleConfig errors when cloning collections. To make it safer
+                   // during retry, we retry the whole cloning process and rely on the resume token
+                   // to be correct.
+                   resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                       _runOnceWithNaturalOrder(opCtx.get(),
+                                                MongoProcessInterface::create(opCtx.get()),
+                                                executor,
+                                                cancelToken);
+                   });
                    // If we got here, we succeeded and there is no more to come.  Otherwise
                    // _runOnceWithNaturalOrder would uassert.
                    chainCtx->moreToCome = false;
