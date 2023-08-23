@@ -533,7 +533,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
             // request which is fine as long as the unsplittable collections remain always on the
             // same shard.
             //
-            // TODO SERVER-XXX Stop ignoring ShardVersion::UNSHARDED for unsplittable collections.
+            // TODO (SERVER-80337): Stop ignoring ShardVersion::UNSHARDED for unsplittable
+            // collections.
             return true;
         }
         return ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
