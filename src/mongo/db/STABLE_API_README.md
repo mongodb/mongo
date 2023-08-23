@@ -89,7 +89,7 @@ python buildscripts/idl/idl_check_compatibility.py -v --old-include idls/r6.0.3/
 
 ## Adding new commands and fields
 ***Any additions to the Stable API must be approved by the Stable API PM and code reviewed by the 
-Replication Team.***
+Query Optimization Team.***
 
 Adding a new IDL command requires the `api_version` field, which indicates which Stable API version 
 this command is in. ***By default, the `api_version` field should be `""`.*** Only if you are adding the
@@ -133,7 +133,7 @@ approval process.) Normally changing a field from `stability: stable` to `stabil
 list for these exceptions. 
 
 ***Additions to the `IGNORE_STABLE_TO_UNSTABLE_LIST` must be approved by the Stable API PM and code
-reviewed by the Replication Team.***
+reviewed by the Query Optimization Team.***
 
 ### The BSON serialization `any` type
 
