@@ -87,8 +87,8 @@ const newMongoD = MongoRunner.runMongod({
 });
 
 jsTest.log("Going to verify the number of documents of both collections");
-assert.eq(st.rs0.getSecondary().getDB(kDbName)[kShardedCollName].find({}).itcount(), 0);
-assert.eq(st.rs0.getSecondary().getDB(kDbName)[kUnshardedCollName].find({}).itcount(), 0);
+assert.eq(newMongoD.getDB(kDbName)[kShardedCollName].find({}).itcount(), 0);
+assert.eq(newMongoD.getDB(kDbName)[kUnshardedCollName].find({}).itcount(), 0);
 
 jsTest.log("Going to stop the shardsvr queryable backup mode mongod process");
 MongoRunner.stopMongod(newMongoD);
