@@ -171,9 +171,6 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
 
 write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     const BulkWriteUpdateOp* op, const BulkWriteCommandRequest& req, size_t currentOpIdx) {
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite update with Queryable Encryption does not support sort.",
-            !op->getSort());
     auto idx = op->getUpdate();
     auto nsEntry = req.getNsInfo()[idx];
 
@@ -218,10 +215,6 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     const BulkWriteDeleteOp* op,
     const BulkWriteCommandRequest& req,
     const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite delete with Queryable Encryption does not support sort.",
-            !op->getSort());
-
     write_ops::DeleteOpEntry deleteEntry;
     if (op->getCollation()) {
         deleteEntry.setCollation(op->getCollation());

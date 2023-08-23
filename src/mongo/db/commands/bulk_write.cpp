@@ -934,7 +934,6 @@ bool handleUpdateOp(OperationContext* opCtx,
         updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
         updateRequest.setUpdateConstants(op->getConstants());
         updateRequest.setLetParameters(req.getLet());
-        updateRequest.setSort(op->getSort().value_or(BSONObj()));
         updateRequest.setHint(op->getHint());
         updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
         updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
@@ -1057,7 +1056,6 @@ bool handleDeleteOp(OperationContext* opCtx,
         deleteRequest.setProj(BSONObj());
         deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
         deleteRequest.setLet(req.getLet());
-        deleteRequest.setSort(op->getSort().value_or(BSONObj()));
         deleteRequest.setHint(op->getHint());
         deleteRequest.setCollation(op->getCollation().value_or(BSONObj()));
         deleteRequest.setMulti(op->getMulti());

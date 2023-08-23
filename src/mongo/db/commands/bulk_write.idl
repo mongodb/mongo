@@ -127,12 +127,6 @@ structs:
                 type: object
                 optional: true
                 stability: unstable
-            sort:
-                description: "Determines which document the operation modifies if the query selects
-                              multiple documents."
-                type: object
-                optional: true
-                stability: unstable
 
     BulkWriteDeleteOp:
         description: "A struct representing deletes in the 'bulkWrite' command."
@@ -162,12 +156,6 @@ structs:
                 stability: unstable
             collation:
                 description: "Specifies the collation to use for the operation."
-                type: object
-                optional: true
-                stability: unstable
-            sort:
-                description: "Determines which document the operation modifies if the query selects
-                              multiple documents."
                 type: object
                 optional: true
                 stability: unstable

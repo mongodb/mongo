@@ -182,7 +182,6 @@ void BulkWriteCommandModifier::addUpdateOp(
     bool multi,
     const boost::optional<std::vector<BSONObj>>& arrayFilters,
     const boost::optional<BSONObj>& collation,
-    const boost::optional<BSONObj>& sort,
     const boost::optional<BSONObj>& hint) {
     auto [nsInfoEntry, idx] = getNsInfoEntry(nss);
 
@@ -193,7 +192,6 @@ void BulkWriteCommandModifier::addUpdateOp(
     op.setCollation(collation);
     op.setHint(hint.value_or(BSONObj()));
     op.setArrayFilters(arrayFilters);
-    op.setSort(sort);
 
     _ops.emplace_back(op);
 }
@@ -218,7 +216,6 @@ void BulkWriteCommandModifier::addDeleteOp(const NamespaceString& nss,
                                            const BSONObj& query,
                                            bool multiDelete,
                                            const boost::optional<BSONObj>& collation,
-                                           const boost::optional<BSONObj>& sort,
                                            const boost::optional<BSONObj>& hint) {
     auto [nsInfoEntry, idx] = getNsInfoEntry(nss);
 
@@ -226,7 +223,6 @@ void BulkWriteCommandModifier::addDeleteOp(const NamespaceString& nss,
 
     op.setMulti(multiDelete);
     op.setHint(hint.value_or(BSONObj()));
-    op.setSort(sort);
     op.setCollation(collation);
 
     _ops.emplace_back(op);

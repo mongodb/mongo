@@ -255,15 +255,8 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
         for (bool multi : {false, true}) {
             BulkWriteCommandRequest request;
             BulkWriteCommandModifier builder(&request);
-            builder.addUpdateOp(nss,
-                                query,
-                                update,
-                                upsert,
-                                multi,
-                                {{arrayFilter}},
-                                collation,
-                                boost::none,
-                                boost::none);
+            builder.addUpdateOp(
+                nss, query, update, upsert, multi, {{arrayFilter}}, collation, boost::none);
             builder.finishBuild();
 
             auto nsInfo = request.getNsInfo();
@@ -390,7 +383,7 @@ TEST(BulkWriteCommandModifier, AddDeleteOps) {
     for (bool multi : {false, true}) {
         BulkWriteCommandRequest request;
         BulkWriteCommandModifier builder(&request);
-        builder.addDeleteOp(nss, query, multi, collation, boost::none, boost::none);
+        builder.addDeleteOp(nss, query, multi, collation, boost::none);
         builder.finishBuild();
 
         auto nsInfo = request.getNsInfo();
@@ -420,7 +413,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);
     builder.addInsertOps(nss, docs);
-    builder.addDeleteOp(nss, query, true, collation, boost::none, boost::none);
+    builder.addDeleteOp(nss, query, true, collation, boost::none);
     builder.finishBuild();
 
     auto nsInfo = request.getNsInfo();
@@ -462,7 +455,7 @@ TEST(BulkWriteCommandModifier, TestMultiOpsDifferentNs) {
     BulkWriteCommandRequest request;
     BulkWriteCommandModifier builder(&request);
     builder.addInsertOps(nss, docs);
-    builder.addDeleteOp(nss2, query, true, collation, boost::none, boost::none);
+    builder.addDeleteOp(nss2, query, true, collation, boost::none);
     builder.finishBuild();
 
     auto nsInfo = request.getNsInfo();

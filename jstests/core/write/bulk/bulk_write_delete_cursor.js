@@ -40,13 +40,13 @@ assert(!coll.findOne());
 
 coll.drop();
 
-// Test only deletes one when multi is false (default value) with sort.
+// Test only deletes one when multi is false (default value).
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
         {insert: 0, document: {_id: 0, skey: "MongoDB"}},
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {delete: 0, filter: {skey: "MongoDB"}, sort: {_id: -1}},
+        {delete: 0, filter: {skey: "MongoDB"}},
     ],
     nsInfo: [{ns: "test.coll"}]
 });
@@ -58,7 +58,7 @@ cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
 assert(!res.cursor.firstBatch[3]);
-assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB"}]);
+assert.eq(coll.find().itcount(), 1);
 
 coll.drop();
 

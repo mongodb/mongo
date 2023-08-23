@@ -347,8 +347,7 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
                                    const bool includeUpsertSupplied,
                                    const boost::optional<mongo::BSONObj>& collation,
                                    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
-                                   const BSONObj& hint,
-                                   const boost::optional<mongo::BSONObj>& sort) {
+                                   const BSONObj& hint) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'update' field which contains the index of the corresponding namespace.
@@ -392,12 +391,6 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
         estSize += BulkWriteUpdateOp::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
     }
 
-    // Add the size of the 'sort' field, if present.
-    if (sort) {
-        estSize +=
-            (BulkWriteUpdateOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
-    }
-
     return estSize;
 }
 
@@ -436,8 +429,7 @@ int getDeleteSizeEstimate(const BSONObj& q,
 // TODO SERVER-77871: Ensure sampleId size is accounted for in this method.
 int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
                                    const boost::optional<mongo::BSONObj>& collation,
-                                   const mongo::BSONObj& hint,
-                                   const boost::optional<mongo::BSONObj>& sort) {
+                                   const mongo::BSONObj& hint) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'delete' field which contains the index of the corresponding namespace.
@@ -459,12 +451,6 @@ int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
     if (!hint.isEmpty()) {
         estSize +=
             (BulkWriteDeleteOp::kHintFieldName.size() + hint.objsize() + kPerElementOverhead);
-    }
-
-    // Add the size of the 'sort' field, if present.
-    if (sort) {
-        estSize +=
-            (BulkWriteDeleteOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
     }
 
     return estSize;

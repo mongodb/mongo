@@ -135,7 +135,6 @@ public:
                      bool multi,
                      const boost::optional<std::vector<BSONObj>>& arrayFilters,
                      const boost::optional<BSONObj>& collation,
-                     const boost::optional<BSONObj>& sort,
                      const boost::optional<BSONObj>& hint);
 
     void addPipelineUpdateOps(const NamespaceString& nss,
@@ -148,7 +147,6 @@ public:
                      const BSONObj& query,
                      bool multiDelete,
                      const boost::optional<BSONObj>& collation,
-                     const boost::optional<BSONObj>& sort,
                      const boost::optional<BSONObj>& hint);
 
 private:
