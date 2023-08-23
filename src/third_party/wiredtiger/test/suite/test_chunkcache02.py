@@ -26,12 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+import os, sys
 import random
 import threading
 import time
 import wiredtiger, wttest
 
+from random import randrange
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -45,25 +46,30 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
     uri = "table:test_chunkcache02"
     rows = 10000
     num_threads = 5
-    current_directory = os.getcwd()
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('row_string', dict(key_format='S', value_format='S')),
     ]
 
-    cache_types = [
-        ('in-memory', dict(chunk_cache_extra_config='type=DRAM')),
-        ('on-disk', dict(chunk_cache_extra_config=f'type=FILE,storage_path={current_directory}/chunk-cache-tmp'))
-    ]
+    cache_types = [('in-memory', dict(chunk_cache_type='dram'))]
+    if sys.byteorder == 'little':
+        # WT's filesystem layer doesn't support mmap on big-endian platforms.
+        cache_types.append(('on-disk', dict(chunk_cache_type='file')))
 
     scenarios = make_scenarios(format_values, cache_types)
 
     def conn_config(self):
         if not os.path.exists('bucket2'):
             os.mkdir('bucket2')
+
+        if self.chunk_cache_type == 'dram':
+            chunk_cache_extra_config = 'type=DRAM'
+        else:
+            chunk_cache_extra_config = 'type=FILE,storage_path=/tmp/chunk_cache_{}'.format(randrange(0, 1000000000))
+
         return 'tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store),' \
-            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20MB,{}],'.format(self.chunk_cache_extra_config)
+            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20MB,{}],'.format(chunk_cache_extra_config)
 
     def conn_extensions(self, extlist):
         if os.name == 'nt':
@@ -79,7 +85,7 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
     def read_and_verify(self, rows, ds):
         session = self.conn.open_session()
         cursor = session.open_cursor(self.uri)
-        for i in range(1, rows):
+        for i in range(1, rows * 10):
             key = random.randint(1, rows - 1)
             cursor.set_key(ds.key(key))
             cursor.search()

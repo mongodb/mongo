@@ -4406,7 +4406,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ${python_binary|python3} chunkcache.py
+            ${test_env_vars|} ${python_binary|python3} chunkcache_simple.py
 
   - name: skiplist-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
