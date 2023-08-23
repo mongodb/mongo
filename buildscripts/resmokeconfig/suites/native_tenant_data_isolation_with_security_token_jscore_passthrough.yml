@@ -78,6 +78,10 @@ selector:
   - jstests/core/**/bench_test2.js
   - jstests/core/**/benchrun_cmd_param_error.js
   - jstests/core/**/benchrun_pipeline_updates.js
+  # TODO SERVER-81009: fix VTS missing from opCtx for distinct transactions
+  - jstests/core/txns/view_reads_in_transaction.js
+  # TODO SERVER-77463: determine whether or not query_settings_cmds.js should be excluded
+  - jstests/core/query/query_settings/query_settings_cmds.js
 
 executor:
   archive:

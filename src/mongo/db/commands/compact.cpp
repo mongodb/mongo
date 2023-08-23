@@ -99,8 +99,12 @@ public:
              BSONObjBuilder& result) override {
         NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
+        auto sc = SerializationContext::stateCommandRequest();
+        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto params = CompactCommand::parse(IDLParserContext("compact"), cmdObj);
+        auto params = CompactCommand::parse(
+            IDLParserContext("compact", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
         bool force = params.getForce() && *params.getForce();
 
         uassert(ErrorCodes::IllegalOperation,

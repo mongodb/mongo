@@ -424,7 +424,7 @@ const testColl = testDb.getCollection(kCollName);
         "collMod": kCollName,
         "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
     });
-    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(res, 8423388 /*"TenantId must be set"*/);
 
     // Modify the index with the tenantId
     res = assert.commandWorked(testDb.runCommand({
@@ -442,17 +442,10 @@ const testColl = testDb.getCollection(kCollName);
 
 // Test the applyOps command
 {
-    if (featureFlagRequireTenantId) {
-        assert.commandWorked(testDb.runCommand({
-            applyOps:
-                [{"op": "i", "ns": testColl.getFullName(), "tid": kTenant, "o": {_id: 5, x: 17}}],
-            '$tenant': kTenant
-        }));
-    } else {
-        const ns = kTenant + '_' + testColl.getFullName();
-        assert.commandWorked(testDb.runCommand(
-            {applyOps: [{"op": "i", "ns": ns, "o": {_id: 5, x: 17}}], '$tenant': kTenant}));
-    }
+    assert.commandWorked(testDb.runCommand({
+        applyOps: [{"op": "i", "ns": testColl.getFullName(), "tid": kTenant, "o": {_id: 5, x: 17}}],
+        '$tenant': kTenant
+    }));
 
     // Check applyOp inserted the document.
     const findRes = assert.commandWorked(

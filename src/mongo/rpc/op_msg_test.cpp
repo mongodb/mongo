@@ -1193,9 +1193,10 @@ TEST(OpMsgRequest, SetDollarTenantFailWithDiffTenant) {
     RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
                                                                    true);
     const TenantId tenantId(OID::gen());
+    auto dbName =
+        DatabaseNameUtil::deserialize(tenantId, "testDb", SerializationContext::stateDefault());
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
-    auto request = OpMsgRequest::fromDBAndBody(
-        DatabaseName::createDatabaseName_forTest(boost::none, "testDb"), body);
+    auto request = OpMsgRequest::fromDBAndBody(dbName, body);
     ASSERT_THROWS_CODE(request.setDollarTenant(TenantId(OID::gen())), DBException, 8423373);
 }
 
@@ -1299,7 +1300,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
                   SC::Source::Command, SC::CallerType::Request, SC::Prefix::Default, false));
-    ASSERT_EQ(request.getDbName(), expectedDbName);
+    ASSERT_THROWS_CODE(request.getDbName(), AssertionException, 8423388 /*"TenantId must be set"*/);
 }
 
 }  // namespace

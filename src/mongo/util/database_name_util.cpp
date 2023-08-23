@@ -189,10 +189,9 @@ DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> t
                                                      StringData db,
                                                      const SerializationContext& context) {
     if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // TODO SERVER-73113 Uncomment out this conditional to check that we always have a tenantId.
-        /* if (db != "admin" && db != "config" && db != "local")
+        if (db != DatabaseName::kAdmin.db() && db != DatabaseName::kLocal.db() &&
+            db != DatabaseName::kConfig.db() && db != DatabaseName::kExternal.db())
             uassert(7005300, "TenantId must be set", tenantId != boost::none);
-        */
 
         return DatabaseName(std::move(tenantId), db);
     }
@@ -250,10 +249,8 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
 
     // We received the tenantId from the prefix.
     auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
-    // TODO SERVER-73113 Uncomment out this conditional to check that we always have a tenantId.
-    // if ((dbName != DatabaseName::kAdmin) && (dbName != DatabaseName::kLocal) &&
-    //     (dbName != DatabaseName::kConfig))
-    //     uassert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
+    if (!dbName.isInternalDb() && !dbName.isExternalDB())
+        uassert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
 
     return dbName;
 }

@@ -74,15 +74,15 @@ TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOff) {
 }
 
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.
-// TODO SERVER-73113 Uncomment out the test case below.
-/* TEST(DatabaseNameUtilTest,
+TEST(DatabaseNameUtilTest,
      DeserializeAssertTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     ASSERT_THROWS_CODE(
-        DatabaseNameUtil::deserialize(boost::none, "foo"), AssertionException, 7005300);
+        DatabaseNameUtil::deserialize(boost::none, "foo", SerializationContext::stateDefault()),
+        AssertionException,
+        7005300 /*"TenantId must be set"*/);
 }
-*/
 
 // If the database is an inernal db, it's acceptable not to have a tenantId even if
 // multitenancySupport and featureFlagRequireTenantID are on.
@@ -333,15 +333,9 @@ TEST(DatabaseNameUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
 
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
         // request --> { ns: database.coll }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
-        ASSERT_EQ(dbName.tenantId(), boost::none);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
-
-        // TODO SERVER-73113: replace the above with the below test for assertion
-        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
-        // ctxt_noTenantId),
-        //                    AssertionException,
-        //                    8423388);
+        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId),
+                           AssertionException,
+                           8423388 /*"TenantId must be set"*/);
     }
 
     {  // Has prefix, no tenantId.
@@ -382,15 +376,9 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     {
         // No prefix, no tenantId.
         // request --> { ns: database.coll, expectPrefix: false }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
-        ASSERT_EQ(dbName.tenantId(), boost::none);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
-
-        // TODO SERVER-73113: replace the above with the below test for assertion
-        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
-        // ctxt_noTenantId),
-        //                    AssertionException,
-        //                    8423388);
+        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId),
+                           AssertionException,
+                           8423388 /*"TenantId must be set"*/);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
@@ -434,15 +422,9 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
     {
         // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
         // request --> { ns: database.coll, expectPrefix: true }
-        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
-        ASSERT_EQ(dbName.tenantId(), boost::none);
-        ASSERT_EQ(dbName.toString_forTest(), dbnString);
-
-        // TODO SERVER-73113: replace the above with the below test for assertion
-        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
-        // ctxt_noTenantId),
-        //                    AssertionException,
-        //                    8423388);
+        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId),
+                           AssertionException,
+                           8423388 /*"TenantId must be set"*/);
     }
 
     {  // Has prefix, no tenantId.

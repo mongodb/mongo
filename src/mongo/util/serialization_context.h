@@ -136,6 +136,15 @@ struct SerializationContext {
     /**
      * Setters for flags that may not be known during construction time, used by producers
      */
+
+    /**
+     * This flag is set/produced at command parsing before the deserializer is called, and
+     * consumed by the serializer.  It indicates whether the tenantId was sourced from the
+     * $tenant field or security token (ie. true), or if it was sourced from parsing the db
+     * string prefix (ie. false).  This is important as the serializer uses this flag to
+     * determine whether the reponse should contain a prefixed tenantId when serializing for
+     * commands when no expectPrefix was given (_prefixState == Default).
+     */
     void setTenantIdSource(bool nonPrefixedTenantId) {
         _nonPrefixedTenantId = nonPrefixedTenantId;
     }
@@ -201,15 +210,6 @@ private:
     // This flag is for the AuthPrevalidated source. If true, when deserializing, we should expect
     // that the database name portion may have the correct tenant ID prefixed.
     bool _authExpectTenantPrefix;
-
-    /**
-     * This flag is set/produced at command parsing before the deserializer is called, and
-     * consumed by the serializer.  It indicates whether the tenantId was sourced from the
-     * $tenant field or security token (ie. true), or if it was sourced from parsing the db
-     * string prefix (ie. false).  This is important as the serializer uses this flag to
-     * determine whether the reponse should contain a prefixed tenantId when serializing for
-     * commands.
-     */
     bool _nonPrefixedTenantId;
 };
 
