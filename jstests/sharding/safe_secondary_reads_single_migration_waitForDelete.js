@@ -398,6 +398,7 @@ let testCases = {
     transitionFromDedicatedConfigServer: {skip: "primary only"},
     transitionToDedicatedConfigServer: {skip: "primary only"},
     top: {skip: "does not return user data"},
+    unshardCollection: {skip: "primary only"},
     update: {skip: "primary only"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "does not return user data"},

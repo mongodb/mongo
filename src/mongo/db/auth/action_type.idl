@@ -198,6 +198,7 @@ enums:
            transitionFromDedicatedConfigServer : "transitionFromDedicatedConfigServer"
            transitionToDedicatedConfigServer : "transitionToDedicatedConfigServer"
            unlock :  "unlock"
+           unshardCollection :  "unshardCollection"
            useTenant : "useTenant"
            useUUID :  "useUUID"
            update :  "update"

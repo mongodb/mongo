@@ -5762,6 +5762,9 @@ export const authCommandsLib = {
           testname: "moveCollection",
           command: {moveCollection: "test.x", toShard: "move_collection-rs"},
           skipUnlessSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagMoveCollection;
+          },
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -6717,6 +6720,25 @@ export const authCommandsLib = {
                 runOnDb: adminDbName,
                 roles: roles_monitoring,
                 privileges: [{resource: {cluster: true}, actions: ["top"]}]
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "unshardCollection",
+          command: {unshardCollection: "test.x", toShard: "unshard_collection-rs"},
+          skipUnlessSharded: true,
+          skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagMoveCollection;
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                    [{resource: {db: "test", collection: "x"}, actions: ["unshardCollection"]}],
+                expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}

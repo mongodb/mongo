@@ -141,6 +141,7 @@ roles:
                 - moveCollection
                 - refineCollectionShardKey
                 - reshardCollection
+                - unshardCollection
 
     readAnyDatabase:
         adminOnly: true
@@ -379,6 +380,7 @@ roles:
                   - splitVector
                   - refineCollectionShardKey
                   - reshardCollection
+                  - unshardCollection
 
             - matchType: any_system_buckets
               actions: *clusterManagerRoleDatabaseActions

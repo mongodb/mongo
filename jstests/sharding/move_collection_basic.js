@@ -39,7 +39,7 @@ assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNo
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-// Fail if missing required key.
+// Fail if missing required field toShard.
 assert.commandFailedWithCode(mongos.adminCommand({moveCollection: ns}), 40414);
 
 // Succeed if command called on mongos.

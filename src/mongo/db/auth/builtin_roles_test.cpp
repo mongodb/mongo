@@ -155,6 +155,7 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
         ActionType::reshardCollection,
         ActionType::analyzeShardKey,
         ActionType::configureQueryAnalyzer,
+        ActionType::unshardCollection,
     });
 
     for (const auto& priv : privs) {

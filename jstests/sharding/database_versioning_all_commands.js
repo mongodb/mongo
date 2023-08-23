@@ -761,6 +761,7 @@ let testCases = {
     testVersions1And2: {skip: "executes locally on mongos (not sent to any remote node)"},
     transitionFromDedicatedConfigServer: {skip: "not on a user database"},
     transitionToDedicatedConfigServer: {skip: "not on a user database"},
+    unshardCollection: {skip: "does not forward command to primary shard"},
     update: {
         run: {
             sendsDbVersion: true,

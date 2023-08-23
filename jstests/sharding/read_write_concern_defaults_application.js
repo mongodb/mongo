@@ -775,6 +775,7 @@ let testCases = {
     top: {skip: "does not accept read or write concern"},
     transitionFromDedicatedConfigServer: {skip: "does not accept read or write concern"},
     transitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
+    unshardCollection: {skip: "does not accept read or write concern"},
     update: {
         setUp: function(conn) {
             assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));

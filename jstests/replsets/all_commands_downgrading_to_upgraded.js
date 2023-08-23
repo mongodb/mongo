@@ -1527,6 +1527,7 @@ const allCommands = {
         // dedicated config server, which is not allowed in a transitionary FCV.
         skip: cannotRunWhileDowngrading
     },
+    unshardCollection: {skip: cannotRunWhileDowngrading},
     update: {
         setUp: function(conn) {
             assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}));

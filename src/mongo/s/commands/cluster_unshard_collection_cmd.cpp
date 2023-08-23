@@ -36,15 +36,16 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
 namespace mongo {
 namespace {
 
-class ClusterMoveCollectionCmd final : public TypedCommand<ClusterMoveCollectionCmd> {
+class ClusterUnshardCollectionCmd final : public TypedCommand<ClusterUnshardCollectionCmd> {
 public:
-    using Request = MoveCollection;
+    using Request = UnshardCollection;
 
     class Invocation final : public InvocationBase {
     public:
@@ -53,7 +54,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(
                 ErrorCodes::CommandNotSupported,
-                "Resharding improvements is not enabled, cannot perform moveCollection command.",
+                "Resharding improvements is not enabled, cannot perform unshardCollection command.",
                 resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
@@ -63,17 +64,25 @@ public:
 
             ReshardCollectionRequest reshardCollectionRequest;
             reshardCollectionRequest.setKey(BSON("_id" << 1));
-            reshardCollectionRequest.setProvenance(StringData("moveCollection"));
+            reshardCollectionRequest.setProvenance(StringData("unshardCollection"));
 
-            std::vector<mongo::ShardKeyRange> destinationShard = {request().getToShard()};
-            reshardCollectionRequest.setShardDistribution(destinationShard);
+            std::vector<mongo::ShardKeyRange> destinationShard;
+            if (request().getToShard().has_value()) {
+                destinationShard.push_back(ShardKeyRange(request().getToShard().get()));
+                reshardCollectionRequest.setShardDistribution(destinationShard);
+            } else {
+                // TODO (SERVER-80265) : Calculate emptiest shard for unshard collection.
+                // This uassert is temporary until we have implemented this ticket.
+                uassert(8018401, "Need to specify toShard option", false);
+            }
+
             reshardCollectionRequest.setForceRedistribution(true);
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));
 
-            LOGV2(7973800,
-                  "Running a reshard collection command for the move collection request.",
+            LOGV2(8018400,
+                  "Running a reshard collection command for the unshard collection request.",
                   "dbName"_attr = request().getDbName(),
                   "toShard"_attr = request().getToShard());
 
@@ -108,7 +117,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::moveCollection));
+                                                           ActionType::unshardCollection));
         }
     };
 
@@ -121,11 +130,11 @@ public:
     }
 
     std::string help() const override {
-        return "Move an unsharded collection from source shard to destination shard.";
+        return "Unshard a sharded collection.";
     }
 };
 
-MONGO_REGISTER_COMMAND(ClusterMoveCollectionCmd)
+MONGO_REGISTER_COMMAND(ClusterUnshardCollectionCmd)
     .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection);
 
 }  // namespace

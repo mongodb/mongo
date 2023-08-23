@@ -153,3 +153,16 @@ commands:
         type: shard_id
         description: "The id specification of the destination shard."
         optional: false
+
+  unshardCollection:
+    description: "The public command on mongos to unshard a sharded collection."
+    command_name: unshardCollection
+    strict: false
+    namespace: type
+    api_version: ""
+    type: namespacestring
+    fields:
+      toShard:
+        type: shard_id
+        description: "The id specification of the destination shard. If empty, we will pick the emptiest shard."
+        optional: true

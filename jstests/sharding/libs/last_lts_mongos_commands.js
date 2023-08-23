@@ -19,4 +19,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "moveCollection",
     "setQuerySettings",
     "removeQuerySettings",
+    "unshardCollection",
 ];
