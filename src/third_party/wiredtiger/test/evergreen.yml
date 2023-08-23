@@ -6554,7 +6554,7 @@ buildvariants:
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
     - name: unit-test-extra-long-nonstandalone
-      distros: ubuntu2004-arm64-perf-testing
+      distros: ubuntu2004-arm64-large
     - name: memory-model-test
       batchtime: 40320 # 28 days
 
