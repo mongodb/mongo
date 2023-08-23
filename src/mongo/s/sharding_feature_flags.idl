@@ -85,3 +85,9 @@ feature_flags:
     cpp_varname: feature_flags::gAuthoritativeShardCollection
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-76436): Remove once 8.0 becomes last LTS.
+  featureFlagBalanceUnshardedCollections:
+    description: "Feature flag for enabling the balancing of user unsharded collections"
+    cpp_varname: feature_flags::gBalanceUnshardedCollections
+    default: false
+    shouldBeFCVGated: true
