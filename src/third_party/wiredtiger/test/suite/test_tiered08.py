@@ -92,6 +92,9 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
             ckpt_count = self.get_stat(stat.conn.checkpoints)
             flush_count = self.get_stat(stat.conn.flush_tier)
             self.pr('Populating: ckpt {}, flush {}'.format(str(ckpt_count), str(flush_count)))
+            crd = self.session.open_cursor(self.uri, None, None)
+            val = crd[self.key_gen(1)]
+            crd.close()
         c.close()
         return nkeys
 

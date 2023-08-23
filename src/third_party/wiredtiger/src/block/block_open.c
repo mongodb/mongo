@@ -105,7 +105,7 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename, uint32
 
     /* Undo any create on error. */
     if (ret != 0)
-        WT_TRET(__wt_fs_remove(session, filename, false));
+        WT_TRET(__wt_fs_remove(session, filename, false, false));
 
 err:
     __wt_scr_free(session, &tmp);

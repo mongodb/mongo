@@ -204,7 +204,8 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
              session, trk->b + strlen("file:"), trk->a + strlen("file:"), true)) != 0)
             __wt_err(session, ret, "metadata unroll rename %s to %s", trk->b, trk->a);
 
-        if (trk->a == NULL && (ret = __wt_fs_remove(session, trk->b + strlen("file:"), false)) != 0)
+        if (trk->a == NULL &&
+          (ret = __wt_fs_remove(session, trk->b + strlen("file:"), false, false)) != 0)
             __wt_err(session, ret, "metadata unroll create %s", trk->b);
 
         /*

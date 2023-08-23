@@ -186,7 +186,7 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
     if (strcmp(uri, WT_HS_URI) == 0) {
         WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
         if (exists)
-            WT_IGNORE_RET(__wt_fs_remove(session, filename, true));
+            WT_IGNORE_RET(__wt_fs_remove(session, filename, true, false));
     }
 
     /* Sanity check the allocation size. */

@@ -125,7 +125,7 @@ __wt_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
  *     Remove the file.
  */
 static inline int
-__wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable)
+__wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable, bool locked)
 {
     WT_DECL_RET;
     WT_FILE_SYSTEM *file_system;
@@ -141,8 +141,10 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable)
      * It is a layering violation to retrieve a WT_FH here, but it is a useful diagnostic to ensure
      * WiredTiger doesn't have the handle open.
      */
-    if (__wt_handle_is_open(session, name))
+    if (__wt_handle_is_open(session, name, locked))
         WT_RET_MSG(session, EINVAL, "%s: file-remove: file has open handles", name);
+#else
+    WT_UNUSED(locked);
 #endif
 
     WT_RET(__wt_filename(session, name, &path));
@@ -176,9 +178,9 @@ __wt_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to, bool 
      * It is a layering violation to retrieve a WT_FH here, but it is a useful diagnostic to ensure
      * WiredTiger doesn't have the handle open.
      */
-    if (__wt_handle_is_open(session, from))
+    if (__wt_handle_is_open(session, from, false))
         WT_RET_MSG(session, EINVAL, "%s: file-rename: file has open handles", from);
-    if (__wt_handle_is_open(session, to))
+    if (__wt_handle_is_open(session, to, false))
         WT_RET_MSG(session, EINVAL, "%s: file-rename: file has open handles", to);
 #endif
 

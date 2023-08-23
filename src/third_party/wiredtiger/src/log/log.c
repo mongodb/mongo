@@ -1581,7 +1581,7 @@ __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, uint32_t logn
     WT_RET(__wt_scr_alloc(session, 0, &path));
     WT_ERR(__wt_log_filename(session, lognum, file_prefix, path));
     __wt_verbose(session, WT_VERB_LOG, "log_remove: remove log %s", (const char *)path->data);
-    WT_ERR(__wt_fs_remove(session, path->data, false));
+    WT_ERR(__wt_fs_remove(session, path->data, false, false));
 err:
     __wt_scr_free(session, &path);
     return (ret);
