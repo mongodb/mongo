@@ -1166,7 +1166,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                                       boost::none,
                                                       fields,
                                                       vars,
-                                                      _yieldPolicy /*yieldPolicy*/,
+                                                      _yieldPolicy,
                                                       planNodeId,
                                                       callbacks);
         }
@@ -1196,7 +1196,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             boost::none /* minRecordIdSlot */,
             boost::none /* maxRecordIdSlot */,
             forwardScan,
-            _yieldPolicy /*yieldPolicy*/,
+            _yieldPolicy,
             planNodeId,
             callbacks,
             gDeprioritizeUnboundedUserCollectionScans.load(), /* lowPriority */
@@ -1322,7 +1322,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
                                                  vars,
                                                  std::move(lowerBoundExpr),
                                                  std::move(upperBoundExpr),
-                                                 _yieldPolicy /*yieldPolicy*/,
+                                                 _yieldPolicy,
                                                  planNodeId);
 }
 
@@ -1362,7 +1362,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
                                       boost::none /* minRecordIdSlot */,
                                       boost::none /* maxRecordIdSlot */,
                                       true /*forward*/,
-                                      _yieldPolicy /*yieldPolicy*/,
+                                      _yieldPolicy,
                                       planNodeId,
                                       callbacks);
 }

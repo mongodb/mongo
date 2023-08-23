@@ -417,14 +417,19 @@ static ExecParams createExecutor(
         yieldable = &(collections.getMainCollection());
     }
 
-    auto sbeYieldPolicy =
-        std::make_unique<PlanYieldPolicySBE>(opCtx,
-                                             yieldPolicy,
-                                             opCtx->getServiceContext()->getFastClockSource(),
-                                             internalQueryExecYieldIterations.load(),
-                                             Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                                             yieldable,
-                                             std::make_unique<YieldPolicyCallbacksImpl>(nss));
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
+    if (!phaseManager.getMetadata().isParallelExecution()) {
+        // TODO SERVER-80311: Enable yielding for parallel scan plans.
+
+        sbeYieldPolicy = std::make_unique<PlanYieldPolicySBE>(
+            opCtx,
+            yieldPolicy,
+            opCtx->getServiceContext()->getFastClockSource(),
+            internalQueryExecYieldIterations.load(),
+            Milliseconds{internalQueryExecYieldPeriodMS.load()},
+            yieldable,
+            std::make_unique<YieldPolicyCallbacksImpl>(nss));
+    }
 
     // Construct the ShardFilterer and bind it to the correct slot.
     setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
