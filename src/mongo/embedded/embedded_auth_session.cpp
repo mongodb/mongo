@@ -264,6 +264,10 @@ public:
         return false;
     }
 
+    const boost::optional<Date_t>& getExpiration() const override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
 protected:
     std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         UASSERT_NOT_IMPLEMENTED;

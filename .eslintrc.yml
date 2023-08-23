@@ -101,6 +101,7 @@ globals:
   isObject: true
   isString: true
   _createSecurityToken: true
+  _createTenantToken: true
   _isAddressSanitizerActive: true
   _isLeakSanitizerActive: true
   _isThreadSanitizerActive: true

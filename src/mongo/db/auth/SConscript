@@ -8,8 +8,11 @@ env.Library(
     target='security_token',
     source=[
         'security_token_authentication_guard.cpp',
-        'security_token.idl',
+        'validated_tenancy_scope.idl',
         'validated_tenancy_scope.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/jwt_types',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',

@@ -7,7 +7,8 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 const kTenant = ObjectId();
 const kTestDb = 'testDb0';
 const kCollName = 'myColl0';
-const kViewName = `myView0`;
+const kViewName = 'myView0';
+const kVTSKey = 'secret';
 
 function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField, options) {
     options = options || {};
@@ -91,6 +92,7 @@ function runTestWithSecurityTokenFlag() {
             setParameter: {
                 multitenancySupport: true,
                 featureFlagSecurityToken: true,
+                testOnlyValidatedTenancyScopeKey: kVTSKey,
             }
         }
     });
@@ -107,7 +109,7 @@ function runTestWithSecurityTokenFlag() {
     const tokenConn = new Mongo(primary.host);
 
     const securityToken =
-        _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
+        _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
     const tokenDb = tokenConn.getDB(kTestDb);
     const prefixedTokenDb = tokenConn.getDB(kTenant + '_' + kTestDb);
 

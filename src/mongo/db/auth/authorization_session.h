@@ -335,6 +335,10 @@ public:
     // isAuthenticated() is also expected to return false.
     virtual bool isExpired() const = 0;
 
+    // When the current authorization will expire.
+    // boost::none indicates a non-expiring session.
+    virtual const boost::optional<Date_t>& getExpiration() const = 0;
+
 protected:
     virtual std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
 };

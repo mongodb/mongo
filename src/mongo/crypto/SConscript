@@ -173,22 +173,31 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='jwt_types',
+    source='jwt_types.idl',
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='jwt',
     source=[
         'jwks_fetcher_impl.cpp',
         'jwk_manager.cpp',
-        'jwt_types.idl',
         'jws_validated_token.cpp',
         'jws_validator_{}.cpp'.format(ssl_provider),
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'jwt_types',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/db/auth/oidc_protocol',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/http_client_impl',
     ],
 )

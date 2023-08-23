@@ -49,31 +49,35 @@
 
 namespace mongo::crypto {
 namespace {
-struct ParsedToken {
-    StringData token[3];
+struct ParsedTokenView {
+    StringData header;
+    StringData body;
+    StringData signature;
+
     StringData payload;
 };
 
 // Split "header.body.signature" into {"header", "body", "signature", "header.body"}
-ParsedToken parseSignedToken(StringData token) {
-    ParsedToken pt;
-    std::size_t split, pos = 0;
-    for (int i = 0; i < 3; ++i) {
-        split = token.find('.', pos);
-        pt.token[i] = token.substr(pos, split - pos);
-        pos = split + 1;
+ParsedTokenView parseSignedToken(StringData token) {
+    ParsedTokenView pt;
 
-        if (i == 1) {
-            // Payload: encoded header + '.' + encoded body
-            pt.payload = token.substr(0, split);
-        }
-    }
+    auto split = token.find('.', 0);
+    uassert(8039401, "Missing JWS delimiter", split != std::string::npos);
+    pt.header = token.substr(0, split);
+    auto pos = split + 1;
 
-    uassert(7095400, "Unknown format of token", split == std::string::npos);
+    split = token.find('.', pos);
+    uassert(8039402, "Missing JWS delimiter", split != std::string::npos);
+    pt.body = token.substr(pos, split - pos);
+    pt.payload = token.substr(0, split);
+    pos = split + 1;
+
+    split = token.find('.', pos);
+    uassert(8039403, "Too many delimiters in JWS token", split == std::string::npos);
+    pt.signature = token.substr(pos);
     return pt;
 }
 }  // namespace
-
 Status JWSValidatedToken::validate(JWKManager* keyMgr) const {
     const auto now = Date_t::now();
 
@@ -93,7 +97,7 @@ Status JWSValidatedToken::validate(JWKManager* keyMgr) const {
     }
 
     auto tokenSplit = parseSignedToken(_originalToken);
-    auto signature = base64url::decode(tokenSplit.token[2]);
+    auto signature = base64url::decode(tokenSplit.signature);
     auto payload = tokenSplit.payload;
 
     auto swValidator = keyMgr->getValidator(_header.getKeyId());
@@ -113,12 +117,12 @@ JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
     : _originalToken(token.toString()) {
     auto tokenSplit = parseSignedToken(token);
 
-    auto headerString = base64url::decode(tokenSplit.token[0]);
+    auto headerString = base64url::decode(tokenSplit.header);
     _headerBSON = fromjson(headerString);
     _header = JWSHeader::parse(IDLParserContext("JWSHeader"), _headerBSON);
     uassert(7095401, "Unknown type of token", !_header.getType() || _header.getType() == "JWT"_sd);
 
-    auto bodyString = base64url::decode(tokenSplit.token[1]);
+    auto bodyString = base64url::decode(tokenSplit.body);
     _bodyBSON = fromjson(bodyString);
     _body = JWT::parse(IDLParserContext("JWT"), _bodyBSON);
 
@@ -128,7 +132,7 @@ JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
 StatusWith<std::string> JWSValidatedToken::extractIssuerFromCompactSerialization(
     StringData token) try {
     auto tokenSplit = parseSignedToken(token);
-    auto payload = fromjson(base64url::decode(tokenSplit.token[1]));
+    auto payload = fromjson(base64url::decode(tokenSplit.body));
     return JWT::parse(IDLParserContext{"JWT"}, payload).getIssuer().toString();
 } catch (const DBException& ex) {
     return ex.toStatus();

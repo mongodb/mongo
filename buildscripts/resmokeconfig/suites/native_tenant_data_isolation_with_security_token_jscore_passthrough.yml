@@ -88,6 +88,7 @@ executor:
       global_vars:
         TestData: &TestData
           hashTestNamesForMultitenancy: true
+          testOnlyValidatedTenancyScopeKey: secret
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
@@ -105,6 +106,7 @@ executor:
         enableTestCommands: 1
         multitenancySupport: true
         featureFlagSecurityToken: true
+        testOnlyValidatedTenancyScopeKey: secret
         # TODO SERVER-70547: remove featureFlagRequireTenantID from the parameters and have the
         # inject_security_token override to be able to test both tenant-prefixed request and non-tenant-prefixed request.
         # Currently, we only test non-tenant-prefixed request and enable the featureFlagRequireTenantID

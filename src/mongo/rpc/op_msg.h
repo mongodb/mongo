@@ -287,10 +287,7 @@ public:
         resumeBody().appendElements(body);
     }
 
-    BSONObjBuilder beginSecurityToken();
-    void setSecurityToken(const BSONObj& token) {
-        beginSecurityToken().appendElements(token);
-    }
+    void setSecurityToken(StringData token);
 
     /**
      * Finish building and return a Message ready to give to the networking layer for transmission.
@@ -353,7 +350,6 @@ private:
         kEmpty,
         kDocSequence,
         kBody,
-        kSecurityToken,
         kDone,
     };
 

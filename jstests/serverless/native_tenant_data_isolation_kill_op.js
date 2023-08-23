@@ -11,10 +11,17 @@ function killCurrentOpTest() {
         assert.commandWorked(db.getSiblingDB(dbName).runCommand(insertCmdObj));
     }
 
+    const kVTSKey = 'secret';
     const rst = new ReplSetTest({
         nodes: 3,
-        nodeOptions:
-            {auth: '', setParameter: {multitenancySupport: true, featureFlagSecurityToken: true}}
+        nodeOptions: {
+            auth: '',
+            setParameter: {
+                multitenancySupport: true,
+                featureFlagSecurityToken: true,
+                testOnlyValidatedTenancyScopeKey: kVTSKey
+            }
+        }
     });
     rst.startSet({keyFile: 'jstests/libs/key1'});
     rst.initiate();
@@ -34,7 +41,7 @@ function killCurrentOpTest() {
 
     // Create a user for kTenant and its security token.
     const securityToken =
-        _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
+        _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant1",
         '$tenant': kTenant,
@@ -44,7 +51,7 @@ function killCurrentOpTest() {
 
     // Create a different tenant to test that one tenant can't see or kill other tenant's op.
     const securityTokenOtherTenant =
-        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant});
+        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant}, kVTSKey);
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant2",
         '$tenant': kOtherTenant,

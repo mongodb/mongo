@@ -68,7 +68,6 @@
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -1604,29 +1603,48 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
+    constexpr auto kVTSKey = "secret"_sd;
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          kVTSKey);
 
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
     using VTS = auth::ValidatedTenancyScope;
 
     // Create and authorize a security token user.
-    constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-
     ASSERT_OK(createUser(kTenant1UserTest, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
     ASSERT_OK(createUser(kUser1Test, {{"readWriteAnyDatabase", "admin"}}));
     ASSERT_OK(createUser(kTenant2UserTest, {{"readWriteAnyDatabase", "admin"}}));
 
     {
-        VTS validatedTenancyScope =
-            VTS(BSON(authUserFieldName << kTenant1UserTest.toBSON(true /* encodeTenant */)),
-                VTS::TokenForTestingTag{});
-        VTS::set(_opCtx.get(), validatedTenancyScope);
+        VTS validatedTenancyScope(kTenant1UserTest, kVTSKey, VTS::TokenForTestingTag{});
 
-        // Make sure that security token users can't be authorized with an expiration date.
-        Date_t expirationTime = clockSource()->now() + Hours(1);
-        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kTenant1UserTestRequest, expirationTime));
+        // Actual expiration used by AuthorizationSession will be the minimum of
+        // the token's known expiraiton time and the expiration time passed in.
+        const auto checkExpiration = [&](const boost::optional<Date_t>& expire,
+                                         const Date_t& expect) {
+            VTS::set(_opCtx.get(), validatedTenancyScope);
+            ASSERT_OK(
+                authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, expire));
+            ASSERT_EQ(authzSession->getExpiration(), expect);
+
+            // Reset for next test.
+            VTS::set(_opCtx.get(), boost::none);
+            authzSession->startRequest(_opCtx.get());
+            assertLogout(testTenant1FooCollResource, ActionType::insert);
+        };
+        const auto exp = validatedTenancyScope.getExpiration();
+        checkExpiration(boost::none, exp);    // Uses token's expiration
+        checkExpiration(Date_t::max(), exp);  // Longer expiration does not override token.
+        checkExpiration(exp - Seconds{1}, exp - Seconds{1});  // Shorter expiration does.
+    }
+
+    {
+        VTS validatedTenancyScope(kTenant1UserTest, kVTSKey, VTS::TokenForTestingTag{});
+
+        // Perform authentication checks.
+        VTS::set(_opCtx.get(), validatedTenancyScope);
         ASSERT_OK(
             authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, boost::none));
 
@@ -1652,8 +1670,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
         const auto kSomeCollNss = NamespaceString::createNamespaceString_forTest(
             boost::none, "anydb"_sd, "somecollection"_sd);
         const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
-        ASSERT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, expirationTime));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(
+            _opCtx.get(), kUser1TestRequest, Date_t() + Hours{1}));
         assertActive(kSomeCollRsrc, ActionType::insert);
 
         // Check that logout proceeds normally.
@@ -1661,11 +1679,10 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
             _client.get(), kTestDB, "Log out readWriteAny user for test"_sd);
         assertLogout(kSomeCollRsrc, ActionType::insert);
     }
+
     // Create a new validated tenancy scope for the readWriteAny tenant user.
     {
-        VTS validatedTenancyScope =
-            VTS(BSON(authUserFieldName << kTenant2UserTest.toBSON(true /* encodeTenant */)),
-                VTS::TokenForTestingTag{});
+        VTS validatedTenancyScope(kTenant2UserTest, kVTSKey, VTS::TokenForTestingTag{});
         VTS::set(_opCtx.get(), validatedTenancyScope);
 
         ASSERT_OK(

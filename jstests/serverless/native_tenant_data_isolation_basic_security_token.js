@@ -8,6 +8,7 @@ function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField) {
     assert.eq(nsField, nss);
 }
 
+const kVTSKey = 'secret';
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
@@ -15,6 +16,7 @@ const rst = new ReplSetTest({
         setParameter: {
             multitenancySupport: true,
             featureFlagSecurityToken: true,
+            testOnlyValidatedTenancyScopeKey: kVTSKey,
         }
     }
 });
@@ -40,7 +42,8 @@ const kDbName = 'myDb';
 const kCollName = 'myColl';
 const kViewName = "view1";
 const tokenConn = new Mongo(primary.host);
-const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
+const securityToken =
+    _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
 const tokenDB = tokenConn.getDB(kDbName);
 
 // In this jstest, the collection (defined by kCollName) and the document "{_id: 0, a: 1, b: 1}"
@@ -511,7 +514,7 @@ const tokenDB = tokenConn.getDB(kDbName);
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
     const securityTokenOtherTenant =
-        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant});
+        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant}, kVTSKey);
     tokenConn._setSecurityToken(securityTokenOtherTenant);
 
     const tokenDB2 = tokenConn.getDB(kDbName);

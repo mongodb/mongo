@@ -1,12 +1,8 @@
 // Test role restrictions when using security tokens.
-// @tags: [requires_replication]
+// @tags: [requires_replication, featureFlagSecurityToken]
 
 const tenantID = ObjectId();
-const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
-
-if (!isSecurityTokenEnabled) {
-    quit();
-}
+const kVTSKey = 'secret';
 
 function runTest(conn, rst = undefined) {
     const admin = conn.getDB('admin');
@@ -32,7 +28,7 @@ function runTest(conn, rst = undefined) {
     Object.keys(users).forEach(function(user) {
         const tokenConn = new Mongo(conn.host);
         tokenConn._setSecurityToken(
-            _createSecurityToken({user: user, db: '$external', tenant: tenantID}));
+            _createSecurityToken({user: user, db: '$external', tenant: tenantID}, kVTSKey));
         const tokenDB = tokenConn.getDB('test');
         if (users[user].prohibited) {
             assert.commandFailed(tokenDB.adminCommand({connectionStatus: 1}));
@@ -58,7 +54,10 @@ function runTest(conn, rst = undefined) {
 
 const opts = {
     auth: '',
-    setParameter: "multitenancySupport=true",
+    setParameter: {
+        multitenancySupport: true,
+        testOnlyValidatedTenancyScopeKey: kVTSKey,
+    },
 };
 {
     const standalone = MongoRunner.runMongod(opts);

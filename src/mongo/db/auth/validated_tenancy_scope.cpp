@@ -44,12 +44,14 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -61,6 +63,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -69,6 +72,14 @@ namespace mongo::auth {
 namespace {
 const auto validatedTenancyScopeDecoration =
     OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
+
+// Signed auth tokens are for internal testing only, and require the use of a preshared key.
+// These tokens will have fixed values for kid/iss/aud fields.
+// This usage will be replaced by full OIDC processing at a later time.
+constexpr auto kTestOnlyKeyId = "test-only-kid"_sd;
+constexpr auto kTestOnlyIssuer = "mongodb://test.kernel.localhost"_sd;
+constexpr auto kTestOnlyAudience = "mongod-testing"_sd;
+
 MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     if (gMultitenancySupport) {
         logv2::detail::setGetTenantIDCallback([]() -> std::string {
@@ -93,32 +104,116 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
             "featureFlagSecurityToken is enabled.  This flag MUST NOT be enabled in production");
     }
 }
+
+struct ParsedTokenView {
+    StringData header;
+    StringData body;
+    StringData signature;
+
+    StringData payload;
+};
+
+// Split "header.body.signature" into {"header", "body", "signature", "header.body"}
+ParsedTokenView parseSignedToken(StringData token) {
+    ParsedTokenView pt;
+
+    auto split = token.find('.', 0);
+    uassert(8039404, "Missing JWS delimiter", split != std::string::npos);
+    pt.header = token.substr(0, split);
+    auto pos = split + 1;
+
+    split = token.find('.', pos);
+    uassert(8039405, "Missing JWS delimiter", split != std::string::npos);
+    pt.body = token.substr(pos, split - pos);
+    pt.payload = token.substr(0, split);
+    pos = split + 1;
+
+    split = token.find('.', pos);
+    uassert(8039406, "Too many delimiters in JWS token", split == std::string::npos);
+    pt.signature = token.substr(pos);
+    return pt;
+}
+
+BSONObj decodeJSON(StringData b64) try { return fromjson(base64url::decode(b64)); } catch (...) {
+    auto status = exceptionToStatus();
+    uasserted(status.code(), "Unable to parse security token: {}"_format(status.reason()));
+}
+
 }  // namespace
 
-ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, InitTag tag) : _originalToken(obj) {
-    const bool enabled = gMultitenancySupport &&
-        gFeatureFlagSecurityToken.isEnabled(serverGlobalParams.featureCompatibility);
+ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData securityToken)
+    : _originalToken(securityToken.toString()) {
 
     uassert(ErrorCodes::InvalidOptions,
             "Multitenancy not enabled, refusing to accept securityToken",
-            enabled || (tag == InitTag::kInitForShell));
+            gMultitenancySupport);
 
-    auto token = SecurityToken::parse(IDLParserContext{"Security Token"}, obj);
-    auto authenticatedUser = token.getAuthenticatedUser();
+    IDLParserContext ctxt("securityToken");
+    auto parsed = parseSignedToken(securityToken);
+    // Unsigned tenantId provided via highly privileged connection will respect tenantId field only.
+    if (parsed.signature.empty()) {
+        auto* as = AuthorizationSession::get(client);
+        uassert(ErrorCodes::Unauthorized,
+                "Use of unsigned security token requires useTenant privilege",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(boost::none), ActionType::useTenant));
+        auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
+        uassert(ErrorCodes::Unauthorized,
+                "Unsigned security token must contain a tenantId",
+                jwt.getTenantId() != boost::none);
+        _tenantOrUser = jwt.getTenantId().get();
+        return;
+    }
+
+    // Else, we expect this to be an HS256 token using a preshared secret.
+    uassert(ErrorCodes::Unauthorized,
+            "Signed authentication tokens are not accepted without feature flag opt-in",
+            gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafeAtStartup());
+
+    uassert(ErrorCodes::OperationFailed,
+            "Unable to validate test tokens when testOnlyValidatedTenancyScopeKey is not provided",
+            !gTestOnlyValidatedTenancyScopeKey.empty());
+    StringData secret(gTestOnlyValidatedTenancyScopeKey);
+
+    auto header = crypto::JWSHeader::parse(ctxt, decodeJSON(parsed.header));
     uassert(ErrorCodes::BadValue,
-            "Security token authenticated user requires a valid Tenant ID",
-            authenticatedUser.getTenant());
+            "Security token must be signed using 'HS256' algorithm",
+            header.getAlgorithm() == "HS256"_sd);
 
-    // Use actual authenticatedUser object as passed to preserve hash input.
-    auto authUserObj = obj[SecurityToken::kAuthenticatedUserFieldName].Obj();
-    ConstDataRange authUserCDR(authUserObj.objdata(), authUserObj.objsize());
+    auto computed =
+        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
+                                 secret.size(),
+                                 reinterpret_cast<const std::uint8_t*>(parsed.payload.rawData()),
+                                 parsed.payload.size());
+    auto sigraw = base64url::decode(parsed.signature);
+    auto signature = SHA256Block::fromBuffer(reinterpret_cast<const std::uint8_t*>(sigraw.data()),
+                                             sigraw.size());
 
-    // Placeholder algorithm.
-    auto computed = SHA256Block::computeHash({authUserCDR});
+    uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == signature);
 
-    uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == token.getSig());
+    auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
 
-    _tenantOrUser = std::move(authenticatedUser);
+    // Expected hard-coded values for kid/iss/aud.
+    // These signed tokens are used exclusively by internal testing,
+    // and should not ever have different values than what we create.
+    uassert(ErrorCodes::BadValue,
+            "Security token must use kid == '{}'"_format(kTestOnlyKeyId),
+            header.getKeyId() == kTestOnlyKeyId);
+    uassert(ErrorCodes::BadValue,
+            "Security token must use iss == '{}'"_format(kTestOnlyIssuer),
+            jwt.getIssuer() == kTestOnlyIssuer);
+    uassert(ErrorCodes::BadValue,
+            "Security token must use aud == '{}'"_format(kTestOnlyAudience),
+            stdx::holds_alternative<std::string>(jwt.getAudience()));
+    uassert(ErrorCodes::BadValue,
+            "Security token must use aud == '{}'"_format(kTestOnlyAudience),
+            stdx::get<std::string>(jwt.getAudience()) == kTestOnlyAudience);
+
+    auto swUserName = UserName::parse(jwt.getSubject(), jwt.getTenantId());
+    uassertStatusOK(swUserName.getStatus().withContext("Invalid subject name"));
+
+    _tenantOrUser = std::move(swUserName.getValue());
+    _expiration = jwt.getExpiration();
 }
 
 ValidatedTenancyScope::ValidatedTenancyScope(Client* client, TenantId tenant)
@@ -141,17 +236,16 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, TenantId tenant)
 
 boost::optional<ValidatedTenancyScope> ValidatedTenancyScope::create(Client* client,
                                                                      BSONObj body,
-                                                                     BSONObj securityToken) {
+                                                                     StringData securityToken) {
     if (!gMultitenancySupport) {
         return boost::none;
     }
 
     auto dollarTenantElem = body["$tenant"_sd];
-    const bool hasToken = securityToken.nFields() > 0;
 
     uassert(6545800,
             "Cannot pass $tenant id if also passing securityToken",
-            dollarTenantElem.eoo() || !hasToken);
+            dollarTenantElem.eoo() || securityToken.empty());
     uassert(ErrorCodes::OperationFailed,
             "Cannot process $tenant id when no client is available",
             dollarTenantElem.eoo() || client);
@@ -163,8 +257,8 @@ boost::optional<ValidatedTenancyScope> ValidatedTenancyScope::create(Client* cli
 
     if (dollarTenantElem) {
         return ValidatedTenancyScope(client, TenantId::parseFromBSON(dollarTenantElem));
-    } else if (hasToken) {
-        return ValidatedTenancyScope(securityToken);
+    } else if (!securityToken.empty()) {
+        return ValidatedTenancyScope(client, securityToken);
     } else {
         return boost::none;
     }
@@ -188,22 +282,66 @@ void ValidatedTenancyScope::set(OperationContext* opCtx,
     validatedTenancyScopeDecoration(opCtx) = std::move(token);
 }
 
-ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, TokenForTestingTag) {
-    auto authUserElem = obj[SecurityToken::kAuthenticatedUserFieldName];
-    uassert(ErrorCodes::BadValue,
-            "Invalid field(s) in token being signed",
-            (authUserElem.type() == Object) && (obj.nFields() == 1));
 
-    auto authUserObj = authUserElem.Obj();
-    ConstDataRange authUserCDR(authUserObj.objdata(), authUserObj.objsize());
+ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
+                                             StringData secret,
+                                             TokenForTestingTag tag)
+    : ValidatedTenancyScope(username, secret, Date_t::now() + kDefaultExpiration, tag) {}
 
-    // Placeholder algorithm.
-    auto sig = SHA256Block::computeHash({authUserCDR});
+ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
+                                             StringData secret,
+                                             Date_t expiration,
+                                             TokenForTestingTag) {
+    invariant(!secret.empty());
 
-    BSONObjBuilder signedToken(obj);
-    signedToken.appendBinData(SecurityToken::kSigFieldName, sig.size(), BinDataGeneral, sig.data());
-    _originalToken = signedToken.obj();
-    _tenantOrUser = UserName::parseFromBSONObj(authUserObj);
+    crypto::JWSHeader header;
+    header.setType("JWT"_sd);
+    header.setAlgorithm("HS256"_sd);
+    header.setKeyId(kTestOnlyKeyId);
+
+    crypto::JWT body;
+    body.setIssuer(kTestOnlyIssuer);
+    body.setSubject(username.getUnambiguousName());
+    body.setAudience(kTestOnlyAudience.toString());
+    body.setTenantId(username.getTenant());
+    body.setExpiration(std::move(expiration));
+
+    std::string payload = "{}.{}"_format(base64url::encode(tojson(header.toBSON())),
+                                         base64url::encode(tojson(body.toBSON())));
+
+    auto computed =
+        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
+                                 secret.size(),
+                                 reinterpret_cast<const std::uint8_t*>(payload.data()),
+                                 payload.size());
+
+    _originalToken =
+        "{}.{}"_format(payload,
+                       base64url::encode(StringData(reinterpret_cast<const char*>(computed.data()),
+                                                    computed.size())));
+
+    if (gTestOnlyValidatedTenancyScopeKey == secret) {
+        _tenantOrUser = username;
+        _expiration = body.getExpiration();
+    }
+}
+
+ValidatedTenancyScope::ValidatedTenancyScope(TenantId tenant, TenantForTestingTag) {
+    crypto::JWSHeader header;
+    header.setType("JWT"_sd);
+    header.setAlgorithm("none"_sd);
+    header.setKeyId("none"_sd);
+
+    crypto::JWT body;
+    body.setIssuer("mongodb://testing.localhost"_sd);
+    body.setSubject(".");
+    body.setAudience(std::string{"mongod-testing"});
+    body.setTenantId(tenant);
+    body.setExpiration(Date_t::max());
+
+    _originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
+                                     base64url::encode(tojson(body.toBSON())));
+    _tenantOrUser = std::move(tenant);
 }
 
 }  // namespace mongo::auth

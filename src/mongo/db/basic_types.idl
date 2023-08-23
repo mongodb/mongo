@@ -319,6 +319,13 @@ types:
         deserializer: "mongo::TenantId::parseFromBSON"
         serializer: "mongo::TenantId::serializeToBSON"
 
+    tenant_id_hex:
+        bson_serialization_type: string
+        description: "A 24 hexit string representing a tenantId"
+        cpp_type: "TenantId"
+        deserializer: "mongo::TenantId::parseFromString"
+        serializer: "mongo::TenantId::toString"
+
     database_name:
         bson_serialization_type: string
         description: "A MongoDB DatabaseName"

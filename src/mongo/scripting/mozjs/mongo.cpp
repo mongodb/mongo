@@ -374,15 +374,14 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
     auto arg = ValueWriter(cx, args.get(1)).toBSON();
 
     auto request = makeRequest(database, arg);
-    if (auto tokenArg = args.get(3); tokenArg.isObject()) {
+    if (auto tokenArg = args.get(3); tokenArg.isString()) {
         using VTS = auth::ValidatedTenancyScope;
-        if (auto token = ValueWriter(cx, tokenArg).toBSON(); token.nFields() > 0) {
-            request.validatedTenancyScope = VTS(token, VTS::InitTag::kInitForShell);
+        if (auto token = ValueWriter(cx, tokenArg).toString(); !token.empty()) {
+            request.validatedTenancyScope = VTS(token, VTS::InitForShellTag{});
         }
     } else {
         uassert(ErrorCodes::BadValue,
-                str::stream() << "The token parameter to " << Params::kCommandName
-                              << " must be an object",
+                "The token parameter to {} must be a string"_format(Params::kCommandName),
                 tokenArg.isUndefined());
     }
 

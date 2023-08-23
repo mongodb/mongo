@@ -72,7 +72,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/hasher.h"
@@ -459,17 +458,35 @@ BSONObj convertShardKeyToHashed(const BSONObj& a, void* data) {
  * Generate a security token suitable for passing in an OpMsg payload token field.
  *
  * @param user object - { user: 'name', db: 'dbname', tenant: OID }
- * @return object - { authenticatedUser: {...user object...}, sig: BinDataGeneral(Signature) }
+ * @param secret string - Secret to use for test signing
+ * @return string - Compact serialized JWS on an OIDC token.
  */
 BSONObj _createSecurityToken(const BSONObj& args, void* data) {
+    std::vector<BSONElement> argv;
+    args.elems(argv);
     uassert(6161500,
-            "_createSecurityToken requires a single object argument",
-            (args.nFields() == 1) && (args.firstElement().type() == Object));
+            "_createSecurityToken requires two arguments, an object and a non-empty string",
+            (argv.size() == 2) && (argv[0].type() == Object) && (argv[1].type() == String) &&
+                !argv[1].valueStringData().empty());
 
-    constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-    auto authUser = args.firstElement().Obj();
     using VTS = auth::ValidatedTenancyScope;
-    auto token = VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{});
+    auto token =
+        VTS(UserName::parseFromBSON(argv[0]), argv[1].valueStringData(), VTS::TokenForTestingTag{});
+    return BSON("" << token.getOriginalToken());
+}
+
+/**
+ * Generate an unsigned security token which contains a tenant component.
+ * @param tenant OID - The tenantId.
+ * @return string - Unsigned compact serialized JWS on an OIDC token.
+ */
+BSONObj _createTenantToken(const BSONObj& args, void* data) {
+    uassert(8039400,
+            "_createTenantToken requires an objectid",
+            (args.nFields() == 1) && (args.firstElement().type() == jstOID));
+
+    using VTS = auth::ValidatedTenancyScope;
+    auto token = VTS(TenantId{args.firstElement().OID()}, VTS::TenantForTestingTag{});
     return BSON("" << token.getOriginalToken());
 }
 
@@ -758,6 +775,7 @@ BSONObj _fnvHashToHexString(const BSONObj& args, void*) {
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_createSecurityToken", _createSecurityToken);
+    scope.injectNative("_createTenantToken", _createTenantToken);
     scope.injectNative("_replMonitorStats", replMonitorStats);
     scope.injectNative("_srand", JSSrand);
     scope.injectNative("_rand", JSRand);

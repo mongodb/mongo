@@ -78,7 +78,8 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
             featureFlagServerlessChangeStreams: true,
             multitenancySupport: true,
             featureFlagSecurityToken: true,
-            featureFlagRequireTenantID: true
+            featureFlagRequireTenantID: true,
+            testOnlyValidatedTenancyScopeKey: ChangeStreamMultitenantReplicaSetTest.getTokenKey(),
         };
 
         const nodeOptions = config.nodeOptions || {};
@@ -113,6 +114,11 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         };
     }
 
+    // Exposed as a method because linter does not yet support static properties.
+    static getTokenKey() {
+        return "secret";
+    }
+
     // Returns a connection to the 'hostAddr' with 'tenantId' stamped to it for the created user.
     static getTenantConnection(hostAddr,
                                tenantId,
@@ -143,8 +149,10 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         }
 
         // Set the provided tenant id into the security token for the user.
+        // PSK for signature matches testOnlyValidatedTenancyScopeKey setting in fixture class.
         tokenConn._setSecurityToken(
-            _createSecurityToken({user: user, db: '$external', tenant: tenantId}));
+            _createSecurityToken({user: user, db: '$external', tenant: tenantId},
+                                 ChangeStreamMultitenantReplicaSetTest.getTokenKey()));
 
         // Logout the root user to avoid multiple authentication.
         tokenConn.getDB("admin").logout();

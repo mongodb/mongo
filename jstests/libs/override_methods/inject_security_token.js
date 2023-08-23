@@ -47,8 +47,11 @@ function prepareSecurityToken(conn) {
     if (typeof conn._securityToken == 'undefined') {
         print(`Inject security token to the connection: "${tojsononeline(conn)}", user: "${
             kUserName}", tenant: ${kTenantId}`);
+        const key = TestData.testOnlyValidatedTenancyScopeKey;
+        assert.eq(
+            typeof key, 'string', 'testOnlyValidatedTenancyScopeKey not configured in TestData');
         const securityToken =
-            _createSecurityToken({user: kUserName, db: '$external', tenant: kTenantId});
+            _createSecurityToken({user: kUserName, db: '$external', tenant: kTenantId}, key);
         conn._setSecurityToken(securityToken);
     }
 }

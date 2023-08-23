@@ -8,6 +8,7 @@ const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kNewCollectionName = "currOpColl";
+const kVTSKey = 'secret';
 
 // Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing '$currentOp' in
 // aggregation pipeline with a security token.
@@ -77,6 +78,7 @@ const rst = new ReplSetTest({
         setParameter: {
             multitenancySupport: true,
             featureFlagSecurityToken: true,
+            testOnlyValidatedTenancyScopeKey: kVTSKey,
         }
     }
 });
@@ -96,7 +98,8 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
 assert.commandWorked(
     adminDb.runCommand({createUser: 'dbAdmin', pwd: 'pwd', roles: ['dbAdminAnyDatabase']}));
 
-const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
+const securityToken =
+    _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant1",
     '$tenant': kTenant,
@@ -104,7 +107,7 @@ assert.commandWorked(primary.getDB('$external').runCommand({
 }));
 
 const securityTokenOtherTenant =
-    _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant});
+    _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant}, kVTSKey);
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant2",
     '$tenant': kOtherTenant,

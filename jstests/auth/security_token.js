@@ -6,6 +6,7 @@ const kLogLevelForToken = 5;
 const kAcceptedSecurityTokenID = 5838100;
 const kLogoutMessageID = 6161506;
 const kStaleAuthenticationMessageID = 6161507;
+const kVTSKey = 'secret';
 const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
 
 function assertNoTokensProcessedYet(conn) {
@@ -14,19 +15,11 @@ function assertNoTokensProcessedYet(conn) {
               'Unexpected security token has been processed');
 }
 
-function makeTokenAndExpect(user, db) {
+function makeToken(user, db, secret = kVTSKey) {
     const authUser = {user: user, db: db, tenant: tenantID};
-
-    const token = _createSecurityToken(authUser);
+    const token = _createSecurityToken(authUser, secret);
     jsTest.log('Using security token: ' + tojson(token));
-
-    // Clone and rewrite OID and BinData fields to be roundtrip-safe.
-    const expect = Object.assign({}, token);
-    expect.authenticatedUser = Object.assign({}, token.authenticatedUser);
-    expect.authenticatedUser.tenant = {'$oid': tenantID.str};
-    expect.sig = {'$binary': {base64: token.sig.base64(), subType: '0'}};
-
-    return [token, {token: expect}];
+    return token;
 }
 
 function runTest(conn, multitenancyEnabled, rst = undefined) {
@@ -36,11 +29,17 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
     // we are accessing system.users for another tenant.
     assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['__system']}));
     assert(admin.auth('admin', 'pwd'));
+    // Make a less-privileged base user.
+    assert.commandWorked(
+        admin.runCommand({createUser: 'baseuser', pwd: 'pwd', roles: ['readWriteAnyDatabase']}));
+
+    const baseConn = new Mongo(conn.host);
+    const baseAdmin = baseConn.getDB('admin');
+    assert(baseAdmin.auth('baseuser', 'pwd'));
 
     // Create a tenant-local user.
     const createUserCmd =
         {createUser: 'user1', "$tenant": tenantID, pwd: 'pwd', roles: ['readWriteAnyDatabase']};
-    const countUserCmd = {count: "system.users", query: {user: 'user1'}, "$tenant": tenantID};
     if (multitenancyEnabled) {
         assert.commandWorked(admin.runCommand(createUserCmd));
 
@@ -49,8 +48,24 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
         assert.eq(admin.system.users.count({user: 'user1'}),
                   0,
                   'user1 should not exist on global users collection');
-        const usersCount = assert.commandWorked(admin.runCommand(countUserCmd));
-        assert.eq(usersCount.n, 1, 'user1 should exist on tenant users collection');
+
+        const countUserCmd = {count: "system.users", query: {user: 'user1'}};
+        const countUserViaBody = Object.assign({}, countUserCmd, {"$tenant": tenantID});
+
+        // Count using {"$tenant":...} param in body.
+        const usersCountDollar = assert.commandWorked(admin.runCommand(countUserViaBody));
+        assert.eq(usersCountDollar.n, 1, 'user1 should exist on tenant users collection');
+
+        // Count again using unsigned tenant token.
+        conn._setSecurityToken(_createTenantToken(tenantID));
+        const usersCountToken = assert.commandWorked(admin.runCommand(countUserCmd));
+        assert.eq(usersCountToken.n, 1, 'user1 should exist on tenant users collection');
+        conn._setSecurityToken(undefined);
+
+        // Users without `useTenant` should not be able to use unsigned tenant tokens.
+        baseConn._setSecurityToken(_createTenantToken(tenantID));
+        assert.commandFailed(baseAdmin.runCommand(countUserCmd));
+        baseConn._setSecurityToken(undefined);
     } else {
         assert.commandFailed(admin.runCommand(createUserCmd));
     }
@@ -67,24 +82,29 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
     const tokenDB = tokenConn.getDB('admin');
 
     // Basic OP_MSG command.
-    tokenConn._setSecurityToken({});
+    tokenConn._setSecurityToken('');
     assert.commandWorked(tokenDB.runCommand({ping: 1}));
     assertNoTokensProcessedYet(conn);
 
     // Test that no token equates to unauthenticated.
     assert.commandFailed(tokenDB.runCommand({features: 1}));
 
-    // Passing a security token with unknown fields will fail at the client
-    // while trying to construct a signed security token.
-    const kIDLParserUnknownField = 40415;
-    tokenConn._setSecurityToken({invalid: 1});
-    assert.throwsWithCode(() => tokenDB.runCommand({ping: 1}), kIDLParserUnknownField);
-    assertNoTokensProcessedYet(conn);
-
-    const [token, expect] = makeTokenAndExpect('user1', 'admin');
-    tokenConn._setSecurityToken(token);
-
     if (multitenancyEnabled && isSecurityTokenEnabled) {
+        // Passing a security token with unknown fields will fail at the client
+        // while trying to construct a signed security token.
+        const kIDLMissingRequiredField = 40414;
+        tokenConn._setSecurityToken('e30.e30.deadbeefcafe');  // b64u('{}') === 'e30'
+        assert.commandFailedWithCode(tokenDB.runCommand({ping: 1}), kIDLMissingRequiredField);
+        assertNoTokensProcessedYet(conn);
+
+        // Passing a valid looking security token signed with the wrong secret should also fail.
+        tokenConn._setSecurityToken(makeToken('user1', 'admin', 'haxx'));
+        assert.commandFailedWithCode(tokenDB.runCommand({ping: 1}), ErrorCodes.Unauthorized);
+        assertNoTokensProcessedYet(conn);
+
+        const token = makeToken('user1', 'admin');
+        tokenConn._setSecurityToken(token);
+
         // Basic use.
         assert.commandWorked(tokenDB.runCommand({features: 1}));
 
@@ -99,6 +119,7 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
                              {role: 'readWriteAnyDatabase', db: 'admin'}));
 
         // Look for "Accepted Security Token" message with explicit tenant logging.
+        const expect = {token: token};
         jsTest.log('Checking for: ' + tojson(expect));
         checkLog.containsJson(conn, kAcceptedSecurityTokenID, expect, 'Security Token not logged');
 
@@ -135,7 +156,10 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
 function runTests(enabled) {
     const opts = {
         auth: '',
-        setParameter: "multitenancySupport=" + (enabled ? 'true' : 'false'),
+        setParameter: {
+            multitenancySupport: enabled,
+            testOnlyValidatedTenancyScopeKey: kVTSKey,
+        },
     };
     {
         const standalone = MongoRunner.runMongod(opts);

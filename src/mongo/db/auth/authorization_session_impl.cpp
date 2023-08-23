@@ -303,9 +303,12 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         uassert(6161502,
                 "Attempt to authorize a user other than that present in the security token",
                 validatedTenancyScope->authenticatedUser() == userName);
-        uassert(7070101,
-                "Attempt to set expiration policy on a security token user",
-                expirationTime == boost::none);
+        auto tokenExpires = validatedTenancyScope->getExpiration();
+        if (!expirationTime) {
+            expirationTime = tokenExpires;
+        } else if (tokenExpires < expirationTime.get()) {
+            expirationTime = tokenExpires;
+        }
         validateSecurityTokenUserPrivileges(user->getPrivileges());
         _authenticationMode = AuthenticationMode::kSecurityToken;
     } else {
@@ -315,10 +318,10 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
                     expirationTime.value() >
                         opCtx->getServiceContext()->getFastClockSource()->now());
         _authenticationMode = AuthenticationMode::kConnection;
-        _expirationTime = std::move(expirationTime);
-        _expiredUserName = boost::none;
     }
     _authenticatedUser = std::move(user);
+    _expirationTime = std::move(expirationTime);
+    _expiredUserName = boost::none;
 
     // If there are any users and roles in the impersonation data, clear it out.
     clearImpersonatedUserData();

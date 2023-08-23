@@ -6,12 +6,14 @@
  * ]
  */
 // Create a replica set with multi-tenancy enabled.
+const kVTSKey = 'secret';
 const replSetTest = ReplSetTest({nodes: 1});
 replSetTest.startSet({
     setParameter: {
         multitenancySupport: true,
         featureFlagSecurityToken: true,
-        featureFlagRequireTenantID: true
+        featureFlagRequireTenantID: true,
+        testOnlyValidatedTenancyScopeKey: kVTSKey,
     }
 });
 replSetTest.initiate();
@@ -39,7 +41,7 @@ const tenantDB = (() => {
 
     // Set the provided tenant id into the security token for the user.
     tokenConn._setSecurityToken(
-        _createSecurityToken({user: user, db: '$external', tenant: tenantId}));
+        _createSecurityToken({user: user, db: '$external', tenant: tenantId}, kVTSKey));
 
     // Logout the root user to avoid multiple authentication.
     tokenConn.getDB("admin").logout();

@@ -111,6 +111,11 @@ structs:
                 type:
                     variant: [string, array<string>]
                 cpp_name: audience
+            "mongodb/tenantId":
+                description: TenantId; 24 hexits identifying the tenant for this operation
+                type: tenant_id_hex
+                cpp_name: tenantId
+                optional: true
             nbf:
                 description: Time at which the JWT becomes valid. (Unix Epoch)
                 type: unixEpoch

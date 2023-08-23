@@ -39,6 +39,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -52,18 +53,11 @@ public:
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
-    // kInitForShell allows parsing a securityToken without multitenancy enabled.
-    // This is required in the shell since we do not enable this setting in non-servers.
-    enum class InitTag {
-        kNormal,
-        kInitForShell,
-    };
-
     /**
-     * Constructs a ValidatedTenancyScope by parsing a SecurityToken from a BSON object
+     * Constructs a ValidatedTenancyScope by parsing a SecurityToken from a JWS String
      * and verifying its cryptographic signature.
      */
-    explicit ValidatedTenancyScope(BSONObj securityToken, InitTag tag = InitTag::kNormal);
+    ValidatedTenancyScope(Client* client, StringData securityToken);
 
     /**
      * Constructs a ValidatedTenancyScope for tenant only by validating that the
@@ -79,23 +73,37 @@ public:
      */
     static boost::optional<ValidatedTenancyScope> create(Client* client,
                                                          BSONObj body,
-                                                         BSONObj securityToken);
+                                                         StringData securityToken);
 
     bool hasAuthenticatedUser() const;
 
     const UserName& authenticatedUser() const;
 
+    bool hasTenantId() const {
+        return stdx::visit(OverloadedVisitor{
+                               [](const std::monostate&) { return false; },
+                               [](const UserName& userName) { return !!userName.getTenant(); },
+                               [](const TenantId& tenant) { return true; },
+                           },
+                           _tenantOrUser);
+    }
+
     const TenantId& tenantId() const {
         return stdx::visit(
             OverloadedVisitor{
+                [](const std::monostate&) -> const TenantId& { MONGO_UNREACHABLE; },
                 [](const UserName& userName) -> decltype(auto) { return *userName.getTenant(); },
                 [](const TenantId& tenant) -> decltype(auto) { return tenant; },
             },
             _tenantOrUser);
     }
 
-    BSONObj getOriginalToken() const {
+    StringData getOriginalToken() const {
         return _originalToken;
+    }
+
+    Date_t getExpiration() const {
+        return _expiration;
     }
 
     /**
@@ -108,14 +116,26 @@ public:
      * Transitional token generator, do not use outside of test code.
      */
     struct TokenForTestingTag {};
-    explicit ValidatedTenancyScope(BSONObj token, TokenForTestingTag);
+    static constexpr Minutes kDefaultExpiration{15};
+    explicit ValidatedTenancyScope(const UserName& username, StringData secret, TokenForTestingTag);
+    explicit ValidatedTenancyScope(const UserName& username,
+                                   StringData secret,
+                                   Date_t expiration,
+                                   TokenForTestingTag);
 
     /**
      * Setup a validated tenant for test, do not use outside of test code.
      */
     struct TenantForTestingTag {};
-    explicit ValidatedTenancyScope(TenantId tenant, TenantForTestingTag)
-        : _tenantOrUser(std::move(tenant)) {}
+    explicit ValidatedTenancyScope(TenantId tenant, TenantForTestingTag);
+
+    /**
+     * Initializes a VTS object with original BSON only.
+     * Used by shell to prepare outgoing OpMsg requests.
+     */
+    struct InitForShellTag {};
+    explicit ValidatedTenancyScope(std::string token, InitForShellTag)
+        : _originalToken(std::move(token)) {}
 
     /**
      * Backdoor API to setup a validated tenant. For use only when a security context is not
@@ -127,9 +147,15 @@ public:
 
 private:
     // Preserve original token for serializing from MongoQ.
-    BSONObj _originalToken;
+    std::string _originalToken;
 
-    stdx::variant<UserName, TenantId> _tenantOrUser;
+    // Expiration time if any.
+    Date_t _expiration = Date_t::max();
+
+    // monostate represents a VTS which has not actually been validated.
+    // It should only persist into construction within the shell,
+    // where VTS is used for sending token data to a server via _originalBSON.
+    stdx::variant<std::monostate, UserName, TenantId> _tenantOrUser;
 };
 
 }  // namespace auth

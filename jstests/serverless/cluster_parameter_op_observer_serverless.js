@@ -37,7 +37,8 @@ rst.startSet({
     setParameter: {
         multitenancySupport: true,
         featureFlagRequireTenantID: true,
-        featureFlagSecurityToken: true
+        featureFlagSecurityToken: true,
+        testOnlyValidatedTenancyScopeKey: ChangeStreamMultitenantReplicaSetTest.getTokenKey(),
     }
 });
 rst.initiate();

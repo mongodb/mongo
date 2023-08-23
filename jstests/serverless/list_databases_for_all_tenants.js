@@ -3,6 +3,8 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
+const kVTSKey = 'secret';
+
 // Given the output from the listDatabasesForAllTenants command, ensures that the total size
 // reported is the sum of the individual db sizes.
 function verifySizeSum(listDatabasesOut) {
@@ -49,7 +51,8 @@ function createMultitenantDatabases(conn, tokenConn, num) {
             roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
         }));
         tokenConn._setSecurityToken(_createSecurityToken(
-            {user: "readWriteUserTenant" + i.toString(), db: '$external', tenant: kTenant}));
+            {user: "readWriteUserTenant" + i.toString(), db: '$external', tenant: kTenant},
+            kVTSKey));
 
         // Create a collection for the tenant and then insert into it.
         const tokenDB = tokenConn.getDB('auto_gen_db_' + i.toString());
@@ -218,7 +221,7 @@ function runTestInvalidCommands(primary) {
         roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
     tokenConn._setSecurityToken(
-        _createSecurityToken({user: "unauthorizedUsr", db: '$external', tenant: kTenant}));
+        _createSecurityToken({user: "unauthorizedUsr", db: '$external', tenant: kTenant}, kVTSKey));
     const tokenAdminDB = tokenConn.getDB("admin");
     cmdRes = assert.commandFailedWithCode(
         tokenAdminDB.runCommand({listDatabasesForAllTenants: 1, filter: {name: /auto_gen_db_/}}),
@@ -233,6 +236,7 @@ function runTestsWithMultiTenancySupport() {
             setParameter: {
                 multitenancySupport: true,
                 featureFlagSecurityToken: true,
+                testOnlyValidatedTenancyScopeKey: kVTSKey,
             }
         }
     });
@@ -263,6 +267,7 @@ function runTestNoMultiTenancySupport() {
             setParameter: {
                 multitenancySupport: false,
                 featureFlagSecurityToken: true,
+                testOnlyValidatedTenancyScopeKey: kVTSKey,
             }
         }
     });

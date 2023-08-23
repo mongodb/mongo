@@ -6,6 +6,7 @@ import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
 
 const tenantId1 = ObjectId();
 const tenantId2 = ObjectId();
+const kVTSKey = 'secret';
 
 // List of tests. Each test specifies a role which the created user should have, whether we
 // should be testing with a tenant ID, and the list of authorization checks to run and their
@@ -222,7 +223,7 @@ function runTests(conn) {
         // users.
         if (test.isTenantedUser) {
             conn._setSecurityToken(
-                _createSecurityToken({user: username, db: 'admin', tenant: tenantId1}));
+                _createSecurityToken({user: username, db: 'admin', tenant: tenantId1}, kVTSKey));
         } else {
             assert(admin.auth(username, 'pwd'));
         }
@@ -260,7 +261,10 @@ function runTests(conn) {
 
 const opts = {
     auth: '',
-    setParameter: {multitenancySupport: true}
+    setParameter: {
+        multitenancySupport: true,
+        testOnlyValidatedTenancyScopeKey: kVTSKey,
+    },
 };
 
 // Test on standalone and replset.

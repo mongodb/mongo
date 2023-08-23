@@ -177,7 +177,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // comments.
     bool haveBody = false;
     OpMsg msg;
-    BSONObj securityToken;
+    StringData securityToken;
     while (!sectionsBuf.atEof()) {
         const auto sectionKind = sectionsBuf.read<Section>();
         switch (sectionKind) {
@@ -221,7 +221,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 uassert(ErrorCodes::Unauthorized,
                         "Unsupported Security Token provided",
                         gMultitenancySupport);
-                securityToken = sectionsBuf.read<Validated<BSONObj>>();
+                securityToken = sectionsBuf.readCStr();
                 break;
             }
 
@@ -423,7 +423,7 @@ void serializeHelper(const std::vector<OpMsg::DocumentSequence>& sequences,
                      OpMsgBuilder* output) {
     if (validatedTenancyScope) {
         auto securityToken = validatedTenancyScope->getOriginalToken();
-        if (securityToken.nFields() > 0) {
+        if (!securityToken.empty()) {
             output->setSecurityToken(securityToken);
         }
     }
@@ -462,15 +462,14 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
     }
 }
 
-BSONObjBuilder OpMsgBuilder::beginSecurityToken() {
+void OpMsgBuilder::setSecurityToken(StringData token) {
     invariant(_state == kEmpty);
-    _state = kSecurityToken;
     _buf.appendStruct(Section::kSecurityToken);
-    return BSONObjBuilder(_buf);
+    _buf.appendStr(token, true /* includeEndingNull */);
 }
 
 auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
-    invariant((_state == kEmpty) || (_state == kSecurityToken) || (_state == kDocSequence));
+    invariant((_state == kEmpty) || (_state == kDocSequence));
     invariant(!_openBuilder);
     _openBuilder = true;
     _state = kDocSequence;
@@ -491,7 +490,7 @@ void OpMsgBuilder::finishDocumentStream(DocSequenceBuilder* docSequenceBuilder) 
 }
 
 BSONObjBuilder OpMsgBuilder::beginBody() {
-    invariant((_state == kEmpty) || (_state == kSecurityToken) || (_state == kDocSequence));
+    invariant((_state == kEmpty) || (_state == kDocSequence));
     _state = kBody;
     _buf.appendStruct(Section::kBody);
     invariant(_bodyStart == 0);

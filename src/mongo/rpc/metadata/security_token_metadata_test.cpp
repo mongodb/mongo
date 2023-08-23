@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/service_context.h"
@@ -64,14 +63,9 @@ namespace {
 
 constexpr auto kPingFieldName = "ping"_sd;
 
-BSONObj makeSecurityToken(const UserName& userName) {
-    constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-    auto authUser = userName.toBSON(true /* serialize token */);
-    ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
+std::string makeSecurityToken(const UserName& userName) {
     using VTS = auth::ValidatedTenancyScope;
-    return VTS(BSON(authUserFieldName << authUser), VTS::TokenForTestingTag{})
-        .getOriginalToken()
-        .getOwned();
+    return VTS(userName, "secret"_sd, VTS::TokenForTestingTag{}).getOriginalToken().toString();
 }
 
 class SecurityTokenMetadataTest : public ServiceContextTest {
@@ -83,6 +77,19 @@ protected:
     ServiceContext::UniqueClient client;
 };
 
+TEST_F(SecurityTokenMetadataTest, SecurityTokenSingletenancy) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+
+    const auto kPingBody = BSON(kPingFieldName << 1);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
+
+    auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
+    ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
+                                DBException,
+                                ErrorCodes::Unauthorized,
+                                "Unsupported Security Token provided");
+}
+
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", false);
@@ -91,15 +98,33 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
 
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
-    ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
-                                DBException,
-                                ErrorCodes::InvalidOptions,
-                                "Multitenancy not enabled, refusing to accept securityToken");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        msgBytes.parse(),
+        DBException,
+        ErrorCodes::Unauthorized,
+        "Signed authentication tokens are not accepted without feature flag opt-in");
+}
+
+TEST_F(SecurityTokenMetadataTest, SecurityTokenTestTokensNotAvailable) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+
+    const auto kPingBody = BSON(kPingFieldName << 1);
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
+
+    auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
+    ASSERT_THROWS_CODE_AND_WHAT(
+        msgBytes.parse(),
+        DBException,
+        ErrorCodes::OperationFailed,
+        "Unable to validate test tokens when testOnlyValidatedTenancyScopeKey is not provided");
 }
 
 TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
 
     const auto kTenantId = TenantId(OID::gen());
     const auto kPingBody = BSON(kPingFieldName << 1);
@@ -109,7 +134,7 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     ASSERT_BSONOBJ_EQ(msg.body, kPingBody);
     ASSERT_EQ(msg.sequences.size(), 0u);
     ASSERT_TRUE(msg.validatedTenancyScope != boost::none);
-    ASSERT_BSONOBJ_EQ(msg.validatedTenancyScope->getOriginalToken(), kTokenBody);
+    ASSERT_EQ(msg.validatedTenancyScope->getOriginalToken(), kTokenBody);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), kTenantId);
 
     auto opCtx = makeOperationContext();

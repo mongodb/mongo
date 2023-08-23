@@ -5,6 +5,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+const kVTSKey = 'secret';
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -12,6 +13,7 @@ const rst = new ReplSetTest({
         setParameter: {
             multitenancySupport: true,
             featureFlagSecurityToken: true,
+            testOnlyValidatedTenancyScopeKey: kVTSKey,
         }
     }
 });
@@ -36,7 +38,7 @@ assert(adminDb.auth('admin', 'pwd'));
 const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTenantID");
 
 const securityToken1 =
-    _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant1});
+    _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant1}, kVTSKey);
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant1",
     '$tenant': kTenant1,
@@ -44,7 +46,7 @@ assert.commandWorked(primary.getDB('$external').runCommand({
 }));
 
 const securityToken2 =
-    _createSecurityToken({user: "userTenant2", db: '$external', tenant: kTenant2});
+    _createSecurityToken({user: "userTenant2", db: '$external', tenant: kTenant2}, kVTSKey);
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant2",
     '$tenant': kTenant2,
@@ -80,6 +82,7 @@ const secondary = rst.add({
     setParameter: {
         multitenancySupport: true,
         featureFlagSecurityToken: true,
+        testOnlyValidatedTenancyScopeKey: kVTSKey,
     }
 });
 rst.reInitiate();
