@@ -85,9 +85,8 @@ void ShardServerTestFixture::setCatalogCacheLoader(std::unique_ptr<CatalogCacheL
 }
 
 void ShardServerTestFixture::tearDown() {
-    CatalogCacheLoader::clearForTests(getServiceContext());
-
     ShardingMongodTestFixture::tearDown();
+    CatalogCacheLoader::clearForTests(getServiceContext());
 }
 
 std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient() {

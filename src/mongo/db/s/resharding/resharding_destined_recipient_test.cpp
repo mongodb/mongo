@@ -326,22 +326,18 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, false);
 
-    {
-        AutoGetCollection coll(opCtx, kNss, MODE_IX);
-        OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
+    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
 
-        FailPointEnableBlock failPoint("blockCollectionCacheLookup");
-        ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache()),
-                                 ShardCannotRefreshDueToLocksHeldException,
-                                 [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
-                                     const auto refreshInfo =
-                                         ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
-                                     ASSERT(refreshInfo);
-                                     ASSERT_EQ(refreshInfo->getNss(), env.tempNss);
-                                 });
-    }
-
-    auto sw = catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, env.tempNss);
+    FailPointEnableBlock failPoint("blockCollectionCacheLookup");
+    ASSERT_THROWS_WITH_CHECK(ShardingWriteRouter(opCtx, kNss, Grid::get(opCtx)->catalogCache()),
+                             ShardCannotRefreshDueToLocksHeldException,
+                             [&](const ShardCannotRefreshDueToLocksHeldException& ex) {
+                                 const auto refreshInfo =
+                                     ex.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+                                 ASSERT(refreshInfo);
+                                 ASSERT_EQ(refreshInfo->getNss(), env.tempNss);
+                             });
 }
 
 TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
