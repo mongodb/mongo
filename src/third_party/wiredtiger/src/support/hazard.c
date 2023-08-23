@@ -19,31 +19,35 @@ static void __hazard_dump(WT_SESSION_IMPL *);
 static int
 hazard_grow(WT_SESSION_IMPL *session)
 {
-    WT_HAZARD *nhazard;
+    WT_HAZARD *new_hazard;
     size_t size;
     uint64_t hazard_gen;
-    void *ohazard;
+    void *old_hazard;
 
     /*
      * Allocate a new, larger hazard pointer array and copy the contents of the original into place.
      */
     size = session->hazard_size;
-    WT_RET(__wt_calloc_def(session, size * 2, &nhazard));
-    memcpy(nhazard, session->hazard, size * sizeof(WT_HAZARD));
+    WT_RET(__wt_calloc_def(session, size * 2, &new_hazard));
+    memcpy(new_hazard, session->hazard, size * sizeof(WT_HAZARD));
 
     /*
      * Swap the new hazard pointer array into place after initialization is complete (initialization
      * must complete before eviction can see the new hazard pointer array), then schedule the
      * original to be freed.
      */
-    ohazard = session->hazard;
-    WT_PUBLISH(session->hazard, nhazard);
+    old_hazard = session->hazard;
+    WT_PUBLISH(session->hazard, new_hazard);
 
     /*
-     * Increase the size of the session's pointer array after swapping it into place (the session's
-     * reference must be updated before eviction can see the new size).
+     * Our larger hazard array means we can use larger indices for reading/writing hazard pointers.
+     * However, if these larger indices become visible to other threads before the new hazard array
+     * we can have out of bounds accesses to the old hazard array. Set a write barrier here to
+     * ensure the array pointer is always visible first.
      */
-    WT_PUBLISH(session->hazard_size, (uint32_t)(size * 2));
+    WT_WRITE_BARRIER();
+
+    session->hazard_size = (uint32_t)(size * 2);
 
     /*
      * Threads using the hazard pointer array from now on will use the new one. Increment the hazard
@@ -51,7 +55,7 @@ hazard_grow(WT_SESSION_IMPL *session)
      * leak the memory.
      */
     __wt_gen_next(session, WT_GEN_HAZARD, &hazard_gen);
-    WT_IGNORE_RET(__wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, ohazard, 0));
+    WT_IGNORE_RET(__wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, old_hazard, 0));
 
     return (0);
 }
@@ -102,6 +106,12 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
         WT_ASSERT(session,
           session->nhazard == session->hazard_inuse &&
             session->hazard_inuse < session->hazard_size);
+        /*
+         * If we've grown the hazard array the inuse counter can be incremented beyond the size of
+         * the old hazard array. We need to ensure the new hazard array pointer is visible before
+         * this increment of the inuse counter and do so with a write barrier in the hazard grow
+         * logic.
+         */
         hp = &session->hazard[session->hazard_inuse++];
     } else {
         WT_ASSERT(session,
