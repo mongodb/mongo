@@ -99,7 +99,8 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
 
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
     conn->flush_ckpt_complete = false;
-    conn->flush_most_recent = conn->ckpt_most_recent;
+    /* Flushing is part of a checkpoint, use the session's checkpoint time. */
+    conn->flush_most_recent = session->current_ckpt_sec;
     conn->flush_ts = conn->txn_global.last_ckpt_timestamp;
     /*
      * It would be more efficient to return here if no tiered storage is enabled in the system. If
