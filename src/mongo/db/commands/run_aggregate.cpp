@@ -1053,6 +1053,14 @@ Status runAggregate(OperationContext* opCtx,
             return std::make_pair(expCtx, std::move(pipeline));
         };
 
+        auto collectionType =
+            ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
+        if (liteParsedPipeline.hasChangeStream()) {
+            collectionType = query_shape::CollectionType::kChangeStream;
+        } else if (nss.isCollectionlessAggregateNS()) {
+            collectionType = query_shape::CollectionType::kVirtual;
+        }
+
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
@@ -1083,7 +1091,7 @@ Status runAggregate(OperationContext* opCtx,
                         expCtx,
                         pipelineInvolvedNamespaces,
                         origNss,
-                        ctx->getCollectionType());
+                        collectionType);
                 });
             } catch (const DBException& ex) {
                 if (ex.code() == 6347902) {
@@ -1140,12 +1148,7 @@ Status runAggregate(OperationContext* opCtx,
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
             query_stats::registerRequest(opCtx, nss, [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request,
-                    *pipeline,
-                    expCtx,
-                    pipelineInvolvedNamespaces,
-                    nss,
-                    ctx ? ctx->getCollectionType() : query_shape::CollectionType::unknown);
+                    request, *pipeline, expCtx, pipelineInvolvedNamespaces, nss, collectionType);
             });
         }
 

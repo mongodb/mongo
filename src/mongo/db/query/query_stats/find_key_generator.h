@@ -61,7 +61,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ParsedFindCommand& request,
         BSONObj parseableQueryShape,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::unknown)
+        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
         : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
           _readConcern(request.findCommandRequest->getReadConcern().has_value()
                            ? request.findCommandRequest->getReadConcern()->copy()

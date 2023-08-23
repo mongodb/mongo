@@ -85,7 +85,7 @@ std::size_t hash(const BSONObj& obj) {
 
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static constexpr auto collectionType = query_shape::CollectionType::collection;
+    static constexpr auto collectionType = query_shape::CollectionType::kCollection;
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {

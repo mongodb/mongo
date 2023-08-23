@@ -304,14 +304,14 @@ public:
     query_shape::CollectionType getCollectionType() const {
         if (isView()) {
             if (getView().getViewDefinition().timeseries())
-                return query_shape::CollectionType::timeseries;
-            return query_shape::CollectionType::view;
+                return query_shape::CollectionType::kTimeseries;
+            return query_shape::CollectionType::kView;
         }
         const auto& collection = getCollection();
         if (!collection.exists()) {
-            return query_shape::CollectionType::nonExistent;
+            return query_shape::CollectionType::kNonExistent;
         }
-        return query_shape::CollectionType::collection;
+        return query_shape::CollectionType::kCollection;
     }
 
     bool collectionExists() const {

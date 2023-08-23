@@ -115,7 +115,7 @@ public:
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
-                 query_shape::CollectionType collectionType = query_shape::CollectionType::unknown,
+                 query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown,
                  boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
         : _parseableQueryShape(parseableQueryShape.getOwned()),
           _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))),
@@ -195,8 +195,7 @@ protected:
         if (_hasField.clientMetaData) {
             bob.append("client", _clientMetaData);
         }
-        if (_collectionType > query_shape::CollectionType::unknown &&
-            _collectionType < query_shape::CollectionType::end) {
+        if (_collectionType != query_shape::CollectionType::kUnknown) {
             bob.append("collectionType", toStringData(_collectionType));
         }
     }
