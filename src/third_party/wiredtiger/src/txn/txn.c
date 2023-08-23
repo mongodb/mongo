@@ -2724,3 +2724,11 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+int WT_CDECL
+__ut_txn_mod_compare(const void *a, const void *b, void *context)
+{
+    return (__txn_mod_compare(a, b, context));
+}
+#endif
