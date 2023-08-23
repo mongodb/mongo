@@ -37,10 +37,18 @@ const sendFCVUpDown = function(ver) {
         if (e.code === 7428200) {
             // Cannot upgrade FCV if a previous FCV downgrade stopped in the middle of cleaning
             // up internal server metadata.
-            assertAlways.eq(latestFCV, targetFCV);
+            assertAlways.eq(latestFCV, ver);
             jsTestLog(
                 'setFCV: Cannot upgrade FCV if a previous FCV downgrade stopped in the middle \
 				of cleaning up internal server metadata');
+            return;
+        }
+        if (e.code === 12587) {
+            // Cannot downgrade FCV that requires a collMod command when index builds are
+            // concurrently taking place.
+            jsTestLog(
+                'setFCV: Cannot downgrade the FCV that requires a collMod command when index \
+                builds are concurrently running');
             return;
         }
         throw e;

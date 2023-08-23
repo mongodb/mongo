@@ -175,10 +175,11 @@ public:
         // entry is not representing a time-series collection or if FCV < 5.2.
         boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
 
-        // The flag will be set to false at the time of time-series collection creation. For any
-        // other collection type the flag will be boost::none. If a subsequent collMod operation
-        // changes either 'bucketRoundingSeconds' or 'bucketMaxSpanSeconds', we set the flag to
-        // true.
+        // The flag will be set to false at the time of time-series collection creation if FCV
+        // >= 7.1. For any other collection type and earlier versions the flag will be boost::none.
+        // Thus, if the field is absent, we assume the time-series bucketing parameters have
+        // changed. If a subsequent collMod operation changes either 'bucketRoundingSeconds' or
+        // 'bucketMaxSpanSeconds', we set the flag to true.
         boost::optional<bool> timeseriesBucketingParametersHaveChanged;
     };
 };

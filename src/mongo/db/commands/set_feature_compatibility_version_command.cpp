@@ -1071,6 +1071,42 @@ private:
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         const auto& [originalVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+            if (feature_flags::gTSBucketingParametersUnchanged
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                  originalVersion)) {
+                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                    catalog::forEachCollectionFromDb(
+                        opCtx,
+                        dbName,
+                        MODE_X,
+                        [&](const Collection* collection) {
+                            // Only remove the catalog entry flag if it exists. It could've been
+                            // removed if the downgrade process was interrupted and is being run
+                            // again. The downgrade process cannot be aborted at this point.
+                            if (collection->timeseriesBucketingParametersHaveChanged()) {
+                                // To remove timeseries bucketing parameters from persistent
+                                // storage, issue the "collMod" command with none of the parameters
+                                // set.
+                                BSONObjBuilder responseBuilder;
+                                uassertStatusOK(processCollModCommand(opCtx,
+                                                                      collection->ns(),
+                                                                      CollMod{collection->ns()},
+                                                                      &responseBuilder));
+                                return true;
+                            }
+                            return true;
+                        },
+                        [&](const Collection* collection) {
+                            return collection->getTimeseriesOptions() != boost::none;
+                        });
+                }
+            }
+        }
+
         _cleanUpClusterParameters(opCtx, requestedVersion);
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.

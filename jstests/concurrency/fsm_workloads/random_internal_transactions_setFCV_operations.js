@@ -46,6 +46,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     of cleaning up internal server metadata');
                 return;
             }
+            if (e.code === 12587) {
+                // Cannot downgrade FCV that requires a collMod command when index builds are
+                // concurrently taking place.
+                jsTestLog(
+                    'setFCV: Cannot downgrade the FCV that requires a collMod command when index \
+                    builds are concurrently running');
+                return;
+            }
             throw e;
         }
         jsTestLog('setFCV state finished');

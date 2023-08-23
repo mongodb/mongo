@@ -778,10 +778,8 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
     return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
 }
 
-bool CollectionImpl::timeseriesBucketingParametersMayHaveChanged() const {
-    return _metadata->timeseriesBucketingParametersHaveChanged
-        ? *_metadata->timeseriesBucketingParametersHaveChanged
-        : true;
+boost::optional<bool> CollectionImpl::timeseriesBucketingParametersHaveChanged() const {
+    return _metadata->timeseriesBucketingParametersHaveChanged;
 }
 
 void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
@@ -847,9 +845,9 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
 
 bool CollectionImpl::areTimeseriesBucketsFixed() const {
     auto tsOptions = getTimeseriesOptions();
-    return tsOptions &&
-        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds() &&
-        !timeseriesBucketingParametersMayHaveChanged();
+    boost::optional<bool> parametersChanged = timeseriesBucketingParametersHaveChanged();
+    return parametersChanged.has_value() && !parametersChanged.get() && tsOptions &&
+        tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
 }
 
 bool CollectionImpl::isClustered() const {

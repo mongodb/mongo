@@ -50,6 +50,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +62,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -307,7 +309,10 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
             // to false by default as mixed-schema data is only possible in versions 5.1 and
             // earlier.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
-            md.timeseriesBucketingParametersHaveChanged = false;
+            if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                md.timeseriesBucketingParametersHaveChanged = false;
+            }
         }
         b.append("md", md.toBSON());
         obj = b.obj();
