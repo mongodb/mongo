@@ -206,7 +206,9 @@ const tokenDB = tokenConn.getDB(kDbName);
         const dbs =
             assert.commandWorked(tokenAdminDB.runCommand({listDatabases: 1, nameOnly: true}));
         assert.eq(3, dbs.databases.length, tojson(dbs));
-        const expectedDbs = ["admin", kDbName, kOtherDbName];
+        const expectedDbs = featureFlagRequireTenantId
+            ? ["admin", kDbName, kOtherDbName]
+            : [kTenant + "_admin", kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
         assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)), tojson(dbs));
     }
 
@@ -550,7 +552,7 @@ const tokenDB = tokenConn.getDB(kDbName);
         tokenConn.getDB('admin').runCommand({listDatabases: 1, nameOnly: true}));
     // Only the 'admin' db exists
     assert.eq(1, dbsWithDiffToken.databases.length, tojson(dbsWithDiffToken));
-    const expectedAdminDb = "admin";
+    const expectedAdminDb = featureFlagRequireTenantId ? "admin" : kOtherTenant + "_admin";
     assert(arrayEq([expectedAdminDb], dbsWithDiffToken.databases.map(db => db.name)),
            tojson(dbsWithDiffToken));
 

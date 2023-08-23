@@ -141,8 +141,6 @@ public:
                 dbNames = storageEngine->listDatabases(cmd.getDbName().tenantId());
             }
             std::vector<ListDatabasesReplyItem> items;
-            SerializationContext scReply =
-                SerializationContext::stateCommandReply(cmd.getSerializationContext());
             int64_t totalSize = list_databases::setReplyItems(opCtx,
                                                               dbNames,
                                                               items,
@@ -150,11 +148,12 @@ public:
                                                               nameOnly,
                                                               filter,
                                                               false /* setTenantId */,
-                                                              authorizedDatabases,
-                                                              scReply);
+                                                              authorizedDatabases);
 
             // We need to copy the serialization context from the request to the reply object
-            ListDatabasesReply reply(std::move(items), scReply);
+            ListDatabasesReply reply(
+                std::move(items),
+                SerializationContext::stateCommandReply(cmd.getSerializationContext()));
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
                 reply.setTotalSizeMb(totalSize / (1024 * 1024));

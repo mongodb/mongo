@@ -133,9 +133,6 @@ public:
             }
 
             std::vector<ListDatabasesForAllTenantsReplyItem> items;
-            // Always return the dbName without the tenantId prefix.
-            SerializationContext scReply = SerializationContext::stateCommandReply();
-            scReply.setPrefixState(false);
             int64_t totalSize = list_databases::setReplyItems(opCtx,
                                                               dbNames,
                                                               items,
@@ -143,10 +140,9 @@ public:
                                                               nameOnly,
                                                               filter,
                                                               true /* setTenantId */,
-                                                              false /* authorizedDatabases*/,
-                                                              scReply);
-            // We need to copy the serialization context from the request to the reply object
-            Reply reply(std::move(items), scReply);
+                                                              false /* authorizedDatabases*/);
+
+            Reply reply(std::move(items));
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
                 reply.setTotalSizeMb(totalSize / (1024 * 1024));
