@@ -209,7 +209,7 @@ public:
                   "CMD: refineCollectionShardKey",
                   "request"_attr = request().toBSON({}));
 
-            ShardingCatalogManager::get(opCtx)->refineCollectionShardKey(
+            ShardingCatalogManager::get(opCtx)->refineCollectionShardKeyDEPRECATED(
                 opCtx, nss, newShardKeyPattern);
         }
 

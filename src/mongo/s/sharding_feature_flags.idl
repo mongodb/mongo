@@ -62,6 +62,13 @@ feature_flags:
     cpp_varname: feature_flags::gEmbeddedRouter
     default: false
     shouldBeFCVGated: true
+  # TODO SERVER-79064: Remove once 8.0 becomes last LTS.
+  featureFlagAuthoritativeRefineCollectionShardKey:
+    description: "Feature flag for enabling the authoritative version of the refine collection shard key."
+    cpp_varname: feature_flags::gAuthoritativeRefineCollectionShardKey
+    default: true
+    version: 7.1
+    shouldBeFCVGated: true
   # TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
   featureFlagTrackUnshardedCollectionsOnShardingCatalog:
     description: "Feature flag for enabling the tracking of user unsharded collection by turning them into a fixed-1-chunk sharded collections"

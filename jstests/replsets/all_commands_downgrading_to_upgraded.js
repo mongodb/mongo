@@ -49,6 +49,7 @@ const allCommands = {
     _configsvrCommitIndex: {skip: isAnInternalCommand},
     _configsvrCommitMergeAllChunksOnShard: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
+    _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},

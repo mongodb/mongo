@@ -55,4 +55,13 @@ commands:
             reason:
                 type: object
                 optional: true
+            # TODO SERVER-79600: Remove once the release of the critical section clears the
+            # filtering metaddata. WARNING: new parameter, do not use in DDLCoordinators unless
+            # it's drained.
+            clearFilteringMetadata:
+                type: bool
+                description: >-
+                    If true the filtering metadata will be cleared, forcing a refresh the next time
+                    the collection metadata is needed.
+                optional: true
         reply_type: OkReply

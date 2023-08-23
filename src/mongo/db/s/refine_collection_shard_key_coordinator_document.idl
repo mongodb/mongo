@@ -43,6 +43,17 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kRemoteIndexValidation: "RemoteIndexValidation"
+            kBlockCrud: "BlockCrud"
+            kCommit: "Commit"
+            kCommitOnShardsAndUnblock: "CommitOnShardsAndUnblock"
+
+    # TODO SERVER-79064: Remove once 8.0 becomes last LTS
+    RefineCollectionShardKeyCoordinatorPhasePre71Compatible:
+        description: "Old refine collection shard key coordinator's operation state."
+        type: string
+        values:
+            kUnset: "unset"
             kRefineCollectionShardKey: "RefineCollectionShardKey"
 
 structs:
@@ -56,5 +67,43 @@ structs:
         fields:
             phase:
                 type: RefineCollectionShardKeyCoordinatorPhase
+                description: "Coordinator phase."
+                default: kUnset
+            newEpoch:
+                type: objectid
+                description: "The new epoch for the collection."
+                optional: true
+            newTimestamp:
+                type: timestamp
+                description: "The new timestamp for the collection."
+                optional: true
+            uuid:
+                type: uuid
+                description: "Expected collection uuid."
+                optional: true
+            oldEpoch:
+                type: objectid
+                description: "The old epoch of the namespace."
+                optional: true
+            oldKey:
+                type: KeyPattern
+                description: "The index specification document that represents the old key."
+                optional: true
+            oldTimestamp:
+                type: timestamp
+                description: "Old timestamp for the collection."
+                optional: true
+
+    # TODO SERVER-79064: Remove once 8.0 becomes last LTS
+    RefineCollectionShardKeyCoordinatorDocumentPre71Compatible:
+        description: "Object with neccessary fields to refine a collection's shard key"
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
+        fields:
+            phase:
+                type: RefineCollectionShardKeyCoordinatorPhasePre71Compatible
                 description: "Coordinator phase."
                 default: kUnset

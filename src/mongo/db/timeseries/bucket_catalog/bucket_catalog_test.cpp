@@ -1500,14 +1500,15 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
     ASSERT_OK(status);
 
     // Insert a measurement that is compatible with the reopened bucket.
-    auto result = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42,
-                                                     "a":-100,"b":100})"),
-                         CombineWithInsertsFromOtherClients::kAllow);
+    auto result =
+        insert(_opCtx,
+               *_bucketCatalog,
+               _ns1,
+               _getCollator(_ns1),
+               _getTimeseriesOptions(_ns1),
+               ::mongo::fromjson(
+                   R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":42, "a":-100,"b":100})"),
+               CombineWithInsertsFromOtherClients::kAllow);
 
     // No buckets are closed.
     ASSERT(result.getValue().closedBuckets.empty());
