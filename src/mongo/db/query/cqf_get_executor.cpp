@@ -370,27 +370,11 @@ void setupShardFiltering(OperationContext* opCtx,
     // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
     sbe::value::SlotId shardFiltererSlot = runtimeEnv.registerSlot(
         kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &slotIdGenerator);
-
-    // TODO SERVER-79007: Merge this method of creating a ShardFilterer with that in
-    // sbe_stage_builders.cpp.
     bool isSharded = collections.isAcquisition()
         ? collections.getMainAcquisition().getShardingDescription().isSharded()
         : collections.getMainCollection().isSharded_DEPRECATED();
     if (isSharded) {
-        auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
-            if (collections.isAcquisition()) {
-                return std::make_unique<ShardFiltererImpl>(
-                    *collections.getMainAcquisition().getShardingFilter());
-            } else {
-                const auto& collection = collections.getMainCollection();
-                ShardFiltererFactoryImpl shardFiltererFactory(collection);
-                return shardFiltererFactory.makeShardFilterer(opCtx);
-            }
-        }();
-        runtimeEnv.resetSlot(shardFiltererSlot,
-                             sbe::value::TypeTags::shardFilterer,
-                             sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
-                             true);
+        populateShardFiltererSlot(opCtx, runtimeEnv, shardFiltererSlot, collections);
     }
 }
 

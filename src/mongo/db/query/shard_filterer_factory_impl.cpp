@@ -42,4 +42,30 @@ std::unique_ptr<ShardFilterer> ShardFiltererFactoryImpl::makeShardFilterer(
         opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
 }
 
+void populateShardFiltererSlot(OperationContext* opCtx,
+                               sbe::RuntimeEnvironment& env,
+                               sbe::value::SlotId shardFiltererSlot,
+                               const MultipleCollectionAccessor& collections) {
+    auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
+        if (collections.isAcquisition()) {
+            auto acquisition = collections.getMainAcquisition();
+            tassert(7900701,
+                    "Setting shard filterer slot on un-sharded collection",
+                    acquisition.getShardingDescription().isSharded());
+            return std::make_unique<ShardFiltererImpl>(*acquisition.getShardingFilter());
+        } else {
+            const auto& collection = collections.getMainCollection();
+            tassert(6108307,
+                    "Setting shard filterer slot on un-sharded collection",
+                    collection.isSharded_DEPRECATED());
+            ShardFiltererFactoryImpl shardFiltererFactory(collection);
+            return shardFiltererFactory.makeShardFilterer(opCtx);
+        }
+    }();
+    env.resetSlot(shardFiltererSlot,
+                  sbe::value::TypeTags::shardFilterer,
+                  sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                  true);
+}
+
 }  // namespace mongo
