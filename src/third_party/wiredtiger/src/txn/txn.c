@@ -1045,12 +1045,8 @@ __txn_search_prepared_op(
     F_SET(txn, txn_flags);
     F_CLR(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
     WT_RET(ret);
-    /*
-     * We cannot guarantee that we find an update when collators are being used as we cannot sort
-     * modifications on collated b-trees.
-     */
-    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL || op->btree->collator == NULL,
-      WT_NOTFOUND, "unable to locate update associated with a prepared operation");
+    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL, WT_NOTFOUND,
+      "unable to locate update associated with a prepared operation");
 
     return (0);
 }
@@ -1473,7 +1469,7 @@ err:
  *     Given an operation return a boolean indicating if it has a sortable key.
  */
 static inline bool
-__txn_mod_sortable_key(WT_TXN_OP *opt)
+__txn_mod_sortable_key(WT_SESSION_IMPL *session, WT_TXN_OP *opt)
 {
     switch (opt->type) {
     case (WT_TXN_OP_NONE):
@@ -1487,23 +1483,27 @@ __txn_mod_sortable_key(WT_TXN_OP *opt)
     case (WT_TXN_OP_INMEM_ROW):
         return (true);
     }
-    __wt_abort(NULL);
+    WT_ASSERT_ALWAYS(session, false, "Unhandled op type encountered");
     return (false);
 }
 
 /*
  * __txn_mod_compare --
- *     Qsort comparison routine for transaction modify list.
+ *     Qsort comparison routine for transaction modify list. Takes a session as a context argument.
+ *     This allows for the use of comparators.
  */
 static int WT_CDECL
-__txn_mod_compare(const void *a, const void *b)
+__txn_mod_compare(const void *a, const void *b, void *context)
 {
+    WT_SESSION_IMPL *session;
     WT_TXN_OP *aopt, *bopt;
+    int cmp;
     bool a_has_sortable_key;
     bool b_has_sortable_key;
 
     aopt = (WT_TXN_OP *)a;
     bopt = (WT_TXN_OP *)b;
+    session = (WT_SESSION_IMPL *)context;
 
     /*
      * We want to sort on two things:
@@ -1531,8 +1531,8 @@ __txn_mod_compare(const void *a, const void *b)
      * Order by whether the given operation has a key. We don't want to call key compare incorrectly
      * especially given that u is a union which would create undefined behavior.
      */
-    a_has_sortable_key = __txn_mod_sortable_key(aopt);
-    b_has_sortable_key = __txn_mod_sortable_key(bopt);
+    a_has_sortable_key = __txn_mod_sortable_key(session, aopt);
+    b_has_sortable_key = __txn_mod_sortable_key(session, bopt);
     if (a_has_sortable_key && !b_has_sortable_key)
         return (-1);
     if (!a_has_sortable_key && b_has_sortable_key)
@@ -1544,11 +1544,13 @@ __txn_mod_compare(const void *a, const void *b)
     if (!a_has_sortable_key && !b_has_sortable_key)
         return (0);
 
-    /* Finally, order by key. We cannot sort if there is a collator as we need a session pointer. */
+    /* Finally, order by key. Row-store requires a call to __wt_compare. */
     if (aopt->btree->type == BTREE_ROW) {
-        return (aopt->btree->collator == NULL ?
-            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key) :
-            0);
+        WT_ASSERT_ALWAYS(session,
+          __wt_compare(
+            session, aopt->btree->collator, &aopt->u.op_row.key, &bopt->u.op_row.key, &cmp) == 0,
+          "Failed to sort transaction modifications during prepare commit/rollback");
+        return (cmp);
     }
     if (aopt->u.op_col.recno < bopt->u.op_col.recno)
         return (-1);
@@ -1644,7 +1646,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort_r(
+          txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare, (void *)session);
 
     /* If we are logging, write a commit log record. */
     if (txn->logrec != NULL) {
@@ -2070,7 +2073,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort_r(
+          txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare, (void *)session);
 
     /* Rollback and free updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
