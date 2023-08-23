@@ -47,7 +47,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
                  use_replica_set_connection_string=None, linear_chain=False,
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None, config_shard=None):
+                 replicaset_logging_prefix=None, replset_name=None, config_shard=None,
+                 use_auto_bootstrap_procedure=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -113,23 +114,44 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
         self.config_shard = config_shard
+        self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
 
     def setup(self):
         """Set up the replica set."""
+        start_node = 0
+        if self.use_auto_bootstrap_procedure:
+            # We need to wait for the first node to finish auto-bootstrapping so that we can
+            # get the auto generated replSet name and update the replSet name of the other mongods with it.
+            self.nodes[0].setup()
+            self.nodes[0].await_ready()
+            client = interface.build_client(self.nodes[0], self.auth_options)
+            res = client.admin.command("hello")
+
+            self.logger.info(
+                f"ReplicaSetFixture using auto generated replSet name {res['setName']} instead of {self.replset_name}"
+            )
+            self.replset_name = res["setName"]
+            self.mongod_options.setdefault("replSet", self.replset_name)
+            for i in range(self.num_nodes):
+                self.nodes[i].mongod_options["replSet"] = self.replset_name
+
+            start_node = 1
 
         # Version-agnostic options for mongod/s can be set here.
         # Version-specific options should be set in get_version_specific_options_for_mongod()
         # to avoid options for old versions being applied to new Replicaset fixtures.
-        for i in range(self.num_nodes):
+        # If we are using the auto_bootstrap_procedure we don't need to setup the first node again.
+        for i in range(start_node, self.num_nodes):
             self.nodes[i].setup()
 
         if self.initial_sync_node:
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
 
-        # We need only to wait to connect to the first node of the replica set because we first
-        # initiate it as a single node replica set.
-        self.nodes[0].await_ready()
+        if not self.use_auto_bootstrap_procedure:
+            # We need only to wait to connect to the first node of the replica set because we first
+            # initiate it as a single node replica set.
+            self.nodes[0].await_ready()
 
         # Initiate the replica set.
         members = []
@@ -158,8 +180,12 @@ class ReplicaSetFixture(interface.ReplFixture):
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
         client = interface.build_client(self.nodes[0], self.auth_options)
 
-        if client.local.system.replset.count_documents(filter={}):
+        if client.local.system.replset.count_documents(
+                filter={}) and not self.use_auto_bootstrap_procedure:
             # Skip initializing the replset if there is an existing configuration.
+            # Auto-bootstrapping will automatically create a configuration document but we do not
+            # want to skip reconfiguring the replset (which adds the other nodes
+            # to the auto-bootstrapped replset).
             self.logger.info("Configuration exists. Skipping initializing the replset.")
             return
 
@@ -171,7 +197,8 @@ class ReplicaSetFixture(interface.ReplFixture):
             if not server_status["storageEngine"]["persistent"]:
                 repl_config["writeConcernMajorityJournalDefault"] = False
 
-        if self.replset_config_options.get("configsvr", False):
+        if (self.replset_config_options.get("configsvr", False) or
+            (self.use_auto_bootstrap_procedure and not self.mongod_options.get("shardsvr", False))):
             repl_config["configsvr"] = True
         if self.replset_config_options.get("settings"):
             replset_settings = self.replset_config_options["settings"]
@@ -185,9 +212,15 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Start up a single node replica set then reconfigure to the correct size (if the config
         # contains more than 1 node), so the primary is elected more quickly.
         repl_config["members"] = [members[0]]
-        self.logger.info("Issuing replSetInitiate command: %s", repl_config)
-        self._initiate_repl_set(client, repl_config)
-        self._await_primary()
+        if self.use_auto_bootstrap_procedure:
+            self._await_primary()
+            # Auto-bootstrap already initiates automatically on the first node, but we still need
+            # to apply the requested repl_config settings using reconfig.
+            self._reconfig_repl_set(client, repl_config)
+        else:
+            self.logger.info("Issuing replSetInitiate command: %s", repl_config)
+            self._initiate_repl_set(client, repl_config)
+            self._await_primary()
 
         if self.fcv is not None:
             # Initiating a replica set with a single node will use "latest" FCV. This will
@@ -224,13 +257,17 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def _add_node_to_repl_set(self, client, repl_config, member_index, members):
         self.logger.info("Adding in node %d: %s", member_index, members[member_index - 1])
+        repl_config["members"] = members[:member_index]
+        self._reconfig_repl_set(client, repl_config)
+
+    def _reconfig_repl_set(self, client, repl_config):
         while True:
             try:
                 # 'newlyAdded' removal reconfigs could bump the version.
                 # Get the current version to be safe.
                 curr_version = client.admin.command({"replSetGetConfig": 1})['config']['version']
                 repl_config["version"] = curr_version + 1
-                repl_config["members"] = members[:member_index]
+
                 self.logger.info("Issuing replSetReconfig command: %s", repl_config)
                 client.admin.command({
                     "replSetReconfig": repl_config,
@@ -743,6 +780,9 @@ class ReplicaSetFixture(interface.ReplFixture):
         mongod_options["set_parameters"] = mongod_options.get("set_parameters",
                                                               self.fixturelib.make_historic(
                                                                   {})).copy()
+
+        if index == 0 and self.use_auto_bootstrap_procedure:
+            del mongod_options["replSet"]
 
         if self.linear_chain and index > 0:
             self.mongod_options["set_parameters"][
