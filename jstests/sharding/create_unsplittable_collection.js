@@ -4,6 +4,7 @@
  * collection. Since we use the same coordinator, we both check the createUnsplittableCollection
  * works and that shardCollection won't generate unsplittable collection.
  * @tags: [
+ *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]
@@ -39,10 +40,6 @@ jsTest.log("Running test command createUnsplittableCollection to track an unshar
 
     let configChunks = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
     assert.eq(configChunks.length, 1);
-
-    // cleanup
-    // TODO SERVER-78765: remove once the consistency checks are aware of unsplittable collections.
-    st.s.getDB(kDbName).getCollection(kColl).drop();
 }
 
 jsTest.log('Check that shardCollection won\'t generate an unsplittable collection');
@@ -55,10 +52,6 @@ jsTest.log('Check that shardCollection won\'t generate an unsplittable collectio
 
     let shardedColl = mongos.getDB('config').collections.findOne({_id: kNssSharded});
     assert.eq(shardedColl.unsplittable, undefined);
-
-    // cleanup
-    // TODO SERVER-78765: remove once the consistency checks are aware of unsplittable collections.
-    st.s.getDB(kDbName).getCollection(kCollSharded).drop();
 }
 
 jsTest.log(
@@ -82,10 +75,6 @@ jsTest.log(
     let chunk = st.s.getCollection('config.chunks').findOne({uuid: col.uuid});
 
     assert.eq(chunk.shard, shard1);
-
-    // cleanup
-    // TODO SERVER-78765: remove once the consistency checks are aware of unsplittable collections.
-    st.s.getDB(kDbName).getCollection(kDataColl).drop();
 }
 
 st.stop();

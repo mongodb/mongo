@@ -89,6 +89,13 @@ public:
         return _cm && _cm->isSharded();
     }
 
+    /**
+     * Returns whether this metadata object represents an unsplittable collection.
+     */
+    bool isUnsplittable() const {
+        return _cm && _cm->isUnsplittable();
+    }
+
     bool hasRoutingTable() const {
         return _cm && _cm->hasRoutingTable();
     }

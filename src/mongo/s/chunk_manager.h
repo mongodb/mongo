@@ -678,6 +678,13 @@ public:
         return hasRoutingTable() ? !_rt->optRt->_unsplittable : false;
     }
 
+    /*
+     * Returns true if routing table is present and unsplittable flag is set
+     */
+    bool isUnsplittable() const {
+        return hasRoutingTable() ? _rt->optRt->_unsplittable : false;
+    }
+
     bool isAtPointInTime() const {
         return bool(_clusterTime);
     }
