@@ -1,5 +1,7 @@
-// The test runs commands that are not allowed with security token: stageDebug.
+// Test basic delete stage functionality.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: stageDebug.
 //   not_allowed_with_security_token,
 //   # This test attempts to remove documents using the stageDebug command, which doesn't support
 //   # specifying a writeConcern.
@@ -10,7 +12,6 @@
 //   no_selinux,
 // ]
 
-// Test basic delete stage functionality.
 var coll = db.stages_delete;
 var collScanStage = {cscan: {args: {direction: 1}, filter: {deleteMe: true}}};
 var deleteStage;

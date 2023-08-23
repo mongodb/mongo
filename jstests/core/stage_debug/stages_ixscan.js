@@ -1,12 +1,13 @@
-// The test runs commands that are not allowed with security token: stageDebug.
+// Test basic query stage index scan functionality.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: stageDebug.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,
 // ]
 
-// Test basic query stage index scan functionality.
 let t = db.stages_ixscan;
 t.drop();
 var collname = "stages_ixscan";

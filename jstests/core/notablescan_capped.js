@@ -1,7 +1,7 @@
 // check notablescan mode for capped collection / tailable cursor
 //
-// The test runs commands that are not allowed with security token: setParameter.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setParameter.
 //   not_allowed_with_security_token,
 //   assumes_against_mongod_not_mongos,
 //   # This test attempts to perform read operations after having enabled the notablescan server

@@ -1,5 +1,5 @@
-// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.
@@ -8,7 +8,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-//
+
 const coll = db.mr_replace;
 coll.drop();
 

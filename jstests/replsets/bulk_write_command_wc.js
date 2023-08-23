@@ -1,9 +1,9 @@
 /**
  * Tests write-concern-related bulkWrite protocol functionality
  *
- * The test runs commands that are not allowed with security token: bulkWrite.
  * @tags: [
  *   assumes_against_mongod_not_mongos,
+ *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   not_allowed_with_security_token,
  *   command_not_supported_in_serverless,
  *   # TODO SERVER-52419 Remove this tag.

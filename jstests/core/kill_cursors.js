@@ -1,16 +1,16 @@
-// The test runs commands that are not allowed with security token: killCursors.
+// Test the killCursors command.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: killCursors.
 //   not_allowed_with_security_token,
+//   # Does not support stepdowns because if a stepdown were to occur between running find() and
+//   # calling killCursors on the cursor ID returned by find(), the killCursors might be sent to
+//   # different node than the one which has the cursor. This would result in the node returning
+//   # "CursorNotFound."
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 // ]
-//
-// Does not support stepdowns because if a stepdown were to occur between running find() and
-// calling killCursors on the cursor ID returned by find(), the killCursors might be sent to
-// different node than the one which has the cursor. This would result in the node returning
-// "CursorNotFound."
-//
-// Test the killCursors command.
+
 var cmdRes;
 var cursor;
 var cursorId;

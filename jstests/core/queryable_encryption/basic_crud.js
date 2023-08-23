@@ -2,10 +2,13 @@
  * Tests basic CRUD operations with queryable encrypted fields.
  *
  * @tags: [
- * no_selinux,
- * tenant_migration_incompatible,
- * does_not_support_transactions,
- * does_not_support_stepdowns,
+ *   no_selinux,
+ *   tenant_migration_incompatible,
+ *   does_not_support_transactions,
+ *   does_not_support_stepdowns,
+ *   # Test requires an internal connection for the keyvault that can't be overriden by the
+ *   # `simulate_atlas_proxy` override.
+ *   simulate_atlas_proxy_incompatible,
  * ]
  */
 import {

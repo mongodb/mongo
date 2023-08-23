@@ -8,11 +8,16 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 import {
     createCmdObjWithTenantId,
+    getTenantIdForDatabase,
     isCmdObjWithTenantId,
     prependTenantIdToDbNameIfApplicable,
     removeTenantId,
     usingMultipleTenants
 } from "jstests/serverless/libs/tenant_prefixing.js";
+
+// Assert that some tenantIds are provided
+assert(!!TestData.tenantId || (TestData.tenantIds && TestData.tenantIds.length > 0),
+       "Missing required tenantId or tenantIds");
 
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -561,27 +566,29 @@ function runCommandRetryOnTenantMigrationErrors(
 }
 
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
-    const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName);
+    const tenantId = getTenantIdForDatabase(dbName);
+    const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName, tenantId);
+
+    // If the command is already prefixed, just run it
+    if (isCmdObjWithTenantId(cmdObj)) {
+        return runCommandRetryOnTenantMigrationErrors(this, dbNameWithTenantId, cmdObj, options);
+    }
 
     // Prepend a tenant prefix to all database names and namespaces, where applicable.
-    const originalCmdObjContainsTenantId = isCmdObjWithTenantId(cmdObj);
-    const cmdObjWithTenantId =
-        originalCmdObjContainsTenantId ? cmdObj : createCmdObjWithTenantId(cmdObj);
-
+    const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj, tenantId);
     const resObj = runCommandRetryOnTenantMigrationErrors(
         this, dbNameWithTenantId, cmdObjWithTenantId, options);
 
-    if (!originalCmdObjContainsTenantId) {
-        // Remove the tenant prefix from all database names and namespaces in the result since tests
-        // assume the command was run against the original database.
-        removeTenantId(resObj);
-    }
+    // Remove the tenant prefix from all database names and namespaces in the result since tests
+    // assume the command was run against the original database.
+    removeTenantId(resObj);
 
     return resObj;
 };
 
 Mongo.prototype.getDbNameWithTenantPrefix = function(dbName) {
-    return prependTenantIdToDbNameIfApplicable(dbName);
+    const tenantId = getTenantIdForDatabase(dbName);
+    return prependTenantIdToDbNameIfApplicable(dbName, tenantId);
 };
 
 // Override base methods on the Mongo prototype to try to proxy the call to the underlying

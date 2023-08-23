@@ -2,8 +2,8 @@
  * Test that, when an existing view in system.views is invalid because of a $out in the
  * pipeline, the database errors on creation of a new view.
  *
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_security_token,
  *   # applyOps is not available on mongos.
  *   assumes_against_mongod_not_mongos,

@@ -1,12 +1,13 @@
-// The test runs commands that are not allowed with security token: stageDebug.
+// Test basic OR functionality
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: stageDebug.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,
 // ]
 
-// Test basic OR functionality
 let t = db.stages_or;
 t.drop();
 var collname = "stages_or";

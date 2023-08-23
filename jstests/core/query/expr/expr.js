@@ -1,5 +1,7 @@
-// The test runs commands that are not allowed with security token: mapReduce.
+// Tests for $expr in the CRUD commands.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_getmore,
@@ -10,7 +12,6 @@
 //   requires_scripting,
 // ]
 
-// Tests for $expr in the CRUD commands.
 import "jstests/libs/sbe_assert_error_override.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

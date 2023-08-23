@@ -4,9 +4,12 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_with_any_tags:
-  # All allowed commands are list in inject_security_token.js override. Any commands out of the list are disallowed.
-  - not_allowed_with_security_token
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
+  # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
+  # Exclude tests which we know use commands that don't support a security token.
+  - not_allowed_with_security_token
   # Theses tests expect replication is not enabled.
   - assumes_standalone_mongod
   # capped collections are banned in Serverless.

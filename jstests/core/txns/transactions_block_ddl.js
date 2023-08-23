@@ -1,7 +1,12 @@
 // Test that open transactions block DDL operations on the involved collections.
-// The test runs commands that are not allowed with security token: endSession.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_rename, uses_transactions]
+//   # The test runs commands that are not allowed with security token: endSession.
+//   not_allowed_with_security_token,
+//   uses_rename,
+//   uses_transactions
+// ]
+
 import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "transactions_block_ddl";

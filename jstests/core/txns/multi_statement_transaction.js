@@ -1,7 +1,11 @@
 // Test basic multi-statement transaction.
-// The test runs commands that are not allowed with security token: endSession.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions]
+//   # The test runs commands that are not allowed with security token: endSession.
+//   not_allowed_with_security_token,
+//   uses_transactions
+// ]
+
 // TODO(SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 

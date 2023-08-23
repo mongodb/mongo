@@ -1,12 +1,12 @@
 // Tests that large queries and updates are properly profiled.
-
-// Special db so that it can be run in parallel tests.
-// The test runs commands that are not allowed with security token: profile.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: profile.
 //   not_allowed_with_security_token,
 //   requires_profiling,
 // ]
 
+// Special db so that it can be run in parallel tests.
 var coll = db.getSiblingDB("profile2").profile2;
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));

@@ -1,15 +1,17 @@
 /**
  * Test that $** indexes obey index filter rules.
  *
- * Does not support stepdowns, because the stepdown/kill_primary passthroughs will reject commands
- * that may return different values after a failover; in this case, 'planCacheClearFilters'.
- * The test runs commands that are not allowed with security token: planCacheClearFilters,
- * planCacheListFilters, planCacheSetFilter.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: planCacheClearFilters,
+ *   # planCacheListFilters, planCacheSetFilter.
  *   not_allowed_with_security_token,
+ *   # Does not support stepdowns, because the stepdown/kill_primary passthroughs will reject
+ *   # commands that may return different values after a failover; in this case,
+ *   # 'planCacheClearFilters'.
  *   does_not_support_stepdowns,
  * ]
  */
+
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

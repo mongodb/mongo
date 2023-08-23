@@ -1,7 +1,8 @@
 // Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
 // startSession may cause this test to fail to find the returned sessionId.
-// The test runs commands that are not allowed with security token: connectionStatus.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: connectionStatus.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,

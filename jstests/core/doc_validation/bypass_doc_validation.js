@@ -1,20 +1,3 @@
-// The test runs commands that are not allowed with security token: applyOps, mapReduce.
-// @tags: [
-//   not_allowed_with_security_token,
-//   does_not_support_stepdowns,
-//   does_not_support_transactions,
-//   requires_fastcount,
-//   # 6.2 removes support for atomic applyOps
-//   requires_fcv_62,
-//   requires_non_retryable_commands,
-//   uses_map_reduce_with_temp_collections,
-//   # Tenant migrations don't support applyOps.
-//   tenant_migration_incompatible,
-//   # This test has statements that do not support non-local read concern.
-//   does_not_support_causal_consistency,
-//   references_foreign_collection,
-// ]
-
 /**
  * Tests that various database commands respect the 'bypassDocumentValidation' flag:
  *
@@ -24,7 +7,25 @@
  * - insert
  * - mapReduce
  * - update
+ *
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps, mapReduce.
+ *   not_allowed_with_security_token,
+ *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
+ *   requires_fastcount,
+ *   # 6.2 removes support for atomic applyOps
+ *   requires_fcv_62,
+ *   requires_non_retryable_commands,
+ *   uses_map_reduce_with_temp_collections,
+ *   # Tenant migrations don't support applyOps.
+ *   tenant_migration_incompatible,
+ *   # This test has statements that do not support non-local read concern.
+ *   does_not_support_causal_consistency,
+ *   references_foreign_collection,
+ * ]
  */
+
 import {
     assertDocumentValidationFailure,
     assertDocumentValidationFailureCheckLogs

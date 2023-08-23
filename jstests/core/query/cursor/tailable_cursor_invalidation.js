@@ -1,11 +1,12 @@
-// The test runs commands that are not allowed with security token: isbdgrid.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: isbdgrid.
 //   not_allowed_with_security_token,
 //   requires_capped,
 //   requires_getmore,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
 // ]
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is

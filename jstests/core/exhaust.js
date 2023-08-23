@@ -1,9 +1,8 @@
 // @tags: [
 //   requires_getmore,
-//   # This test uses exhaust which does not use runCommand (required by the simulate_atlas_proxy.js
-//   # override).
-//   tenant_migration_incompatible,
-//   no_selinux
+//   no_selinux,
+//   # Exhaust does not use runCommand which is required by the `simulate_atlas_proxy` override.
+//   simulate_atlas_proxy_incompatible,
 // ]
 
 var coll = db.exhaustColl;

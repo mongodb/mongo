@@ -1,6 +1,8 @@
-// The test runs commands that are not allowed with security token: mapReduce,
-// setProfilingLevel.
+// Confirms that profiled findAndModify execution contains all expected metrics with proper values.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce,
+//   # setProfilingLevel.
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
@@ -9,8 +11,6 @@
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
 // ]
-
-// Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

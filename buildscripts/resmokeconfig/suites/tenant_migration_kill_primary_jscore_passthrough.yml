@@ -142,6 +142,8 @@ selector:
   # process.
   - uses_full_validation
   - requires_timeseries # Tenant migration not supported
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
 
 executor:
   archive:

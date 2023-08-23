@@ -1,8 +1,8 @@
 /*
  * Test SERVER-18622 listCollections should special case filtering by name.
  *
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_security_token,
  *   requires_replication,
  *   # applyOps is not supported on mongos

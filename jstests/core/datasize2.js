@@ -1,12 +1,14 @@
-// Cannot implicitly shard accessed collections because the "dataSize" command returns an
-// "keyPattern must equal shard key" error response.
-// The test runs commands that are not allowed with security token: dataSize.
-// @tags: [
-//   not_allowed_with_security_token,assumes_unsharded_collection, no_selinux]
-//
 // Test dataSize command, when called on the same or different database
 // than the collection being queried.
 //
+// @tags: [
+//   #  The test runs commands that are not allowed with security token: dataSize.
+//   not_allowed_with_security_token,
+//   # Cannot implicitly shard accessed collections because the "dataSize" command returns an
+//   # "keyPattern must equal shard key" error response.
+//   assumes_unsharded_collection,
+//   no_selinux
+// ]
 
 var coll = db.foo;
 var adminDB = db.getSiblingDB('admin');

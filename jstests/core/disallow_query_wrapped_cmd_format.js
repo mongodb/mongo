@@ -1,9 +1,9 @@
 /**
  * Test that the "wrapped" command format using {$query: <cmd>} fails cleanly.
  *
- * The test runs commands that are not allowed with security token: query.
  * @tags: [
  *    requires_fcv_63,
+ *    # The test runs commands that are not allowed with security token: query.
  *    not_allowed_with_security_token,
  * ]
  */

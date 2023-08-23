@@ -1,8 +1,8 @@
 /**
  * Tests creating, dropping, and writing to a global index container on a shard.
  *
- * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: endSession.
  *   not_allowed_with_security_token,
  *   assumes_against_mongod_not_mongos,
  *   # Do not implicitly create columnstore indexes.

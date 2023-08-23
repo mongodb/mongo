@@ -1,6 +1,7 @@
 // Tests that multi-line strings with comments are allowed within mapReduce.
-// The test runs commands that are not allowed with security token: mapreduce.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapreduce.
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,

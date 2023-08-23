@@ -17,8 +17,8 @@
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_replication,
- *   # This test depends on hardcoded database name equality.
- *   tenant_migration_incompatible,
+ *   # Test depends on hardcoded database name equality which is incompatible with tenant prefixing.
+ *   simulate_atlas_proxy_incompatible,
  *   references_foreign_collection,
  * ]
  */

@@ -1,7 +1,12 @@
 // Test basic transaction write ops, reads, and commit/abort using the shell helper.
-// The test runs commands that are not allowed with security token: endSession.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions, uses_snapshot_read_concern]
+//   # The test runs commands that are not allowed with security token: endSession.
+//   not_allowed_with_security_token,
+//   uses_transactions,
+//   uses_snapshot_read_concern
+// ]
+
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 

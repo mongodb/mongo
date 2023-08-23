@@ -1,6 +1,8 @@
-// The test runs commands that are not allowed with security token: ConnectionStatus,
-// connectionStatus, createUser, logout.
+// Tests the connectionStatus command
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: ConnectionStatus,
+//   # connectionStatus, createUser, logout.
 //   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
@@ -12,7 +14,6 @@
 //   tenant_migration_incompatible,
 // ]
 
-// Tests the connectionStatus command
 const kAdminDbName = 'admin';
 const kTestDbName = 'connection_status';
 

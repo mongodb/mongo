@@ -1,13 +1,11 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
 // collection.
-// The test runs commands that are not allowed with security token: benchRun.
+//
 // @tags: [
-//   not_allowed_with_security_token,
 //   assumes_no_implicit_index_creation,
 //   uses_multiple_connections,
-//   # This test uses benchRun which does not use runCommand (required by the
-//   # simulate_atlas_proxy.js override).
-//   tenant_migration_incompatible,
+//   # benchRun does not use runCommand which is required by the `simulate_atlas_proxy` override.
+//   simulate_atlas_proxy_incompatible,
 // ]
 const t = db.bench_test1;
 t.drop();

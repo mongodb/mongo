@@ -1,8 +1,8 @@
 /**
  * Checks that the server properly parses "API Version" parameters
  *
- * The test runs commands that are not allowed with security token: testDeprecation.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: testDeprecation.
  *   not_allowed_with_security_token,
  *   uses_api_parameters,
  *   no_selinux,

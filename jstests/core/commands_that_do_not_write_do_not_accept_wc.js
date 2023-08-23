@@ -3,8 +3,8 @@
  * writeConcern fields to commands and expects the commands to fail with a writeConcernNotSupported
  * error.
  *
- * The test runs commands that are not allowed with security token: mapReduce.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: mapReduce.
  *   not_allowed_with_security_token,
  *   assumes_write_concern_unchanged,
  *   does_not_support_stepdowns,

@@ -1,9 +1,11 @@
 /**
  * Tests initializing a mixed version replica set through resmoke.
  *
- * The test runs commands that are not allowed with security token: replSetGetStatus.
  * @tags: [
- *   not_allowed_with_security_token,multiversion_sanity_check]
+ *   # The test runs commands that are not allowed with security token: replSetGetStatus.
+ *   not_allowed_with_security_token,
+ *   multiversion_sanity_check
+ * ]
  */
 
 const latestBinVersion = MongoRunner.getBinVersionFor("latest");

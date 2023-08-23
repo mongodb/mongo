@@ -1,5 +1,5 @@
-// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
@@ -7,6 +7,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
+
 const testName = "mr_reduce_merge_other_db";
 const testDB = db.getSiblingDB(testName);
 const coll = testDB.mr_replace;

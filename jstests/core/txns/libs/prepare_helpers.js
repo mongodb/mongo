@@ -1,12 +1,7 @@
 /**
  * Helper functions for testing prepared transactions.
- *
- * The test runs commands that are not allowed with security token: dataSize, prepareTransaction,
- * replSetGetStatus.
- * @tags: [
- *   not_allowed_with_security_token,uses_transactions]
- *
  */
+
 export const PrepareHelpers = (function() {
     /**
      * Prepares the active transaction on the session. This expects the 'prepareTransaction' command

@@ -1,13 +1,10 @@
 /**
  * Tests that benchRun can understand pipeline-style updates and findAndModifys.
  *
- * The test runs commands that are not allowed with security token: benchRun.
  * @tags: [
- *     not_allowed_with_security_token,
  *     uses_multiple_connections,
- *     # This test uses exhaust which does not use runCommand (required by the
- *     # simulate_atlas_proxy.js override).
- *     tenant_migration_incompatible,
+ *     # benchRun does not use runCommand which is required by the `simulate_atlas_proxy` override.
+ *     simulate_atlas_proxy_incompatible,
  * ]
  */
 const coll = db.benchrun_pipeline_updates;

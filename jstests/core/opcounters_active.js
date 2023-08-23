@@ -1,6 +1,9 @@
 // checks that db.serverStatus will not throw errors when metrics tree is not present.
-// The test runs commands that are not allowed with security token: mapreduce.
-// @tags: [not_allowed_with_security_token]
+//
+// @tags: [
+//   # The test runs commands that are not allowed with security token: mapreduce.
+//   not_allowed_with_security_token
+// ]
 
 // Test the getActiveCommands function
 // Should remove the listCollections section but keep the rest

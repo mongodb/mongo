@@ -1,11 +1,11 @@
 /**
  * Tests that the regular collection compact command can be run against a time-series collection.
  *
- * The test runs commands that are not allowed with security token: compact.
  * @tags: [
  *   # Compact is not available on mongos.
  *   assumes_against_mongod_not_mongos,
  *   multiversion_incompatible,
+ *   # The test runs commands that are not allowed with security token: compact.
  *   not_allowed_with_security_token,
  *   # Cannot compact when using the in-memory storage engine.
  *   requires_persistence,

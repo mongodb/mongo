@@ -1,8 +1,9 @@
 /**
  * Test that index filters are applied with the correct collation.
- * The test runs commands that are not allowed with security token: planCacheListFilters,
- * planCacheSetFilter.
+ *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: planCacheListFilters,
+ *   # planCacheSetFilter.
  *   not_allowed_with_security_token,
  *   # Needs to create a collection with a collation.
  *   assumes_no_implicit_collection_creation_after_drop,

@@ -1,6 +1,7 @@
 // just make sure logout doesn't break anything
-// The test runs commands that are not allowed with security token: logout.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: logout.
 //   not_allowed_with_security_token,
 //   requires_auth,
 //   requires_non_retryable_commands

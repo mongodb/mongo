@@ -1,14 +1,3 @@
-// The test runs commands that are not allowed with security token: mapReduce.
-// @tags: [
-//   not_allowed_with_security_token,
-//   does_not_support_stepdowns,
-//   requires_fastcount,
-//   requires_multi_updates,
-//   requires_non_retryable_writes,
-//   # This test has statements that do not support non-local read concern.
-//   does_not_support_causal_consistency,
-// ]
-
 //
 //  Big Polygon edge cases
 //
@@ -20,6 +9,17 @@
 //  - Other cases which should work
 //    MapReduce with a big polygon
 //    CRS84 & EPSG4326 objects should be retrieved from query with big polygon
+//
+// @tags: [
+//   #  The test runs commands that are not allowed with security token: mapReduce.
+//   not_allowed_with_security_token,
+//   does_not_support_stepdowns,
+//   requires_fastcount,
+//   requires_multi_updates,
+//   requires_non_retryable_writes,
+//   # This test has statements that do not support non-local read concern.
+//   does_not_support_causal_consistency,
+// ]
 
 var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
 var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};

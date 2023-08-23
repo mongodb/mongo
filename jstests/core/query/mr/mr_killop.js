@@ -1,6 +1,7 @@
 // Test killop applied to m/r operations and child ops of m/r operations.
-// The test runs commands that are not allowed with security token: mapreduce.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapreduce.
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,

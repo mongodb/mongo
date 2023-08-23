@@ -2,11 +2,15 @@
  * Tests that transactional writes are prohibited on capped collections, but transactional reads are
  * still allowed.
  *
- * 'requires_capped' tagged tests are excluded from txn passthrough suites.
- * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
- *   not_allowed_with_security_token,requires_capped, uses_transactions]
+ *   # The test runs commands that are not allowed with security token: endSession.
+ *   not_allowed_with_security_token,
+ *   # 'requires_capped' tagged tests are excluded from txn passthrough suites.
+ *   requires_capped,
+ *   uses_transactions
+ * ]
  */
+
 const dbName = "test";
 const cappedCollName = "transaction_ops_against_capped_collection";
 const testDB = db.getSiblingDB(dbName);

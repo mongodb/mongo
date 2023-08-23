@@ -1,11 +1,14 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
-// The test runs commands that are not allowed with security token: godinsert.
-// @tags: [
-//   not_allowed_with_security_token,assumes_unsharded_collection, requires_non_retryable_commands]
-
 // Tests that _id will exist in all updated docs.
+//
+// @tags: [
+//   # The test runs commands that are not allowed with security token: godinsert.
+//   not_allowed_with_security_token,
+//   # Cannot implicitly shard accessed collections because of following errmsg: A single
+//   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
+//   # key.
+//   assumes_unsharded_collection,
+//   requires_non_retryable_commands
+// ]
 
 let t = db.jstests_updatem;
 t.drop();

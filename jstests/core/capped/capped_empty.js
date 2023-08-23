@@ -1,6 +1,6 @@
 /**
- * The test runs commands that are not allowed with security token: emptycapped.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: emptycapped.
  *   not_allowed_with_security_token,
  *   requires_capped,
  *   requires_fastcount,

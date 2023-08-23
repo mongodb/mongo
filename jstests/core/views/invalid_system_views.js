@@ -2,8 +2,8 @@
  * Tests that invalid view definitions in system.views do not impact valid commands on existing
  * collections.
  *
- * The test runs commands that are not allowed with security token: applyOps, compact, reIndex.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps, compact, reIndex.
  *   not_allowed_with_security_token,
  *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.

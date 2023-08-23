@@ -1,8 +1,9 @@
 // Tests the 'reduce' output mode for mapReduce.
 // Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
 // non-sharded collection because sharded collection exists already.
-// The test runs commands that are not allowed with security token: mapReduce.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.
@@ -11,6 +12,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
+
 (function() {
 const source = db.mr_reduce;
 source.drop();
@@ -70,6 +72,7 @@ expected = [
 ];
 assert.docEq(expected, out.find().sort({_id: 1}).toArray());
 }());
+
 (function() {
 const source = db.mr_reduce;
 source.drop();

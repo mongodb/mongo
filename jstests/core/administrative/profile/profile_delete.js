@@ -1,5 +1,7 @@
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+// Confirms that profiled delete execution contains all expected metrics with proper values.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   # Asserts on the number of index keys deleted.
 //   assumes_no_implicit_index_creation,
@@ -10,8 +12,6 @@
 //   # Uses $where operator
 //   requires_scripting,
 // ]
-
-// Confirms that profiled delete execution contains all expected metrics with proper values.
 
 import {
     ClusteredCollectionUtil

@@ -1,7 +1,12 @@
 // Tests that killSessions kills inactive transactions.
-// The test runs commands that are not allowed with security token: endSession, killSessions.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions, uses_parallel_shell]
+//   # The test runs commands that are not allowed with security token: endSession, killSessions.
+//   not_allowed_with_security_token,
+//   uses_transactions,
+//   uses_parallel_shell
+// ]
+
 const dbName = "test";
 const collName = "kill_sessions_kills_transaction";
 const testDB = db.getSiblingDB(dbName);

@@ -2,14 +2,14 @@
  * Tests bulk write command in conjunction with using getMore to obtain the rest
  * of the cursor response.
  *
- * These tests are incompatible with various overrides due to using getMore.
  *
- * The test runs commands that are not allowed with security token: bulkWrite.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   not_allowed_with_security_token,
  *   command_not_supported_in_serverless,
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,
+ *   # These tests are incompatible with various overrides due to using getMore.
  *   requires_getmore,
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,

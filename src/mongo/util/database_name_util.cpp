@@ -53,7 +53,7 @@ namespace mongo {
 std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
                                         const SerializationContext& context) {
     if (!gMultitenancySupport)
-        dbName.toString();
+        return dbName.toString();
 
     if (context.getSource() == SerializationContext::Source::Command)
         return serializeForCommands(dbName, context);

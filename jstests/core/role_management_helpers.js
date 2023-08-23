@@ -1,6 +1,9 @@
-// The test runs commands that are not allowed with security token: createRole, dropRole,
-// grantPrivilegesToRole, grantRolesToRole, revokeRolesFromRole, updateRole.
+// This test is a basic sanity check of the shell helpers for manipulating role objects
+// It is not a comprehensive test of the functionality of the role manipulation commands
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: createRole, dropRole,
+//   # grantPrivilegesToRole, grantRolesToRole, revokeRolesFromRole, updateRole.
 //   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
@@ -8,9 +11,6 @@
 //   requires_multi_updates,
 //   requires_non_retryable_commands,
 // ]
-
-// This test is a basic sanity check of the shell helpers for manipulating role objects
-// It is not a comprehensive test of the functionality of the role manipulation commands
 
 function assertHasRole(rolesArray, roleName, roleDB) {
     for (let i in rolesArray) {

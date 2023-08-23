@@ -1,8 +1,12 @@
 // SERVER-38015 Test having many interactive transactions to ensure we don't hold on to too
 // many resources (like "write tickets") and don't prevent other operations from succeeding.
-// The test runs commands that are not allowed with security token: endSession.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions]
+//   # The test runs commands that are not allowed with security token: endSession.
+//   not_allowed_with_security_token,
+//   uses_transactions
+// ]
+
 const dbName = "test";
 const collName = "many_txns";
 const numTxns = 150;

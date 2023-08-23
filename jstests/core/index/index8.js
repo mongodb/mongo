@@ -1,6 +1,8 @@
-// The test runs commands that are not allowed with security token: reIndex.
+// Test key uniqueness
+//
 // @tags: [
-//   not_allowed_with_security_token,
+//     # The test runs commands that are not allowed with security token: reIndex.
+//     not_allowed_with_security_token,
 //     # Asserts on the output of listIndexes.
 //     assumes_no_implicit_index_creation,
 //     # Cannot implicitly shard accessed collections because of not being able to create unique
@@ -9,7 +11,6 @@
 //     requires_fastcount
 // ]
 
-// Test key uniqueness
 let t = db.jstests_index8;
 t.drop();
 

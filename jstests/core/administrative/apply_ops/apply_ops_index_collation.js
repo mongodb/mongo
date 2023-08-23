@@ -3,8 +3,8 @@
  * Indexes created through applyOps should be built exactly according to their index spec, without
  * inheriting the collection default collation, since this is how the oplog entries are replicated.
  *
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_security_token,
  *   # Cannot implicitly shard accessed collections because of
  *   # collection existing when none expected.

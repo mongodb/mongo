@@ -4,9 +4,9 @@
  * These tests are incompatible with the transaction overrides since any failure
  * will cause a transaction abortion which will make the overrides infinite loop.
  *
- * The test runs commands that are not allowed with security token: bulkWrite.
  * @tags: [
  *   not_allowed_with_security_token,
+ *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   command_not_supported_in_serverless,
  *   # Contains commands that fail which will fail the entire transaction
  *   does_not_support_transactions,

@@ -1,8 +1,8 @@
 /*
  * SERVER-15033 truncate on a regular collection
  *
- * The test runs commands that are not allowed with security token: emptycapped.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: emptycapped.
  *   not_allowed_with_security_token,
  *   requires_collstats,
  *   requires_non_retryable_commands,

@@ -1,6 +1,8 @@
-// The test runs commands that are not allowed with security token: convertToCapped, mapReduce,
-// profile.
+// Test various user operations against "system.profile" collection.  SERVER-18111.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: convertToCapped, mapReduce,
+//   # profile.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_capped,
@@ -10,8 +12,6 @@
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
 // ]
-
-// Test various user operations against "system.profile" collection.  SERVER-18111.
 
 var testDB = db.getSiblingDB("system_profile");
 var testDBCopy = db.getSiblingDB("system_profile_copy");

@@ -1,11 +1,3 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// The test runs commands that are not allowed with security token: isbdgrid.
-// @tags: [
-//   not_allowed_with_security_token,
-//   assumes_no_implicit_collection_creation_after_drop,
-// ]
-
 /**
  * Test correctness of explaining findAndModify. Asserts the following:
  *
@@ -14,7 +6,16 @@
  * 3. Explaining findAndModify should not work with an invalid findAndModify command object.
  * 4. Explaining findAndModify should not modify any contents of the collection.
  * 5. The reported stats should reflect how the command would be executed.
+ *
+ * @tags: [
+ *   # The test runs commands that are not allowed with security token: isbdgrid.
+ *   not_allowed_with_security_token,
+ *   # Cannot implicitly shard accessed collections because of collection existing when none
+ *   # expected.
+ *   assumes_no_implicit_collection_creation_after_drop,
+ * ]
  */
+
 var cName = "explain_find_and_modify";
 var t = db.getCollection(cName);
 

@@ -1,6 +1,7 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   # Asserts on the number of index keys modified.
 //   assumes_no_implicit_index_creation,

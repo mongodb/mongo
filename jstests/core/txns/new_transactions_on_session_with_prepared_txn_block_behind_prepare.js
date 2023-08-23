@@ -2,8 +2,9 @@
  * Tests that new transactions on a session block behind an existing prepared transaction on the
  * session.
  *
- * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: endSession,
+ *   # prepareTransaction.
  *   not_allowed_with_security_token,
  *   uses_transactions,
  *   uses_prepare_transaction,

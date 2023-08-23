@@ -1,7 +1,8 @@
 /**
  * Test that we can use the $_resumeAfter and $_requestResumeToken options to resume a query.
- * The test runs commands that are not allowed with security token: killCursors.
+ *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: killCursors.
  *   not_allowed_with_security_token,
  *   assumes_against_mongod_not_mongos,
  *   multiversion_incompatible,

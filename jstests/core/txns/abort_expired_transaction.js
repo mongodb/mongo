@@ -2,9 +2,11 @@
 // 'transactionLifetimeLimitSeconds' to lower the transaction lifetime for quicker transaction
 // expiration.
 //
-// The test runs commands that are not allowed with security token: endSession, setParameter.
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions]
+//   # The test runs commands that are not allowed with security token: endSession, setParameter.
+//   not_allowed_with_security_token,
+//   uses_transactions
+// ]
 
 const testDBName = "testDB";
 const testCollName = "abort_expired_transaction";

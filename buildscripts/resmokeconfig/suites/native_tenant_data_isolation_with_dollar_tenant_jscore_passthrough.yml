@@ -13,6 +13,9 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_with_any_tags:
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
+  # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Theses tests expect replication is not enabled.
   - assumes_standalone_mongod

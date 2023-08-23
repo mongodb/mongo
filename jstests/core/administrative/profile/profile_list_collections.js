@@ -1,12 +1,12 @@
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+// Confirms that a listCollections command is not profiled.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
 // ]
-
-// Confirms that a listCollections command is not profiled.
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 

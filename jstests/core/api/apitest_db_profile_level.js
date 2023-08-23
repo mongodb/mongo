@@ -1,7 +1,8 @@
 /**
- *  Tests for setting of profile levels
- * The test runs commands that are not allowed with security token: getLog, setProfilingLevel.
+ * Tests for setting of profile levels
+ *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: getLog, setProfilingLevel.
  *   not_allowed_with_security_token,
  *   does_not_support_stepdowns,
  *   requires_profiling,

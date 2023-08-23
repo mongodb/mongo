@@ -14,11 +14,22 @@ export function usingMultipleTenants() {
 
 const kTenantPrefixMap = {};
 
+export function getTenantIdForDatabase(dbName) {
+    if (!kTenantPrefixMap[dbName]) {
+        const tenantId = usingMultipleTenants()
+            ? TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)]
+            : TestData.tenantId;
+        kTenantPrefixMap[dbName] = tenantId;
+    }
+
+    return kTenantPrefixMap[dbName];
+}
+
 /**
  * If the database with the given name can be migrated, prepend a tenant prefix if one has not
  * already been applied.
  */
-export function prependTenantIdToDbNameIfApplicable(dbName) {
+export function prependTenantIdToDbNameIfApplicable(dbName, tenantId) {
     if (dbName.length === 0) {
         // There are input validation tests that use invalid database names, those should be
         // ignored.
@@ -30,20 +41,7 @@ export function prependTenantIdToDbNameIfApplicable(dbName) {
         return dbName;
     }
 
-    let prefix;
-    // If running shard split passthroughs, then assign a database to a randomly selected tenant
-    if (usingMultipleTenants()) {
-        if (!kTenantPrefixMap[dbName]) {
-            const tenantId =
-                TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)];
-            kTenantPrefixMap[dbName] = `${tenantId}_`;
-        }
-
-        prefix = kTenantPrefixMap[dbName];
-    } else {
-        prefix = `${TestData.tenantId}_`;
-    }
-
+    const prefix = `${kTenantPrefixMap[dbName] || tenantId}_`;
     return (isDenylistedDb(dbName) || dbName.startsWith(prefix)) ? dbName : `${prefix}${dbName}`;
 }
 
@@ -51,14 +49,14 @@ export function prependTenantIdToDbNameIfApplicable(dbName) {
  * If the database for the given namespace can be migrated, prepend a tenant prefix if one has not
  * already been applied.
  */
-function prependTenantIdToNsIfApplicable(ns) {
+function prependTenantIdToNsIfApplicable(ns, tenantId) {
     if (ns.length === 0 || !ns.includes(".")) {
         // There are input validation tests that use invalid namespaces, those should be ignored.
         return ns;
     }
 
     const splitNs = ns.split(".");
-    splitNs[0] = prependTenantIdToDbNameIfApplicable(splitNs[0]);
+    splitNs[0] = prependTenantIdToDbNameIfApplicable(splitNs[0], tenantId);
     return splitNs.join(".");
 }
 
@@ -66,12 +64,9 @@ function prependTenantIdToNsIfApplicable(ns) {
  * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    if (usingMultipleTenants()) {
-        const anyTenantPrefixOnceRegex = new RegExp(Object.values(kTenantPrefixMap).join('|'), '');
-        return dbName.replace(anyTenantPrefixOnceRegex, "");
-    }
-
-    return dbName.replace(`${TestData.tenantId}_`, "");
+    const anyTenantPrefixOnceRegex =
+        new RegExp(`^(${Object.values(kTenantPrefixMap).map(tid => `${tid}_`).join('|')})`, '');
+    return dbName.replace(anyTenantPrefixOnceRegex, "");
 }
 
 /**
@@ -87,34 +82,31 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    if (usingMultipleTenants()) {
-        const anyTenantPrefixGlobalRegex =
-            new RegExp(Object.values(kTenantPrefixMap).join('|'), 'g');
-        return string.replace(anyTenantPrefixGlobalRegex, "");
-    }
-
-    return string.replace(new RegExp(`${TestData.tenantId}_`, 'g'), "");
+    const anyTenantPrefixGlobalRegex =
+        new RegExp(Object.values(kTenantPrefixMap).map(tid => `${tid}_`).join('|'), 'g');
+    return string.replace(anyTenantPrefixGlobalRegex, "");
 }
 
 /**
  * Prepends a tenant prefix to all database name and namespace fields in the provided object, where
  * applicable.
  */
-function prependTenantId(obj) {
+function prependTenantId(obj, tenantId) {
     for (let k of Object.keys(obj)) {
         let v = obj[k];
         if (typeof v === "string") {
             if (k === "dbName" || k == "db") {
-                obj[k] = prependTenantIdToDbNameIfApplicable(v);
+                obj[k] = prependTenantIdToDbNameIfApplicable(v, tenantId);
             } else if (k === "namespace" || k === "ns") {
-                obj[k] = prependTenantIdToNsIfApplicable(v);
+                obj[k] = prependTenantIdToNsIfApplicable(v, tenantId);
             }
         } else if (Array.isArray(v)) {
             obj[k] = v.map((item) => {
-                return (typeof item === "object" && item !== null) ? prependTenantId(item) : item;
+                return (typeof item === "object" && item !== null) ? prependTenantId(item, tenantId)
+                                                                   : item;
             });
         } else if (typeof v === "object" && v !== null && Object.keys(v).length > 0) {
-            obj[k] = prependTenantId(v);
+            obj[k] = prependTenantId(v, tenantId);
         }
     }
 
@@ -163,7 +155,7 @@ export function isCmdObjWithTenantId(cmdObj) {
  * Prepend a tenant prefix to all namespaces within a provided command object, and record a comment
  * indicating that the command object has alrady been modified.
  */
-export function createCmdObjWithTenantId(cmdObj) {
+export function createCmdObjWithTenantId(cmdObj, tenantId) {
     const cmdName = Object.keys(cmdObj)[0];
     let cmdObjWithTenantId = TransactionsUtil.deepCopyObject({}, cmdObj);
 
@@ -173,25 +165,29 @@ export function createCmdObjWithTenantId(cmdObj) {
 
     // Handle commands with special database and namespace field names.
     if (kCmdsWithNsAsFirstField.has(cmdName)) {
-        cmdObjWithTenantId[cmdName] = prependTenantIdToNsIfApplicable(cmdObjWithTenantId[cmdName]);
+        cmdObjWithTenantId[cmdName] =
+            prependTenantIdToNsIfApplicable(cmdObjWithTenantId[cmdName], tenantId);
     }
 
     switch (cmdName) {
         case "renameCollection":
-            cmdObjWithTenantId.to = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to);
+            cmdObjWithTenantId.to =
+                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
             break;
         case "internalRenameIfOptionsAndIndexesMatch":
-            cmdObjWithTenantId.from = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.from);
-            cmdObjWithTenantId.to = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to);
+            cmdObjWithTenantId.from =
+                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.from, tenantId);
+            cmdObjWithTenantId.to =
+                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
             break;
         case "configureFailPoint":
             if (cmdObjWithTenantId.data) {
                 if (cmdObjWithTenantId.data.namespace) {
-                    cmdObjWithTenantId.data.namespace =
-                        prependTenantIdToNsIfApplicable(cmdObjWithTenantId.data.namespace);
+                    cmdObjWithTenantId.data.namespace = prependTenantIdToNsIfApplicable(
+                        cmdObjWithTenantId.data.namespace, tenantId);
                 } else if (cmdObjWithTenantId.data.ns) {
                     cmdObjWithTenantId.data.ns =
-                        prependTenantIdToNsIfApplicable(cmdObjWithTenantId.data.ns);
+                        prependTenantIdToNsIfApplicable(cmdObjWithTenantId.data.ns, tenantId);
                 }
             }
             break;
@@ -200,7 +196,7 @@ export function createCmdObjWithTenantId(cmdObj) {
                 if (typeof op.ns === "string" && op.ns.endsWith("system.views") && op.o._id &&
                     typeof op.o._id === "string") {
                     // For views, op.ns and op.o._id must be equal.
-                    op.o._id = prependTenantIdToNsIfApplicable(op.o._id);
+                    op.o._id = prependTenantIdToNsIfApplicable(op.o._id, tenantId);
                 }
             }
             break;
@@ -212,7 +208,7 @@ export function createCmdObjWithTenantId(cmdObj) {
     // since data.errorExtraInfo.namespace or data.errorExtraInfo.ns can sometimes refer to
     // collection name instead of namespace.
     if (cmdName != "configureFailPoint") {
-        prependTenantId(cmdObjWithTenantId);
+        prependTenantId(cmdObjWithTenantId, tenantId);
     }
 
     cmdObjWithTenantId.comment = Object.assign(

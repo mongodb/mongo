@@ -1,12 +1,12 @@
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+// Confirms that profiled distinct execution contains all expected metrics with proper values.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_fcv_70,
 //   requires_profiling,
 // ]
-
-// Confirms that profiled distinct execution contains all expected metrics with proper values.
 
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";

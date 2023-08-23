@@ -1,5 +1,5 @@
-// The test runs commands that are not allowed with security token: dbhash.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: dbhash.
 //   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 // ]

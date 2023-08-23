@@ -1,6 +1,6 @@
-// The test runs commands that are not allowed with security token: createUser, dropUser,
-// logout, profile, setProfilingLevel.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: createUser, dropUser,
+//   # logout, profile, setProfilingLevel.
 //   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,

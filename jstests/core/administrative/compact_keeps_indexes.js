@@ -1,8 +1,9 @@
 // SERVER-16676 Make sure compact doesn't leave the collection with bad indexes
 // SERVER-16967 Make sure compact doesn't crash while collections are being dropped
 // in a different database.
-// The test runs commands that are not allowed with security token: compact.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: compact.
 //   not_allowed_with_security_token,
 //   uses_multiple_connections,
 //   uses_parallel_shell,

@@ -1,7 +1,7 @@
 // Test various cursor behaviors
 //
-// The test runs commands that are not allowed with security token: profile, setProfilingLevel.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: profile, setProfilingLevel.
 //   not_allowed_with_security_token,
 //   # This test attempts to enable profiling on a server and then get profiling data by reading
 //   # nodes the "system.profile" collection. The former operation must be routed to the primary in

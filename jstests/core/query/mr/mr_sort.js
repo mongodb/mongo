@@ -1,7 +1,8 @@
 // Cannot implicitly shard accessed collections because the "limit" option to the "mapReduce"
 // command cannot be used on a sharded collection.
-// The test runs commands that are not allowed with security token: mapReduce.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   assumes_unsharded_collection,
 //   # mapReduce does not support afterClusterTime.

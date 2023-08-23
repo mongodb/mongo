@@ -1,7 +1,12 @@
 // Tests that it is illegal to read from system.views and system.profile within a transaction.
-// The test runs commands that are not allowed with security token: profile.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions, uses_snapshot_read_concern]
+//   # The test runs commands that are not allowed with security token: profile.
+//   not_allowed_with_security_token,
+//   uses_transactions,
+//   uses_snapshot_read_concern
+// ]
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const session = db.getMongo().startSession();

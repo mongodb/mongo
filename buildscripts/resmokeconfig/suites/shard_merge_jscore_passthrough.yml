@@ -42,6 +42,8 @@ selector:
   - requires_timeseries # Tenant migration not supported
   - requires_fastcount
   - multiple_tenants_incompatible
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
 
 executor:
   archive:

@@ -6,8 +6,8 @@
  * - Confirm that writes can progress after fsyncUnlock
  * - Confirm that the command can be run repeatedly without breaking things
  *
- * The test runs commands that are not allowed with security token: fsync, fsyncUnlock.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: fsync, fsyncUnlock.
  *   not_allowed_with_security_token,
  *   requires_fastcount,
  *   requires_fsync,

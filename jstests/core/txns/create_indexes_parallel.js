@@ -1,8 +1,8 @@
 /**
  * Tests parallel transactions with createIndexes.
  *
- * The test runs commands that are not allowed with security token: endSession.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: endSession.
  *   not_allowed_with_security_token,
  *   uses_transactions,
  * ]

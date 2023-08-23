@@ -1,7 +1,6 @@
 /**
  * Tests running the delete command with a hint on a time-series collection.
  * @tags: [
-
  *   # $currentOp can't run with a readConcern other than 'local'.
  *   assumes_read_concern_unchanged,
  *   # This test only synchronizes deletes on the primary.
@@ -15,6 +14,8 @@
  *   requires_timeseries,
  *   # Uses parallel shell to wait on fail point
  *   uses_parallel_shell,
+ *   # TODO(SERVER-80252): Uses namespace strings which are too long for Serverless
+ *   simulate_atlas_proxy_incompatible,
  * ]
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";

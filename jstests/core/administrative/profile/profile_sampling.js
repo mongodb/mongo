@@ -1,6 +1,7 @@
 // Confirms that the number of profiled operations is consistent with the sampleRate, if set.
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
@@ -9,6 +10,7 @@
 //   # errors.
 //   tenant_migration_incompatible,
 // ]
+
 // Use a special db to support running other tests in parallel.
 const profileDB = db.getSiblingDB("profile_sampling");
 const coll = profileDB.profile_sampling;

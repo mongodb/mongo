@@ -1,8 +1,11 @@
 // Test that the server cleans up correctly when creating a collection fails.
 //
-// The test runs commands that are not allowed with security token: top.
 // @tags: [
-//   not_allowed_with_security_token,requires_capped]
+//   # The test runs commands that are not allowed with security token: top.
+//   not_allowed_with_security_token,
+//   requires_capped
+// ]
+
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var dbTest = db.getSiblingDB("DB_create_collection_fail_cleanup");

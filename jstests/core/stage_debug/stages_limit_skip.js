@@ -1,12 +1,13 @@
-// The test runs commands that are not allowed with security token: stageDebug.
+// Test limit and skip
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: stageDebug.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   no_selinux,
 // ]
 
-// Test limit and skip
 let t = db.stages_limit_skip;
 t.drop();
 var collname = "stages_limit_skip";

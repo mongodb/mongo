@@ -19,9 +19,9 @@
  * using the $planCacheStats aggregation metadata source on the same query shape with the index
  * filters.
  *
- * The test runs commands that are not allowed with security token: planCacheClearFilters,
- * planCacheListFilters, planCacheSetFilter.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: planCacheClearFilters,
+ *   # planCacheListFilters, planCacheSetFilter.
  *   not_allowed_with_security_token,
  *   # Cannot implicitly shard accessed collections because of collection existing when none
  *   # expected.

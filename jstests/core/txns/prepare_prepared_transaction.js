@@ -1,9 +1,13 @@
 /**
  * Tests that we can successfully prepare a prepared transaction.
  *
- * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
  * @tags: [
- *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
+ *   # The test runs commands that are not allowed with security token: endSession,
+ *   # prepareTransaction.
+ *   not_allowed_with_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction
+ * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 

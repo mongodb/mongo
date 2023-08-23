@@ -1,6 +1,7 @@
 // Test invocations of {rolesInfo: ...} command
-// The test runs commands that are not allowed with security token: createRole, dropRole.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: createRole, dropRole.
 //   not_allowed_with_security_token,
 //   requires_multi_updates,
 //   requires_non_retryable_commands,

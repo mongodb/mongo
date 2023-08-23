@@ -1,7 +1,12 @@
 // Tests that the killCursors command is allowed in transactions.
-// The test runs commands that are not allowed with security token: endSession, killCursors.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions, uses_parallel_shell]
+//   # The test runs commands that are not allowed with security token: endSession, killCursors.
+//   not_allowed_with_security_token,
+//   uses_transactions,
+//   uses_parallel_shell
+// ]
+
 const dbName = "test";
 const collName = "kill_cursors_in_transaction";
 const testDB = db.getSiblingDB(dbName);

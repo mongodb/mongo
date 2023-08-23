@@ -1,9 +1,13 @@
 /**
  * Test error cases when calling prepare on a non-existent transaction.
  *
- * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
  * @tags: [
- *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
+ *   # The test runs commands that are not allowed with security token: endSession,
+ *   # prepareTransaction.
+ *   not_allowed_with_security_token,
+ *   uses_transactions,
+ *   uses_prepare_transaction
+ * ]
  */
 const dbName = "test";
 const collName = "prepare_nonexistent_transaction";

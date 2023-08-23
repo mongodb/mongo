@@ -1,7 +1,8 @@
 // Tests that the map function can access state of the 'this' object using both the '.x' and ["x"]
 // syntax.
-// The test runs commands that are not allowed with security token: mapReduce.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,

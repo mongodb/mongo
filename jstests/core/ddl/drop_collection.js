@@ -1,7 +1,8 @@
 /**
  * Basic test for the drop collection command
- * The test runs commands that are not allowed with security token: isbdgrid.
+ *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: isbdgrid.
  *   not_allowed_with_security_token,
  *   # Cannot implicitly shard accessed collections because of collection
  *   # existing when none expected.

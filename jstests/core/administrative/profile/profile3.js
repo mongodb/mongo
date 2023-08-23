@@ -1,6 +1,6 @@
-// The test runs commands that are not allowed with security token: createUser, logout,
-// setProfilingLevel.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: createUser, logout,
+//   # setProfilingLevel.
 //   not_allowed_with_security_token,
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
@@ -9,6 +9,7 @@
 //   # This test depends on hardcoded database name equality.
 //   tenant_migration_incompatible,
 // ]
+
 // special db so that it can be run in parallel tests
 var stddb = db;
 var db = db.getSiblingDB("profile3");

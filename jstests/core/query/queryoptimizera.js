@@ -1,12 +1,12 @@
-// The test runs commands that are not allowed with security token: getLog.
+// Check that a warning message about doing a capped collection scan for a query with an _id
+// constraint is printed at appropriate times.  SERVER-5353
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: getLog.
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_capped,
 // ]
-
-// Check that a warning message about doing a capped collection scan for a query with an _id
-// constraint is printed at appropriate times.  SERVER-5353
 
 function numWarnings() {
     let logs = db.adminCommand({getLog: "global"}).log;

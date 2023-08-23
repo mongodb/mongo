@@ -1,5 +1,7 @@
-// The test runs commands that are not allowed with security token: setProfilingLevel.
+// Confirms that profiled update execution contains all expected metrics with proper values.
+//
 // @tags: [
+//   # The test runs commands that are not allowed with security token: setProfilingLevel.
 //   not_allowed_with_security_token,
 //   # Asserts on the number of index keys modified.
 //   assumes_no_implicit_index_creation,
@@ -7,8 +9,6 @@
 //   requires_non_retryable_writes,
 //   requires_profiling,
 // ]
-
-// Confirms that profiled update execution contains all expected metrics with proper values.
 
 import {
     ClusteredCollectionUtil

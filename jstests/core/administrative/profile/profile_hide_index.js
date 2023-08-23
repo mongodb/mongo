@@ -1,8 +1,8 @@
 /**
  * Ensure the 'hidden' flag can be found in currentOp and profiler.
  *
- * The test runs commands that are not allowed with security token: setProfilingLevel.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: setProfilingLevel.
  *   not_allowed_with_security_token,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,

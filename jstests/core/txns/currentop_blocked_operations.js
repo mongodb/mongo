@@ -1,8 +1,8 @@
 /**
  * Tests that currentOp reports debug information for operations that are blocked on transactions.
  *
- * The test runs commands that are not allowed with security token: prepareTransaction.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction.
  *   not_allowed_with_security_token,
  *   uses_transactions,
  *   uses_prepare_transaction,

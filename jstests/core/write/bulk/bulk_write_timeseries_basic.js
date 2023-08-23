@@ -1,9 +1,9 @@
 /**
  * Tests bulk write to timeseries collections.
  *
- * The test runs commands that are not allowed with security token: bulkWrite.
  * @tags: [
  *   assumes_against_mongod_not_mongos,
+ *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
  *   # TODO SERVER-52419 Remove this tag.

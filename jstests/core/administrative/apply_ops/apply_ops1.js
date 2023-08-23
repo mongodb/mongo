@@ -1,6 +1,6 @@
 /*
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_security_token,
  *   assumes_superuser_permissions,
  *   requires_fastcount,

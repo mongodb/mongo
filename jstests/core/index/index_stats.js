@@ -1,5 +1,5 @@
-// The test runs commands that are not allowed with security token: mapReduce.
 // @tags: [
+//   # The test runs commands that are not allowed with security token: mapReduce.
 //   not_allowed_with_security_token,
 //   # This test attempts to perform write operations and get index usage statistics using the
 //   # $indexStats stage. The former operation must be routed to the primary in a replica set,

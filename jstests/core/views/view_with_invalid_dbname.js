@@ -3,8 +3,8 @@
  * invalid name. This test is specifically for the case of a view with a dbname that contains an
  * embedded null character (SERVER-36859).
  *
- * The test runs commands that are not allowed with security token: applyOps.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_security_token,
  *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.

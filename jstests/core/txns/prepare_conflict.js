@@ -1,8 +1,8 @@
 /**
  * Tests that prepare conflicts for prepared transactions are retried.
  *
- * The test runs commands that are not allowed with security token: prepareTransaction, profile.
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: prepareTransaction, profile.
  *   not_allowed_with_security_token,
  *   uses_prepare_transaction,
  *   uses_transactions,

@@ -1,7 +1,11 @@
 // Test that ongoing operations in a transaction are interrupted when the transaction expires.
-// The test runs commands that are not allowed with security token: endSession, setParameter.
+//
 // @tags: [
-//   not_allowed_with_security_token,uses_transactions]
+//   # The test runs commands that are not allowed with security token: endSession, setParameter.
+//   not_allowed_with_security_token,
+//   uses_transactions
+// ]
+
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 

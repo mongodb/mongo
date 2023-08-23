@@ -1,7 +1,8 @@
 /**
  * Tests that running mapReduce with explain behaves as expected.
- * The test runs commands that are not allowed with security token: mapReduce.
+ *
  * @tags: [
+ *   # The test runs commands that are not allowed with security token: mapReduce.
  *   not_allowed_with_security_token,
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
