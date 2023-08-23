@@ -23,7 +23,7 @@ const paramList = [
     {name: "internalQueryCacheWorksGrowthCoefficient", value: 3.0},
     {name: "internalQueryCacheDisableInactiveEntries", value: true},
     {name: "internalQueryPlannerMaxIndexedSolutions", value: 32},
-    {name: "internalQueryEnumerationPreferLockstepOrEnumeration", value: true},
+    {name: "internalQueryEnumerationPreferLockstepOrEnumeration", value: false},
     {name: "internalQueryEnumerationMaxOrSolutions", value: 5},
     {name: "internalQueryEnumerationMaxIntersectPerAnd", value: 10},
     {name: "internalQueryPlanOrChildrenIndependently", value: false},
