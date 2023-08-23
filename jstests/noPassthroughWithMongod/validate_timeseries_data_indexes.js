@@ -6,12 +6,6 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-// TODO SERVER-77347 Enable once we can perform updates on compressed buckets.
-if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-    jsTestLog("Skipping tests until updates to compressed buckets are enabled.");
-    quit();
-}
-
 const collPrefix = "validate_timeseries_data_indexes";
 const bucketPrefix = "system.buckets.validate_timeseries_data_indexes";
 let collName = collPrefix;
@@ -52,6 +46,16 @@ function setUpCollection(data) {
     assert(result.valid, tojson(result));
     assert(result.warnings.length == 0, tojson(result));
     assert(result.nNonCompliantDocuments == 0, tojson(result));
+
+    // If we are always writing to time-series collections using the compressed format, replace the
+    // compressed bucket with the decompressed bucket in the system.buckets collection. This allows
+    // this test to directly make updates to bucket measurements in order to test validation.
+    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+        const bucket = db.getCollection(bucketName);
+        const bucketDoc = bucket.find().toArray()[0];
+        TimeseriesTest.decompressBucket(bucketDoc);
+        bucket.replaceOne({_id: bucketDoc._id}, bucketDoc);
+    }
 }
 
 // Non-numerical index.

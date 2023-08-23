@@ -23,13 +23,27 @@ const numDocs = bucketMaxCount + 100;
 const collNamePrefix = jsTestName() + "_";
 let count = 0;
 let coll;
+let bucketsColl;
+
+function assertBucketsAreCompressed(db, bucketsColl) {
+    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+        return;
+    }
+
+    const bucketDocs = bucketsColl.find().toArray();
+    bucketDocs.forEach(
+        // Version 2 indicates the bucket is compressed.
+        bucketDoc => {assert.eq(2,
+                                bucketDoc.control.version,
+                                `Expected bucket to be compressed: ${tojson(bucketDoc)}`)});
+}
 
 function prepareCompressedBucket() {
     coll = db.getCollection(collNamePrefix + count++);
     coll.drop();
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     // Insert enough documents to trigger bucket compression.
     let docs = [];
@@ -76,8 +90,6 @@ function prepareCompressedBucket() {
 // Update many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.updateMany({str: "even"}, {$inc: {updated: 1}}));
-// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket update if the
-// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(numDocs / 2, result.modifiedCount);
 assert.eq(coll.countDocuments({updated: 1, str: "even"}),
           numDocs / 2,
@@ -85,12 +97,11 @@ assert.eq(coll.countDocuments({updated: 1, str: "even"}),
 assert.eq(coll.countDocuments({updated: 1, str: "odd"}),
           0,
           "Expected records not matching the filter not to be updated.");
+assertBucketsAreCompressed(db, bucketsColl);
 
 // Update one record from the compressed bucket.
 prepareCompressedBucket();
 result = assert.commandWorked(coll.updateOne({str: "even", f: {$lt: 100}}, {$inc: {updated: 1}}));
-// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket update if the
-// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(1, result.modifiedCount);
 assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
           1,
@@ -98,3 +109,4 @@ assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
 assert.eq(coll.countDocuments({updated: 1}),
           1,
           "Expected records not matching the filter not to be updated.");
+assertBucketsAreCompressed(db, bucketsColl);

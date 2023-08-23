@@ -84,7 +84,16 @@ function testOplogCloning(ordered) {
             return Object.values(oplogEntry.o.data.tag);
         }
         if (oplogEntry.op == "u") {
-            return Object.values(oplogEntry.o.diff.sdata.stag.i);
+            if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(
+                    donorPrimary.getDB("admin"))) {
+                // With the feature flag enabled, the behavior of updates is changed. They are now
+                // compressed, and also full replacements. We can decompress to inspect the op in
+                // this case.
+                TimeseriesTest.decompressBucket(oplogEntry.o);
+                return Object.values(oplogEntry.o.data.tag).slice(3);
+            } else {
+                return Object.values(oplogEntry.o.diff.sdata.stag.i);
+            }
         }
         throw Error("Unknown op type " + oplogEntry.op);
     }
@@ -271,18 +280,12 @@ function testOplogCloning(ordered) {
     assert.eq(docs[0].stmtId.length, 3);
     assert.eq(docs[1].stmtId.length, 3);
 
-    // TODO SERVER-77347: Re-enable. Currently, not all the tags will match because some
-    // updates will be full replacements in the oplog (i.e. if we insert into a compressed bucket
-    // and the update decompresses the bucket), and some updates will have diffs (i.e. if we update
-    // an already-decompressed bucket).
-    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(donorPrimary.getDB("admin"))) {
-        getTagsFromOplog(docs[0]).forEach(tag => {
-            assert.eq(tag, insertTag);
-        });
-        getTagsFromOplog(docs[1]).forEach(tag => {
-            assert.eq(tag, updateTag);
-        });
-    }
+    getTagsFromOplog(docs[0]).forEach(tag => {
+        assert.eq(tag, insertTag);
+    });
+    getTagsFromOplog(docs[1]).forEach(tag => {
+        assert.eq(tag, updateTag);
+    });
 
     donorRst.stopSet();
     recipientRst.stopSet();

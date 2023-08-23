@@ -4,6 +4,9 @@
  *   requires_replication,
  * ]
  */
+
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -126,6 +129,9 @@ const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
               ': bucket collection: ' + bucketsColl.getFullName() + ': ' + tojson(bucketDoc));
 
     // Check bucket.
+    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB)) {
+        TimeseriesTest.decompressBucket(bucketDoc);
+    }
     assert.eq(docs.length,
               Object.keys(bucketDoc.data[timeFieldName]).length,
               'invalid number of measurements in first bucket: ' + tojson(bucketDoc));

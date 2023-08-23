@@ -55,6 +55,7 @@
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -291,6 +292,145 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
 
     UnorderedFieldsBSONObjComparator comparator;
     ASSERT_EQ(0, comparator.compare(newDoc, bucketDoc));
+}
+
+TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesDecompressAndUpdateOp) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "MakeTimeseriesDecompressAndUpdateOp");
+
+    // Builds a write batch for an update and sets the decompressed field of the batch.
+    auto batch = generateBatch(ns);
+    const std::vector<BSONObj> measurements = {
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0})"),
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:34.000Z"},"a":4,"b":4})"),
+    };
+
+    batch->min = fromjson(R"({"u": {"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0}})");
+    batch->max = fromjson(R"({"u": {"time":{"$date":"2022-06-06T15:34:34.000Z"},"a":4,"b":4}})");
+    batch->measurements = {measurements.begin(), measurements.end()};
+
+    const BSONObj uncompressedPreImage = fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:31.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:33.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:31.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:32.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:33.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    const auto preImageCompressionResult = timeseries::compressBucket(
+        uncompressedPreImage, kTimeseriesOptions.getTimeField(), ns, /*validateCompression=*/true);
+    ASSERT_TRUE(preImageCompressionResult.compressedBucket);
+
+    batch->decompressed =
+        DecompressionResult{*preImageCompressionResult.compressedBucket, uncompressedPreImage};
+
+    // The expected uncompressed BSON created by the expected transformation function in
+    // makeTimeseriesDecompressAndUpdateOp(). The compressed version of this is checked against the
+    // output of the function.
+    const BSONObj expectedUncompressedPostImage = fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+        "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0},
+                               "max":{"time":{"$date":"2022-06-06T15:34:34.000Z"},"a":4,"b":4}},
+        "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                        "1":{"$date":"2022-06-06T15:34:31.000Z"},
+                        "2":{"$date":"2022-06-06T15:34:32.000Z"},
+                        "3":{"$date":"2022-06-06T15:34:33.000Z"},
+                        "4":{"$date":"2022-06-06T15:34:34.000Z"}},
+                "a":{"0":0,"1":1,"2":2,"3":3,"4":4},
+                "b":{"0":0,"1":1,"2":2,"3":3,"4":4}}})");
+
+    const auto expectedPostImageCompressionResult =
+        timeseries::compressBucket(expectedUncompressedPostImage,
+                                   kTimeseriesOptions.getTimeField(),
+                                   ns,
+                                   /*validateCompression=*/true);
+    ASSERT_TRUE(expectedPostImageCompressionResult.compressedBucket);
+
+    auto request = makeTimeseriesDecompressAndUpdateOp(
+        operationContext(), batch, ns.makeTimeseriesBucketsNamespace(), /*metadata=*/{});
+    auto& updates = request.getUpdates();
+
+    ASSERT_EQ(updates.size(), 1);
+
+    // The transformation function in the request should successfully validate the compressed
+    // pre-image, then return the compressed post image.
+    ASSERT((updates[0].getU().getTransform()(*preImageCompressionResult.compressedBucket))
+               ->binaryEqual(*expectedPostImageCompressionResult.compressedBucket));
+}
+
+TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesDecompressAndUpdateOpWithMeta) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "makeTimeseriesDecompressAndUpdateOpWithMeta");
+
+    // Builds a write batch for an update and sets the decompressed field of the batch.
+    auto batch = generateBatch(ns);
+    const std::vector<BSONObj> measurements = {
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":0,"b":0})"),
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:34.000Z"},"meta":{"tag":1},"a":4,"b":4})"),
+    };
+
+    batch->min = fromjson(R"({"u": {"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0}})");
+    batch->max = fromjson(R"({"u": {"time":{"$date":"2022-06-06T15:34:34.000Z"},"a":4,"b":4}})");
+    batch->measurements = {measurements.begin(), measurements.end()};
+    auto metadata = fromjson(R"({"meta":{"tag":1}})");
+
+    const BSONObj uncompressedPreImage = fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:31.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:33.000Z"},"a":3,"b":3}},
+            "meta":{"tag":1},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:31.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:32.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:33.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    const auto preImageCompressionResult = timeseries::compressBucket(
+        uncompressedPreImage, kTimeseriesOptions.getTimeField(), ns, /*validateCompression=*/true);
+    ASSERT_TRUE(preImageCompressionResult.compressedBucket);
+
+    batch->decompressed =
+        DecompressionResult{*preImageCompressionResult.compressedBucket, uncompressedPreImage};
+
+    // The expected uncompressed BSON created by the expected transformation function in
+    // makeTimeseriesDecompressAndUpdateOp(). The compressed version of this is checked against the
+    // output of the function.
+    const BSONObj expectedUncompressedPostImage = fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+        "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":0,"b":0},
+                               "max":{"time":{"$date":"2022-06-06T15:34:34.000Z"},"a":4,"b":4}},
+        "meta":{"tag":1},
+        "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                        "1":{"$date":"2022-06-06T15:34:31.000Z"},
+                        "2":{"$date":"2022-06-06T15:34:32.000Z"},
+                        "3":{"$date":"2022-06-06T15:34:33.000Z"},
+                        "4":{"$date":"2022-06-06T15:34:34.000Z"}},
+                "a":{"0":0,"1":1,"2":2,"3":3,"4":4},
+                "b":{"0":0,"1":1,"2":2,"3":3,"4":4}}})");
+
+    const auto expectedPostImageCompressionResult =
+        timeseries::compressBucket(expectedUncompressedPostImage,
+                                   kTimeseriesOptions.getTimeField(),
+                                   ns,
+                                   /*validateCompression=*/true);
+    ASSERT_TRUE(expectedPostImageCompressionResult.compressedBucket);
+
+    auto request = makeTimeseriesDecompressAndUpdateOp(
+        operationContext(), batch, ns.makeTimeseriesBucketsNamespace(), metadata);
+    auto& updates = request.getUpdates();
+
+    ASSERT_EQ(updates.size(), 1);
+
+    // The transformation function in the request should successfully validate the compressed
+    // pre-image, then return the compressed post image.
+    ASSERT((updates[0].getU().getTransform()(*preImageCompressionResult.compressedBucket))
+               ->binaryEqual(*expectedPostImageCompressionResult.compressedBucket));
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {

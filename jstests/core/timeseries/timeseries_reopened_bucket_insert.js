@@ -243,8 +243,9 @@ const checkIfBucketReopened = function(
             initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
     }
     // Time forwards will open a new bucket, and close and compress the old one.
-    checkIfBucketReopened(forward, /* willCreateBucket= */ true, /* willReopenBucket= */ false);
-    assert.eq(1, bucketsColl.find({"control.version": 2}).toArray().length);
+    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    // Version 2 indicates the bucket is compressed.
+    assert.eq(2, bucketsColl.find({"control.version": 2}).toArray().length);
 
     // We expect to reopen the compressed bucket with time backwards.
     checkIfBucketReopened(backward, /* willCreateBucket= */ false, /* willReopenBucket= */ true);

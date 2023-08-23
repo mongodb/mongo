@@ -225,6 +225,9 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
     assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
     assert.eq(null, mongosColl.findOne({_id: 7}), mongosColl.find().toArray());
     const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 2});
+    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(st.shard0)) {
+        TimeseriesTest.decompressBucket(shard0Bucket);
+    }
     assert.eq(2, shard0Bucket.meta, shard0Bucket);
     assert.eq(6, shard0Bucket.control.min._id, shard0Bucket);
     assert.eq(7, shard0Bucket.control.max._id, shard0Bucket);

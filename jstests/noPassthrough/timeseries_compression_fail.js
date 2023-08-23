@@ -10,10 +10,7 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 const coll = db.getCollection('t');
 
-// TODO SERVER-77347: Re-enable.
-// Currently, this test cannot be enabled because the server does not set time-series collection
-// stats until write_ops_exec::tryPerformTimeseriesBucketCompression() is called. This function will
-// not be called because updates will decompress a bucket.
+// TODO SERVER-80004: Re-enable.
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     jsTestLog("Skipping test as the always use compressed buckets feature is enabled");
     MongoRunner.stopMongod(conn);

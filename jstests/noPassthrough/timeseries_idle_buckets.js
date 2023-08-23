@@ -13,8 +13,6 @@ rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
 
-// TODO SERVER-70605: Remove.
-const alwaysUseCompressedBuckets = TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db);
 const isBucketReopeningEnabled = TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
 assert.commandWorked(db.dropDatabase());
@@ -57,7 +55,7 @@ for (let i = 0; i < numDocs; i++) {
     ]));
 }
 
-// No go back and insert documents with the same metadata, and verify that we at some point
+// Now go back and insert documents with the same metadata, and verify that we at some point
 // insert into a new bucket, indicating the old one was expired.
 let foundExpiredBucket = false;
 for (let i = 0; i < numDocs; i++) {
@@ -69,9 +67,8 @@ for (let i = 0; i < numDocs; i++) {
 
     // Check buckets.
     if (isBucketReopeningEnabled) {
-        let bucketDocs = bucketsColl.find({"control.version": alwaysUseCompressedBuckets ? 1 : 2})
-                             .limit(1)
-                             .toArray();
+        // Version 2 indicates the bucket is compressed.
+        let bucketDocs = bucketsColl.find({"control.version": 2}).limit(1).toArray();
         if (bucketDocs.length > 0) {
             foundExpiredBucket = true;
         }
@@ -80,10 +77,12 @@ for (let i = 0; i < numDocs; i++) {
                              .sort({'control.min._id': 1})
                              .toArray();
         if (bucketDocs.length > 1) {
-            // If bucket compression is enabled the expired bucket should have been compressed
-            assert.eq(alwaysUseCompressedBuckets ? 1 : 2,
+            // If bucket compression is enabled the expired bucket should have been compressed.
+            // Version 2 indicates the bucket is compressed.
+            assert.eq(2,
                       bucketDocs[0].control.version,
                       'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+            // Version 1 indicates the bucket is uncompressed.
             assert.eq(1,
                       bucketDocs[1].control.version,
                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
@@ -97,6 +96,7 @@ for (let i = 0; i < numDocs; i++) {
                       1,
                       'Invalid number of buckets for metadata ' + (numDocs - 1) + ': ' +
                           tojson(bucketDocs));
+            // Version 1 indicates the bucket is uncompressed.
             assert.eq(1,
                       bucketDocs[0].control.version,
                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));

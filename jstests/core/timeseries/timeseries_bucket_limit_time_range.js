@@ -14,9 +14,6 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const isTimeseriesScalabilityImprovementsEnabled =
-        TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
-
     const collNamePrefix = 'timeseries_bucket_limit_time_range_';
 
     const timeFieldName = 'time';
@@ -87,14 +84,10 @@ TimeseriesTest.run((insert) => {
         assert.eq(docTimes[2],
                   bucketDocs[0].control.max[timeFieldName],
                   'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
-        if (!isTimeseriesScalabilityImprovementsEnabled) {  // If enabled, we will archive instead
-                                                            // of closing, but another simultaneous
-                                                            // operation may close it in the
-                                                            // background.
-            assert.eq(2,
-                      bucketDocs[0].control.version,
-                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-        }
+        // Version 2 indicates the bucket is compressed.
+        assert.eq(2,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
         // Second bucket should contain the remaining document.
         assert.eq(numDocs - 1,

@@ -24,13 +24,27 @@ const numDocs = bucketMaxCount + 100;
 const collNamePrefix = jsTestName() + "_";
 let count = 0;
 let coll;
+let bucketsColl;
+
+function assertBucketsAreCompressed(db, bucketsColl) {
+    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+        return;
+    }
+
+    const bucketDocs = bucketsColl.find().toArray();
+    bucketDocs.forEach(
+        // Version 2 indicates the bucket is compressed.
+        bucketDoc => {assert.eq(2,
+                                bucketDoc.control.version,
+                                `Expected bucket to be compressed: ${tojson(bucketDoc)}`)});
+}
 
 function prepareCompressedBucket() {
     coll = db.getCollection(collNamePrefix + count++);
     coll.drop();
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
     // Insert enough documents to trigger bucket compression.
     let docs = [];
@@ -54,6 +68,7 @@ function prepareCompressedBucket() {
     assert.eq(bucketMaxCount - 1,
               bucketDocs[0].control.max.f,
               `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`);
+    // Version 2 indicates the bucket is compressed.
     assert.eq(2,
               bucketDocs[0].control.version,
               `Expected first bucket to be compressed. ${tojson(bucketDocs)}`);
@@ -76,23 +91,21 @@ function prepareCompressedBucket() {
 // Delete many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.deleteMany({str: "even"}));
-// TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket deletion if the
-// AlwaysUseCompressedBuckets feature flag is enabled.
 assert.eq(numDocs / 2, result.deletedCount);
 assert.eq(
     coll.countDocuments({str: "even"}), 0, "Expected records matching the filter to be deleted.");
 assert.eq(coll.countDocuments({str: "odd"}),
           numDocs / 2,
           "Expected records not matching the filter not to be deleted.");
+assertBucketsAreCompressed(db, bucketsColl);
 
 // Delete one record from the compressed bucket.
 prepareCompressedBucket();
 if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
     result = assert.commandWorked(coll.deleteOne({f: {$lt: 100}}));
-    // TODO SERVER-77347: Check that the buckets stay compressed after a partial bucket deletion if
-    // the AlwaysUseCompressedBuckets feature flag is enabled.
     assert.eq(1, result.deletedCount);
     assert.eq(coll.countDocuments({f: {$lt: 100}}),
               100 - 1,
               "Expected exactly one record matching the filter to be deleted.");
+    assertBucketsAreCompressed(db, bucketsColl);
 }

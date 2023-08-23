@@ -52,6 +52,10 @@ TimeseriesTest.run((insert) => {
         const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
         assert.eq(1, bucketDocs.length, bucketDocs);
 
+        if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+            TimeseriesTest.decompressBucket(bucketDocs[0]);
+        }
+
         // Check bucket.
         assert.eq(docs.length,
                   Object.keys(bucketDocs[0].data[timeFieldName]).length,

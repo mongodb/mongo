@@ -257,10 +257,8 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
             bucket->decompressed = boost::none;
         }
 
-        // TODO SERVER-77347: Remove check on numPreviouslyCommittedMeasurements once updates on
-        // compressed buckets are supported.
         // Take ownership of the committed batch's decompressed image.
-        if (batch->decompressed && batch->numPreviouslyCommittedMeasurements == 0) {
+        if (batch->decompressed) {
             bucket->decompressed = std::move(batch->decompressed);
             bucket->memoryUsage +=
                 bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize();
