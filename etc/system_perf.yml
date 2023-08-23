@@ -898,6 +898,13 @@ tasks:
         vars:
           test_control: "startup"
 
+  - name: dbcheck
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "dbcheck"
+
   - name: misc_workloads
     priority: 5
     commands:
@@ -3352,6 +3359,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: dbcheck
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
