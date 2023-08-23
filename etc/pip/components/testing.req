@@ -27,3 +27,8 @@ selenium
 geckodriver-autoinstaller
 pipx==1.2.0
 pigz-python
+opentelemetry-api
+opentelemetry-sdk; platform_machine != "darwin" # TODO: SERVER-80336 this should work on macosx
+# TODO: EVG-20576
+# Once the above is merged we can get rid of our dependency on grpc
+opentelemetry-exporter-otlp-proto-grpc; platform_machine != "darwin" # TODO: SERVER-80336 this should work on macosx

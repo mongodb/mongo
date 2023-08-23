@@ -1052,6 +1052,10 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/resmoke_tests_execute.sh"
+      env:
+        OTEL_TRACE_ID: ${otel_trace_id}
+        OTEL_PARENT_ID: ${otel_parent_id}
+        OTEL_COLLECTOR_ENDPOINT: ${otel_collector_endpoint}
 
   "retrieve generated test configuration": &retrieve_generated_test_configuration
     command: s3.get
@@ -1399,6 +1403,10 @@ functions:
       binary: bash
       args:
         - "src/evergreen/get_bin_and_fcv_versions.sh"
+      env:
+        OTEL_TRACE_ID: ${otel_trace_id}
+        OTEL_PARENT_ID: ${otel_parent_id}
+        OTEL_COLLECTOR_ENDPOINT: ${otel_collector_endpoint}
 
   "archive resmoke constants": &archive_resmoke_constants
     command: archive.targz_pack
