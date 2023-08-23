@@ -854,6 +854,10 @@ __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET(chunkcache->fh->handle->fh_truncate(
           chunkcache->fh->handle, &session->iface, (wt_off_t)chunkcache->capacity));
 
+        if (chunkcache->fh->handle->fh_map == NULL) {
+            WT_IGNORE_RET(__wt_close(session, &chunkcache->fh));
+            WT_RET_MSG(session, EINVAL, "Not on a supported platform for memory-mapping files");
+        }
         WT_RET(chunkcache->fh->handle->fh_map(chunkcache->fh->handle, &session->iface,
           (void **)&chunkcache->memory, &mapped_size, NULL));
         if (mapped_size != chunkcache->capacity)

@@ -26,7 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wttest
+import os, sys, wiredtiger, wttest
+from random import randrange
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -34,7 +35,6 @@ from wtscenario import make_scenarios
 # comes back out unscathed.
 class test_chunkcache01(wttest.WiredTigerTestCase):
     uri = 'table:test_chunkcache01'
-    current_directory = os.getcwd()
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),
@@ -42,10 +42,10 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
         ('row_string', dict(key_format='S', value_format='u')),
     ]
 
-    cache_types = [
-        ('in-memory', dict(chunk_cache_extra_config='type=DRAM')),
-        ('on-disk', dict(chunk_cache_extra_config=f'type=FILE,storage_path={current_directory}/chunk-cache-tmp')),
-    ]
+    cache_types = [('in-memory', dict(chunk_cache_type='dram'))]
+    if sys.byteorder == 'little':
+        # WT's filesystem layer doesn't support mmap on big-endian platforms.
+        cache_types.append(('on-disk', dict(chunk_cache_type='file')))
 
     scenarios = make_scenarios(format_values, cache_types)
 
@@ -58,8 +58,14 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
     def conn_config(self):
         if not os.path.exists('bucket1'):
             os.mkdir('bucket1')
+
+        if self.chunk_cache_type == 'dram':
+            chunk_cache_extra_config = 'type=DRAM'
+        else:
+            chunk_cache_extra_config = 'type=FILE,storage_path=/tmp/chunk_cache_{}'.format(randrange(0, 1000000000))
+
         return 'tiered_storage=(auth_token=Secret,bucket=bucket1,bucket_prefix=pfx_,name=dir_store),' \
-            'chunk_cache=[enabled=true,chunk_size=100MB,capacity=2GB,{}],'.format(self.chunk_cache_extra_config)
+            'chunk_cache=[enabled=true,chunk_size=100MB,capacity=2GB,{}],'.format(chunk_cache_extra_config)
 
     def conn_extensions(self, extlist):
         if os.name == 'nt':
