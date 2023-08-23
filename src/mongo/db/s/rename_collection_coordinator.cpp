@@ -590,21 +590,28 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         // the collection exists and is unsharded, the critical section can be
                         // released right away as the participant will re-acquire it when needed.
                         auto criticalSection = ShardingRecoveryService::get(opCtx);
-                        criticalSection->acquireRecoverableCriticalSectionBlockWrites(
-                            opCtx,
-                            toNss,
-                            criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
-                        criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                            opCtx,
-                            toNss,
-                            criticalSectionReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
-
-                        // Make sure the target namespace is not a view
-                        uassert(ErrorCodes::NamespaceExists,
-                                str::stream() << "a view already exists with that name: " << toNss,
-                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
+                        try {
+                            criticalSection->acquireRecoverableCriticalSectionBlockWrites(
+                                opCtx,
+                                toNss,
+                                criticalSectionReason,
+                                ShardingCatalogClient::kLocalWriteConcern);
+                            criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                                opCtx,
+                                toNss,
+                                criticalSectionReason,
+                                ShardingCatalogClient::kLocalWriteConcern);
+                        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+                            // Target namespace should never be a view
+                            // We forcely throw NamespaceExists for compatibility with replicaset
+                            // Note: a previous solution used allowView flag when acquiring
+                            // critical section and then checked the nss belongs to a view. However
+                            // that caused the secondary to throw CommandNotSupportedOnView in case
+                            // of mixed binaries with 6.0
+                            uasserted(ErrorCodes::NamespaceExists,
+                                      str::stream()
+                                          << "a view already exists with that name: " << toNss);
+                        }
 
                         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
                                                                                        toNss)) {
@@ -640,6 +647,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 } catch (const DBException&) {
                     auto criticalSection = ShardingRecoveryService::get(opCtx);
+                    // allowView=true to prevent overwriting NamespaceExists with
+                    // CommandNotSupportedOnView
                     criticalSection->releaseRecoverableCriticalSection(
                         opCtx,
                         toNss,
