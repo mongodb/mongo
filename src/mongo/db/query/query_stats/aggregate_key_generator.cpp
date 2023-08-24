@@ -65,7 +65,7 @@ BSONObj AggregateKeyGenerator::generate(
                                *hmacPolicy,
                                /*includePath*/ true,
                                /*verbosity*/ boost::none,
-                               /*inMatchExprSortAndDedupElements*/ true}
+                               /*inMatchExprSortAndDedupElements*/ false}
         : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
     return makeQueryStatsKey(opts, expCtx);

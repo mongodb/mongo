@@ -219,13 +219,16 @@ TEST(QueryPredicateShape, Exists) {
 }
 
 TEST(QueryPredicateShape, In) {
-    // Any number of children is always the same shape
+    // Any number of children in any order is always the same shape
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
         R"({"a":{"$in":"?array<?number>"}})",
         "{a: {$in: [1]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
         R"({"a":{"$in":"?array<>"}})",
         "{a: {$in: [1, 4, 'str', /regex/]}}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$in":"?array<>"}})",
+        "{a: {$in: ['str', /regex/, 1, 4]}}");
 }
 
 TEST(QueryPredicateShape, BitTestOperators) {

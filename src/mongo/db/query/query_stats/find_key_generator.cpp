@@ -85,7 +85,8 @@ BSONObj FindKeyGenerator::generate(
                                                   /*transformIdentifiersBool*/ true,
                                                   *hmacPolicy,
                                                   /*includePath*/ true,
-                                                  /*verbosity*/ boost::none}
+                                                  /*verbosity*/ boost::none,
+                                                  /*inMatchExprSortAndDedupElements*/ false}
                            : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
     return generateWithQueryShape(query_shape::extractQueryShape(*parsedRequest, opts, expCtx),
