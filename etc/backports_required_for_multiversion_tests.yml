@@ -414,6 +414,8 @@ last-continuous:
     ticket: SERVER-77382
   - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
     ticket: SERVER-78813
+  - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
+    ticket: SERVER-78650
   suites: null
 
 last-lts:
@@ -910,4 +912,6 @@ last-lts:
     ticket: SERVER-77382
   - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
     ticket: SERVER-78813
+  - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
+    ticket: SERVER-78650
   suites: null

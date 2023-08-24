@@ -97,12 +97,13 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                       std::back_inserter(children));
         }
 
-        // Remove all children of AND that are $alwaysTrue and all children of OR that are
+        // Remove all children of AND that are $alwaysTrue and all children of OR and NOR that are
         // $alwaysFalse.
-        if (matchType == AND || matchType == OR) {
+        if (matchType == AND || matchType == OR || matchType == NOR) {
             for (auto& childExpression : children)
                 if ((childExpression->isTriviallyTrue() && matchType == MatchExpression::AND) ||
-                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::OR))
+                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::OR) ||
+                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::NOR))
                     childExpression = nullptr;
 
             // We replaced each destroyed child expression with nullptr. Now we remove those
@@ -112,12 +113,16 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
 
         // Check if the above optimizations eliminated all children. An OR with no children is
         // always false.
-        // TODO SERVER-34759 It is correct to replace this empty AND with an $alwaysTrue, but we
-        // need to make enhancements to the planner to make it understand an $alwaysTrue and an
-        // empty AND as the same thing. The planner can create inferior plans for $alwaysTrue which
-        // it would not produce for an AND with no children.
         if (children.empty() && matchType == MatchExpression::OR) {
             return std::make_unique<AlwaysFalseMatchExpression>();
+        }
+        // An AND with no children is always true and we need to return an
+        // EmptyExpression. This ensures that the empty $and[] will be returned that serializes to
+        // {} (SERVER-34759). A NOR with no children is always true. We treat an empty $nor[]
+        // similarly.
+        if (children.empty() &&
+            (matchType == MatchExpression::AND || matchType == MatchExpression::NOR)) {
+            return std::make_unique<AndMatchExpression>();
         }
 
         if (children.size() == 1) {
@@ -136,7 +141,8 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             }
         }
 
-        if (matchType == MatchExpression::AND || matchType == MatchExpression::OR) {
+        if (matchType == MatchExpression::AND || matchType == MatchExpression::OR ||
+            matchType == MatchExpression::NOR) {
             for (auto& childExpression : children) {
                 // An AND containing an expression that always evaluates to false can be
                 // optimized to a single $alwaysFalse expression.
@@ -148,6 +154,11 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 // optimized to a single $alwaysTrue expression.
                 if (childExpression->isTriviallyTrue() && matchType == MatchExpression::OR) {
                     return std::make_unique<AlwaysTrueMatchExpression>();
+                }
+                // A NOR containing an expression that always evaluates to true can be
+                // optimized to a single $alwaysFalse expression.
+                if (childExpression->isTriviallyTrue() && matchType == MatchExpression::NOR) {
+                    return std::make_unique<AlwaysFalseMatchExpression>();
                 }
             }
         }
