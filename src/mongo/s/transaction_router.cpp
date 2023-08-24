@@ -1055,6 +1055,15 @@ void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
             repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
 
             ++p().latestStmtId;
+
+            uassert(
+                8027900,
+                str::stream() << "attempting to continue transaction that was not started lsid: "
+                              << _sessionId()
+                              << " txnNumber: " << o().txnNumberAndRetryCounter.getTxnNumber(),
+                o().atClusterTimeForSnapshotReadConcern ||
+                    o().placementConflictTimeForNonSnapshotReadConcern);
+
             _onContinue(opCtx);
             break;
         }
