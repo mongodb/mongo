@@ -149,10 +149,8 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_unlikely(
-            throwClientDisconnectInSignLogicalTimeForExternalClients.shouldFail() &&
-            opCtx->getClient()->session() &&
-            !(opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient))) {
+    if (MONGO_unlikely(throwClientDisconnectInSignLogicalTimeForExternalClients.shouldFail() &&
+                       opCtx->getClient()->session() && !opCtx->getClient()->isInternalClient())) {
         // KeysCollectionManager::refreshNow() can throw an exception if the client has
         // already disconnected. We simulate such behavior using this failpoint.
         keyStatus = {ErrorCodes::ClientDisconnect,
@@ -218,9 +216,7 @@ void LogicalTimeValidator::enableKeyGenerator(OperationContext* opCtx, bool doEn
 
 bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
     if (MONGO_unlikely(externalClientsNeverAuthorizedToAdvanceLogicalClock.shouldFail())) {
-        auto isInternalClient = opCtx->getClient()->session() &&
-            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-        return isInternalClient;
+        return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
     }
 
     auto as = AuthorizationSession::get(opCtx->getClient());

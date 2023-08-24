@@ -233,7 +233,7 @@ public:
                 // We need to perform this operation with internal permissions.
                 const bool wasInternalClient = isInternalClient(opCtx->getClient());
                 if (!wasInternalClient) {
-                    opCtx->getClient()->session()->setTags(transport::Session::kInternalClient);
+                    opCtx->getClient()->setIsInternalClient(true);
                 }
 
                 DBDirectClient client(opCtx);
@@ -249,7 +249,7 @@ public:
 
                 // We must reset the internal flag.
                 if (!wasInternalClient) {
-                    opCtx->getClient()->session()->unsetTags(transport::Session::kInternalClient);
+                    opCtx->getClient()->setIsInternalClient(false);
                 }
 
                 uassertStatusOK(getStatusFromCommandResult(analyzeResult));

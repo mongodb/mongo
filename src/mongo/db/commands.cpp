@@ -668,8 +668,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     if (auto clientMetadata = ClientMetadata::get(client)) {
         appName = clientMetadata->getApplicationName();
     }
-    auto isInternalClient =
-        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
+
+    auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
 
     if (data.hasField("threadName") && (threadName != data.getStringField("threadName"))) {
         return false;  // only activate failpoint on thread from certain client
@@ -687,7 +687,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     if (!(data.hasField("failInternalCommands") && data.getBoolField("failInternalCommands")) &&
-        isInternalClient) {
+        isInternalThreadOrClient) {
         return false;
     }
 
@@ -698,7 +698,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
               "threadName"_attr = threadName,
               "appName"_attr = appName,
               logAttrs(nss),
-              "isInternalClient"_attr = isInternalClient,
+              "isInternalClient"_attr = isInternalThreadOrClient,
               "command"_attr = cmd->getName());
         return true;
     }
@@ -711,7 +711,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                   "threadName"_attr = threadName,
                   "appName"_attr = appName,
                   logAttrs(nss),
-                  "isInternalClient"_attr = isInternalClient,
+                  "isInternalClient"_attr = isInternalThreadOrClient,
                   "command"_attr = cmd->getName());
 
             return true;

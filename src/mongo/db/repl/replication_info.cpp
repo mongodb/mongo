@@ -415,6 +415,7 @@ public:
 
         transport::Session::TagMask sessionTagsToSet = 0;
         transport::Session::TagMask sessionTagsToUnset = 0;
+        bool isInternalClient = false;
 
         // Tag connections to avoid closing them on stepdown.
         if (!cmd.getHangUpOnStepDown()) {
@@ -433,8 +434,8 @@ public:
         // Parse the optional 'internalClient' field. This is provided by incoming connections from
         // mongod and mongos.
         if (auto internalClient = cmd.getInternalClient()) {
-            sessionTagsToSet |= transport::Session::kInternalClient;
             sessionTagsToUnset |= transport::Session::kExternalClientKeepOpen;
+            isInternalClient = true;
 
             // All incoming connections from mongod/mongos of earlier versions should be
             // closed if the featureCompatibilityVersion is bumped to 3.6.
@@ -445,26 +446,28 @@ public:
                 sessionTagsToUnset |= transport::Session::kLatestVersionInternalClientKeepOpen;
             }
         } else {
-            sessionTagsToUnset |= (transport::Session::kInternalClient |
-                                   transport::Session::kLatestVersionInternalClientKeepOpen);
+            sessionTagsToUnset |= transport::Session::kLatestVersionInternalClientKeepOpen;
             sessionTagsToSet |= transport::Session::kExternalClientKeepOpen;
         }
 
         auto session = opCtx->getClient()->session();
         if (session) {
-            session->mutateTags(
-                [sessionTagsToSet, sessionTagsToUnset](transport::Session::TagMask originalTags) {
-                    // After a mongos sends the initial "isMaster" command with its mongos client
-                    // information, it sometimes sends another "isMaster" command that is forwarded
-                    // from its client. Once kInternalClient has been set, we assume that any future
-                    // "isMaster" commands are forwarded in this manner, and we do not update the
-                    // session tags.
-                    if ((originalTags & transport::Session::kInternalClient) == 0) {
-                        return (originalTags | sessionTagsToSet) & ~sessionTagsToUnset;
-                    } else {
-                        return originalTags;
-                    }
-                });
+            session->mutateTags([sessionTagsToSet, sessionTagsToUnset, opCtx, isInternalClient](
+                                    transport::Session::TagMask originalTags) {
+                // After a mongos sends the initial "isMaster" command with its mongos client
+                // information, it sometimes sends another "isMaster" command that is forwarded
+                // from its client. Once kInternalClient has been set, we assume that any future
+                // "isMaster" commands are forwarded in this manner, and we do not update the
+                // session tags.
+                if (!opCtx->getClient()->isInternalClient()) {
+                    return (originalTags | sessionTagsToSet) & ~sessionTagsToUnset;
+                } else {
+                    return originalTags;
+                }
+            });
+            if (!opCtx->getClient()->isInternalClient()) {
+                opCtx->getClient()->setIsInternalClient(isInternalClient);
+            }
         }
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be

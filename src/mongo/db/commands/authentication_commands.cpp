@@ -245,10 +245,6 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             "X.509 authentication must always use the $external database.",
             userName.getDatabaseName().isExternalDB());
 
-    auto isInternalClient = [&]() -> bool {
-        return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
-    };
-
     const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
 
     auto request = getX509UserRequest(opCtx, UserRequest(userName, boost::none));
@@ -270,7 +266,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
             authorizeExternalUser();
         } else {
-            if (!isInternalClient()) {
+            if (!opCtx->getClient()->isInternalClient()) {
                 LOGV2_WARNING(
                     20430,
                     "Client isn't a mongod or mongos, but is connecting with a certificate "

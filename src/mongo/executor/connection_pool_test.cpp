@@ -1857,9 +1857,8 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap3));
 
-    t->mutateTags(hap1, [](transport::Session::TagMask tags) {
-        return transport::Session::kKeepOpen | transport::Session::kInternalClient;
-    });
+    t->mutateTags(hap1,
+                  [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
 
     t->mutateTags(hap2,
                   [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
@@ -1873,12 +1872,6 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
     ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap3));
 
-    t->dropConnections(transport::Session::kInternalClient);
-
-    ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap1));
-    ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap2));
-    ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap3));
-
     ConnectionImpl::pushSetup(Status::OK());
     pool->get_forTest(
         hap4,
@@ -1890,7 +1883,7 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
     t->dropConnections(hap1);
 
     ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap1));
-    ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
     ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap3));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap4));
 }

@@ -260,9 +260,7 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
     // An internal client could be one of the following :
     //     - Does not have any transport session
     //     - The transport session tag is internal
-    bool isInternalClient =
-        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
-
+    bool isInternalThreadOrClient = !client->session() || client->isInternalClient();
     // Checks that the 'exchange' or 'fromMongos' option can only be specified by the internal
     // client.
     if ((request.getExchange() || request.getFromMongos()) && apiStrict && apiVersion == "1") {
@@ -270,7 +268,7 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
                 str::stream() << "'exchange' and 'fromMongos' option cannot be specified with "
                                  "'apiStrict: true' in API Version "
                               << apiVersion,
-                isInternalClient);
+                isInternalThreadOrClient);
     }
 }
 

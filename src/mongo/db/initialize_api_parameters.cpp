@@ -118,10 +118,9 @@ APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Comm
 
 void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {
     auto client = opCtx->getClient();
-    auto isInternalClient =
-        !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
+    auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
 
-    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
+    if (gRequireApiVersion.load() && !client->isInDirectClient() && !isInternalThreadOrClient) {
         uassert(
             498870,
             "The apiVersion parameter is required, please configure your MongoClient's API version",

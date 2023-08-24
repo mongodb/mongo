@@ -273,6 +273,14 @@ public:
         _supportsHello = newVal;
     }
 
+    bool isInternalClient() const {
+        return _isInternalClient;
+    }
+
+    void setIsInternalClient(bool isInternalClient) {
+        _isInternalClient = isInternalClient;
+    }
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;
@@ -317,6 +325,9 @@ private:
     bool _supportsHello = false;
 
     UUID _uuid;
+
+    // Indicates that this client is internal to the cluster.
+    bool _isInternalClient{false};
 };
 
 /**

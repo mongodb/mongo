@@ -563,10 +563,8 @@ public:
                     }
                 }
 
-                auto isInternal = (opCtx->getClient()->session() &&
-                                   (opCtx->getClient()->session()->getTags() &
-                                    transport::Session::kInternalClient));
-
+                auto isInternal =
+                    opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
                 if (MONGO_unlikely(allowExternalReadsForReverseOplogScanRule.shouldFail())) {
                     isInternal = true;
                 }

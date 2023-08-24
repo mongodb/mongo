@@ -49,9 +49,9 @@ namespace {
 std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
     // In the case where the client has connected directly to a shard rather than via mongoS, we
     // should behave exactly as we do when running on a standalone or single-replset deployment.
-    const auto isInternalClient = !opCtx->getClient()->session() ||
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-    if (ShardingState::get(opCtx)->enabled() && isInternalClient) {
+    const auto isInternalThreadOrClient =
+        !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient();
+    if (ShardingState::get(opCtx)->enabled() && isInternalThreadOrClient) {
         return std::make_shared<ShardServerProcessInterface>(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     } else if (auto executor = ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(opCtx)) {

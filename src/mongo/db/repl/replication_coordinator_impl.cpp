@@ -3213,9 +3213,8 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
     if (!isPrimaryOrSecondary && _settings.isReplSet() && ns.isLocalDB() &&
         client->isFromUserConnection()) {
         stdx::lock_guard<Latch> lock(_mutex);
-        auto isInternalClient = !client->session() ||
-            (client->session()->getTags() & transport::Session::kInternalClient);
-        if (!isInternalClient && _memberState.startup2() && _initialSyncer &&
+        auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
+        if (!isInternalThreadOrClient && _memberState.startup2() && _initialSyncer &&
             !_initialSyncer->allowLocalDbAccess()) {
             return Status{ErrorCodes::NotPrimaryOrSecondary,
                           str::stream() << "Local reads are not allowed during initial sync with "

@@ -81,7 +81,7 @@ Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
     }
 
     VectorClock::get(_service)->gossipIn(
-        opCtx, metadataObj, false /* couldBeUnauthorized */, transport::Session::kInternalClient);
+        opCtx, metadataObj, false /* couldBeUnauthorized */, true /* defaultIsInternalClient */);
     return Status::OK();
 }
 

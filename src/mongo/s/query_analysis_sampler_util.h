@@ -140,11 +140,11 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
         return boost::none;
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        const auto isInternalClient = !opCtx->getClient()->session() ||
-            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+        const auto isInternalThreadOrClient =
+            !opCtx->getClient()->session() || opCtx->getClient()->isInternalClient();
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot specify 'sampleId' since it is an internal field",
-                !request.getSampleId() || isInternalClient ||
+                !request.getSampleId() || isInternalThreadOrClient ||
                     TestingProctor::instance().isEnabled());
         return request.getSampleId();
     }

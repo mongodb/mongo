@@ -129,8 +129,7 @@ double calculatePercentage(double part, double whole) {
 }
 
 bool isInternalClient(OperationContext* opCtx) {
-    return !opCtx->getClient()->session() ||
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+    return (!opCtx->getClient()->session() || opCtx->getClient()->isInternalClient());
 }
 
 }  // namespace analyze_shard_key

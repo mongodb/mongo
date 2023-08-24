@@ -301,11 +301,10 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery &&
         feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        bool isInternalClient =
-            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
+        bool isInternalThreadOrClient = !cc().session() || cc().isInternalClient();
         uassert(ErrorCodes::InvalidOptions,
                 "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
-                isInternalClient);
+                isInternalThreadOrClient);
 
         // If this node is a replica set primary node, an attempted update to the shard key value
         // must either be a retryable write or inside a transaction. An update without a transaction

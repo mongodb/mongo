@@ -281,8 +281,7 @@ boost::optional<std::function<void(const Value&)>> validateVariable(OperationCon
 
     uassert(4738901,
             str::stream() << "Attempt to set internal constant: " << varName,
-            opCtx->getClient()->session() &&
-                (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
+            opCtx->getClient()->session() && opCtx->getClient()->isInternalClient());
 
     return knownConstantIt->second;
 }

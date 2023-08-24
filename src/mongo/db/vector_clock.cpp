@@ -325,9 +325,9 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
             return true;
         }
 
-        if (opCtx && opCtx->getClient()) {
-            if (auto session = opCtx->getClient()->session()) {
-                return session->getTags() & transport::Session::kInternalClient;
+        if (opCtx) {
+            if (auto client = opCtx->getClient(); client && client->session()) {
+                return opCtx->getClient()->isInternalClient();
             }
         }
 
@@ -347,22 +347,20 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
 void VectorClock::gossipIn(OperationContext* opCtx,
                            const BSONObj& inMessage,
                            bool couldBeUnauthenticated,
-                           const transport::Session::TagMask defaultClientSessionTags) {
+                           bool defaultIsInternalClient) {
     if (!isEnabled()) {
         return;
     }
 
-    auto clientSessionTags = defaultClientSessionTags;
+    auto isInternal = defaultIsInternalClient;
     if (opCtx && opCtx->getClient()) {
         const auto session = opCtx->getClient()->session();
         if (session && !(session->getTags() & transport::Session::kPending)) {
-            clientSessionTags = session->getTags();
+            isInternal = opCtx->getClient()->isInternalClient();
         }
     }
 
-    ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
-        ? _gossipInInternal()
-        : _gossipInExternal();
+    ComponentSet toGossip = isInternal ? _gossipInInternal() : _gossipInExternal();
 
     LogicalTimeArray newTime;
     for (auto component : toGossip) {

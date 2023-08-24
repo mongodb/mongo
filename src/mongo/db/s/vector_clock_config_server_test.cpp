@@ -258,7 +258,7 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
                       << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
                       << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2)),
                  false,
-                 transport::Session::kInternalClient);
+                 true);
 
     // On config servers, gossip in from internal clients should update $clusterTime, $configTime,
     // and $topologyTime.
@@ -272,7 +272,7 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
                       << BSON("clusterTime" << Timestamp(1, 2) << "signature" << dummySignature)
                       << "$configTime" << Timestamp(1, 2) << "$topologyTime" << Timestamp(1, 2)),
                  false,
-                 transport::Session::kInternalClient);
+                 true);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
@@ -284,7 +284,7 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
                       << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
                       << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
                  false,
-                 transport::Session::kInternalClient);
+                 true);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));

@@ -172,12 +172,12 @@ public:
     /**
      * Read the necessary fields from inMessage in order to update the current time, based on this
      * message received from another node, taking into account if the gossiping is from an internal
-     * or external client (based on the session tags).
+     * or external client.
      */
     void gossipIn(OperationContext* opCtx,
                   const BSONObj& inMessage,
                   bool couldBeUnauthenticated,
-                  transport::Session::TagMask defaultClientSessionTags = 0);
+                  bool defaultIsInternalClient = false);
 
     /**
      * Returns true if the clock is enabled and can be used. Defaults to true.

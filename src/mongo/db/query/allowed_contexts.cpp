@@ -93,9 +93,7 @@ void assertLanguageFeatureIsAllowed(
  *     - The transport session tag is internal
  */
 bool isInternalClient(const Client* client) {
-    return client &&
-        (!client->session() ||
-         (client->session()->getTags() & transport::Session::kInternalClient));
+    return client && (!client->session() || client->isInternalClient());
 }
 
 /**

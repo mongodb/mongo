@@ -272,8 +272,8 @@ struct HandleRequest {
          * internal errors escape.
          */
         bool isInternalClient() const {
-            return (client().isInDirectClient()) ||
-                (session() && (session()->getTags() & transport::Session::kInternalClient));
+            return client().isInDirectClient() ||
+                (client().session() && client().isInternalClient());
         }
 
         std::unique_ptr<const ServiceEntryPointCommon::Hooks> behaviors;

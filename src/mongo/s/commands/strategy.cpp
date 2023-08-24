@@ -629,8 +629,7 @@ void ParseAndRunCommand::_parseCommand() {
 }
 
 bool isInternalClient(OperationContext* opCtx) {
-    return (opCtx->getClient()->session() &&
-            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
+    return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
 }
 
 Status ParseAndRunCommand::RunInvocation::_setup() {

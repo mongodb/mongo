@@ -723,8 +723,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
 
 bool shouldExclude(OperationContext* opCtx) {
     return repl::tenantMigrationInfo(opCtx) || opCtx->getClient()->isInDirectClient() ||
-        (opCtx->getClient()->session() &&
-         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
+        (opCtx->getClient()->session() && opCtx->getClient()->isInternalClient());
 }
 
 std::string getTenantPrefix(StringData prefixedDb) {
