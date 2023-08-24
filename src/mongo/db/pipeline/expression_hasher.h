@@ -49,6 +49,11 @@ H AbslHashValue(H h, const FieldPath& value) {
 }
 
 template <typename H>
+H AbslHashValue(H h, const TimeZone& value) {
+    return H::combine(std::move(h), value.toString());
+}
+
+template <typename H>
 class ExpressionHashVisitor : public ExpressionConstVisitor {
 public:
     enum class OpType {
@@ -301,38 +306,50 @@ public:
     }
 
     void visit(const ExpressionDateFromString* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(std::move(_hashState), OpType::kDateFromString);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDateFromParts* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(std::move(_hashState), OpType::kDateFromParts);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDateDiff* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(
             std::move(_hashState), OpType::kDateDiff, expr->_parsedStartOfWeek, expr->_parsedUnit);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDateToParts* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(std::move(_hashState), OpType::kDateToParts);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDateToString* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(std::move(_hashState), OpType::kDateToString);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDateTrunc* expr) final {
-        // _parsedTimeZone is not included into the hash since it is expensive to hash it correctly.
         _hashState = H::combine(std::move(_hashState),
                                 OpType::kDateTrunc,
                                 expr->_parsedStartOfWeek,
                                 expr->_parsedUnit,
                                 expr->_parsedBinSize);
+        if (expr->_parsedTimeZone) {
+            _hashState = H::combine(std::move(_hashState), expr->_parsedTimeZone);
+        }
     }
 
     void visit(const ExpressionDivide* expr) final {

@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_hasher.h"
+#include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include <string>
 
 namespace mongo {
 
@@ -54,69 +57,134 @@ public:
             &ctx, std::vector<boost::intrusive_ptr<Expression>>{constE(std::move(value))});
     }
 
-    absl::Hash<Expression> hash{};
-    ExpressionContextForTest ctx{};
-};
-
-TEST_F(ExpressionHasherTest, ExpressionConstant) {
-    ExpressionConstant expr1{&ctx, Value(1)};
-    ExpressionConstant expr2{&ctx, Value(1)};
-    ExpressionConstant expr3{&ctx, Value("abc"_sd)};
-
-    ASSERT_EQ(hash(expr1), hash(expr2));
-    ASSERT_NE(hash(expr1), hash(expr3));
-}
-
-TEST_F(ExpressionHasherTest, ExpressionAbs) {
-    ExpressionAbs expr1{&ctx, {constE(1)}};
-    ExpressionAbs expr2{&ctx, {constE(1)}};
-    ExpressionAbs expr3{&ctx, {constE(10)}};
-
-    ASSERT_EQ(hash(expr1), hash(expr2));
-    ASSERT_NE(hash(expr1), hash(expr3));
-}
-
-TEST_F(ExpressionHasherTest, ExpressionAdd) {
-    ExpressionAdd expr1{&ctx, {constE(1), constE("abc"_sd)}};
-    ExpressionAdd expr2{&ctx, {constE(1), constE("abc"_sd)}};
-    ExpressionAdd expr3{&ctx, {constE("abc"_sd), constE(1)}};
-
-    ASSERT_EQ(hash(expr1), hash(expr2));
-    ASSERT_NE(hash(expr1), hash(expr3));
-}
-
-TEST_F(ExpressionHasherTest, ExpressionCompare) {
-    ExpressionCompare expr1{&ctx, ExpressionCompare::EQ, {constE(1), constE("abc"_sd)}};
-    ExpressionCompare expr2{&ctx, ExpressionCompare::EQ, {constE(1), constE("abc"_sd)}};
-    ExpressionCompare expr3{&ctx, ExpressionCompare::NE, {constE(1), constE("abc"_sd)}};
-    ExpressionCompare expr4{&ctx, ExpressionCompare::EQ, {constE("abc"_sd), constE(1)}};
-
-    ASSERT_EQ(hash(expr1), hash(expr2));
-    ASSERT_NE(hash(expr1), hash(expr3));
-    ASSERT_NE(hash(expr1), hash(expr4));
-}
-
-TEST_F(ExpressionHasherTest, DifferentTypesAreNotEqual) {
-    std::vector<boost::intrusive_ptr<Expression>> expressions{
-        makeExpr<ExpressionAbs>(1),
-        makeExpr<ExpressionAdd>(1),
-        makeExpr<ExpressionAllElementsTrue>(1),
-        makeExpr<ExpressionAnd>(1),
-        makeExpr<ExpressionAnyElementTrue>(1),
-        makeExpr<ExpressionArray>(1),
-        makeExpr<ExpressionBitAnd>(1),
-        makeExpr<ExpressionBitOr>(1),
-        makeExpr<ExpressionBitXor>(1),
-        makeExpr<ExpressionBitNot>(1),
-        makeExpr<ExpressionFirst>(1),
-        makeExpr<ExpressionArrayToObject>(1),
-    };
-
-    stdx::unordered_set<size_t> uniqueHashes{};
-    for (const auto& expr : expressions) {
-        uniqueHashes.insert(hash(*expr));
+    template <typename Expr, typename T>
+    boost::intrusive_ptr<Expression> makeExprWithIterable(T value) {
+        std::vector<boost::intrusive_ptr<Expression>> expressions;
+        for (const auto& v : value) {
+            expressions.push_back(constE(v));
+        }
+        return boost::intrusive_ptr<Expression>(
+            new Expr(&ctx, std::vector<boost::intrusive_ptr<Expression>>{expressions}));
     }
 
-    ASSERT_EQ(expressions.size(), uniqueHashes.size());
+    absl::Hash<Expression> hash{};
+    ExpressionContextForTest ctx{};
+
+    std::vector<boost::intrusive_ptr<Expression>> makeExprList() {
+        std::vector<boost::intrusive_ptr<Expression>> expressions{
+            // Test different constants.
+            constE(1),
+            constE("abc"_sd),
+            constE(""_sd),
+            // Test arithmetic expressions.
+            makeExpr<ExpressionAbs>(1),
+            makeExpr<ExpressionAbs>(10),
+            makeExpr<ExpressionAdd>(1),
+            makeExprWithIterable<ExpressionAdd>(std::vector<int>{1, 5}),
+            makeExprWithIterable<ExpressionAdd>(std::vector<int>{5, 1}),
+            // Test boolean function expressions
+            makeExpr<ExpressionAllElementsTrue>(1),
+            makeExpr<ExpressionAllElementsTrue>(200),
+            makeExpr<ExpressionAllElementsTrue>("hi"_sd),
+            makeExpr<ExpressionAnd>(1),
+            makeExpr<ExpressionAnd>(300),
+            makeExpr<ExpressionAnyElementTrue>(1),
+            makeExpr<ExpressionAnyElementTrue>(400),
+            // Test array and object expressions.
+            makeExpr<ExpressionArray>(1),
+            makeExprWithIterable<ExpressionArray>(std::vector<int>{}),
+            makeExprWithIterable<ExpressionArray>(std::vector<int>{1, 2, 3}),
+            makeExprWithIterable<ExpressionArray>(std::vector<int>{1, 2, 4}),
+            makeExprWithIterable<ExpressionArray>(std::vector<int>{1, 2, 3, 4}),
+            makeExpr<ExpressionArrayToObject>(1),
+            makeExprWithIterable<ExpressionArrayToObject>(std::vector<int>{}),
+            makeExprWithIterable<ExpressionArrayToObject>(std::vector<int>{1, 2, 3}),
+            makeExprWithIterable<ExpressionArrayToObject>(std::vector<int>{1, 2, 4}),
+            makeExprWithIterable<ExpressionArrayToObject>(std::vector<int>{1, 2, 3, 4}),
+            // Test bit operator expressions.
+            makeExpr<ExpressionBitAnd>(1),
+            makeExpr<ExpressionBitAnd>(2),
+            makeExpr<ExpressionBitOr>(1),
+            makeExpr<ExpressionBitOr>(0),
+            makeExpr<ExpressionBitXor>(1),
+            makeExpr<ExpressionBitXor>(""_sd),
+            makeExpr<ExpressionBitNot>(1),
+            makeExpr<ExpressionBitNot>("o-o"_sd),
+            // Test comparator expressions.
+            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE(1), constE("abc"_sd)),
+            ExpressionCompare::create(&ctx, ExpressionCompare::NE, constE(1), constE("abc"_sd)),
+            ExpressionCompare::create(&ctx, ExpressionCompare::EQ, constE("abc"_sd), constE(1)),
+            ExpressionCompare::create(&ctx,
+                                      ExpressionCompare::EQ,
+                                      makeExprWithIterable<ExpressionAdd>(std::vector<int>{1, 5}),
+                                      makeExprWithIterable<ExpressionAdd>(std::vector<int>{3, 2})),
+            // Test date expressions/
+            ExpressionDateFromString::parseExpression(
+                &ctx,
+                BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07"
+                                               << "format"
+                                               << "%Y-%m-%d")),
+                ctx.variablesParseState),
+            ExpressionDateFromString::parseExpression(
+                &ctx,
+                BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07-14 -0400"
+                                               << "timezone"
+                                               << "GMT")),
+                ctx.variablesParseState),
+            ExpressionDateFromString::parseExpression(
+                &ctx,
+                BSON("$dateFromString" << BSON("dateString"
+                                               << "Day 7 Week 53 Year 2017"
+                                               << "format"
+                                               << "Day %u Week %V Year %G")),
+                ctx.variablesParseState),
+            ExpressionDateFromString::parseExpression(
+                &ctx,
+                BSON("$dateFromString" << BSON("dateString"
+                                               << "2017-07-14 -0400"
+                                               << "timezone"
+                                               << "-08:00")),
+                ctx.variablesParseState),
+            // Test field path expressions.
+            ExpressionFieldPath::createPathFromString(&ctx, "foo.bar", ctx.variablesParseState),
+            ExpressionFieldPath::createPathFromString(&ctx, "foo.bar.a", ctx.variablesParseState),
+            ExpressionFieldPath::createPathFromString(&ctx, "HI.foo", ctx.variablesParseState),
+            // Test first expressions.
+            makeExpr<ExpressionFirst>(1),
+            makeExpr<ExpressionFirst>(0),
+            makeExpr<ExpressionFirst>(""_sd),
+            makeExpr<ExpressionFirst>("Hello"_sd),
+        };
+        return expressions;
+    }
+};
+
+TEST_F(ExpressionHasherTest, ExpressionsAreNotEqual) {
+    auto exprList1{makeExprList()};
+    auto exprList2{makeExprList()};
+
+    std::set<size_t> list1Hashes{};
+    std::set<size_t> list2Hashes{};
+
+    for (const auto& expr : exprList1) {
+        list1Hashes.insert(hash(*expr));
+    }
+    for (const auto& expr : exprList2) {
+        list2Hashes.insert(hash(*expr));
+    }
+
+    // Test that each element in exprList 1 and 2 are hashed to unique values.
+    ASSERT_EQ(exprList1.size(), list1Hashes.size());
+    ASSERT_EQ(exprList2.size(), list2Hashes.size());
+    // Test that exprList 1 and 2 hashed to the same number of values.
+    ASSERT_EQ(list1Hashes.size(), list2Hashes.size());
+
+    // Test that two identically initialised lists (1 and 2) have the same expressions hashed to
+    // the same values
+    for (const auto& hash : list1Hashes) {
+        ASSERT(list2Hashes.contains(hash));
+    }
 }
 }  // namespace mongo
