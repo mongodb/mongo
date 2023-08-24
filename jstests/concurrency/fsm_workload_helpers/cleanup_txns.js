@@ -17,7 +17,9 @@ function abortTransaction(sessionAwareDB, txnNumber) {
         ErrorCodes.TransactionCommitted,
         ErrorCodes.TransactionTooOld,
         ErrorCodes.Interrupted,
-        ErrorCodes.LockTimeout
+        ErrorCodes.LockTimeout,
+        // TransactionRouter will error when trying to abort txns that have not been started
+        8027900
     ];
     const abortCmd = {
         abortTransaction: 1,
