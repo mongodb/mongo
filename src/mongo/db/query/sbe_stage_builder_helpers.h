@@ -74,7 +74,7 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/sbe_stage_builder_sbstage.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 #include "mongo/db/query/sbe_stage_builder_state.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/repl/oplog.h"
@@ -224,11 +224,6 @@ std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> in
  * Create tree consisting of coscan stage followed by limit stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
-
-/**
- * Same as 'makeLimitCoScanTree()', but returns 'EvalStage' with empty 'outSlots' vector.
- */
-EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1);
 
 /**
  * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
@@ -382,85 +377,21 @@ std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
     const std::vector<bool>& shardKeyHashed,
     const PlanStageSlots& slots);
 
-/**
- * If given 'EvalExpr' already contains a slot, simply returns it. Otherwise, allocates a new slot
- * and creates project stage to assign expression to this new slot. After that, new slot and project
- * stage are returned.
- */
-std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
-    EvalExpr expr,
-    EvalStage stage,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    StageBuilderState& state);
-
-template <bool IsConst, bool IsEof = false>
-EvalStage makeFilter(EvalStage stage,
-                     std::unique_ptr<sbe::EExpression> filter,
-                     PlanNodeId planNodeId) {
-    return {sbe::makeS<sbe::FilterStage<IsConst, IsEof>>(
-                stage.extractStage(planNodeId), std::move(filter), planNodeId),
-            stage.extractOutSlots()};
-}
-
-EvalStage makeProject(EvalStage stage, sbe::SlotExprPairVector projects, PlanNodeId planNodeId);
+SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId nodeId);
 
 template <typename... Ts>
-EvalStage makeProject(EvalStage stage, PlanNodeId planNodeId, Ts&&... pack) {
+SbStage makeProject(SbStage stage, PlanNodeId nodeId, Ts&&... pack) {
     return makeProject(
-        std::move(stage), makeSlotExprPairVec(std::forward<Ts>(pack)...), planNodeId);
+        std::move(stage), sbe::makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
 }
 
-/**
- * Creates loop join stage. All 'outSlots' from the 'left' argument along with slots from the
- * 'lexicalEnvironment' argument are passed as correlated.
- * If stage in 'left' or 'right' argument is 'nullptr', it is treated as if it was limit-1/coscan.
- * In this case, loop join stage is not created. 'right' stage is returned if 'left' is 'nullptr'.
- * 'left' stage is returned if 'right' is 'nullptr'.
- */
-EvalStage makeLoopJoin(EvalStage left,
-                       EvalStage right,
-                       PlanNodeId planNodeId,
-                       const sbe::value::SlotVector& lexicalEnvironment = {});
-
-/**
- * Creates an unwind stage and an output slot for it using the first slot in the outSlots vector of
- * the inputEvalStage as the input slot to the new stage. The preserveNullAndEmptyArrays is passed
- * to the UnwindStage constructor to specify the treatment of null or missing inputs.
- */
-EvalStage makeUnwind(EvalStage inputEvalStage,
-                     sbe::value::SlotIdGenerator* slotIdGenerator,
-                     PlanNodeId planNodeId,
-                     bool preserveNullAndEmptyArrays = true);
-
-EvalStage makeLimitSkip(EvalStage input,
-                        PlanNodeId planNodeId,
-                        boost::optional<long long> limit,
-                        boost::optional<long long> skip = boost::none);
-
-EvalStage makeUnion(std::vector<EvalStage> inputStages,
-                    std::vector<sbe::value::SlotVector> inputVals,
-                    sbe::value::SlotVector outputVals,
+SbStage makeHashAgg(SbStage stage,
+                    sbe::value::SlotVector gbs,
+                    sbe::AggExprVector aggs,
+                    boost::optional<sbe::value::SlotId> collatorSlot,
+                    bool allowDiskUse,
+                    sbe::SlotExprPairVector mergingExprs,
                     PlanNodeId planNodeId);
-
-EvalStage makeHashAgg(EvalStage stage,
-                      sbe::value::SlotVector gbs,
-                      sbe::AggExprVector aggs,
-                      boost::optional<sbe::value::SlotId> collatorSlot,
-                      bool allowDiskUse,
-                      sbe::SlotExprPairVector mergingExprs,
-                      PlanNodeId planNodeId);
-
-EvalStage makeMkBsonObj(EvalStage stage,
-                        sbe::value::SlotId objSlot,
-                        boost::optional<sbe::value::SlotId> rootSlot,
-                        boost::optional<sbe::MakeObjFieldBehavior> fieldBehavior,
-                        std::vector<std::string> fields,
-                        std::vector<std::string> projectFields,
-                        sbe::value::SlotVector projectVars,
-                        bool forceNewObject,
-                        bool returnOldObject,
-                        PlanNodeId planNodeId);
 
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
                                          std::unique_ptr<sbe::EExpression> thenExpr,

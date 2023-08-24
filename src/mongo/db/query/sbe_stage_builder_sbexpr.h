@@ -304,6 +304,17 @@ private:
     stdx::variant<bool, EExpr, sbe::value::SlotId, LocalVarInfo, abt::HolderPtr> _storage;
 };
 
+/**
+ * "SbStage" is short for "stage builder stage". SbStage is an alias for a unique pointer type.
+ */
+using SbStage = std::unique_ptr<sbe::PlanStage>;
+
+/**
+ * In the past, "SbExpr" used to be named "EvalExpr". For now we have this type alias so that code
+ * that refers to "EvalExpr" still works.
+ *
+ * TODO SERVER-80366: Remove this type alias when it's no longer needed.
+ */
 using EvalExpr = SbExpr;
 
 }  // namespace mongo::stage_builder

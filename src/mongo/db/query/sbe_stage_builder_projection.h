@@ -36,7 +36,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 
 namespace mongo::stage_builder {
 class PlanStageSlots;

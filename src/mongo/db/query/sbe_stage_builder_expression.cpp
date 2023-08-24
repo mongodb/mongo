@@ -103,14 +103,14 @@ struct ExpressionVisitorContext {
             : currentBindingIndex(0) {
             bindings.reserve(variableIds.size());
             for (const auto& variableId : variableIds) {
-                bindings.push_back({variableId, frameIdGenerator->generate(), EvalExpr{}});
+                bindings.push_back({variableId, frameIdGenerator->generate(), SbExpr{}});
             }
         }
 
         struct Binding {
             Variables::Id variableId;
             sbe::FrameId frameId;
-            EvalExpr expr;
+            SbExpr expr;
         };
 
         std::vector<Binding> bindings;
@@ -134,29 +134,29 @@ struct ExpressionVisitorContext {
     }
 
     optimizer::ABT popABTExpr() {
-        tassert(6987504, "tried to pop from empty EvalExpr stack", !exprStack.empty());
+        tassert(6987504, "tried to pop from empty SbExpr stack", !exprStack.empty());
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
         return abt::unwrap(expr.extractABT());
     }
 
-    EvalExpr popEvalExpr() {
-        tassert(7261700, "tried to pop from empty EvalExpr stack", !exprStack.empty());
+    SbExpr popExpr() {
+        tassert(7261700, "tried to pop from empty SbExpr stack", !exprStack.empty());
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
         return expr;
     }
 
-    EvalExpr done() {
-        tassert(6987501, "expected exactly one EvalExpr on the stack", exprStack.size() == 1);
-        return popEvalExpr();
+    SbExpr done() {
+        tassert(6987501, "expected exactly one SbExpr on the stack", exprStack.size() == 1);
+        return popExpr();
     }
 
     StageBuilderState& state;
 
-    std::vector<EvalExpr> exprStack;
+    std::vector<SbExpr> exprStack;
 
     boost::optional<sbe::value::SlotId> rootSlot;
 
@@ -515,7 +515,7 @@ public:
         invariant(currentBindingIndex < currentFrame.bindings.size());
 
         auto& currentBinding = currentFrame.bindings[currentBindingIndex++];
-        currentBinding.expr = _context->popEvalExpr();
+        currentBinding.expr = _context->popExpr();
 
         // Second, we bind this variables AST-level name (with type Variable::Id) to the frame that
         // will be used for compilation and execution. Once this "stage builder" finishes, these
@@ -2233,7 +2233,7 @@ public:
             std::move(inputName), _context->popABTExpr(), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
-        EvalExpr inputExpr;
+        SbExpr inputExpr;
         boost::optional<sbe::value::SlotId> topLevelFieldSlot;
         bool expectsDocumentInputOnly = false;
         auto fp = (expr->getFieldPath().getPathLength() > 1)
@@ -2244,7 +2244,7 @@ public:
             const auto* slots = _context->slots;
             if (expr->getVariableId() == Variables::kRootId) {
                 // Set inputExpr to refer to the root document.
-                inputExpr = _context->rootSlot ? EvalExpr{*_context->rootSlot} : EvalExpr{};
+                inputExpr = _context->rootSlot ? SbExpr{*_context->rootSlot} : SbExpr{};
                 expectsDocumentInputOnly = true;
 
                 if (slots && fp) {
@@ -4325,10 +4325,10 @@ private:
 };
 }  // namespace
 
-EvalExpr generateExpression(StageBuilderState& state,
-                            const Expression* expr,
-                            boost::optional<sbe::value::SlotId> rootSlot,
-                            const PlanStageSlots* slots) {
+SbExpr generateExpression(StageBuilderState& state,
+                          const Expression* expr,
+                          boost::optional<sbe::value::SlotId> rootSlot,
+                          const PlanStageSlots* slots) {
     ExpressionVisitorContext context(state, std::move(rootSlot), slots);
 
     ExpressionPreVisitor preVisitor{&context};

@@ -58,6 +58,7 @@
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
@@ -82,7 +83,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/storage/key_string.h"
@@ -356,8 +356,8 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
     return {keyValueSlot, std::move(currentStage)};
 }
 
-std::pair<SlotId /* keyValuesSetSlot */, EvalStage> replaceEmptySetWithNullArray(
-    EvalStage innerStage,
+std::pair<SlotId /* keyValuesSetSlot */, SbStage> replaceEmptySetWithNullArray(
+    SbStage innerStage,
     SlotId innerRecordSlot,
     SlotIdGenerator& slotIdGenerator,
     const PlanNodeId nodeId) {
@@ -409,8 +409,8 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
         ? makeFunction("aggCollSetUnion"_sd, makeVariable(*collatorSlot), makeVariable(spillSlot))
         : makeFunction("aggSetUnion"_sd, makeVariable(spillSlot));
 
-    EvalStage packedKeyValuesStage = makeHashAgg(
-        EvalStage{std::move(keyValuesStage), SlotVector{}},
+    auto packedKeyValuesStage = makeHashAgg(
+        std::move(keyValuesStage),
         makeSV(), /* groupBy slots - "none" means creating a single group */
         makeAggExprVector(keyValuesSetSlot, nullptr, std::move(addToSetExpr)),
         boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
@@ -432,21 +432,21 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     }
 
     // Attach the set of key values to the original local record.
-    std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet = makeS<LoopJoinStage>(
-        std::move(inputStage),
-        packedKeyValuesStage.extractStage(nodeId),  // NOLINT(bugprone-use-after-move)
-        makeSV(recordSlot) /* outerProjects */,
-        makeSV(recordSlot) /* outerCorrelated */,
-        nullptr /* predicate */,
-        nodeId);
+    auto nljLocalWithKeyValuesSet =
+        makeS<LoopJoinStage>(std::move(inputStage),
+                             std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
+                             makeSV(recordSlot) /* outerProjects */,
+                             makeSV(recordSlot) /* outerCorrelated */,
+                             nullptr /* predicate */,
+                             nodeId);
 
     return {keyValuesSetSlot, std::move(nljLocalWithKeyValuesSet)};
 }
 
 // Creates stages for grouping matched foreign records into an array. If there's no match, the
 // stages return an empty array instead.
-std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeignMatchedArray(
-    EvalStage innerBranch,
+std::pair<SlotId /* resultSlot */, SbStage> buildForeignMatchedArray(
+    SbStage innerBranch,
     SlotId foreignRecordSlot,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator,
@@ -501,16 +501,16 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
         makeLimitCoScanTree(nodeId, 1), nodeId, emptyArraySlot, std::move(emptyArrayConst));
 
     SlotId unionOutputSlot = slotIdGenerator.generate();
-    EvalStage unionStage =
-        makeUnion(makeVector(EvalStage{innerBranch.extractStage(nodeId), SlotVector{}},
-                             EvalStage{std::move(emptyArrayStage), SlotVector{}}),
-                  {makeSV(matchedRecordsSlot), makeSV(emptyArraySlot)} /* inputs */,
-                  makeSV(unionOutputSlot),
-                  nodeId);
+
+    auto unionStage = sbe::makeS<sbe::UnionStage>(
+        sbe::makeSs(std::move(innerBranch), std::move(emptyArrayStage)),
+        makeVector(makeSV(matchedRecordsSlot), makeSV(emptyArraySlot)) /* inputs */,
+        makeSV(unionOutputSlot),
+        nodeId);
 
     return std::make_pair(
         unionOutputSlot,
-        makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).extractStage(nodeId));
+        sbe::makeS<sbe::LimitSkipStage>(std::move(unionStage), 1 /* limit */, boost::none, nodeId));
 }
 
 /**
@@ -619,9 +619,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
     // It creates a union stage internally so that when there's no matching foreign records, an
     // empty array will be returned.
     return buildForeignMatchedArray(
-        makeFilter<false /*IsConst*/>(EvalStage{std::move(foreignStage), makeSV(foreignRecordSlot)},
-                                      std::move(filter),
-                                      nodeId),
+        sbe::makeS<sbe::FilterStage<false>>(std::move(foreignStage), std::move(filter), nodeId),
         foreignRecordSlot,
         nodeId,
         slotIdGenerator,

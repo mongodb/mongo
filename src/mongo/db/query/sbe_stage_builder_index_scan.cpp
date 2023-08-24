@@ -74,7 +74,6 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
-#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

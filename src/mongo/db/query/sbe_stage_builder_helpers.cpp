@@ -268,10 +268,6 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EE
                         makeConstant(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
-EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit) {
-    return {makeLimitCoScanTree(planNodeId, limit), sbe::makeSV()};
-}
-
 std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fields,
                                                     sbe::EExpression::Vector values) {
     tassert(7103507,
@@ -333,157 +329,34 @@ std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
     return makeNewBsonObject(std::move(projectFields), std::move(projectValues));
 }
 
-std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
-    SbExpr expr,
-    EvalStage stage,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    StageBuilderState& state) {
-    // If expr's value is already in a slot, return the slot.
-    if (expr.hasSlot()) {
-        return {*expr.getSlot(), std::move(stage)};
-    }
-
-    // If expr's value is an expression, create a ProjectStage to evaluate the expression
-    // into a slot.
-    auto slot = slotIdGenerator->generate();
-    stage = makeProject(std::move(stage), planNodeId, slot, expr.extractExpr(state));
-    return {slot, std::move(stage)};
+SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId nodeId) {
+    return sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
 }
 
-EvalStage makeProject(EvalStage stage, sbe::SlotExprPairVector projects, PlanNodeId planNodeId) {
-    auto outSlots = stage.extractOutSlots();
-    for (auto& [slot, _] : projects) {
-        outSlots.push_back(slot);
-    }
-
-    return {sbe::makeS<sbe::ProjectStage>(
-                stage.extractStage(planNodeId), std::move(projects), planNodeId),
-            std::move(outSlots)};
-}
-
-EvalStage makeLoopJoin(EvalStage left,
-                       EvalStage right,
-                       PlanNodeId planNodeId,
-                       const sbe::value::SlotVector& lexicalEnvironment) {
-    // If 'left' and 'right' are both null, we just return null. If one of 'left'/'right' is null
-    // and the other is non-null, return whichever one is non-null.
-    if (left.isNull()) {
-        return right;
-    } else if (right.isNull()) {
-        return left;
-    }
-
-    auto outerProjects = left.getOutSlots();
-    auto outerCorrelated = left.getOutSlots();
-
-    outerCorrelated.insert(
-        outerCorrelated.end(), lexicalEnvironment.begin(), lexicalEnvironment.end());
-
-    auto outSlots = left.extractOutSlots();
-    outSlots.insert(outSlots.end(), right.getOutSlots().begin(), right.getOutSlots().end());
-
-    return {sbe::makeS<sbe::LoopJoinStage>(left.extractStage(planNodeId),
-                                           right.extractStage(planNodeId),
-                                           std::move(outerProjects),
-                                           std::move(outerCorrelated),
-                                           nullptr,
-                                           planNodeId),
-            std::move(outSlots)};
-}
-
-EvalStage makeUnwind(EvalStage inputEvalStage,
-                     sbe::value::SlotIdGenerator* slotIdGenerator,
-                     PlanNodeId planNodeId,
-                     bool preserveNullAndEmptyArrays) {
-    auto unwindSlot = slotIdGenerator->generate();
-    auto unwindStage = sbe::makeS<sbe::UnwindStage>(inputEvalStage.extractStage(planNodeId),
-                                                    inputEvalStage.getOutSlots().front(),
-                                                    unwindSlot,
-                                                    slotIdGenerator->generate(),
-                                                    preserveNullAndEmptyArrays,
-                                                    planNodeId);
-    return {std::move(unwindStage), sbe::makeSV(unwindSlot)};
-}
-
-EvalStage makeLimitSkip(EvalStage input,
-                        PlanNodeId planNodeId,
-                        boost::optional<long long> limit,
-                        boost::optional<long long> skip) {
-    return EvalStage{
-        sbe::makeS<sbe::LimitSkipStage>(input.extractStage(planNodeId), limit, skip, planNodeId),
-        input.extractOutSlots()};
-}
-
-EvalStage makeUnion(std::vector<EvalStage> inputStages,
-                    std::vector<sbe::value::SlotVector> inputVals,
-                    sbe::value::SlotVector outputVals,
+SbStage makeHashAgg(SbStage stage,
+                    sbe::value::SlotVector gbs,
+                    sbe::AggExprVector aggs,
+                    boost::optional<sbe::value::SlotId> collatorSlot,
+                    bool allowDiskUse,
+                    sbe::SlotExprPairVector mergingExprs,
                     PlanNodeId planNodeId) {
-    sbe::PlanStage::Vector branches;
-    branches.reserve(inputStages.size());
-    for (auto& inputStage : inputStages) {
-        branches.emplace_back(inputStage.extractStage(planNodeId));
-    }
-    return EvalStage{sbe::makeS<sbe::UnionStage>(
-                         std::move(branches), std::move(inputVals), outputVals, planNodeId),
-                     outputVals};
-}
-
-EvalStage makeHashAgg(EvalStage stage,
-                      sbe::value::SlotVector gbs,
-                      sbe::AggExprVector aggs,
-                      boost::optional<sbe::value::SlotId> collatorSlot,
-                      bool allowDiskUse,
-                      sbe::SlotExprPairVector mergingExprs,
-                      PlanNodeId planNodeId) {
-    stage.setOutSlots(gbs);
-    for (auto& [slot, _] : aggs) {
-        stage.addOutSlot(slot);
-    }
-
     // In debug builds or when we explicitly set the query knob, we artificially force frequent
     // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
     // logic for merging partial aggregates which otherwise would require large data sizes to
     // exercise.
     const bool forceIncreasedSpilling = allowDiskUse &&
         (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
-    stage.setStage(sbe::makeS<sbe::HashAggStage>(stage.extractStage(planNodeId),
-                                                 std::move(gbs),
-                                                 std::move(aggs),
-                                                 sbe::makeSV(),
-                                                 true /* optimized close */,
-                                                 collatorSlot,
-                                                 allowDiskUse,
-                                                 std::move(mergingExprs),
-                                                 planNodeId,
-                                                 true /* participateInTrialRunTracking */,
-                                                 forceIncreasedSpilling));
-    return stage;
-}
-
-EvalStage makeMkBsonObj(EvalStage stage,
-                        sbe::value::SlotId objSlot,
-                        boost::optional<sbe::value::SlotId> rootSlot,
-                        boost::optional<sbe::MakeObjFieldBehavior> fieldBehavior,
-                        std::vector<std::string> fields,
-                        std::vector<std::string> projectFields,
-                        sbe::value::SlotVector projectVars,
-                        bool forceNewObject,
-                        bool returnOldObject,
-                        PlanNodeId planNodeId) {
-    stage.setStage(sbe::makeS<sbe::MakeBsonObjStage>(stage.extractStage(planNodeId),
-                                                     objSlot,
-                                                     rootSlot,
-                                                     fieldBehavior,
-                                                     std::move(fields),
-                                                     std::move(projectFields),
-                                                     std::move(projectVars),
-                                                     forceNewObject,
-                                                     returnOldObject,
-                                                     planNodeId));
-    stage.addOutSlot(objSlot);
-
-    return stage;
+    return sbe::makeS<sbe::HashAggStage>(std::move(stage),
+                                         std::move(gbs),
+                                         std::move(aggs),
+                                         sbe::makeSV(),
+                                         true /* optimized close */,
+                                         collatorSlot,
+                                         allowDiskUse,
+                                         std::move(mergingExprs),
+                                         planNodeId,
+                                         true /* participateInTrialRunTracking */,
+                                         forceIncreasedSpilling);
 }
 
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,

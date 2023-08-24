@@ -61,7 +61,6 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/query/sbe_stage_builder_sbstage.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
