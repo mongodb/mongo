@@ -368,7 +368,7 @@ class DecorablePrinter(object):
         # TODO: abstract out navigating a std::vector
         self.start = decl_vector["_M_impl"]["_M_start"]
         finish = decl_vector["_M_impl"]["_M_finish"]
-        decinfo_t = lookup_type('mongo::decorable_detail::Registry::Entry')
+        decinfo_t = lookup_type('mongo::decorable_detail::RegistryEntry')
         self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
@@ -386,10 +386,9 @@ class DecorablePrinter(object):
 
         for index in range(self.count):
             entry = self.start[index]
-            deco_type_info = str(entry["typeInfo"])
-            # print(f"orig: {deco_type_info}")
+            deco_type_info = str(entry["_typeInfo"])
             deco_type_name = re.sub(r'.* <typeinfo for (.*)>', r'\1', deco_type_info)
-            offset = int(entry["offset"])
+            offset = int(entry["_offset"])
             obj = decoration_data[offset]
             obj_addr = re.sub(r'^(.*) .*', r'\1', str(obj.address))
             try:
@@ -399,6 +398,33 @@ class DecorablePrinter(object):
                 obj = f'[[Err:{err}]]'
             yield ('key', "{}:{}:{}".format(index, obj_addr, deco_type_name))
             yield ('value', obj)
+
+
+class LazyInitPrinter(object):
+    """Pretty printer for mongo::decorable_detail::LazyInit<T>."""
+
+    def __init__(self, val):
+        """Initialize DecorablePrinter."""
+        self.val = val
+
+    def to_string(self):
+        """Return LazyInit for printing."""
+        state = str(self.val["_flag"]["_state"])
+        state_type = 'mongo::decorable_detail::LazyInitFlag::State'
+        if f'{state_type}::empty' in state:
+            return "[[disengaged]]"
+        if f'{state_type}::busy' in state:
+            return "[[busy]]"
+        if not f'{state_type}::done' in state:
+            return f"[[unknown: {state}]]"
+        buf = self.val["_buf"]
+        try:
+            value_type = self.val.type.template_argument(0)
+            obj = buf.cast(value_type)
+        except Exception as err:
+            obj = f'[[Err:{err}]]'
+        obj = f'{state}: {obj}'
+        return obj
 
 
 def _get_flags(flag_val, flags):
@@ -1025,6 +1051,7 @@ def build_pretty_printer():
     pp.add('boost::optional', 'boost::optional', True, BoostOptionalPrinter)
     pp.add('immutable::map', 'mongo::immutable::map', True, ImmutableMapPrinter)
     pp.add('immutable::set', 'mongo::immutable::set', True, ImmutableSetPrinter)
+    pp.add('LazyInit', 'mongo::decorable_detail::LazyInit', True, LazyInitPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_abt_printers(pp)
