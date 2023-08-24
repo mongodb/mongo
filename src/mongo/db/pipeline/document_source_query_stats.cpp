@@ -94,9 +94,12 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     if (transformIdentifiers) {
         algorithm = transformIdentifiers->getAlgorithm();
         boost::optional<ConstDataRange> hmacKeyContainer = transformIdentifiers->getHmacKey();
-        if (hmacKeyContainer) {
-            hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
-        }
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "The 'hmacKey' parameter of the $queryStats stage must be "
+                                 "specified when applying the hmac-sha-256 algorithm",
+                algorithm != TransformAlgorithmEnum::kHmacSha256 ||
+                    hmacKeyContainer != boost::none);
+        hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
     }
     return ctor(algorithm, hmacKey);
 }
