@@ -1408,9 +1408,6 @@ public:
     /** Add `command` to the registry. */
     void registerCommand(Command* command);
 
-    /** Variant of `registerCommand` called from inside the `command` constructor. */
-    void selfRegister(Command* command);
-
     Command* findCommand(StringData name) const;
 
     void incrementUnknownCommands();
@@ -1420,7 +1417,6 @@ public:
 private:
     struct Entry {
         Command* command;
-        bool isWeak;
     };
 
     stdx::unordered_map<Command*, std::unique_ptr<Entry>> _commands;

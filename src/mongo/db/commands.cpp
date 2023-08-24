@@ -137,25 +137,6 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 auto getCommandInvocationHooks =
     ServiceContext::declareDecoration<std::unique_ptr<CommandInvocationHooks>>();
 
-thread_local CommandRegistry* selfRegisterTarget = nullptr;
-
-void selfRegister(Command* cmd) {
-    if (selfRegisterTarget == nullptr)
-        selfRegisterTarget = globalCommandRegistry();
-    selfRegisterTarget->selfRegister(cmd);
-}
-
-std::shared_ptr<void> selfRegisterTargetGuard(CommandRegistry* reg) {
-    struct SavedValue {
-        explicit SavedValue(CommandRegistry* reg) : _orig{std::exchange(selfRegisterTarget, reg)} {}
-        ~SavedValue() {
-            selfRegisterTarget = _orig;
-        }
-        CommandRegistry* _orig;
-    };
-    return std::make_shared<SavedValue>(reg);
-}
-
 }  // namespace
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
@@ -1050,9 +1031,7 @@ Command::Command(StringData name, std::vector<StringData> aliases)
     : _name(name.toString()),
       _aliases(std::move(aliases)),
       _commandsExecuted("commands." + _name + ".total"),
-      _commandsFailed("commands." + _name + ".failed") {
-    selfRegister(this);
-}
+      _commandsFailed("commands." + _name + ".failed") {}
 
 const std::set<std::string>& Command::apiVersions() const {
     return kNoApiVersions;
@@ -1098,21 +1077,10 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 // CommandRegistry
 
 void CommandRegistry::registerCommand(Command* command) {
-    auto it = _commands.find(command);
-    invariant(it != _commands.end());
-    it->second->isWeak = false;
-}
-
-void CommandRegistry::selfRegister(Command* command) {
-    // Calls to `registerCommand` will be redundant with `selfRegister` for now.
-    // As we work to convert the commands to the non-self registration paradigm,
-    // we'll want to identify registrations that come in ONLY through
-    // `selfRegister`. Eventually we'll remove `selfRegister`.
     StringData name = command->getName();
     std::vector<StringData> aliases = command->getAliases();
     auto ep = std::make_unique<Entry>();
     ep->command = command;
-    ep->isWeak = true;
     auto [cIt, cOk] = _commands.emplace(command, std::move(ep));
     invariant(cOk, "Command identity collision: {}"_format(name));
 
@@ -1151,7 +1119,6 @@ CommandConstructionPlan& globalCommandConstructionPlan() {
 
 void CommandConstructionPlan::execute(CommandRegistry* registry) const {
     LOGV2_DEBUG(7897601, 3, "Constructing Command objects from specs");
-    auto selfRegisterGuard = selfRegisterTargetGuard(registry);
     for (auto&& entry : entries()) {
         auto type = demangleName(*entry->typeInfo);
         if (entry->testOnly && !getTestCommandsEnabled()) {

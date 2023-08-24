@@ -411,31 +411,6 @@ public:
 };
 MONGO_REGISTER_COMMAND(UnauthorizedCommand);
 
-template <typename ConcreteCommand>
-auto& fetchCommandAs(StringData name) {
-    return *dynamic_cast<ConcreteCommand*>(globalCommandRegistry()->findCommand(name));
-}
-
-auto& throwsStatusCommand() {
-    return fetchCommandAs<ThrowsStatusCommand>("throwsStatus");
-}
-
-auto& unauthorizedCommand() {
-    return fetchCommandAs<UnauthorizedCommand>("unauthorizedCmd");
-}
-
-auto& exampleIncrementCommand() {
-    return fetchCommandAs<ExampleIncrementCommand>("exampleIncrement");
-}
-
-auto& exampleMinimalCommand() {
-    return fetchCommandAs<ExampleMinimalCommand>("exampleMinimal");
-}
-
-auto& exampleVoidCommand() {
-    return fetchCommandAs<ExampleVoidCommand>("exampleVoid");
-}
-
 class TypedCommandTest : public ServiceContextMongoDTest {
 public:
     void setUp() {
@@ -483,6 +458,31 @@ public:
 
         auto opCtx = _client->makeOperationContext();
         ASSERT_OK(_managerState->insertPrivilegeDocument(opCtx.get(), userDoc, {}));
+    }
+
+    template <typename ConcreteCommand>
+    auto& fetchCommandAs(StringData name) {
+        return *dynamic_cast<ConcreteCommand*>(globalCommandRegistry()->findCommand(name));
+    }
+
+    auto& throwsStatusCommand() {
+        return fetchCommandAs<ThrowsStatusCommand>("throwsStatus");
+    }
+
+    auto& unauthorizedCommand() {
+        return fetchCommandAs<UnauthorizedCommand>("unauthorizedCmd");
+    }
+
+    auto& exampleIncrementCommand() {
+        return fetchCommandAs<ExampleIncrementCommand>("exampleIncrement");
+    }
+
+    auto& exampleMinimalCommand() {
+        return fetchCommandAs<ExampleMinimalCommand>("exampleMinimal");
+    }
+
+    auto& exampleVoidCommand() {
+        return fetchCommandAs<ExampleVoidCommand>("exampleVoid");
     }
 
 protected:
