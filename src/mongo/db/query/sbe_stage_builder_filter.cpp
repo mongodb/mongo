@@ -956,11 +956,19 @@ public:
 
         generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode, hasNull);
     }
+
     // The following are no-ops. The internal expr comparison match expression are produced
     // internally by rewriting an $expr expression to an AND($expr, $_internalExpr[OP]), which can
     // later be eliminated by via a conversion into EXACT index bounds, or remains present. In the
     // latter case we can simply ignore it, as the result of AND($expr, $_internalExpr[OP]) is equal
     // to just $expr.
+    //
+    // TODO SERVER-62058: This is a correct implementation for the time-series loose filter since
+    // the event filter should be able to filter out non-matching results but will not be
+    // performant. But this is an incorrect implementation for the time-series tight filter since
+    // if the tight filter evalutes to 'true', then the event filter will not be evaluated at all.
+    // Implement the exact behavior for the better performance of the loose filter and the
+    // correctness of the tight filter.
     void visit(const InternalExprEqMatchExpression* expr) final {
         generateAlwaysBoolean(_context, true);
     }

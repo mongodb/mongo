@@ -39,8 +39,8 @@ namespace mongo::sbe {
  *
  * Debug string representations:
  *
- *  ts_bucket_to_cellblock bucketSlot paths[blocksOut[0] = paths[0], ..., blocksOut[N] = paths[N]]
- *     meta = metaOut?
+ *  ts_bucket_to_cellblock bucketSlot pathReqs[blocksOut[0] = paths[0], ...,
+ *      blocksOut[N] = paths[N]] metaOut = meta?
  */
 class TsBucketToCellBlockStage final : public PlanStage {
 public:
@@ -49,7 +49,6 @@ public:
                              std::vector<value::CellBlock::PathRequest> pathReqs,
                              value::SlotVector blocksOut,
                              boost::optional<value::SlotId> metaOut,
-                             bool hasMetaField,
                              const std::string& timeField,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking = true);
@@ -79,7 +78,6 @@ private:
     const std::vector<value::CellBlock::PathRequest> _pathReqs;
     const value::SlotVector _blocksOutSlotId;
     const boost::optional<value::SlotId> _metaOutSlotId;
-    const bool _hasMetaField;
     const std::string _timeField;
 
     value::TsBucketPathExtractor _pathExtractor;

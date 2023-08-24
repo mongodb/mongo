@@ -793,6 +793,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnpackTsBucket(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a
      * plan over. If no current namespace is configured, a CollectionPtr referencing the main

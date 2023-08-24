@@ -19,6 +19,7 @@
  */
 
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 (function() {
 "use strict";
@@ -51,12 +52,27 @@ function checkResults({
 }
 
 function validateExplain(pipeline, rewriteExpected) {
+    // We don't verify yet explain output on mongos due to complication with $_internalUnpackBucket
+    // lowered to SBE.
+    // TODO SERVER-80395: Reenable explain output verification on mongos.
+    if (FixtureHelpers.isMongos(db)) {
+        return;
+    }
+
     // Since we have unit tests that validate the specific output of the rewrite, we can just
     // validate if the rewrite occurred or not.
     const explain = coll.explain().aggregate(pipeline);
-    const unpack = getAggPlanStages(explain, "$_internalUnpackBucket");
+    const unpack = (() => {
+        // The 'explainVersion' being 1 means that the $_internalUnpackBucket stage is not pushed
+        // down to the SBE. Otherwise, it is pushed down to the SBE.
+        if (explain.explainVersion === "1") {
+            return getAggPlanStages(explain, "$_internalUnpackBucket");
+        } else {
+            return getAggPlanStages(explain, "UNPACK_TS_BUCKET");
+        }
+    })();
     const expectedStageCount = rewriteExpected ? 0 : 1;
-    assert.eq(unpack.length, expectedStageCount);
+    assert.eq(unpack.length, expectedStageCount, tojson(explain));
 }
 
 let b, times = [];
