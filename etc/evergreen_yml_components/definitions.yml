@@ -1280,6 +1280,11 @@ functions:
       binary: bash
       args:
       - "src/evergreen/scons_compile.sh"
+  - command: expansions.update
+    params:
+      updates:
+      - key: install_dir
+        value: ${install_dir}
 
   "ninja compile":
   - *f_expansions_write
@@ -6783,7 +6788,11 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle
