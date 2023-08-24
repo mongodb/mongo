@@ -478,11 +478,24 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
     expect<Event::sessionSourceMessage>(makeGetMoreRequest(123));
     expect<Event::sepHandleRequest>(setExhaust(makeGetMoreResponse()));
 
-    // Simulate a disconnect during the session sink call. The cleanup of
-    // exhaust resources happens when the session disconnects. So after the send
-    // of the "getMore" response returns the injected error, expect the
-    // SessionWorkflow to issue a fire-and-forget "killCursors".
-    expect<Event::sessionSinkMessage>(kClosedSessionError);
+    expect<Event::sessionSinkMessage>(Status::OK());
+
+    // Test thread waits on this to ensure the callback is run by the ServiceEntryPoint (and
+    // therefore popped) before another callback is pushed.
+    auto pf = std::make_shared<PromiseAndFuture<void>>();
+
+    // Simulate a client disconnect during handleRequest. The cleanup of
+    // exhaust resources happens when the session disconnects. After the simulated
+    // client disconnect, expect the SessionWorkflow to issue a fire-and-forget "killCursors".
+    injectMockResponse<Event::sepHandleRequest>(
+        [promise = std::move(pf->promise)](OperationContext* opCtx, const Message& msg) mutable {
+            promise.emplaceValue();
+            // Simulate the opCtx being marked as killed due to client disconnect.
+            opCtx->markKilled(ErrorCodes::ClientDisconnect);
+            return Status(ErrorCodes::ClientDisconnect,
+                          "ClientDisconnect as part of testing session cleanup.");
+        });
+    pf->future.get();
 
     PromiseAndFuture<Message> killCursors;
     injectMockResponse<Event::sepHandleRequest>(
