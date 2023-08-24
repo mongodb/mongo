@@ -594,8 +594,9 @@ public:
                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                     CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
             };
-            auto const nssOrUUID = CommandHelpers::parseNsOrUUID(_dbName, _request.body);
+            auto const nssOrUUID = findCommand->getNamespaceOrUUID();
             if (nssOrUUID.isNamespaceString()) {
+                CommandHelpers::ensureNsNotCommand(nssOrUUID.nss());
                 initializeTracker(nssOrUUID.nss());
             }
             const auto acquisitionRequest = [&] {

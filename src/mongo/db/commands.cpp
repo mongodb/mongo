@@ -344,14 +344,17 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
         return {dbName, uassertStatusOK(UUID::parse(first))};
     } else {
-        // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid collection name specified '" << nss.toStringForErrorMsg(),
-                !(NamespaceStringUtil::serialize(nss).find('$') != std::string::npos &&
-                  nss != NamespaceString::kLocalOplogDollarMain));
+        ensureNsNotCommand(nss);
         return nss;
     }
+}
+
+void CommandHelpers::ensureNsNotCommand(const NamespaceString& nss) {
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid collection name specified '" << nss.toStringForErrorMsg(),
+            !(NamespaceStringUtil::serialize(nss).find('$') != std::string::npos &&
+              nss != NamespaceString::kLocalOplogDollarMain));
 }
 
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,

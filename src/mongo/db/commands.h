@@ -171,6 +171,9 @@ struct CommandHelpers {
 
     static NamespaceStringOrUUID parseNsOrUUID(const DatabaseName& dbName, const BSONObj& cmdObj);
 
+    // Ensure collection identifier is not a Command
+    static void ensureNsNotCommand(const NamespaceString& nss);
+
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type
      * mongo::String, then that field is interpreted as the collection name.
