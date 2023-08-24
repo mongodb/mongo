@@ -117,18 +117,11 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
 }
 
 std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMetadata(
-    const boost::optional<LogicalTime>& atClusterTime) {
+    const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) {
     stdx::lock_guard<Latch> lg(_managerLock);
 
     auto activeMetadataTracker = _metadata.back();
     const auto& activeMetadata = activeMetadataTracker->metadata;
-
-    // We don't keep routing history for unsharded collections, so if the collection is unsharded
-    // just return the active metadata
-    if (!atClusterTime || !activeMetadata->isSharded()) {
-        return std::make_shared<RangePreserver>(
-            lg, shared_from_this(), std::move(activeMetadataTracker));
-    }
 
     class MetadataAtTimestamp : public ScopedCollectionDescription::Impl {
     public:
@@ -141,6 +134,17 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
     private:
         CollectionMetadata _metadata;
     };
+
+    // We don't keep routing history for unsharded collections, so if the collection is unsharded
+    // just return the active metadata
+    if (!atClusterTime || !activeMetadata->isSharded()) {
+        if (preserveRange) {
+            return std::make_shared<RangePreserver>(
+                lg, shared_from_this(), std::move(activeMetadataTracker));
+        } else {
+            return std::make_shared<MetadataAtTimestamp>(*activeMetadata);
+        }
+    }
 
     return std::make_shared<MetadataAtTimestamp>(CollectionMetadata(
         ChunkManager::makeAtTime(*activeMetadata->getChunkManager(), atClusterTime->asTimestamp()),

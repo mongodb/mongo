@@ -142,6 +142,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
         _getMetadataWithVersionCheckAt(opCtx,
                                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                        optReceivedShardVersion,
+                                       true /* preserveRange */,
                                        supportNonVersionedOperations);
 
     return {std::move(metadata)};
@@ -151,8 +152,10 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx,
     OrphanCleanupPolicy orphanCleanupPolicy,
     const ShardVersion& receivedShardVersion) const {
-    return _getMetadataWithVersionCheckAt(
-        opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(), receivedShardVersion);
+    return _getMetadataWithVersionCheckAt(opCtx,
+                                          repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
+                                          receivedShardVersion,
+                                          true /* preserveRange */);
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
@@ -174,7 +177,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 
     auto& oss = OperationShardingState::get(opCtx);
 
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
@@ -196,7 +199,7 @@ boost::optional<ShardingIndexesCatalogCache> CollectionShardingRuntime::getIndex
 }
 
 boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() const {
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
     if (!optMetadata)
         return boost::none;
     return optMetadata->get();
@@ -211,7 +214,8 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 
 void CollectionShardingRuntime::checkShardVersionOrThrow(
     OperationContext* opCtx, const ShardVersion& receivedShardVersion) const {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, receivedShardVersion);
+    (void)_getMetadataWithVersionCheckAt(
+        opCtx, boost::none, receivedShardVersion, false /* preserveRange */);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
@@ -419,7 +423,7 @@ SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFut
 
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getCurrentMetadataIfKnown(
-    const boost::optional<LogicalTime>& atClusterTime) const {
+    const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) const {
     stdx::lock_guard lk(_metadataManagerLock);
     switch (_metadataType) {
         case MetadataType::kUnknown:
@@ -433,7 +437,7 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
         case MetadataType::kUnsharded:
             return kUnshardedCollection;
         case MetadataType::kSharded:
-            return _metadataManager->getActiveMetadata(atClusterTime);
+            return _metadataManager->getActiveMetadata(atClusterTime, preserveRange);
     };
     MONGO_UNREACHABLE;
 }
@@ -443,6 +447,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     OperationContext* opCtx,
     const boost::optional<mongo::LogicalTime>& atClusterTime,
     const boost::optional<ShardVersion>& optReceivedShardVersion,
+    bool preserveRange,
     bool supportNonVersionedOperations) const {
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded
@@ -479,7 +484,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                 !criticalSectionSignal);
     }
 
-    auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
+    auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime, preserveRange);
     uassert(StaleConfigInfo(_nss,
                             receivedShardVersion,
                             boost::none /* wantedVersion */,
