@@ -302,7 +302,8 @@ public:
                                    ProjectionNameOrderPreservingSet required) {
         ProjectionNameOrderPreservingSet requiredForChild = required;
         requiredForChild.erase(node.getProjectionName());
-        auto env = VariableEnvironment::build(node.getProjection());
+        auto env = VariableEnvironment::build(
+            node.getProjection(), nullptr /*memoInterface*/, false /*computeLastRefs*/);
         for (const auto& proj : env.freeVariableNames()) {
             requiredForChild.emplace_back(proj);
         }

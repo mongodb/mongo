@@ -328,7 +328,8 @@ public:
     }
 
     GroupIdType integrate(const ABT& n) {
-        return algebra::transport<true>(n, *this, VariableEnvironment::build(n, &_memo));
+        return algebra::transport<true>(
+            n, *this, VariableEnvironment::build(n, &_memo, false /*computeLastRefs*/));
     }
 
 private:

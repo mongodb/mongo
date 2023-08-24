@@ -304,7 +304,8 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
             "Requesting rejected plans without the requiring to keep them first.",
             !includeRejected || _hints._keepRejectedPlans);
 
-    VariableEnvironment env = VariableEnvironment::build(input);
+    VariableEnvironment env =
+        VariableEnvironment::build(input, nullptr /*memoInterface*/, false /*computeLastRefs*/);
     if (env.hasFreeVariables()) {
         tasserted(6808711, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
     }

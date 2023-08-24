@@ -310,7 +310,8 @@ ReorderDependencies computeDependencies(ABT::reference_type aboveNodeRef,
     const auto aboveNodeVarNames = collectVariableReferences(aboveNodeRef);
 
     ABT belowNode{belowNodeRef};
-    VariableEnvironment env = VariableEnvironment::build(belowNode, &ctx.getMemo());
+    VariableEnvironment env =
+        VariableEnvironment::build(belowNode, &ctx.getMemo(), false /*computeLastRefs*/);
     const DefinitionsMap belowNodeDefs = env.hasDefinitions(belowNode.ref())
         ? env.getDefinitions(belowNode.ref())
         : DefinitionsMap{};
