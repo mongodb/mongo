@@ -127,6 +127,7 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_window_function.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -734,89 +735,78 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
-std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& state,
-                                                             const MatchExpression* me,
-                                                             SbExpr expr) {
+SbExpr generatePerColumnPredicate(StageBuilderState& state,
+                                  const MatchExpression* me,
+                                  SbExpr expr) {
+    SbExprBuilder b(state);
     switch (me->matchType()) {
         // These are always safe since they will never match documents missing their field, or where
         // the element is an object or array.
         case MatchExpression::REGEX:
             return generateRegexExpr(
-                       state, checked_cast<const RegexMatchExpression*>(me), std::move(expr))
-                .extractExpr(state);
+                state, checked_cast<const RegexMatchExpression*>(me), std::move(expr));
         case MatchExpression::MOD:
             return generateModExpr(
-                       state, checked_cast<const ModMatchExpression*>(me), std::move(expr))
-                .extractExpr(state);
+                state, checked_cast<const ModMatchExpression*>(me), std::move(expr));
         case MatchExpression::BITS_ALL_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllSet,
-                                       std::move(expr))
-                .extractExpr(state);
+                                       std::move(expr));
         case MatchExpression::BITS_ALL_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllClear,
-                                       std::move(expr))
-                .extractExpr(state);
+                                       std::move(expr));
         case MatchExpression::BITS_ANY_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnySet,
-                                       std::move(expr))
-                .extractExpr(state);
+                                       std::move(expr));
         case MatchExpression::BITS_ANY_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnyClear,
-                                       std::move(expr))
-                .extractExpr(state);
+                                       std::move(expr));
         case MatchExpression::EXISTS:
-            return makeBoolConstant(true);
+            return b.makeBoolConstant(true);
         case MatchExpression::LT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::less,
-                                          std::move(expr))
-                .extractExpr(state);
+                                          std::move(expr));
         case MatchExpression::GT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greater,
-                                          std::move(expr))
-                .extractExpr(state);
+                                          std::move(expr));
         case MatchExpression::EQ:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::eq,
-                                          std::move(expr))
-                .extractExpr(state);
+                                          std::move(expr));
         case MatchExpression::LTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::lessEq,
-                                          std::move(expr))
-                .extractExpr(state);
+                                          std::move(expr));
         case MatchExpression::GTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greaterEq,
-                                          std::move(expr))
-                .extractExpr(state);
+                                          std::move(expr));
         case MatchExpression::MATCH_IN: {
             const auto* ime = checked_cast<const InMatchExpression*>(me);
             tassert(6988583,
                     "Push-down of non-scalar values in $in is not supported.",
                     !ime->hasNonScalarOrNonEmptyValues());
-            return generateInExpr(state, ime, std::move(expr)).extractExpr(state);
+            return generateInExpr(state, ime, std::move(expr));
         }
         case MatchExpression::TYPE_OPERATOR: {
             const auto* tme = checked_cast<const TypeMatchExpression*>(me);
             const MatcherTypeSet& ts = tme->typeSet();
-
-            return makeFunction(
-                "typeMatch", expr.extractExpr(state), makeInt32Constant(ts.getBSONTypeMask()));
+            return b.makeFunction(
+                "typeMatch", std::move(expr), b.makeInt32Constant(ts.getBSONTypeMask()));
         }
 
         default:
@@ -827,13 +817,14 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
     MONGO_UNREACHABLE;
 }
 
-std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
-                                                   const MatchExpression* me,
-                                                   sbe::FrameId lambdaFrameId,
-                                                   sbe::value::SlotId inputSlot) {
+SbExpr generateLeafExpr(StageBuilderState& state,
+                        const MatchExpression* me,
+                        sbe::FrameId lambdaFrameId,
+                        sbe::value::SlotId inputSlot) {
     auto lambdaParam = makeVariable(lambdaFrameId, 0);
     const MatchExpression::MatchType mt = me->matchType();
 
+    SbExprBuilder b(state);
     if (mt == MatchExpression::NOT) {
         // NOT cannot be pushed into the cell traversal because for arrays, it should behave as
         // conjunction of negated child predicate on each element of the aray, but if we pushed it
@@ -841,7 +832,7 @@ std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
         const auto& notMe = checked_cast<const NotMatchExpression*>(me);
         uassert(7040601, "Should have exactly one child under $not", notMe->numChildren() == 1);
         const auto child = notMe->getChild(0);
-        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+        auto lambdaExpr = b.makeLocalLambda(
             lambdaFrameId, generatePerColumnPredicate(state, child, std::move(lambdaParam)));
 
         const MatchExpression::MatchType mtChild = child->matchType();
@@ -849,38 +840,39 @@ std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
             (mtChild == MatchExpression::EXISTS || mtChild == MatchExpression::TYPE_OPERATOR)
             ? "traverseCsiCellTypes"
             : "traverseCsiCellValues";
-        return makeNot(makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr)));
+        return b.makeNot(
+            b.makeFunction(traverserName, b.makeVariable(inputSlot), std::move(lambdaExpr)));
     } else {
-        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+        auto lambdaExpr = b.makeLocalLambda(
             lambdaFrameId, generatePerColumnPredicate(state, me, std::move(lambdaParam)));
 
         auto traverserName = (mt == MatchExpression::EXISTS || mt == MatchExpression::TYPE_OPERATOR)
             ? "traverseCsiCellTypes"
             : "traverseCsiCellValues";
-        return makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr));
+        return b.makeFunction(traverserName, b.makeVariable(inputSlot), std::move(lambdaExpr));
     }
 }
 
-std::unique_ptr<sbe::EExpression> generatePerColumnLogicalAndExpr(StageBuilderState& state,
-                                                                  const AndMatchExpression* me,
-                                                                  sbe::FrameId lambdaFrameId,
-                                                                  sbe::value::SlotId inputSlot) {
+SbExpr generatePerColumnLogicalAndExpr(StageBuilderState& state,
+                                       const AndMatchExpression* me,
+                                       sbe::FrameId lambdaFrameId,
+                                       sbe::value::SlotId inputSlot) {
     const auto cTerms = me->numChildren();
     tassert(7072600, "AND should have at least one child", cTerms > 0);
 
-    std::vector<std::unique_ptr<sbe::EExpression>> leaves;
+    SbExpr::Vector leaves;
     leaves.reserve(cTerms);
     for (size_t i = 0; i < cTerms; i++) {
         leaves.push_back(generateLeafExpr(state, me->getChild(i), lambdaFrameId, inputSlot));
     }
-
+    SbExprBuilder b(state);
     // Create the balanced binary tree to keep the tree shallow and safe for recursion.
-    return makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, std::move(leaves));
+    return b.makeBalancedBooleanOpTree(sbe::EPrimBinary::logicAnd, std::move(leaves));
 }
 
-std::unique_ptr<sbe::EExpression> generatePerColumnFilterExpr(StageBuilderState& state,
-                                                              const MatchExpression* me,
-                                                              sbe::value::SlotId inputSlot) {
+SbExpr generatePerColumnFilterExpr(StageBuilderState& state,
+                                   const MatchExpression* me,
+                                   sbe::value::SlotId inputSlot) {
     auto lambdaFrameId = state.frameIdGenerator->generate();
 
     if (me->matchType() == MatchExpression::AND) {
@@ -942,7 +934,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             filteredPaths.emplace_back(
                 i,
-                generatePerColumnFilterExpr(_state, itFilter->second.get(), filterInputSlot),
+                generatePerColumnFilterExpr(_state, itFilter->second.get(), filterInputSlot)
+                    .extractExpr(_state),
                 filterInputSlot);
         }
     }
@@ -1212,40 +1205,36 @@ namespace {
  * Given a field path, this function will return an expression that will be true if evaluating the
  * field path involves array traversal at any level of the path (including the leaf field).
  */
-std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
-    std::unique_ptr<sbe::EExpression> inputExpr,
-    const FieldPath& fp,
-    FieldIndex level,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    boost::optional<sbe::value::SlotId> fieldSlot = boost::none) {
+SbExpr generateArrayCheckForSort(StageBuilderState& state,
+                                 SbExpr inputExpr,
+                                 const FieldPath& fp,
+                                 FieldIndex level,
+                                 sbe::value::FrameIdGenerator* frameIdGenerator,
+                                 boost::optional<sbe::value::SlotId> fieldSlot = boost::none) {
     invariant(level < fp.getPathLength());
 
-    auto fieldExpr = fieldSlot ? makeVariable(*fieldSlot)
-                               : makeFunction("getField"_sd,
-                                              std::move(inputExpr),
-                                              makeStrConstant(fp.getFieldName(level)));
-
+    SbExprBuilder b(state);
     auto resultExpr = [&] {
+        auto fieldExpr = fieldSlot ? b.makeVariable(*fieldSlot)
+                                   : b.makeFunction("getField"_sd,
+                                                    std::move(inputExpr),
+                                                    b.makeStrConstant(fp.getFieldName(level)));
         if (level == fp.getPathLength() - 1u) {
-            return makeFunction("isArray"_sd, std::move(fieldExpr));
+            return b.makeFunction("isArray"_sd, std::move(fieldExpr));
         }
-        auto frameId = fieldSlot ? boost::optional<sbe::FrameId>{}
-                                 : boost::make_optional(frameIdGenerator->generate());
-        auto var = fieldSlot ? std::move(fieldExpr) : makeVariable(*frameId, 0);
-        auto resultExpr =
-            makeBinaryOp(sbe::EPrimBinary::logicOr,
-                         makeFunction("isArray"_sd, var->clone()),
-                         generateArrayCheckForSort(var->clone(), fp, level + 1, frameIdGenerator));
-
-        if (!fieldSlot) {
-            resultExpr = sbe::makeE<sbe::ELocalBind>(
-                *frameId, sbe::makeEs(std::move(fieldExpr)), std::move(resultExpr));
-        }
-        return resultExpr;
+        sbe::FrameId frameId = frameIdGenerator->generate();
+        return b.makeLet(
+            frameId,
+            SbExpr::makeSeq(std::move(fieldExpr)),
+            b.makeBinaryOp(
+                sbe::EPrimBinary::logicOr,
+                b.makeFunction("isArray"_sd, b.makeVariable(frameId, 0)),
+                generateArrayCheckForSort(
+                    state, b.makeVariable(frameId, 0), fp, level + 1, frameIdGenerator)));
     }();
 
     if (level == 0) {
-        resultExpr = makeFillEmptyFalse(std::move(resultExpr));
+        resultExpr = b.makeFillEmptyFalse(std::move(resultExpr));
     }
 
     return resultExpr;
@@ -1395,9 +1384,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         // Sorting has a limitation where only one of the sort patterns can involve arrays.
         // If there are at least two sort patterns, check the data for this possibility.
-        auto failOnParallelArrays = [&]() -> std::unique_ptr<mongo::sbe::EExpression> {
-            auto parallelArraysError = sbe::makeE<sbe::EFail>(
-                ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
+        auto failOnParallelArrays = [&]() -> SbExpr {
+            SbExprBuilder b(_state);
+            auto parallelArraysError =
+                b.makeFail(ErrorCodes::BadValue, "cannot sort with keys that are parallel arrays");
 
             if (sortPattern.size() < 2) {
                 // If the sort pattern only has one part, we don't need to generate a "parallel
@@ -1407,8 +1397,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 // If the sort pattern has two parts, we can generate a simpler expression to
                 // perform the "parallel arrays" check.
                 auto makeIsNotArrayCheck = [&](const FieldPath& fp) {
-                    return makeNot(generateArrayCheckForSort(
-                        makeVariable(outputSlotId),
+                    return b.makeNot(generateArrayCheckForSort(
+                        _state,
+                        b.makeVariable(outputSlotId),
                         fp,
                         0 /* level */,
                         &_frameIdGenerator,
@@ -1416,47 +1407,48 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                             std::make_pair(PlanStageSlots::kField, fp.getFieldName(0)))));
                 };
 
-                return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                    makeIsNotArrayCheck(*sortPattern[0].fieldPath),
-                                    makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                                 makeIsNotArrayCheck(*sortPattern[1].fieldPath),
-                                                 std::move(parallelArraysError)));
+                return b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                      makeIsNotArrayCheck(*sortPattern[0].fieldPath),
+                                      b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                     makeIsNotArrayCheck(*sortPattern[1].fieldPath),
+                                                     std::move(parallelArraysError)));
             } else {
                 // If the sort pattern has three or more parts, we generate an expression to
                 // perform the "parallel arrays" check that works (and scales well) for an
                 // arbitrary number of sort pattern parts.
                 auto makeIsArrayCheck = [&](const FieldPath& fp) {
-                    return makeBinaryOp(
+                    return b.makeBinaryOp(
                         sbe::EPrimBinary::cmp3w,
-                        generateArrayCheckForSort(makeVariable(outputSlotId),
+                        generateArrayCheckForSort(_state,
+                                                  b.makeVariable(outputSlotId),
                                                   fp,
                                                   0,
                                                   &_frameIdGenerator,
                                                   outputs.getIfExists(std::make_pair(
                                                       PlanStageSlots::kField, fp.getFieldName(0)))),
-                        makeBoolConstant(false));
+                        b.makeBoolConstant(false));
                 };
 
                 auto numArraysExpr = makeIsArrayCheck(*sortPattern[0].fieldPath);
                 for (size_t idx = 1; idx < sortPattern.size(); ++idx) {
-                    numArraysExpr = makeBinaryOp(sbe::EPrimBinary::add,
-                                                 std::move(numArraysExpr),
-                                                 makeIsArrayCheck(*sortPattern[idx].fieldPath));
+                    numArraysExpr = b.makeBinaryOp(sbe::EPrimBinary::add,
+                                                   std::move(numArraysExpr),
+                                                   makeIsArrayCheck(*sortPattern[idx].fieldPath));
                 }
 
-                return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                    makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                                 std::move(numArraysExpr),
-                                                 makeInt32Constant(1)),
-                                    std::move(parallelArraysError));
+                return b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                      b.makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                                     std::move(numArraysExpr),
+                                                     b.makeInt32Constant(1)),
+                                      std::move(parallelArraysError));
             }
         }();
 
-        if (failOnParallelArrays) {
+        if (!failOnParallelArrays.isNull()) {
             stage = sbe::makeProjectStage(std::move(stage),
                                           root->nodeId(),
                                           _slotIdGenerator.generate(),
-                                          std::move(failOnParallelArrays));
+                                          failOnParallelArrays.extractExpr(_state));
         }
 
         sbe::SlotExprPairVector sortExpressions;
