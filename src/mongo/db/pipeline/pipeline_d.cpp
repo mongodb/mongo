@@ -34,8 +34,10 @@
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -45,9 +47,6 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/exact_cast.h"
@@ -102,6 +101,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -220,6 +220,7 @@ struct CompatiblePipelineStages {
     bool search : 1;
 
     bool window : 1;
+    bool unpackBucket : 1;
 };
 
 // Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list as
@@ -299,6 +300,15 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(windowStage, isLastSource));
         return true;
+    } else if (auto unpackBucketStage =
+                   dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get())) {
+        if (!allowedStages.unpackBucket) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(unpackBucketStage, isLastSource));
+        return true;
     }
 
     return false;
@@ -336,6 +346,12 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * Search is extracted from the pipeline when the following conditions are met:
  *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
  *    - When 'featureFlagSearchInSbe' is true.
+ *
+ * $_internalUnpackBucket stages ('DocumentSourceInternalUnpackBucket') are extracted when all of:
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
+ *    - When 'featureFlagTimeSeriesInSbe' is true.
+ *    - When ExpressionContext::sbePipelineCompatibility is set to
+ *      'SbeCompatibility::fullyCompatible'.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -405,6 +421,11 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         .search = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe(),
 
         .window = !(SbeCompatibility::fullyCompatible < minRequiredCompatibility),
+
+        // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
+        .unpackBucket = feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
+                            serverGlobalParams.featureCompatibility) &&
+            cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
     };
 
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
@@ -1574,9 +1595,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     // Do not double-optimize the sort.
     auto sort = (su.sort && su.sort->isBoundedSortStage()) ? nullptr : su.sort;
     auto unpack = su.unpack;
-    if (unpack &&
-        unpack->bucketUnpacker().bucketSpec().behavior() == BucketSpec::Behavior::kExclude) {
-        // Currently we only support in SBE unpacking with a statically known set of fields.
+    if (unpack && !unpack->isSbeCompatible()) {
         expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
     }
     if (unpack && sort) {

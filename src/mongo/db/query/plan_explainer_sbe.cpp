@@ -39,6 +39,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_impl.h"
@@ -287,6 +288,32 @@ void statsToBSON(const QuerySolutionNode* node,
                 bob->append("residualPredicate", cisn->postAssemblyFilter->serialize());
             }
             bob->appendBool("extraFieldsPermitted", cisn->extraFieldsPermitted);
+
+            break;
+        }
+        case STAGE_UNPACK_TS_BUCKET: {
+            auto utsbn = static_cast<const UnpackTsBucketNode*>(node);
+            {
+                const auto behaviorField =
+                    utsbn->bucketSpec.behavior() == BucketSpec::Behavior::kInclude ? "include"
+                                                                                   : "exclude";
+                BSONArrayBuilder fieldsBab{bob->subarrayStart(behaviorField)};
+                for (const auto& field : utsbn->bucketSpec.fieldSet()) {
+                    fieldsBab.append(field);
+                }
+            }
+            {
+                BSONArrayBuilder fieldsBab{bob->subarrayStart("computedMetaProjFields")};
+                for (const auto& computedMeta : utsbn->bucketSpec.computedMetaProjFields()) {
+                    fieldsBab.append(computedMeta);
+                }
+            }
+            bob->append("includeMeta", utsbn->includeMeta);
+            bob->append("eventFilter",
+                        utsbn->eventFilter ? utsbn->eventFilter->serialize() : BSONObj());
+            bob->append("wholebucketFilter",
+                        utsbn->wholeBucketFilter ? utsbn->wholeBucketFilter->serialize()
+                                                 : BSONObj());
 
             break;
         }

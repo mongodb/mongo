@@ -3,10 +3,12 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   requires_fcv_62,
- *   does_not_support_stepdowns,
- *   directly_against_shardsvrs_incompatible,
+ *   featureFlagTimeSeriesInSbe,
+ *   featureFlagSbeFull,
  * ]
+ *
+ * TODO SERVER-80243: This test is just slightly modified copy of a test file in the directory
+ * jstests/core/timeseries. Move this file to jstests/core/timeseries.
  */
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
@@ -34,26 +36,32 @@ assert.commandWorked(coll.insert([
  * Runs a 'pipeline', asserts the bucket unpacking 'behaviour' (either include or exclude) is
  * expected.
  */
-const runTest = function({pipeline, behaviour, expectedDocs}) {
+const runTest = function({pipeline, behaviour, expectedDocs, sbeCompatibleUnpack = false}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
-    if (explain.explainVersion === "1") {
-        // Verify the explain only when explainVersion is 1 which means the $_internalUnpackBucket
-        // stage is not pushed down to the SBE.
-        const unpackStages = getAggPlanStages(explain, '$_internalUnpackBucket');
-        assert.eq(1,
-                  unpackStages.length,
-                  "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
-        const unpackStage = unpackStages[0].$_internalUnpackBucket;
-        if (behaviour.include) {
-            assert(unpackStage.include,
-                   "Unpacking stage must have 'include' behaviour: " + tojson(explain));
-            assert.sameMembers(behaviour.include, unpackStage.include);
+    const unpackStage = (() => {
+        if (sbeCompatibleUnpack) {
+            const unpackStages = getAggPlanStages(explain, 'UNPACK_TS_BUCKET');
+            assert.eq(1,
+                      unpackStages.length,
+                      "Should only have a single UNPACK_TS_BUCKET stage: " + tojson(explain));
+            return unpackStages[0];
+        } else {
+            const unpackStages = getAggPlanStages(explain, '$_internalUnpackBucket');
+            assert.eq(1,
+                      unpackStages.length,
+                      "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
+            return unpackStages[0].$_internalUnpackBucket;
         }
-        if (behaviour.exclude) {
-            assert(unpackStage.exclude,
-                   "Unpacking stage must have 'exclude' behaviour: " + tojson(explain));
-            assert.sameMembers(behaviour.exclude, unpackStage.exclude);
-        }
+    })();
+    if (behaviour.include) {
+        assert(unpackStage.include,
+               "Unpacking stage must have 'include' behaviour: " + tojson(explain));
+        assert.sameMembers(behaviour.include, unpackStage.include);
+    }
+    if (behaviour.exclude) {
+        assert(unpackStage.exclude,
+               "Unpacking stage must have 'exclude' behaviour: " + tojson(explain));
+        assert.sameMembers(behaviour.exclude, unpackStage.exclude);
     }
 
     const docs = coll.aggregate([...pipeline, {$sort: {a: 1, b: 1, _id: 1}}]).toArray();
@@ -72,6 +80,7 @@ runTest({
         {b: 8, _id: 8},
         {b: 9, _id: 9},
     ],
+    sbeCompatibleUnpack: true,
 });
 
 runTest({
@@ -83,6 +92,7 @@ runTest({
         {b: 8},
         {b: 9},
     ],
+    sbeCompatibleUnpack: true,
 });
 
 runTest({
@@ -94,6 +104,7 @@ runTest({
         {a: 8, _id: 8},
         {a: 9, _id: 9},
     ],
+    sbeCompatibleUnpack: true,
 });
 
 runTest({
@@ -105,6 +116,7 @@ runTest({
         {a: 8},
         {a: 9},
     ],
+    sbeCompatibleUnpack: true,
 });
 
 runTest({

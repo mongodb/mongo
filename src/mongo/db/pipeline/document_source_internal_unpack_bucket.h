@@ -290,6 +290,16 @@ public:
                                             Pipeline::SourceContainer* container,
                                             bool includeEventFilter) const;
 
+    const MatchExpression* eventFilter() const {
+        return _eventFilter.get();
+    }
+
+    const MatchExpression* wholeBucketFilter() const {
+        return _wholeBucketFilter.get();
+    }
+
+    bool isSbeCompatible();
+
 private:
     GetNextResult doGetNext() final;
 
@@ -336,5 +346,8 @@ private:
     bool _triedInternalizeProject = false;
     bool _triedLastpointRewrite = false;
     bool _triedLimitPushDown = false;
+
+    // Caches the SBE-compatibility status result of this stage.
+    boost::optional<bool> _isSbeCompatible = boost::none;
 };
 }  // namespace mongo

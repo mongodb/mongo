@@ -3883,7 +3883,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         {STAGE_EQ_LOOKUP, &SlotBasedStageBuilder::buildLookup},
         {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter},
         {STAGE_SEARCH, &SlotBasedStageBuilder::buildSearch},
-        {STAGE_WINDOW, &SlotBasedStageBuilder::buildWindow}};
+        {STAGE_WINDOW, &SlotBasedStageBuilder::buildWindow},
+        {STAGE_UNPACK_TS_BUCKET, &SlotBasedStageBuilder::buildUnpackTsBucket}};
 
     tassert(4822884,
             str::stream() << "Unsupported QSN in SBE stage builder: " << root->toString(),

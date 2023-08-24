@@ -85,6 +85,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -1759,6 +1760,70 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     enableStreamingGroupIfPossible(itr, container);
 
     return container->end();
+}
+
+bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
+    // Caches the SBE compatibility status when this function is called for the first time. This is
+    // called before trying to push down stages to SBE.
+    if (!_isSbeCompatible) {
+        _isSbeCompatible.emplace([&] {
+            // Just in case that the event filter or the whole bucket filter is incompatible with
+            // SBE. Here's what may happen:
+            //
+            // While optimizing pipeline, we may end up with pushing SBE-incompatible filters down
+            // to the '$_internalUnpackBucket' stage. But before trying to pushing down stages to
+            // SBE, we set the expCtx->sbeCompatibility to 'fullyCompatible' and we forget the the
+            // whole SBE compatibility status for pipeline. And we examine each stage one by one
+            // while pushding down them. So, we need to remember the SBE compatibility at this
+            // point.
+            //
+            // This is overly conservative but we don't have a way to check which stage or
+            // expression is individually incompatible with SBE.
+            if (pExpCtx->sbeCompatibility < SbeCompatibility::fullyCompatible) {
+                return false;
+            }
+
+            // Currently we only support in SBE unpacking with a statically known set of fields.
+            if (_bucketUnpacker.bucketSpec().behavior() != BucketSpec::Behavior::kInclude) {
+                return false;
+            }
+
+            auto fieldSet = _bucketUnpacker.bucketSpec().fieldSet();
+            tassert(7969801,
+                    "All fields must be top-level ones",
+                    std::all_of(fieldSet.begin(), fieldSet.end(), [](auto&& field) {
+                        return FieldPath(field).getPathLength() == 1;
+                    }));
+            // If any top-level field of the 'eventFilter' is not in the bucketSpec's fieldSet, then
+            // it's a discarded field and we cannot push down the stage because the SBE filter
+            // generator cannot refer to slot(s) for the discarded field(s) which are not returned
+            // from 'block_to_row' stage.
+            //
+            // TODO SERVER-80324: Remove this restriction.
+            for (auto&& eventFilterPath : _eventFilterDeps.fields) {
+                if (!fieldSet.contains(FieldPath(eventFilterPath).front().toString())) {
+                    return false;
+                }
+            }
+
+            for (auto&& computedMeta : _bucketUnpacker.bucketSpec().computedMetaProjFields()) {
+                fieldSet.erase(computedMeta);
+            }
+            if (fieldSet.empty()) {
+                // If the bucket spec has no measurement fields, then the stage cannot be pushed
+                // down because if the 'block_to_row' / 'ts_bucket_to_cell_block' stages in the SBE
+                // do not have any fields to unpack, then they can't know how many rows to produce
+                // according to the current implementation.
+                //
+                // TODO SERVER-80323: Remove this restriction.
+                return false;
+            }
+
+            return true;
+        }());
+    }
+
+    return *_isSbeCompatible;
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifiedPaths() const {
