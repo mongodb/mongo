@@ -2221,6 +2221,26 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
     future.default_timed_get();
 }
 
+TEST_F(TransactionRouterTest, CannotContinueAfterCommit) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    RouterOperationContextSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    ASSERT_THROWS(txnRouter.beginOrContinueTxn(
+                      opCtx, txnNum, TransactionRouter::TransactionActions::kContinue),
+                  AssertionException);
+}
+
 TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     TxnNumber txnNum{3};
     auto opCtx = operationContext();
@@ -4285,17 +4305,6 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_Stash) {
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentInactive());
-}
-
-TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_BeginAfterStash) {
-    beginRecoverCommitWithDefaultTxnNumber();
-    txnRouter().stash(operationContext());
-    txnRouter().beginOrContinueTxn(
-        operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kContinue);
-
-    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
-    ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
-    ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
 }
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_AreNotCumulative) {
