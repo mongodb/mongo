@@ -641,6 +641,13 @@ public:
      **/
     void cleanUpPlacementHistory(OperationContext* opCtx, const Timestamp& earliestClusterTime);
 
+    /**
+     * Remove unused `maxSizeMb` field from `config.shards` documents on upgrade to 8.0
+     * returns the number of documents updated
+     * TODO SERVER-80266 delete once 8.0 becomes last lts
+     */
+    int deleteMaxSizeMbFromShardEntries(OperationContext* opCtx);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

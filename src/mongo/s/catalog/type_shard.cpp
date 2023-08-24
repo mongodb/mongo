@@ -50,7 +50,6 @@ namespace mongo {
 const BSONField<std::string> ShardType::name("_id");
 const BSONField<std::string> ShardType::host("host");
 const BSONField<bool> ShardType::draining("draining");
-const BSONField<long long> ShardType::maxSizeMB("maxSize");
 const BSONField<BSONArray> ShardType::tags("tags");
 const BSONField<ShardType::ShardState> ShardType::state("state");
 const BSONField<Timestamp> ShardType::topologyTime("topologyTime");
@@ -84,19 +83,6 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
             shard._draining = isShardDraining;
         } else if (status == ErrorCodes::NoSuchKey) {
             // draining field can be mssing in which case it is presumed false
-        } else {
-            return status;
-        }
-    }
-
-    {
-        long long shardMaxSizeMB;
-        // maxSizeMB == 0 means there's no limitation to space usage.
-        Status status = bsonExtractIntegerField(source, maxSizeMB.name(), &shardMaxSizeMB);
-        if (status.isOK()) {
-            shard._maxSizeMB = shardMaxSizeMB;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // maxSizeMB field can be missing in which case it is presumed false
         } else {
             return status;
         }
@@ -170,10 +156,6 @@ Status ShardType::validate() const {
                       str::stream() << "missing " << host.name() << " field");
     }
 
-    if (_maxSizeMB.has_value() && getMaxSizeMB() < 0) {
-        return Status(ErrorCodes::BadValue, str::stream() << "maxSize can't be negative");
-    }
-
     return Status::OK();
 }
 
@@ -186,8 +168,6 @@ BSONObj ShardType::toBSON() const {
         builder.append(host(), getHost());
     if (_draining)
         builder.append(draining(), getDraining());
-    if (_maxSizeMB)
-        builder.append(maxSizeMB(), getMaxSizeMB());
     if (_tags)
         builder.append(tags(), getTags());
     if (_state)
@@ -213,11 +193,6 @@ void ShardType::setHost(const std::string& host) {
 
 void ShardType::setDraining(const bool isDraining) {
     _draining = isDraining;
-}
-
-void ShardType::setMaxSizeMB(const long long maxSizeMB) {
-    invariant(maxSizeMB >= 0);
-    _maxSizeMB = maxSizeMB;
 }
 
 void ShardType::setTags(const std::vector<std::string>& tags) {

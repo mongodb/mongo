@@ -60,7 +60,6 @@ public:
     static const BSONField<std::string> mongosAddShardDeprecated;
     static const BSONField<std::string> configsvrAddShard;
     static const BSONField<std::string> shardName;
-    static const BSONField<long long> maxSizeMB;
 
     /**
      * Parses the provided BSON content as the external addShard command, and if it is correct,

@@ -58,7 +58,6 @@ const BSONField<std::string> AddShardRequest::mongosAddShard("addShard");
 const BSONField<std::string> AddShardRequest::mongosAddShardDeprecated("addshard");
 const BSONField<std::string> AddShardRequest::configsvrAddShard("_configsvrAddShard");
 const BSONField<std::string> AddShardRequest::shardName("name");
-const BSONField<long long> AddShardRequest::maxSizeMB("maxSize");
 
 namespace {
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
@@ -120,7 +119,7 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
 
     uassert(ErrorCodes::InvalidOptions,
             "addShard no longer supports maxSize field",
-            !obj.hasField(maxSizeMB.name()));
+            !obj.hasField("maxSize"));
 
     return request;
 }

@@ -68,7 +68,6 @@ public:
     static const BSONField<std::string> name;
     static const BSONField<std::string> host;
     static const BSONField<bool> draining;
-    static const BSONField<long long> maxSizeMB;
     static const BSONField<BSONArray> tags;
     static const BSONField<ShardState> state;
     static const BSONField<Timestamp> topologyTime;
@@ -113,11 +112,6 @@ public:
     }
     void setDraining(bool draining);
 
-    long long getMaxSizeMB() const {
-        return _maxSizeMB.value_or(0);
-    }
-    void setMaxSizeMB(long long maxSizeMB);
-
     std::vector<std::string> getTags() const {
         return _tags.value_or(std::vector<std::string>());
     }
@@ -142,10 +136,6 @@ private:
     boost::optional<std::string> _host;
     // (O) is it draining chunks?
     boost::optional<bool> _draining;
-
-    // TODO SERVER-68430 remove maxSizeMB field after 7.0 branches out
-    // (O) maximum allowed disk space in MB
-    boost::optional<long long> _maxSizeMB;
     // (O) shard tags
     boost::optional<std::vector<std::string>> _tags;
     // (O) shard state

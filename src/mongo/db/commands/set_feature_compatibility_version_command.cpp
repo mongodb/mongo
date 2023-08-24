@@ -1507,6 +1507,11 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible);
         }
         _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
+
+        // TODO SERVER-80266 remove once 8.0 becomes last lts
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            ShardingCatalogManager::get(opCtx)->deleteMaxSizeMbFromShardEntries(opCtx);
+        }
     }
 };
 MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand);
