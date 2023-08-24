@@ -25,7 +25,7 @@ class ShardedClusterFixture(interface.Fixture):
                  preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1,
                  enable_sharding=None, enable_balancer=True, auth_options=None,
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
-                 config_shard=None):
+                 config_shard=None, use_auto_bootstrap_procedure=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
@@ -55,6 +55,7 @@ class ShardedClusterFixture(interface.Fixture):
             self.fixturelib.default_if_none(configsvr_options, {}))
         self.shard_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(shard_options, {}))
+        self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
 
         # The logging prefix used in cluster to cluster replication.
         self.cluster_logging_prefix = "" if cluster_logging_prefix is None else f"{cluster_logging_prefix}:"
@@ -126,6 +127,11 @@ class ShardedClusterFixture(interface.Fixture):
         # Wait for each of the shards
         for shard in self.shards:
             shard.await_ready()
+
+        # Need to get the new config shard connection string generated from the auto-bootstrap procedure
+        if self.use_auto_bootstrap_procedure:
+            for mongos in self.mongos:
+                mongos.mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
         # We call mongos.setup() in self.await_ready() function instead of self.setup()
         # because mongos routers have to connect to a running cluster.
@@ -377,7 +383,8 @@ class ShardedClusterFixture(interface.Fixture):
             "mongod_options": mongod_options, "mongod_executable": self.mongod_executable,
             "auth_options": auth_options, "preserve_dbpath": preserve_dbpath,
             "replset_config_options": replset_config_options, "shard_logging_prefix":
-                shard_logging_prefix, "config_shard": self.config_shard, **shard_options
+                shard_logging_prefix, "config_shard": self.config_shard,
+            "use_auto_bootstrap_procedure": self.use_auto_bootstrap_procedure, **shard_options
         }
 
     def install_rs_shard(self, rs_shard):
@@ -410,7 +417,7 @@ class ShardedClusterFixture(interface.Fixture):
         See https://docs.mongodb.org/manual/reference/command/addShard for more details.
         """
         connection_string = shard.get_internal_connection_string()
-        if is_config_shard:
+        if is_config_shard and not self.use_auto_bootstrap_procedure:
             self.logger.info("Adding %s as config shard...", connection_string)
             client.admin.command({"transitionFromDedicatedConfigServer": 1})
         else:

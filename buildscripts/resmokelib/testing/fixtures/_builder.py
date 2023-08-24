@@ -422,6 +422,10 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         config_shard = pick_catalog_shard_node(
             kwargs.pop("config_shard", config.CONFIG_SHARD), num_shards)
+        # Currently the auto_boostrap_procedure requires us to have a config_shard
+        if "use_auto_bootstrap_procedure" in kwargs and kwargs[
+                "use_auto_bootstrap_procedure"] and not config_shard:
+            config_shard = 0
         kwargs["config_shard"] = config_shard
 
     @staticmethod
