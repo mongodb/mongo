@@ -278,13 +278,6 @@ void execCommandClient(OperationContext* opCtx,
             globalOpCounters.gotCommand();
         }
 
-        ON_BLOCK_EXIT([opCtx, shouldAffectCommandCounter] {
-            if (shouldAffectCommandCounter) {
-                Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-                    opCtx, mongo::LogicalOp::opCommand);
-            }
-        });
-
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
@@ -936,11 +929,6 @@ void runCommand(OperationContext* opCtx,
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
     globalOpCounters.gotQueryDeprecated();
-
-    ON_BLOCK_EXIT([opCtx] {
-        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-            opCtx, mongo::LogicalOp::opQuery);
-    });
 
     const QueryMessage q(*dbm);
 
