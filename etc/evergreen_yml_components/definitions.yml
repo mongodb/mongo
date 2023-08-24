@@ -1341,6 +1341,11 @@ functions:
       binary: bash
       args:
       - "src/evergreen/scons_compile.sh"
+  - command: expansions.update
+    params:
+      updates:
+      - key: install_dir
+        value: ${install_dir}
 
 # This is only used to simulate local dev compilation. Do NOT use for anything else.
   "scons raw compile":
@@ -7186,7 +7191,11 @@ tasks:
     vars:
       <<: *powercycle_remote_credentials
   - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
   - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle
