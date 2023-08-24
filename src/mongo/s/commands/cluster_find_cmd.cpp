@@ -221,11 +221,6 @@ public:
             // We count find command as a query op.
             globalOpCounters.gotQuery();
 
-            ON_BLOCK_EXIT([opCtx] {
-                Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-                    opCtx, mongo::LogicalOp::opQuery);
-            });
-
             auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             const boost::intrusive_ptr<ExpressionContext> expCtx;

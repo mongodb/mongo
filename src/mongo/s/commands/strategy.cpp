@@ -424,14 +424,6 @@ public:
 
     explicit RunInvocation(ParseAndRunCommand* parc) : _parc(parc) {}
 
-    ~RunInvocation() {
-        if (!_shouldAffectCommandCounter)
-            return;
-        auto opCtx = _parc->_rec->getOpCtx();
-        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-            opCtx, mongo::LogicalOp::opCommand);
-    }
-
     Future<void> run();
 
 private:
@@ -440,7 +432,6 @@ private:
     ParseAndRunCommand* const _parc;
 
     boost::optional<RouterOperationContextSession> _routerSession;
-    bool _shouldAffectCommandCounter = false;
 };
 
 /*
@@ -903,7 +894,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
-        _shouldAffectCommandCounter = true;
     }
 
     if (_parc->_opType == dbQuery && !_parc->_isHello.get()) {
@@ -1150,11 +1140,6 @@ Future<void> ParseAndRunCommand::run() {
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
     globalOpCounters.gotQueryDeprecated();
-
-    ON_BLOCK_EXIT([opCtx] {
-        Grid::get(opCtx)->catalogCache()->checkAndRecordOperationBlockedByRefresh(
-            opCtx, mongo::LogicalOp::opQuery);
-    });
 
     const QueryMessage q(*dbm);
 

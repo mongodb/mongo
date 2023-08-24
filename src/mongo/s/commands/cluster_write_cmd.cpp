@@ -493,22 +493,17 @@ private:
 
         // TODO: increase opcounters by more than one
         auto& debug = CurOp::get(opCtx)->debug();
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
         switch (_batchedRequest.getBatchType()) {
             case BatchedCommandRequest::BatchType_Insert:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotInsert();
                 }
-                catalogCache->checkAndRecordOperationBlockedByRefresh(opCtx,
-                                                                      mongo::LogicalOp::opInsert);
                 debug.additiveMetrics.ninserted = response.getN();
                 break;
             case BatchedCommandRequest::BatchType_Update:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotUpdate();
                 }
-                catalogCache->checkAndRecordOperationBlockedByRefresh(opCtx,
-                                                                      mongo::LogicalOp::opUpdate);
 
                 // The response.getN() count is the sum of documents matched and upserted.
                 if (response.isUpsertDetailsSet()) {
@@ -541,8 +536,6 @@ private:
                 for (size_t i = 0; i < numAttempts; ++i) {
                     globalOpCounters.gotDelete();
                 }
-                catalogCache->checkAndRecordOperationBlockedByRefresh(opCtx,
-                                                                      mongo::LogicalOp::opDelete);
                 debug.additiveMetrics.ndeleted = response.getN();
                 break;
         }
