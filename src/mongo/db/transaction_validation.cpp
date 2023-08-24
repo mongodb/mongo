@@ -45,16 +45,16 @@ namespace mongo {
 
 using namespace fmt::literals;
 
-bool isRetryableWriteCommand(StringData cmdName) {
-    auto command = CommandHelpers::findCommand(cmdName);
+bool isRetryableWriteCommand(Service* service, StringData cmdName) {
+    auto command = CommandHelpers::findCommand(service, cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Encountered unknown command during retryability check: " << cmdName,
             command);
     return command->supportsRetryableWrite();
 }
 
-bool isTransactionCommand(StringData cmdName) {
-    auto command = CommandHelpers::findCommand(cmdName);
+bool isTransactionCommand(Service* service, StringData cmdName) {
+    auto command = CommandHelpers::findCommand(service, cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Encountered unknown command during isTransactionCommand check: "
                           << cmdName,
@@ -62,10 +62,12 @@ bool isTransactionCommand(StringData cmdName) {
     return command->isTransactionCommand();
 }
 
-void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName) {
+void validateWriteConcernForTransaction(Service* service,
+                                        const WriteConcernOptions& wcResult,
+                                        StringData cmdName) {
     uassert(ErrorCodes::InvalidOptions,
             "writeConcern is not allowed within a multi-statement transaction",
-            wcResult.usedDefaultConstructedWC || isTransactionCommand(cmdName));
+            wcResult.usedDefaultConstructedWC || isTransactionCommand(service, cmdName));
 }
 
 bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLevel) {
@@ -75,11 +77,13 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
 }
 
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
+                            Service* service,
                             StringData cmdName,
                             const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase) {
     if (sessionOptions.getAutocommit()) {
-        CommandHelpers::canUseTransactions(namespaces, cmdName, allowTransactionsOnConfigDatabase);
+        CommandHelpers::canUseTransactions(
+            service, namespaces, cmdName, allowTransactionsOnConfigDatabase);
     }
 
     if (!sessionOptions.getAutocommit() && sessionOptions.getTxnNumber()) {
@@ -87,7 +91,7 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
                 "txnNumber may only be provided for multi-document transactions and retryable "
                 "write commands. autocommit:false was not provided, and {} is not a retryable "
                 "write command."_format(cmdName),
-                isRetryableWriteCommand(cmdName));
+                isRetryableWriteCommand(service, cmdName));
     }
 
     if (sessionOptions.getStartTransaction()) {

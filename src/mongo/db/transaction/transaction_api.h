@@ -410,7 +410,7 @@ public:
         : _executor(executor),
           _txnClient(std::move(txnClient)),
           _token(token),
-          _service(opCtx->getServiceContext()) {
+          _service(opCtx->getService()) {
         _primeTransaction(opCtx);
         _txnClient->initialize(_makeTxnHooks());
     }
@@ -501,7 +501,7 @@ public:
      * Returns an unowned pointer to the ServiceContext used to create this transaction.
      */
     ServiceContext* getParentServiceContext() const {
-        return _service;
+        return _service->getServiceContext();
     }
 
 private:
@@ -582,7 +582,7 @@ private:
     OperationSessionInfo _sessionInfo;
     TransactionState _state;
     bool _acquiredSessionFromPool{false};
-    ServiceContext* _service;
+    Service* _service;
 };
 
 /**

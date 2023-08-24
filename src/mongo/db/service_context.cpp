@@ -109,7 +109,8 @@ ServiceContext::ServiceContext()
     : _opIdRegistry(UniqueOperationIdRegistry::create()),
       _tickSource(makeSystemTickSource()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
-      _preciseClockSource(std::make_unique<SystemClockSource>()) {}
+      _preciseClockSource(std::make_unique<SystemClockSource>()),
+      _service(std::make_unique<Service>(this)) {}
 
 
 ServiceContext::~ServiceContext() {
@@ -178,7 +179,12 @@ void onCreate(T* object, const ObserversContainer& observers) {
 
 ServiceContext::UniqueClient ServiceContext::makeClient(
     std::string desc, std::shared_ptr<transport::Session> session) {
-    std::unique_ptr<Client> client(new Client(std::move(desc), this, std::move(session)));
+    return getService()->makeClient(std::move(desc), std::move(session));
+}
+
+ServiceContext::UniqueClient ServiceContext::makeClientForService(
+    std::string desc, std::shared_ptr<transport::Session> session, Service* service) {
+    std::unique_ptr<Client> client(new Client(std::move(desc), service, std::move(session)));
     onCreate(client.get(), _clientObservers);
     {
         stdx::lock_guard<Latch> lk(_mutex);

@@ -437,7 +437,7 @@ const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
 }
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
-    BSONObj cmd, bool isFirstStatementInThisParticipant) const {
+    OperationContext* opCtx, BSONObj cmd, bool isFirstStatementInThisParticipant) const {
     bool hasStartTxn = false;
     bool hasAutoCommit = false;
     bool hasTxnNum = false;
@@ -462,7 +462,9 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     // command, which don't support the options that start transactions, i.e. startTransaction and
     // readConcern. Otherwise the command must not have a read concern.
     auto cmdName = cmd.firstElement().fieldNameStringData();
-    bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmdName);
+    auto service = opCtx->getService();
+    bool mustStartTransaction =
+        isFirstStatementInThisParticipant && !isTransactionCommand(service, cmdName);
 
     // Strip the command of its read concern if it should not have one.
     if (!mustStartTransaction) {
@@ -672,7 +674,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
             "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
             "shardId"_attr = shardId,
             "request"_attr = redact(cmdObj));
-        return txnPart->attachTxnFieldsIfNeeded(cmdObj, false);
+        return txnPart->attachTxnFieldsIfNeeded(opCtx, cmdObj, false);
     }
 
     auto txnPart = _createParticipant(opCtx, shardId);
@@ -690,7 +692,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
         RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
     }
 
-    return txnPart.attachTxnFieldsIfNeeded(cmdObj, true);
+    return txnPart.attachTxnFieldsIfNeeded(opCtx, cmdObj, true);
 }
 
 const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(

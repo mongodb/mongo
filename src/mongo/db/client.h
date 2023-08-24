@@ -74,21 +74,36 @@ typedef long long ConnectionId;
 
 /**
  * The database's concept of an outside "client".
- * */
+ */
 class Client final : public Decorable<Client> {
 public:
+    /** Used as a placeholder argument to avoid specifying a session. */
+    static std::shared_ptr<transport::Session> noSession() {
+        return {};
+    }
+
+    /** Placeholder for Service argument. */
+    static Service* unspecifiedService() {
+        return getGlobalServiceContext()->getService();
+    }
+
     /**
      * Creates a Client object and stores it in TLS for the current thread.
      *
-     * An unowned pointer to a transport::Session may optionally be provided. If 'session'
-     * is non-null, then it will be used to augment the thread name, and for reporting purposes.
+     * A `service` of `unspecifiedService()` can be given, and will take a default.
      *
-     * If provided, session's ref count will be bumped by this Client.
+     * A `session` of `noSession()` can be given, to default to a null pointer.
+     * If `session` is non-null, then it will be used to augment the thread name
+     * and for reporting purposes. Its ref count will be bumped by this Client.
      */
-    static void initThread(StringData desc, std::shared_ptr<transport::Session> session = nullptr);
     static void initThread(StringData desc,
-                           ServiceContext* serviceContext,
+                           Service* service,
                            std::shared_ptr<transport::Session> session);
+
+    /** Convenience for the common case of using an unspecifiedService and noSession. */
+    static void initThread(StringData desc) {
+        return initThread(desc, unspecifiedService(), noSession());
+    }
 
     /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
@@ -125,10 +140,17 @@ public:
     }
 
     /**
+     * Returns the Service that owns this client.
+     */
+    Service* getService() const {
+        return _service;
+    }
+
+    /**
      * Returns the ServiceContext that owns this client session context.
      */
     ServiceContext* getServiceContext() const {
-        return _serviceContext;
+        return getService()->getServiceContext();
     }
 
     /**
@@ -284,9 +306,7 @@ public:
 private:
     friend class ServiceContext;
     friend class ThreadClient;
-    explicit Client(std::string desc,
-                    ServiceContext* serviceContext,
-                    std::shared_ptr<transport::Session> session);
+    Client(std::string desc, Service* service, std::shared_ptr<transport::Session> session);
 
     /**
      * Sets the active operation context on this client to "opCtx".
@@ -295,7 +315,7 @@ private:
         _opCtx = opCtx;
     }
 
-    ServiceContext* const _serviceContext;
+    Service* _service;
     const std::shared_ptr<transport::Session> _session;
 
     // Description for the client (e.g. conn8)
@@ -343,10 +363,42 @@ private:
  */
 class ThreadClient {
 public:
-    explicit ThreadClient(ServiceContext* serviceContext);
-    explicit ThreadClient(StringData desc,
-                          ServiceContext* serviceContext,
-                          std::shared_ptr<transport::Session> session = nullptr);
+    /**
+     * The overload set for this constructor bears some explanation.
+     * The primary fully-populated parameter list is:
+     *     StringData desc
+     *     Service* service
+     *     std::shared_ptr<transport::Session> session
+     *
+     * However, a full set of 3 variations on this constructor are accepted.
+     *
+     * A) The `desc` can be omitted, and will default to `getThreadName()`.
+     *
+     * B) A `ServiceContext* sc` can be given instead of `Service*`. In
+     *    that case it behaves as if `sc->getService()` was given.
+     *
+     * C) The `session` can be omitted, and will default to `Client::noSession()`.
+     */
+    ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session);
+
+    /** A) Repeat, with `desc` omitted. */
+    ThreadClient(Service* service, std::shared_ptr<transport::Session> session)
+        : ThreadClient(getThreadName(), service, std::move(session)) {}
+
+    /** B) Repeat all previous constructors, accepting ServiceContext instead of Service. */
+    ThreadClient(StringData desc, ServiceContext* sc, std::shared_ptr<transport::Session> session)
+        : ThreadClient{desc, sc->getService(), std::move(session)} {}
+    ThreadClient(ServiceContext* sc, std::shared_ptr<transport::Session> session)
+        : ThreadClient(sc->getService(), std::move(session)) {}
+
+    /** C) Repeat all previous constructors, with `session` omitted. */
+    ThreadClient(StringData desc, Service* service)
+        : ThreadClient{desc, service, Client::noSession()} {}
+    explicit ThreadClient(Service* service) : ThreadClient{service, Client::noSession()} {}
+    ThreadClient(StringData desc, ServiceContext* sc)
+        : ThreadClient{desc, sc, Client::noSession()} {}
+    explicit ThreadClient(ServiceContext* sc) : ThreadClient{sc, Client::noSession()} {}
+
     ~ThreadClient();
     ThreadClient(const ThreadClient&) = delete;
     ThreadClient(ThreadClient&&) = delete;

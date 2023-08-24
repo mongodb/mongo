@@ -82,7 +82,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
     _thread = stdx::thread([this, startPromise = std::move(startPromise)]() mutable {
         ON_BLOCK_EXIT([this] { _stopPromise.emplaceValue(); });
 
-        ThreadClient client(_job.name, _serviceContext, nullptr);
+        ThreadClient client(_job.name, _serviceContext, Client::noSession());
 
         if (!_job.isKillableByStepdown) {
             stdx::lock_guard<Client> lk(*client.get());

@@ -189,11 +189,8 @@ struct CommandHelpers {
      */
     static ResourcePattern resourcePatternForNamespace(const NamespaceString& ns);
 
+    static Command* findCommand(Service* service, StringData name);
     static Command* findCommand(OperationContext* opCtx, StringData name);
-
-    static Command* findCommand(StringData name) {
-        return findCommand(nullptr, name);
-    }
 
     /**
      * Helper for setting errmsg and ok field in command result object.
@@ -356,7 +353,8 @@ struct CommandHelpers {
      * Verifies that command is allowed to run under a transaction in the given database or
      * namespaces, and throws if that verification doesn't pass.
      */
-    static void canUseTransactions(const std::vector<NamespaceString>& namespaces,
+    static void canUseTransactions(Service* service,
+                                   const std::vector<NamespaceString>& namespaces,
                                    StringData cmdName,
                                    bool allowTransactionsOnConfigDatabase);
 
@@ -1423,6 +1421,26 @@ private:
     StringMap<Command*> _commandNames;
 };
 
+/** Legacy compatibility. Prefer `getCommandRegistry(service)`. */
+CommandRegistry* globalCommandRegistry();
+
+inline CommandRegistry* getCommandRegistry(Service* service) {
+    return globalCommandRegistry();  // There's just one registry for now
+}
+
+/** Convenience overload. */
+inline CommandRegistry* getCommandRegistry(OperationContext* opCtx) {
+    return getCommandRegistry(opCtx->getService());
+}
+
+inline Command* CommandHelpers::findCommand(Service* service, StringData name) {
+    return getCommandRegistry(service)->findCommand(name);
+}
+
+inline Command* CommandHelpers::findCommand(OperationContext* opCtx, StringData name) {
+    return getCommandRegistry(opCtx)->findCommand(name);
+}
+
 /**
  * When CommandRegistry objects are initialized, they look into the global
  * CommandConstructionPlan to find the list of Command objects that need to
@@ -1454,19 +1472,6 @@ public:
 private:
     std::vector<std::unique_ptr<Entry>> _entries;
 };
-
-/**
- * Returns the command registry for the service relevant to `opCtx`.
- */
-CommandRegistry* getCommandRegistry(OperationContext* opCtx);
-
-/**
- * Accessor to the command registry, an always-valid singleton.
- * Legacy compatibility. Prefer `getCommandRegistry(opCtx)`.
- */
-inline CommandRegistry* globalCommandRegistry() {
-    return getCommandRegistry(nullptr);
-}
 
 /**
  * CommandRegisterer objects attach entries to this instance at static-init

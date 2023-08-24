@@ -423,17 +423,17 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(Operati
  */
 class DbCheckJob : public BackgroundJob {
 public:
-    DbCheckJob(const DatabaseName& dbName, std::unique_ptr<DbCheckRun> run)
-        : BackgroundJob(true), _done(false), _run(std::move(run)) {}
+    DbCheckJob(Service* service, std::unique_ptr<DbCheckRun> run)
+        : BackgroundJob(true), _service(service), _done(false), _run(std::move(run)) {}
 
 protected:
-    virtual std::string name() const override {
+    std::string name() const override {
         return "dbCheck";
     }
 
-    virtual void run() override {
+    void run() override {
         // Every dbCheck runs in its own client.
-        ThreadClient tc(name(), getGlobalServiceContext());
+        ThreadClient tc(name(), _service);
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
@@ -1193,10 +1193,6 @@ private:
         }
     }
 
-    // Set if the job cannot proceed.
-    bool _done;
-    std::unique_ptr<DbCheckRun> _run;
-
     StatusWith<DbCheckCollectionBatchStats> _runBatch(OperationContext* opCtx,
                                                       const DbCheckCollectionInfo& info,
                                                       const BSONKey& first,
@@ -1301,6 +1297,10 @@ private:
         return false;
     }
 
+    Service* _service;
+    bool _done;  // Set if the job cannot proceed.
+    std::unique_ptr<DbCheckRun> _run;
+
     // Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in
     // lockstep with other replica set members.
     unsigned int _batchesProcessed = 0;
@@ -1360,7 +1360,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto job = getRun(opCtx, dbName, cmdObj);
-        (new DbCheckJob(dbName, std::move(job)))->go();
+        (new DbCheckJob(opCtx->getService(), std::move(job)))->go();
         return true;
     }
 };

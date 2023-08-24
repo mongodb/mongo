@@ -192,6 +192,11 @@ public:
         return _client->getServiceContext();
     }
 
+    /** Returns the Service under which this operation operates. */
+    Service* getService() const {
+        return _client ? _client->getService() : nullptr;
+    }
+
     /**
      * Returns the client under which this context runs.
      */

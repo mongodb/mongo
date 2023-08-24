@@ -121,7 +121,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
                 repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
                 (!opCtx->inMultiDocumentTransaction() ||
-                 isTransactionCommand(cmdObj.firstElementFieldName())) &&
+                 isTransactionCommand(opCtx->getService(), cmdObj.firstElementFieldName())) &&
                 !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
 
                 const auto rwcDefaults =

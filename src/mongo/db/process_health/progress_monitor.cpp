@@ -152,7 +152,8 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
 }
 
 void ProgressMonitor::_progressMonitorLoop() {
-    Client::initThread("FaultManagerProgressMonitor"_sd, _svcCtx, nullptr);
+    Client::initThread(
+        "FaultManagerProgressMonitor"_sd, _svcCtx->getService(), Client::noSession());
     static const int kSleepsPerInterval = 10;
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.

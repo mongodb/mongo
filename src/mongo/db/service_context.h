@@ -142,6 +142,8 @@ private:
  */
 using OperationKey = UUID;
 
+class Service;
+
 /**
  * Class representing the context of a service, such as a MongoD database service or
  * a MongoS routing service.
@@ -382,6 +384,11 @@ public:
      */
     UniqueClient makeClient(std::string desc,
                             std::shared_ptr<transport::Session> session = nullptr);
+
+    /** Internal: Called by Service->makeClient. */
+    UniqueClient makeClientForService(std::string desc,
+                                      std::shared_ptr<transport::Session> session,
+                                      Service* service);
 
     /**
      * Creates a new OperationContext on "client".
@@ -640,6 +647,11 @@ public:
 
     LockedClient getLockedClient(OperationId id);
 
+    /** Transitional. There's only one service for now. */
+    Service* getService() const {
+        return _service.get();
+    }
+
 private:
     /**
      * A synchronized owning pointer to avoid setters racing with getters.
@@ -791,6 +803,38 @@ private:
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;
+
+    // There's only one for now!
+    std::unique_ptr<Service> _service;
+};
+
+/**
+ * A Service is a grouping of Clients, and is a creator of Client objects.
+ * It determines the ClusterRole of the Clients and the CommandRegistry
+ * available to them. Each service tracks some metrics separately.
+ *
+ * A Service is logically on a level below the ServiceContext, which holds state
+ * for the whole process, and above Client, which holds state for each
+ * connection. A ServiceContext owns one or more Service objects.
+ *
+ * A Service will be the handler for either the "shard" or "router" service, as
+ * both services can now exist in the same server process (ServiceContext).
+ */
+class Service : public Decorable<Service> {
+public:
+    explicit Service(ServiceContext* sc) : _sc{sc} {}
+
+    ServiceContext::UniqueClient makeClient(std::string desc,
+                                            std::shared_ptr<transport::Session> session = nullptr) {
+        return _sc->makeClientForService(std::move(desc), std::move(session), this);
+    }
+
+    ServiceContext* getServiceContext() const {
+        return _sc;
+    }
+
+private:
+    ServiceContext* _sc;
 };
 
 /**

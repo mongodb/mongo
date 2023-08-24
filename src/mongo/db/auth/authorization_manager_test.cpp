@@ -103,7 +103,7 @@ public:
         // Re-initialize the client after setting the AuthorizationManager to get an
         // AuthorizationSession.
         Client::releaseCurrent();
-        Client::initThread(getThreadName(), session);
+        Client::initThread(getThreadName(), Client::unspecifiedService(), session);
         opCtx = makeOperationContext();
 
         credentials = BSON("SCRAM-SHA-1"

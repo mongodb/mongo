@@ -915,7 +915,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         // commands have the same ids inferred.
         dassert(
             !isRetryableWriteCommand(
-                cmdBuilder->asTempObj().firstElement().fieldNameStringData()) ||
+                _service, cmdBuilder->asTempObj().firstElement().fieldNameStringData()) ||
                 (cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdsFieldName) ||
                  cmdBuilder->hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName)) ||
                 (cmdBuilder->hasField(BulkWriteCommandRequest::kStmtIdFieldName) ||
@@ -941,8 +941,8 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         uassert(5956600,
                 "Command object passed to the transaction api should not contain maxTimeMS field",
                 !cmdBuilder->hasField(kMaxTimeMSField));
-        auto timeLeftover =
-            std::max(Milliseconds(0), *_opDeadline - _service->getFastClockSource()->now());
+        auto now = _service->getServiceContext()->getFastClockSource()->now();
+        auto timeLeftover = std::max(Milliseconds(0), *_opDeadline - now);
         cmdBuilder->append(kMaxTimeMSField, durationCount<Milliseconds>(timeLeftover));
     }
 
@@ -1142,8 +1142,8 @@ LogicalTime Transaction::getOperationTime() const {
 
 Transaction::~Transaction() {
     if (_acquiredSessionFromPool) {
-        InternalSessionPool::get(_service)->release(
-            {*_sessionInfo.getSessionId(), *_sessionInfo.getTxnNumber()});
+        InternalSessionPool::get(_service->getServiceContext())
+            ->release({*_sessionInfo.getSessionId(), *_sessionInfo.getTxnNumber()});
         _acquiredSessionFromPool = false;
     }
 }

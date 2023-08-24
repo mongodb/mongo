@@ -413,7 +413,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
 
     AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RefetchRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetchRunner", _svcCtx, Client::noSession());
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
                                        _reshardingUUID,
                                        dataColl->uuid(),
@@ -447,7 +447,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 
     const int maxBatches = 1;
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetcherRunner", _svcCtx, Client::noSession());
 
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
                                        _reshardingUUID,
@@ -485,7 +485,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
 
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetcherRunner", _svcCtx, Client::noSession());
 
         const Timestamp doesNotExist(1, 1);
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
@@ -549,7 +549,7 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     // Because no writes have happened to the data collection, the fetcher will insert a no-op entry
     // with the latestOplogTimestamp, so `hasSeenStartAtFuture` will be ready.
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         auto factory = makeCancelableOpCtx();
@@ -577,7 +577,7 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     }();
 
     fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         auto factory = makeCancelableOpCtx();
@@ -639,7 +639,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
     }();
 
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         auto factory = makeCancelableOpCtx();
@@ -666,7 +666,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
     }();
 
     fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         auto factory = makeCancelableOpCtx();
@@ -708,7 +708,7 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
     }();
 
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
 
         ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
@@ -750,7 +750,7 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnNetworkTimeoutError) {
     }();
 
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
 
         ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),
@@ -822,7 +822,7 @@ DEATH_TEST_REGEX_F(ReshardingOplogFetcherTest,
     }();
 
     auto fetcherJob = launchAsync([&, this] {
-        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+        ThreadClient tc("RunnerForFetcher", _svcCtx, Client::noSession());
 
         // We intentionally do not call fetcher.useReadConcernForTest(false) for this test case.
         ReshardingOplogFetcher fetcher(makeFetcherEnv(),

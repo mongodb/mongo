@@ -185,7 +185,6 @@ FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringDat
                                                                        BSONObj cmdObj)
     : _name(name.toString()), _request(OpMsgRequest::fromDBAndBody(db, std::move(cmdObj))) {
     invariant(command == _request.getCommandName());
-    invariant(CommandHelpers::findCommand(command));  // Fail early if it doesn't exist.
 }
 
 void FTDCSimpleInternalCommandCollector::collect(OperationContext* opCtx, BSONObjBuilder& builder) {

@@ -1437,8 +1437,8 @@ void RunCommandAndWaitForWriteConcern::_setup() {
         _extractedWriteConcern.emplace(
             uassertStatusOK(extractWriteConcern(opCtx, request.body, _isInternalClient())));
         if (_ecd->getSessionOptions().getAutocommit()) {
-            validateWriteConcernForTransaction(*_extractedWriteConcern,
-                                               invocation->definition()->getName());
+            validateWriteConcernForTransaction(
+                opCtx->getService(), *_extractedWriteConcern, invocation->definition()->getName());
         }
 
         // Ensure that the WC being set on the opCtx has provenance.
@@ -1572,6 +1572,7 @@ void ExecCommandDatabase::_initiateCommand() {
         client->isFromSystemConnection();
 
     validateSessionOptions(_sessionOptions,
+                           opCtx->getService(),
                            command->getName(),
                            _invocation->allNamespaces(),
                            allowTransactionsOnConfigDatabase);

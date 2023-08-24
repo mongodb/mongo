@@ -156,7 +156,7 @@ const WriteConcernOptions CommandHelpers::kMajorityWriteConcern(
     WriteConcernOptions::kWriteConcernTimeoutUserCommand);
 
 BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
-    auto command = globalCommandRegistry()->findCommand(request.getCommandName());
+    auto command = getCommandRegistry(opCtx)->findCommand(request.getCommandName());
     invariant(command);
     rpc::OpMsgReplyBuilder replyBuilder;
     std::unique_ptr<CommandInvocation> invocation;
@@ -353,10 +353,6 @@ ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceStrin
         return ResourcePattern::forDatabaseName(ns.dbName());
     }
     return ResourcePattern::forExactNamespace(ns);
-}
-
-Command* CommandHelpers::findCommand(OperationContext* opCtx, StringData name) {
-    return getCommandRegistry(opCtx)->findCommand(name);
 }
 
 bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status) {
@@ -562,16 +558,16 @@ void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
             writeConcern.isMajority());
 }
 
-void CommandHelpers::canUseTransactions(const std::vector<NamespaceString>& namespaces,
+void CommandHelpers::canUseTransactions(Service* service,
+                                        const std::vector<NamespaceString>& namespaces,
                                         StringData cmdName,
                                         bool allowTransactionsOnConfigDatabase) {
-
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "Cannot run 'count' in a multi-document transaction. Please see "
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
             cmdName != "count"_sd);
 
-    auto command = findCommand(cmdName);
+    auto command = findCommand(service, cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Encountered unknown command during check if can run in transactions: "
                           << cmdName,
@@ -1044,7 +1040,8 @@ const std::set<std::string>& Command::deprecatedApiVersions() const {
 }
 
 bool Command::hasAlias(const StringData& alias) const {
-    return globalCommandRegistry()->findCommand(alias) == this;
+    return getName() == alias ||
+        std::find(_aliases.begin(), _aliases.end(), alias) != _aliases.end();
 }
 
 Status BasicCommandWithReplyBuilderInterface::explain(OperationContext* opCtx,
@@ -1108,8 +1105,7 @@ void CommandRegistry::incrementUnknownCommands() {
     unknowns.increment();
 }
 
-CommandRegistry* getCommandRegistry(OperationContext* opCtx) {
-    // For now there's one service for everything.
+CommandRegistry* globalCommandRegistry() {
     static StaticImmortal<CommandRegistry> obj{};
     return &*obj;
 }

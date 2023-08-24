@@ -171,7 +171,7 @@ private:
     }
 
     static void onCreateThread(const std::string& threadName) {
-        Client::initThread(threadName, getGlobalServiceContext(), nullptr);
+        Client::initThread(threadName);
     }
 
 };  // namespace mongo

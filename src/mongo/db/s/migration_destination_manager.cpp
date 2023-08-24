@@ -640,7 +640,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
     repl::OpTime lastOpApplied;
 
     stdx::thread applicationThread{[&] {
-        Client::initThread("batchApplier", opCtx->getServiceContext(), nullptr);
+        Client::initThread("batchApplier", opCtx->getService(), Client::noSession());
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
         auto applicationOpCtx = CancelableOperationContext(

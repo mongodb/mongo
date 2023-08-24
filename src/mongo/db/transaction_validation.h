@@ -43,18 +43,20 @@ namespace mongo {
 /**
  * Returns true if the given command name can run as a retryable write.
  */
-bool isRetryableWriteCommand(StringData cmdName);
+bool isRetryableWriteCommand(Service* service, StringData cmdName);
 
 /**
  * Returns true if the given cmd name is a transaction control command.  These are also the only
  * commands allowed to specify write concern in a transaction.
  */
-bool isTransactionCommand(StringData cmdName);
+bool isTransactionCommand(Service* service, StringData cmdName);
 
 /**
  * Throws if the given write concern is not allowed in a transaction.
  */
-void validateWriteConcernForTransaction(const WriteConcernOptions& wcResult, StringData cmdName);
+void validateWriteConcernForTransaction(Service* service,
+                                        const WriteConcernOptions& wcResult,
+                                        StringData cmdName);
 
 /**
  * Returns true if the given readConcern level is valid for use in a transaction.
@@ -65,6 +67,7 @@ bool isReadConcernLevelAllowedInTransaction(repl::ReadConcernLevel readConcernLe
  * Throws if the given session options are invalid for the given command and target namespace.
  */
 void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions,
+                            Service* service,
                             StringData cmdName,
                             const std::vector<NamespaceString>& namespaces,
                             bool allowTransactionsOnConfigDatabase);

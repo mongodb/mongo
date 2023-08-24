@@ -608,7 +608,8 @@ void ParseAndRunCommand::_parseCommand() {
         !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
         client->isFromSystemConnection();
     // TODO (SERVER-79644): Make this call also use allNamespaces() when applicable.
-    validateSessionOptions(_osi, command->getName(), {nss}, allowTransactionsOnConfigDatabase);
+    validateSessionOptions(
+        _osi, opCtx->getService(), command->getName(), {nss}, allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
@@ -756,7 +757,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     if (TransactionRouter::get(opCtx)) {
-        validateWriteConcernForTransaction(*_parc->_wc, _parc->_commandName);
+        validateWriteConcernForTransaction(opCtx->getService(), *_parc->_wc, _parc->_commandName);
     }
 
     if (supportsWriteConcern) {
