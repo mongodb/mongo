@@ -728,6 +728,33 @@ BSONObj _buildBsonObj(const BSONObj& args, void*) {
     return BSON("" << builder.obj());
 }
 
+/*
+ * The following code has been updated to remove unnecessary content and better comply
+ * with MongoDB coding standards.  The original source code can be found at:
+ * FNV 1a 64 bit: http://www.isthe.com/chongo/src/fnv/hash_64a.c
+ */
+#define FNV1A_64_INIT ((uint64_t)0xcbf29ce484222325ULL)
+static inline uint64_t fnv_64a_buf(const void* buf, size_t len, uint64_t hval) {
+    const unsigned char* bp = (const unsigned char*)buf; /* start of buffer */
+    const unsigned char* be = bp + len;                  /* beyond end of buffer */
+    while (bp < be) {
+        hval ^= (uint64_t)*bp++;
+        hval += (hval << 1) + (hval << 4) + (hval << 5) + (hval << 7) + (hval << 8) + (hval << 40);
+    }
+
+    return (hval);
+}
+
+BSONObj _fnvHashToHexString(const BSONObj& args, void*) {
+    uassert(8423397,
+            "_fnvHashToHexString expects one string argument",
+            args.nFields() == 1 && args.firstElement().type() == String);
+
+    auto input = args.firstElement().str();
+    auto hashed = fnv_64a_buf(input.c_str(), input.size(), FNV1A_64_INIT);
+    return BSON("" << fmt::format("{0:x}", hashed));
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_createSecurityToken", _createSecurityToken);
@@ -748,6 +775,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_writeGoldenData", _writeGoldenData);
     scope.injectNative("_closeGoldenData", _closeGoldenData);
     scope.injectNative("_buildBsonObj", _buildBsonObj);
+    scope.injectNative("_fnvHashToHexString", _fnvHashToHexString);
 
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);

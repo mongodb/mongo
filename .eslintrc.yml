@@ -144,6 +144,7 @@ globals:
   _getEnv: true
   indentStr: true
   _forgetReplSet: true
+  _fnvHashToHexString: true
 
   # likely could be replaced with `path`
   _copyFileRange: true
