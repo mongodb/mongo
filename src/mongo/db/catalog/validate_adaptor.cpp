@@ -324,11 +324,13 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
             }
             // Checks that indices are consecutively increasing numbers starting from 0.
             if (auto idx = _idxInt(metric.fieldNameStringData()); idx != *bucketCount) {
-                return Status(ErrorCodes::BadValue,
-                              fmt::format("The index '{}' in time-series bucket data field '{}' is "
-                                          "not consecutively increasing from '0'",
-                                          metric.fieldNameStringData(),
-                                          fieldName));
+                return Status(
+                    ErrorCodes::BadValue,
+                    fmt::format("The indexes in time-series bucket data field '{}' is "
+                                "not consecutively increasing from '0'. Expected: {}, but got: {}",
+                                fieldName,
+                                *bucketCount,
+                                idx));
             }
             minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
             ++(*bucketCount);
