@@ -492,7 +492,7 @@ TEST_F(WriteOpTest, CombineBulkWriteReplyItems) {
     combined = op.combineBulkWriteReplyItems({&basicReply, &replyWithUpsert});
     ASSERT_EQ(combined->getN(), 2);
     ASSERT_EQ(combined->getNModified(), 1);
-    ASSERT_EQ(combined->getUpserted()->get_id().getElement().Int(),
+    ASSERT_EQ(combined->getUpserted()->getElement().Int(),
               dummyUpserted.get_id().getElement().Int());
     ASSERT_EQ(combined->getIdx(), 0);
 

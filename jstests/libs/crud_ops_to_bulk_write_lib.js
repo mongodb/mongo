@@ -210,8 +210,8 @@ export const BulkWriteUtils = (function() {
                             if (!resp.hasOwnProperty("upserted")) {
                                 resp["upserted"] = [];
                             }
-                            // Need to update the index of the upserted doc.
-                            current.upserted.index = cursorIdx;
+                            // Need to add the index of the upserted doc.
+                            current.upserted["index"] = cursorIdx;
                             resp["upserted"].push(current.upserted);
                         }
                     }

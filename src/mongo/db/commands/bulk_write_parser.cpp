@@ -110,8 +110,7 @@ void BulkWriteReplyItem::parseProtected(const BSONObj& bsonObject) {
             _nModified = element.Int();
         } else if (fieldName == kUpsertedFieldName) {
             IDLParserContext ctxt("bulkWrite");
-            const auto localObject = element.Obj();
-            _upserted = mongo::write_ops::Upserted::parse(ctxt, localObject);
+            _upserted = IDLAnyTypeOwned(element.Obj().getOwned().getField("_id"));
         } else if (fieldName == kCodeFieldName) {
             code = element.Int();
         } else if (fieldName == kErrmsgFieldName) {
@@ -160,7 +159,7 @@ BSONObj BulkWriteReplyItem::serialize() const {
 
     if (_upserted) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(kUpsertedFieldName));
-        _upserted.get().serialize(&subObjBuilder);
+        _upserted.get().serializeToBSON("_id", &builder);
     }
 
     return builder.obj();

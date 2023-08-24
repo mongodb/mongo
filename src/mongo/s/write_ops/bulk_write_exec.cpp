@@ -235,9 +235,9 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                 if (response.isUpsertDetailsSet()) {
                     std::vector<BatchedUpsertDetail*> upsertDetails = response.getUpsertDetails();
                     invariant(upsertDetails.size() == 1);
-                    mongo::write_ops::Upserted upserted(
-                        0, IDLAnyTypeOwned(upsertDetails[0]->getUpsertedID().firstElement()));
-                    reply.setUpserted(upserted);
+                    // BulkWrite needs only _id, not index.
+                    reply.setUpserted(
+                        IDLAnyTypeOwned(upsertDetails[0]->getUpsertedID().firstElement()));
                 }
 
                 reply.setNModified(response.getNModified());

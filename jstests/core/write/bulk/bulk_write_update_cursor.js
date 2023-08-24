@@ -123,7 +123,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0});
-assert.docEq(res.cursor.firstBatch[0].upserted, {index: 0, _id: 1});
+assert.docEq(res.cursor.firstBatch[0].upserted, {_id: 1});
 assert(!res.cursor.firstBatch[1]);
 
 assert.eq("MongoDB2", coll.findOne().skey);
@@ -150,7 +150,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0});
-assert.docEq(res.cursor.firstBatch[0].upserted, {index: 0, _id: 1});
+assert.docEq(res.cursor.firstBatch[0].upserted, {_id: 1});
 assert(!res.cursor.firstBatch[1]);
 
 assert.eq("MongoDB", coll.findOne().skey);
@@ -331,7 +331,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1, nModified: 0});
-assert.docEq(res.cursor.firstBatch[0].upserted, {index: 0, _id: 1});
+assert.docEq(res.cursor.firstBatch[0].upserted, {_id: 1});
 assert(!res.cursor.firstBatch[1]);
 
 var coll2 = db.getCollection("coll2");

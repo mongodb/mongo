@@ -130,12 +130,22 @@ public:
     /**
      * Contains documents that have been upserted.
      */
-    const boost::optional<mongo::write_ops::Upserted>& getUpserted() const {
+    const boost::optional<IDLAnyTypeOwned>& getUpserted() const {
         return _upserted;
     }
 
-    void setUpserted(boost::optional<mongo::write_ops::Upserted> value) {
+    void setUpserted(boost::optional<IDLAnyTypeOwned> value) {
         _upserted = std::move(value);
+    }
+
+    void setUpserted(boost::optional<mongo::write_ops::Upserted> value) {
+        if (!value) {
+            _upserted = boost::none;
+            return;
+        }
+        // BulkWrite needs only _id, not index.
+        BSONObj upserted = value->toBSON().removeField("index");
+        _upserted = IDLAnyTypeOwned(upserted.getField("_id"));
     }
 
     /**
@@ -163,7 +173,7 @@ private:
     std::int32_t _idx;
     boost::optional<std::int32_t> _n;
     boost::optional<std::int32_t> _nModified;
-    boost::optional<mongo::write_ops::Upserted> _upserted;
+    boost::optional<IDLAnyTypeOwned> _upserted;
     Status _status = Status::OK();
     bool _hasOk : 1;
     bool _hasIdx : 1;

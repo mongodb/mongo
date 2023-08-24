@@ -186,7 +186,7 @@ cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.DuplicateKey});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 0});
 
-assert.docEq(res.cursor.firstBatch[1].upserted, {index: 0, _id: 1});
+assert.docEq(res.cursor.firstBatch[1].upserted, {_id: 1});
 assert(!res.cursor.firstBatch[2]);
 coll.drop();
 coll2.drop();
