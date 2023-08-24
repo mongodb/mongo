@@ -190,7 +190,7 @@ std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    ret.emplace_back(DebugPrinter::Block("row[`"));
+    ret.emplace_back(DebugPrinter::Block("vals[`"));
     for (size_t i = 0; i < _valsOutSlotIds.size(); ++i) {
         if (i) {
             ret.emplace_back(DebugPrinter::Block("`,"));

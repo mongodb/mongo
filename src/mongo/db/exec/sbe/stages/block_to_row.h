@@ -46,7 +46,14 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *  block_to_row blocks[blocks[0], ..., blocks[N]] row[valsOut[0], ..., valsOut[N]]
+ *  block_to_row blocks[blocks[0], ..., blocks[N]] vals[valsOut[0], ..., valsOut[N]]
+ *
+ * Note: Due to the way how the TsBlock's deblocking works, we won't be able to identify the
+ * trailing gaps at the tail of selected columns compared to the time field which is guaranteed to
+ * exist. Depending on which column is selected, we may need to always add the time field to figure
+ * out how many rows really exist in a bucket.
+ *
+ * TODO SERVER-79621: Add a way to figure out the number of measurements in a bucket.
  */
 class BlockToRowStage final : public PlanStage {
 public:

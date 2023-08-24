@@ -89,6 +89,7 @@ protected:
                                                              pathRequests,
                                                              blockSlots,
                                                              metaSlot,
+                                                             metaSlot.has_value() /*hasMetaField*/,
                                                              tsOptions.getTimeField().toString(),
                                                              1 /*nodeId*/);
 

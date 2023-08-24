@@ -36,24 +36,20 @@ assert.commandWorked(coll.insert([
  */
 const runTest = function({pipeline, behaviour, expectedDocs}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
-    if (explain.explainVersion === "1") {
-        // Verify the explain only when explainVersion is 1 which means the $_internalUnpackBucket
-        // stage is not pushed down to the SBE.
-        const unpackStages = getAggPlanStages(explain, '$_internalUnpackBucket');
-        assert.eq(1,
-                  unpackStages.length,
-                  "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
-        const unpackStage = unpackStages[0].$_internalUnpackBucket;
-        if (behaviour.include) {
-            assert(unpackStage.include,
-                   "Unpacking stage must have 'include' behaviour: " + tojson(explain));
-            assert.sameMembers(behaviour.include, unpackStage.include);
-        }
-        if (behaviour.exclude) {
-            assert(unpackStage.exclude,
-                   "Unpacking stage must have 'exclude' behaviour: " + tojson(explain));
-            assert.sameMembers(behaviour.exclude, unpackStage.exclude);
-        }
+    const unpackStages = getAggPlanStages(explain, '$_internalUnpackBucket');
+    assert.eq(1,
+              unpackStages.length,
+              "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
+    const unpackStage = unpackStages[0].$_internalUnpackBucket;
+    if (behaviour.include) {
+        assert(unpackStage.include,
+               "Unpacking stage must have 'include' behaviour: " + tojson(explain));
+        assert.sameMembers(behaviour.include, unpackStage.include);
+    }
+    if (behaviour.exclude) {
+        assert(unpackStage.exclude,
+               "Unpacking stage must have 'exclude' behaviour: " + tojson(explain));
+        assert.sameMembers(behaviour.exclude, unpackStage.exclude);
     }
 
     const docs = coll.aggregate([...pipeline, {$sort: {a: 1, b: 1, _id: 1}}]).toArray();
