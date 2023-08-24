@@ -218,6 +218,23 @@ export const authCommandsLib = {
 
     tests: [
         {
+          testname: "abortMoveCollection",
+          command: {abortMoveCollection: "test.x"},
+          skipUnlessSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagMoveCollection;
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                [{resource: {db: "test", collection: "x"}, actions: ["moveCollection"]}],
+                  expectFail: true
+              },
+          ]
+        },
+        {
           testname: "abortReshardCollection",
           command: {abortReshardCollection: "test.x"},
           skipUnlessSharded: true,

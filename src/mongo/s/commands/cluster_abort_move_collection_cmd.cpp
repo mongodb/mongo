@@ -27,71 +27,54 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/reshard_collection_gen.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 
 namespace mongo {
 namespace {
 
-class ClusterMoveCollectionCmd final : public TypedCommand<ClusterMoveCollectionCmd> {
+class ClusterAbortMoveCollectionCmd : public TypedCommand<ClusterAbortMoveCollectionCmd> {
 public:
-    using Request = MoveCollection;
+    using Request = AbortMoveCollection;
 
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "Resharding improvements is not enabled, cannot perform moveCollection command.",
-                resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+            const NamespaceString& nss = ns();
 
-            const auto& nss = ns();
-            ShardsvrReshardCollection shardsvrReshardCollection(nss);
-            shardsvrReshardCollection.setDbName(request().getDbName());
+            LOGV2(7973900, "Beginning move collection abort operation", logAttrs(ns()));
 
-            ReshardCollectionRequest reshardCollectionRequest;
-            reshardCollectionRequest.setKey(BSON("_id" << 1));
-            reshardCollectionRequest.setProvenance(StringData("moveCollection"));
+            ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
+            configsvrAbortReshardCollection.setDbName(request().getDbName());
 
-            std::vector<mongo::ShardKeyRange> destinationShard = {request().getToShard()};
-            reshardCollectionRequest.setShardDistribution(destinationShard);
-            reshardCollectionRequest.setForceRedistribution(true);
-
-            shardsvrReshardCollection.setReshardCollectionRequest(
-                std::move(reshardCollectionRequest));
-
-            LOGV2(7973800,
-                  "Running a reshard collection command for the move collection request.",
-                  "dbName"_attr = request().getDbName(),
-                  "toShard"_attr = request().getToShard());
-
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
-
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
-                DatabaseName::kAdmin,
-                dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrReshardCollection.toBSON({}),
-                                                           opCtx->getWriteConcern()),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
-
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                DatabaseName::kAdmin,
+                CommandHelpers::appendMajorityWriteConcern(
+                    configsvrAbortReshardCollection.toBSON({}), opCtx->getWriteConcern()),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(cmdResponse.commandStatus);
+            uassertStatusOK(cmdResponse.writeConcernStatus);
         }
 
     private:
@@ -121,11 +104,11 @@ public:
     }
 
     std::string help() const override {
-        return "Move an unsharded collection from source shard to destination shard.";
+        return "Abort an in-progress move collection operation for this collection.";
     }
 };
 
-MONGO_REGISTER_COMMAND(ClusterMoveCollectionCmd)
+MONGO_REGISTER_COMMAND(ClusterAbortMoveCollectionCmd)
     .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection);
 
 }  // namespace

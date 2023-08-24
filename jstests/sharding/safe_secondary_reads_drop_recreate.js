@@ -99,6 +99,7 @@ let testCases = {
     _recvChunkStart: {skip: "primary only"},
     _recvChunkStatus: {skip: "primary only"},
     _transferMods: {skip: "primary only"},
+    abortMoveCollection: {skip: "primary only"},
     abortReshardCollection: {skip: "primary only"},
     abortTransaction: {skip: "primary only"},
     addShard: {skip: "primary only"},

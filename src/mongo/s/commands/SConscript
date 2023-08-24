@@ -29,6 +29,7 @@ env.Library(
 env.Library(
     target='cluster_commands',
     source=[
+        'cluster_abort_move_collection_cmd.cpp',
         'cluster_abort_reshard_collection_cmd.cpp',
         'cluster_abort_transaction_cmd_s.cpp',
         'cluster_analyze_cmd.cpp',

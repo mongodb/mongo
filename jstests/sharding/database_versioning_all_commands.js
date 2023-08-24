@@ -272,6 +272,7 @@ let testCases = {
     _mergeAuthzCollections: {skip: "always targets the config server"},
     _mongotConnPoolStats: {skip: "not on a user database", conditional: true},
     _dropConnectionsToMongot: {skip: "not on a user database", conditional: true},
+    abortMoveCollection: {skip: "always targets the config server"},
     abortReshardCollection: {skip: "always targets the config server"},
     abortTransaction: {skip: "unversioned and uses special targetting rules"},
     addShard: {skip: "not on a user database"},

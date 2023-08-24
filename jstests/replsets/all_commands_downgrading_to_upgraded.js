@@ -150,6 +150,10 @@ const allCommands = {
     streams_getMetrics: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
+    abortMoveCollection: {
+        // Skipping command because it requires testing through a parallel shell.
+        skip: requiresParallelShell,
+    },
     abortReshardCollection: {
         // Skipping command because it requires testing through a parallel shell.
         skip: requiresParallelShell,

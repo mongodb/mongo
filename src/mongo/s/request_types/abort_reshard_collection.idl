@@ -66,3 +66,11 @@ commands:
         type: bool
         optional: false
         description: "Determines whether the resharding opertion was user aborted."
+
+  abortMoveCollection:
+    description: "The public command on mongos that aborts a moveCollection commmand."
+    command_name: abortMoveCollection
+    strict: false
+    namespace: type
+    api_version: ""
+    type: namespacestring 
