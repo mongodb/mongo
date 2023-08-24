@@ -1,3 +1,8 @@
+// Tests for $elemMatch to ensure correct count of returned elements.
+// @tags: [
+//   assumes_write_concern_unchanged,
+// ]
+
 const coll = db.c;
 coll.drop();
 
