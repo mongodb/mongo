@@ -436,14 +436,30 @@ class Suite(object):
 
         return self.get_config()["description"]
 
-    def get_suite_attributes(self) -> Dict[str, Any]:
-        return {
-            "suite_kind": self.test_kind,
-            "suite_display_name": self.get_display_name(),
-            "suite_name": self.get_name(),
-            "suite_num_jobs_to_start": self.get_num_jobs_to_start(),
-            "suite_num_times_to_repeat_tests": self.get_num_times_to_repeat_tests(),
-            "suite_is_matrix_suite": self.is_matrix_suite(),
-            "suite_is_antithesis_suite": self.is_antithesis_suite(),
-            "suite_return_code": self.return_code,
+    class METRIC_NAMES:
+        DISPLAY_NAME = "suite_display_name"
+        NAME = "suite_name"
+        NUM_JOBS_TO_START = "suite_num_jobs_to_start"
+        NUM_TIMES_TO_REPEAT_TESTS = "suite_num_times_to_repeat_tests"
+        IS_MATRIX_SUITE = "suite_is_matrix_suite"
+        IS_ANTITHESIS_SUITE = "suite_is_antithesis_suite"
+        KIND = "suite_kind"
+        RETURN_CODE = "suite_return_code"
+        RETURN_STATUS = "suite_return_status"
+        ERRORNO = "suite_errorno"
+
+    def get_suite_otel_attributes(self) -> Dict[str, Any]:
+        attributes = {
+            Suite.METRIC_NAMES.DISPLAY_NAME: self.get_display_name(),
+            Suite.METRIC_NAMES.NAME: self.get_name(),
+            Suite.METRIC_NAMES.NUM_JOBS_TO_START: self.get_num_jobs_to_start(),
+            Suite.METRIC_NAMES.NUM_TIMES_TO_REPEAT_TESTS: self.get_num_times_to_repeat_tests(),
+            Suite.METRIC_NAMES.IS_MATRIX_SUITE: self.is_matrix_suite(),
+            Suite.METRIC_NAMES.IS_ANTITHESIS_SUITE: self.is_antithesis_suite(),
         }
+        # Note '' and 0 we want to return and those are both falsey
+        if self.test_kind is not None:
+            attributes[Suite.METRIC_NAMES.KIND] = self.test_kind
+        if self.return_code is not None:
+            attributes[Suite.METRIC_NAMES.RETURN_CODE] = self.return_code
+        return attributes

@@ -500,12 +500,16 @@ class TestRunner(Subcommand):
     def _execute_suite(self, suite: Suite) -> bool:
         """Execute Fa suite and return True if interrupted, False otherwise."""
         execute_suite_span = trace.get_current_span()
-        execute_suite_span.set_attributes(attributes=suite.get_suite_attributes())
+        execute_suite_span.set_attributes(attributes=suite.get_suite_otel_attributes())
         self._shuffle_tests(suite)
         if not suite.tests:
-            execute_suite_span.set_status(StatusCode.OK, description="skipped")
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
             suite.return_code = 0
+            execute_suite_span.set_status(StatusCode.OK)
+            execute_suite_span.set_attributes({
+                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                Suite.METRIC_NAMES.RETURN_STATUS: "skipped",
+            })
             return False
         executor_config = suite.get_executor_config()
         try:
@@ -513,26 +517,44 @@ class TestRunner(Subcommand):
                 self._exec_logger, suite, archive_instance=self._archive, **executor_config)
             executor.run()
         except (errors.UserInterrupt, errors.LoggerRuntimeConfigError) as err:
-            execute_suite_span.set_status(
-                StatusCode.ERROR, description="user_interrupt" if isinstance(
-                    err, errors.UserInterrupt) else "logger_runtime_config")
             self._exec_logger.error("Encountered an error when running %ss of suite %s: %s",
                                     suite.test_kind, suite.get_display_name(), err)
             suite.return_code = err.EXIT_CODE
+            return_status = "user_interrupt" if isinstance(
+                err, errors.UserInterrupt) else "logger_runtime_config"
+            execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
+            execute_suite_span.set_attributes({
+                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+            })
             return True
         except OSError as err:
-            execute_suite_span.set_attribute("errno", err.errno)
-            execute_suite_span.set_status(StatusCode.ERROR, description="os_error")
             self._exec_logger.error("Encountered an OSError: %s", err)
             suite.return_code = 74  # Exit code for OSError on POSIX systems.
+            return_status = "os_error"
+            execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
+            execute_suite_span.set_attributes({
+                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+                Suite.METRIC_NAMES.ERRORNO: err.errno
+            })
             return True
         except:  # pylint: disable=bare-except
-            execute_suite_span.set_status(StatusCode.ERROR, description="unknown_error")
             self._exec_logger.exception("Encountered an error when running %ss of suite %s.",
                                         suite.test_kind, suite.get_display_name())
             suite.return_code = 2
+            return_status = "unknown_error"
+            execute_suite_span.set_status(StatusCode.ERROR, description=return_status)
+            execute_suite_span.set_attributes({
+                Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+                Suite.METRIC_NAMES.RETURN_STATUS: return_status,
+            })
             return False
-        execute_suite_span.set_status(StatusCode.OK, description="success")
+        execute_suite_span.set_status(StatusCode.OK)
+        execute_suite_span.set_attributes({
+            Suite.METRIC_NAMES.RETURN_CODE: suite.return_code,
+            Suite.METRIC_NAMES.RETURN_STATUS: "success",
+        })
         return False
 
     def _shuffle_tests(self, suite: Suite):

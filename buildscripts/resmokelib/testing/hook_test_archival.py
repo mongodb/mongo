@@ -62,7 +62,7 @@ class HookTestArchival(object):
         """
 
         archive_span = trace.get_current_span()
-        archive_span.set_attributes(attributes=result.test.get_test_attributes())
+        archive_span.set_attributes(attributes=result.test.get_test_otel_attributes())
 
         success = result.success
         should_archive = (config.ARCHIVE_FILE and self.archive_instance) and not success
