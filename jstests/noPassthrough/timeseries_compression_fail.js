@@ -47,7 +47,7 @@ assert.gt(stats.timeseries["numFailedDecompressBuckets"], 0);
 // Check that we did not compress the bucket
 const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
 assert.eq(2, bucketDocs.length, tojson(bucketDocs));
-assert.eq(1, bucketDocs[0].control.version);
-assert.eq(1, bucketDocs[1].control.version);
+assert.eq(TimeseriesTest.BucketVersion.kUncompressed, bucketDocs[0].control.version);
+assert.eq(TimeseriesTest.BucketVersion.kUncompressed, bucketDocs[1].control.version);
 
 MongoRunner.stopMongod(conn);

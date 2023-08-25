@@ -43,12 +43,11 @@ const bucketColl = db.getCollection(bucketCollName);
 
     const bucketDoc = bucketColl.find().toArray()[0];
     if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        // Version 2 indicates the bucket is compressed.
-        assert.eq(
-            2, bucketDoc.control.version, 'Expected bucket to be compressed' + tojson(bucketDoc));
+        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+                  bucketDoc.control.version,
+                  'Expected bucket to be compressed' + tojson(bucketDoc));
     } else {
-        // Version 1 indicates the bucket is uncompressed.
-        assert.eq(1,
+        assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
                   bucketDoc.control.version,
                   'Expected bucket not to be compressed' + tojson(bucketDoc));
     }
@@ -76,11 +75,10 @@ const bucketColl = db.getCollection(bucketCollName);
     // The buckets should be compressed if we are always using the compressed format for
     // time-series writes.
     if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        // Version 2 indicates the bucket is compressed.
-        assert.eq(2,
+        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
                   bucketDocs[0].control.version,
                   'Expected first bucket to be compressed' + tojson(bucketDocs));
-        assert.eq(2,
+        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
                   bucketDocs[1].control.version,
                   'Expected second bucket to be compressed' + tojson(bucketDocs));
 
@@ -92,11 +90,10 @@ const bucketColl = db.getCollection(bucketCollName);
                   bucketDocs[1].control.count,
                   "Expected 1 measurement in second bucket " + tojson(bucketDocs));
     } else {
-        // Version 1 indicates the bucket is uncompressed.
-        assert.eq(1,
+        assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
                   bucketDocs[0].control.version,
                   'Expected first bucket not to be compressed' + tojson(bucketDocs));
-        assert.eq(1,
+        assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
                   bucketDocs[1].control.version,
                   'Expected second bucket not to be compressed' + tojson(bucketDocs));
     }

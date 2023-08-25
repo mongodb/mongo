@@ -265,7 +265,11 @@ runTest({
         insert: bucketsCollName,
         documents: [{
             _id: ObjectId(),
-            control: {min: {time: ISODate()}, max: {time: ISODate()}, version: 1},
+            control: {
+                min: {time: ISODate()},
+                max: {time: ISODate()},
+                version: TimeseriesTest.BucketVersion.kUncompressed
+            },
             data: {}
         }]
     },

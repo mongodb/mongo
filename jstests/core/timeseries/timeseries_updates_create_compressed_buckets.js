@@ -13,11 +13,11 @@
  * ]
  */
 
-"use strict";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 jsTestLog("Running " + jsTestName());
 
 const timeField = "time";
-const kCompressedVersion = 2;
 const kBucketMax = 1000;
 // Create the time-series collection.
 assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeField}}));
@@ -28,10 +28,11 @@ function insertAndCheckBuckets(value) {
     assert.commandWorked(coll.insert({[timeField]: ISODate(), x: value}));
     let buckets = bucketsColl.find().toArray();
     buckets.forEach((bucket, index) => {
-        assert.eq(bucket.control.version,
-                  kCompressedVersion,
-                  `Bucket ${index} does not have the correct version. Expected ${
-                      kCompressedVersion}, but got ${bucket.control.version}`);
+        assert.eq(
+            bucket.control.version,
+            TimeseriesTest.BucketVersion.kCompressed,
+            `Bucket ${index} does not have the correct version. Expected ${
+                TimeseriesTest.BucketVersion.kCompressed}, but got ${bucket.control.version}`);
     });
 }
 
