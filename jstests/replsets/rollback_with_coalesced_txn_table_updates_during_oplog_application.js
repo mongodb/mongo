@@ -126,16 +126,16 @@ function runTest(crashAfterRollbackTruncation) {
     rst.freeze(primary);
     rst.awaitNodesAgreeOnPrimary(undefined, undefined, secondary2);
 
-    for (const fp of stopReplProducerOnDocumentFailpoints) {
-        fp.off();
-    }
-
     // Wait for secondary2 to be a writable primary.
     rst.getPrimary();
 
     // Do a write which becomes majority committed and wait for secondary1 to complete its rollback.
     assert.commandWorked(
         secondary2.getCollection("test.dummy").insert({}, {writeConcern: {w: 'majority'}}));
+
+    for (const fp of stopReplProducerOnDocumentFailpoints) {
+        fp.off();
+    }
 
     // Wait for rollback to finish truncating oplog.
     // Entering rollback will close connections so we expect some network errors while waiting.
