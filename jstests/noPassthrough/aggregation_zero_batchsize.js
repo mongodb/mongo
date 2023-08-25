@@ -7,7 +7,7 @@ const conn = MongoRunner.runMongod(mongodOptions);
 assert.neq(null, conn, "mongod failed to start with options " + tojson(mongodOptions));
 
 const testDB = conn.getDB("test");
-const coll = testDB[jsTest.name];
+const coll = testDB[jsTest.name()];
 coll.drop();
 
 // Test that an aggregate is successful on a non-existent collection.
