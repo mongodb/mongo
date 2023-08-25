@@ -78,7 +78,7 @@ export var TimeseriesTest = class {
             ["control"],
             "TimeseriesTest.decompressBucket() should only be called on a bucket document");
         assert.eq(
-            2,
+            TimeseriesTest.BucketVersion.kCompressed,
             compressedBucket.control.version,
             "TimeseriesTest.decompressBucket() should only be called on a compressed bucket document");
 
@@ -87,7 +87,7 @@ export var TimeseriesTest = class {
         }
 
         // The control object should reflect that the data is uncompressed.
-        compressedBucket.control.version = 1;
+        compressedBucket.control.version = TimeseriesTest.BucketVersion.kUncompressed;
         delete compressedBucket.control.count;
     }
 
@@ -274,4 +274,9 @@ export var TimeseriesTest = class {
     static getBucketsCollName(collName) {
         return `system.buckets.${collName}`;
     }
+};
+
+TimeseriesTest.BucketVersion = {
+    kUncompressed: 1,
+    kCompressed: 2,
 };
