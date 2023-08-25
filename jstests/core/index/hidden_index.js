@@ -11,6 +11,7 @@
  *   #      return different values after a failover
  *   tenant_migration_incompatible,
  *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
  *   not_allowed_with_security_token,
  * ]
  */
