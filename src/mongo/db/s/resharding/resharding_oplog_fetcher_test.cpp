@@ -665,6 +665,44 @@ TEST_F(ReshardingOplogFetcherTest, RetriesOnRemoteInterruptionError) {
     ASSERT_TRUE(moreToCome);
 }
 
+TEST_F(ReshardingOplogFetcherTest, RetriesOnNetworkTimeoutError) {
+    const NamespaceString outputCollectionNss("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+    _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    auto fetcherJob = launchAsync([&, this] {
+        ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
+
+        ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
+        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                       _reshardingUUID,
+                                       collectionUUID,
+                                       startAt,
+                                       _donorShard,
+                                       _destinationShard,
+                                       outputCollectionNss);
+
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
+    });
+
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        // Inject network timeout error.
+        return {ErrorCodes::NetworkInterfaceExceededTimeLimit, "exceeded network time limit"};
+    });
+
+    auto moreToCome = fetcherJob.timed_get(Seconds(5));
+    ASSERT_TRUE(moreToCome);
+}
+
 TEST_F(ReshardingOplogFetcherTest, ImmediatelyDoneWhenFinalOpHasAlreadyBeenFetched) {
     const NamespaceString outputCollectionNss("dbtests.outputCollection");
     const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
