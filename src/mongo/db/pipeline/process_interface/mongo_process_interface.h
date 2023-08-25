@@ -352,8 +352,8 @@ public:
      * shard.
 
      * Performs no further optimization of the pipeline. NamespaceNotFound will be
-     * thrown if ExpressionContext has a UUID and that UUID doesn't exist anymore. That should be
-     * the only case where NamespaceNotFound is returned.
+     * thrown if ExpressionContext has a UUID and that UUID doesn't match the ExpressionContext's
+     * ns. That should be the only case where NamespaceNotFound is returned.
      *
      * This function takes ownership of the 'pipeline' argument as if it were a unique_ptr.
      * Changing it to a unique_ptr introduces a circular dependency on certain platforms where the
