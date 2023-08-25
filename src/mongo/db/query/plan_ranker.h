@@ -81,6 +81,9 @@ void logEOFBonus(double eofBonus);
 void logFailedPlan(std::function<std::string()> planSummary);
 }  // namespace log_detail
 
+// Constant used for tie breakers.
+const double kBonusEpsilon = 1e-4;
+
 /**
  * Assigns the stats tree a 'goodness' score. The higher the score, the better the plan. The exact
  * value isn't meaningful except for imposing a ranking.
@@ -103,7 +106,7 @@ public:
         const auto productivity = calculateProductivity(stats);
         const auto advances = getNumberOfAdvances(stats);
         const double epsilon =
-            std::min(1.0 / static_cast<double>(10 * (advances > 0 ? advances : 1)), 1e-4);
+            std::min(1.0 / static_cast<double>(10 * (advances > 0 ? advances : 1)), kBonusEpsilon);
 
 
         // We prefer queries that don't require a fetch stage.

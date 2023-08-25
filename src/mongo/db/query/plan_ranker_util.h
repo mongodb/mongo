@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 
@@ -43,6 +45,53 @@ namespace mongo::plan_ranker {
  * A factory function to create a plan scorer for a plan stage stats tree.
  */
 std::unique_ptr<PlanScorer<PlanStageStats>> makePlanScorer();
+
+/**
+ * Takes a vector of pairs holding (score, planIndex).
+ * Returns an iterator pointing to the first non-tying plan, or the end of the vector.
+ */
+inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
+    std::vector<std::pair<double, size_t>>& plans) {
+    return std::find_if(plans.begin(), plans.end(), [&plans](const auto& plan) {
+        return plan.first != plans[0].first;
+    });
+}
+
+/**
+ * Tie breaking by documents examined, implementation of SERVER-79400.
+ * Only try to modify score if we have a tie after existing bonuses.
+ * Returns the number of previously tied plans.
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+int addBonusToLeastDocsExamined(
+    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::vector<size_t>& documentsExamined) {
+
+    // Find top tied plans, if there are any.
+    auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
+    int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+
+    if (numberOfTiedPlans == 1) {
+        return numberOfTiedPlans;
+    }
+
+    // The vector tiedPlans holds the number of documents and the plan's index.
+    std::vector<std::pair<double, size_t>> tiedPlans{};
+    for (auto i = scoresAndCandidateIndices.begin(); i < tiedPlansEnd; ++i) {
+        tiedPlans.push_back(std::make_pair(documentsExamined[i->second], i->second));
+    }
+
+    // Sort top plans by least documents examined, and allocate a bonus to each of the top plans.
+    std::stable_sort(tiedPlans.begin(), tiedPlans.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+    });
+    auto stillTiedPlansEnd = findTopTiedPlans(tiedPlans);
+    for (auto topPlan = tiedPlans.begin(); topPlan < stillTiedPlansEnd; ++topPlan) {
+        scoresAndCandidateIndices[topPlan->second].first += kBonusEpsilon;
+    }
+    return numberOfTiedPlans;
+}
 
 /**
  * Returns a PlanRankingDecision which has the ranking and the information about the ranking
@@ -75,6 +124,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     // Used to derive scores and candidate ordering.
     std::vector<std::pair<double, size_t>> scoresAndCandidateIndices;
     std::vector<size_t> failed;
+    std::vector<size_t> documentsExamined;
 
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
@@ -118,6 +168,11 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
 
             candidates[i].solution->score = score;
             scoresAndCandidateIndices.push_back(std::make_pair(score, i));
+
+            // Collect some information about documents examined for tie breaking later.
+            PlanSummaryStats stats;
+            explainer->getSummaryStats(&stats);
+            documentsExamined.push_back(stats.totalDocsExamined);
         } else {
             failed.push_back(i);
             log_detail::logFailedPlan([&] { return explainer->getPlanSummary(); });
@@ -138,6 +193,17 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                          // Ignore candidate array index in lhs.second and rhs.second.
                          return lhs.first > rhs.first;
                      });
+
+    // Tie-breaking by number of documents examined, currently only activated by query knob
+    // responsible for this tie-breaking heuristic.
+    if (internalQueryPlanTieBreakingWithIndexHeuristics.load()) {
+        int numberOfTiedPlans =
+            addBonusToLeastDocsExamined(scoresAndCandidateIndices, candidates, documentsExamined);
+        // Re-sort top candidates.
+        std::stable_sort(scoresAndCandidateIndices.begin(),
+                         scoresAndCandidateIndices.begin() + numberOfTiedPlans,
+                         [](const auto& lhs, const auto& rhs) { return lhs.first > rhs.first; });
+    }
 
     auto why = std::make_unique<PlanRankingDecision>();
 

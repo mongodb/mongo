@@ -25,6 +25,20 @@ const docsToInsert = [
     {_id: 3, x: 2, y: 1, a: [1, 2, 3]}
 ];
 
+const multiplannerTieBreakingKnobOn = assert.commandWorked(
+    dbConn.adminCommand({getParameter: 1, "internalQueryPlanTieBreakingWithIndexHeuristics": 1}));
+if (multiplannerTieBreakingKnobOn) {
+    // TODO SERVER-80388: Re-enable this test for all query knobs.
+    // New tie breaking behaviour changes plan chosen and breaks the following three tests:
+    // - findAndModify remove with positional projection with sort
+    // - findAndModify update with positional projection with sort
+    // - findAndModify update with positional update with sort
+    // When this heuristic is applied, the plan with "CLUSTERED_IXSCAN" is chosen over "FETCH".
+    jsTestLog("Skipping the test as multi-planner tie breaking is on.");
+    st.stop();
+    quit();
+}
+
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
