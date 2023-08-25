@@ -1022,11 +1022,12 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                       str::stream() << "Cannot rename collection to the oplog");
     }
 
-    // Take global IX lock explicitly to avoid upgrading from IS later
-    Lock::GlobalLock globalLock(opCtx, MODE_IX);
-    AutoGetCollectionForRead sourceColl(
+    // Take strong database and collection locks in order to avoid upgrading later.
+    AutoGetDb sourceDb(opCtx, sourceNss.dbName(), MODE_X);
+    AutoGetCollection sourceColl(
         opCtx,
         sourceNss,
+        MODE_X,
         AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
     if (sourceNss.isDropPendingNamespace() || !sourceColl) {
