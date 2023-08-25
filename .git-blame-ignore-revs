@@ -13,12 +13,6 @@ f63255ee677ecae5896d6f35dd712ed60ae8c39a
 # SERVER-22470 Format JS code with approved style
 f5a6c794a0af1a5d57db2617c2e9464eaad9f221
 
-# SERVER-22469 Format JS code with approved style in src/mongo/shell & src/mongo/scripting
-a025d43f3ce2efc1fb1282a718f5d286fa0a4dc1
-
-# SERVER-22340 Fix JS lint errors in src/mongo/shell & src/mongo/scripting with ESLint --fix
-c3996780b76316793758b43fa1fca5b9d0857b6c
-
 # SERVER-18579: Clang-Format - reformat code
 9c2ed42daa8fbbef4a919c21ec564e2db55e8d60
 

@@ -357,17 +357,8 @@ function _isUndefinedBehaviorSanitizerActive() {
 }
 
 jsTestName = function() {
-    if (TestData) {
-        // If we are using the jsTestName as a database name and performing tenant prefixing
-        // then it's possible that the prefixed database name will exceed the server's dbName
-        // length. In these cases, hashing the test name improves our chances of success. FNV-1a
-        // hashes are maximum 16 characters, so don't hash dbNames that are up to 16 characters.
-        if (TestData.testName.length > 16 && TestData.hashTestNamesForMultitenancy) {
-            return _fnvHashToHexString(TestData.testName);
-        }
+    if (TestData)
         return TestData.testName;
-    }
-
     return "__unknown_name__";
 };
 
