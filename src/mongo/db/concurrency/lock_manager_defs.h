@@ -329,7 +329,7 @@ private:
     }
 
     static uint64_t hashStringData(StringData str) {
-        return murmur3<sizeof(uint64_t)>(str, 0 /*seed*/);
+        return absl::hash_internal::CityHash64(str.rawData(), str.size());
     }
 };
 

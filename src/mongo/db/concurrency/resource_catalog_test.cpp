@@ -57,7 +57,8 @@ protected:
 
     NamespaceString secondCollection =
         NamespaceString::createNamespaceString_forTest(boost::none, "1626936312");
-    ResourceId secondResourceId{RESOURCE_COLLECTION, secondCollection};
+    // Use a duplicate ResourceId to simulate ResourceId hash collisions.
+    ResourceId secondResourceId = firstResourceId;
 
     NamespaceString thirdCollection =
         NamespaceString::createNamespaceString_forTest(boost::none, "2930102946");
