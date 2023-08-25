@@ -248,6 +248,19 @@ class TestTestSelection(_ResmokeSelftest):
 
         return tests_run
 
+    def test_missing_excluded_file(self):
+        # Tests a suite that excludes a missing file
+        self.assertEqual(
+            0,
+            self.execute_resmoke([
+                f"--reportFile={self.report_file}", "--repeatTests=2",
+                f"--suites={self.suites_root}/resmoke_missing_test.yml",
+                f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/one.js",
+                f"{self.testfiles_root}/one.js"
+            ]).wait())
+
+        self.assertEqual(6 * [f"{self.testfiles_root}/one.js"], self.get_tests_run())
+
     def test_positional_arguments(self):
         self.assertEqual(
             0,
