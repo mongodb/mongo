@@ -59,6 +59,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockCollectionCacheLookup);
+MONGO_FAIL_POINT_DEFINE(blockDatabaseCacheLookup);
 
 // How many times to try refreshing the routing info or the index info of a collection if the
 // information loaded from the config server is found to be inconsistent.
@@ -280,8 +281,13 @@ void CatalogCache::shutDownAndJoin() {
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
-                                                         StringData dbName,
-                                                         bool allowLocks) {
+                                                         StringData dbName) {
+    return _getDatabase(opCtx, dbName);
+}
+
+StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCtx,
+                                                          StringData dbName,
+                                                          bool allowLocks) {
     tassert(7032313,
             "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
             "hold the lock during a network call, and can lead to a deadlock as described in "
@@ -294,7 +300,26 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     });
 
     try {
-        auto dbEntry = _databaseCache.acquire(opCtx, dbName, CacheCausalConsistency::kLatestKnown);
+        auto dbEntryFuture =
+            _databaseCache.acquireAsync(dbName, CacheCausalConsistency::kLatestKnown);
+
+        if (allowLocks) {
+            // When allowLocks is true we may be holding a lock, so we don't want to block the
+            // current thread: if the future is ready let's use it, otherwise return an error.
+            if (dbEntryFuture.isReady()) {
+                return dbEntryFuture.get(opCtx);
+            } else {
+                // This error only contains the database name and must be handled by any callers of
+                // _getDatabase with the potential for allowLocks to be true. The caller should
+                // convert this to ErrorCodes::ShardCannotRefreshDueToLocksHeld with the full
+                // namespace.
+                return Status{ShardCannotRefreshDueToLocksHeldInfo(NamespaceString(dbName)),
+                              "Database info refresh did not complete"};
+            }
+        }
+
+        // From this point we can guarantee that allowLocks is false.
+        auto dbEntry = dbEntryFuture.get(opCtx);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName << " not found",
                 dbEntry);
@@ -317,9 +342,21 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
     try {
-        const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
+        const auto swDbInfo = _getDatabase(opCtx, nss.db(), allowLocks);
         if (!swDbInfo.isOK()) {
-            if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+            if (swDbInfo == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+                // Since collection refreshes always imply database refreshes, it is ok to transform
+                // this error into a collection error rather than a database error.
+                auto dbRefreshInfo =
+                    swDbInfo.getStatus().extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+                LOGV2_DEBUG(7850500,
+                            2,
+                            "Adding collection name to ShardCannotRefreshDueToLocksHeld error",
+                            "dbName"_attr = dbRefreshInfo->getNss().dbName(),
+                            "nss"_attr = nss);
+                return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
+                              "Routing info refresh did not complete"};
+            } else if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 LOGV2_FOR_CATALOG_REFRESH(
                     4947103,
                     2,
@@ -446,9 +483,21 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
                   "SERVER-37398.");
     }
 
-    const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
+    const auto swDbInfo = _getDatabase(opCtx, nss.db(), allowLocks);
     if (!swDbInfo.isOK()) {
-        if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+        if (swDbInfo == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+            // Since collection refreshes always imply database refreshes, it is ok to transform
+            // this error into a collection error rather than a database error.
+            auto dbRefreshInfo =
+                swDbInfo.getStatus().extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+            LOGV2_DEBUG(7850501,
+                        2,
+                        "Adding collection name to ShardCannotRefreshDueToLocksHeld error",
+                        "dbName"_attr = dbRefreshInfo->getNss().dbName(),
+                        "nss"_attr = nss);
+            uasserted(Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
+                             "Routing info refresh did not complete"});
+        } else if (swDbInfo == ErrorCodes::NamespaceNotFound) {
             LOGV2_FOR_CATALOG_REFRESH(
                 6686300,
                 2,
@@ -760,6 +809,10 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
     const std::string& dbName,
     const DatabaseTypeValueHandle& previousDbType,
     const ComparableDatabaseVersion& previousDbVersion) {
+    if (MONGO_unlikely(blockDatabaseCacheLookup.shouldFail())) {
+        LOGV2(8023400, "Hanging before refreshing cached database entry");
+        blockDatabaseCacheLookup.pauseWhileSet();
+    }
     // TODO (SERVER-34164): Track and increment stats for database refreshes
 
     LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
