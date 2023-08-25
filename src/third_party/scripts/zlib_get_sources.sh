@@ -8,7 +8,7 @@ set -o errexit
 # This script is designed to run on most unix-like OSes
 #
 
-VERSION=1.2.13
+VERSION=1.3
 NAME=zlib
 TARBALL=${NAME}-${VERSION}.tar.gz
 TARBALL_DEST_DIR=${NAME}-${VERSION}
@@ -45,7 +45,7 @@ rm -fR ${TARBALL_DEST_DIR}
 
 Import("env")
 
-env = env.Clone()
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 
 env.Append(CPPDEFINES=["HAVE_STDARG_H"])
 if not env.TargetOSIs('windows'):
