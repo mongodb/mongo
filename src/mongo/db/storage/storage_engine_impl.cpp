@@ -879,7 +879,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 }
 
 std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName) const {
-    return _catalog->getFilesystemPathForDb(DatabaseNameUtil::serializeForCatalog(dbName));
+    return _catalog->getFilesystemPathForDb(dbName);
 }
 
 void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {

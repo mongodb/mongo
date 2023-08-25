@@ -200,7 +200,7 @@ public:
                                              std::string ident,
                                              const CollectionOptions& optionsWithUUID);
 
-    std::string getFilesystemPathForDb(const std::string& dbName) const;
+    std::string getFilesystemPathForDb(const DatabaseName& dbName) const;
 
     /**
      * Generate an internal ident name.

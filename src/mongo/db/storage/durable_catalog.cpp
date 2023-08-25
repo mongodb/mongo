@@ -117,10 +117,11 @@ constexpr std::array<StringData, 256> escapeTable = {
     ".240"_sd, ".241"_sd, ".242"_sd, ".243"_sd, ".244"_sd, ".245"_sd, ".246"_sd, ".247"_sd,
     ".248"_sd, ".249"_sd, ".250"_sd, ".251"_sd, ".252"_sd, ".253"_sd, ".254"_sd, ".255"_sd};
 
-std::string escapeDbName(StringData dbname) {
+std::string escapeDbName(const DatabaseName& dbName) {
     std::string escaped;
-    escaped.reserve(dbname.size());
-    for (unsigned char c : dbname) {
+    const auto db = DatabaseNameUtil::serializeForCatalog(dbName);
+    escaped.reserve(db.size());
+    for (unsigned char c : db) {
         StringData ce = escapeTable[c];
         escaped.append(ce.begin(), ce.end());
     }
@@ -174,7 +175,7 @@ std::string DurableCatalog::_newInternalIdent(StringData identStem) {
     return buf.str();
 }
 
-std::string DurableCatalog::getFilesystemPathForDb(const std::string& dbName) const {
+std::string DurableCatalog::getFilesystemPathForDb(const DatabaseName& dbName) const {
     if (_directoryPerDb) {
         return storageGlobalParams.dbpath + '/' + escapeDbName(dbName);
     } else {
@@ -187,7 +188,7 @@ std::string DurableCatalog::generateUniqueIdent(NamespaceString nss, const char*
     stdx::lock_guard<Latch> lk(_randLock);
     StringBuilder buf;
     if (_directoryPerDb) {
-        buf << escapeDbName(nss.db_deprecated()) << '/';
+        buf << escapeDbName(nss.dbName()) << '/';
     }
     buf << kind;
     buf << (_directoryForIndexes ? '/' : '-');
