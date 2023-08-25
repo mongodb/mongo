@@ -2372,7 +2372,7 @@ buildvariants:
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
     compile_variant: windows
   tasks:
-  - name: compile_test_serial_no_unittests_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-large
   - name: .aggfuzzer !.feature_flag_guarded
@@ -2447,7 +2447,7 @@ buildvariants:
     exec_timeout_secs: 14400 # 3 hour timeout
     compile_variant: enterprise-windows
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
   - name: .aggfuzzer !.feature_flag_guarded
@@ -2507,7 +2507,7 @@ buildvariants:
     resmoke_jobs_max: 6
     compile_variant: macos
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -2559,7 +2559,7 @@ buildvariants:
     resmoke_jobs_max: 6
     compile_variant: macos-arm64
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -2618,7 +2618,7 @@ buildvariants:
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen
@@ -2662,7 +2662,7 @@ buildvariants:
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos-arm64
   tasks:
-  - name: compile_test_serial_TG
+  - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen

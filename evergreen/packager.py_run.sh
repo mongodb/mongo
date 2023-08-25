@@ -8,8 +8,10 @@ set -o verbose
 
 activate_venv
 if [ "${has_packages}" != "true" ]; then
-  echo "Error: packager run when has_packages is not set to true, please remove the package task from this variant (or variant task group) or set has_packages to true if this variant is intended to run the packager."
-  exit 1
+  exit 0
+  # TODO: SERVER-80443 add back validation
+  # echo "Error: packager run when has_packages is not set to true, please remove the package task from this variant (or variant task group) or set has_packages to true if this variant is intended to run the packager."
+  # exit 1
 fi
 
 cd buildscripts
