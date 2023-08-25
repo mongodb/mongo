@@ -1,6 +1,7 @@
 /**
  * Tests parsing and validation of columnstore indexes.
  * @tags: [
+ *   assumes_balancer_off,
  *   featureFlagColumnstoreIndexes,
  *   # Uses index building in background.
  *   requires_background_index,
