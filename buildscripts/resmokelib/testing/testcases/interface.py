@@ -121,7 +121,6 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
         ID = "test_id"
         KIND = "test_kind"
         DYNAMIC = "test_dynamic"
-        BACKGROUND = "test_background"
 
     def get_test_otel_attributes(self) -> Dict[str, Any]:
         return {
