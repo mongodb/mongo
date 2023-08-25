@@ -361,19 +361,18 @@ namespace {
 /*
  * This function initializes the slot in the SBE runtime environment that provides a
  * 'ShardFilterer' and populates it.
- * TODO SERVER-79041: Change how and when the shardFilterer slot is allocated.
  */
 void setupShardFiltering(OperationContext* opCtx,
                          const MultipleCollectionAccessor& collections,
                          mongo::sbe::RuntimeEnvironment& runtimeEnv,
                          sbe::value::SlotIdGenerator& slotIdGenerator) {
-    // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
-    sbe::value::SlotId shardFiltererSlot = runtimeEnv.registerSlot(
-        kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &slotIdGenerator);
     bool isSharded = collections.isAcquisition()
         ? collections.getMainAcquisition().getShardingDescription().isSharded()
         : collections.getMainCollection().isSharded_DEPRECATED();
     if (isSharded) {
+        // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
+        sbe::value::SlotId shardFiltererSlot = runtimeEnv.registerSlot(
+            kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &slotIdGenerator);
         populateShardFiltererSlot(opCtx, runtimeEnv, shardFiltererSlot, collections);
     }
 }
