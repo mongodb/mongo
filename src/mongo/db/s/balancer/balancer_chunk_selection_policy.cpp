@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
-
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -220,8 +220,6 @@ last-continuous:
     ticket: SERVER-65947
   - test_file: jstests/aggregation/match_no_swap_rand.js
     ticket: SERVER-66072
-  - test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
-    ticket: SERVER-66078
   - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     ticket: SERVER-66089
   - test_file: jstests/core/query/or/or_to_in.js
@@ -712,8 +710,6 @@ last-lts:
     ticket: SERVER-65947
   - test_file: jstests/aggregation/match_no_swap_rand.js
     ticket: SERVER-66072
-  - test_file: jstests/sharding/data_size_aware_balancing_sessions_collection.js
-    ticket: SERVER-66078
   - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     ticket: SERVER-66089
   - test_file: jstests/core/query/or/or_to_in.js

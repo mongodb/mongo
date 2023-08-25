@@ -220,13 +220,8 @@ private:
     bool _checkOIDs(OperationContext* opCtx);
 
     /**
-     * Iterates through all chunks in all collections. If the collection is the sessions collection,
-     * checks if the number of chunks is greater than or equal to the configured minimum number of
-     * chunks for the sessions collection (minNumChunksForSessionsCollection). If it isn't,
-     * calculates split points that evenly partition the key space into N ranges (where N is
-     * minNumChunksForSessionsCollection rounded up the next power of 2), and splits any chunks that
-     * straddle those split points. If the collection is any other collection, splits any chunks
-     * that straddle zone boundaries.
+     * Iterates through all chunks in all collections, except for the sessions collection, splitting
+     * any chunks that straddle zone boundaries.
      */
     Status _splitChunksIfNeeded(OperationContext* opCtx);
 

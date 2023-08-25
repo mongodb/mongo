@@ -241,14 +241,6 @@ class MongodLauncher(object):
             suite_set_parameters[
                 "logComponentVerbosity"] = self.get_default_log_component_verbosity_for_mongod()
 
-        # minNumChunksForSessionsCollection controls the minimum number of chunks the balancer will
-        # enforce for the sessions collection. If the actual number of chunks is less, the balancer will
-        # issue split commands to create more chunks. As a result, the balancer will also end up moving
-        # chunks for the sessions collection to balance the chunks across shards. Unless the suite is
-        # explicitly prepared to handle these background migrations, set the parameter to 1.
-        if "configsvr" in mongod_options and "minNumChunksForSessionsCollection" not in suite_set_parameters:
-            suite_set_parameters["minNumChunksForSessionsCollection"] = 1
-
         # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
         # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
         # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.

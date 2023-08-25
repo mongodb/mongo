@@ -42,7 +42,6 @@
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/bits.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -281,60 +280,6 @@ void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
     }
 }
 
-/**
- * If the number of chunks as given by the ChunkManager is less than the configured minimum
- * number of chunks for the sessions collection (minNumChunksForSessionsCollection), calculates
- * split points that evenly partition the key space into N ranges (where N is
- * minNumChunksForSessionsCollection rounded up to the next power of 2), and populates
- * splitCandidates with chunk and splitPoint pairs for chunks that need to split.
- */
-void getSplitCandidatesForSessionsCollection(OperationContext* opCtx,
-                                             const ChunkManager& cm,
-                                             SplitCandidatesBuffer* splitCandidates) {
-    const auto minNumChunks = minNumChunksForSessionsCollection.load();
-
-    if (cm.numChunks() >= minNumChunks) {
-        return;
-    }
-
-    // Use the next power of 2 as the target number of chunks.
-    const size_t numBits = 64 - countLeadingZeros64(minNumChunks - 1);
-    const uint32_t numChunks = 1 << numBits;
-
-    // Compute split points for _id.id that partition the UUID 128-bit data space into numChunks
-    // equal ranges. Since the numChunks is a power of 2, the split points are the permutations
-    // of the prefix numBits right-padded with 0's.
-    std::vector<BSONObj> splitPoints;
-    for (uint32_t i = 1; i < numChunks; i++) {
-        // Start with a buffer of 0's.
-        std::array<uint8_t, 16> buf{0b0};
-
-        // Left-shift i to fill the remaining bits in the prefix 32 bits with 0's.
-        const uint32_t high = i << (CHAR_BIT * 4 - numBits);
-
-        // Fill the prefix 4 bytes with high's bytes.
-        buf[0] = static_cast<uint8_t>(high >> CHAR_BIT * 3);
-        buf[1] = static_cast<uint8_t>(high >> CHAR_BIT * 2);
-        buf[2] = static_cast<uint8_t>(high >> CHAR_BIT * 1);
-        buf[3] = static_cast<uint8_t>(high);
-
-        ConstDataRange cdr(buf.data(), sizeof(buf));
-        splitPoints.push_back(BSON("_id" << BSON("id" << UUID::fromCDR(cdr))));
-    }
-
-    // For each split point, find a chunk that needs to be split.
-    for (auto& splitPoint : splitPoints) {
-        const auto chunkAtSplitPoint = cm.findIntersectingChunkWithSimpleCollation(splitPoint);
-        invariant(chunkAtSplitPoint.getMax().woCompare(splitPoint) > 0);
-
-        if (chunkAtSplitPoint.getMin().woCompare(splitPoint)) {
-            splitCandidates->addSplitPoint(chunkAtSplitPoint, splitPoint);
-        }
-    }
-
-    return;
-}
-
 }  // namespace
 
 BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats)
@@ -370,19 +315,11 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
         } else if (!candidatesStatus.isOK()) {
-            if (nss == NamespaceString::kLogicalSessionsNamespace) {
-                LOGV2_WARNING(4562402,
-                              "Unable to split sessions collection chunks",
-                              "error"_attr = candidatesStatus.getStatus());
-
-            } else {
-                LOGV2_WARNING(
-                    21852,
-                    "Unable to enforce zone range policy for collection {namespace}: {error}",
-                    "Unable to enforce zone range policy for collection",
-                    logAttrs(nss),
-                    "error"_attr = candidatesStatus.getStatus());
-            }
+            LOGV2_WARNING(21852,
+                          "Unable to enforce zone range policy for collection {namespace}: {error}",
+                          "Unable to enforce zone range policy for collection",
+                          logAttrs(nss),
+                          "error"_attr = candidatesStatus.getStatus());
 
             continue;
         }
@@ -718,14 +655,11 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     // Accumulate split points for the same chunk together
     SplitCandidatesBuffer splitCandidates(nss, cm.getVersion());
 
-    if (nss == NamespaceString::kLogicalSessionsNamespace) {
-        if (!distribution.zones().empty()) {
-            LOGV2_WARNING(4562401,
-                          "Ignoring zones for the sessions collection",
-                          "zones"_attr = distribution.zones());
-        }
-
-        getSplitCandidatesForSessionsCollection(opCtx, cm, &splitCandidates);
+    if (nss == NamespaceString::kLogicalSessionsNamespace && !distribution.zones().empty()) {
+        LOGV2_WARNING(4562401,
+                      "Ignoring zones for the internal sessions collection.",
+                      "nss"_attr = NamespaceString::kLogicalSessionsNamespace,
+                      "zones"_attr = distribution.zones());
     } else {
         getSplitCandidatesToEnforceZoneRanges(cm, distribution, &splitCandidates);
     }
