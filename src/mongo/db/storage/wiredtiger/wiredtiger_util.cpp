@@ -127,34 +127,6 @@ void removeTableChecksFile() {
     }
 }
 
-void setTableWriteTimestampAssertion(OperationContext* opCtx,
-                                     WiredTigerSessionCache* sessionCache,
-                                     const std::string& uri,
-                                     bool on) {
-    const std::string setting = on ? "assert=(write_timestamp=on)" : "assert=(write_timestamp=off)";
-    LOGV2_DEBUG(6003700,
-                1,
-                "Changing table write timestamp assertion settings",
-                "uri"_attr = uri,
-                "writeTimestampAssertionOn"_attr = on);
-    auto status = sessionCache->getKVEngine()->alterMetadata(opCtx, uri, setting);
-    if (!status.isOK()) {
-        // Dump the storage engine's internal state to assist in diagnosis.
-        sessionCache->getKVEngine()->dump();
-
-        auto sessionPtr = sessionCache->getSession();
-        LOGV2_FATAL(
-            6003701,
-            "Failed to update write timestamp assertion setting",
-            "uri"_attr = uri,
-            "writeTimestampAssertionOn"_attr = on,
-            "error"_attr = status.code(),
-            "metadata"_attr =
-                redact(WiredTigerUtil::getMetadataCreate(sessionPtr->getSession(), uri).getValue()),
-            "message"_attr = status.reason());
-    }
-}
-
 }  // namespace
 
 using std::string;
@@ -1079,15 +1051,6 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
                     "error"_attr = status.code(),
                     "metadata"_attr = redact(existingMetadata),
                     "message"_attr = status.reason());
-    }
-
-    // The write timestamp assertion setting only needs to be changed at startup. It will be turned
-    // on when logging is disabled, and off when logging is enabled.
-    if (TestingProctor::instance().isEnabled()) {
-        setTableWriteTimestampAssertion(opCtx, sessionCache, uri, !on);
-    } else {
-        // Disables the assertion when the testing proctor is off.
-        setTableWriteTimestampAssertion(opCtx, sessionCache, uri, false /* on */);
     }
 
     return Status::OK();

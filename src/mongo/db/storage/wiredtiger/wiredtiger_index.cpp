@@ -190,10 +190,6 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
         ss << "prefix_compression=true,";
     }
 
-    // Report errors on writes without ordered timestamps.
-    ss << "assert=(write_timestamp=on),";
-    ss << "verbose=[write_timestamp],";
-
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(collectionNamespace));
     ss << sysIndexConfig << ",";
