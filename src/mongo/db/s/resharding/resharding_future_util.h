@@ -138,7 +138,8 @@ public:
                     status.isA<ErrorCategory::CursorInvalidatedError>() ||
                     status == ErrorCodes::Interrupted ||
                     status.isA<ErrorCategory::CancellationError>() ||
-                    status.isA<ErrorCategory::NotPrimaryError>()) {
+                    status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::NetworkTimeoutError>()) {
                     // Always attempt to retry on any type of retryable error. Also retry on errors
                     // from stray killCursors and killOp commands being run. Cancellation and
                     // NotPrimary errors may indicate the primary-only service Instance will be shut

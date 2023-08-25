@@ -253,23 +253,22 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
 }
 
 bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextFactory factory) {
-    std::shared_ptr<Shard> targetShard;
-    {
-        auto opCtxRaii = factory.makeOperationContext(client);
-        opCtxRaii->checkForInterrupt();
-
-        StatusWith<std::shared_ptr<Shard>> swDonor =
-            Grid::get(opCtxRaii.get())->shardRegistry()->getShard(opCtxRaii.get(), _donorShard);
-        if (!swDonor.isOK()) {
-            LOGV2_WARNING(5127203,
-                          "Error finding shard in registry, retrying.",
-                          "error"_attr = swDonor.getStatus());
-            return true;
-        }
-        targetShard = swDonor.getValue();
-    }
-
     try {
+        std::shared_ptr<Shard> targetShard;
+        {
+            auto opCtxRaii = factory.makeOperationContext(client);
+            opCtxRaii->checkForInterrupt();
+
+            StatusWith<std::shared_ptr<Shard>> swDonor =
+                Grid::get(opCtxRaii.get())->shardRegistry()->getShard(opCtxRaii.get(), _donorShard);
+            if (!swDonor.isOK()) {
+                LOGV2_WARNING(5127203,
+                              "Error finding shard in registry, retrying.",
+                              "error"_attr = swDonor.getStatus());
+                return true;
+            }
+            targetShard = swDonor.getValue();
+        }
         return consume(client, factory, targetShard.get());
     } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
         LOGV2_ERROR(
