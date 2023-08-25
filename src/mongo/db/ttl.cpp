@@ -919,7 +919,7 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
                     continue;
                 }
 
-                if (!info.isExpireAfterSecondsInvalid()) {
+                if (!info.isExpireAfterSecondsInvalid() && !info.isExpireAfterSecondsNonInt()) {
                     continue;
                 }
 
@@ -936,8 +936,32 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
                 // would be used by listIndexes() to convert a NaN value in the catalog.
                 CollModIndex collModIndex;
                 collModIndex.setName(StringData{indexName});
-                collModIndex.setExpireAfterSeconds(mongo::durationCount<Seconds>(
-                    index_key_validate::kExpireAfterSecondsForInactiveTTLIndex));
+                if (info.isExpireAfterSecondsInvalid()) {
+                    collModIndex.setExpireAfterSeconds(mongo::durationCount<Seconds>(
+                        index_key_validate::kExpireAfterSecondsForInactiveTTLIndex));
+                } else if (info.isExpireAfterSecondsNonInt()) {
+                    const auto coll = acquireCollection(
+                        opCtx,
+                        CollectionAcquisitionRequest::fromOpCtx(
+                            opCtx, *nss, AcquisitionPrerequisites::OperationType::kWrite),
+                        MODE_X);
+
+                    if (!coll.exists() || coll.uuid() != uuid) {
+                        continue;
+                    }
+                    const auto& collectionPtr = coll.getCollectionPtr();
+
+                    if (!collectionPtr->isIndexPresent(indexName)) {
+                        ttlCollectionCache.deregisterTTLIndexByName(uuid, indexName);
+                        continue;
+                    }
+
+                    BSONObj spec = collectionPtr->getIndexSpec(indexName);
+                    auto expireAfterSeconds =
+                        spec[IndexDescriptor::kExpireAfterSecondsFieldName].safeNumberInt();
+
+                    collModIndex.setExpireAfterSeconds(expireAfterSeconds);
+                }
                 CollMod collModCmd{*nss};
                 collModCmd.getCollModRequest().setIndex(collModIndex);
 

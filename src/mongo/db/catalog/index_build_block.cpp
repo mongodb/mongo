@@ -284,11 +284,13 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                 (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
                      serverGlobalParams.featureCompatibility) ||
                  !coll->isCapped())) {
-                auto validateStatus = index_key_validate::validateExpireAfterSeconds(
+                auto swType = index_key_validate::validateExpireAfterSeconds(
                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],
                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
                 TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                    coll->uuid(), TTLCollectionCache::Info{indexName, !validateStatus.isOK()});
+                    coll->uuid(),
+                    TTLCollectionCache::Info{
+                        indexName, index_key_validate::extractExpireAfterSecondsType(swType)});
             }
         });
 }

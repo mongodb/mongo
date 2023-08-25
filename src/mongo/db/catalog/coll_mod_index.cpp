@@ -90,15 +90,16 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         const auto& coll = autoColl->getCollection();
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
         // IndexCatalog::refreshEntry().
-        opCtx->recoveryUnit()->onCommit([ttlCache,
-                                         uuid = coll->uuid(),
-                                         indexName = idx->indexName()](OperationContext*,
-                                                                       boost::optional<Timestamp>) {
-            // We assume the expireAfterSeconds field is valid, because we've already done
-            // validation of this field.
-            ttlCache->registerTTLInfo(
-                uuid, TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
+                OperationContext*, boost::optional<Timestamp>) {
+                // We assume the expireAfterSeconds field is valid, because we've already done
+                // validation of this field.
+                ttlCache->registerTTLInfo(
+                    uuid,
+                    TTLCollectionCache::Info{
+                        indexName, TTLCollectionCache::Info::ExpireAfterSecondsType::kInt});
+            });
 
         // Change the value of "expireAfterSeconds" on disk.
         autoColl->getWritableCollection(opCtx)->updateTTLSetting(
@@ -129,7 +130,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         opCtx->recoveryUnit()->onCommit(
             [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
                 OperationContext*, boost::optional<Timestamp>) {
-                ttlCache->unsetTTLIndexExpireAfterSecondsInvalid(uuid, indexName);
+                ttlCache->setTTLIndexExpireAfterSecondsType(
+                    uuid, indexName, TTLCollectionCache::Info::ExpireAfterSecondsType::kInt);
             });
         return;
     }
