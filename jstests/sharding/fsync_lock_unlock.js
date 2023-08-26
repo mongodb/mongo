@@ -2,8 +2,8 @@
  * Verifies the fsync with lock+unlock command on mongos.
  * @tags: [
  *   requires_fsync,
- *   featureFlagClusterFsyncLock,
  *   uses_parallel_shell,
+ *   requires_fcv_71
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
@@ -11,14 +11,8 @@ import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 const dbName = "test";
 const collName = "collTest";
 const ns = dbName + "." + collName;
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    mongosOptions: {setParameter: {featureFlagClusterFsyncLock: true}},
-    config: 1,
-    configShard: true,
-    enableBalancer: true
-});
+const st =
+    new ShardingTest({shards: 2, mongos: 1, config: 1, configShard: true, enableBalancer: true});
 const adminDB = st.s.getDB('admin');
 const distributed_txn_insert_count = 10;
 

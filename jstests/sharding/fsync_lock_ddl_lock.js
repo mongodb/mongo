@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   requires_fsync,
- *   featureFlagClusterFsyncLock
+ *   requires_fcv_71
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -14,12 +14,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 const dbName = "test";
 const collName = "collTest";
 const renamedCollName = "collTest1";
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    mongosOptions: {setParameter: {featureFlagClusterFsyncLock: true}},
-    config: 1
-});
+const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 const db = st.s0.getDB(dbName);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
