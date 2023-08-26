@@ -21,8 +21,8 @@ from buildscripts.resmokelib.testing.testcases import fixture as _fixture
 from buildscripts.resmokelib.utils import queue as _queue
 
 from opentelemetry import trace, context
+from opentelemetry.context.context import Context
 from opentelemetry.trace.status import StatusCode
-from opentelemetry.trace import NonRecordingSpan, SpanContext
 
 # TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class Job(object):
             self,
             queue: 'TestQueue[Union[QueueElemRepeatTime, QueueElem]]',
             interrupt_flag: threading.Event,
-            parent_span_context: SpanContext,
+            parent_context: Context,
             setup_flag: Optional[threading.Event] = None,
             teardown_flag: Optional[threading.Event] = None,
             hook_failure_flag: Optional[threading.Event] = None,
@@ -87,8 +87,7 @@ class Job(object):
         """
         # Since this is called from another thread we need to pass the context in
         # This will make it have the correct parent and traceid
-        ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
-        context.attach(ctx)
+        context.attach(parent_context)
 
         setup_succeeded = True
         if setup_flag is not None:
