@@ -54,6 +54,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
@@ -232,6 +233,8 @@ struct OpMsgRequest : public OpMsg {
     }
 
     void setDollarTenant(const TenantId& tenant);
+
+    SerializationContext getSerializationContext() const;
 
     // DO NOT ADD MEMBERS!  Since this type is essentially a strong typedef (see the class comment),
     // it should not hold more data than an OpMsg. It should be freely interconvertible with OpMsg

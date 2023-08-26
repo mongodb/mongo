@@ -110,8 +110,7 @@ public:
         const OpMsgRequest& opMsgRequest,
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
 
-        SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
-        serializationCtx.setTenantIdSource(opMsgRequest.getValidatedTenantId() != boost::none);
+        SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
 
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,

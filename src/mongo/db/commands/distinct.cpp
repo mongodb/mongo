@@ -222,8 +222,7 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
-        SerializationContext sc(SerializationContext::stateCommandRequest());
-        sc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
+        SerializationContext sc = request.getSerializationContext();
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.

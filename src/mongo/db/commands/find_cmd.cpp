@@ -929,8 +929,7 @@ public:
         std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
             OperationContext* opCtx, NamespaceString nss, const OpMsgRequest& request) {
             // check validated tenantId and set the flag on the serialization context object
-            auto reqSc = SerializationContext::stateCommandRequest();
-            reqSc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
+            auto reqSc = request.getSerializationContext();
 
             auto findCommand = query_request_helper::makeFromFindCommand(
                 request.body,
