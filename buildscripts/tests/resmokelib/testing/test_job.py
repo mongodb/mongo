@@ -5,7 +5,7 @@ import threading
 import unittest
 
 import mock
-from opentelemetry.trace import SpanContext
+from opentelemetry.context.context import Context
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import job
@@ -213,7 +213,7 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         logger = logging.getLogger("job_unittest")
         self.__job_object = job.Job(job_num=0, logger=logger, fixture=None, hooks=[], report=None,
                                     archival=None, suite_options=None, test_queue_logger=logger)
-        self.__span_context = SpanContext(trace_id=0, span_id=0, is_remote=False)
+        self.__context = Context(trace_id=0, span_id=0, is_remote=False)
 
         # Initialize the Job instance such that its setup_fixture() and teardown_fixture() methods
         # always indicate success. The settings for these mocked method will be changed in the
@@ -227,7 +227,7 @@ class TestFixtureSetupAndTeardown(unittest.TestCase):
         setup_flag = threading.Event()
         teardown_flag = threading.Event()
 
-        self.__job_object(queue, interrupt_flag, self.__span_context, setup_flag, teardown_flag)
+        self.__job_object(queue, interrupt_flag, self.__context, setup_flag, teardown_flag)
 
         self.assertEqual(setup_succeeded, not interrupt_flag.is_set())
         self.assertEqual(setup_succeeded, not setup_flag.is_set())
