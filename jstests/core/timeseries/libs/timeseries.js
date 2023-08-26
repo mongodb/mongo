@@ -5,11 +5,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export var TimeseriesTest = class {
-    static BucketVersion = {
-        kUncompressed: 1,
-        kCompressed: 2,
-    };
-
     static getBucketMaxSpanSecondsFromGranularity(granularity) {
         switch (granularity) {
             case 'seconds':
@@ -83,7 +78,7 @@ export var TimeseriesTest = class {
             ["control"],
             "TimeseriesTest.decompressBucket() should only be called on a bucket document");
         assert.eq(
-            TimeseriesTest.BucketVersion.kCompressed,
+            2,
             compressedBucket.control.version,
             "TimeseriesTest.decompressBucket() should only be called on a compressed bucket document");
 
@@ -92,7 +87,7 @@ export var TimeseriesTest = class {
         }
 
         // The control object should reflect that the data is uncompressed.
-        compressedBucket.control.version = TimeseriesTest.BucketVersion.kUncompressed;
+        compressedBucket.control.version = 1;
         delete compressedBucket.control.count;
     }
 

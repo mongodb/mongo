@@ -67,10 +67,8 @@ for (let i = 0; i < numDocs; i++) {
 
     // Check buckets.
     if (isBucketReopeningEnabled) {
-        let bucketDocs =
-            bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
-                .limit(1)
-                .toArray();
+        // Version 2 indicates the bucket is compressed.
+        let bucketDocs = bucketsColl.find({"control.version": 2}).limit(1).toArray();
         if (bucketDocs.length > 0) {
             foundExpiredBucket = true;
         }
@@ -80,10 +78,12 @@ for (let i = 0; i < numDocs; i++) {
                              .toArray();
         if (bucketDocs.length > 1) {
             // If bucket compression is enabled the expired bucket should have been compressed.
-            assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+            // Version 2 indicates the bucket is compressed.
+            assert.eq(2,
                       bucketDocs[0].control.version,
                       'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+            // Version 1 indicates the bucket is uncompressed.
+            assert.eq(1,
                       bucketDocs[1].control.version,
                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
 
@@ -96,9 +96,10 @@ for (let i = 0; i < numDocs; i++) {
                       1,
                       'Invalid number of buckets for metadata ' + (numDocs - 1) + ': ' +
                           tojson(bucketDocs));
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+            // Version 1 indicates the bucket is uncompressed.
+            assert.eq(1,
                       bucketDocs[0].control.version,
-                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
         }
     }
 }

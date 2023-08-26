@@ -6,9 +6,6 @@
  * requires_fcv_62
  * ]
  */
-
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_count";
 const bucketNamePrefix = "system.buckets.validate_timeseries_count";
@@ -63,8 +60,8 @@ coll.insertMany([...Array(1002).keys()].map(i => ({
                                                 "temp": i
                                             })),
                 {ordered: false});
-bucket.updateOne({"meta.sensorId": 2, 'control.version': TimeseriesTest.BucketVersion.kCompressed},
-                 {"$set": {"control.count": 10}});
+// Version 2 indicates the bucket is compressed.
+bucket.updateOne({"meta.sensorId": 2, 'control.version': 2}, {"$set": {"control.count": 10}});
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);

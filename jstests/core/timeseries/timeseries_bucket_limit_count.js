@@ -67,7 +67,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketMaxCount - 1,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs));
-        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+        // Version 2 indicates the bucket is compressed.
+        assert.eq(2,
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
         assert(!bucketDocs[0].control.hasOwnProperty("closed"),
@@ -87,11 +88,13 @@ TimeseriesTest.run((insert) => {
                   bucketDocs[1].control.max.x,
                   'invalid control.max for x in second bucket: ' + tojson(bucketDocs));
         if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-            assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+            // Version 2 indicates the bucket is compressed.
+            assert.eq(2,
                       bucketDocs[1].control.version,
                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
         } else {
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
+            // Version 1 indicates the bucket is uncompressed.
+            assert.eq(1,
                       bucketDocs[1].control.version,
                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
         }

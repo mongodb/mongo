@@ -9,6 +9,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
@@ -248,43 +249,23 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
-    assert.commandWorked(bucketsColl.insert({
-        control: {
-            version: TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: ISODate()},
-            max: {time: ISODate()}
-        },
-        data: {}
-    }));
+    assert.commandWorked(bucketsColl.insert(
+        {control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}}, data: {}}));
     assert.commandFailedWithCode(bucketsColl.insert({
         control: {version: 'not a number', min: {time: ISODate()}, max: {time: ISODate()}},
         data: {}
     }),
                                  ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(
+        bucketsColl.insert(
+            {control: {version: 1, min: {time: 'not a date'}, max: {time: ISODate()}}, data: {}}),
+        ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(
+        bucketsColl.insert(
+            {control: {version: 1, min: {time: ISODate()}, max: {time: 'not a date'}}, data: {}}),
+        ErrorCodes.DocumentValidationFailure);
     assert.commandFailedWithCode(bucketsColl.insert({
-        control: {
-            version: TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: 'not a date'},
-            max: {time: ISODate()}
-        },
-        data: {}
-    }),
-                                 ErrorCodes.DocumentValidationFailure);
-    assert.commandFailedWithCode(bucketsColl.insert({
-        control: {
-            version: TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: ISODate()},
-            max: {time: 'not a date'}
-        },
-        data: {}
-    }),
-                                 ErrorCodes.DocumentValidationFailure);
-    assert.commandFailedWithCode(bucketsColl.insert({
-        control: {
-            version: TimeseriesTest.BucketVersion.kUncompressed,
-            min: {time: ISODate()},
-            max: {time: ISODate()}
-        },
+        control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}},
         data: 'not an object'
     }),
                                  ErrorCodes.DocumentValidationFailure);

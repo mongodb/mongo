@@ -48,10 +48,11 @@ TimeseriesTest.run((insert) => {
         }
     }
 
+    const controlVersion = 1;
     const numDocs = 100;
     const expectedBucketDoc = {
         control: {
-            version: TimeseriesTest.BucketVersion.kUncompressed,
+            version: controlVersion,
             min: {},
             max: {},
         },
