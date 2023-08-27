@@ -105,6 +105,7 @@ executor:
       global_vars:
         TestData: &TestData
           tenant: "636d957b2646ddfaf9b5e13f"
+          hashTestNamesForMultitenancy: true
           auth: true
           authMechanism: SCRAM-SHA-256
           keyFile: *keyFile

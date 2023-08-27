@@ -10,3 +10,6 @@ executor:
   config:
     shell_options:
       nodb: ''
+      global_vars:
+        TestData:
+          hashTestNamesForMultitenancy: true

@@ -28,7 +28,7 @@ if (!checkSBEEnabled(db)) {
     quit();
 }
 
-const testDb = db.getSiblingDB('cached_plan_trial_does_not_discard_work');
+const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());
 const coll = testDb.getCollection('test');
 

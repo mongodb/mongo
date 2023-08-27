@@ -10,9 +10,9 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
-const dbName = "prepared_transactions_do_not_block_non_conflicting_ddl";
+const dbName = jsTestName();
 const collName = "transactions_collection";
-const otherDBName = "prepared_transactions_do_not_block_non_conflicting_ddl_other";
+const otherDBName = dbName + "_other";
 const otherCollName = "transactions_collection_other";
 const testDB = db.getSiblingDB(dbName);
 const otherDB = db.getSiblingDB(otherDBName);

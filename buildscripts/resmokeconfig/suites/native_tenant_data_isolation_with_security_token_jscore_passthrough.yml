@@ -85,6 +85,9 @@ executor:
       eval: |
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/inject_security_token.js');
+      global_vars:
+        TestData: &TestData
+          hashTestNamesForMultitenancy: true
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

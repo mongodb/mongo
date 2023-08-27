@@ -13,7 +13,7 @@ import {
     isPlainObject
 } from "jstests/libs/change_stream_rewrite_util.js";
 
-const dbName = "change_stream_rewrite_null_existence_test";
+const dbName = jsTestName();
 const collName = "coll1";
 const testDB = db.getSiblingDB(dbName);
 
