@@ -228,8 +228,12 @@ __wt_session_compact_check_interrupted(WT_SESSION_IMPL *session)
     /* Compaction can be interrupted if the timeout has exceeded. */
     WT_RET(__session_compact_check_timeout(session));
 
-    /* Background compaction may have been disabled in the meantime. */
-    if (session == conn->background_compact.session) {
+    /*
+     * Background compaction may have been disabled in the meantime. Only check for interruption
+     * when the connection is not being opened/closed.
+     */
+    if (session == conn->background_compact.session &&
+      !F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_MINIMAL)) {
         __wt_spin_lock(session, &conn->background_compact.lock);
         if (!conn->background_compact.running)
             ret = WT_ERROR;
