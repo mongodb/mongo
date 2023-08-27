@@ -1644,7 +1644,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
 
     /* If we are logging, write a commit log record. */
     if (txn->logrec != NULL) {
@@ -2070,7 +2070,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
      * page within each file are done at the same time.
      */
     if (prepare)
-        qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
+        __wt_qsort(txn->mod, txn->mod_count, sizeof(WT_TXN_OP), __txn_mod_compare);
 
     /* Rollback and free updates. */
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {

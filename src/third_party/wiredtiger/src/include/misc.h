@@ -222,6 +222,15 @@
     } while (0)
 
 /*
+ * Some C compiler address sanitizers complain if qsort is passed a NULL base reference, even if
+ * there are no elements to compare (note zero elements is allowed by the IEEE Std 1003.1-2017
+ * standard). Avoid the complaint.
+ */
+#define __wt_qsort(base, nmemb, size, compar) \
+    if ((nmemb) != 0)                         \
+    qsort(base, nmemb, size, compar)
+
+/*
  * Binary search for an integer key.
  */
 #define WT_BINARY_SEARCH(key, arrayp, n, found)                        \
