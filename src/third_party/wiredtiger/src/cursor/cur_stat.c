@@ -395,12 +395,12 @@ __curstat_file_init(
     const char *filename;
 
     /*
-     * If we are only getting the size of the file, we don't need to open the tree.
+     * If we are only getting the size of the file, we don't need to open the tree. This only
+     * applies to file: types. Tiered tables need to use the dhandle.
      */
-    if (F_ISSET(cst, WT_STAT_TYPE_SIZE)) {
+    if (F_ISSET(cst, WT_STAT_TYPE_SIZE) && WT_PREFIX_MATCH(uri, "file:")) {
         filename = uri;
-        if (!WT_PREFIX_SKIP(filename, "file:"))
-            return (__wt_unexpected_object_type(session, uri, "file:"));
+        WT_PREFIX_SKIP(filename, "file:");
         __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
         WT_RET(__wt_block_manager_named_size(session, filename, &size));
         cst->u.dsrc_stats.block_size = size;
@@ -427,6 +427,22 @@ __curstat_file_init(
     WT_TRET(__wt_session_release_dhandle(session));
 
     return (ret);
+}
+
+/*
+ * __curstat_tiered_init --
+ *     Initialize the statistics for a tiered table.
+ */
+static int
+__curstat_tiered_init(
+  WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+{
+    /*
+     * This is currently just a wrapper for the file initialization to get block manager level
+     * statistics. If or when we want to collect statistics on objects then this function will need
+     * to use schema operations to work down from the active object to other flushed objects.
+     */
+    return (__curstat_file_init(session, uri, cfg, cst));
 }
 
 /*
@@ -584,6 +600,8 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin,
         WT_RET(__wt_curstat_lsm_init(session, dsrc_uri, cst));
     else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
         WT_RET(__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
+    else if (WT_PREFIX_MATCH(dsrc_uri, "tiered:"))
+        WT_RET(__curstat_tiered_init(session, dsrc_uri, cfg, cst));
     else
         return (__wt_bad_object_type(session, uri));
 

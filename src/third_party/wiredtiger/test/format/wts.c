@@ -751,15 +751,9 @@ wts_stats(void)
     wt_wrap_open_session(conn, &sap, NULL, &session);
     stats_data_print(session, "statistics:", fp);
 
-    /*
-     * Data source statistics.
-     *     FIXME-WT-9785: Statistics cursors on tiered storage objects are not yet supported.
-     */
-    if (!g.tiered_storage_config) {
-        args.fp = fp;
-        args.session = session;
-        tables_apply(stats_data_source, &args);
-    }
+    args.fp = fp;
+    args.session = session;
+    tables_apply(stats_data_source, &args);
 
     wt_wrap_close_session(session);
 

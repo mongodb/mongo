@@ -233,12 +233,10 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     ret = orig_session_create(session_self, uri, new_config)
     return ret
 
-# FIXME-WT-9785
+# FIXME-PM-2532
 # Called to replace Session.open_cursor. This is needed to skip tests that
-# do statistics on (tiered) table data sources, as that is not yet supported.
+# do backup on (tiered) table data sources, as that is not yet supported.
 def session_open_cursor_replace(orig_session_open_cursor, session_self, uri, dupcursor, config):
-    if uri != None and (uri.startswith("statistics:table:") or uri.startswith("statistics:file:")):
-        skip_test("statistics on tiered tables not yet implemented")
     if uri != None and uri.startswith("backup:"):
         skip_test("backup on tiered tables not yet implemented")
     return orig_session_open_cursor(session_self, uri, dupcursor, config)

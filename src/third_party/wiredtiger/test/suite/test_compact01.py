@@ -114,7 +114,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Verify compact progress stats. We can't do this with utility method as reopening the
         # connection would reset the stats.
-        if self.utility == 0 and self.reopen == 0:
+        if self.utility == 0 and self.reopen == 0 and not self.runningHook('tiered'):
             statDict = self.getCompactProgressStats(uri)
             self.assertGreater(statDict["pages_reviewed"],0)
             self.assertGreater(statDict["pages_rewritten"],0)
