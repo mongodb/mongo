@@ -2252,6 +2252,12 @@ config_compact(void)
 {
     char buf[128];
 
+    /* FIXME-WT-11432: Background and foreground compaction should not be executed in parallel. */
+    if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT) &&
+      config_explicit(NULL, "ops.compaction") && GV(OPS_COMPACTION))
+        testutil_die(EINVAL,
+          "%s: Background and foreground compaction cannot be enabled at the same time", progname);
+
     /* Compaction does not work on in-memory databases, disable it. */
     if (GV(RUNS_IN_MEMORY)) {
         if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT))
@@ -2262,6 +2268,21 @@ config_compact(void)
               EINVAL, "%s: Foreground compaction cannot be enabled for in-memory runs", progname);
         config_off(NULL, "background_compact");
         config_off(NULL, "ops.compaction");
+    }
+
+    /*
+     * FIXME-WT-11432: If both are enabled, disable the one that is not explicitly set or choose one
+     * randomly.
+     */
+    if (GV(BACKGROUND_COMPACT) && GV(OPS_COMPACTION)) {
+        if (config_explicit(NULL, "background_compact"))
+            config_off(NULL, "ops.compaction");
+        else if (config_explicit(NULL, "ops.compaction"))
+            config_off(NULL, "background_compact");
+        else if (mmrand(&g.data_rnd, 1, 2) == 1)
+            config_off(NULL, "background_compact");
+        else
+            config_off(NULL, "ops.compaction");
     }
 
     /* Generate values if not explicit set. */

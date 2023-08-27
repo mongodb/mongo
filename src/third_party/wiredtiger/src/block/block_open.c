@@ -198,7 +198,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     /* Basic structure allocation, initialization. */
     WT_ERR(__wt_calloc_one(session, &block));
     WT_ERR(__wt_strdup(session, filename, &block->name));
-    block->compact_session_id = WT_SESSION_ID_INVALID;
     block->objectid = objectid;
     block->ref = 1;
 

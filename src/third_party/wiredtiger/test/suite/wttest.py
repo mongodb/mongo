@@ -1021,15 +1021,6 @@ class WiredTigerTestCase(unittest.TestCase):
         if self.runningHook('tiered'):
             self.skipTest('Test requires removal from cloud storage, which is not yet permitted')
 
-    def compactUntilSuccess(self, session, uri, config=None):
-        while True:
-            try:
-                session.compact(uri, config)
-                return
-            except wiredtiger.WiredTigerError as err:
-                if str(err) != os.strerror(errno.EBUSY):
-                    raise err
-
     def dropUntilSuccess(self, session, uri, config=None):
         # Most test cases consider a drop, and especially a 'drop until success',
         # to completely remove a file's artifacts, so that the name can be reused.
