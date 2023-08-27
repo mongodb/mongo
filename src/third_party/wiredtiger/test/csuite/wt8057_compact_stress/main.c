@@ -97,7 +97,7 @@ handle_general(WT_EVENT_HANDLER *handler, WT_CONNECTION *conn, WT_SESSION *sessi
      * often. We don't want to change the nature of the test too much.
      */
     if (++compact_event % 8 == 0) {
-        printf(" *** Compact check interrupting compact with error\n");
+        printf(" *** Compact check interrupting compact with warning\n");
         compact_error = true;
         return (-1);
     }

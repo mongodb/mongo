@@ -182,7 +182,7 @@ class test_compact07(wttest.WiredTigerTestCase):
 
         # Background compaction may be have been inspecting a table when disabled which is
         # considered as an interruption, ignore that message.
-        self.ignoreStderrPatternIfExists('background compact interrupted by application')
+        self.ignoreStdoutPatternIfExists('background compact interrupted by application')
 
         # Perform foreground compaction on the remaining file by setting a free_space_target value
         # that is guaranteed to run on it.
