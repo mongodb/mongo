@@ -98,7 +98,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     /* FIXME-WT-10520 - Let verify process tiered storage related entries once it is supported. */
     is_tiered = WT_PREFIX_MATCH(uri, "object:") || WT_PREFIX_MATCH(uri, "tier:") ||
       WT_PREFIX_MATCH(uri, "tiered:");
-    if (file_func == __wt_verify && is_tiered)
+    if (is_tiered && (file_func == __wt_salvage || file_func == __wt_verify))
         WT_ERR(ENOTSUP);
 
     /* Get the btree handle(s) and call the underlying function. */
@@ -132,7 +132,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
             colgroup = table->cgroups[i];
 
             /* FIXME-WT-10520 - Let verify process tiered tables once it is supported. */
-            if (file_func == __wt_verify && WT_PREFIX_MATCH(colgroup->source, "tiered:"))
+            if ((file_func == __wt_salvage || file_func == __wt_verify) &&
+              WT_PREFIX_MATCH(colgroup->source, "tiered:"))
                 WT_ERR(ENOTSUP);
 
             skip = false;
