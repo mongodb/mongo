@@ -35,6 +35,7 @@ sbeEnv.Library(
         'vm/datetime.cpp',
         'vm/makeobj.cpp',
         'vm/vm.cpp',
+        'vm/vm_block.cpp',
         'vm/vm_printer.cpp',
     ],
     LIBDEPS=[
@@ -163,6 +164,7 @@ env.CppUnitTest(
     source=[
         'column_store_encoder_test.cpp',
         'columnar_test.cpp',
+        'expressions/sbe_block_expr_test.cpp',
         'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',

@@ -38,22 +38,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::value {
-/**
- * Deblocked tags and values for a ValueBlock.
- *
- * Note: Deblocked values are read-only and must not be modified.
- */
-struct DeblockedTagVals {
-    // 'tags' and 'vals' point to an array of 'count' elements respectively.
-    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
-        : count(count), tags(tags), vals(vals) {
-        tassert(7888701, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
-    }
-
-    size_t count;
-    const TypeTags* tags;
-    const Value* vals;
-};
+struct DeblockedTagVals;
 
 /**
  * Interface for accessing a sequence of SBE Values independent of their backing storage.
@@ -83,6 +68,24 @@ struct ValueBlock {
      */
     virtual boost::optional<size_t> tryCount() const = 0;
 };
+
+/**
+ * Deblocked tags and values for a ValueBlock.
+ *
+ * Note: Deblocked values are read-only and must not be modified.
+ */
+struct DeblockedTagVals {
+    // 'tags' and 'vals' point to an array of 'count' elements respectively.
+    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
+        : count(count), tags(tags), vals(vals) {
+        tassert(7888701, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
+    }
+
+    size_t count;
+    const TypeTags* tags;
+    const Value* vals;
+};
+std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked);
 
 /**
  * A block that is a run of repeated values.

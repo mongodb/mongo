@@ -8467,6 +8467,28 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableStdDevSampFinalize(arity);
         case Builtin::aggRemovableStdDevPopFinalize:
             return builtinAggRemovableStdDevPopFinalize(arity);
+        case Builtin::valueBlockExists:
+            return builtinValueBlockExists(arity);
+        case Builtin::valueBlockFillEmpty:
+            return builtinValueBlockFillEmpty(arity);
+        case Builtin::valueBlockMin:
+            return builtinValueBlockMin(arity);
+        case Builtin::valueBlockMax:
+            return builtinValueBlockMax(arity);
+        case Builtin::valueBlockCount:
+            return builtinValueBlockCount(arity);
+        case Builtin::valueBlockGtScalar:
+            return builtinValueBlockGtScalar(arity);
+        case Builtin::valueBlockGteScalar:
+            return builtinValueBlockGteScalar(arity);
+        case Builtin::valueBlockEqScalar:
+            return builtinValueBlockEqScalar(arity);
+        case Builtin::valueBlockLtScalar:
+            return builtinValueBlockLtScalar(arity);
+        case Builtin::valueBlockLteScalar:
+            return builtinValueBlockLteScalar(arity);
+        case Builtin::valueBlockCombine:
+            return builtinValueBlockCombine(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -8845,6 +8867,28 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableStdDevSampFinalize";
         case Builtin::aggRemovableStdDevPopFinalize:
             return "aggRemovableStdDevPopFinalize";
+        case Builtin::valueBlockExists:
+            return "valueBlockExists";
+        case Builtin::valueBlockFillEmpty:
+            return "valueBlockFillEmpty";
+        case Builtin::valueBlockMin:
+            return "valueBlockMin";
+        case Builtin::valueBlockMax:
+            return "valueBlockMax";
+        case Builtin::valueBlockCount:
+            return "valueBlockCount";
+        case Builtin::valueBlockGtScalar:
+            return "valueBlockGtScalar";
+        case Builtin::valueBlockGteScalar:
+            return "valueBlockGteScalar";
+        case Builtin::valueBlockEqScalar:
+            return "valueBlockEqScalar";
+        case Builtin::valueBlockLtScalar:
+            return "valueBlockLtScalar";
+        case Builtin::valueBlockLteScalar:
+            return "valueBlockLteScalar";
+        case Builtin::valueBlockCombine:
+            return "valueBlockCombine";
         default:
             MONGO_UNREACHABLE;
     }

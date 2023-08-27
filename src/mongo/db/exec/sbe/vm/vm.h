@@ -832,6 +832,18 @@ enum class Builtin : uint8_t {
     aggRemovableStdDevRemove,
     aggRemovableStdDevSampFinalize,
     aggRemovableStdDevPopFinalize,
+
+    valueBlockExists,
+    valueBlockFillEmpty,
+    valueBlockMin,
+    valueBlockMax,
+    valueBlockCount,
+    valueBlockGtScalar,
+    valueBlockGteScalar,
+    valueBlockEqScalar,
+    valueBlockLtScalar,
+    valueBlockLteScalar,
+    valueBlockCombine,
 };
 
 std::string builtinToString(Builtin b);
@@ -1925,6 +1937,18 @@ private:
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevPopFinalize(
         ArityType arity);
+
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGtScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGteScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockEqScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,

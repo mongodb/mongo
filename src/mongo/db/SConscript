@@ -1671,6 +1671,7 @@ env.Library(
     target='sbe_values',
     source=[
         'exec/sbe/values/arith_common.cpp',
+        'exec/sbe/values/block_interface.cpp',
         'exec/sbe/values/bson.cpp',
         'exec/sbe/values/bson_block.cpp',
         'exec/sbe/values/cell_interface.cpp',
