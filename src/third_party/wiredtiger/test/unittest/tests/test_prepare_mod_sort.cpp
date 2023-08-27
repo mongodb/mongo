@@ -294,9 +294,9 @@ TEST_CASE("Keyedness sort test", "[mod_compare]")
     init_key(keys[0], "1");
 
     for (int i = 0; i < 6; i++)
-        init_btree(&btrees[i], BTREE_ROW, rand() % 100);
+        init_btree(&btrees[i], BTREE_ROW, i);
     for (int i = 6; i < 12; i++)
-        init_btree(&btrees[i], BTREE_COL_VAR, rand() % 100);
+        init_btree(&btrees[i], BTREE_COL_VAR, i);
 
     for (int i = 0; i < 6; i++)
         init_op(&ops[i], &btrees[i], WT_TXN_OP_BASIC_ROW, WT_RECNO_OOB, keys[0]);
@@ -364,7 +364,7 @@ TEST_CASE("Different column store keys test", "[mod_compare]")
 
     // Randomly choose btrees and assign random recnos to the ops.
     for (int i = 0; i < 8; i++)
-        init_op(&ops[i], &btrees[rand() % 6], WT_TXN_OP_BASIC_COL, rand() % 200, NULL);
+        init_op(&ops[i], &btrees[rand() % 6], WT_TXN_OP_BASIC_COL, rand() % 200 + 1, NULL);
 
     qsort(&ops, 8, sizeof(WT_TXN_OP), __ut_txn_mod_compare);
     ret = __mod_ops_sorted(ops, 8);
