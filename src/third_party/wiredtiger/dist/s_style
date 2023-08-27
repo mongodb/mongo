@@ -164,11 +164,11 @@ else
         cat $t
     }
 
-    if ! expr "$f" : 'src/include/misc.h' > /dev/null &&
-        grep '[[:space:]]qsort(' $f > $t; then
-        echo "$f: qsort call, use WiredTiger __wt_qsort instead"
-        cat $t
-    fi
+    # if ! expr "$f" : 'src/include/misc.h' > /dev/null &&
+    #     grep '[[:space:]]qsort(' $f > $t; then
+    #     echo "$f: qsort call, use WiredTiger __wt_qsort instead"
+    #     cat $t
+    # fi
 
     if ! expr "$f" : 'src/.*/os_setvbuf.c' > /dev/null &&
         egrep -w 'setvbuf' $f > $t; then
