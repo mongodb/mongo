@@ -8,23 +8,13 @@ variables:
 - &perf-tasks-template
   batchtime: 1440 # 1 day
   expansions: &ubuntu2004-perf-tests-expansions-template
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    test_env_vars:
-      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-      WT_TOPDIR=$(git rev-parse --show-toplevel)
-      WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
+    additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
     HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
-    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
-    pip3_binary: '/opt/mongodbtoolchain/v4/bin/pip3'
-    virtualenv_binary: '/opt/mongodbtoolchain/v4/bin/virtualenv'
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
-    make_command: ninja
     database: WTPerformanceDataDB
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
@@ -127,18 +117,7 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     database: WTCodeStatisticsDB
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    test_env_vars:
-      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-      WT_TOPDIR=$(git rev-parse --show-toplevel)
-      WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
-    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
-    pip3_binary: '/opt/mongodbtoolchain/v4/bin/pip3'
-    virtualenv_binary: '/opt/mongodbtoolchain/v4/bin/virtualenv'
-    make_command: ninja
+    additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     cmake_generator: Ninja
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
@@ -178,19 +157,9 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-    test_env_vars:
-      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-      WT_TOPDIR=$(git rev-parse --show-toplevel)
-      WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
-      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
-    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
-    make_command: ninja
   # As these tests run infrequently by the time they fail we may have had 
   # a lot of prior commits that would also fail for the same test. This is acceptable 
   # as our infrequent tests aren't tracking critical failures, but we don't want 
