@@ -117,7 +117,7 @@ struct __wt_cursor_btree {
     /* Next item(s) found during search */
     WT_INSERT *next_stack[WT_SKIP_MAXDEPTH];
 
-    uint32_t page_deleted_count; /* Deleted items on the page */
+    uint32_t page_obsolete_deleted_count; /* Obsolete deleted items on the page */
 
     uint64_t recno; /* Record number */
 
@@ -249,15 +249,16 @@ struct __wt_cursor_btree {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CBT_ACTIVE 0x001u             /* Active in the tree */
-#define WT_CBT_CACHEABLE_RLE_CELL 0x002u /* Col-store: value in RLE cell valid for its keys */
-#define WT_CBT_ITERATE_APPEND 0x004u     /* Col-store: iterating append list */
-#define WT_CBT_ITERATE_NEXT 0x008u       /* Next iteration configuration */
-#define WT_CBT_ITERATE_PREV 0x010u       /* Prev iteration configuration */
-#define WT_CBT_ITERATE_RETRY_NEXT 0x020u /* Prepare conflict by next. */
-#define WT_CBT_ITERATE_RETRY_PREV 0x040u /* Prepare conflict by prev. */
-#define WT_CBT_READ_ONCE 0x080u          /* Page in with WT_READ_WONT_NEED */
-#define WT_CBT_SEARCH_SMALLEST 0x100u    /* Row-store: small-key insert list */
-#define WT_CBT_VAR_ONPAGE_MATCH 0x200u   /* Var-store: on-page recno match */
+#define WT_CBT_ALL_DELETED_ITEMS 0x002u  /* All deleted items on a page. */
+#define WT_CBT_CACHEABLE_RLE_CELL 0x004u /* Col-store: value in RLE cell valid for its keys */
+#define WT_CBT_ITERATE_APPEND 0x008u     /* Col-store: iterating append list */
+#define WT_CBT_ITERATE_NEXT 0x010u       /* Next iteration configuration */
+#define WT_CBT_ITERATE_PREV 0x020u       /* Prev iteration configuration */
+#define WT_CBT_ITERATE_RETRY_NEXT 0x040u /* Prepare conflict by next. */
+#define WT_CBT_ITERATE_RETRY_PREV 0x080u /* Prepare conflict by prev. */
+#define WT_CBT_READ_ONCE 0x100u          /* Page in with WT_READ_WONT_NEED */
+#define WT_CBT_SEARCH_SMALLEST 0x200u    /* Row-store: small-key insert list */
+#define WT_CBT_VAR_ONPAGE_MATCH 0x400u   /* Var-store: on-page recno match */
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 #define WT_CBT_POSITION_MASK /* Flags associated with position */                      \
