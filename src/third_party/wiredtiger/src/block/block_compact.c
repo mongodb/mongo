@@ -19,10 +19,14 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_UNUSED(session);
 
+    if (block->compact_session_id != WT_SESSION_ID_INVALID)
+        return (EBUSY);
+
     /* Switch to first-fit allocation. */
     __wt_block_configure_first_fit(block, true);
 
     /* Reset the compaction state information. */
+    block->compact_session_id = session->id;
     block->compact_pct_tenths = 0;
     block->compact_bytes_reviewed = 0;
     block->compact_bytes_rewritten = 0;
@@ -45,12 +49,17 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
     /* Restore the original allocation plan. */
     __wt_block_configure_first_fit(block, false);
 
+    /* Ensure this the same session that started compaction. */
+    WT_ASSERT(session, block->compact_session_id == session->id);
+    block->compact_session_id = WT_SESSION_ID_INVALID;
+
     /* Dump the results of the compaction pass. */
     if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1)) {
         __wt_spin_lock(session, &block->live_lock);
         __block_dump_file_stat(session, block, false);
         __wt_spin_unlock(session, &block->live_lock);
     }
+
     return (0);
 }
 

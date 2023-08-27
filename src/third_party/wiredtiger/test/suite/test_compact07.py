@@ -129,10 +129,9 @@ class test_compact07(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # Delete the first 90%.
-        delete_range = 90 * self.table_numkv // 100
         for i in range(self.n_tables):
             uri = self.uri_prefix + f'_{i}'
-            self.delete_range(uri, delete_range)
+            self.delete_range(uri, 90 * self.table_numkv // 100)
 
         # Write to disk.
         self.session.checkpoint()
@@ -169,8 +168,15 @@ class test_compact07(wttest.WiredTigerTestCase):
         self.assertGreater(success, 0)
         stat_cursor.close()
 
-        # FIXME-WT-11432: Background and foreground compaction should not run in parallel, stop the
-        # background compaction server before proceeding.
+        # Perform foreground compaction on the remaining file by setting a free_space_target value
+        # that is guaranteed to run on it. This call might return EBUSY if background compaction is
+        # inspecting it at the same time.
+        self.compactUntilSuccess(self.session, uri_small, 'free_space_target=1MB')
+
+        # Check that foreground compaction has done some work on the small table.
+        self.assertGreater(self.get_pages_rewritten(uri_small), 0)
+
+        # Stop the background compaction server.
         self.session.compact(None, 'background=false')
 
         # Wait for the background compaction server to stop running.
@@ -183,13 +189,6 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Background compaction may be have been inspecting a table when disabled which is
         # considered as an interruption, ignore that message.
         self.ignoreStdoutPatternIfExists('background compact interrupted by application')
-
-        # Perform foreground compaction on the remaining file by setting a free_space_target value
-        # that is guaranteed to run on it.
-        self.session.compact(uri_small, f'free_space_target=1MB')
-
-        # Check that foreground compaction has done some work on the small table.
-        self.assertGreater(self.get_pages_rewritten(uri_small), 0)
 
 if __name__ == '__main__':
     wttest.run()
