@@ -192,7 +192,8 @@ struct __wtperf {         /* Per-database structure */
 
     volatile bool idle_cycle_run; /* Signal for idle cycle thread */
 
-    volatile uint32_t totalsec; /* total seconds running */
+    uint32_t testsec;           /* total seconds executing workload */
+    volatile uint32_t totalsec; /* total seconds running - including populate */
 
 #define CFG_GROW 0x0001     /* There is a grow workload */
 #define CFG_SHRINK 0x0002   /* There is a shrink workload */
