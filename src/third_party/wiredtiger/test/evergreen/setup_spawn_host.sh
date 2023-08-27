@@ -23,6 +23,26 @@ if [[ -n $WT_ARCHIVE ]]; then
     tar --wildcards -xzf $WT_ARCHIVE
 fi
 
+# Setup the gdb environment if there are core dumps present in the artefacts.
+GDB_CORE_DUMP=$(find ${HOME}/wiredtiger/cmake_build -name "*.core" | head -n 1 2>/dev/null)
+if [[ -n $GDB_CORE_DUMP ]]; then
+    # Read the CMakeCache txt file to find the old source directory and fix up the expected path to
+    # the correct path on the new machine.
+    OLD_WT_PATH=$(grep "WiredTiger_SOURCE_DIR" ${HOME}/wiredtiger/cmake_build/CMakeCache.txt | sed -e 's/[^\/]*//')
+
+    # GDB debug symbols includes a path to the source code we originally compiled. However since we
+    # compiled on a different machine and copied the artefacts to this spawn host, the file paths
+    # have changed. substitute-path command tells gdb the new location of the source code. Therefore
+    # set up the shared library paths and add another source directory to look under using 
+    # substitute path. 
+    cat >> ~/.gdbinit << EOF
+set solib-search-path ${HOME}/wiredtiger/cmake_build/lang/python:${HOME}/wiredtiger/cmake_build:${HOME}/wiredtiger/TCMALLOC_LIB/lib
+set substitute-path ${OLD_WT_PATH} ${HOME}/wiredtiger
+set print pretty on
+EOF
+
+fi
+
 # Install CMake into the machine.
 . test/evergreen/find_cmake.sh
 
