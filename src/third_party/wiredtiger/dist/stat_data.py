@@ -274,8 +274,7 @@ conn_stats = [
     CacheStat('cache_eviction_force', 'forced eviction - pages selected count'),
     CacheStat('cache_eviction_force_clean', 'forced eviction - pages evicted that were clean count'),
     CacheStat('cache_eviction_force_clean_time', 'forced eviction - pages evicted that were clean time (usecs)'),
-    CacheStat('cache_eviction_force_delete', 'forced eviction - pages selected because of all deleted items found'),
-    CacheStat('cache_eviction_force_obsolete_delete', 'forced eviction - pages selected because of too many obsolete deleted items count'),
+    CacheStat('cache_eviction_force_delete', 'forced eviction - pages selected because of too many deleted items count'),
     CacheStat('cache_eviction_force_dirty', 'forced eviction - pages evicted that were dirty count'),
     CacheStat('cache_eviction_force_dirty_time', 'forced eviction - pages evicted that were dirty time (usecs)'),
     CacheStat('cache_eviction_force_fail', 'forced eviction - pages selected unable to be evicted count'),
@@ -980,7 +979,6 @@ conn_dsrc_stats = [
     CursorStat('cursor_reposition_failed', 'Total number of times cursor fails to temporarily release pinned page to encourage eviction of hot or large page'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),
-    CursorStat('cursor_tree_walk_del_page_skip', 'Total number of deleted pages skipped during tree walk'),
 
     ##########################################
     # Cursor API error statistics
