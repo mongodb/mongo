@@ -234,9 +234,14 @@ thread_run(void *arg)
         if (compaction && i >= (100 * WT_THOUSAND) && i % (100 * WT_THOUSAND) == 0) {
             printf("Running compaction in Thread %" PRIu32 "\n", td->id);
             if (columnar_table)
-                testutil_check(session->compact(session, col_uri, NULL));
+                ret = session->compact(session, col_uri, NULL);
             else
-                testutil_check(session->compact(session, uri, NULL));
+                ret = session->compact(session, uri, NULL);
+            /*
+             * We may have several sessions trying to compact the same URI, in this case, EBUSY is
+             * returned.
+             */
+            testutil_assert(ret == 0 || ret == EBUSY);
         }
 
         /*
