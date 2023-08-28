@@ -69,7 +69,6 @@ boost::optional<std::pair<StringData, StringData>> _splitPath(StringData path) {
 }
 
 void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
-                                                     BSONElement elem,
                                                      StringData path,
                                                      BSONElementSet& elements,
                                                      bool expandArrayOnTrailingField,
@@ -85,13 +84,8 @@ void _handleIntermediateElementForExtractAllElementsOnBucketPath(
     MultikeyComponents* arrayComponents) {
     if (elem.type() == Object) {
         BSONObj embedded = elem.embeddedObject();
-        _handleElementForExtractAllElementsOnBucketPath(embedded,
-                                                        embedded.getField(path),
-                                                        path,
-                                                        elements,
-                                                        expandArrayOnTrailingField,
-                                                        depth + 1,
-                                                        arrayComponents);
+        _handleElementForExtractAllElementsOnBucketPath(
+            embedded, path, elements, expandArrayOnTrailingField, depth + 1, arrayComponents);
     } else if (elem.type() == Array) {
         bool allDigits = false;
         if (path.size() > 0 && ctype::isDigit(path[0])) {
@@ -102,13 +96,8 @@ void _handleIntermediateElementForExtractAllElementsOnBucketPath(
         }
         if (allDigits) {
             BSONObj embedded = elem.embeddedObject();
-            _handleElementForExtractAllElementsOnBucketPath(embedded,
-                                                            embedded.getField(path),
-                                                            path,
-                                                            elements,
-                                                            expandArrayOnTrailingField,
-                                                            depth + 1,
-                                                            arrayComponents);
+            _handleElementForExtractAllElementsOnBucketPath(
+                embedded, path, elements, expandArrayOnTrailingField, depth + 1, arrayComponents);
         } else {
             BSONObjIterator i(elem.embeddedObject());
             while (i.more()) {
@@ -116,7 +105,6 @@ void _handleIntermediateElementForExtractAllElementsOnBucketPath(
                 if (e2.type() == Object || e2.type() == Array) {
                     BSONObj embedded = e2.embeddedObject();
                     _handleElementForExtractAllElementsOnBucketPath(embedded,
-                                                                    embedded.getField(path),
                                                                     path,
                                                                     elements,
                                                                     expandArrayOnTrailingField,
@@ -146,31 +134,29 @@ void _handleTerminalElementForExtractAllElementsOnBucketPath(BSONElement elem,
         if (arrayComponents) {
             arrayComponents->insert(depth);
         }
-    } else {
+    } else if (!elem.eoo()) {
         elements.insert(elem);
     }
 }
 
 void _handleElementForExtractAllElementsOnBucketPath(const BSONObj& obj,
-                                                     BSONElement elem,
                                                      StringData path,
                                                      BSONElementSet& elements,
                                                      bool expandArrayOnTrailingField,
                                                      BSONDepthIndex depth,
                                                      MultikeyComponents* arrayComponents) {
-    if (elem.eoo()) {
-        size_t idx = path.find('.');
-        if (idx != std::string::npos) {
-            invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
-            StringData left = path.substr(0, idx);
-            StringData next = path.substr(idx + 1, path.size());
+    size_t idx = path.find('.');
+    if (idx != std::string::npos) {
+        invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
+        StringData left = path.substr(0, idx);
+        StringData next = path.substr(idx + 1, path.size());
 
-            BSONElement e = obj.getField(left);
+        BSONElement e = obj.getField(left);
 
-            _handleIntermediateElementForExtractAllElementsOnBucketPath(
-                e, next, elements, expandArrayOnTrailingField, depth, arrayComponents);
-        }
+        _handleIntermediateElementForExtractAllElementsOnBucketPath(
+            e, next, elements, expandArrayOnTrailingField, depth, arrayComponents);
     } else {
+        auto elem = obj.getField(path);
         _handleTerminalElementForExtractAllElementsOnBucketPath(
             elem, elements, expandArrayOnTrailingField, depth, arrayComponents);
     }
@@ -294,7 +280,6 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
 bool _haveArrayAlongBucketDataPath(const BSONObj& obj, StringData path, BSONDepthIndex depth);
 
 bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
-                                                   BSONElement elem,
                                                    StringData path,
                                                    BSONDepthIndex depth);
 
@@ -303,8 +288,7 @@ bool _handleIntermediateElementForHaveArrayAlongBucketDataPath(BSONElement elem,
                                                                BSONDepthIndex depth) {
     if (elem.type() == Object) {
         auto embedded = elem.embeddedObject();
-        return _handleElementForHaveArrayAlongBucketDataPath(
-            embedded, embedded.getField(path), path, depth + 1);
+        return _handleElementForHaveArrayAlongBucketDataPath(embedded, path, depth + 1);
     } else if (elem.type() == Array) {
         return true;
     }
@@ -318,27 +302,20 @@ bool _handleTerminalElementForHaveArrayAlongBucketDataPath(BSONElement elem) {
 
 
 bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
-                                                   BSONElement elem,
                                                    StringData path,
                                                    BSONDepthIndex depth) {
-    if (elem.eoo()) {
-        size_t idx = path.find('.');
-        if (idx != std::string::npos) {
-            tassert(5930502,
-                    "BSON depth too great",
-                    depth != std::numeric_limits<BSONDepthIndex>::max());
-            StringData left = path.substr(0, idx);
-            StringData next = path.substr(idx + 1, path.size());
+    size_t idx = path.find('.');
+    if (idx != std::string::npos) {
+        tassert(
+            5930502, "BSON depth too great", depth != std::numeric_limits<BSONDepthIndex>::max());
+        StringData left = path.substr(0, idx);
+        StringData next = path.substr(idx + 1, path.size());
 
-            BSONElement e = obj.getField(left);
+        BSONElement e = obj.getField(left);
 
-            return _handleIntermediateElementForHaveArrayAlongBucketDataPath(e, next, depth);
-        }
-    } else {
-        return _handleTerminalElementForHaveArrayAlongBucketDataPath(elem);
+        return _handleIntermediateElementForHaveArrayAlongBucketDataPath(e, next, depth);
     }
-
-    return false;
+    return _handleTerminalElementForHaveArrayAlongBucketDataPath(obj.getField(path));
 }
 
 bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
@@ -429,8 +406,7 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
             return false;
         }
         default: {
-            BSONElement e = obj.getField(path);
-            return _handleElementForHaveArrayAlongBucketDataPath(obj, e, path, depth);
+            return _handleElementForHaveArrayAlongBucketDataPath(obj, path, depth);
         }
     }
 }
@@ -471,8 +447,8 @@ Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
     // When we get here, we know that some prefix value on the control.min path was a non-object
     // type < Object. We can also assume that our parent was an Object.
 
-    auto e = maxObj.getField(field);
-    if (!e.eoo()) {
+    if (std::string::npos == field.find('.')) {
+        auto e = maxObj.getField(field);
         if (e.type() == BSONType::Array) {
             return Decision::Yes;
         } else if (e.type() > BSONType::Array) {
@@ -483,7 +459,7 @@ Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
 
     if (auto res = _splitPath(field)) {
         auto& [left, next] = *res;
-        e = maxObj.getField(left);
+        auto e = maxObj.getField(left);
 
         if (e.type() >= BSONType::Array) {
             return e.type() == BSONType::Array ? Decision::Yes : Decision::Maybe;
@@ -511,23 +487,20 @@ Decision _fieldContainsArrayData(const BSONObj& min, const BSONObj& max, StringD
 
     // Let's decide whether we are looking at the terminal field on the dotted path, or if we might
     // need to unpack sub-objects.
-    const bool terminal = std::string::npos == field.find('.');
-
-    // First lets try to use the field name literally (i.e. treat it as terminal, even if it has an
-    // internal dot).
-    auto [minLit, maxLit] = _getLiteralFields(min, max, field);
-    tassert(5993302, "Malformed control summary for bucket", minLit.eoo() == maxLit.eoo());
-    if (!minLit.eoo() /* => !maxLit.eoo()*/) {
-        return _controlTypesIndicateArrayData(minLit, maxLit, terminal);
-    } else if (terminal) {
+    if (std::string::npos == field.find('.')) {
+        auto [minLit, maxLit] = _getLiteralFields(min, max, field);
+        tassert(5993302, "Malformed control summary for bucket", minLit.eoo() == maxLit.eoo());
+        if (!minLit.eoo() /* => !maxLit.eoo()*/) {
+            return _controlTypesIndicateArrayData(minLit, maxLit, true);
+        }
         // Nothing further to evaluate, the field is missing from min and max, and thus from all
         // measurements in this bucket.
         return Decision::No;
     }
 
     auto [minEl, maxEl, nextField] = _getNextFields(min, max, field);
-    invariant(terminal == nextField.empty());
-    auto decision = _controlTypesIndicateArrayData(minEl, maxEl, terminal);
+    invariant(!nextField.empty());
+    auto decision = _controlTypesIndicateArrayData(minEl, maxEl, false);
     if (decision != Decision::Undecided) {
         return decision;
     }
