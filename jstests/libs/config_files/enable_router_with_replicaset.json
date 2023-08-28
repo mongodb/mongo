@@ -1,8 +1,8 @@
 {
-    "sharding" : {
-        "routerEnabled" : true
+    "replication": {
+        "replSetName": "dummy"
     },
-    "replication" : {
-        "replSetName" : "dummy"
+    "net": {
+        "routerPort": 27016
     }
 }

@@ -1,5 +1,5 @@
 {
-    "sharding" : {
-        "routerEnabled" : true
+    "net": {
+        "routerPort": 27016
     }
 }

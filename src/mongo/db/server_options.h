@@ -69,10 +69,11 @@ struct ServerGlobalParams {
 
     int port = DefaultDBPort;  // --port
     enum {
-        ConfigServerPort = 27019,
-        CryptDServerPort = 27020,
+        RouterPort = 27016,
         DefaultDBPort = 27017,
         ShardServerPort = 27018,
+        ConfigServerPort = 27019,
+        CryptDServerPort = 27020,
 #ifdef MONGO_CONFIG_GRPC
         DefaultGRPCServerPort = 27021,
 #endif
@@ -93,7 +94,7 @@ struct ServerGlobalParams {
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
     MaintenanceMode maintenanceMode;              // --maintenanceMode
 
-    int internalPort = ShardServerPort;  // --internalPort
+    boost::optional<int> routerPort;  // --routerPort
 
     bool objcheck = true;  // --objcheck
 

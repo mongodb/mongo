@@ -130,7 +130,7 @@ public:
         const ServerGlobalParams* config,
         ServiceContext* ctx,
         boost::optional<int> loadBalancerPort = {},
-        boost::optional<int> internalPort = {});
+        boost::optional<int> routerPort = {});
 
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 

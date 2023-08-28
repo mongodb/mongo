@@ -856,18 +856,18 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL
 
-class AsioTransportLayerWithInternalPortTest : public unittest::Test {
+class AsioTransportLayerWithRouterPortTest : public unittest::Test {
 public:
     // We opted to use static ports for simplicity. If this results in test failures due to busy
     // ports, we may change the fixture, as well as the underlying transport layer, to dynamically
     // choose the listening ports.
-    static constexpr auto kExternalPort = 22000;
-    static constexpr auto kInternalPort = 22001;
+    static constexpr auto kMainPort = 22000;
+    static constexpr auto kRouterPort = 22001;
 
     void setUp() override {
         auto options = defaultTLAOptions();
-        options.port = kExternalPort;
-        options.internalPort = kInternalPort;
+        options.port = kMainPort;
+        options.routerPort = kRouterPort;
         _fixture = std::make_unique<TestFixture>(options);
     }
 
@@ -883,16 +883,16 @@ public:
         return _fixture->tla().connect(remote, ConnectSSLMode::kDisableSSL, Seconds{10}, {});
     }
 
-    void doDifferentiatesConnectionsCase(bool internal) {
-        auto internalIngress = std::make_shared<Notification<bool>>();
-        sep().setOnStartSession([internalIngress](test::SessionThread& st) {
-            internalIngress->set(st.session().isFromInternalPort());
+    void doDifferentiatesConnectionsCase(bool useRouterPort) {
+        auto isFromRouterPort = std::make_shared<Notification<bool>>();
+        sep().setOnStartSession([isFromRouterPort](test::SessionThread& st) {
+            isFromRouterPort->set(st.session().isFromRouterPort());
         });
-        HostAndPort target{testHostName(), internal ? kInternalPort : kExternalPort};
+        HostAndPort target{testHostName(), useRouterPort ? kRouterPort : kMainPort};
         auto conn = connect(target);
         ASSERT_OK(conn) << " target={}"_format(target);
-        ASSERT_FALSE(conn.getValue()->isFromInternalPort());
-        ASSERT_EQ(internalIngress->get(), internal);
+        ASSERT_FALSE(conn.getValue()->isFromRouterPort());
+        ASSERT_EQ(isFromRouterPort->get(), useRouterPort);
     }
 
 private:
@@ -903,18 +903,18 @@ private:
     std::unique_ptr<TestFixture> _fixture;
 };
 
-TEST_F(AsioTransportLayerWithInternalPortTest, ListensOnBothPorts) {
-    for (auto port : {kInternalPort, kExternalPort}) {
+TEST_F(AsioTransportLayerWithRouterPortTest, ListensOnBothPorts) {
+    for (auto port : {kRouterPort, kMainPort}) {
         HostAndPort remote(testHostName(), port);
         ASSERT_OK(connect(remote).getStatus()) << "Unable to connect to " << remote;
     }
 }
 
-TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnectionsExternal) {
+TEST_F(AsioTransportLayerWithRouterPortTest, DifferentiatesConnectionsMainPort) {
     doDifferentiatesConnectionsCase(false);
 }
 
-TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnectionsInternal) {
+TEST_F(AsioTransportLayerWithRouterPortTest, DifferentiatesConnectionsRouterPort) {
     doDifferentiatesConnectionsCase(true);
 }
 

@@ -345,7 +345,7 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
     }
 
     onClientConnect(clientPtr);
-    // TODO SERVER-77921: use the return value of `Session::isFromInternalPort()` to choose an
+    // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
     // instance of `ServiceEntryPoint`.
     workflow->start();
 }

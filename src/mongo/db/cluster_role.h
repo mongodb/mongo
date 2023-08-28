@@ -59,7 +59,7 @@ public:
         ConfigServer = 0x02,
 
         /**
-         * The node acts as a router server (the process was started with --router argument).
+         * The node acts as a router server (the process was started with --routerPort argument).
          */
         RouterServer = 0x04
     };

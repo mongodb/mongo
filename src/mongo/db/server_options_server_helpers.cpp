@@ -353,10 +353,6 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("net.internalPort")) {
-        serverGlobalParams.internalPort = params["net.internalPort"].as<int>();
-    }
-
     if (params.count("security.transitionToAuth")) {
         serverGlobalParams.transitionToAuth = params["security.transitionToAuth"].as<bool>();
     }

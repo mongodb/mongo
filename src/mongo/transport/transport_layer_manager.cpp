@@ -159,12 +159,12 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     const ServerGlobalParams* config,
     ServiceContext* ctx,
     boost::optional<int> loadBalancerPort,
-    boost::optional<int> internalPort) {
+    boost::optional<int> routerPort) {
     auto sep = ctx->getServiceEntryPoint();
 
     transport::AsioTransportLayer::Options opts(config);
     opts.loadBalancerPort = std::move(loadBalancerPort);
-    opts.internalPort = std::move(internalPort);
+    opts.routerPort = std::move(routerPort);
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.push_back(std::make_unique<transport::AsioTransportLayer>(opts, sep));

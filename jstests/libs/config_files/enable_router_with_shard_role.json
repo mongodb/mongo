@@ -1,9 +1,11 @@
 {
-    "sharding" : {
-        "clusterRole" : "shardsvr",
-        "routerEnabled" : true
+    "sharding": {
+        "clusterRole": "shardsvr"
     },
-    "replication" : {
-        "replSetName" : "dummy"
+    "replication": {
+        "replSetName": "dummy"
+    },
+    "net": {
+        "routerPort": 27016
     }
 }

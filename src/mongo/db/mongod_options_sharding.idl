@@ -68,18 +68,15 @@ configs:
         source: yaml
         conflicts: configsvr
         requires: 'storage.queryableBackupMode'
-    router:
+    routerPort:
         description: >-
-            Assigns the router role to this node in a sharded cluster, and results in listening on
-            a dedicated port (27017 by default) for routing requests.
-        arg_vartype: Switch
+            Assigns the router role to this node in a sharded cluster, and results in listening to a
+            dedicated port (27016 by default) to serve routing requests.
+        arg_vartype: Int
         source: [ cli, ini ]
-    'sharding.routerEnabled':
-        description: >-
-            Assigns the router role to this node in a sharded cluster, and results in listening on
-            a dedicated port (27017 by default) for routing requests.
-        arg_vartype: Bool
-        source: yaml
+        validator: { gte: 0, lte: 65535 }
+        implicit:
+            expr: static_cast<int>(mongo::ServerGlobalParams::RouterPort)
     maintenanceMode:
         description: >-
             Allows this node to skip starting up sharding components or both replication and 
@@ -91,11 +88,10 @@ configs:
         conflicts: [configsvr, shardsvr]
         validator:
             callback: validateMaintenanceModeSetting
-    'net.internalPort':
-        source: [ cli, ini ]
-        description: 'The port to accept connections from other servers, when acting as a router.'
-        short_name: internalPort
+    'net.routerPort':
+        description: >-
+            Assigns the router role to this node in a sharded cluster, and results in listening to a
+            dedicated port to serve routing requests.
+        source: yaml
         arg_vartype: Int
         validator: { gte: 0, lte: 65535 }
-        default:
-            expr: static_cast<int>(mongo::ServerGlobalParams::ShardServerPort)

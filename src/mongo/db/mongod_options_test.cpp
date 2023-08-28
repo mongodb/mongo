@@ -42,18 +42,13 @@ class MongodOptionsTest : public unittest::Test {
 public:
     class Environment : public moe::Environment {
     public:
-        auto& setRouterRole(bool enable) {
-            _set("sharding.routerEnabled", enable);
-            return *this;
-        }
-
         auto& setPort(int port) {
             _set("net.port", port);
             return *this;
         }
 
-        auto& setInternalPort(int port) {
-            _set("net.internalPort", port);
+        auto& setRouterPort(int port = ServerGlobalParams::RouterPort) {
+            _set("net.routerPort", port);
             return *this;
         }
 
@@ -80,7 +75,7 @@ public:
         ServerGlobalParams defaults;
         serverGlobalParams.port = defaults.port;
         serverGlobalParams.clusterRole = defaults.clusterRole;
-        serverGlobalParams.internalPort = defaults.internalPort;
+        serverGlobalParams.routerPort = defaults.routerPort;
 
         env = Environment{};
     }
@@ -95,57 +90,46 @@ TEST_F(MongodOptionsTest, Base) {
     ASSERT_OK(storeMongodOptions(env));
 }
 
-TEST_F(MongodOptionsTest, RouterOnly) {
-    env.setRouterRole(true);
-    ASSERT_OK(storeMongodOptions(env));
-    ASSERT_FALSE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer))
-        << "Router role must be set along with a cluster role";
-}
-
 TEST_F(MongodOptionsTest, RouterAndShardServerWithDefaultPorts) {
-    env.setRouterRole(true).setClusterRole("shardsvr").setReplicaSet("myRS");
+    env.setClusterRole("shardsvr").setReplicaSet("myRS").setRouterPort();
     ASSERT_OK(storeMongodOptions(env));
 
-    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::DefaultDBPort);
-    ASSERT_EQ(serverGlobalParams.internalPort, ServerGlobalParams::ShardServerPort);
+    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::ShardServerPort);
+    ASSERT(serverGlobalParams.routerPort);
+    ASSERT_EQ(*serverGlobalParams.routerPort, ServerGlobalParams::RouterPort);
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 }
 
 TEST_F(MongodOptionsTest, RouterAndShardServerWithCustomPorts) {
-    env.setRouterRole(true)
-        .setClusterRole("shardsvr")
-        .setReplicaSet("myRS")
-        .setPort(123)
-        .setInternalPort(456);
+    env.setClusterRole("shardsvr").setReplicaSet("myRS").setPort(123).setRouterPort(456);
     ASSERT_OK(storeMongodOptions(env));
 
     ASSERT_EQ(serverGlobalParams.port, 123);
-    ASSERT_EQ(serverGlobalParams.internalPort, 456);
+    ASSERT(serverGlobalParams.routerPort);
+    ASSERT_EQ(*serverGlobalParams.routerPort, 456);
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 }
 
 TEST_F(MongodOptionsTest, RouterAndConfigServerWithDefaultPorts) {
-    env.setRouterRole(true).setClusterRole("configsvr").setReplicaSet("myRS");
+    env.setClusterRole("configsvr").setReplicaSet("myRS").setRouterPort();
     ASSERT_OK(storeMongodOptions(env));
 
-    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::DefaultDBPort);
-    ASSERT_EQ(serverGlobalParams.internalPort, ServerGlobalParams::ShardServerPort);
+    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::ConfigServerPort);
+    ASSERT(serverGlobalParams.routerPort);
+    ASSERT_EQ(*serverGlobalParams.routerPort, ServerGlobalParams::RouterPort);
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
 TEST_F(MongodOptionsTest, RouterAndConfigServerWithCustomPorts) {
-    env.setRouterRole(true)
-        .setClusterRole("configsvr")
-        .setReplicaSet("myRS")
-        .setPort(123)
-        .setInternalPort(456);
+    env.setClusterRole("configsvr").setReplicaSet("myRS").setPort(123).setRouterPort(456);
     ASSERT_OK(storeMongodOptions(env));
 
     ASSERT_EQ(serverGlobalParams.port, 123);
-    ASSERT_EQ(serverGlobalParams.internalPort, 456);
+    ASSERT(serverGlobalParams.routerPort);
+    ASSERT_EQ(*serverGlobalParams.routerPort, 456);
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }

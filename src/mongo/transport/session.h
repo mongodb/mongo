@@ -165,9 +165,9 @@ public:
     virtual bool isFromLoadBalancer() const = 0;
 
     /**
-     * Returns true if this session corresponds to a connection accepted from the internal port.
+     * Returns true if this session corresponds to a connection accepted from the router port.
      */
-    virtual bool isFromInternalPort() const {
+    virtual bool isFromRouterPort() const {
         return false;
     }
 

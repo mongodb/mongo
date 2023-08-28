@@ -109,9 +109,9 @@ public:
         return _isFromLoadBalancer;
     }
 
-    bool isFromInternalPort() const override {
-        auto internalPort = _tl->internalPort();
-        return _isIngressSession && internalPort && *internalPort == _local.port();
+    bool isFromRouterPort() const override {
+        auto routerPort = _tl->routerPort();
+        return _isIngressSession && routerPort && *routerPort == _local.port();
     }
 
 #ifdef MONGO_CONFIG_SSL

@@ -254,13 +254,10 @@ Status validateMongodOptions(const moe::Environment& params) {
         setShardRole = setShardRole || clusterRole == "shardsvr";
     }
 
-    bool setRouterRole = params.count("router");
-    if (params.count("sharding.routerEnabled")) {
-        setRouterRole = setRouterRole || params["sharding.routerEnabled"].as<bool>();
-    }
+    bool setRouterPort = params.count("routerPort") || params.count("net.routerPort");
 
     // TODO (SERVER-79008): Make `--configdb` mandatory when the embedded router is enabled.
-    if (setRouterRole && !setConfigRole && !setShardRole) {
+    if (setRouterPort && !setConfigRole && !setShardRole) {
         return Status(ErrorCodes::BadValue,
                       "The embedded router requires the node to act as a shard or config server");
     }
@@ -352,15 +349,14 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
-    // If the "--router" option is passed from the command line, override "sharding.routerEnabled"
+    // If the "--routerPort" option is passed from the command line, override "net.routerPort"
     // (config file option) as it will be used later.
-    if (params->count("router")) {
-        Status ret =
-            params->set("sharding.routerEnabled", moe::Value((*params)["router"].as<bool>()));
+    if (params->count("routerPort")) {
+        Status ret = params->set("net.routerPort", moe::Value((*params)["routerPort"].as<int>()));
         if (!ret.isOK()) {
             return ret;
         }
-        ret = params->remove("router");
+        ret = params->remove("routerPort");
         if (!ret.isOK()) {
             return ret;
         }
@@ -687,9 +683,11 @@ Status storeMongodOptions(const moe::Environment& params) {
                                       clusterRoleParam));
         }
 
-        if (feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
-            params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
-            serverGlobalParams.clusterRole += ClusterRole::RouterServer;
+        if (params.count("net.routerPort")) {
+            if (feature_flags::gEmbeddedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+                serverGlobalParams.routerPort = params["net.routerPort"].as<int>();
+                serverGlobalParams.clusterRole += ClusterRole::RouterServer;
+            }
         }
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
                serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {
@@ -697,11 +695,10 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (!params.count("net.port")) {
-        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
-            serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-        } else if (serverGlobalParams.clusterRole.hasExclusively(
-                       {ClusterRole::ShardServer, ClusterRole::ConfigServer})) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
         }
     }
 

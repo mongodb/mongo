@@ -316,14 +316,14 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 #endif
 
 auto makeTransportLayer(ServiceContext* svcCtx) {
-    boost::optional<int> internalPort;
+    boost::optional<int> routerPort;
     boost::optional<int> loadBalancerPort;
 
-    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        internalPort = serverGlobalParams.internalPort;
-        if (*internalPort == serverGlobalParams.port) {
+    if (serverGlobalParams.routerPort) {
+        routerPort = serverGlobalParams.routerPort;
+        if (*routerPort == serverGlobalParams.port) {
             LOGV2_ERROR(7791701,
-                        "The internal port must be different from the public listening port.",
+                        "The router port must be different from the public listening port.",
                         "port"_attr = serverGlobalParams.port);
             quickExit(ExitCode::badOptions);
         }
@@ -331,7 +331,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
     }
 
     return transport::TransportLayerManager::createWithConfig(
-        &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(internalPort));
+        &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(routerPort));
 }
 
 void logStartup(OperationContext* opCtx) {
