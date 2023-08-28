@@ -55,7 +55,7 @@ a notice will be included in
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0 | |             ✗                |
 | [variant]                  | BSL-1.0           | 1.4.0             |                      |                ✗                |
 | [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
-| [yaml-cpp]                 | MIT               | 0.6.2             |                      |                ✗                |
+| [yaml-cpp]                 | MIT               | 0.6.3             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.13            |          ✗           |                ✗                |
 | [Zstandard]                | BSD-3-Clause      | 1.5.2             |          ✗           |                ✗                |
 
