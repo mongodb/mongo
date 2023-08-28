@@ -203,7 +203,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
                     opCtx, *metadata, shardKey, *atClusterTime);
             }
 
-            return;
+            continue;
         }
 
         auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
