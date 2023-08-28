@@ -79,18 +79,6 @@ H AbslHashValue(H h, const Collation& collation) {
 }
 
 /**
- * CollatorInterface's hash function compatible with absl::Hash.
- */
-template <typename H>
-H AbslHashValue(H h, const CollatorInterface* ci) {
-    if (ci == nullptr) {
-        return std::move(h);
-    }
-
-    return H::combine(std::move(h), ci->getSpec());
-}
-
-/**
  * MatchExpression's hasher implementation compatible with absl::Hash.
  */
 template <typename H>
@@ -132,7 +120,8 @@ public:
         // regexes, and equalities fields.
 
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState), expr->hasNull(), expr->getCollator());
+        _hashState = H::combine(std::move(_hashState), expr->hasNull());
+        hashCombineCollator(expr->getCollator());
 
         BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                      expr->getCollator());
@@ -194,9 +183,8 @@ public:
     }
     void visit(const ExprMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
-        _hashState = H::combine(std::move(_hashState),
-                                expr->getExpressionContext()->getCollator(),
-                                *expr->getExpression());
+        hashCombineCollator(expr->getExpressionContext()->getCollator());
+        _hashState = H::combine(std::move(_hashState), *expr->getExpression());
     }
     void visit(const GeoMatchExpression* expr) final {
         hashCombineTypeAndPath(expr);
@@ -324,6 +312,12 @@ private:
         _hashState = H::combine(std::move(_hashState), expr->matchType(), expr->path());
     }
 
+    void hashCombineCollator(const CollatorInterface* ci) {
+        if (ci) {
+            _hashState = H::combine(std::move(_hashState), ci->getSpec());
+        }
+    }
+
     void visitBitTest(const BitTestMatchExpression* expr) {
         // BitPositionsParamId, BitMaskParamId, and BitMask are not hashed because they are not used
         // in `equivalent()` function.
@@ -344,8 +338,8 @@ private:
         BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                      stringComparator);
         hashCombineTypeAndPath(expr);
-        _hashState =
-            H::combine(std::move(_hashState), eltCmp.hash(expr->getData()), expr->getCollator());
+        _hashState = H::combine(std::move(_hashState), eltCmp.hash(expr->getData()));
+        hashCombineCollator(expr->getCollator());
     }
 
     void visitText(const TextMatchExpressionBase* expr) {
