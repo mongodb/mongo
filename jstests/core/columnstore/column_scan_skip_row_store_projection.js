@@ -186,6 +186,14 @@ function runAllAggregations() {
         requiredRowstoreReads: 1
     });
 
+    // $project inclusion followed by a $addFields which can be pushed into SBE should
+    // require a row store expression.
+    test({
+        agg: [{$project: {a: 1}}, {$addFields: {newField: 999}}],
+        requiresRowStoreExpr: true,
+        requiredRowstoreReads: 1
+    });
+
     // Nested paths.
     // The BrowserUsageByDistinctUserQuery that motivated this ticket is an example of this.
     test({

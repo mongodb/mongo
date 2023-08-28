@@ -1002,7 +1002,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "corresponding 'proj' object in the provided JSON"};
         }
         BSONObj projObj = el.Obj();
-        invariant(bsonObjFieldsAreInSet(projObj, {"type", "spec", "node"}));
+        invariant(bsonObjFieldsAreInSet(projObj, {"type", "spec", "node", "isAddition"}));
 
         BSONElement projType = projObj["type"];
         if (!projType.eoo()) {
@@ -1048,14 +1048,23 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                 "JSON"};
         }
 
+        // Extra flag which can be used to indicate whether the projection is an "addition" (adding
+        // fields) or not (excluding/including fields);
+        BSONElement isAdditionElt = projObj["isAddition"];
+        const bool isAddition = isAdditionElt.trueValue();
+
         // Create an empty/dummy expression context without access to the operation context and
         // collator. This should be sufficient to parse a projection.
         auto expCtx = make_intrusive<ExpressionContext>(
             nullptr, nullptr, NamespaceString::createNamespaceString_forTest("test.dummy"));
         auto projection = projection_ast::parseAndAnalyze(
-            expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
+            expCtx,
+            spec.Obj(),
+            isAddition ? ProjectionPolicies::addFieldsProjectionPolicies()
+                       : ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());
         auto solnProjObj = projection_ast::astToDebugBSON(pn->proj.root());
+
         if (!SimpleBSONObjComparator::kInstance.evaluate(specProjObj == solnProjObj)) {
             return {ErrorCodes::Error{5619278},
                     str::stream() << "found a projection stage in the solution with "
@@ -1376,6 +1385,16 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                     "mismatching output fields within 'column_scan'");
                 !outputStatus.isOK()) {
                 return outputStatus;
+            }
+        }
+
+        if (auto extraFieldsPermittedElt = obj["extraFieldsPermitted"]) {
+            const bool extraFieldsPermitted = extraFieldsPermittedElt.trueValue();
+            if (actualColumnIxScanNode->extraFieldsPermitted != extraFieldsPermitted) {
+                return {ErrorCodes::Error{5842499},
+                        str::stream() << "Found mismatched extraFieldsPermitted. Expected "
+                                      << extraFieldsPermitted << " Found: "
+                                      << actualColumnIxScanNode->extraFieldsPermitted};
             }
         }
 

@@ -891,6 +891,46 @@ TEST_F(QueryPlannerColumnarTest, DottedFieldsWithGroupStageDoesNotRequireProject
         << solution->root()->toString();
 }
 
+TEST_F(QueryPlannerColumnarTest, ExtraFieldsNotPermittedWhenApplyingExclusionProjectionAfter) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    auto pipeline = Pipeline::parse(
+        {fromjson(
+            "{$_internalProjection: {spec: {newfield: {$const: 999}}, policies: 'addFields'}}")},
+        expCtx);
+
+    runQueryWithPipeline(BSONObj(), BSON("a" << 1), makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {},
+            outputFields: ['_id', 'a'],
+            matchFields: []
+        }
+    })");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+        proj: {
+            spec: {newfield: { $const: 999 }},
+            isAddition: true,
+            node: {
+                 column_scan: {
+                     filtersByPath: {},
+                     outputFields: ['_id', 'a'],
+                     matchFields: [],
+                     extraFieldsPermitted: false
+                 }
+            }
+        }
+    })",
+                                                   solution->root()))
+        << solution->root()->toString();
+}
+
 TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsIncluded) {
     addColumnStoreIndexAndEnableFilterSplitting();
     params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;

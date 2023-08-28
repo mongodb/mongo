@@ -844,8 +844,10 @@ void QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(QuerySoluti
                 }
             }
             // Look for projection above column scan.
-            else if (root.getType() == STAGE_PROJECTION_SIMPLE ||
-                     root.getType() == STAGE_PROJECTION_DEFAULT) {
+            else if ((root.getType() == STAGE_PROJECTION_SIMPLE ||
+                      root.getType() == STAGE_PROJECTION_DEFAULT) &&
+                     static_cast<ProjectionNode&>(root).proj.type() ==
+                         projection_ast::ProjectType::kInclusion) {
                 auto& parentProjection = static_cast<ProjectionNode&>(root);
                 // A row store expression that preserves all fields used by the parent projection is
                 // redundant and can be removed.
