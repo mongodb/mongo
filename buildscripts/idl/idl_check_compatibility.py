@@ -195,48 +195,6 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'newReplyFieldTypeStructIgnoreList-reply-unstableNewFieldIgnoreList',
 
     # Real use cases for changing a field from 'stable' to 'unstable'.
-
-    # The 'originalSpec' field was introduced in v5.1 behind a disabled feature flag and is not user
-    # visible. This is part of the listIndexes output when executed against system.bucket.*
-    # collections, which users should avoid doing.
-    'listIndexes-reply-originalSpec',
-    # The 'vars' field was introduced to facilitate communication between mongot and mongod and is
-    # not user visible.
-    'find-reply-vars',
-    'aggregate-reply-vars',
-    # The 'cursor' field is now optional in a reply, as inter-node communication in aggregation
-    # can return one or more cursors. Multiple cursors are covered under the 'cursors' field.
-    'find-reply-cursor',
-    'aggregate-reply-cursor',
-    # The 'ignoreUnknownIndexOptions' field is for internal use only and is not documented to users.
-    'createIndexes-param-ignoreUnknownIndexOptions',
-    # The 'runtimeConstants' field is a legacy field for internal use only and is not documented to
-    # users.
-    'delete-param-runtimeConstants',
-    # The 'isTimeseriesNamespace' field is sent from mongos to shards for internal use.
-    'collMod-param-isTimeseriesNamespace',
-    'createIndexes-param-isTimeseriesNamespace',
-    'dropIndexes-param-isTimeseriesNamespace',
-    'listIndexes-param-isTimeseriesNamespace',
-    'insert-param-isTimeseriesNamespace',
-    'update-param-isTimeseriesNamespace',
-    'delete-param-isTimeseriesNamespace',
-    'findAndModify-param-isTimeseriesNamespace',
-    # The 'needsMerge' and 'fromMongos' fields of aggregation are sent from mongos to shards for internal use.
-    'aggregate-param-needsMerge',
-    'aggregate-param-fromMongos',
-    # Bulk fixes for fields that are strictly internal all along and should thus be marked unstable.
-    'endSessions-param-txnNumber',
-    'endSessions-param-txnUUID',
-    'findAndModify-param-stmtId',
-    'hello-reply-cwwc',
-    'hello-reply-isImplicitDefaultMajorityWC',
-    'hello-param-loadBalanced',
-    'hello-reply-serviceId',
-    'refreshSessions-param-txnNumber',
-    'refreshSessions-param-txnUUID',
-    # upsertSupplied is an internal implementation detail of $merge
-    'update-param-upsertSupplied',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable
@@ -1069,9 +1027,7 @@ def check_param_or_type_validator(ctxt: IDLCompatibilityContext, old_field: synt
     # SERVER-71601.
     #
     # Do not add additional parameters to this list.
-    ignore_validator_check_list = [
-        "create-param-bucketMaxSpanSeconds", "create-param-bucketRoundingSeconds"
-    ]
+    ignore_validator_check_list: List[str] = []
 
     if new_field.validator:
         if old_field.validator:
