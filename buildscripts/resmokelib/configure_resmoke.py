@@ -20,7 +20,10 @@ import pymongo.uri_parser
 import yaml
 from opentelemetry import trace, context, baggage
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
-from opentelemetry.context.context import Context
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
+from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
 
 from buildscripts.idl import gen_all_feature_flag_list
 
@@ -165,24 +168,16 @@ def _set_up_tracing(
 ) -> bool:
     """Try to set up otel tracing. On success return True. On failure return False."""
 
-    # TODO: SERVER-80336
-    # Due to a very weird python bug between macosx and opentelemetry-sdk there is a python segfault on shutdown
-    # This is a huge hack to just manually not use this part of OTEL on mac
-    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import ConsoleSpanExporter
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
-
     success = True
     # Service name is required for most backends
     resource = Resource(attributes={SERVICE_NAME: "resmoke"})
 
     provider = TracerProvider(resource=resource)
-    if otel_collector_endpoint:
+    if otel_collector_endpoint and sys.platform != "darwin":
         # TODO: EVG-20576
         # We can remove this and export to a file when EVG-20576 is merged
         # This will remove our dependency on grpc
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=otel_collector_endpoint))
         provider.add_span_processor(processor)
 
@@ -190,8 +185,7 @@ def _set_up_tracing(
         try:
             otel_collector_file_path = Path(otel_collector_file)
             otel_collector_file_path.parent.mkdir(parents=True, exist_ok=True)
-            processor = BatchedBaggageSpanProcessor(
-                ConsoleSpanExporter(out=open(otel_collector_file_path, mode='w')))
+            processor = BatchedBaggageSpanProcessor(FileSpanExporter(otel_collector_file_path))
             provider.add_span_processor(processor)
         except OSError:
             traceback.print_exc()
@@ -453,39 +447,32 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.OTEL_COLLECTOR_ENDPOINT = config.pop("otel_collector_endpoint")
     _config.OTEL_COLLECTOR_FILE = config.pop("otel_collector_file")
 
-    # TODO: SERVER-80336
-    # Due to a very weird python bug between macosx and opentelemetry-sdk there is a python segfault on shutdown
-    # This is a huge hack to just manually not use this part of OTEL on mac
-    # Currently evergreen does not support OTEL on mac so we are not losing anything
-    # Even if they ended up supporting otel on mac we would not lose much info
-    # since the vast majority of our testing is not on mac
-    if sys.platform != "darwin":
-        try:
-            setup_success = _set_up_tracing(
-                _config.OTEL_COLLECTOR_ENDPOINT,
-                _config.OTEL_COLLECTOR_FILE,
-                _config.OTEL_TRACE_ID,
-                _config.OTEL_PARENT_ID,
-                extra_context={
-                    "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
-                    "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
-                    "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
-                    "evergreen.task.execution": _config.EVERGREEN_EXECUTION,
-                    "evergreen.task.id": _config.EVERGREEN_TASK_ID,
-                    "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
-                    "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
-                    "evergreen.revision": _config.EVERGREEN_REVISION,
-                    "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
-                },
-            )
-            if not setup_success:
-                print("Failed to create file to send otel metrics to. Continuing.")
-        except:
-            # We want this as a catch all exception
-            # If there is some problem setting up metrics we don't want resmoke to fail
-            # We would rather just swallow the error
-            traceback.print_exc()
-            print("Failed to set up otel metrics. Continuing.")
+    try:
+        setup_success = _set_up_tracing(
+            _config.OTEL_COLLECTOR_ENDPOINT,
+            _config.OTEL_COLLECTOR_FILE,
+            _config.OTEL_TRACE_ID,
+            _config.OTEL_PARENT_ID,
+            extra_context={
+                "evergreen.build.id": _config.EVERGREEN_BUILD_ID,
+                "evergreen.distro.id": _config.EVERGREEN_DISTRO_ID,
+                "evergreen.project.identifier": _config.EVERGREEN_PROJECT_NAME,
+                "evergreen.task.execution": _config.EVERGREEN_EXECUTION,
+                "evergreen.task.id": _config.EVERGREEN_TASK_ID,
+                "evergreen.task.name": _config.EVERGREEN_TASK_NAME,
+                "evergreen.variant.name": _config.EVERGREEN_VARIANT_NAME,
+                "evergreen.revision": _config.EVERGREEN_REVISION,
+                "evergreen.patch_build": _config.EVERGREEN_PATCH_BUILD,
+            },
+        )
+        if not setup_success:
+            print("Failed to create file to send otel metrics to. Continuing.")
+    except:
+        # We want this as a catch all exception
+        # If there is some problem setting up metrics we don't want resmoke to fail
+        # We would rather just swallow the error
+        traceback.print_exc()
+        print("Failed to set up otel metrics. Continuing.")
 
     # Force invalid suite config
     _config.FORCE_EXCLUDED_TESTS = config.pop("force_excluded_tests")
