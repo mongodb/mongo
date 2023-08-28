@@ -12,6 +12,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: linux-x86-dynamic-compile
 
 # THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_x86_generic_expansions

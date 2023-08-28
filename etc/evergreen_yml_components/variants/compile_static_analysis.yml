@@ -215,6 +215,7 @@ buildvariants:
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: .crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile

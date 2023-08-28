@@ -74,6 +74,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: linux-x86-dynamic-compile
 
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
@@ -84,6 +86,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: amazon-linux2-arm64-compile
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
@@ -94,6 +98,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: linux-x86-dynamic-debug-compile-required
 
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
@@ -104,6 +110,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: linux-debug-aubsan-compile-required
 
 - &windows_compile_variant_dependency
   depends_on:
@@ -114,6 +122,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: windows-compile-required
 
 # THIS WAS COPIED TO config_shard.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_x86_generic_expansions
