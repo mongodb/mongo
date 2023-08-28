@@ -320,10 +320,12 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
     SerializationOptions{.literalPolicy =
-                             LiteralSerializationPolicy::kToRepresentativeParseableValue};
+                             LiteralSerializationPolicy::kToRepresentativeParseableValue,
+                         .inMatchExprSortAndDedupElements = false};
 
 const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
-    SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString};
+    SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString,
+                         .inMatchExprSortAndDedupElements = false};
 
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {
