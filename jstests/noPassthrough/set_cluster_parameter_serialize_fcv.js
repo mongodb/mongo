@@ -18,23 +18,22 @@ const parallelShellSetFCVFn = `({conn}) => {
 const parallelShellSetCSPFnSuccess =
     `({conn}) => {
 assert.commandWorked(
-    conn.getDB('admin').runCommand({setClusterParameter: {testMinFcvClusterParameter: {intData: 106}}}));
+    conn.getDB('admin').runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}));
 }`;
 const parallelShellSetCSPFnFail =
     `({conn}) => {
 assert.commandFailedWithCode(
-    conn.getDB('admin').runCommand({setClusterParameter: {testMinFcvClusterParameter: {intData: 106}}}), ErrorCodes.BadValue);
+    conn.getDB('admin').runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}), ErrorCodes.BadValue);
 }`;
 
 function runReplSetTest(fixture) {
-    // Assert that the cluster parameter is initially at default value of 16.
+    // Assert that the cluster parameter is initially at default value of 0.
     fixture.asAdmin(({admin}) => {
-        const intData = assert
-                            .commandWorked(admin.runCommand(
-                                {getClusterParameter: "testMinFcvClusterParameter"}))
-                            .clusterParameters[0]
-                            .intData;
-        assert.eq(intData, 16);
+        const intData =
+            assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
+                .clusterParameters[0]
+                .intData;
+        assert.eq(intData, 0);
     });
 
     // Set a failpoint to make setFeatureCompatibilityVersion hang when modifying the FCV document.
@@ -49,7 +48,7 @@ function runReplSetTest(fixture) {
 
     // Assert that the cluster parameter has been disabled.
     fixture.asAdmin(({admin}) => assert.commandFailedWithCode(
-                        admin.runCommand({getClusterParameter: "testMinFcvClusterParameter"}),
+                        admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
                         ErrorCodes.BadValue));
 
     // Turn off the failpoint. This should unblock setFCV, allowing FCV downgrade.
@@ -64,12 +63,11 @@ function runReplSetTest(fixture) {
     fixture.asAdmin(({admin}) => assert.commandWorked(admin.runCommand(
                         {setFeatureCompatibilityVersion: latestFCV, confirm: true})));
     fixture.asAdmin(({admin}) => {
-        const intData = assert
-                            .commandWorked(admin.runCommand(
-                                {getClusterParameter: "testMinFcvClusterParameter"}))
-                            .clusterParameters[0]
-                            .intData;
-        assert.eq(intData, 16);
+        const intData =
+            assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
+                .clusterParameters[0]
+                .intData;
+        assert.eq(intData, 0);
     });
 
     // Now, set a failpoint to make setClusterParameter hang.
@@ -92,32 +90,31 @@ function runReplSetTest(fixture) {
     // disabled.
     fixture.assertFCV(lastLTSFCV);
     fixture.asAdmin(({admin}) => assert.commandFailedWithCode(
-                        admin.runCommand({getClusterParameter: "testMinFcvClusterParameter"}),
+                        admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
                         ErrorCodes.BadValue));
 }
 
 function runShardedTest(fixture) {
-    // Check that the starting value of testMinFcvClusterParameter is the default of 16.
+    // Check that the starting value of cwspTestNeedsLatestFCV is the default of 0.
     fixture.asAdmin(({admin}) => {
-        const intData = assert
-                            .commandWorked(admin.runCommand(
-                                {getClusterParameter: "testMinFcvClusterParameter"}))
-                            .clusterParameters[0]
-                            .intData;
-        assert.eq(intData, 16);
+        const intData =
+            assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
+                .clusterParameters[0]
+                .intData;
+        assert.eq(intData, 0);
     });
 
     // Set a failpoint to make setFeatureCompatibilityVersion hang on a shard. setClusterParameter
-    // should also complete but return an error since testMinFCVClusterParameter is unavailable on
+    // should also complete but return an error since cwspTestNeedsLatestFCV is unavailable on
     // the lower FCV.
     let hangSetFCVWaiter = fixture.hangTransition(
         {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}, 'hangBeforeUpdatingFcvDoc');
     fixture.asAdmin(
         ({admin}) => assert.commandFailedWithCode(
-            admin.runCommand({setClusterParameter: {testMinFcvClusterParameter: {intData: 106}}}),
+            admin.runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}),
             ErrorCodes.BadValue));
     fixture.asAdmin(({admin}) => assert.commandFailedWithCode(
-                        admin.runCommand({getClusterParameter: "testMinFcvClusterParameter"}),
+                        admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
                         ErrorCodes.BadValue));
 
     // Turn off the failpoint and wait for the hung FCV downgrade to complete.
@@ -128,26 +125,25 @@ function runShardedTest(fixture) {
     // the config server due to the FCV downgrade.
     fixture.assertFCV(lastLTSFCV);
     fixture.asAdmin(({admin}) => assert.commandFailedWithCode(
-                        admin.runCommand({getClusterParameter: "testMinFcvClusterParameter"}),
+                        admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
                         ErrorCodes.BadValue));
 
     // After the failpoint is turned off, FCV upgrade should occur normally.
-    // testMinFcvClusterParameter should also become available.
+    // cwspTestNeedsLatestFCV should also become available.
     fixture.asAdmin(({admin}) => assert.commandWorked(admin.runCommand(
                         {setFeatureCompatibilityVersion: latestFCV, confirm: true})));
     fixture.asAdmin(({admin}) => {
-        const intData = assert
-                            .commandWorked(admin.runCommand(
-                                {getClusterParameter: "testMinFcvClusterParameter"}))
-                            .clusterParameters[0]
-                            .intData;
-        assert.eq(intData, 16);
+        const intData =
+            assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
+                .clusterParameters[0]
+                .intData;
+        assert.eq(intData, 0);
     });
 
     // Set a failpoint to make setClusterParameter hang on a shard. FCV downgrade should
     // fail while setClusterParameter is in progress.
     let hangSetClusterParameterWaiter =
-        fixture.hangTransition({setClusterParameter: {testMinFcvClusterParameter: {intData: 107}}},
+        fixture.hangTransition({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 107}}},
                                'hangInShardsvrSetClusterParameter');
     fixture.asAdmin(
         ({admin}) => assert.commandFailedWithCode(
@@ -161,11 +157,10 @@ function runShardedTest(fixture) {
     // Verify that the cluster parameter was correctly set and FCV remains at latestFCV.
     fixture.assertFCV(latestFCV);
     fixture.asAdmin(({admin}) => {
-        const intData = assert
-                            .commandWorked(admin.runCommand(
-                                {getClusterParameter: "testMinFcvClusterParameter"}))
-                            .clusterParameters[0]
-                            .intData;
+        const intData =
+            assert.commandWorked(admin.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}))
+                .clusterParameters[0]
+                .intData;
         assert.eq(intData, 107);
     });
 }

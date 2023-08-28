@@ -123,12 +123,3 @@ server_parameters:
         test_only: true
         condition:
             feature_flag: gFeatureFlagClusterWideToaster
-
-    testMinFcvClusterParameter:
-        set_at: cluster
-        description: "Test cluster parameter that is disabled below a specific FCV"
-        cpp_varname: gTestMinFCVClusterParameter
-        cpp_vartype: TestIntClusterParameterStorage
-        test_only: true
-        condition:
-            min_fcv: 7.1 # TODO: SERVER-78872 change this to latestFCV constant rather than specific FCV
