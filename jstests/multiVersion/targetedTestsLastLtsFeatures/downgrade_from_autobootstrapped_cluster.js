@@ -186,6 +186,11 @@ configConn = MongoRunner.runMongod({
     port: oldConfig.port
 });
 
+assert.soon(() => {
+    let hello = configConn.getDB('admin')._helloOrLegacyHello();
+    return hello.isWritablePrimary || hello.ismaster;
+});
+
 removeShardingMetadata(configConn);
 verifyConfigColl(configConn);
 
