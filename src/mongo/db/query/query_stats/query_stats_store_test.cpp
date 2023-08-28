@@ -396,10 +396,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -411,7 +407,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<otherSort>": -1
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -446,10 +446,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -465,7 +461,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -500,10 +500,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -524,7 +520,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "allowPartialResults": true,
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -553,10 +553,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -577,7 +573,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "allowPartialResults": false,
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -596,13 +596,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 },
                 "command": "find",
                 "filter": {},
-                "hint": {
-                    "$natural": 1
-                },
                 "tailable": true,
                 "awaitData": true
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$natural": 1
+            }
         })",
         key);
 }
@@ -656,10 +656,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "z": 1,
-                    "c": 1
-                },
                 "max": {
                     "z": "?number"
                 },
@@ -667,7 +663,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "z": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "z": 1,
+                "c": 1
+            }
         })",
         key);
     // Test with a string hint. Note that this is the internal representation of the string hint
@@ -689,9 +689,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "$hint": "z"
-                },
                 "max": {
                     "z": "?number"
                 },
@@ -699,7 +696,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "z": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$hint": "z"
+            }
         })",
         key);
 
@@ -718,10 +718,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -729,7 +725,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<z>": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -749,9 +749,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "$natural": -1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -759,7 +756,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<z>": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$natural": -1
+            }
         })",
         key);
 }
@@ -1054,13 +1054,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "allowDiskUse": false,
                 "collation": {
                     "locale": "simple"
-                },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 
@@ -1127,16 +1127,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "collation": {
                     "locale": "simple"
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "let": {
                     "HASH<var1>": "$HASH<foo>",
                     "HASH<var2>": "?string"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 
@@ -1206,10 +1206,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "collation": {
                     "locale": "simple"
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "let": {
                     "HASH<var1>": "$HASH<foo>",
                     "HASH<var2>": "?string"
@@ -1221,7 +1217,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
             "maxTimeMS": "?number",
             "bypassDocumentValidation": "?bool",
             "comment": "?string",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 }

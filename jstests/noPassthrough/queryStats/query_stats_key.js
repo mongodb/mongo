@@ -30,7 +30,6 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "filter",
         "sort",
         "projection",
-        "hint",
         "skip",
         "limit",
         "singleBatch",
@@ -59,7 +58,8 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "apiVersion",
         "apiStrict",
         "collectionType",
-        "client"
+        "client",
+        "hint",
     ];
 
     for (const entry of queryStatsEntries) {

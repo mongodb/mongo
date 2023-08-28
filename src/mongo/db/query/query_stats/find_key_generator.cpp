@@ -53,7 +53,7 @@ std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* 
     // TODO: SERVER-76330 factor out building the parseable cmdObj into a helper function in
     // query_shape.h.
     BSONObjBuilder cmdBuilder;
-    NamespaceStringOrUUID nss = query_shape::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
+    NamespaceStringOrUUID nss = shape_helpers::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
     nss.serialize(&cmdBuilder, FindCommandRequest::kCommandName);
     cmdBuilder.append("$db", DatabaseNameUtil::serialize(nss.dbName()));
 

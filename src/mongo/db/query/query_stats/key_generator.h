@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/shape_helpers.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/decorable.h"
 
@@ -105,7 +106,7 @@ public:
             _parseableQueryShape.objsize() + /* _collectionType is not owned here */
             (_apiParams ? sizeof(*_apiParams) + optionalSize(_apiParams->getAPIVersion()) : 0) +
             (_hasField.clientMetaData ? _clientMetaData.objsize() : 0) + _commentObj.objsize() +
-            (_hasField.readPreference ? _readPreference.objsize() : 0);
+            (_hasField.readPreference ? _readPreference.objsize() : 0) + _hintObj.objsize();
     }
 
     BSONObj getRepresentativeQueryShapeForDebug() const {
@@ -115,9 +116,11 @@ public:
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
+                 boost::optional<BSONObj> hint,
                  query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown,
                  boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
         : _parseableQueryShape(parseableQueryShape.getOwned()),
+          _hintObj(hint.value_or(BSONObj())),
           _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))),
           _collectionType(collectionType) {
         if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
@@ -198,6 +201,10 @@ protected:
         if (_collectionType != query_shape::CollectionType::kUnknown) {
             bob.append("collectionType", toStringData(_collectionType));
         }
+
+        if (!_hintObj.isEmpty()) {
+            bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
+        }
     }
 
     /**
@@ -214,12 +221,17 @@ protected:
     // minimize the struct's size as much as possible.
 
     BSONObj _parseableQueryShape;
-    // Preserve this value in the query shape.
+    // Preserve this value.
     BSONObj _clientMetaData;
     // Shapify this value.
     BSONObj _commentObj;
-    // Preserve this value in the query shape.
+    // Preserve this value.
     BSONObj _readPreference;
+    // Preserve this value. Possibly empty.
+    // In the future a hint may not be part of every single type of request, but it is possibly
+    // set on a find, aggregate, distinct, and update, so this is going to be a "common" element
+    // for a while. It may not make sense on an insert request.
+    BSONObj _hintObj;
 
     // Separate the possibly-enormous BSONObj from the remaining members
 
@@ -245,7 +257,7 @@ protected:
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    sizeof(KeyGenerator) <= 4 * sizeof(BSONObj) + sizeof(BSONElement) +
+    sizeof(KeyGenerator) <= 5 * sizeof(BSONObj) + sizeof(BSONElement) +
             2 * sizeof(std::unique_ptr<APIParameters>) + sizeof(query_shape::CollectionType) +
             sizeof(query_shape::QueryShapeHash) + sizeof(int64_t),
     "Size of KeyGenerator is too large! "

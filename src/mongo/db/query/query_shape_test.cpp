@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_shape_test_gen.h"
+#include "mongo/db/query/shape_helpers.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"

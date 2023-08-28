@@ -76,6 +76,7 @@ public:
               expCtx->opCtx,
               // TODO: SERVER-76330 Store representative agg query shape in telemetry store.
               BSONObj(),
+              request.getHint(),
               collectionType),
           _request(std::move(request)),
           _involvedNamespaces(std::move(involvedNamespaces)),

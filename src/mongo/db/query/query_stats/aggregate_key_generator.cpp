@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/shape_helpers.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::query_stats {
@@ -100,7 +101,7 @@ void AggregateKeyGenerator::appendCommandSpecificComponents(
         BSONArrayBuilder otherNss = bob.subarrayStart(kOtherNssFieldName);
         for (const auto& nss : _involvedNamespaces) {
             BSONObjBuilder otherNsEntryBob = otherNss.subobjStart();
-            query_shape::appendNamespaceShape(otherNsEntryBob, nss, opts);
+            shape_helpers::appendNamespaceShape(otherNsEntryBob, nss, opts);
             otherNsEntryBob.doneFast();
         }
         otherNss.doneFast();

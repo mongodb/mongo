@@ -62,7 +62,10 @@ public:
         const ParsedFindCommand& request,
         BSONObj parseableQueryShape,
         query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
-        : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
+        : KeyGenerator(expCtx->opCtx,
+                       parseableQueryShape,
+                       request.findCommandRequest->getHint(),
+                       collectionType),
           _readConcern(request.findCommandRequest->getReadConcern().has_value()
                            ? request.findCommandRequest->getReadConcern()->copy()
                            : BSONObj()),

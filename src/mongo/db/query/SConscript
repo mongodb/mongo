@@ -454,7 +454,6 @@ env.Library(
     target='query_shape',
     source=[
         'query_shape.cpp',
-        'query_shape.idl',
         'query_stats/find_key_generator.cpp',
         'query_stats/aggregate_key_generator.cpp',
     ],
@@ -466,6 +465,7 @@ env.Library(
         'canonical_query',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query_shape_common',
         'projection_ast',
         'sort_pattern',
     ],
