@@ -120,6 +120,15 @@ runTest({
 });
 
 runTest({
+    pipeline: [{$match: {a: 5, b: 5}}, {$project: {_id: 0, a: 1, b: 1}}],
+    behaviour: {include: ['a', 'b']},
+    expectedDocs: [
+        {a: 5, b: 5},
+    ],
+    sbeCompatibleUnpack: true,
+});
+
+runTest({
     pipeline: [{$match: {a: {$gt: 5}}}, {$project: {a: 0}}],
     behaviour: {exclude: []},
     expectedDocs: [

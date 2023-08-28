@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
@@ -80,6 +81,25 @@ void printPlan(const sbe::PlanStage& stage) {
 
     static sbe::DebugPrinter debugPrinter(true);
     std::cout << std::endl << debugPrinter.print(stage) << std::endl << std::endl;
+}
+
+std::unique_ptr<sbe::EExpression> buildAndTree(sbe::EExpression::Vector& vec,
+                                               size_t beginIdx,
+                                               size_t endIdx) {
+    if (beginIdx == endIdx) {
+        return nullptr;
+    }
+
+    if (beginIdx + 1 == endIdx) {
+        return std::move(vec[beginIdx]);
+    }
+
+    auto midPt = (beginIdx + endIdx) / 2;
+    auto left = buildAndTree(vec, beginIdx, midPt);
+    auto right = buildAndTree(vec, midPt, endIdx);
+
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::Op::logicAnd, std::move(left), std::move(right));
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
@@ -157,14 +177,38 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         outputs.set(std::pair(PlanStageSlots::kField, *metaField), *optMetaSlot);
     }
 
-    // Adds a filter for the event filter if one exists.
-    if (unpackNode->eventFilter) {
-        auto eventFilterSbExpr = generateFilter(
-            _state, unpackNode->eventFilter.get(), /*rootSlot*/ boost::none, &outputs);
-        if (!eventFilterSbExpr.isNull()) {
-            stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), eventFilterSbExpr.extractExpr(_state), unpackNode->nodeId());
-            printPlan(*stage);
+
+    // Add filter stage(s) for the per-event filter.
+    if (auto eventFilter = unpackNode->eventFilter.get()) {
+        auto [eventFilterByPath, eventFilterResidual] =
+            expression::splitMatchExpressionForColumns(eventFilter);
+        {
+            sbe::EExpression::Vector andBranches;
+            for (auto& [_, filterMatchExpr] : eventFilterByPath) {
+                auto eventFilterSbExpr = generateFilter(
+                    _state, filterMatchExpr.get(), /*rootSlot*/ boost::none, &outputs);
+
+                andBranches.push_back(eventFilterSbExpr.extractExpr(_state));
+            }
+
+            auto combinedFilter = buildAndTree(andBranches, 0, andBranches.size());
+
+            if (combinedFilter) {
+                stage = sbe::makeS<sbe::FilterStage<false>>(
+                    std::move(stage), std::move(combinedFilter), unpackNode->nodeId());
+                printPlan(*stage);
+            }
+        }
+
+        // Adds a filter for the residual predicates.
+        if (eventFilterResidual) {
+            auto eventFilterSbExpr = generateFilter(
+                _state, eventFilterResidual.get(), /*rootSlot*/ boost::none, &outputs);
+            if (!eventFilterSbExpr.isNull()) {
+                stage = sbe::makeS<sbe::FilterStage<false>>(
+                    std::move(stage), eventFilterSbExpr.extractExpr(_state), unpackNode->nodeId());
+                printPlan(*stage);
+            }
         }
     }
 
