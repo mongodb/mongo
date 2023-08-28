@@ -33,12 +33,12 @@ def generate(env):
         scons_outfile_base = f"{cwd}/lib{target_to_build}"
 
         static_link = env.GetOption("link-model") in ["auto", "static"]
-        link_args = "--dynamic_mode=off" if static_link else "--dynamic_mode=fully"
+        link_args = ["--dynamic_mode=off"] if static_link else ["--dynamic_mode=fully"]
 
         # Craft series of build actions:
         env['BUILDERS']['_BazelBuild'] = SCons.Builder.Builder(action=" && ".join([
             # Build the target via Bazel
-            f"{BAZELISK_PATH} build {bazel_target} {link_args}",
+            f"{BAZELISK_PATH} build {bazel_target} {' '.join(link_args)}",
 
             # Colocate the Bazel static library with the SCons output:
             f"cp -f {bazel_outfile_base}.a {scons_outfile_base}.a",
