@@ -19,8 +19,6 @@ build_variant_large_distro_exceptions:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
-  - enterprise-rhel-72-s390x
-  - enterprise-rhel-72-s390x-inmem
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-coverage
   - enterprise-rhel-81-ppc64le

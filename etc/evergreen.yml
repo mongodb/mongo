@@ -1741,48 +1741,6 @@ buildvariants:
     distros:
     - ubuntu1804-build
 
-- name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
-  display_name: "Enterprise RHEL 7.2 s390x Compile"
-  modules:
-  - enterprise
-  run_on:
-  - rhel72-zseries-test
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  stepback: false
-  expansions:
-    compile_variant: *enterprise-rhel-72-s390x-compile
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel72
-      -j3
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-      --linker=gold
-    resmoke_jobs_max: 2
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: s390x
-    packager_distro: rhel72
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: s390x-enterprise-rhel72
-    repo_edition: enterprise
-    multiversion_platform: rhel72
-    multiversion_architecture: s390x
-    multiversion_edition: enterprise
-    num_scons_link_jobs_available: 0.99
-    test_flags: >-
-      --excludeWithAnyTags=incompatible_with_s390x
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - rhel72-zseries-build
-  - name: generate_buildid_to_debug_symbols_mapping
-
 ################################
 # storage engine buildvariants #
 ################################
