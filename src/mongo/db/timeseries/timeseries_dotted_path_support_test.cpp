@@ -105,6 +105,12 @@ TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPath) {
                 {a: true},
                 {a: false}
             ]
+        },
+        "j.k": {
+             "1": [
+                {a: true},
+                {a: false}
+            ]
         }
     }
 })");
@@ -130,6 +136,9 @@ TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPath) {
         ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.h.a.b"));
         ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i"));
         ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i.a"));
+
+        // Should not check dotted field names
+        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.j.k.a"));
     });
 }
 
@@ -171,7 +180,8 @@ TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
                     d: [],
                     e: true
                 }
-            }
+            },
+            "j.k": []
         },
         max: {
             a: true,
@@ -207,7 +217,8 @@ TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
                     e: true
                 },
                 g: true
-            }
+            },
+            "j.k": []
         }
     },
     data: {
@@ -321,6 +332,9 @@ TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
         ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "i.g.d"));
         // i.g.e: {min: object.object.bool, max: object.bool.eoo}
         ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.e"));
+
+        // Should not check dotted field names
+        ASSERT_EQ(no, tdps::fieldContainsArrayData(obj, "j.k"));
     });
 }
 
@@ -378,6 +392,12 @@ TEST_F(TimeseriesDottedPathSupportTest, ExtractAllElementsAlongBucketPath) {
                 {a: true},
                 {a: false}
             ]
+        },
+        "j.k": {
+             "1": [
+                {a: true},
+                {a: false}
+            ]
         }
     }
 })");
@@ -423,6 +443,9 @@ TEST_F(TimeseriesDottedPathSupportTest, ExtractAllElementsAlongBucketPath) {
         assertExtractionMatches("data.h.a"_sd, BSON_ARRAY(BSON("b" << true) << BSON("b" << false)));
         assertExtractionMatches("data.h.a.b"_sd, BSON_ARRAY(true << false));
         assertExtractionMatches("data.i.a"_sd, BSON_ARRAY(true << false));
+
+        // Do not check dotted field names
+        assertExtractionMatches("data.j.k.a"_sd, BSONArray());
     });
 }
 }  // namespace
