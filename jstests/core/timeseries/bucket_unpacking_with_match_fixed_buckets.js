@@ -343,7 +343,8 @@ function checkRandomTestResult(pipeline, shouldCheckExplain = true) {
 function generateRandomTimestamp() {
     const startTime = ISODate("2012-01-01T00:01:00.000Z");
     const maxTime = ISODate("2015-12-31T23:59:59.000Z");
-    return new Date(Math.floor(Random.rand() * (maxTime - startTime) + startTime));
+    return new Date(Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) +
+                               startTime.getTime()));
 }
 
 (function testRandomizedInput() {

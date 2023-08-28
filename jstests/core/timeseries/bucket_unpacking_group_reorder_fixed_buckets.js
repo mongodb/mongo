@@ -475,7 +475,8 @@ checkResults({
     // Insert 1000 documents at random times spanning 3 years (between 2012 and 2015). These dates
     // were chosen arbitrarily.
     for (let i = 0; i < 1000; i++) {
-        const randomTime = new Date(Math.floor(Random.rand() * (maxTime - startTime) + startTime));
+        const randomTime = new Date(Math.floor(
+            Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime()));
         docs.push({[timeField]: randomTime, [metaField]: "location"});
     }
     assert.commandWorked(coll.insertMany(docs));

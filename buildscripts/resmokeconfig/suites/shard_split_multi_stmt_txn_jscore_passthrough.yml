@@ -248,7 +248,7 @@ selector:
   # Multi-updates that conflict with shard split are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   - multiple_tenants_incompatible
-  - requires_timeseries # Tenant migration, transactions not supported
+  - requires_timeseries # Transactions not supported
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
   - simulate_atlas_proxy_incompatible
 

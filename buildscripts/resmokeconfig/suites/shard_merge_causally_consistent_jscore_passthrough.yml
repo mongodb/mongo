@@ -251,7 +251,7 @@ selector:
   - uses_full_validation
   # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
-  - requires_timeseries # Tenant migration, transactions not supported
+  - requires_timeseries # Transactions not supported
   - requires_fastcount
   - multiple_tenants_incompatible
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.

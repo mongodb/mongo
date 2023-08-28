@@ -115,7 +115,6 @@ selector:
   # Full validation can cause ongoing queries to fail. This can affect the shard split process.
   - uses_full_validation
   - multiple_tenants_incompatible
-  - requires_timeseries # Tenant migration not supported
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
   - simulate_atlas_proxy_incompatible
 
