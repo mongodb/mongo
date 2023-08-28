@@ -1787,41 +1787,49 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     return router.route(
         expCtx->opCtx,
         "targeting pipeline to attach cursors"_sd,
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            const auto& cm = cri.cm;
+        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
             auto pipelineToTarget = pipeline->clone();
 
             AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
             LiteParsedPipeline liteParsedPipeline{aggRequest};
             const bool hasChangeStream = liteParsedPipeline.hasChangeStream();
             // CRI, provided by CollectionRouter, contains the latest data. We call
-            // getCollectionRoutingInfoForTargeting to get CRI with historical data for transactions
-            // with snapshot isolations.
-            auto targetingCri = getCollectionRoutingInfoForTargeting(expCtx, hasChangeStream);
+            // getCollectionRoutingInfoForTxnCmd to get CRI with historical data for transactions
+            // with snapshot isolations. We wrap the result into boost::optional, as the next
+            // function accept only boost::optional.
+            boost::optional<CollectionRoutingInfo> targetingCri =
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, expCtx->ns));
             TargetingResults targeting = targetPipeline(expCtx,
                                                         pipeline.get(),
                                                         hasChangeStream,
                                                         liteParsedPipeline.startsWithDocuments(),
                                                         shardTargetingPolicy,
                                                         targetingCri);
+
             const ShardId localShardId = getLocalShardId(opCtx);
-            const bool useLocalRead = !targeting.needsSplit && targeting.shardIds.size() == 1 &&
+            // If there is no targetingCri, we can't enter the shard role correctly, so we need to
+            // fallback to remote read.
+            bool useLocalRead = !targeting.needsSplit && targeting.shardIds.size() == 1 &&
                 *targeting.shardIds.begin() == localShardId;
+
+            // If subpipeline have different read concern, we need to perform remote read to
+            // satifly it.
+            useLocalRead = useLocalRead &&
+                (!readConcern ||
+                 readConcern->woCompare(repl::ReadConcernArgs::get(opCtx).toBSONInner(),
+                                        BSONObj{} /* ordering */,
+                                        BSONObj::ComparisonRules::kConsiderFieldName |
+                                            BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
 
             if (useLocalRead) {
                 try {
-                    boost::optional<DatabaseVersion> expectedDbVersion = boost::none;
-                    // If we are on a primary, shard targeting may depend on that, so we add
-                    // dbVersion to ScopeSetShardRole to make sure we are still the primary when we
-                    // start reading.
-                    if (cm.dbPrimary() == localShardId) {
-                        expectedDbVersion = cm.dbVersion();
-                    }
-                    ScopedSetShardRole shardRole{opCtx,
-                                                 expCtx->ns,
-                                                 cm.isSharded() ? cri.getShardVersion(localShardId)
-                                                                : ShardVersion::UNSHARDED(),
-                                                 expectedDbVersion};
+                    const auto& cm = targetingCri->cm;
+                    ScopedSetShardRole shardRole{
+                        opCtx,
+                        expCtx->ns,
+                        cm.hasRoutingTable() ? targetingCri->getShardVersion(localShardId)
+                                             : ShardVersion::UNSHARDED(),
+                        boost::optional<DatabaseVersion>{!cm.hasRoutingTable(), cm.dbVersion()}};
 
                     // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
                     // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the

@@ -318,7 +318,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_
     // results in 3 remote reads. If the non-primary shard sends a subpipeline to execute on the
     // primary shard first, then the primary does a coll refresh before it attempts to run one of
     // its own subpipelines and does not need to target shards. This results in 2 remote reads.
-    subPipelineLocal: [1, 0],
+    subPipelineLocal: [[1, 2], 0],
     subPipelineRemote: [[2, 3], 0]
 });
 
