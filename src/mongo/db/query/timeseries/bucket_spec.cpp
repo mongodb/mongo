@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/timeseries/bucket_spec.h"
+#include "mongo/db/query/timeseries/bucket_spec.h"
 
 #include <algorithm>
 #include <boost/cstdint.hpp>
@@ -50,7 +50,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/timeseries/bucket_level_comparison_predicate_generator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -65,6 +64,7 @@
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"

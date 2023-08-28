@@ -203,6 +203,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="bucket_predicate_generator",
+    source=[
+        "timeseries/bucket_spec.cpp",
+        "timeseries/bucket_level_comparison_predicate_generator.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        "$BUILD_DIR/mongo/db/query_expressions",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/bson/util/bson_column",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
+    ],
+)
+
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",

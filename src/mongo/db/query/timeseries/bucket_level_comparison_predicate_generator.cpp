@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/timeseries/bucket_level_comparison_predicate_generator.h"
+#include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

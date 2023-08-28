@@ -47,7 +47,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/timeseries/bucket_spec.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

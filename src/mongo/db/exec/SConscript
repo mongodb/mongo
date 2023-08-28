@@ -55,9 +55,7 @@ env.Library(
 env.Library(
     target="bucket_unpacker",
     source=[
-        "timeseries/bucket_spec.cpp",
         "timeseries/bucket_unpacker.cpp",
-        "timeseries/bucket_level_comparison_predicate_generator.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query_expressions",
@@ -65,7 +63,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/bson/util/bson_column",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
+        "$BUILD_DIR/mongo/db/query/bucket_predicate_generator",
     ],
 )
 
