@@ -97,8 +97,7 @@ void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
     // 'transitionFromDedicatedConfigServer'.
     auto clientGuard = ClientStrand::make(serviceContext->makeClient("ShardingReady"))->bind();
     auto uniqueOpCtx = clientGuard->makeOperationContext();
-    uniqueOpCtx.get()->setWriteConcern(WriteConcernOptions{
-        1, WriteConcernOptions::SyncMode::JOURNAL, WriteConcernOptions::kNoTimeout});
+
     ShardingCatalogManager::get(uniqueOpCtx.get())->addConfigShard(uniqueOpCtx.get());
     LOGV2(7910800, "Auto-bootstrap to config shard complete.");
 }
