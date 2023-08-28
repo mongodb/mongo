@@ -55,14 +55,15 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
               feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
       }()),
       _skipFiltering([&] {
-          // Always allow writes on replica sets.
+          // Allow writes on standalone and replica set.
           if (serverGlobalParams.clusterRole == ClusterRole::None) {
               return true;
           }
 
-          // Always allow writes on standalone and secondary nodes.
-          const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-          return !replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
+          // Only the primary node of a shard that is a replica set should run this filter.
+          const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+          return !replCoord->getSettings().usingReplSets() ||
+              !replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
