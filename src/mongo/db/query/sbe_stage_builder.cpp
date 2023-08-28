@@ -278,21 +278,6 @@ PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
     }
 }
 
-std::string PlanStageData::debugString() const {
-    StringBuilder builder;
-
-    if (auto slot = staticData->resultSlot) {
-        builder << "$$RESULT=s" << *slot << " ";
-    }
-    if (auto slot = staticData->recordIdSlot) {
-        builder << "$$RID=s" << *slot << " ";
-    }
-
-    env->debugString(&builder);
-
-    return builder.str();
-}
-
 namespace {
 void getAllNodesByTypeHelper(const QuerySolutionNode* root,
                              StageType type,

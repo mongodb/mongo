@@ -56,7 +56,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_plan_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"

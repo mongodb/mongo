@@ -42,7 +42,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_plan_data.h"
 
 namespace mongo::stage_builder {
 /**

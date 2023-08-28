@@ -1567,6 +1567,7 @@ execEnv.Library(
         'query/sbe_stage_builder_helpers.cpp',
         'query/sbe_stage_builder_index_scan.cpp',
         'query/sbe_stage_builder_lookup.cpp',
+        'query/sbe_stage_builder_plan_data.cpp',
         'query/sbe_stage_builder_projection.cpp',
         'query/sbe_stage_builder_sbexpr.cpp',
         'query/sbe_stage_builder_sbexpr_helpers.cpp',
