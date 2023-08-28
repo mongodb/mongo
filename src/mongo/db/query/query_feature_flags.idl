@@ -64,7 +64,8 @@ feature_flags:
     featureFlagQueryStatsFindCommand:
       description: "Feature flag for enabling queryStats collection for the find command."
       cpp_varname: gFeatureFlagQueryStatsFindCommand
-      default: false
+      default: true
+      version: 7.1
       shouldBeFCVGated: true
 
     featureFlagSearchBatchSizeLimit:

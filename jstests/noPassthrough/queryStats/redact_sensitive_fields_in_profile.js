@@ -1,6 +1,6 @@
 /**
  * Test that the queryStats HMAC key is not leaked during profiling.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";

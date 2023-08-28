@@ -1,6 +1,6 @@
 /**
  * This test confirms that query stats store key fields are properly nested and none are missing.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 

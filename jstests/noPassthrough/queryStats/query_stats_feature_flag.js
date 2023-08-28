@@ -6,14 +6,12 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 // This test specifically tests error handling when the feature flag is not on.
 // TODO SERVER-65800 this test can be removed when the feature flag is removed.
 // TODO SERVER-79494 remove reference to featureFlagQueryStatsFindCommand.
+// Disable via TestData so there's no conflict in case a variant has all flags enabled.
+TestData.setParameters.featureFlagQueryStatsFindCommand = false;
+TestData.setParameters.featureFlagQueryStats = false;
 const conn = MongoRunner.runMongod();
+assert.neq(null, conn, 'failed to start mongod');
 const testDB = conn.getDB('test');
-if (FeatureFlagUtil.isEnabled(testDB, "QueryStats") ||
-    FeatureFlagUtil.isEnabled(testDB, "QueryStatsFindCommand")) {
-    jsTestLog("Skipping test since query stats are enabled.");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 // Pipeline to read telemetry store should fail without feature flag turned on.
 assert.commandFailedWithCode(

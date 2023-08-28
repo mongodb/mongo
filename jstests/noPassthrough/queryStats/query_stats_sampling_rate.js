@@ -1,7 +1,7 @@
 /**
  * Test that calls to read from query stats store fail when sampling rate is not greater than 0 even
  * if feature flag is on.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 

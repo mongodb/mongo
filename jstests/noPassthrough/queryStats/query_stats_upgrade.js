@@ -1,6 +1,11 @@
 /**
  * Test that query stats doesn't work on a lower FCV version but works after an FCV upgrade.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [
+ *   # Query Stats is new in 7.1.
+ *   requires_fcv_71,
+ *   # Re-uses FCV state in the dbpath.
+ *   requires_persistence
+ *  ]
  */
 
 const dbpath = MongoRunner.dataPath + jsTestName();

@@ -1,6 +1,6 @@
 /**
  * Test that the queryStats HMAC key is not logged.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 
 import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";

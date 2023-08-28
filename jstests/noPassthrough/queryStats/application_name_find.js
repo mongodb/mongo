@@ -1,6 +1,6 @@
 /**
  * Test that applicationName and namespace appear in queryStats for the find command.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 import {getQueryStats, getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 

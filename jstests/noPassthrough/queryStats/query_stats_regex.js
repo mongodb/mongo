@@ -1,6 +1,6 @@
 /**
  * Test that telemetry works properly for a find command that uses regex.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 

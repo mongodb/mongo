@@ -2,26 +2,19 @@
  * Test that calls to read from query stats store fail when feature flag is turned off and sampling
  * rate > 0.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// This test specifically tests error handling when the feature flag is not on.
+// Disable via TestData so there's no conflict in case a variant has all flags enabled.
+TestData.setParameters.featureFlagQueryStatsFindCommand = false;
+TestData.setParameters.featureFlagQueryStats = false;
 
 // Set sampling rate to -1.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };
 const conn = MongoRunner.runMongod(options);
+assert.neq(null, conn, 'failed to start mongod');
 const testdb = conn.getDB('test');
-
-// This test specifically tests error handling when the feature flag is not on.
-// TODO SERVER-65800 This test can be deleted when the feature is on by default.
-// TODO SERVER-79494 remove reference to featureFlagQueryStatsFindCommand.
-if (!conn || FeatureFlagUtil.isEnabled(testdb, "QueryStats") ||
-    FeatureFlagUtil.isEnabled(testdb, "QueryStatsFindCommand")) {
-    jsTestLog(`Skipping test since feature flag is enabled. conn: ${conn}`);
-    if (conn) {
-        MongoRunner.stopMongod(conn);
-    }
-    quit();
-}
 
 var coll = testdb[jsTestName()];
 coll.drop();

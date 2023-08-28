@@ -1,6 +1,6 @@
 /**
  * Test the $queryStats hmac properties.
- * @tags: [featureFlagQueryStatsFindCommand]
+ * @tags: [requires_fcv_71]
  */
 
 import {assertAdminDBErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";

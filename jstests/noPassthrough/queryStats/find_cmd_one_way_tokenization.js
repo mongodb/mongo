@@ -48,16 +48,6 @@ let conn = MongoRunner.runMongod({
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-79494 remove second run with find-command-only feature flag
-conn = MongoRunner.runMongod({
-    setParameter: {
-        internalQueryStatsRateLimit: -1,
-        featureFlagQueryStatsFindCommand: true,
-    }
-});
-runTest(conn);
-MongoRunner.stopMongod(conn);
-
 let st = new ShardingTest({
     mongos: 1,
     shards: 1,
