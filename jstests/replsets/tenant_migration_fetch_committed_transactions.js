@@ -9,6 +9,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  *   incompatible_with_shard_merge,
  *   requires_fcv_53
  * ]

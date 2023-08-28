@@ -99,7 +99,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {
     isShardMergeEnabled,
-    makeMigrationCertificatesForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
 
@@ -115,7 +114,6 @@ export const adminDbName = "admin";
 export const authErrCode = 13;
 export const commandNotSupportedCode = 115;
 let shard0name = "shard0000";
-const migrationCertificates = makeMigrationCertificatesForTest();
 
 function buildTenantMigrationCmd(cmd, state) {
     const {isShardMergeEnabled} = state;
@@ -4242,8 +4240,6 @@ export const authCommandsLib = {
                   migrationId: UUID(),
                   recipientConnectionString: "recipient-rs/localhost:1234",
                   readPreference: {mode: "primary"},
-                  donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
             }, state);
           },
           skipSharded: true,
@@ -4271,7 +4267,6 @@ export const authCommandsLib = {
                   donorConnectionString: "donor-rs/localhost:1234",
                   readPreference: {mode: "primary"},
                   startMigrationDonorTimestamp: Timestamp(1, 1),
-                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
               }, state);
           },
           skipSharded: true,

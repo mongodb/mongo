@@ -158,20 +158,6 @@ class TenantMigrationLifeCycle(object):
             return self.__test_state == self._TEST_FINISHED_STATE
 
 
-def get_certificate_and_private_key(pem_file_path):  # noqa: D205,D400
-    """Return a dictionary containing the certificate and private key extracted from the given pem
-    file.
-    """
-    lines = open(pem_file_path, 'rt').read()
-    certificate = re.findall(
-        re.compile("(-*BEGIN CERTIFICATE-*\n(.*\n)*-*END CERTIFICATE-*\n)", re.MULTILINE),
-        lines)[0][0]
-    private_key = re.findall(
-        re.compile("(-*BEGIN PRIVATE KEY-*\n(.*\n)*-*END PRIVATE KEY-*\n)", re.MULTILINE),
-        lines)[0][0]
-    return {"certificate": certificate, "privateKey": private_key}
-
-
 def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
     """Return the primary from a replica set. Retries up to 'max_tries' times of it fails to get
     the primary within the time limit.
@@ -479,10 +465,6 @@ class _TenantMigrationThread(threading.Thread):
                     migration_opts.tenant_id,
                 "readPreference":
                     migration_opts.read_preference,
-                "donorCertificateForRecipient":
-                    get_certificate_and_private_key("jstests/libs/tenant_migration_donor.pem"),
-                "recipientCertificateForDonor":
-                    get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
             }))
 
             if res["state"] == "committed":

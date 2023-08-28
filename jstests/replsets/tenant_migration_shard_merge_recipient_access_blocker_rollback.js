@@ -9,6 +9,7 @@
  *   requires_persistence,
  *   featureFlagShardMerge,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -18,20 +19,15 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
-    getCertificateAndPrivateKey,
     isShardMergeEnabled,
     kProtocolShardMerge,
-    makeTenantDB,
-    makeX509OptionsForTest
+    makeTenantDB
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-const migrationX509Options = makeX509OptionsForTest();
 
 const recipientRst = new ReplSetTest({
     name: "recipRst",
     nodes: 3,
     serverless: true,
-    nodeOptions: Object.assign(migrationX509Options.recipient, {}),
     settings: {catchUpTimeoutMillis: 0, chainingAllowed: false}
 });
 
@@ -136,8 +132,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     const kMigrationId = UUID();
     const kTenantId = ObjectId();
     const kReadPreference = {mode: "primary"};
-    const recipientCertificateForDonor =
-        getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
     const dbName = makeTenantDB(kTenantId.str, "testDB");
     const collName = "testColl";
@@ -163,7 +157,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
                                              donorConnectionString,
                                              tenantIds,
                                              readPreference,
-                                             recipientCertificateForDonor
                                          },
                                          protocol) {
         const db = new Mongo(host);
@@ -175,7 +168,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
             protocol,
             decision: "committed",
             readPreference,
-            recipientCertificateForDonor
         });
     }
 
@@ -187,7 +179,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
                        donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
                        tenantIds: tojson([kTenantId]),
                        readPreference: kReadPreference,
-                       recipientCertificateForDonor
                    },
                    kProtocolShardMerge);
 

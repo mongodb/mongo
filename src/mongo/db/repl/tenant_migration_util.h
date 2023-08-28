@@ -233,29 +233,6 @@ inline Status validateConnectionString(const StringData& donorOrRecipientConnect
     return Status::OK();
 }
 
-inline Status validateCertificatePEMPayload(const StringData& payload) {
-#ifndef MONGO_CONFIG_SSL
-    return {ErrorCodes::InternalError,
-            "Could not validate certificate field as SSL is not supported"};
-#else
-    auto swBlob =
-        ssl_util::findPEMBlob(payload, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
-    return swBlob.getStatus().withContext("Invalid certificate field");
-#endif
-}
-
-inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
-#ifndef MONGO_CONFIG_SSL
-    return {ErrorCodes::InternalError,
-            "Could not validate certificate field as SSL is not supported"};
-#else
-    auto swBlob =
-        ssl_util::findPEMBlob(payload, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
-    return swBlob.getStatus().withContext("Invalid private key field");
-#endif
-}
-
-
 inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum protocol,
                                                const boost::optional<StringData>& tenantId) {
     switch (protocol) {

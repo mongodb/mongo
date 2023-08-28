@@ -9,6 +9,7 @@
  *   incompatible_with_windows_tls,
  *   incompatible_with_macos,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

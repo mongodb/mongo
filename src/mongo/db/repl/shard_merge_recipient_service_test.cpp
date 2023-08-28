@@ -373,22 +373,6 @@ protected:
     const TenantId _tenantB{OID::gen()};
     const std::vector<TenantId> _tenants{_tenantA, _tenantB};
 
-    const TenantMigrationPEMPayload kRecipientPEMPayload = [&] {
-        std::ifstream infile("jstests/libs/client.pem");
-        std::string buf((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-
-        auto swCertificateBlob =
-            ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swCertificateBlob.isOK());
-
-        auto swPrivateKeyBlob =
-            ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swPrivateKeyBlob.isOK());
-
-        return TenantMigrationPEMPayload{swCertificateBlob.getValue().toString(),
-                                         swPrivateKeyBlob.getValue().toString()};
-    }();
-
     struct cursorDataMock {
         const UUID kBackupId =
             UUID(uassertStatusOK(UUID::parse(("2b068e03-5961-4d8e-b47a-d1c8cbd4b835"))));
@@ -672,7 +656,6 @@ TEST_F(ShardMergeRecipientServiceTestInsert, TestBlockersAreInsertedWhenInsertin
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -708,7 +691,6 @@ TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorSuccessfully) {
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -739,7 +721,6 @@ TEST_F(ShardMergeRecipientServiceTest, OpenBackupCursorRetriesIfBackupCursorIsTo
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -804,7 +785,6 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorIsAlreadyActiveOn
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -840,7 +820,6 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfDonorIsFsyncLocked) {
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -875,7 +854,6 @@ TEST_F(ShardMergeRecipientServiceTest, MergeFailsIfBackupCursorNotSupportedOnDon
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -916,7 +894,6 @@ TEST_F(ShardMergeRecipientServiceTest, KeepingBackupCursorAlive) {
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -955,7 +932,6 @@ TEST_F(ShardMergeRecipientServiceTest, TestGarbageCollectionStarted) {
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
     initialStateDocument.setState(ShardMergeRecipientStateEnum::kStarted);
 
     // Set startGarbageCollect to true to simulate the case where 'recipientForgetMigration' is
@@ -999,7 +975,6 @@ TEST_F(ShardMergeRecipientServiceTest, TestForgetMigrationAborted) {
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     auto instance = ShardMergeRecipientService::Instance::getOrCreate(
@@ -1037,7 +1012,6 @@ TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByForgetM
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -1074,7 +1048,6 @@ TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByFailove
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -1109,7 +1082,6 @@ TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedByWaitTim
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;
@@ -1143,7 +1115,6 @@ TEST_F(ShardMergeRecipientServiceTest, ImportQuorumWaitCanBeInterruptedOnQuorumS
         _tenants,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<ShardMergeRecipientService::Instance> instance;

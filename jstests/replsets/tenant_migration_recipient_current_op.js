@@ -14,6 +14,7 @@
  *   # The currentOp output field 'dataSyncCompleted' was renamed to 'migrationCompleted'.
  *   requires_fcv_70,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

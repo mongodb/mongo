@@ -135,11 +135,10 @@ export async function runMigrationAsync(migrationOpts, donorRstArgs, opts = {}) 
             tenantId: migrationOpts.tenantId,
             tenantIds: eval(migrationOpts.tenantIds),
             recipientConnectionString: migrationOpts.recipientConnString,
-            readPreference: migrationOpts.readPreference || {mode: "primary"},
-            donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
-                migrationCertificates.donorCertificateForRecipient,
-            recipientCertificateForDonor: migrationOpts.recipientCertificateForDonor ||
-                migrationCertificates.recipientCertificateForDonor,
+            readPreference: migrationOpts.readPreference ||
+                {
+                    mode: "primary"
+                }
         },
         donorRst,
         {retryOnRetryableErrors, shouldStopFunc: isMigrationCompleted});

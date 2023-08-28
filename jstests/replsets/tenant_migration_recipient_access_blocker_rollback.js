@@ -11,6 +11,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -19,19 +20,12 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    getCertificateAndPrivateKey,
-    makeTenantDB,
-    makeX509OptionsForTest
-} from "jstests/replsets/libs/tenant_migration_util.js";
-
-const migrationX509Options = makeX509OptionsForTest();
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const recipientRst = new ReplSetTest({
     name: "recipRst",
     nodes: 3,
     serverless: true,
-    nodeOptions: Object.assign(migrationX509Options.recipient, {}),
     settings: {catchUpTimeoutMillis: 0, chainingAllowed: false}
 });
 
@@ -125,8 +119,6 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     const kMigrationId = UUID();
     const kTenantId = tenantId;
     const kReadPreference = {mode: "primary"};
-    const recipientCertificateForDonor =
-        getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
     const dbName = makeTenantDB(kTenantId, "testDB");
     const collName = "testColl";
@@ -146,21 +138,15 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     const fpNewPrimary =
         configureFailPoint(newPrimary, "pauseBeforeRunTenantMigrationRecipientInstance");
 
-    function runRecipientForgetMigration(host, {
-        migrationIdString,
-        donorConnectionString,
-        tenantId,
-        readPreference,
-        recipientCertificateForDonor
-    }) {
+    function runRecipientForgetMigration(
+        host, {migrationIdString, donorConnectionString, tenantId, readPreference}) {
         const db = new Mongo(host);
         return db.adminCommand({
             recipientForgetMigration: 1,
             migrationId: UUID(migrationIdString),
             donorConnectionString,
             tenantId,
-            readPreference,
-            recipientCertificateForDonor
+            readPreference
         });
     }
 
@@ -169,8 +155,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
             migrationIdString: extractUUIDFromObject(kMigrationId),
             donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
             tenantId: kTenantId,
-            readPreference: kReadPreference,
-            recipientCertificateForDonor
+            readPreference: kReadPreference
         });
 
     // Run a delayed/retried recipientForgetMigration command after the state doc has been deleted.

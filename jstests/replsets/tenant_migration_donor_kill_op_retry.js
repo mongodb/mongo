@@ -8,6 +8,7 @@
  *   requires_persistence,
  *   multiversion_incompatible,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

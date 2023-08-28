@@ -518,31 +518,7 @@ ShardMergeRecipientService::Instance::Instance(ServiceContext* const serviceCont
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
-      _readPreference(_stateDoc.getReadPreference()),
-      _recipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor()),
-      _transientSSLParams([&]() -> boost::optional<TransientSSLParams> {
-          if (auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor()) {
-              invariant(!repl::tenantMigrationDisableX509Auth);
-#ifdef MONGO_CONFIG_SSL
-              uassert(ErrorCodes::IllegalOperation,
-                      "Cannot run shard merge with x509 authentication as SSL is not enabled",
-                      getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
-              auto recipientSSLClusterPEMPayload =
-                  recipientCertificate->getCertificate().toString() + "\n" +
-                  recipientCertificate->getPrivateKey().toString();
-              return TransientSSLParams{_donorUri.connectionString(),
-                                        std::move(recipientSSLClusterPEMPayload)};
-#else
-              // If SSL is not supported, the recipientSyncData command should have failed
-              // certificate field validation.
-              MONGO_UNREACHABLE;
-#endif
-          } else {
-              invariant(repl::tenantMigrationDisableX509Auth);
-              return boost::none;
-          }
-      }()) {
-}
+      _readPreference(_stateDoc.getReadPreference()) {}
 
 boost::optional<BSONObj> ShardMergeRecipientService::Instance::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -613,8 +589,7 @@ void ShardMergeRecipientService::Instance::checkIfOptionsConflict(const BSONObj&
 
     if (stateDoc.getTenantIds() != _tenantIds ||
         stateDoc.getDonorConnectionString() != _donorConnectionString ||
-        !stateDoc.getReadPreference().equals(_readPreference) ||
-        stateDoc.getRecipientCertificateForDonor() != _recipientCertificateForDonor) {
+        !stateDoc.getReadPreference().equals(_readPreference)) {
         uasserted(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _migrationUuid.toBSON() << "\" with different options "
@@ -718,12 +693,7 @@ OpTime ShardMergeRecipientService::Instance::waitUntilMigrationReachesReturnAfte
 
 std::unique_ptr<DBClientConnection> ShardMergeRecipientService::Instance::_connectAndAuth(
     const HostAndPort& serverAddress, StringData applicationName) {
-    auto swClientBase = ConnectionString(serverAddress)
-                            .connect(applicationName,
-                                     0 /* socketTimeout */,
-                                     nullptr /* uri */,
-                                     nullptr /* apiParameters */,
-                                     _transientSSLParams ? &_transientSSLParams.value() : nullptr);
+    auto swClientBase = ConnectionString(serverAddress).connect(applicationName);
     if (!swClientBase.isOK()) {
         LOGV2_ERROR(7339719,
                     "Failed to connect to migration donor",
@@ -741,15 +711,10 @@ std::unique_ptr<DBClientConnection> ShardMergeRecipientService::Instance::_conne
     std::unique_ptr<DBClientConnection> client(checked_cast<DBClientConnection*>(clientBase));
 
     // Authenticate connection to the donor.
-    if (!_transientSSLParams) {
-        uassertStatusOK(replAuthenticate(clientBase)
-                            .withContext(str::stream()
-                                         << "ShardMergeRecipientService failed to authenticate to "
-                                         << serverAddress));
-    } else if (MONGO_likely(!skipTenantMigrationRecipientAuth.shouldFail())) {
-        client->auth(auth::createInternalX509AuthDocument());
-    }
-
+    uassertStatusOK(replAuthenticate(clientBase)
+                        .withContext(str::stream()
+                                     << "ShardMergeRecipientService failed to authenticate to "
+                                     << serverAddress));
     return client;
 }
 

@@ -10,6 +10,7 @@
  *   incompatible_with_shard_merge,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  *   # The currentOp output field 'state' was changed from an enum value to a string.
  *   requires_fcv_70,
  * ]
@@ -19,17 +20,12 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    getCertificateAndPrivateKey,
-    makeTenantDB
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const migrationId = UUID();
 const tenantId = ObjectId().str;
-const recipientCertificateForDonor =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
 const dbName = makeTenantDB(tenantId, "test");
 const collName = "coll";
@@ -45,7 +41,6 @@ function runRecipientForgetMigration(host, {
     donorConnectionString,
     tenantId,
     readPreference,
-    recipientCertificateForDonor
 }) {
     const db = new Mongo(host);
     return db.adminCommand({
@@ -54,7 +49,6 @@ function runRecipientForgetMigration(host, {
         donorConnectionString,
         tenantId,
         readPreference,
-        recipientCertificateForDonor
     });
 }
 
@@ -66,7 +60,6 @@ const recipientForgetMigrationThread =
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId,
         readPreference: {mode: "primary"},
-        recipientCertificateForDonor
     });
 
 // Run a delayed/retried recipientForgetMigration command after the state doc has been deleted.
@@ -109,7 +102,6 @@ assert.commandWorked(runRecipientForgetMigration(newRecipientPrimary.host, {
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     tenantId,
     readPreference: {mode: "primary"},
-    recipientCertificateForDonor
 }));
 
 currOp = assert

@@ -21,6 +21,7 @@
  *      requires_persistence,
  *    # Tenant migrations are only used in serverless.
  *      serverless,
+ *   requires_fcv_71,
  * ]
  */
 

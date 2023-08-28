@@ -9,6 +9,7 @@
  *   requires_persistence,
  *   featureFlagShardMerge,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -17,7 +18,6 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
-    getCertificateAndPrivateKey,
     isShardMergeEnabled,
     kProtocolShardMerge,
     makeTenantDB
@@ -39,8 +39,6 @@ if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
 
 const migrationId = UUID();
 const tenantId = ObjectId();
-const recipientCertificateForDonor =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
 const dbName = makeTenantDB(tenantId.str, "test");
 const collName = "coll";
@@ -50,9 +48,7 @@ const collName = "coll";
 assert.commandWorked(recipientPrimary.getDB(dbName)[collName].insert({_id: 1}));
 
 function runRecipientForgetMigration(
-    host,
-    {migrationIdString, donorConnectionString, tenantIds, recipientCertificateForDonor},
-    protocol) {
+    host, {migrationIdString, donorConnectionString, tenantIds}, protocol) {
     const db = new Mongo(host);
     return db.adminCommand({
         recipientForgetMigration: 1,
@@ -62,7 +58,6 @@ function runRecipientForgetMigration(
         protocol,
         decision: "committed",
         readPreference: {mode: "primary"},
-        recipientCertificateForDonor
     });
 }
 
@@ -75,8 +70,7 @@ const recipientForgetMigrationThread =
                {
                    migrationIdString: extractUUIDFromObject(migrationId),
                    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-                   tenantIds: tojson([tenantId]),
-                   recipientCertificateForDonor
+                   tenantIds: tojson([tenantId])
                },
                kProtocolShardMerge);
 
@@ -121,7 +115,6 @@ assert.commandWorked(runRecipientForgetMigration(
         migrationIdString: extractUUIDFromObject(migrationId),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantIds: tojson([tenantId]),
-        recipientCertificateForDonor
     },
     kProtocolShardMerge));
 

@@ -396,14 +396,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _recipientConnectionString(_stateDoc.getRecipientConnectionString()),
       _readPreference(_stateDoc.getReadPreference()),
-      _migrationUuid(_stateDoc.getId()),
-      _donorCertificateForRecipient(_stateDoc.getDonorCertificateForRecipient()),
-      _recipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor()),
-      _sslMode(repl::tenantMigrationDisableX509Auth ? transport::kGlobalSSLMode
-                                                    : transport::kEnableSSL) {
-
-    _recipientCmdExecutor = _makeRecipientCmdExecutor();
-    _recipientCmdExecutor->startup();
+      _migrationUuid(_stateDoc.getId()) {
 
     if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
         // The migration was resumed on stepup.
@@ -432,59 +425,6 @@ TenantMigrationDonorService::Instance::~Instance() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_initialDonorStateDurablePromise.getFuture().isReady());
     invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
-
-    // Unlike the TenantMigrationDonorService's scoped task executor which is shut down on stepdown
-    // and joined on stepup, _recipientCmdExecutor is only shut down and joined when the Instance
-    // is destroyed. This is safe since ThreadPoolTaskExecutor::shutdown() only cancels the
-    // outstanding work on the task executor which the cancellation token will already do, and the
-    // Instance will be destroyed on stepup so this is equivalent to joining the task executor on
-    // stepup.
-    _recipientCmdExecutor->shutdown();
-    _recipientCmdExecutor->join();
-}
-
-std::shared_ptr<executor::ThreadPoolTaskExecutor>
-TenantMigrationDonorService::Instance::_makeRecipientCmdExecutor() {
-    ThreadPool::Options threadPoolOptions(_getRecipientCmdThreadPoolLimits());
-    threadPoolOptions.threadNamePrefix = _instanceName + "-";
-    threadPoolOptions.poolName = _instanceName + "ThreadPool";
-    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-        auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
-    };
-
-    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-
-    auto connPoolOptions = executor::ConnectionPool::Options();
-    if (_donorCertificateForRecipient) {
-        invariant(!repl::tenantMigrationDisableX509Auth);
-        invariant(_recipientCertificateForDonor);
-        invariant(_sslMode == transport::kEnableSSL);
-#ifdef MONGO_CONFIG_SSL
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot run tenant migration with x509 authentication as SSL is not enabled",
-                getSSLGlobalParams().sslMode.load() != SSLParams::SSLMode_disabled);
-        auto donorSSLClusterPEMPayload =
-            _donorCertificateForRecipient->getCertificate().toString() + "\n" +
-            _donorCertificateForRecipient->getPrivateKey().toString();
-        connPoolOptions.transientSSLParams = TransientSSLParams{
-            _recipientUri.connectionString(), std::move(donorSSLClusterPEMPayload)};
-#else
-        // If SSL is not supported, the donorStartMigration command should have failed certificate
-        // field validation.
-        MONGO_UNREACHABLE;
-#endif
-    } else {
-        invariant(repl::tenantMigrationDisableX509Auth);
-        invariant(!_recipientCertificateForDonor);
-        invariant(_sslMode == transport::kGlobalSSLMode);
-    }
-
-    return std::make_shared<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(threadPoolOptions),
-        executor::makeNetworkInterface(
-            _instanceName + "-Network", nullptr, std::move(hookList), connPoolOptions));
 }
 
 boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrentOp(
@@ -540,9 +480,7 @@ void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj
 
     if (stateDoc.getProtocol().value() != _protocol || stateDoc.getTenantId() != _tenantId ||
         stateDoc.getRecipientConnectionString() != _recipientConnectionString ||
-        !stateDoc.getReadPreference().equals(_readPreference) ||
-        stateDoc.getDonorCertificateForRecipient() != _donorCertificateForRecipient ||
-        stateDoc.getRecipientCertificateForDonor() != _recipientCertificateForDonor) {
+        !stateDoc.getReadPreference().equals(_readPreference)) {
         uasserted(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _migrationUuid.toBSON() << "\" with different options "
@@ -868,7 +806,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
 
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
-    commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
     if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
         commonData.setTenantId(boost::optional<StringData>(_tenantId));
     } else {
@@ -911,7 +848,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
-    commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
@@ -1241,7 +1177,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        };
 
                        auto fetcher = std::make_shared<Fetcher>(
-                           _recipientCmdExecutor.get(),
+                           *executor,
                            host,
                            nss.dbName(),
                            cmdObj,
@@ -1252,8 +1188,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                            RemoteCommandRetryScheduler::makeRetryPolicy<
                                ErrorCategory::RetriableError>(
                                kMaxRecipientKeyDocsFindAttempts,
-                               executor::RemoteCommandRequest::kNoTimeout),
-                           _sslMode);
+                               executor::RemoteCommandRequest::kNoTimeout));
 
                        {
                            stdx::lock_guard<Latch> lg(_mutex);

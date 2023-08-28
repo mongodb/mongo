@@ -564,14 +564,13 @@ server_parameters:
         validator:
             gte: 1
 
-    # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
     tenantMigrationDisableX509Auth:
         description: >-
             Disable x509 authentication for all ingoing and outgoing tenant migrations.
         set_at: [ startup ]
         cpp_vartype: bool
         cpp_varname: tenantMigrationDisableX509Auth
-        default: false
+        default: true
 
     tenantMigrationExcludeDonorHostTimeoutMS:
         description: >-

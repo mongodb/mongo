@@ -58,7 +58,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/tenant_all_database_cloner.h"
-#include "mongo/db/repl/tenant_migration_pem_payload_gen.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
@@ -375,10 +374,8 @@ public:
             const CancellationToken& token);
 
         /**
-         * Creates a client, connects it to the donor. If '_transientSSLParams' is not none, uses
-         * the migration certificate to do SSL authentication. Otherwise, uses the default
-         * authentication mode. Throws a user assertion on failure.
-         *
+         * Creates a client, connects it to the donor and uses the default
+         * authentication mode (KeyFile Authentication). Throws a user assertion on failure.
          */
         std::unique_ptr<DBClientConnection> _connectAndAuth(const HostAndPort& serverAddress,
                                                             StringData applicationName);
@@ -594,16 +591,11 @@ public:
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
-        const std::string _tenantId;                                                     // (R)
-        const UUID _migrationUuid;                                                       // (R)
-        const std::string _donorConnectionString;                                        // (R)
-        const MongoURI _donorUri;                                                        // (R)
-        const ReadPreferenceSetting _readPreference;                                     // (R)
-        const boost::optional<TenantMigrationPEMPayload> _recipientCertificateForDonor;  // (R)
-        // TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
-        // Transient SSL params created based on the state doc if the server parameter
-        // 'tenantMigrationDisableX509Auth' is false.
-        const boost::optional<TransientSSLParams> _transientSSLParams = boost::none;  // (R)
+        const std::string _tenantId;                  // (R)
+        const UUID _migrationUuid;                    // (R)
+        const std::string _donorConnectionString;     // (R)
+        const MongoURI _donorUri;                     // (R)
+        const ReadPreferenceSetting _readPreference;  // (R)
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
 

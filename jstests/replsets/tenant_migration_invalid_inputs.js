@@ -11,11 +11,11 @@
  *   requires_persistence,
  *   requires_fcv_63,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeMigrationCertificatesForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
@@ -27,7 +27,6 @@ const tenantId = ObjectId().str;
 const readPreference = {
     mode: 'primary'
 };
-const migrationCertificates = makeMigrationCertificatesForTest();
 
 jsTestLog("Testing 'donorStartMigration' command provided with invalid options.");
 
@@ -37,8 +36,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
 
@@ -51,8 +48,6 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: invalidTenantId,
         readPreference,
-        donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  [ErrorCodes.InvalidOptions, ErrorCodes.BadValue]);
 });
@@ -64,8 +59,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     tenantId,
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -77,8 +70,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
         tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
     tenantId,
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -91,8 +82,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     tenantId,
     tenantIds: [ObjectId(), ObjectId()],
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -103,8 +92,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientConnectionString: recipientPrimary.host,
     tenantId,
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -117,7 +104,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
 
@@ -129,7 +115,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
 
@@ -142,7 +127,6 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         tenantId: invalidTenantId,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  [ErrorCodes.InvalidOptions, ErrorCodes.BadValue]);
 });
@@ -155,7 +139,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     tenantId: tenantId,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -167,7 +150,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     tenantId: tenantId,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -179,7 +161,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     tenantId: tenantId,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -194,7 +175,6 @@ nullTimestamps.forEach((nullTs) => {
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
         returnAfterReachingDonorTimestamp: nullTs,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.BadValue);
 });
@@ -206,7 +186,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     tenantId: ObjectId().str,
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     decision: "committed"
 }),
                              ErrorCodes.InvalidOptions);

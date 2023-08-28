@@ -146,38 +146,6 @@ protected:
     PrimaryOnlyService* _service;
     ClockSourceMock _clkSource;
     long long _term = 0;
-
-    const TenantMigrationPEMPayload kDonorPEMPayload = [&] {
-        std::ifstream infile("jstests/libs/ca.pem");
-        std::string buf((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-
-        auto swCertificateBlob =
-            ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swCertificateBlob.isOK());
-
-        auto swPrivateKeyBlob =
-            ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swPrivateKeyBlob.isOK());
-
-        return TenantMigrationPEMPayload{swCertificateBlob.getValue().toString(),
-                                         swPrivateKeyBlob.getValue().toString()};
-    }();
-
-    const TenantMigrationPEMPayload kRecipientPEMPayload = [&] {
-        std::ifstream infile("jstests/libs/client.pem");
-        std::string buf((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-
-        auto swCertificateBlob =
-            ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swCertificateBlob.isOK());
-
-        auto swPrivateKeyBlob =
-            ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
-        ASSERT_TRUE(swPrivateKeyBlob.isOK());
-
-        return TenantMigrationPEMPayload{swCertificateBlob.getValue().toString(),
-                                         swPrivateKeyBlob.getValue().toString()};
-    }();
 };
 
 TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
@@ -196,8 +164,6 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
         kTenantId.toString());
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
-    initialStateDocument.setDonorCertificateForRecipient(kDonorPEMPayload);
-    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();

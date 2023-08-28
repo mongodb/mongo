@@ -12,6 +12,7 @@
  *   # The currentOp output field 'lastDurableState' was changed from an enum to a string.
  *   requires_fcv_70,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

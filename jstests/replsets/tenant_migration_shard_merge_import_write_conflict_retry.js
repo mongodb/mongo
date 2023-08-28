@@ -12,6 +12,7 @@
  *   requires_persistence,
  *   requires_wiredtiger,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

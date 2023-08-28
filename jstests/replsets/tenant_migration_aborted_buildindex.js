@@ -7,6 +7,7 @@
  *   incompatible_with_macos,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

@@ -314,8 +314,6 @@ export class TenantMigrationTest {
             tenantIds,
             recipientConnectionString,
             readPreference,
-            donorCertificateForRecipient,
-            recipientCertificateForDonor,
             protocol
         };
 

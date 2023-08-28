@@ -7,6 +7,7 @@
  *   requires_persistence,
  *   requires_replication,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 

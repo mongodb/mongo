@@ -1370,7 +1370,6 @@ env.Library(
 env.Library(
     target='tenant_migration_state_machine_idl',
     source=[
-        'tenant_migration_pem_payload.idl',
         'tenant_migration_state_machine.idl',
     ],
     LIBDEPS=[

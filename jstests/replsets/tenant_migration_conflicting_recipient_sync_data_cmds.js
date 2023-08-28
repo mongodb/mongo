@@ -11,19 +11,15 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    getCertificateAndPrivateKey,
-    makeX509OptionsForTest
-} from "jstests/replsets/libs/tenant_migration_util.js";
 
-var rst =
-    new ReplSetTest({nodes: 1, serverless: true, nodeOptions: makeX509OptionsForTest().donor});
+var rst = new ReplSetTest({nodes: 1, serverless: true});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
@@ -38,10 +34,6 @@ const kPrimaryReadPreference = {
 const kSecondaryReadPreference = {
     mode: "secondary"
 };
-const kRecipientCertificateForDonor =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
-const kExpiredRecipientCertificateForDonor =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient_expired.pem");
 
 TestData.stopFailPointErrorCode = 4880402;
 
@@ -53,7 +45,6 @@ function runRecipientSyncDataCmd(primaryHost, {
     tenantId,
     donorConnectionString,
     readPreference,
-    recipientCertificateForDonor
 }) {
     jsTestLog("Starting a recipientSyncDataCmd for migrationId: " + migrationIdString +
               " tenantId: '" + tenantId + "'");
@@ -65,7 +56,6 @@ function runRecipientSyncDataCmd(primaryHost, {
         tenantId: tenantId,
         readPreference: readPreference,
         startMigrationDonorTimestamp: Timestamp(1, 1),
-        recipientCertificateForDonor: recipientCertificateForDonor
     });
     return res;
 }
@@ -77,14 +67,6 @@ function runRecipientSyncDataCmd(primaryHost, {
 function getTenantMigrationRecipientCurrentOpEntries(recipientPrimary, query) {
     const cmdObj = Object.assign({currentOp: true, desc: "tenant recipient migration"}, query);
     return assert.commandWorked(recipientPrimary.adminCommand(cmdObj)).inprog;
-}
-
-/**
- * Asserts that the string does not contain certificate or private pem string.
- */
-function assertNoCertificateOrPrivateKey(string) {
-    assert(!string.includes("CERTIFICATE"), "found certificate");
-    assert(!string.includes("PRIVATE KEY"), "found private key");
 }
 
 // Enable the failpoint to stop the tenant migration after persisting the state doc.
@@ -107,7 +89,6 @@ assert.commandWorked(primary.adminCommand({
         tenantId: tenantId,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
-        recipientCertificateForDonor: kRecipientCertificateForDonor
     };
     const migrationOpts1 = Object.extend({}, migrationOpts0, true);
     migrationOpts1.migrationIdString = extractUUIDFromObject(UUID());
@@ -143,11 +124,9 @@ assert.commandWorked(primary.adminCommand({
     if (res0.code == TestData.stopFailPointErrorCode) {
         assert.commandFailedWithCode(res0, TestData.stopFailPointErrorCode);
         assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
-        assertNoCertificateOrPrivateKey(res1.errmsg);
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
         assert.commandFailedWithCode(res1, TestData.stopFailPointErrorCode);
-        assertNoCertificateOrPrivateKey(res0.errmsg);
     }
 
     // One of the two instances should have been cleaned up, and therefore only one will remain.
@@ -193,7 +172,6 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
     if (res0.code == TestData.stopFailPointErrorCode) {
         assert.commandFailedWithCode(res0, TestData.stopFailPointErrorCode);
         assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
-        assertNoCertificateOrPrivateKey(res1.errmsg);
         assert.eq(1, configRecipientsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
         assert.eq(1, getTenantMigrationRecipientCurrentOpEntries(primary, {
                          "instanceID": UUID(migrationOpts0.migrationIdString)
@@ -212,7 +190,6 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
         assert.commandFailedWithCode(res1, TestData.stopFailPointErrorCode);
-        assertNoCertificateOrPrivateKey(res0.errmsg);
         assert.eq(1, configRecipientsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
         assert.eq(1, getTenantMigrationRecipientCurrentOpEntries(primary, {
                          "instanceID": UUID(migrationOpts1.migrationIdString)
@@ -240,7 +217,6 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
         tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
-        recipientCertificateForDonor: kRecipientCertificateForDonor
     };
     const migrationOpts1 = Object.extend({}, migrationOpts0, true);
     migrationOpts1.tenantId = ObjectId().str;
@@ -254,7 +230,6 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
         tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
-        recipientCertificateForDonor: kRecipientCertificateForDonor
     };
     const migrationOpts1 = Object.extend({}, migrationOpts0, true);
     migrationOpts1.donorConnectionString = kDonorConnectionString1;
@@ -268,24 +243,9 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
         tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
-        recipientCertificateForDonor: kRecipientCertificateForDonor
     };
     const migrationOpts1 = Object.extend({}, migrationOpts0, true);
     migrationOpts1.readPreference = kSecondaryReadPreference;
-    testConcurrentConflictingMigration(migrationOpts0, migrationOpts1);
-})();
-
-// Test different certificates.
-(() => {
-    const migrationOpts0 = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: ObjectId().str,
-        donorConnectionString: kDonorConnectionString0,
-        readPreference: kPrimaryReadPreference,
-        recipientCertificateForDonor: kRecipientCertificateForDonor
-    };
-    const migrationOpts1 = Object.extend({}, migrationOpts0, true);
-    migrationOpts1.recipientCertificateForDonor = kExpiredRecipientCertificateForDonor;
     testConcurrentConflictingMigration(migrationOpts0, migrationOpts1);
 })();
 

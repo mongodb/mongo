@@ -51,7 +51,6 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/db/repl/tenant_migration_pem_payload_gen.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/service_context.h"
@@ -239,13 +238,6 @@ public:
             const CancellationToken& token);
 
         /**
-         * Makes a task executor for executing commands against the recipient. If the server
-         * parameter 'tenantMigrationDisableX509Auth' is false, configures the executor to use the
-         * migration certificate to establish an SSL connection to the recipient.
-         */
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeRecipientCmdExecutor();
-
-        /**
          * Inserts the state document to _stateDocumentsNS and returns the opTime for the insert
          * oplog entry.
          */
@@ -334,14 +326,6 @@ public:
         const std::string _recipientConnectionString;
         const ReadPreferenceSetting _readPreference;
         const UUID _migrationUuid;
-        const boost::optional<TenantMigrationPEMPayload> _donorCertificateForRecipient;
-        const boost::optional<TenantMigrationPEMPayload> _recipientCertificateForDonor;
-
-        // TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
-        const transport::ConnectSSLMode _sslMode;
-
-        // Task executor used for executing commands against the recipient.
-        std::shared_ptr<executor::TaskExecutor> _recipientCmdExecutor;
 
         // Weak pointer to the Fetcher used for fetching admin.system.keys documents from the
         // recipient. It is only not null when the instance is actively fetching the documents.

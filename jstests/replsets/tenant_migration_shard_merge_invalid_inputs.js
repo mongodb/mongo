@@ -11,6 +11,7 @@
  *   featureFlagShardMerge,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -18,7 +19,6 @@ import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.j
 import {
     isShardMergeEnabled,
     kProtocolShardMerge,
-    makeMigrationCertificatesForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 const tenantMigrationTest =
@@ -42,7 +42,6 @@ const tenantId = ObjectId().str;
 const readPreference = {
     mode: 'primary'
 };
-const migrationCertificates = makeMigrationCertificatesForTest();
 
 jsTestLog("Testing 'donorStartMigration' command provided with invalid options.");
 
@@ -56,8 +55,6 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         tenantId: invalidTenantId,
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         readPreference,
-        donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     };
     assert.commandFailedWithCode(donorPrimary.adminCommand(cmd),
                                  [ErrorCodes.InvalidOptions, ErrorCodes.BadValue]);
@@ -70,8 +67,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     protocol: kProtocolShardMerge,
     recipientConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -83,8 +78,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     recipientConnectionString:
         tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -95,8 +88,6 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     protocol: kProtocolShardMerge,
     recipientConnectionString: recipientPrimary.host,
     readPreference,
-    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -113,7 +104,6 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         protocol: kProtocolShardMerge,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  [ErrorCodes.InvalidOptions, ErrorCodes.BadValue]);
 });
@@ -127,7 +117,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -140,7 +129,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: `${tenantMigrationTest.getDonorRst().getURL()},${recipientPrimary.host}`,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -153,7 +141,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: recipientPrimary.host,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -169,7 +156,6 @@ nullTimestamps.forEach((nullTs) => {
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
         returnAfterReachingDonorTimestamp: nullTs,
-        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.BadValue);
 });
@@ -182,7 +168,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
 
@@ -195,7 +180,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
 
@@ -207,7 +191,6 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     tenantIds: [ObjectId()],
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     readPreference,
-    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
 }),
                              ErrorCodes.InvalidOptions);
 

@@ -6,6 +6,7 @@
  *   incompatible_with_windows_tls,
  *   requires_persistence,
  *   serverless,
+ *   requires_fcv_71,
  * ]
  */
 
