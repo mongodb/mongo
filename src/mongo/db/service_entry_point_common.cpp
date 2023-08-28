@@ -2473,12 +2473,12 @@ void HandleRequest::completeOperation(DbResponse& response) {
 
     recordCurOpMetrics(opCtx);
 
-    const auto& stats =
-        CurOp::get(opCtx)->getReadOnlyUserAcquisitionStats()->getLdapOperationStats();
-    if (stats.shouldReport()) {
+    const auto& ldapOperationStatsSnapshot =
+        CurOp::get(opCtx)->getUserAcquisitionStats()->getLdapOperationStatsSnapshot();
+    if (ldapOperationStatsSnapshot.shouldReport()) {
         auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
-        if (nullptr != ldapCumulativeOperationsStats) {
-            ldapCumulativeOperationsStats->recordOpStats(stats, false);
+        if (ldapCumulativeOperationsStats) {
+            ldapCumulativeOperationsStats->recordOpStats(ldapOperationStatsSnapshot);
         }
     }
 }

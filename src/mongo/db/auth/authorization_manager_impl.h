@@ -48,6 +48,7 @@
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -226,7 +227,8 @@ private:
         // the value can not be loaded, so if it returns, the value will always be set.
         LookupResult _lookup(OperationContext* opCtx,
                              const UserRequest& user,
-                             const UserHandle& unusedCachedUser);
+                             const UserHandle& unusedCachedUser,
+                             const SharedUserAcquisitionStats& userAcquisitionStats);
 
         Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");
 

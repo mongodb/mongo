@@ -1113,17 +1113,17 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("locks", locks.obj());
     }
 
-    auto userAcquisitionStats = curop.getReadOnlyUserAcquisitionStats();
-    if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
+    auto userAcquisitionStats = curop.getUserAcquisitionStats();
+    if (userAcquisitionStats->shouldReportUserCacheAccessStats()) {
         BSONObjBuilder userCacheAcquisitionStatsBuilder;
-        userAcquisitionStats->userCacheAcquisitionStatsReport(
+        userAcquisitionStats->reportUserCacheAcquisitionStats(
             &userCacheAcquisitionStatsBuilder, opCtx->getServiceContext()->getTickSource());
         pAttrs->add("authorization", userCacheAcquisitionStatsBuilder.obj());
     }
 
-    if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
+    if (userAcquisitionStats->shouldReportLDAPOperationStats()) {
         BSONObjBuilder ldapOperationStatsBuilder;
-        userAcquisitionStats->ldapOperationStatsReport(&ldapOperationStatsBuilder,
+        userAcquisitionStats->reportLdapOperationStats(&ldapOperationStatsBuilder,
                                                        opCtx->getServiceContext()->getTickSource());
         pAttrs->add("LDAPOperations", ldapOperationStatsBuilder.obj());
     }
@@ -1293,16 +1293,16 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     {
-        auto userAcquisitionStats = curop.getReadOnlyUserAcquisitionStats();
-        if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
+        auto userAcquisitionStats = curop.getUserAcquisitionStats();
+        if (userAcquisitionStats->shouldReportUserCacheAccessStats()) {
             BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart("authorization"));
-            userAcquisitionStats->userCacheAcquisitionStatsReport(
+            userAcquisitionStats->reportUserCacheAcquisitionStats(
                 &userCacheAcquisitionStatsBuilder, opCtx->getServiceContext()->getTickSource());
         }
 
-        if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
+        if (userAcquisitionStats->shouldReportLDAPOperationStats()) {
             BSONObjBuilder ldapOperationStatsBuilder;
-            userAcquisitionStats->ldapOperationStatsReport(
+            userAcquisitionStats->reportLdapOperationStats(
                 &ldapOperationStatsBuilder, opCtx->getServiceContext()->getTickSource());
         }
     }
@@ -1600,17 +1600,17 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("authorization", [](auto field, auto args, auto& b) {
-        auto userAcquisitionStats = args.curop.getReadOnlyUserAcquisitionStats();
-        if (userAcquisitionStats->shouldUserCacheAcquisitionStatsReport()) {
+        auto userAcquisitionStats = args.curop.getUserAcquisitionStats();
+        if (userAcquisitionStats->shouldReportUserCacheAccessStats()) {
             BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart(field));
-            userAcquisitionStats->userCacheAcquisitionStatsReport(
+            userAcquisitionStats->reportUserCacheAcquisitionStats(
                 &userCacheAcquisitionStatsBuilder,
                 args.opCtx->getServiceContext()->getTickSource());
         }
 
-        if (userAcquisitionStats->shouldLDAPOperationStatsReport()) {
+        if (userAcquisitionStats->shouldReportLDAPOperationStats()) {
             BSONObjBuilder ldapOperationStatsBuilder(b.subobjStart(field));
-            userAcquisitionStats->ldapOperationStatsReport(
+            userAcquisitionStats->reportLdapOperationStats(
                 &ldapOperationStatsBuilder, args.opCtx->getServiceContext()->getTickSource());
         }
     });

@@ -71,10 +71,13 @@ public:
     }
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) final;
-    StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) final;
+    StatusWith<User> getUserObject(OperationContext* opCtx,
+                                   const UserRequest& userReq,
+                                   const SharedUserAcquisitionStats& userAcquisitionStats) final;
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
-                              BSONObj* result) final;
+                              BSONObj* result,
+                              const SharedUserAcquisitionStats& userAcquisitionStats) final;
     StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
                                               const std::vector<RoleName>& roleNames,
                                               ResolveRoleOption option) final {

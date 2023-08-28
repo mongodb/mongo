@@ -526,7 +526,7 @@ env.Library(
     source=[
         'ldap_operation_stats.cpp',
         'ldap_cumulative_operation_stats.cpp',
-        'user_cache_acquisition_stats.cpp',
+        'user_cache_access_stats.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -569,6 +569,7 @@ env.CppUnitTest(
         'sasl_mechanism_registry_test.cpp',
         'sasl_scram_test.cpp',
         'security_key_test.cpp',
+        'user_acquisition_stats_test.cpp',
         'user_document_parser_test.cpp',
         'validated_tenancy_scope_test.cpp',
     ],

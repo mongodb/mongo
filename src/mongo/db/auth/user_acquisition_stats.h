@@ -34,17 +34,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
+#include "mongo/db/auth/user_cache_access_stats.h"
 #include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
-#include "user_cache_acquisition_stats.h"
 
 namespace mongo {
-enum UserAcquisitionOpType { kCache, kBind, kSearch, kUnbind, kIncrementReferrals };
+enum UserAcquisitionOpType { kCache, kBind, kSearch, kSuccessfulReferral, kFailedReferral };
 
 /**
- * Generalized wrapper class for CurOp. Has access to the `UserCacheAcquisitionStats` class and to
+ * Generalized wrapper class for CurOp. Has access to the `UserCacheAccessStats` class and to
  * `LDAPOperationStats` class. This allows CurOp to have encapsulated information about LDAP
  * specific metrics and existing user cache metrics.
  */
@@ -58,7 +58,7 @@ class UserAcquisitionStats {
 
 public:
     UserAcquisitionStats()
-        : _userCacheAcquisitionStats(UserCacheAcquisitionStats()),
+        : _userCacheAccessStats(UserCacheAccessStats()),
           _ldapOperationStats(LDAPOperationStats()){};
     ~UserAcquisitionStats() = default;
 
@@ -66,11 +66,13 @@ public:
      * Functions for determining if there is data to report in the userCacheAcquisitionStats or
      * LDAPOperationStats object
      */
-    bool shouldUserCacheAcquisitionStatsReport() const {
-        return _userCacheAcquisitionStats.shouldReport();
+    bool shouldReportUserCacheAccessStats() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _userCacheAccessStats.shouldReport();
     }
 
-    bool shouldLDAPOperationStatsReport() const {
+    bool shouldReportLDAPOperationStats() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _ldapOperationStats.shouldReport();
     }
 
@@ -78,27 +80,43 @@ public:
      * Read only serialization methods for UserCacheAcquisitionStats object. Methods will serialize
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
-    void userCacheAcquisitionStatsReport(BSONObjBuilder* builder, TickSource* tickSource) const {
-        _userCacheAcquisitionStats.report(builder, tickSource);
+    void reportUserCacheAcquisitionStats(BSONObjBuilder* builder, TickSource* tickSource) const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _userCacheAccessStats.report(builder, tickSource);
     }
 
     void userCacheAcquisitionStatsToString(StringBuilder* sb, TickSource* tickSource) const {
-        _userCacheAcquisitionStats.toString(sb, tickSource);
+        stdx::lock_guard<Latch> lk(_mutex);
+        _userCacheAccessStats.toString(sb, tickSource);
     }
 
     /**
      * Read only serialization methods for LDAPOperationStats object. Methods will serialize
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
-    void ldapOperationStatsReport(BSONObjBuilder* builder, TickSource* tickSource) const {
+    void reportLdapOperationStats(BSONObjBuilder* builder, TickSource* tickSource) const {
+        stdx::lock_guard<Latch> lk(_mutex);
         _ldapOperationStats.report(builder, tickSource);
     }
 
     void ldapOperationStatsToString(StringBuilder* sb, TickSource* tickSource) const {
+        stdx::lock_guard<Latch> lk(_mutex);
         _ldapOperationStats.toString(sb, tickSource);
     }
 
-    const LDAPOperationStats& getLdapOperationStats() const {
+    /**
+     * Returns a copy of the current _userCacheAccessStats object.
+     */
+    UserCacheAccessStats getUserCacheAccessStatsSnapshot() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _userCacheAccessStats;
+    }
+
+    /**
+     * Returns a copy of the current _ldapOperationStats object.
+     */
+    LDAPOperationStats getLdapOperationStatsSnapshot() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _ldapOperationStats;
     }
 
@@ -108,17 +126,16 @@ private:
      */
     void _recordBindStart(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setBindStatsStartTime(_getTime(tickSource));
-        _ldapOperationStats.incrementBindNumOps();
+        _ldapOperationStats.recordBindStart(_getTime(tickSource));
     }
 
     /**
      * Records the completion of a LDAP bind operation by setting the end time. The start time
      * must already be set.
      */
-    void _recordBindEnd(TickSource* tickSource) {
+    void _recordBindComplete(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setBindStatsEndTime(_getTime(tickSource));
+        _ldapOperationStats.recordBindComplete(tickSource);
     }
 
     /**
@@ -126,48 +143,32 @@ private:
      */
     void _recordSearchStart(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setSearchStatsStartTime(
-            tickSource->ticksTo<Microseconds>(tickSource->getTicks()));
-        _ldapOperationStats.incrementSearchNumOps();
+        _ldapOperationStats.recordSearchStart(_getTime(tickSource));
     }
 
     /**
      * Records the completion of a LDAP search/query operation by setting the end time. The start
-     *time must already be set.
+     * time must already be set.
      */
-    void _recordSearchEnd(TickSource* tickSource) {
+    void _recordSearchComplete(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setSearchStatsEndTime(_getTime(tickSource));
+        _ldapOperationStats.recordSearchComplete(tickSource);
     }
 
     /**
-     * Records the start time of an LDAP unbind operation
+     * Increments the number of successful referrals to another LDAP server.
      */
-    void _recordUnbindStart(TickSource* tickSource) {
+    void _incrementSuccessfulReferrals() {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setUnbindStatsStartTime(_getTime(tickSource));
-        _ldapOperationStats.incrementUnbindNumOps();
+        _ldapOperationStats.incrementSuccessfulReferrals();
     }
 
     /**
-     * Records the completion of a LDAP unbind operation by setting the end time. The start time
-     * must already be set.
+     * Increments the number of failed referrals to another LDAP server.
      */
-    void _recordUnbindEnd(TickSource* tickSource) {
+    void _incrementFailedReferrals() {
         stdx::lock_guard<Latch> lk(_mutex);
-        _ldapOperationStats.setUnbindStatsEndTime(_getTime(tickSource));
-        auto ldapCumulativeOperationsStats = LDAPCumulativeOperationStats::get();
-        if (nullptr != ldapCumulativeOperationsStats) {
-            ldapCumulativeOperationsStats->recordOpStats(_ldapOperationStats, true);
-        }
-    }
-
-    /**
-     * Increments the number of referrals to another LDAP server, by increasing the  numReferrals
-     * feild of the LDAPOperationStats object
-     */
-    void _incrementReferrals() {
-        _ldapOperationStats.incrementReferrals();
+        _ldapOperationStats.incrementFailedReferrals();
     }
 
     /**
@@ -175,18 +176,16 @@ private:
      */
     void _recordCacheAccessStart(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _userCacheAcquisitionStats.setCacheAccessStartTime(_getTime(tickSource));
-        _userCacheAcquisitionStats.incrementAcquisitionAttempts();
+        _userCacheAccessStats.recordUserCacheAccessStart(_getTime(tickSource));
     }
 
     /**
      * Records the completion of a cache access attempt by setting the end time. The start time must
      * already be set.
      */
-    void _recordCacheAccessEnd(TickSource* tickSource) {
+    void _recordCacheAccessComplete(TickSource* tickSource) {
         stdx::lock_guard<Latch> lk(_mutex);
-        _userCacheAcquisitionStats.setCacheAccessEndTime(_getTime(tickSource));
-        _userCacheAcquisitionStats.incrementAcquisitionCompletions();
+        _userCacheAccessStats.recordUserCacheAccessComplete(tickSource);
     }
 
     /**
@@ -197,14 +196,16 @@ private:
     }
 
     /**
-     * UserCacheAcquisitionStats and LDAPOperationStats
+     * UserCacheAccessStats and LDAPOperationStats
      * associated with this UserAcquisitionStats object.
      */
-    UserCacheAcquisitionStats _userCacheAcquisitionStats;
+    UserCacheAccessStats _userCacheAccessStats;
     LDAPOperationStats _ldapOperationStats;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("UserAcquisitionStats::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("UserAcquisitionStats::_mutex");
 };
+
+using SharedUserAcquisitionStats = std::shared_ptr<UserAcquisitionStats>;
 
 /**
  * RAII handle that is used to mutate a UserAcquisitionStats object. It automatically records
@@ -232,10 +233,8 @@ public:
                 case kSearch:
                     _stats->_recordSearchStart(_tickSource);
                     break;
-                case kUnbind:
-                    _stats->_recordUnbindStart(_tickSource);
-                    break;
-                case kIncrementReferrals:
+                case kSuccessfulReferral:
+                case kFailedReferral:
                     break;
             }
         }
@@ -263,19 +262,19 @@ public:
         if (_stats) {
             switch (_type) {
                 case kCache:
-                    _stats->_recordCacheAccessEnd(_tickSource);
+                    _stats->_recordCacheAccessComplete(_tickSource);
                     break;
                 case kBind:
-                    _stats->_recordBindEnd(_tickSource);
+                    _stats->_recordBindComplete(_tickSource);
                     break;
                 case kSearch:
-                    _stats->_recordSearchEnd(_tickSource);
+                    _stats->_recordSearchComplete(_tickSource);
                     break;
-                case kUnbind:
-                    _stats->_recordUnbindEnd(_tickSource);
+                case kSuccessfulReferral:
+                    _stats->_incrementSuccessfulReferrals();
                     break;
-                case kIncrementReferrals:
-                    _stats->_incrementReferrals();
+                case kFailedReferral:
+                    _stats->_incrementFailedReferrals();
                     break;
             }
         }

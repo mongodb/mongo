@@ -583,18 +583,11 @@ public:
     std::string getNS() const;
 
     /**
-     * Returns a const pointer to the UserAcquisitionStats for the current operation.
-     * This can only be used for reading (i.e., when logging or profiling).
+     * Returns a non-const copy of the UserAcquisitionStats shared_ptr. The caller takes shared
+     * ownership of the userAcquisitionStats.
      */
-    const UserAcquisitionStats* getReadOnlyUserAcquisitionStats() const {
-        return &_userAcquisitionStats;
-    }
-
-    /**
-     * Returns a non-const raw pointers to UserAcquisitionStats member.
-     */
-    UserAcquisitionStats* getMutableUserAcquisitionStats() {
-        return &_userAcquisitionStats;
+    SharedUserAcquisitionStats getUserAcquisitionStats() const {
+        return _userAcquisitionStats;
     }
 
     /**
@@ -1079,7 +1072,7 @@ private:
     // CurOpStack.
     boost::optional<SingleThreadedLockStats> _lockStatsBase;
 
-    UserAcquisitionStats _userAcquisitionStats;
+    SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};
 
     TickSource* _tickSource = globalSystemTickSource();
     // These values are used to calculate the amount of time spent planning a query.

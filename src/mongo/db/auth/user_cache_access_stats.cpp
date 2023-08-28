@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/user_cache_acquisition_stats.h"
+#include "mongo/db/auth/user_cache_access_stats.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/duration.h"
@@ -38,26 +39,26 @@ constexpr auto kActiveAcquisitionAttemptsName = "startedUserCacheAcquisitionAtte
 constexpr auto kCompletedAcquisitionAttemptsName = "completedUserCacheAcquisitionAttempts"_sd;
 constexpr auto kWaitTimeName = "userCacheWaitTimeMicros"_sd;
 
-void UserCacheAcquisitionStats::report(BSONObjBuilder* builder, TickSource* tickSource) const {
-    builder->append(kActiveAcquisitionAttemptsName, std::int64_t(_totalStartedAcquisitionAttempts));
-    builder->append(kCompletedAcquisitionAttemptsName,
-                    std::int64_t(_totalCompletedAcquisitionAttempts));
+void UserCacheAccessStats::report(BSONObjBuilder* builder, TickSource* tickSource) const {
+    builder->append(kActiveAcquisitionAttemptsName, std::int64_t(_startedCacheAccessAttempts));
+    builder->append(kCompletedAcquisitionAttemptsName, std::int64_t(_completedCacheAccessAttempts));
     builder->append(kWaitTimeName, durationCount<Microseconds>(_timeElapsed(tickSource)));
 }
 
-void UserCacheAcquisitionStats::toString(StringBuilder* sb, TickSource* tickSource) const {
-    *sb << "{ " << kActiveAcquisitionAttemptsName << ": " << _totalStartedAcquisitionAttempts
-        << ", ";
-    *sb << kCompletedAcquisitionAttemptsName << ": " << _totalCompletedAcquisitionAttempts << ", ";
+void UserCacheAccessStats::toString(StringBuilder* sb, TickSource* tickSource) const {
+    *sb << "{ " << kActiveAcquisitionAttemptsName << ": " << _startedCacheAccessAttempts << ", ";
+    *sb << kCompletedAcquisitionAttemptsName << ": " << _completedCacheAccessAttempts << ", ";
     *sb << kWaitTimeName << ": " << durationCount<Microseconds>(_timeElapsed(tickSource)) << " }";
 }
 
-Microseconds UserCacheAcquisitionStats::_timeElapsed(TickSource* tickSource) const {
-    if (_cacheAccessEndTime <= _cacheAccessStartTime) {
-        return tickSource->ticksTo<Microseconds>(tickSource->getTicks()) - _cacheAccessStartTime;
+Microseconds UserCacheAccessStats::_timeElapsed(TickSource* tickSource) const {
+    if (_ongoingCacheAccessStartTime > Microseconds{0}) {
+        return _totalCompletedCacheAccessTime +
+            (tickSource->ticksTo<Microseconds>(tickSource->getTicks()) -
+             _ongoingCacheAccessStartTime);
     }
 
-    return _cacheAccessEndTime - _cacheAccessStartTime;
+    return _totalCompletedCacheAccessTime;
 }
 
 }  // namespace mongo

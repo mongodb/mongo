@@ -121,13 +121,17 @@ public:
      */
     virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserRequest& user,
-                                      BSONObj* result) = 0;
+                                      BSONObj* result,
+                                      const SharedUserAcquisitionStats& userAcquisitionStats) = 0;
 
     /**
      * Fetches and/or synthesizes a User object similar to above eliding additional
      * marshalling of data to BSON and back.
      */
-    virtual StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) = 0;
+    virtual StatusWith<User> getUserObject(
+        OperationContext* opCtx,
+        const UserRequest& userReq,
+        const SharedUserAcquisitionStats& userAcquisitionStats) = 0;
 
     /**
      * Checks to see if the named roles exist.

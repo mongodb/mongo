@@ -116,15 +116,19 @@ private:
     Mutex _cancelTokensMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokensMutex");
 };
 
-template <typename Result, typename Key, typename Value, typename Time>
+template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>
 struct ReadThroughCacheLookup {
-    using Fn = unique_function<Result(
-        OperationContext*, const Key&, const Value& cachedValue, const Time& timeInStore)>;
+    using Fn = unique_function<Result(OperationContext*,
+                                      const Key&,
+                                      const Value& cachedValue,
+                                      const Time& timeInStore,
+                                      const LookupArgs&... lookupArgs)>;
 };
 
-template <typename Result, typename Key, typename Value>
-struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent> {
-    using Fn = unique_function<Result(OperationContext*, const Key&, const Value& cachedValue)>;
+template <typename Result, typename Key, typename Value, typename... LookupArgs>
+struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
+    using Fn = unique_function<Result(
+        OperationContext*, const Key&, const Value& cachedValue, const LookupArgs&... lookupArgs)>;
 };
 
 /**
@@ -133,8 +137,16 @@ struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent> {
  *
  * Causal consistency is provided by requiring the backing store to asociate every Value it returns
  * with a logical timestamp of type Time.
+ *
+ * Lookup functions to the backing store can be supplied with additional arguments as specified in
+ * LookupArgs. These additional arguments are expected to be supplied to all calls to `acquire()`
+ * for the cache. The signature of the backing `LookupFn` is also expected to correspond with these
+ * `LookupArgs`.
  */
-template <typename Key, typename Value, typename Time = CacheNotCausallyConsistent>
+template <typename Key,
+          typename Value,
+          typename Time = CacheNotCausallyConsistent,
+          typename... LookupArgs>
 class ReadThroughCache : public ReadThroughCacheBase {
     /**
      * Data structure wrapping and expanding on the values stored in the cache.
@@ -246,7 +258,8 @@ public:
         Time t;
     };
 
-    using LookupFn = typename ReadThroughCacheLookup<LookupResult, Key, ValueHandle, Time>::Fn;
+    using LookupFn =
+        typename ReadThroughCacheLookup<LookupResult, Key, ValueHandle, Time, LookupArgs...>::Fn;
 
     // Exposed publicly so it can be unit-tested indepedently of the usages in this class. Must not
     // be used independently.
@@ -257,7 +270,8 @@ public:
      * set ValueHandle (its operator bool will be true). Otherwise, either causes the blocking
      * 'LookupFn' to be asynchronously invoked to fetch 'key' from the backing store or joins an
      * already scheduled invocation) and returns a future which will be signaled when the lookup
-     * completes.
+     * completes. The blocking 'LookupFn' will be invoked with the arguments supplied in
+     * 'lookupArgs.'
      *
      * If the lookup is successful and 'key' is found in the store, it will be cached (so subsequent
      * lookups won't have to re-fetch it) and the future will be set. If 'key' is not found in the
@@ -271,9 +285,9 @@ public:
      */
     template <typename KeyType>
     requires(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
-        SharedSemiFuture<ValueHandle> acquireAsync(
-            const KeyType& key,
-            CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
+        SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key,
+                                                   CacheCausalConsistency causalConsistency,
+                                                   LookupArgs&&... lookupArgs) {
 
         // Fast path
         if (auto cachedValue = _cache.get(key, causalConsistency))
@@ -293,8 +307,11 @@ public:
         auto [cachedValue, timeInStore] = _cache.getCachedValueAndTimeInStore(key);
         auto [it, emplaced] = _inProgressLookups.emplace(
             key,
-            std::make_unique<InProgressLookup>(
-                *this, Key(key), ValueHandle(std::move(cachedValue)), std::move(timeInStore)));
+            std::make_unique<InProgressLookup>(*this,
+                                               Key(key),
+                                               ValueHandle(std::move(cachedValue)),
+                                               std::move(timeInStore),
+                                               std::forward<LookupArgs>(lookupArgs)...));
         invariant(emplaced);
         auto& inProgressLookup = *it->second;
         auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);
@@ -307,6 +324,13 @@ public:
         return sharedFutureToReturn;
     }
 
+    template <typename KeyType>
+    requires(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
+        SharedSemiFuture<ValueHandle> acquireAsync(const KeyType& key, LookupArgs&&... lookupArgs) {
+        return acquireAsync(
+            key, CacheCausalConsistency::kLatestCached, std::forward<LookupArgs>(lookupArgs)...);
+    }
+
     /**
      * A blocking variant of 'acquireAsync' above - refer to it for more details.
      *
@@ -314,11 +338,22 @@ public:
      *  This is a potentially blocking method.
      */
     template <typename KeyType>
-    requires IsComparable<KeyType> ValueHandle
-    acquire(OperationContext* opCtx,
-            const KeyType& key,
-            CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
-        return acquireAsync(key, causalConsistency).get(opCtx);
+    requires IsComparable<KeyType> ValueHandle acquire(OperationContext* opCtx,
+                                                       const KeyType& key,
+                                                       CacheCausalConsistency causalConsistency,
+                                                       LookupArgs&&... lookupArgs) {
+        return acquireAsync(key, causalConsistency, std::forward<LookupArgs>(lookupArgs)...)
+            .get(opCtx);
+    }
+
+    template <typename KeyType>
+    requires IsComparable<KeyType> ValueHandle acquire(OperationContext* opCtx,
+                                                       const KeyType& key,
+                                                       LookupArgs&&... lookupArgs) {
+        return acquire(opCtx,
+                       key,
+                       CacheCausalConsistency::kLatestCached,
+                       std::forward<LookupArgs>(lookupArgs)...);
     }
 
     /**
@@ -622,7 +657,8 @@ private:
     // Client lock).
     Mutex& _mutex;
 
-    // Blocking function which will be invoked to retrieve entries from the backing store
+    // Blocking function which will be invoked to retrieve entries from the backing store. It will
+    // be supplied with the arguments specified by the LookupArgs parameter pack.
     const LookupFn _lookupFn;
 
     // Contains all the currently cached keys. This structure is self-synchronising and doesn't
@@ -666,14 +702,19 @@ private:
  *      inProgress.signalWaiters(result);
  * }
  */
-template <typename Key, typename Value, typename Time>
-class ReadThroughCache<Key, Value, Time>::InProgressLookup {
+template <typename Key, typename Value, typename Time, typename... LookupArgs>
+class ReadThroughCache<Key, Value, Time, LookupArgs...>::InProgressLookup {
 public:
-    InProgressLookup(ReadThroughCache& cache, Key key, ValueHandle cachedValue, Time minTimeInStore)
+    InProgressLookup(ReadThroughCache& cache,
+                     Key key,
+                     ValueHandle cachedValue,
+                     Time minTimeInStore,
+                     LookupArgs&&... lookupArgs)
         : _cache(cache),
           _key(std::move(key)),
           _cachedValue(std::move(cachedValue)),
-          _minTimeInStore(std::move(minTimeInStore)) {}
+          _minTimeInStore(std::move(minTimeInStore)),
+          _lookupArgs(std::forward<LookupArgs>(lookupArgs)...) {}
 
     Future<LookupResult> asyncLookupRound() {
         auto [promise, future] = makePromiseFuture<LookupResult>();
@@ -687,13 +728,19 @@ public:
                     uassertStatusOK(cancelStatusAtTaskBegin);
 
                     if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
-                        return _cache._lookupFn(opCtx, _key, _cachedValue);
+                        return std::apply(_cache._lookupFn,
+                                          std::tuple_cat(std::make_tuple(opCtx, _key, _cachedValue),
+                                                         std::move(_lookupArgs)));
                     } else {
                         auto minTimeInStore = [&] {
                             stdx::lock_guard lg(_cache._mutex);
                             return _minTimeInStore;
                         }();
-                        return _cache._lookupFn(opCtx, _key, _cachedValue, minTimeInStore);
+                        return std::apply(
+                            _cache._lookupFn,
+                            std::tuple_cat(
+                                std::make_tuple(opCtx, _key, _cachedValue, minTimeInStore),
+                                std::move(_lookupArgs)));
                     }
                 });
             }));
@@ -777,6 +824,8 @@ private:
 
     ValueHandle _cachedValue;
     Time _minTimeInStore;
+
+    std::tuple<LookupArgs...> _lookupArgs;
 
     using TimeAndPromiseMap = std::map<Time, std::unique_ptr<SharedPromise<ValueHandle>>>;
     TimeAndPromiseMap _outstanding;

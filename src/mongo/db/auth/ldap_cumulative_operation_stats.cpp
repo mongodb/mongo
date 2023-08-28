@@ -46,9 +46,10 @@ namespace {
  * LDAPOperationStats members
  */
 constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"_sd;
+constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"_sd;
+constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"_sd;
 constexpr auto kBindStats = "bindStats"_sd;
 constexpr auto kSearchStats = "searchStats"_sd;
-constexpr auto kUnbindStats = "unbindStats"_sd;
 
 /**
  * Fields of the Stats struct
@@ -57,13 +58,7 @@ constexpr auto kLDAPMetricNumOp = "numOp"_sd;
 constexpr auto kLDAPMetricDuration = "opDurationMicros"_sd;
 
 const auto getLDAPCumulativeOperationStats =
-    ServiceContext::declareDecoration<std::unique_ptr<LDAPCumulativeOperationStats>>();
-
-ServiceContext::ConstructorActionRegisterer setLDAPCumulativeOperationStats{
-    "SetLDAPCumulativeOperationStats", [](ServiceContext* service) {
-        auto s = std::make_unique<LDAPCumulativeOperationStats>();
-        getLDAPCumulativeOperationStats(service) = std::move(s);
-    }};
+    ServiceContext::declareDecoration<LDAPCumulativeOperationStats>();
 
 }  // namespace
 
@@ -76,53 +71,52 @@ void LDAPCumulativeOperationStats::report(BSONObjBuilder* builder) const {
 
     stdx::lock_guard<Latch> lock(_memberAccessMutex);
 
-    builder->append(kNumberOfReferrals, _numReferrals);
+    builder->append(kNumberOfSuccessfulReferrals, _numSuccessfulReferrals);
+    builder->append(kNumberOfFailedReferrals, _numFailedReferrals);
+    builder->append(kNumberOfReferrals, (_numSuccessfulReferrals + _numFailedReferrals));
     reportHelper(_bindStats, kBindStats);
     reportHelper(_searchStats, kSearchStats);
-    reportHelper(_unbindStats, kUnbindStats);
 }
 
 void LDAPCumulativeOperationStats::toString(StringBuilder* sb) const {
     auto toStringHelper = [=](const Stats& stats, StringData statsName) {
-        *sb << statsName << "{" << kLDAPMetricNumOp << ":" << stats.numOps << ","
+        *sb << statsName << ":{" << kLDAPMetricNumOp << ":" << stats.numOps << ","
             << kLDAPMetricDuration << ":" << durationCount<Microseconds>(stats.totalTime) << "}";
     };
 
     stdx::lock_guard<Latch> lock(_memberAccessMutex);
 
-    *sb << "{" << kNumberOfReferrals << ":" << _numReferrals << ",";
+    *sb << "{" << kNumberOfSuccessfulReferrals << ":" << _numSuccessfulReferrals << ",";
+    *sb << kNumberOfFailedReferrals << ":" << _numFailedReferrals << ",";
+    *sb << kNumberOfReferrals << ":" << (_numSuccessfulReferrals + _numFailedReferrals) << ",";
     toStringHelper(_bindStats, kBindStats);
     toStringHelper(_searchStats, kSearchStats);
-    toStringHelper(_unbindStats, kUnbindStats);
     *sb << "}";
 }
 
 bool LDAPCumulativeOperationStats::hasData() const {
     stdx::lock_guard<Latch> lock(_memberAccessMutex);
-    return _numReferrals > 0 || _bindStats.numOps > 0 || _searchStats.numOps > 0 ||
-        _unbindStats.numOps > 0;
+    return _numSuccessfulReferrals > 0 || _numFailedReferrals > 0 || _bindStats.numOps > 0 ||
+        _searchStats.numOps > 0;
 }
 
-void LDAPCumulativeOperationStats::recordOpStats(const LDAPOperationStats& stats, bool isUnbind) {
+void LDAPCumulativeOperationStats::recordOpStats(const LDAPOperationStats& stats) {
     auto recordHelper = [](Stats& stats, const LDAPOperationStats::Stats& ldapOpStats) {
         stats.numOps += ldapOpStats.numOps;
-        stats.totalTime += ldapOpStats.endTime - ldapOpStats.startTime;
+        stats.totalTime += ldapOpStats.timeElapsed(getGlobalServiceContext()->getTickSource());
     };
 
     stdx::lock_guard<Latch> lock(_memberAccessMutex);
 
-    if (isUnbind) {
-        recordHelper(_unbindStats, stats._unbindStats);
-    } else {
-        _numReferrals += stats._numReferrals;
-        recordHelper(_bindStats, stats._bindStats);
-        recordHelper(_searchStats, stats._searchStats);
-    }
+    _numSuccessfulReferrals += stats._numSuccessfulReferrals;
+    _numFailedReferrals += stats._numFailedReferrals;
+    recordHelper(_bindStats, stats._bindStats);
+    recordHelper(_searchStats, stats._searchStats);
 }
 
 LDAPCumulativeOperationStats* LDAPCumulativeOperationStats::get() {
     if (hasGlobalServiceContext()) {
-        return getLDAPCumulativeOperationStats(getGlobalServiceContext()).get();
+        return &getLDAPCumulativeOperationStats(getGlobalServiceContext());
     } else {
         return nullptr;
     }

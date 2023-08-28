@@ -41,9 +41,10 @@ namespace {
  * LDAPOperationStats members
  */
 constexpr auto kNumberOfReferrals = "LDAPNumberOfReferrals"_sd;
+constexpr auto kNumberOfSuccessfulReferrals = "LDAPNumberOfSuccessfulReferrals"_sd;
+constexpr auto kNumberOfFailedReferrals = "LDAPNumberOfFailedReferrals"_sd;
 constexpr auto kBindStats = "bindStats"_sd;
 constexpr auto kSearchStats = "searchStats"_sd;
-constexpr auto kUnbindStats = "unbindStats"_sd;
 
 /**
  * Fields of the Stats struct
@@ -54,53 +55,50 @@ constexpr auto kLDAPMetricDuration = "opDurationMicros"_sd;
 }  // namespace
 
 void LDAPOperationStats::report(BSONObjBuilder* builder, TickSource* tickSource) const {
-    builder->append(kNumberOfReferrals, _numReferrals);
-    reportHelper(builder, tickSource, _bindStats, kBindStats);
-    reportHelper(builder, tickSource, _searchStats, kSearchStats);
-    reportHelper(builder, tickSource, _unbindStats, kUnbindStats);
+    builder->append(kNumberOfSuccessfulReferrals, std::int64_t(_numSuccessfulReferrals));
+    builder->append(kNumberOfFailedReferrals, std::int64_t(_numFailedReferrals));
+    builder->append(kNumberOfReferrals,
+                    std::int64_t(_numSuccessfulReferrals + _numFailedReferrals));
+    _bindStats.report(builder, tickSource, kBindStats);
+    _searchStats.report(builder, tickSource, kSearchStats);
 }
 
-void LDAPOperationStats::reportHelper(BSONObjBuilder* builder,
-                                      TickSource* tickSource,
-                                      Stats ldapOpStats,
-                                      StringData statsName) const {
+void LDAPOperationStats::Stats::report(BSONObjBuilder* builder,
+                                       TickSource* tickSource,
+                                       StringData statsName) const {
     BSONObjBuilder subObjBuildr(builder->subobjStart(statsName));
-    subObjBuildr.append(kLDAPMetricNumOp, ldapOpStats.numOps);
-    subObjBuildr.append(kLDAPMetricDuration,
-                        durationCount<Microseconds>(_timeElapsed(tickSource, ldapOpStats)));
+    subObjBuildr.append(kLDAPMetricNumOp, numOps);
+    subObjBuildr.append(kLDAPMetricDuration, durationCount<Microseconds>(timeElapsed(tickSource)));
 }
 
 void LDAPOperationStats::toString(StringBuilder* sb, TickSource* tickSource) const {
-    *sb << "{" << kNumberOfReferrals << ":" << _numReferrals << ",";
-    toStringHelper(sb, tickSource, _bindStats, kBindStats);
-    toStringHelper(sb, tickSource, _searchStats, kSearchStats);
-    toStringHelper(sb, tickSource, _unbindStats, kUnbindStats);
-    *sb << "}";
+    *sb << "{ " << kNumberOfSuccessfulReferrals << ": " << _numSuccessfulReferrals << ", ";
+    *sb << kNumberOfFailedReferrals << ": " << _numFailedReferrals << ", ";
+    *sb << kNumberOfReferrals << ": " << (_numSuccessfulReferrals + _numFailedReferrals) << ", ";
+    _bindStats.toString(sb, tickSource, kBindStats);
+    *sb << ", ";
+    _searchStats.toString(sb, tickSource, kSearchStats);
+    *sb << " }";
 }
 
-void LDAPOperationStats::toStringHelper(StringBuilder* sb,
-                                        TickSource* tickSource,
-                                        Stats ldapOpStats,
-                                        StringData statsName) const {
-    *sb << statsName << "{" << kLDAPMetricNumOp << ":" << ldapOpStats.numOps << ","
-        << kLDAPMetricDuration << ":"
-        << durationCount<Microseconds>(_timeElapsed(tickSource, ldapOpStats)) << "}";
+void LDAPOperationStats::Stats::toString(StringBuilder* sb,
+                                         TickSource* tickSource,
+                                         StringData statsName) const {
+    *sb << statsName << ": { " << kLDAPMetricNumOp << ": " << numOps << ", " << kLDAPMetricDuration
+        << ": " << durationCount<Microseconds>(timeElapsed(tickSource)) << " }";
 }
 
-Microseconds LDAPOperationStats::_timeElapsed(TickSource* tickSource, Stats ldapOpStats) const {
-    if (ldapOpStats.startTime == Microseconds{0}) {
-        return Microseconds{0};
+Microseconds LDAPOperationStats::Stats::timeElapsed(TickSource* tickSource) const {
+    if (startTime > Microseconds{0}) {
+        return totalCompletedOpTime +
+            (tickSource->ticksTo<Microseconds>(tickSource->getTicks()) - startTime);
     }
 
-    if (ldapOpStats.endTime <= ldapOpStats.startTime) {
-        return tickSource->ticksTo<Microseconds>(tickSource->getTicks()) - ldapOpStats.startTime;
-    }
-
-    return ldapOpStats.endTime - ldapOpStats.startTime;
+    return totalCompletedOpTime;
 }
 
 bool LDAPOperationStats::shouldReport() const {
-    return _numReferrals != 0 || _bindStats.numOps != 0 || _searchStats.numOps != 0 ||
-        _unbindStats.numOps != 0;
+    return _numSuccessfulReferrals != 0 || _numFailedReferrals != 0 || _bindStats.numOps != 0 ||
+        _searchStats.numOps != 0;
 }
 }  // namespace mongo

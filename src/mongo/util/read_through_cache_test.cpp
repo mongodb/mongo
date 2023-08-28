@@ -112,6 +112,34 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::CausallyConsistentCache");
 };
 
+class CausallyConsistentCacheWithLookupArgs
+    : public ReadThroughCache<std::string, CachedValue, Timestamp, std::string, int> {
+public:
+    CausallyConsistentCacheWithLookupArgs(ServiceContext* service,
+                                          ThreadPoolInterface& threadPool,
+                                          size_t size,
+                                          LookupFn lookupFn)
+        : ReadThroughCache(
+              _mutex,
+              service,
+              threadPool,
+              [this, lookupFn = std::move(lookupFn)](OperationContext* opCtx,
+                                                     const std::string& key,
+                                                     const ValueHandle& cachedValue,
+                                                     Timestamp timeInStore,
+                                                     const std::string& name,
+                                                     int val) {
+                  ++countLookups;
+                  return lookupFn(opCtx, key, cachedValue, timeInStore, name, val);
+              },
+              size) {}
+
+    int countLookups{0};
+
+private:
+    Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::CausallyConsistentCache");
+};
+
 /**
  * Fixture for tests, which do not need to exercise the multi-threading capabilities of the cache
  * and as such do not require control over the creation/destruction of their operation contexts.
@@ -380,6 +408,48 @@ TEST_F(ReadThroughCacheTest, CausalConsistency) {
     ASSERT(!cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached).isValid());
     ASSERT_EQ(20, cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown)->counter);
     ASSERT(cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown).isValid());
+}
+
+TEST_F(ReadThroughCacheTest, CausalConsistencyWithLookupArgs) {
+    boost::optional<CausallyConsistentCacheWithLookupArgs::LookupResult> nextToReturn;
+
+    CacheWithThreadPool<CausallyConsistentCacheWithLookupArgs> cache(
+        getServiceContext(),
+        1,
+        [&](OperationContext*,
+            const std::string& key,
+            const CausallyConsistentCacheWithLookupArgs::ValueHandle&,
+            const Timestamp& timeInStore,
+            const std::string& name,
+            int val) {
+            ASSERT_EQ("TestKey", key);
+            ASSERT_EQ("hello", name);
+            ASSERT_GTE(val, 0);
+            return CausallyConsistentCacheWithLookupArgs::LookupResult(std::move(*nextToReturn));
+        });
+
+    constexpr auto kName = "hello";
+
+    nextToReturn.emplace(CachedValue(10), Timestamp(10));
+    ASSERT_EQ(10,
+              cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached, kName, 16)
+                  ->counter);
+    ASSERT_EQ(
+        10,
+        cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown, kName, 12)->counter);
+
+    nextToReturn.emplace(CachedValue(20), Timestamp(20));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(20)));
+    ASSERT_EQ(
+        10,
+        cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached, kName, 0)->counter);
+    ASSERT(!cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached, kName, 17)
+                .isValid());
+    ASSERT_EQ(
+        20,
+        cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown, kName, 39)->counter);
+    ASSERT(
+        cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown, kName, 2).isValid());
 }
 
 /**

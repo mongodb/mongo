@@ -121,12 +121,14 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     return Status::OK();
 }
 
-StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(OperationContext* opCtx,
-                                                                const UserRequest& userReq) {
+StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(
+    OperationContext* opCtx,
+    const UserRequest& userReq,
+    const SharedUserAcquisitionStats& userAcquisitionStats) {
     // Marshalling to BSON and back is inevitable since the
     // source of truth is a system external to mongos.
     BSONObj userDoc;
-    auto status = getUserDescription(opCtx, userReq, &userDoc);
+    auto status = getUserDescription(opCtx, userReq, &userDoc, userAcquisitionStats);
     if (!status.isOK()) {
         return status;
     }
@@ -142,9 +144,11 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(OperationContext
     return std::move(user);
 }
 
-Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opCtx,
-                                                           const UserRequest& user,
-                                                           BSONObj* result) {
+Status AuthzManagerExternalStateMongos::getUserDescription(
+    OperationContext* opCtx,
+    const UserRequest& user,
+    BSONObj* result,
+    const SharedUserAcquisitionStats& userAcquisitionStats) {
     const UserName& userName = user.name;
     if (!user.roles) {
         BSONObj usersInfoCmd = BSON("usersInfo" << userName.toBSON(true /* serialize tenant */)

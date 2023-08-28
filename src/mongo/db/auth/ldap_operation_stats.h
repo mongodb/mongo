@@ -37,6 +37,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/auth/ldap_cumulative_operation_stats.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
@@ -44,14 +46,14 @@
 namespace mongo {
 /**
  * Class used to track statistics associated with LDAP operations for a specfic
- * UserAcquisitionStats object.
+ * UserAcquisitionStats object. All methods must be called while holding that UserAcquisitionStats'
+ * lock.
  */
 class LDAPOperationStats {
 public:
     LDAPOperationStats() = default;
     ~LDAPOperationStats() = default;
-    LDAPOperationStats(const LDAPOperationStats&) = delete;
-    LDAPOperationStats& operator=(const LDAPOperationStats&) = delete;
+
     /**
      * Marshals all statistics into BSON for reporting.
      */
@@ -68,104 +70,92 @@ public:
     bool shouldReport() const;
 
     /**
-     * Increment the total number of referrals for an LDAP operation.
+     * Increment the number of successful or failed referrals for an LDAP operation.
      */
-    void incrementReferrals() {
-        ++_numReferrals;
+    void incrementSuccessfulReferrals() {
+        ++_numSuccessfulReferrals;
+    }
+
+    void incrementFailedReferrals() {
+        ++_numFailedReferrals;
     }
 
     /**
-     * Increment LDAPOperationStats bind, search, and unbind number of operations feild
+     * Update number of binds and searches and set their start times.
+     * If the start time is not 0, then some other bind/search is still running on the same
+     * OperationContext.
+     * In those cases, the start time will not be updated and whichever operation
+     * finishes first will record its time and update the start time back to 0.
      */
-    void incrementBindNumOps() {
+    void recordBindStart(Microseconds startTime) {
         ++_bindStats.numOps;
+        if (_bindStats.startTime == Microseconds{0}) {
+            _bindStats.startTime = startTime;
+        }
     }
 
-    void incrementSearchNumOps() {
+    void recordSearchStart(Microseconds startTime) {
         ++_searchStats.numOps;
-    }
-
-    void incrementUnbindNumOps() {
-        ++_unbindStats.numOps;
-    }
-
-    /**
-     * Setters for bind, search, and unbind start times
-     */
-    void setBindStatsStartTime(Microseconds startTime) {
-        _bindStats.startTime = startTime;
-    }
-
-    void setSearchStatsStartTime(Microseconds startTime) {
-        _searchStats.startTime = startTime;
-    }
-
-    void setUnbindStatsStartTime(Microseconds startTime) {
-        _unbindStats.startTime = startTime;
+        if (_searchStats.startTime == Microseconds{0}) {
+            _searchStats.startTime = startTime;
+        }
     }
 
     /**
-     * Setters for bind, search, and unbind end times
+     * Update bind and search completion.
+     * If the start time is Microseconds{0}, then another concurrent LDAP operation on the same
+     * UserAcquisitionStats instance completed before this one. In those cases, don't record
+     * the elapsed time.
      */
-    void setBindStatsEndTime(Microseconds startTime) {
-        invariant(_bindStats.startTime != Microseconds{0});
-        _bindStats.endTime = startTime;
+    void recordBindComplete(TickSource* tickSource) {
+        if (_bindStats.startTime > Microseconds{0}) {
+            _bindStats.totalCompletedOpTime =
+                tickSource->ticksTo<Microseconds>(tickSource->getTicks()) - _bindStats.startTime;
+        }
+        _bindStats.startTime = Microseconds{0};
     }
 
-    void setSearchStatsEndTime(Microseconds startTime) {
-        invariant(_searchStats.startTime != Microseconds{0});
-        _searchStats.endTime = startTime;
-    }
-
-    void setUnbindStatsEndTime(Microseconds startTime) {
-        invariant(_unbindStats.startTime != Microseconds{0});
-        _unbindStats.endTime = startTime;
+    void recordSearchComplete(TickSource* tickSource) {
+        if (_searchStats.startTime > Microseconds{0}) {
+            _searchStats.totalCompletedOpTime =
+                tickSource->ticksTo<Microseconds>(tickSource->getTicks()) - _searchStats.startTime;
+        }
+        _searchStats.startTime = Microseconds{0};
     }
 
 private:
     friend class LDAPCumulativeOperationStats;
+    friend class UserAcquisitionStatsTest;
+    friend class LDAPTransformContext;
 
     /**
-     * Struct Stats is used to contain information about the bind, search, and unbind stats
+     * Struct Stats is used to contain information about the bind and search stats
      * of the LDAP Operations.
      */
     struct Stats {
+        void report(BSONObjBuilder* builder, TickSource* tickSource, StringData statsName) const;
+        void toString(StringBuilder* sb, TickSource* tickSource, StringData statsName) const;
+        Microseconds timeElapsed(TickSource* tickSource) const;
+
         int64_t numOps{0};
         Microseconds startTime{Microseconds{0}};
-        Microseconds endTime{Microseconds{0}};
+        Microseconds totalCompletedOpTime{Microseconds{0}};
     };
 
     /**
-     * Helper function to reduce redundancy for constructing BSON report of LDAPOperationsStats.
+     * Number of successful referrals to other LDAP servers
      */
-    void reportHelper(BSONObjBuilder* builder,
-                      TickSource* tickSource,
-                      Stats ldapOpStats,
-                      StringData statsName) const;
+    std::uint64_t _numSuccessfulReferrals{0};
 
     /**
-     * Helper function to reduce redundancy for constructing string of LDAPOperationsStats.
+     * Number of failed referrals to other LDAP servers
      */
-    void toStringHelper(StringBuilder* sb,
-                        TickSource* tickSource,
-                        Stats ldapOpStats,
-                        StringData statsName) const;
+    std::uint64_t _numFailedReferrals{0};
 
     /**
-     * Computes and returns total time spent on all cache accesses.
-     */
-    Microseconds _timeElapsed(TickSource* tickSource, Stats ldapOpStats) const;
-
-    /**
-     * Number of referrals to other LDAP servers
-     */
-    int64_t _numReferrals{0};
-
-    /**
-     * Metrics associated with binding, search/query, and unbinding from an LDAP server.
+     * Metrics associated with binding and search/querying an LDAP server.
      */
     Stats _bindStats;
     Stats _searchStats;
-    Stats _unbindStats;
 };
 }  // namespace mongo
