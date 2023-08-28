@@ -674,10 +674,6 @@ private:
     // _internalServerCleanupForDowngrade.
     void _upgradeServerMetadata(OperationContext* opCtx,
                                 const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            _dropConfigMigrationsCollection(opCtx);
-        }
-
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             // Delete any possible leftover ShardingStateRecovery document.
             // TODO SERVER-78330 remove this.
@@ -806,22 +802,6 @@ private:
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
         }
-    }
-
-    // TODO SERVER-75080 get rid of `_dropConfigMigrationsCollection` once v7.0 branches out
-    void _dropConfigMigrationsCollection(OperationContext* opCtx) {
-        // Dropping potential leftover `config.migrations` collection as it is unused since v6.0
-        DropReply dropReply;
-        const auto deletionStatus =
-            dropCollection(opCtx,
-                           NamespaceString::kMigrationsNamespace,
-                           &dropReply,
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-        uassert(deletionStatus.code(),
-                str::stream() << "Failed to drop "
-                              << NamespaceString::kMigrationsNamespace.toStringForErrorMsg()
-                              << causedBy(deletionStatus.reason()),
-                deletionStatus.isOK() || deletionStatus.code() == ErrorCodes::NamespaceNotFound);
     }
 
     // _prepareToUpgrade performs all actions and checks that need to be done before proceeding to
