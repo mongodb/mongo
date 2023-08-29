@@ -8,8 +8,9 @@
  *     # This complicates aggregation extraction.
  *     do_not_wrap_aggregations_in_facets,
  *     # Refusing to run a test that issues an aggregation command with explain because it may
- *     # return incomplete results if interrupted by a stepdown.
+ *     # return incomplete results if interrupted by a stepdown/tenant migration.
  *     does_not_support_stepdowns,
+ *     tenant_migration_incompatible,
  *     # We need a timeseries collection.
  *     requires_timeseries,
  * ]
