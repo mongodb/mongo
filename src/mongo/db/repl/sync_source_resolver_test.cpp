@@ -343,13 +343,14 @@ BSONObj _makeOplogEntry(Timestamp ts, long long term) {
                              NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
                              boost::none,                                            // uuid
                              boost::none,                                            // fromMigrate
-                             repl::OplogEntry::kOplogVersion,                        // version
-                             BSONObj(),                                              // o
-                             boost::none,                                            // o2
-                             {},                                                     // sessionInfo
-                             boost::none,                                            // upsert
-                             Date_t(),     // wall clock time
-                             {},           // statement ids
+                             boost::none,                      // checkExistenceForDiffInsert
+                             repl::OplogEntry::kOplogVersion,  // version
+                             BSONObj(),                        // o
+                             boost::none,                      // o2
+                             {},                               // sessionInfo
+                             boost::none,                      // upsert
+                             Date_t(),                         // wall clock time
+                             {},                               // statement ids
                              boost::none,  // optime of previous write within same transaction
                              boost::none,  // pre-image optime
                              boost::none,  // post-image optime

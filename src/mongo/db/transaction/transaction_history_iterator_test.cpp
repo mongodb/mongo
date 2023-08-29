@@ -74,6 +74,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         NamespaceString::createNamespaceString_forTest("a.b"),  // namespace
         boost::none,                                            // uuid
         boost::none,                                            // fromMigrate
+        boost::none,                                            // checkExistenceForDiffInsert
         repl::OplogEntry::kOplogVersion,                        // version
         docToInsert,                                            // o
         boost::none,                                            // o2
