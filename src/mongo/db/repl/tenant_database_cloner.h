@@ -141,6 +141,8 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
+    // TODO SERVER-63517 - since the MTM code will be removed in 7.2, changing _dbName to use a
+    // DatabaseName is not necessary and we are leaving it as a string for now.
     const std::string _dbName;                                                // (R)
     std::vector<std::pair<NamespaceString, CollectionOptions>> _collections;  // (X)
     std::unique_ptr<TenantCollectionCloner> _currentCollectionCloner;         // (MX)
