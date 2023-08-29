@@ -1,7 +1,7 @@
 /**
  * Test the rank based window functions.
  */
-import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {assertErrCodeAndErrMsgContains, documentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 for (let i = 0; i < 12; i++) {
@@ -51,6 +51,15 @@ assert.commandFailedWithCode(coll.runCommand({
     cursor: {}
 }),
                              5371603);
+
+// This test validates the error message displays $rank correctly.
+let pipeline = [{
+    $setWindowFields: {
+        sortBy: {_id: 1},
+        output: {rank: {$rank: "$_id"}},
+    }
+}]
+assertErrCodeAndErrMsgContains(coll, pipeline, 5371603, "$rank");
 
 // Rank based accumulators must have a sortBy.
 assert.commandFailedWithCode(coll.runCommand({
