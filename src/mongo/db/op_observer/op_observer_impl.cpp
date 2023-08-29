@@ -232,6 +232,9 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry->setObject(args.updateArgs->update);
     oplogEntry->setObject2(args.updateArgs->criteria);
     oplogEntry->setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+    if (args.updateArgs->mustCheckExistenceForInsertOperations) {
+        oplogEntry->setCheckExistenceForDiffInsert();
+    }
     if (!args.updateArgs->oplogSlots.empty()) {
         oplogEntry->setOpTime(args.updateArgs->oplogSlots.back());
     }

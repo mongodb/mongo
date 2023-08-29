@@ -1883,13 +1883,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
             // If we are in steady state and the update is on a timeseries bucket collection, we can
-            // enable some optimizations in diff application. In some cases, during tenant
-            // migration, we can for some reason generate entries for timeseries bucket collections
-            // which still rely on the idempotency guarantee, which then means we shouldn't apply
-            // these optimizations.
+            // enable some optimizations in diff application. In some cases, like during tenant
+            // migration or $_internalApplyOplogUpdate update, we can for some reason generate
+            // entries for timeseries bucket collections which still rely on the idempotency
+            // guarantee, which then means we shouldn't apply these optimizations.
             write_ops::UpdateModification::DiffOptions options;
             if (mode == OplogApplication::Mode::kSecondary && collection->getTimeseriesOptions() &&
-                !op.getFromTenantMigration()) {
+                !op.getCheckExistenceForDiffInsert() && !op.getFromTenantMigration()) {
                 options.mustCheckExistenceForInsertOperations = false;
             }
             auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o, options);

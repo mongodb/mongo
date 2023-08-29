@@ -363,8 +363,12 @@ struct StageConstraints {
     // ahead of this stage.
     bool canSwapWithSingleDocTransform = false;
 
-    // Indicates that a stage is allowed within a pipeline-stlye update.
+    // Indicates that a stage is allowed within a pipeline-style update.
     bool isAllowedWithinUpdatePipeline = false;
+
+    // Indicates that a stage requires idempotency guarantee and needs to check for existence of a
+    // field before performing a diff insert.
+    bool checkExistenceForDiffInsertOperations = false;
 
     // If true, then this stage may only appear in the pipeline once, though it can appear at an
     // arbitrary position. It is not necessary to consider this for stages which have a strict

@@ -254,6 +254,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         // Ensure we set the type correctly
         args.source = writeToOrphan ? OperationSource::kFromMigrate : request->source();
 
+        args.mustCheckExistenceForInsertOperations =
+            driver->getUpdateExecutor()->getCheckExistenceForDiffInsertOperations();
+
         args.retryableWrite = write_stage_common::isRetryableWrite(opCtx());
 
         bool indexesAffected = false;

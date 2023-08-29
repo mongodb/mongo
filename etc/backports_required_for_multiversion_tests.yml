@@ -393,6 +393,8 @@ last-continuous:
     ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
+  - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
+    ticket: SERVER-79912
   suites: null
 last-lts:
   all:
@@ -838,5 +840,7 @@ last-lts:
     ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
+  - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
+    ticket: SERVER-79912
 
   suites: null

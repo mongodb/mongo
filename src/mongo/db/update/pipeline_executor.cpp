@@ -88,6 +88,10 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
         invariant(stageConstraints.requiredPosition ==
                   StageConstraints::PositionRequirement::kNone);
         invariant(!stageConstraints.isIndependentOfAnyCollection);
+
+        if (stageConstraints.checkExistenceForDiffInsertOperations) {
+            _checkExistenceForDiffInsertOperations = true;
+        }
     }
 
     _pipeline->addInitialSource(DocumentSourceQueue::create(expCtx));

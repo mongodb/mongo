@@ -93,6 +93,9 @@ struct CollectionUpdateArgs {
 
     bool retryableWrite = false;
 
+    // Set if the diff insert operation needs to check for the field's existence.
+    bool mustCheckExistenceForInsertOperations = false;
+
     // Set if OpTimes were reserved for the update ahead of time.
     std::vector<OplogSlot> oplogSlots;
 };

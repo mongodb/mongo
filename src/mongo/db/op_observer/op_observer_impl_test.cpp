@@ -596,6 +596,35 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
 
+TEST_F(OpObserverTest, OnUpdateCheckExistenceForDiffInsert) {
+    const auto criteria = BSON("_id" << 0);
+    // Create a fake preImageDoc; the tested code path does not care about this value.
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs{preImageDoc};
+    updateArgs.criteria = criteria;
+    updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                       << "x");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "x"));
+    updateArgs.mustCheckExistenceForInsertOperations = true;
+
+    auto opCtx = cc().makeOperationContext();
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
+
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+    opObserver.onUpdate(opCtx.get(), update);
+    wuow.commit();
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
+
+    ASSERT_TRUE(entry.getCheckExistenceForDiffInsert());
+}
+
 TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();

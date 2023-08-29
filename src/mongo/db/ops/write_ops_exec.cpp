@@ -1822,7 +1822,7 @@ Status performAtomicTimeseriesWrites(
             diffFromUpdate = update.getU().getDiff();
             updated = doc_diff::applyDiff(original.value(),
                                           diffFromUpdate,
-                                          static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
+                                          update.getU().mustCheckExistenceForInsertOperations());
             diffOnIndexes = &diffFromUpdate;
             args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
         } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {
