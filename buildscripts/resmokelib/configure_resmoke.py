@@ -5,7 +5,6 @@ import configparser
 import datetime
 import os
 import os.path
-import distutils.spawn
 from pathlib import Path
 import sys
 import platform
@@ -13,6 +12,7 @@ import random
 import glob
 import textwrap
 import shlex
+import shutil
 import traceback
 from typing import Dict, Optional
 
@@ -135,7 +135,7 @@ def _validate_config(parser):
             parser.error("--recordWith is only supported on x86 and x86_64 Linux distributions")
             return
 
-        resolved_path = distutils.spawn.find_executable(_config.UNDO_RECORDER_PATH)
+        resolved_path = shutil.which(_config.UNDO_RECORDER_PATH)
         if resolved_path is None:
             parser.error(
                 f"Cannot find the UndoDB live-record binary '{_config.UNDO_RECORDER_PATH}'. Check that it exists and is executable"
