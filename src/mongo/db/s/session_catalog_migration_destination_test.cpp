@@ -98,6 +98,7 @@ repl::OplogEntry makeOplogEntry(
                                 kNs,             // namespace
                                 boost::none,     // uuid
                                 boost::none,     // fromMigrate
+                                boost::none,     // checkExistenceForDiffInsert
                                 0,               // version
                                 object,          // o
                                 object2,         // o2

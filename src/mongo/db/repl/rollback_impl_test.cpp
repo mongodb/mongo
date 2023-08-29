@@ -1491,13 +1491,14 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
     insertOp2Obj = insertOp2Obj.removeField("wall");
 
     auto partialApplyOpsObj = BSON("applyOps" << BSON_ARRAY(insertOp2Obj) << "partialTxn" << true);
-    DurableOplogEntry partialApplyOpsOplogEntry(partialApplyOpsOpTime,      // opTime
-                                                1LL,                        // hash
-                                                OpTypeEnum::kCommand,       // opType
-                                                boost::none,                // tenant id
-                                                adminCmdNss,                // nss
-                                                boost::none,                // uuid
-                                                boost::none,                // fromMigrate
+    DurableOplogEntry partialApplyOpsOplogEntry(partialApplyOpsOpTime,  // opTime
+                                                1LL,                    // hash
+                                                OpTypeEnum::kCommand,   // opType
+                                                boost::none,            // tenant id
+                                                adminCmdNss,            // nss
+                                                boost::none,            // uuid
+                                                boost::none,            // fromMigrate
+                                                boost::none,  // checkExistenceForDiffInsert
                                                 OplogEntry::kOplogVersion,  // version
                                                 partialApplyOpsObj,         // oField
                                                 boost::none,                // o2Field
@@ -1534,6 +1535,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
         adminCmdNss,                // nss
         boost::none,                // uuid
         boost::none,                // fromMigrate
+        boost::none,                // checkExistenceForDiffInsert
         OplogEntry::kOplogVersion,  // version
         commitApplyOpsObj,          // oField
         boost::none,                // o2Field

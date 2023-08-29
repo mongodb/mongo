@@ -642,6 +642,7 @@ OplogEntry makeOplogEntry(int t,
                               NamespaceString("a.a"),      // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
                               version,                     // version
                               oField,                      // o
                               boost::none,                 // o2

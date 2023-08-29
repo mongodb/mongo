@@ -346,6 +346,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                               NamespaceString("a.a"),      // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2

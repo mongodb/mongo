@@ -91,6 +91,7 @@ BSONObj makeNoopOplogEntry(OpTime opTime) {
                                 NamespaceString("test.t"),        // namespace
                                 boost::none,                      // uuid
                                 boost::none,                      // fromMigrate
+                                boost::none,                      // checkExistenceForDiffInsert
                                 repl::OplogEntry::kOplogVersion,  // version
                                 BSONObj(),                        // o
                                 boost::none,                      // o2

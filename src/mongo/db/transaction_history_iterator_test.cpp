@@ -68,6 +68,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         NamespaceString("a.b"),           // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
+        boost::none,                      // checkExistenceForDiffInsert
         repl::OplogEntry::kOplogVersion,  // version
         docToInsert,                      // o
         boost::none,                      // o2

@@ -53,6 +53,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
                           const boost::optional<bool>& fromMigrate,
+                          const boost::optional<bool>& checkExistenceForDiffInsert,
                           int64_t version,
                           const BSONObj& oField,
                           const boost::optional<BSONObj>& o2Field,
@@ -88,6 +89,10 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     }
     if (fromMigrate) {
         builder.append(OplogEntryBase::kFromMigrateFieldName, fromMigrate.get());
+    }
+    if (checkExistenceForDiffInsert) {
+        builder.append(OplogEntryBase::kCheckExistenceForDiffInsertFieldName,
+                       checkExistenceForDiffInsert.value());
     }
     builder.append(OplogEntryBase::kObjectFieldName, oField);
     if (o2Field) {
@@ -323,6 +328,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const NamespaceString& nss,
                                      const boost::optional<UUID>& uuid,
                                      const boost::optional<bool>& fromMigrate,
+                                     const boost::optional<bool>& checkExistenceForDiffInsert,
                                      int version,
                                      const BSONObj& oField,
                                      const boost::optional<BSONObj>& o2Field,
@@ -343,6 +349,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                           nss,
                                           uuid,
                                           fromMigrate,
+                                          checkExistenceForDiffInsert,
                                           version,
                                           oField,
                                           o2Field,
@@ -637,6 +644,10 @@ std::int64_t OplogEntry::getVersion() const {
 
 const boost::optional<bool> OplogEntry::getFromMigrate() const& {
     return _entry.getFromMigrate();
+}
+
+bool OplogEntry::getCheckExistenceForDiffInsert() const& {
+    return _entry.getCheckExistenceForDiffInsert().get_value_or(false);
 }
 
 const boost::optional<mongo::UUID>& OplogEntry::getFromTenantMigration() const& {

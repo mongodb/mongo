@@ -73,6 +73,7 @@ OplogEntry makeOplogEntry(int ts) {
                               NamespaceString("a.a"),       // namespace
                               boost::none,                  // uuid
                               boost::none,                  // fromMigrate
+                              boost::none,                  // checkExistenceForDiffInsert
                               OplogEntry::kOplogVersion,    // version
                               BSONObj(),                    // o
                               boost::none,                  // o2

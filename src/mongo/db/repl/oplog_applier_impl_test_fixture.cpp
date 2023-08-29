@@ -413,6 +413,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                               nss,                         // namespace
                               uuid,                        // uuid
                               fromMigrate,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
                               OplogEntry::kOplogVersion,   // version
                               o,                           // o
                               o2,                          // o2
