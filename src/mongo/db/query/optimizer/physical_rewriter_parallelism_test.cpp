@@ -413,7 +413,7 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
     ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_PROPS_V2_AUTO(
-        "Properties [cost: 0.00929774, localCost: 0, adjustedCE: 20]\n"
+        "Properties [cost: 0.00930515, localCost: 0, adjustedCE: 20]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 20\n"
@@ -430,7 +430,7 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "|       distribution: \n"
         "|           type: Centralized\n"
         "Root [{root}]\n"
-        "Properties [cost: 0.00929774, localCost: 0.00252777, adjustedCE: 30]\n"
+        "Properties [cost: 0.00930515, localCost: 0.00252964, adjustedCE: 30.03]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -456,7 +456,7 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "|       removeOrphans: \n"
         "|           false\n"
         "LimitSkip [limit: 20, skip: 10]\n"
-        "Properties [cost: 0.00676997, localCost: 0.003001, adjustedCE: 30]\n"
+        "Properties [cost: 0.00677551, localCost: 0.003004, adjustedCE: 30.03]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -483,7 +483,7 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "Exchange []\n"
         "|   |   distribution: \n"
         "|   |       type: Centralized\n"
-        "Properties [cost: 0.00376897, localCost: 0.00376897, adjustedCE: 30]\n"
+        "Properties [cost: 0.00377151, localCost: 0.00377151, adjustedCE: 30.03]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"

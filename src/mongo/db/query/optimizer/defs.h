@@ -227,6 +227,9 @@ constexpr SelectivityType operator/(const CEType v1, const CEType v2) {
     return {v1._value / v2._value};
 }
 
+// Constant to correct for the difference between CE estimates which don't contain orphans and
+// physical execution of plans which will encounter orphans if shard filtering has not occurred.
+inline constexpr double kOrphansCardinalityFudgeFactor = 1.001;
 
 class CostType {
     static constexpr double kPrecision = 0.00000001;

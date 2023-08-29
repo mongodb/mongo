@@ -139,7 +139,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
 
     // Plan output with properties.
     ASSERT_EXPLAIN_PROPS_V2_AUTO(
-        "Properties [cost: 0.438321, localCost: 0, adjustedCE: 10]\n"
+        "Properties [cost: 0.438752, localCost: 0, adjustedCE: 10.01]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -161,7 +161,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|       removeOrphans: \n"
         "|           false\n"
         "Root [{p2}]\n"
-        "Properties [cost: 0.438321, localCost: 0.00983406, adjustedCE: 10]\n"
+        "Properties [cost: 0.438752, localCost: 0.00984243, adjustedCE: 10.01]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -192,7 +192,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   PathGet [a]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
+        "Properties [cost: 0.428909, localCost: 0, adjustedCE: 100.1]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -216,7 +216,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|       removeOrphans: \n"
         "|           false\n"
         "Evaluation [{p2} = Variable [p1]]\n"
-        "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
+        "Properties [cost: 0.428909, localCost: 0, adjustedCE: 100.1]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -242,7 +242,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   EvalFilter []\n"
         "|   |   Variable [p1]\n"
         "|   PathIdentity []\n"
-        "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
+        "Properties [cost: 0.428909, localCost: 0.428909, adjustedCE: 1001]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -3249,7 +3249,7 @@ TEST(PhysRewriter, IndexResidualReq) {
 
     // Make sure we can use the index to cover "b" while testing "b.c" with a separate filter.
     ASSERT_EXPLAIN_PROPS_V2_AUTO(
-        "Properties [cost: 0.176361, localCost: 0, adjustedCE: 189.571]\n"
+        "Properties [cost: 0.176522, localCost: 0, adjustedCE: 189.76]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -3271,7 +3271,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|       removeOrphans: \n"
         "|           false\n"
         "Root [{pa}]\n"
-        "Properties [cost: 0.176361, localCost: 0.176361, adjustedCE: 189.571]\n"
+        "Properties [cost: 0.176522, localCost: 0.176522, adjustedCE: 189.76]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -4077,7 +4077,7 @@ TEST(PhysRewriter, CollationLimit) {
     // We have a collation node with limit-skip physical properties. It will be lowered to a
     // sort node with limit.
     ASSERT_EXPLAIN_PROPS_V2_AUTO(
-        "Properties [cost: 4.75042, localCost: 0, adjustedCE: 20]\n"
+        "Properties [cost: 4.75516, localCost: 0, adjustedCE: 20]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 20\n"
@@ -4093,7 +4093,7 @@ TEST(PhysRewriter, CollationLimit) {
         "|       distribution: \n"
         "|           type: Centralized\n"
         "Root [{root}]\n"
-        "Properties [cost: 4.75042, localCost: 4.32193, adjustedCE: 20]\n"
+        "Properties [cost: 4.75516, localCost: 4.32625, adjustedCE: 20.02]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -4124,7 +4124,7 @@ TEST(PhysRewriter, CollationLimit) {
         "|       removeOrphans: \n"
         "|           false\n"
         "Collation [{pa: Ascending}]\n"
-        "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
+        "Properties [cost: 0.428909, localCost: 0.428909, adjustedCE: 1001]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -4836,7 +4836,7 @@ TEST(PhysRewriter, EqMemberSargable) {
 
         // Test sargable filter is satisfied with an index scan.
         ASSERT_EXPLAIN_PROPS_V2_AUTO(
-            "Properties [cost: 0.163045, localCost: 0, adjustedCE: 54.6819]\n"
+            "Properties [cost: 0.163158, localCost: 0, adjustedCE: 54.7365]\n"
             "|   |   Logical:\n"
             "|   |       cardinalityEstimate: \n"
             "|   |           ce: 54.6819\n"
@@ -4858,7 +4858,7 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|       removeOrphans: \n"
             "|           false\n"
             "Root [{root}]\n"
-            "Properties [cost: 0.163045, localCost: 0.0180785, adjustedCE: 54.6819]\n"
+            "Properties [cost: 0.163158, localCost: 0.0180962, adjustedCE: 54.7365]\n"
             "|   |   Logical:\n"
             "|   |       cardinalityEstimate: \n"
             "|   |           ce: 54.6819\n"
@@ -4886,7 +4886,7 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|           false\n"
             "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
-            "|   Properties [cost: 0.0757996, localCost: 0.0757996, adjustedCE: 54.6819]\n"
+            "|   Properties [cost: 0.0758673, localCost: 0.0758673, adjustedCE: 54.7365]\n"
             "|   |   |   Logical:\n"
             "|   |   |       cardinalityEstimate: \n"
             "|   |   |           ce: 1000\n"
@@ -4912,7 +4912,7 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |           false\n"
             "|   LimitSkip [limit: 1, skip: 0]\n"
             "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-            "Properties [cost: 0.0691671, localCost: 0.0691671, adjustedCE: 54.6819]\n"
+            "Properties [cost: 0.0691941, localCost: 0.0691941, adjustedCE: 54.7365]\n"
             "|   |   Logical:\n"
             "|   |       cardinalityEstimate: \n"
             "|   |           ce: 54.6819\n"
@@ -5380,7 +5380,7 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    31.6228\n"
         "                removeOrphans: \n"
         "                    false\n"
-        "            cost: 0.0472695, localCost: 0.0472695, adjustedCE: 31.6228, rule: Seek, "
+        "            cost: 0.0473086, localCost: 0.0473086, adjustedCE: 31.6544, rule: Seek, "
         "node: \n"
         "                LimitSkip [limit: 1, skip: 0]\n"
         "                    ce: 1\n"
@@ -5433,18 +5433,18 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    Complete, dedupRID\n"
         "                removeOrphans: \n"
         "                    false\n"
-        "            cost: 0.0847147, localCost: 0.0106248, adjustedCE: 31.6228, rule: "
-        "IndexFetch, node: \n"
+        "            cost: 0.0847769, localCost: 0.010635, adjustedCE: 31.6544, rule: IndexFetch, "
+        "node: \n"
         "                NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "                    ce: 31.6228\n"
         "                |   |   Const [true]\n"
         "                |   MemoPhysicalDelegator [groupId: 0, index: 0]\n"
         "                MemoPhysicalDelegator [groupId: 3, index: 1]\n"
         "            rejectedPlans: \n"
-        "                cost: {Infinite cost}, localCost: 0, adjustedCE: 31.6228, rule: "
+        "                cost: {Infinite cost}, localCost: 0, adjustedCE: 31.6544, rule: "
         "AttemptCoveringQuery, node: \n"
         "                    MemoLogicalDelegator [groupId: 3]\n"
-        "                cost: 0.513676, localCost: 0.513676, adjustedCE: 31.6228, rule: "
+        "                cost: 0.514182, localCost: 0.514182, adjustedCE: 31.6544, rule: "
         "SargableToPhysicalScan, node: \n"
         "                    Filter []\n"
         "                        ce: 31.6228\n"
@@ -5482,7 +5482,7 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    Complete, dedupRID\n"
         "                removeOrphans: \n"
         "                    false\n"
-        "            cost: 0.0847147, localCost: 0, adjustedCE: 31.6228, rule: Root, node: \n"
+        "            cost: 0.0847769, localCost: 0, adjustedCE: 31.6544, rule: Root, node: \n"
         "                Root [{root}]\n"
         "                    ce: 31.6228\n"
         "                MemoPhysicalDelegator [groupId: 1, index: 0]\n"
@@ -5534,7 +5534,7 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    Index, dedupRID\n"
         "                removeOrphans: \n"
         "                    false\n"
-        "            cost: 0.0268205, localCost: 0.0268205, adjustedCE: 31.6228, rule: "
+        "            cost: 0.0268333, localCost: 0.0268333, adjustedCE: 31.6544, rule: "
         "SargableToIndex, node: \n"
         "                IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, "
         "interval: {=Const [1]}]\n"
@@ -5586,7 +5586,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
 
     // Display the 3 best plans.
     ASSERT_STR_EQ_AUTO(  // NOLINT
-        "Cost: 0.0641986\n"
+        "Cost: 0.0642388\n"
         "Root [{root}]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
@@ -5604,7 +5604,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
         getExplainForPlan(0));
 
     ASSERT_STR_EQ_AUTO(  // NOLINT
-        "Cost: 0.0641986\n"
+        "Cost: 0.0642388\n"
         "Root [{root}]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
@@ -5622,7 +5622,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
         getExplainForPlan(1));
 
     ASSERT_STR_EQ_AUTO(  // NOLINT
-        "Cost: 0.0955468\n"
+        "Cost: 0.0956168\n"
         "Root [{root}]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"

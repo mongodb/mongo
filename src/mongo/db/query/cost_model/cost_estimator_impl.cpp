@@ -426,6 +426,15 @@ private:
             result *= getPropertyConst<RepetitionEstimate>(physProps).getEstimate();
         }
 
+        // Fourth: correct for orphans.
+        // This plan fragment is going to see some orphaned documents at execution time that are not
+        // reflected in the logical CE. To account for this, we bump the CE to adjust the cost
+        // accordingly.
+        if (hasProperty<RemoveOrphansRequirement>(physProps) &&
+            !getPropertyConst<RemoveOrphansRequirement>(physProps).mustRemove()) {
+            result *= kOrphansCardinalityFudgeFactor;
+        }
+
         return result;
     }
 
