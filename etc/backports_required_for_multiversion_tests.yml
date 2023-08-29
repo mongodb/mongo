@@ -4,19 +4,20 @@
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
-# under the appropriate suite. Any test in a (ticket, test_file) pair that appears in this file but
+# under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
 # not in the last-lts or last-continuous branch version of this file indicates that a commit has
 # not yet been backported to the last-lts or last-continuous branch and will be excluded from the
 # multiversion suite corresponding to the root level suite key.
 #
-# Example: To prevent 'my_test_file.js' from running in the 'replica_sets_multiversion' suite with the last-continuous binary
-# replica_sets_multiversion:
-#   - ticket: SERVER-1000
-#     test_file: jstests/core/my_test_file.js
+# Example: To prevent 'my_test_file.js' from running with the last-continuous binary
+# last-continuous:
+#   all:
+#   - test_file: jstests/core/my_test_file.js
+#     ticket: SERVER-1000
 #
 # The above example will denylist jstests/core/my_test_file.js from the
-# 'replica_sets_multiversion_gen' task until this file has been updated with the same
-# (ticket, test_file) pair on the last-lts branch.
+# last-continuous branch until this file has been updated with the same
+# (ticket, test_file) pair on the last-continuous branch.
 #
 all:
 - test_file: jstests/sharding/log_remote_op_wait.js
@@ -67,46 +68,20 @@ all:
   ticket: SERVER-47190
 - test_file: jstests/replsets/disallow_adding_initialized_node1.js
   ticket: SERVER-47390
-- test_file: jstests/change_streams/report_post_batch_resume_token.js
-  ticket: SERVER-47810
-- test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
-  ticket: SERVER-48179
-- test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
-  ticket: SERVER-50140
 - test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
   ticket: SERVER-50416
 - test_file: jstests/sharding/migration_waits_for_majority_commit.js
   ticket: SERVER-52906
-- test_file: jstests/sharding/migration_ignore_interrupts_1.js
-  ticket: SERVER-52906
-- test_file: jstests/sharding/migration_ignore_interrupts_3.js
-  ticket: SERVER-52906
-- test_file: jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-  ticket: SERVER-52906
-- test_file: jstests/sharding/movechunk_parallel.js
-  ticket: SERVER-52906
-- test_file: jstests/sharding/txn_writes_during_movechunk.js
-  ticket: SERVER-52906
-- test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
-  ticket: SERVER-52906
 - test_file: jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
   ticket: SERVER-52906
-- test_file: jstests/core/sort_spill_estimate_data_size.js
-  ticket: SERVER-53760
-- test_file: jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
-  ticket: SERVER-53849
 - test_file: jstests/replsets/unconditional_step_down.js
   ticket: SERVER-53985
-- test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
-  ticket: SERVER-54909
 - test_file: jstests/sharding/time_zone_info_mongos.js
   ticket: SERVER-55725
 - test_file: jstests/concurrency/fsm_workloads/findAndModify_flip_location.js
   ticket: SERVER-56377
 - test_file: jstests/core/neq_null_correctly_cache.js
   ticket: SERVER-56468
-- test_file: jstests/sharding/read_pref_with_hedging_mode.js
-  ticket: SERVER-57117
 - test_file: jstests/replsets/invalidate_images_when_minvalid.js
   ticket: SERVER-57173
 - test_file: jstests/replsets/catchup_takeover_with_higher_config.js
@@ -121,44 +96,24 @@ all:
   ticket: SERVER-58203
 - test_file: jstests/replsets/initial_sync_replicate_drop_mid_secondary_batch.js
   ticket: SERVER-58636
-- test_file: jstests/replsets/stepdown_race_with_transaction.js
-  ticket: SERVER-59108
 - test_file: jstests/replsets/dbcheck.js
   ticket: SERVER-61738
 - test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
   ticket: SERVER-61894
-- test_file: jstests/auth/dbcheck.js
-  ticket: SERVER-61955
-- test_file: jstests/replsets/rollback_during_step_up.js
-  ticket: SERVER-61977
 - test_file: jstests/replsets/dbcheck_write_concern.js
   ticket: SERVER-62212
 - test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
   ticket: SERVER-63159
 - test_file: jstests/core/internal_apply_oplog_update.js
   ticket: SERVER-63159
-- test_file: jstests/sharding/refine_collection_shard_key_basic.js
-  ticket: SERVER-64142
 - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
   ticket: SERVER-66089
 - test_file: jstests/replsets/dbhash_lock_acquisition.js
   ticket: SERVER-66719
 - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
   ticket: SERVER-67492
-- test_file: jstests/replsets/optime.js
-  ticket: SERVER-67532
-- test_file: jstests/sharding/prepare_transaction_then_migrate.js
-  ticket: SERVER-71219
 - test_file: jstests/core/partial_index_logical.js
   ticket: SERVER-68434
-- test_file: jstests/core/map_reduce_subplanning.js
-  ticket: SERVER-74131
-- test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
-  ticket: SERVER-73229
-- test_file: jstests/sharding/move_chunk_deferred_lookup.js
-  ticket: SERVER-78050
-- test_file: jstests/sharding/transfer_mods_large_batches.js
-  ticket: SERVER-78414
 - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
   ticket: SERVER-78813
 suites:
