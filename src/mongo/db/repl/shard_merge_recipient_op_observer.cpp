@@ -92,6 +92,9 @@ bool markedGCAfterMigrationStart(const ShardMergeRecipientDocument& doc) {
 }
 
 void dropTempFilesAndCollsIfAny(OperationContext* opCtx, const UUID& migrationId) {
+    // Drop the import done marker collection.
+    dropImportDoneMarkerLocalCollection(opCtx, migrationId);
+
     const auto tempWTDirectory = fileClonerTempDir(migrationId);
     // Do an early exit if the temp dir is not present.
     if (!boost::filesystem::exists(tempWTDirectory))
@@ -118,9 +121,6 @@ void dropTempFilesAndCollsIfAny(OperationContext* opCtx, const UUID& migrationId
 
     // Remove the temp directory.
     fsyncRemoveDirectory(tempWTDirectory);
-
-    // Now, drop the import done marker collection.
-    dropImportDoneMarkerLocalCollection(opCtx, migrationId);
 }
 
 void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
