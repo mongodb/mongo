@@ -93,23 +93,23 @@ ColumnStoreSorter::Value ColumnStoreSorter::Value::deserializeForSorter(
 }
 
 ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
-                                     StringData dbName,
+                                     const DatabaseName& dbName,
                                      SorterFileStats* stats,
                                      SorterTracker* tracker)
     : SorterBase(tracker),
-      _dbName(dbName.toString()),
+      _dbName(dbName),
       _fileStats(stats),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _spillFile(std::make_shared<Sorter<Key, Value>::File>(pathForNewSpillFile(), _fileStats)) {}
 
 ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
-                                     StringData dbName,
+                                     const DatabaseName& dbName,
                                      SorterFileStats* stats,
                                      StringData fileName,
                                      const std::vector<SorterRange>& ranges,
                                      SorterTracker* tracker)
     : SorterBase(tracker),
-      _dbName(dbName.toString()),
+      _dbName(dbName),
       _fileStats(stats),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _spillFile(std::make_shared<Sorter<Key, Value>::File>(
@@ -164,7 +164,7 @@ std::string tempDir() {
 }
 }  // namespace
 
-SortOptions ColumnStoreSorter::makeSortOptions(const std::string& dbName, SorterFileStats* stats) {
+SortOptions ColumnStoreSorter::makeSortOptions(const DatabaseName& dbName, SorterFileStats* stats) {
     return SortOptions().TempDir(tempDir()).ExtSortAllowed().FileStats(stats).DBName(dbName);
 }
 

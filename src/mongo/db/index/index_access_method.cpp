@@ -237,7 +237,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes,
         .UseMemoryPool(true)
         .FileStats(stats)
         .Tracker(&indexBulkBuilderSSS.sorterTracker)
-        .DBName(DatabaseNameUtil::serializeForCatalog(dbName));
+        .DBName(dbName);
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {

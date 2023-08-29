@@ -158,10 +158,7 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                         "Index Build: inserting keys from external sorter into columnstore index",
                         entry->descriptor()->indexName()),
       _columnsAccess(index),
-      _sorter(maxMemoryUsageBytes,
-              DatabaseNameUtil::serializeForCatalog(dbName),
-              bulkBuilderFileStats(),
-              bulkBuilderTracker()) {
+      _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
     countNewBuildInStats();
 }
 
@@ -175,7 +172,7 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                         entry->descriptor()->indexName()),
       _columnsAccess(index),
       _sorter(maxMemoryUsageBytes,
-              DatabaseNameUtil::serializeForCatalog(dbName),
+              dbName,
               bulkBuilderFileStats(),
               stateInfo.getFileName()->toString(),
               *stateInfo.getRanges(),

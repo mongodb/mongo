@@ -83,7 +83,7 @@ Status EncryptionHooks::protectTmpData(const uint8_t* in,
                                        uint8_t* out,
                                        size_t outLen,
                                        size_t* resultLen,
-                                       boost::optional<std::string> dbName) {
+                                       boost::optional<DatabaseName> dbName) {
     return Status(ErrorCodes::InternalError,
                   "Encryption hooks must be enabled to use preprocessTmpData.");
 }
@@ -93,7 +93,7 @@ Status EncryptionHooks::unprotectTmpData(const uint8_t* in,
                                          uint8_t* out,
                                          size_t outLen,
                                          size_t* resultLen,
-                                         boost::optional<std::string> dbName) {
+                                         boost::optional<DatabaseName> dbName) {
     return Status(ErrorCodes::InternalError,
                   "Encryption hooks must be enabled to use postprocessTmpData.");
 }

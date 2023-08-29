@@ -69,12 +69,12 @@ namespace mongo {
 class ColumnStoreSorter : public SorterBase {
 public:
     ColumnStoreSorter(size_t maxMemoryUsageBytes,
-                      StringData dbName,
+                      const DatabaseName& dbName,
                       SorterFileStats* stats,
                       SorterTracker* tracker = nullptr);
 
     ColumnStoreSorter(size_t maxMemoryUsageBytes,
-                      StringData dbName,
+                      const DatabaseName& dbName,
                       SorterFileStats* stats,
                       StringData fileName,
                       const std::vector<SorterRange>& ranges,
@@ -135,7 +135,7 @@ public:
 private:
     class InMemoryIterator;
 
-    static SortOptions makeSortOptions(const std::string& dbName, SorterFileStats* stats);
+    static SortOptions makeSortOptions(const DatabaseName& dbName, SorterFileStats* stats);
     static std::string pathForNewSpillFile();
     static std::string pathForResumeSpillFile(std::string fileName);
 
@@ -143,7 +143,7 @@ private:
 
     Iterator* inMemoryIterator() const;
 
-    const std::string _dbName;
+    const DatabaseName _dbName;
     SorterFileStats* _fileStats;  // Unowned
 
     const size_t _maxMemoryUsageBytes;

@@ -77,14 +77,14 @@ TEST(ColumnStoreSorter, SortTest) {
 
     // We test two sorters: one that can perform the sort in memory and one that is constrained so
     // that it must spill to disk.
-
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "dbName");
     SorterFileStats statsForInMemorySorter(nullptr);
     auto inMemorySorter = std::make_unique<ColumnStoreSorter>(
-        1000000 /* maxMemoryUsageBytes */, "dbName", &statsForInMemorySorter);
+        1000000 /* maxMemoryUsageBytes */, dbName, &statsForInMemorySorter);
 
     SorterFileStats statsForExternalSorter(nullptr);
     auto externalSorter = std::make_unique<ColumnStoreSorter>(
-        500 /* maxMemoryUsageBytes */, "dbName", &statsForExternalSorter);
+        500 /* maxMemoryUsageBytes */, dbName, &statsForExternalSorter);
 
     // First, load documents into each sorter.
     for (size_t i = 0; i < sampleData.size(); ++i) {
