@@ -350,6 +350,7 @@ __wt_update_obsolete_check(
     page = cbt->ref->page;
     txn_global = &S2C(session)->txn_global;
 
+    WT_ASSERT(session, page->modify != NULL);
     /* If we can't lock it, don't scan, that's okay. */
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
@@ -432,10 +433,9 @@ __wt_update_obsolete_check(
     else {
         /*
          * If the list is long, don't retry checks on this page until the transaction state has
-         * moved forwards. This function is used to trim update lists independently of the page
-         * state, ensure there is a modify structure.
+         * moved forwards.
          */
-        if (count > 20 && page->modify != NULL) {
+        if (count > 20) {
             page->modify->obsolete_check_txn = txn_global->last_running;
             if (txn_global->has_pinned_timestamp)
                 page->modify->obsolete_check_timestamp = txn_global->pinned_timestamp;
