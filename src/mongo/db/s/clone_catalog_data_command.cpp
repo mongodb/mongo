@@ -120,17 +120,17 @@ public:
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
-        const auto dbname = cloneCatalogDataRequest.getCommandParameter().dbName();
+        const auto dbName = cloneCatalogDataRequest.getCommandParameter().dbName();
 
         uassert(
             ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbname.toStringForErrorMsg(),
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            str::stream() << "invalid db name specified: " << dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't clone catalog data for " << dbname.toStringForErrorMsg()
+                str::stream() << "Can't clone catalog data for " << dbName.toStringForErrorMsg()
                               << " database",
-                !dbname.isAdminDB() && !dbname.isConfigDB() && !dbname.isLocalDB());
+                !dbName.isAdminDB() && !dbName.isConfigDB() && !dbName.isLocalDB());
 
         auto from = cloneCatalogDataRequest.getFrom();
 
@@ -141,7 +141,7 @@ public:
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
             opCtx,
-            DatabaseNameUtil::serialize(dbname),
+            DatabaseNameUtil::serialize(dbName),
             repl::ReadConcernLevel::kMajorityReadConcern);
 
         DisableDocumentValidation disableValidation(opCtx);
@@ -150,11 +150,7 @@ public:
         std::set<std::string> clonedColls;
 
         Cloner cloner;
-        uassertStatusOK(cloner.copyDb(opCtx,
-                                      DatabaseNameUtil::serialize(dbname),
-                                      from.toString(),
-                                      shardedColls,
-                                      &clonedColls));
+        uassertStatusOK(cloner.copyDb(opCtx, dbName, from.toString(), shardedColls, &clonedColls));
         {
             BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
             cloneBarr.append(clonedColls);

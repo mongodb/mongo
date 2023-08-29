@@ -122,7 +122,7 @@ BSONObj DefaultClonerImpl::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs)
 }
 
 struct DefaultClonerImpl::BatchHandler {
-    BatchHandler(OperationContext* opCtx, const std::string& dbName)
+    BatchHandler(OperationContext* opCtx, const DatabaseName& dbName)
         : lastLog(0), opCtx(opCtx), _dbName(dbName), numSeen(0), saveLast(0) {}
 
     void operator()(DBClientCursor& cursor) {
@@ -137,9 +137,7 @@ struct DefaultClonerImpl::BatchHandler {
         };
 
         boost::optional<Lock::DBLock> dbLock;
-        // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
-        DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
-        dbLock.emplace(opCtx, dbName, MODE_X);
+        dbLock.emplace(opCtx, _dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning collection "
                               << nss.toStringForErrorMsg(),
@@ -148,7 +146,7 @@ struct DefaultClonerImpl::BatchHandler {
 
         // Make sure database still exists after we resume from the temp release
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto db = databaseHolder->openDb(opCtx, dbName);
+        auto db = databaseHolder->openDb(opCtx, _dbName);
         auto catalog = CollectionCatalog::get(opCtx);
         boost::optional<CollectionAcquisition> collection = acquireCollectionFn(opCtx);
         if (!collection->exists()) {
@@ -187,10 +185,7 @@ struct DefaultClonerImpl::BatchHandler {
 
                 CurOp::get(opCtx)->yielded();
 
-                // No tenant id required as the db cloner is only used for moving primary dbs in
-                // sharding.
-                DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
-                dbLock.emplace(opCtx, dbName, MODE_X);
+                dbLock.emplace(opCtx, _dbName, MODE_X);
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
@@ -201,9 +196,10 @@ struct DefaultClonerImpl::BatchHandler {
                         repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
                 }
 
-                db = databaseHolder->getDb(opCtx, dbName);
+                db = databaseHolder->getDb(opCtx, _dbName);
                 uassert(28593,
-                        str::stream() << "Database " << _dbName << " dropped while cloning",
+                        str::stream() << "Database " << _dbName.toStringForErrorMsg()
+                                      << " dropped while cloning",
                         db != nullptr);
 
                 collection.emplace(acquireCollectionFn(opCtx));
@@ -273,7 +269,7 @@ struct DefaultClonerImpl::BatchHandler {
 
     time_t lastLog;
     OperationContext* opCtx;
-    const std::string _dbName;
+    const DatabaseName _dbName;
 
     int64_t numSeen;
     NamespaceString nss;
@@ -286,7 +282,7 @@ struct DefaultClonerImpl::BatchHandler {
  * Copy the specified collection.
  */
 void DefaultClonerImpl::_copy(OperationContext* opCtx,
-                              const std::string& toDBName,
+                              const DatabaseName& toDBName,
                               const NamespaceString& nss,
                               const BSONObj& from_opts,
                               const BSONObj& from_id_index) {
@@ -316,7 +312,6 @@ void DefaultClonerImpl::_copy(OperationContext* opCtx,
 }
 
 void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
-                                     const std::string& toDBName,
                                      const NamespaceString& nss,
                                      const BSONObj& from_opts,
                                      const std::list<BSONObj>& from_indexes) {
@@ -356,7 +351,7 @@ void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
 }
 
 StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
-    const std::string& fromDBName, const std::list<BSONObj>& initialCollections) {
+    const DatabaseName& fromDBName, const std::list<BSONObj>& initialCollections) {
     std::vector<BSONObj> finalCollections;
     for (auto&& collection : initialCollections) {
         LOGV2_DEBUG(20418, 2, "\t cloner got {collection}", "collection"_attr = collection);
@@ -376,8 +371,7 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
             return status;
         }
 
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none, fromDBName, collectionName.c_str());
+        const auto nss = NamespaceStringUtil::deserialize(fromDBName, collectionName.c_str());
         if (nss.isSystem()) {
             if (!nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 LOGV2_DEBUG(20419, 2, "\t\t not cloning because system collection");
@@ -393,11 +387,10 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
 Status DefaultClonerImpl::_createCollectionsForDb(
     OperationContext* opCtx,
     const std::vector<CreateCollectionParams>& createCollectionParams,
-    const std::string& dbName) {
+    const DatabaseName& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const DatabaseName tenantDbName = DatabaseNameUtil::deserialize(boost::none, dbName);
-    auto db = databaseHolder->openDb(opCtx, tenantDbName);
-    invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName, MODE_X));
+    auto db = databaseHolder->openDb(opCtx, dbName);
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
     auto collCount = 0;
@@ -410,8 +403,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
         BSONObjBuilder optionsBuilder;
         optionsBuilder.appendElements(params.collectionInfo["options"].Obj());
 
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none, dbName, params.collectionName);
+        const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(opCtx, nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss, [&] {
@@ -487,9 +479,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
     return Status::OK();
 }
 
-Status DefaultClonerImpl::setupConn(OperationContext* opCtx,
-                                    const std::string& dBName,
-                                    const std::string& masterHost) {
+Status DefaultClonerImpl::setupConn(OperationContext* opCtx, const std::string& masterHost) {
     invariant(!_conn);
     invariant(!opCtx->lockState()->isLocked());
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
@@ -534,11 +524,11 @@ Status DefaultClonerImpl::setupConn(OperationContext* opCtx,
 }
 
 StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
-    OperationContext* opCtx, const std::string& dBName, const std::string& masterHost) {
+    OperationContext* opCtx, const DatabaseName& dbName, const std::string& masterHost) {
     invariant(!opCtx->lockState()->isLocked());
     std::vector<BSONObj> collsToClone;
     if (!_conn) {
-        auto connStatus = setupConn(opCtx, dBName, masterHost);
+        auto connStatus = setupConn(opCtx, masterHost);
         if (!connStatus.isOK()) {
             return connStatus;
         }
@@ -546,21 +536,21 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
     // Gather the list of collections to clone
     // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
     std::list<BSONObj> initialCollections =
-        getConn()->getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, dBName),
-                                      ListCollectionsFilter::makeTypeCollectionFilter());
-    return _filterCollectionsForClone(dBName, initialCollections);
+        getConn()->getCollectionInfos(dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    return _filterCollectionsForClone(dbName, initialCollections);
 }
 
 Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
-                                 const std::string& dBName,
+                                 const DatabaseName& dbName,
                                  const std::string& masterHost,
                                  const std::vector<NamespaceString>& shardedColls,
                                  std::set<std::string>* clonedColls) {
-    invariant(clonedColls && clonedColls->empty(), str::stream() << masterHost << ":" << dBName);
+    invariant(clonedColls && clonedColls->empty(),
+              str::stream() << masterHost << ":" << dbName.toStringForErrorMsg());
     // This function can potentially block for a long time on network activity, so holding of locks
     // is disallowed.
     invariant(!opCtx->lockState()->isLocked());
-    auto toCloneStatus = getListOfCollections(opCtx, dBName, masterHost);
+    auto toCloneStatus = getListOfCollections(opCtx, dbName, masterHost);
     if (!toCloneStatus.isOK()) {
         return toCloneStatus.getStatus();
     }
@@ -576,9 +566,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
             params.idIndexSpec = idIndex.Obj();
         }
 
-        const auto ns =
-            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
-        if (std::find(shardedColls.begin(), shardedColls.end(), ns) != shardedColls.end()) {
+        const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
+        if (std::find(shardedColls.begin(), shardedColls.end(), nss) != shardedColls.end()) {
             params.shardedColl = true;
         }
         createCollectionParams.push_back(params);
@@ -587,8 +576,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     // Get index specs for each collection.
     std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
     for (auto&& params : createCollectionParams) {
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
+        const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
         const bool includeBuildUUIDs = false;
         const int options = 0;
         auto indexSpecs = getConn()->getIndexSpecs(nss, includeBuildUUIDs, options);
@@ -601,17 +589,16 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     }
 
     {
-        // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
-        DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, dBName);
         Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
-                str::stream() << "Not primary while cloning database " << dBName
+                str::stream() << "Not primary while cloning database "
+                              << dbName.toStringForErrorMsg()
                               << " (after getting list of collections to clone)",
                 !opCtx->writesAreReplicated() ||
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
                                                                                          dbName));
 
-        auto status = _createCollectionsForDb(opCtx, createCollectionParams, dBName);
+        auto status = _createCollectionsForDb(opCtx, createCollectionParams, dbName);
         if (!status.isOK()) {
             return status;
         }
@@ -630,12 +617,10 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                   "Copying indexes",
                   "collectionInfo"_attr = params.collectionInfo);
 
-            const auto nss =
-                NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
+            const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
 
             _copyIndexes(opCtx,
-                         dBName,
                          nss,
                          params.collectionInfo["options"].Obj(),
                          collectionIndexSpecs[params.collectionName]);
@@ -652,14 +637,13 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                     "  really will clone: {params_collectionInfo}",
                     "params_collectionInfo"_attr = params.collectionInfo);
 
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none, dBName, params.collectionName);
+        const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
         clonedColls->insert(NamespaceStringUtil::serialize(nss));
 
         LOGV2_DEBUG(20421, 1, "\t\t cloning", logAttrs(nss), "host"_attr = masterHost);
 
-        _copy(opCtx, dBName, nss, params.collectionInfo["options"].Obj(), params.idIndexSpec);
+        _copy(opCtx, dbName, nss, params.collectionInfo["options"].Obj(), params.idIndexSpec);
     }
 
     return Status::OK();
@@ -668,17 +652,17 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
 Cloner::Cloner() : Cloner(std::make_unique<DefaultClonerImpl>()) {}
 
 Status Cloner::copyDb(OperationContext* opCtx,
-                      const std::string& dBName,
+                      const DatabaseName& dbName,
                       const std::string& masterHost,
                       const std::vector<NamespaceString>& shardedColls,
                       std::set<std::string>* clonedColls) {
-    return _clonerImpl->copyDb(opCtx, dBName, masterHost, shardedColls, clonedColls);
+    return _clonerImpl->copyDb(opCtx, dbName, masterHost, shardedColls, clonedColls);
 }
 
 StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* opCtx,
-                                                              const std::string& dBName,
+                                                              const DatabaseName& dbName,
                                                               const std::string& masterHost) {
-    return _clonerImpl->getListOfCollections(opCtx, dBName, masterHost);
+    return _clonerImpl->getListOfCollections(opCtx, dbName, masterHost);
 }
 
 }  // namespace mongo
