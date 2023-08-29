@@ -117,7 +117,9 @@ public:
                        std::vector<InsertStatement>& batch,
                        ShardId donorShard = ShardId(),
                        HostAndPort donorHost = HostAndPort(),
-                       BSONObj resumeToken = BSONObj());
+                       BSONObj resumeToken = BSONObj(),
+                       // TODO(SERVER-77873): remove the useNaturalOrderCloner parameter.
+                       bool useNaturalOrderCloner = false);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
