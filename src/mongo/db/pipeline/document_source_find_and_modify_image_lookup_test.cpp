@@ -74,6 +74,7 @@ repl::OplogEntry makeOplogEntry(
                                 nss,                              // namespace
                                 uuid,                             // uuid
                                 boost::none,                      // fromMigrate
+                                boost::none,                      // checkExistenceForDiffInsert
                                 repl::OplogEntry::kOplogVersion,  // version
                                 oField,                           // o
                                 boost::none,                      // o2

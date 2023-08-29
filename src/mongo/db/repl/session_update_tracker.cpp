@@ -62,6 +62,7 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                                     NamespaceString::kSessionTransactionsTableNamespace,
                                     boost::none,  // uuid
                                     false,        // fromMigrate
+                                    boost::none,  // checkExistenceForDiffInsert
                                     repl::OplogEntry::kOplogVersion,
                                     updateBSON,
                                     o2Field,

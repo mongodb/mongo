@@ -275,6 +275,11 @@ TEST(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     entry.setFromMigrateIfTrue(true);
     auto replOp2 = entry.toReplOperation();
     ASSERT_EQ(replOp2.getFromMigrate(), entry.getFromMigrate());
+
+    // Tests when 'checkExistenceForDiffInsert' is set to true.
+    entry.setCheckExistenceForDiffInsert();
+    auto replOp3 = entry.toReplOperation();
+    ASSERT_EQ(replOp3.getCheckExistenceForDiffInsert(), entry.getCheckExistenceForDiffInsert());
 }
 
 }  // namespace

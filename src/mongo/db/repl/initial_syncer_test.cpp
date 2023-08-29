@@ -649,11 +649,12 @@ OplogEntry makeOplogEntry(int t,
                               NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
                               boost::none,                                            // uuid
                               boost::none,                                            // fromMigrate
-                              version,                                                // version
-                              oField,                                                 // o
-                              boost::none,                                            // o2
-                              {},                                                     // sessionInfo
-                              boost::none,                                            // upsert
+                              boost::none,            // checkExistenceForDiffInsert
+                              version,                // version
+                              oField,                 // o
+                              boost::none,            // o2
+                              {},                     // sessionInfo
+                              boost::none,            // upsert
                               Date_t() + Seconds(t),  // wall clock time
                               {},                     // statement ids
                               boost::none,    // optime of previous write within same transaction

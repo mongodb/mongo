@@ -784,6 +784,7 @@ OplogEntry makeInvalidateOp(OpTime opTime,
                              std::move(nss),             // namespace
                              uuid,                       // uuid
                              boost::none,                // fromMigrate
+                             boost::none,                // checkExistenceForDiffInsert
                              OplogEntry::kOplogVersion,  // version
                              document,                   // o
                              boost::none,                // o2
@@ -3821,6 +3822,7 @@ public:
             ns,             // namespace
             boost::none,    // uuid
             boost::none,    // fromMigrate
+            boost::none,    // checkExistenceForDiffInsert
             0,              // version
             object,         // o
             object2,        // o2
@@ -3852,6 +3854,7 @@ public:
             ns,             // namespace
             boost::none,    // uuid
             true,           // fromMigrate
+            boost::none,    // checkExistenceForDiffInsert
             0,              // version
             object,         // o
             object2,        // o2

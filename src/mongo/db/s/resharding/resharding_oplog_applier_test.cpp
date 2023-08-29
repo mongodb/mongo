@@ -300,6 +300,7 @@ public:
                                         kCrudNs,
                                         kCrudUUID,
                                         false /* fromMigrate */,
+                                        boost::none,  // checkExistenceForDiffInsert
                                         0 /* version */,
                                         obj1,
                                         obj2,

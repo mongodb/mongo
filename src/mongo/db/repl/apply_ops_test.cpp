@@ -259,13 +259,14 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                               NamespaceString::createNamespaceString_forTest("a.a"),  // namespace
                               boost::none,                                            // uuid
                               boost::none,                                            // fromMigrate
-                              OplogEntry::kOplogVersion,                              // version
-                              oField,                                                 // o
-                              boost::none,                                            // o2
-                              {},                                                     // sessionInfo
-                              boost::none,                                            // upsert
-                              Date_t(),       // wall clock time
-                              stmtIds,        // statement ids
+                              boost::none,                // checkExistenceForDiffInsert
+                              OplogEntry::kOplogVersion,  // version
+                              oField,                     // o
+                              boost::none,                // o2
+                              {},                         // sessionInfo
+                              boost::none,                // upsert
+                              Date_t(),                   // wall clock time
+                              stmtIds,                    // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime

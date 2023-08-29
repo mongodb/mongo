@@ -133,6 +133,11 @@ structs:
                 type: bool
                 optional: true
                 description: "An operation caused by a chunk migration"
+            checkExistenceForDiffInsert:
+                type: bool
+                optional: true
+                description: "Marks that checks on field existence are needed for insert operations
+                              in the diff update."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
