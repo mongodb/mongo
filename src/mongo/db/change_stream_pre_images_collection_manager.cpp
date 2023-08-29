@@ -257,7 +257,9 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             insertionStatus != ErrorCodes::DuplicateKey);
     uassertStatusOK(insertionStatus);
 
-    _docsInserted.fetchAndAddRelaxed(1);
+    opCtx->recoveryUnit()->onCommit([this](OperationContext* opCtx, boost::optional<Timestamp>) {
+        _docsInserted.fetchAndAddRelaxed(1);
+    });
 
     if (useUnreplicatedTruncates()) {
         // This is a no-op until the 'tenantId' is registered with the 'truncateManager' in the
