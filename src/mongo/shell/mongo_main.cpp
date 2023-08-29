@@ -814,6 +814,10 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
         parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
         parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
+#ifdef MONGO_CONFIG_GRPC
+        parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
+#endif
 #ifdef MONGO_CONFIG_SSL
         if (!awsIam::saslAwsClientGlobalParams.awsSessionToken.empty()) {
             parsedURI.setOptionIfNecessary("authmechanismproperties"s,

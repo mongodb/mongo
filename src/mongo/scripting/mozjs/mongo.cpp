@@ -82,12 +82,15 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace mozjs {
@@ -725,6 +728,16 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
                         apiParameters.getVersion());
             }
         }
+    }
+
+    if (cs.isGRPC()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot enable gRPC mode when connecting to a replica set",
+                cs.type() != ConnectionString::ConnectionType::kReplicaSet);
+
+        uassert(ErrorCodes::InvalidOptions,
+                "Authentication is not currently supported when gRPC mode is enabled",
+                cs.getUser().empty());
     }
 
     boost::optional<std::string> appname = cs.getAppName();

@@ -64,6 +64,7 @@ public:
 
         sslGlobalParams.sslCAFile = CommandServiceTestFixtures::kCAFile;
         sslGlobalParams.sslPEMKeyFile = CommandServiceTestFixtures::kServerCertificateKeyFile;
+        sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_requireSSL);
     }
 
     virtual std::unique_ptr<PeriodicRunner> newPeriodicRunner() {

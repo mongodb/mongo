@@ -478,6 +478,7 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     }
 
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
     if (params.count("net.grpc.port")) {
         serverGlobalParams.grpcPort = params["net.grpc.port"].as<int>();

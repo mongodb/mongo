@@ -81,6 +81,12 @@ struct ShellGlobalParams {
     int jsHeapLimitMB = 0;
     bool nokillop = false;
     Seconds idleSessionTimeout = Seconds{0};
+
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
+#ifdef MONGO_CONFIG_GRPC
+    bool gRPC = false;
+    boost::optional<std::string> gRPCAuthToken;
+#endif
 };
 
 extern ShellGlobalParams shellGlobalParams;

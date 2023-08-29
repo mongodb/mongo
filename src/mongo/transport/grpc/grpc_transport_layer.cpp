@@ -127,6 +127,24 @@ Status GRPCTransportLayer::start() try {
             "Cannot start GRPCTransportLayer after it has been shut down",
             !_isShutdown);
 
+    // We can't distinguish between the default list of disabled protocols and one specified by
+    // via options, so we just log that the list is being ignored when using gRPC.
+    if (!sslGlobalParams.sslDisabledProtocols.empty()) {
+        LOGV2_DEBUG(8000811,
+                    3,
+                    "Ignoring tlsDisabledProtocols for gRPC-based connections",
+                    "tlsDisabledProtocols"_attr = sslGlobalParams.sslDisabledProtocols);
+    }
+    uassert(ErrorCodes::InvalidSSLConfiguration,
+            "Specifying a CRL file is not supported when gRPC mode is enabled",
+            sslGlobalParams.sslCRLFile.empty());
+    uassert(ErrorCodes::InvalidSSLConfiguration,
+            "Certificate passwords are not supported when gRPC mode is enabled",
+            sslGlobalParams.sslPEMKeyPassword.empty());
+    uassert(ErrorCodes::InvalidSSLConfiguration,
+            "tlsFIPSMode is not supported when gRPC mode is enabled",
+            !sslGlobalParams.sslFIPSMode);
+
     if (_server) {
         _server->start();
         if (_options.useUnixDomainSockets) {
@@ -150,7 +168,9 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayer::connect(
 
     iassert(ErrorCodes::InvalidSSLConfiguration,
             "SSL must be enabled when using gRPC",
-            sslMode != ConnectSSLMode::kDisableSSL);
+            sslMode == ConnectSSLMode::kEnableSSL ||
+                (sslMode == transport::ConnectSSLMode::kGlobalSSLMode &&
+                 sslGlobalParams.sslMode.load() != SSLParams::SSLModes::SSLMode_disabled));
     iassert(ErrorCodes::InvalidSSLConfiguration,
             "Transient SSL parameters are not supported when using gRPC",
             !transientSSLParams);

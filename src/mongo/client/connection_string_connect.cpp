@@ -89,9 +89,9 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                 c->setSoTimeout(socketTimeout);
                 LOGV2_DEBUG(20109,
                             1,
-                            "Creating new connection to: {hostAndPort}",
                             "Creating new connection",
-                            "hostAndPort"_attr = server);
+                            "hostAndPort"_attr = server,
+                            "gRPC"_attr = newURI.isGRPC());
                 lastError = c->connect(
                     server,
                     applicationName,

@@ -66,6 +66,7 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/dns_name.h"
@@ -491,47 +492,36 @@ MongoURI MongoURI::parseImpl(StringData url) {
                   str::stream() << "appName cannot exceed 128 characters: " << optIter->second);
     }
 
-    boost::optional<bool> retryWrites = boost::none;
-    optIter = options.find("retryWrites");
-    if (optIter != end(options)) {
-        if (optIter->second == "true") {
-            retryWrites.reset(true);
-        } else if (optIter->second == "false") {
-            retryWrites.reset(false);
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "retryWrites must be either \"true\" or \"false\"");
+    auto extractBooleanOption =
+        [&options](CaseInsensitiveString optionName) -> boost::optional<bool> {
+        auto optIter = options.find(optionName);
+        if (optIter == end(options)) {
+            return boost::none;
         }
+        if (auto value = optIter->second; value == "true") {
+            return true;
+        } else if (value == "false") {
+            return false;
+        }
+        uasserted(ErrorCodes::FailedToParse,
+                  fmt::format("{} must be either \"true\" or \"false\"", optionName.original()));
+    };
+
+    const auto retryWrites = extractBooleanOption("retryWrites");
+    const auto helloOk = extractBooleanOption("helloOk");
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
+#ifdef MONGO_CONFIG_GRPC
+    const auto gRPC = extractBooleanOption("gRPC");
+#endif
+    auto tlsEnabled = extractBooleanOption("tls");
+    if (!tlsEnabled.has_value()) {
+        tlsEnabled = extractBooleanOption("ssl");
     }
 
-    const auto helloOk = [&options]() -> boost::optional<bool> {
-        if (auto optIter = options.find("helloOk"); optIter != end(options)) {
-            if (auto value = optIter->second; value == "true") {
-                return true;
-            } else if (value == "false") {
-                return false;
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          "helloOk must be either \"true\" or \"false\"");
-            }
-        }
-        return boost::none;
-    }();
-
-    transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
-    auto sslModeIter = std::find_if(options.begin(), options.end(), [](auto pred) {
-        return pred.first == CaseInsensitiveString("ssl") ||
-            pred.first == CaseInsensitiveString("tls");
-    });
-    if (sslModeIter != options.end()) {
-        const auto& val = sslModeIter->second;
-        if (val == "true") {
-            sslMode = transport::kEnableSSL;
-        } else if (val == "false") {
-            sslMode = transport::kDisableSSL;
-        } else {
-            uasserted(51041, str::stream() << "tls must be either 'true' or 'false', not" << val);
-        }
+    auto tlsMode = transport::ConnectSSLMode::kGlobalSSLMode;
+    if (tlsEnabled.has_value()) {
+        tlsMode = *tlsEnabled ? transport::ConnectSSLMode::kEnableSSL
+                              : transport::ConnectSSLMode::kDisableSSL;
     }
 
     auto cs = replicaSetName.empty()
@@ -542,8 +532,12 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     password,
                     database,
                     std::move(retryWrites),
-                    sslMode,
+                    tlsMode,
                     helloOk,
+// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
+#ifdef MONGO_CONFIG_GRPC
+                    gRPC,
+#endif
                     std::move(options));
 }
 

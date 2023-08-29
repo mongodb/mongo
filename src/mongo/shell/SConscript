@@ -105,10 +105,16 @@ env.Library(
     ],
 )
 
+
+def shouldBuildGRPC(myEnv):
+    return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
+
+
 env.Library(
     target='shell_options_register',
     source=[
         'shell_options.idl',
+        'shell_options_grpc.idl' if shouldBuildGRPC(env) else [],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
