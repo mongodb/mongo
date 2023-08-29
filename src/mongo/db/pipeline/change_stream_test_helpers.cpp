@@ -106,13 +106,14 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
                                     nss,                                // namespace
                                     uuid,                               // uuid
                                     fromMigrate,                        // fromMigrate
-                                    repl::OplogEntry::kOplogVersion,    // version
-                                    object,                             // o
-                                    object2,                            // o2
-                                    sessionInfo,                        // sessionInfo
-                                    boost::none,                        // upsert
-                                    Date_t(),                           // wall clock time
-                                    {},                                 // statement ids
+                                    boost::none,                      // checkExistenceForDiffInsert
+                                    repl::OplogEntry::kOplogVersion,  // version
+                                    object,                           // o
+                                    object2,                          // o2
+                                    sessionInfo,                      // sessionInfo
+                                    boost::none,                      // upsert
+                                    Date_t(),                         // wall clock time
+                                    {},                               // statement ids
                                     prevOpTime,  // optime of previous write within same transaction
                                     preImageOpTime,  // pre-image optime
                                     boost::none,     // post-image optime

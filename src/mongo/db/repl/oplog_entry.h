@@ -416,6 +416,10 @@ public:
         getDurableReplOperation().setFromMigrate(value);
     }
 
+    void setCheckExistenceForDiffInsert() & {
+        getDurableReplOperation().setCheckExistenceForDiffInsert(true);
+    }
+
     /**
      * Same as setFromMigrate but only set when it is true.
      */
@@ -455,6 +459,7 @@ class DurableOplogEntry : private MutableOplogEntry {
 public:
     // Make field names accessible.
     using MutableOplogEntry::k_idFieldName;
+    using MutableOplogEntry::kCheckExistenceForDiffInsertFieldName;
     using MutableOplogEntry::kDestinedRecipientFieldName;
     using MutableOplogEntry::kDonorApplyOpsIndexFieldName;
     using MutableOplogEntry::kDonorOpTimeFieldName;
@@ -483,6 +488,7 @@ public:
 
     // Make serialize() and getters accessible.
     using MutableOplogEntry::get_id;
+    using MutableOplogEntry::getCheckExistenceForDiffInsert;
     using MutableOplogEntry::getDestinedRecipient;
     using MutableOplogEntry::getDonorApplyOpsIndex;
     using MutableOplogEntry::getDonorOpTime;
@@ -552,6 +558,7 @@ public:
                       const NamespaceString& nss,
                       const boost::optional<UUID>& uuid,
                       const boost::optional<bool>& fromMigrate,
+                      const boost::optional<bool>& checkExistenceForDiffInsert,
                       int version,
                       const BSONObj& oField,
                       const boost::optional<BSONObj>& o2Field,
@@ -747,6 +754,8 @@ public:
     static constexpr auto kDurableReplOperationFieldName =
         DurableOplogEntry::kDurableReplOperationFieldName;
     static constexpr auto kFromMigrateFieldName = DurableOplogEntry::kFromMigrateFieldName;
+    static constexpr auto kCheckExistenceForDiffInsertFieldName =
+        DurableOplogEntry::kCheckExistenceForDiffInsertFieldName;
     static constexpr auto kFromTenantMigrationFieldName =
         DurableOplogEntry::kFromTenantMigrationFieldName;
     static constexpr auto kDonorOpTimeFieldName = DurableOplogEntry::kDonorOpTimeFieldName;
@@ -820,6 +829,7 @@ public:
     const mongo::Date_t& getWallClockTime() const;
     std::int64_t getVersion() const;
     boost::optional<bool> getFromMigrate() const&;
+    bool getCheckExistenceForDiffInsert() const&;
     const boost::optional<mongo::UUID>& getFromTenantMigration() const&;
     const boost::optional<mongo::repl::OpTime>& getDonorOpTime() const&;
     boost::optional<std::int64_t> getDonorApplyOpsIndex() const&;

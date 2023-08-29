@@ -71,6 +71,7 @@ OplogEntry makeInsertOplogEntry(int t, const std::string& id, const NamespaceStr
                               nss,                         // namespace
                               boost::none,                 // uuid
                               boost::none,                 // fromMigrate
+                              boost::none,                 // checkExistenceForDiffInsert
                               OplogEntry::kOplogVersion,   // version
                               oField,                      // o
                               boost::none,                 // o2

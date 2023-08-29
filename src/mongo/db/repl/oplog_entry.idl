@@ -137,6 +137,11 @@ structs:
                               deletions performed during a chunk migration) maintains its original
                               name for retro compatibility, but it is now used in a wider range of 
                               contexts."
+            checkExistenceForDiffInsert:
+                type: bool
+                optional: true
+                description: "Marks that checks on field existence are needed for insert operations
+                              in the diff update."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
