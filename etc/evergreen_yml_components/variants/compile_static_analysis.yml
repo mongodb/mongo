@@ -217,6 +217,19 @@ buildvariants:
   - name: .crypt
   - name: generate_buildid_to_debug_symbols_mapping
 
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
+  display_name: "Ubuntu 22.04 arm64 Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - ubuntu2204-arm64-small
+  stepback: false
+  expansions:
+    compile_variant: *ubuntu2204-arm64-bazel-compile
+  tasks:
+    - name: compile_bazel_dist_test_TG
+
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
   display_name: "! Amazon Linux 2 arm64 Shared Library Compile & Static Analysis"

@@ -200,6 +200,25 @@ variables:
   private_key_file: src/powercycle.pem
   private_key_remote: ${__project_aws_ssh_key_value}
 
+- &compile_bazel_task_group_template
+  name: compile_bazel_task_group_template
+  max_hosts: 1
+  tasks: []
+  setup_group_can_fail_task: true
+  setup_group:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "set up credentials"
+  - func: "f_expansions_write"
+
+
 - &compile_task_group_template
   name: compile_task_group_template
   max_hosts: 1
@@ -1352,6 +1371,25 @@ functions:
       binary: bash
       args:
       - "src/evergreen/scons_raw_compile.sh"
+
+  "fetch bazel":
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/get_bazelisk.sh"
+
+  "bazel compile":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/bazel_compile.sh"
 
   "ninja compile":
   - *f_expansions_write
@@ -2583,6 +2621,21 @@ tasks:
         ${additional_compile_targets|}
       task_compile_flags: >-
         PREFIX=dist-test
+
+## compile - build bazel targets ##
+## The bazel migration is in progress & this
+## task ensures we can build with bazel.
+- name: compile_bazel_dist_test
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  - func: "fetch bazel"
+  - func: "bazel compile"
+    vars:
+      targets: src/mongo/db/commands:fsync_locked
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half
@@ -8754,6 +8807,11 @@ task_groups:
   name: compile_dist_test_TG
   tasks:
   - compile_dist_test
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_dist_test_TG
+  tasks:
+  - compile_bazel_dist_test
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG
