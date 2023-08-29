@@ -83,7 +83,7 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
     // a migration takes long enough.
     const expectedCodes = [ErrorCodes.SnapshotTooOld, ErrorCodes.StaleChunkHistory];
 
-    if (testCaseName === "insert") {
+    if (testCaseName === "insert" || testCaseName.startsWith("insert_")) {
         // Insert always inserts a new document, so the only typical error is MigrationConflict.
         expectedCodes.push(ErrorCodes.MigrationConflict);
         assert.commandFailedWithCode(res, expectedCodes, errMsg);
@@ -290,12 +290,22 @@ let moveHashed = function(toShard) {
 
 var hashedDocs = [{_id: -3}, {_id: 11}];
 
-// The command should target only the second chunk.
+// The "insert_into_multiple_chunks" test case depends on the first document targeting the chunk on
+// the second shard which isn't being moved.
+assert(bsonWoCompare(convertShardKeyToHashed(4), NumberLong("0")) >= 0 &&
+           bsonWoCompare(convertShardKeyToHashed(4), NumberLong("3074457345618258602")) < 0,
+       "expected {_id: 4} document to reside within unmoved chunk on shard1");
+
+// The command should target only the second shard.
 let commandTestCases = function(collName) {
     return [
         {
             name: "insert",
             command: {insert: collName, documents: [{_id: 3}]},
+        },
+        {
+            name: "insert_into_multiple_chunks",
+            command: {insert: collName, documents: [{_id: 4}, {_id: 3}]},
         },
         {
             name: "update_query",
