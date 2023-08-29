@@ -561,6 +561,35 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
 
+TEST_F(OpObserverTest, OnUpdateCheckExistenceForDiffInsert) {
+    NamespaceString nss("test.coll");
+    const auto uuid = UUID::gen();
+
+    const auto criteria = BSON("_id" << 0);
+    CollectionUpdateArgs updateArgs;
+    updateArgs.criteria = criteria;
+    updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                       << "x");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "x"));
+    updateArgs.mustCheckExistenceForInsertOperations = true;
+
+    auto opCtx = cc().makeOperationContext();
+    WriteUnitOfWork wuow(opCtx.get());
+    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+    AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+    OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
+
+    OpObserverImpl opObserver;
+    opObserver.onUpdate(opCtx.get(), update);
+    wuow.commit();
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
+
+    ASSERT_TRUE(entry.getCheckExistenceForDiffInsert());
+}
+
 TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();

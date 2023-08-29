@@ -278,6 +278,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         // Ensure we set the type correctly
         args.source = writeToOrphan ? OperationSource::kFromMigrate : request->source();
 
+        args.mustCheckExistenceForInsertOperations =
+            driver->getUpdateExecutor()->getCheckExistenceForDiffInsertOperations();
+
         if (inPlace) {
             if (!request->explain()) {
                 newObj = oldObj.value();

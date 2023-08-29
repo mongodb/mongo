@@ -1540,7 +1540,7 @@ Status performAtomicTimeseriesWrites(
             doc_diff::applyDiff(original.value(),
                                 update.getU().getDiff(),
                                 &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
-                                static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx)));
+                                update.getU().mustCheckExistenceForInsertOperations());
 
         CollectionUpdateArgs args;
         if (const auto& stmtIds = op.getStmtIds()) {
