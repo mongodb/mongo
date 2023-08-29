@@ -41,12 +41,14 @@ namespace mongo::sbe {
 BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  value::SlotVector blocks,
                                  value::SlotVector valsOut,
+                                 boost::optional<value::SlotId> bitmapSlotId,
                                  PlanNodeId nodeId,
                                  PlanYieldPolicy* yieldPolicy,
                                  bool participateInTrialRunTracking)
     : PlanStage("block_to_row"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _blockSlotIds(std::move(blocks)),
-      _valsOutSlotIds(std::move(valsOut)) {
+      _valsOutSlotIds(std::move(valsOut)),
+      _bitmapSlotId(bitmapSlotId) {
     _children.emplace_back(std::move(input));
     invariant(_blockSlotIds.size() == _valsOutSlotIds.size());
 }
@@ -55,6 +57,7 @@ std::unique_ptr<PlanStage> BlockToRowStage::clone() const {
     return std::make_unique<BlockToRowStage>(_children[0]->clone(),
                                              _blockSlotIds,
                                              _valsOutSlotIds,
+                                             _bitmapSlotId,
                                              _commonStats.nodeId,
                                              _yieldPolicy,
                                              _participateInTrialRunTracking);
@@ -65,6 +68,10 @@ void BlockToRowStage::prepare(CompileCtx& ctx) {
 
     for (auto& id : _blockSlotIds) {
         _blockAccessors.push_back(_children[0]->getAccessor(ctx, id));
+    }
+
+    if (_bitmapSlotId) {
+        _bitmapAccessor = _children[0]->getAccessor(ctx, *_bitmapSlotId);
     }
 
     _valsOutAccessors.resize(_blockSlotIds.size());
@@ -88,13 +95,13 @@ void BlockToRowStage::open(bool reOpen) {
 }
 
 PlanState BlockToRowStage::getNextFromDeblockedValues() {
-    if (_curIdx >= _deblockedValueRuns[0].count) {
+    if (_curIdx >= _deblockedValueRuns[0].size()) {
         return PlanState::IS_EOF;
     }
 
     for (size_t i = 0; i < _blocks.size(); ++i) {
-        _valsOutAccessors[i].reset(_deblockedValueRuns[i].tags[_curIdx],
-                                   _deblockedValueRuns[i].vals[_curIdx]);
+        auto [t, v] = _deblockedValueRuns[i][_curIdx];
+        _valsOutAccessors[i].reset(t, v);
     }
 
     ++_curIdx;
@@ -106,6 +113,28 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
 void BlockToRowStage::prepareDeblock() {
     _blocks.clear();
     _deblockedValueRuns.clear();
+
+    // Extract the value in the bitmap slot into a selectivity vector, to determine which indexes
+    // should get passed along and which should be filtered out.
+    std::vector<char> selectivityVector;
+    boost::optional<size_t> onesInBitset;
+    if (_bitmapAccessor) {
+        auto [bitmapTag, bitmapValue] = _bitmapAccessor->getViewOfValue();
+        tassert(8044671, "Bitmap must be a block type", bitmapTag == value::TypeTags::valueBlock);
+        auto bitmapBlock = value::getValueBlock(bitmapValue);
+        auto extractedBitmap = bitmapBlock->extract();
+
+        selectivityVector.resize(extractedBitmap.count);
+        onesInBitset = 0;
+        for (size_t i = 0; i < extractedBitmap.count; ++i) {
+            auto [t, v] = extractedBitmap[i];
+            tassert(8044672, "Bitmap must contain only booleans", t == value::TypeTags::Boolean);
+            auto idxPasses = value::bitcastTo<bool>(v);
+            *onesInBitset += idxPasses;
+            selectivityVector[i] = static_cast<char>(idxPasses);
+        }
+    }
+
     for (auto acc : _blockAccessors) {
         auto [tag, val] = acc->getViewOfValue();
         invariant(tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
@@ -118,14 +147,33 @@ void BlockToRowStage::prepareDeblock() {
         // yielding.
         // TODO SERVER-79629: Avoid cloning the block.
         _blocks.emplace_back(valueBlock->clone());
-        _deblockedValueRuns.emplace_back(_blocks.back()->extract());
-        tassert(7962101, "Block's count must always be same as count of deblocked values", [&] {
+
+        auto deblocked = _blocks.back()->extract();
+        tassert(8044674,
+                "Bitmap must be same size as data blocks",
+                selectivityVector.empty() || deblocked.count == selectivityVector.size());
+
+        // Apply the selectivity vector here, only taking the values which are included.
+        std::vector<std::pair<value::TypeTags, value::Value>> tvVec;
+        tvVec.reserve(onesInBitset.get_value_or(deblocked.count));
+        for (size_t i = 0; i < deblocked.count; ++i) {
+            if (selectivityVector.empty() || selectivityVector[i]) {
+                tvVec.push_back(deblocked[i]);
+            }
+        }
+
+        _deblockedValueRuns.emplace_back(std::move(tvVec));
+
+        tassert(7962151, "Block's count must always be same as count of deblocked values", [&] {
             if (auto optCnt = _blocks.back()->tryCount()) {
-                return *optCnt == _deblockedValueRuns.back().count;
+                return *optCnt == deblocked.count;
             } else {
                 return true;
             }
         }());
+        tassert(7962101,
+                "All deblocked value runs for output must be same size",
+                _deblockedValueRuns.back().size() == _deblockedValueRuns.front().size());
     }
 }
 
@@ -198,6 +246,10 @@ std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, _valsOutSlotIds[i]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
+
+    if (_bitmapSlotId) {
+        DebugPrinter::addIdentifier(ret, *_bitmapSlotId);
+    }
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());

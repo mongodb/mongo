@@ -58,10 +58,16 @@ protected:
     }
 
     std::tuple<std::unique_ptr<PlanStage>, value::SlotVector /*outSlots*/> makeBlockToRow(
-        std::unique_ptr<PlanStage> input, value::SlotVector blockSlots) {
+        std::unique_ptr<PlanStage> input,
+        value::SlotVector blockSlots,
+        boost::optional<value::SlotId> bitsetSlotId) {
         auto outSlots = generateMultipleSlotIds(blockSlots.size());
-        auto blockToRowStage = makeS<BlockToRowStage>(
-            std::move(input), std::move(blockSlots), outSlots, 1 /*nodeId*/, getYieldPolicy());
+        auto blockToRowStage = makeS<BlockToRowStage>(std::move(input),
+                                                      std::move(blockSlots),
+                                                      outSlots,
+                                                      bitsetSlotId,
+                                                      1 /*nodeId*/,
+                                                      getYieldPolicy());
         return {std::move(blockToRowStage), std::move(outSlots)};
     }
 
@@ -119,7 +125,7 @@ protected:
 
         // Builds a BlockToRowStage on top of the TsBucketToCellBlockStage.
         auto [bucketToRow, outSlots] =
-            makeBlockToRow(std::move(tsBucketStage), std::move(blockSlots));
+            makeBlockToRow(std::move(tsBucketStage), std::move(blockSlots), boost::none);
 
         return {std::move(bucketToRow), std::move(outSlots), metaSlot};
     }
@@ -197,6 +203,10 @@ protected:
         verifyUnpackBucket(
             std::move(blockToRow), cellPaths, outSlots, metaSlot, expectedData, yieldAfter);
     }
+
+    void testBlockToBitmap(std::vector<std::unique_ptr<value::ValueBlock>>& dataBlocksInput,
+                           std::vector<std::vector<bool>> bitsets,
+                           const value::Array& expected);
 };
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -716,5 +726,137 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField_Yield) {
                         tsOptionsForBucketWithObjectField,
                         expectedDataForBucketWithObjectField,
                         /*yieldAfter*/ 1);
+}
+
+/*
+ * Test that the 'bitmap' argument to the BlockToRow stage is used. This bitmap indicates which
+ * indexes in the input blocks should be propagated upwards and which should not.
+ *
+ * The test creates a block_to_row stage above a virtual scan and checks that only the values with
+ * a corresponding '1' in the bitmap can be fetched from the block_to_row stage.
+ */
+void BlockStagesTest::testBlockToBitmap(
+    std::vector<std::unique_ptr<value::ValueBlock>>& dataBlocksInput,
+    std::vector<std::vector<bool>> bitsets,
+    const value::Array& expected) {
+    // The data passed to the virtual scan. This is an array of the form:
+    // [[ValueBlock([42, 43, 44]), ValueBlock([true, false, true])], ...]
+    auto [scanDataTag, scanDataVal] = value::makeNewArray();
+    auto scanData = value::getArrayView(scanDataVal);
+
+    // Check that the test data is valid.
+    invariant(dataBlocksInput.size() == bitsets.size());
+
+    // The virtual scan will return three blocks, each with a corresponding bitset.
+    const size_t kNumBlocks = bitsets.size();
+
+    for (size_t blockIdx = 0; blockIdx < kNumBlocks; ++blockIdx) {
+        auto [chunkTag, chunkVal] = value::makeNewArray();
+        auto chunk = value::getArrayView(chunkVal);
+
+        auto& valBlock = dataBlocksInput[blockIdx];
+        auto& bitset = bitsets[blockIdx];
+
+        auto extracted = valBlock->extract();
+        invariant(extracted.count == bitset.size());
+
+        value::HeterogeneousBlock bitsetBlock;
+        for (size_t i = 0; i < bitset.size(); ++i) {
+            // Generate the inclusion bitset based on a coin flip.
+            if (bitset[i] == 0) {
+                bitsetBlock.push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+            } else {
+                bitsetBlock.push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+            }
+        }
+        chunk->push_back(value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(valBlock->clone().release()));
+        chunk->push_back(value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(bitsetBlock.clone().release()));
+        scanData->push_back(chunkTag, chunkVal);
+    }
+
+    // Construct the SBE PlanStage tree.
+    auto [blockSlots, scan] = generateVirtualScanMulti(2, scanDataTag, scanDataVal);
+    auto [blockToRow, outputSlots] = makeBlockToRow(
+        std::move(scan), blockSlots, blockSlots.back() /* last slot is the bitset */);
+
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), blockToRow.get());
+
+    // Run the plan and ensure that only values with a corresponding '1' in the bitset are returned.
+    auto accessor = blockToRow->getAccessor(*ctx, outputSlots[0]);
+    size_t i = 0;
+    for (auto st = blockToRow->getNext(); st == PlanState::ADVANCED;
+         st = blockToRow->getNext(), ++i) {
+        auto tagVal = accessor->getViewOfValue();
+        auto expectedTagVal = expected.getAt(i);
+
+        ASSERT_THAT(tagVal, ValueEq(expectedTagVal)) << "for {}th 'tag'"_format(i);
+    }
+}
+
+std::unique_ptr<value::ValueBlock> makeBlock(std::vector<int> ints) {
+    auto out = std::make_unique<value::HeterogeneousBlock>();
+    for (auto i : ints) {
+        out->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+    }
+
+    return std::unique_ptr<value::ValueBlock>(out.release());
+}
+
+value::Array makeArray(std::vector<int> ints) {
+
+    value::Array out;
+    for (auto i : ints) {
+        out.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+    }
+    return out;
+}
+
+TEST_F(BlockStagesTest, BlockToRowRespectsZerosBitmap) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    blocks.push_back(makeBlock({1, 2, 3, 4, 5, 6}));
+
+    testBlockToBitmap(
+        blocks, {std::vector<bool>{false, false, false, false, false, false}}, makeArray({}));
+}
+
+TEST_F(BlockStagesTest, BlockToRowSingleValueFiltered) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    blocks.push_back(makeBlock({1, 2, 3, 4, 5, 6}));
+
+    testBlockToBitmap(
+        blocks, {std::vector<bool>{false, false, true, false, false, false}}, makeArray({3}));
+}
+
+TEST_F(BlockStagesTest, MultipleBlocksWithSingleValueFilteredFromEach) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    blocks.push_back(makeBlock({1, 2, 3}));
+    blocks.push_back(makeBlock({4, 5, 6}));
+
+    testBlockToBitmap(blocks,
+                      {std::vector<bool>{true, false, true}, std::vector<bool>{true, false, true}},
+                      makeArray({1, 3, 4, 6}));
+}
+
+TEST_F(BlockStagesTest, MultipleBlocksWithMultipleValuesFilteredFromEach) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    blocks.push_back(makeBlock({1, 2, 3}));
+    blocks.push_back(makeBlock({4, 5, 6, 7}));
+
+    testBlockToBitmap(
+        blocks,
+        {std::vector<bool>{false, false, true}, std::vector<bool>{true, false, true, false}},
+        makeArray({3, 4, 6}));
+}
+
+TEST_F(BlockStagesTest, BlockToRowNoValuesFiltered) {
+    std::vector<std::unique_ptr<value::ValueBlock>> blocks;
+    blocks.push_back(makeBlock({1, 2, 3, 4, 5, 6}));
+
+    testBlockToBitmap(blocks,
+                      {std::vector<bool>{true, true, true, true, true, true}},
+                      makeArray({1, 2, 3, 4, 5, 6}));
 }
 }  // namespace mongo::sbe

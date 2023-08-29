@@ -151,8 +151,12 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     // Adds the BlockToRowStage.
     auto unpackedSlots = _slotIdGenerator.generateMultiple(blockSlots.size());
-    stage = std::make_unique<sbe::BlockToRowStage>(
-        std::move(stage), blockSlots, unpackedSlots, unpackNode->nodeId(), _yieldPolicy);
+    stage = std::make_unique<sbe::BlockToRowStage>(std::move(stage),
+                                                   blockSlots,
+                                                   unpackedSlots,
+                                                   boost::none, /* bitmap */
+                                                   unpackNode->nodeId(),
+                                                   _yieldPolicy);
     printPlan(*stage);
 
     // Begins populating our output map.

@@ -136,18 +136,19 @@ private:
     TypeTags _tag;
     Value _val;
 
-    // To lazily extract the values, we need to remember the number of values which is supposed to
-    // exist in this block.
+    // To lazily extract the values, we need to remember the number of values which is supposed
+    // to exist in this block.
     size_t _count;
 
-    // These are always a view onto '_tag' and '_val', materialized lazily if the caller requests
-    // it.
+    // These are always a view onto '_tag' and '_val', materialized lazily if the caller
+    // requests it.
     std::vector<TypeTags> _deblockedTags;
     std::vector<Value> _deblockedVals;
 };
 
 /**
- * The most general type of block that can hold any assortment of tags/values with no commonality.
+ * The most general type of block that can hold any assortment of tags/values with no
+ * commonality.
  */
 struct HeterogeneousBlock : public ValueBlock {
     HeterogeneousBlock() = default;

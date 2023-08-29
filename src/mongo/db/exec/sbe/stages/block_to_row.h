@@ -39,20 +39,23 @@
 namespace mongo::sbe {
 /**
  * The stage iterates all input blocks, which can be a mix of either ValueBlocks or CellBlocks, and
- * populates the corresponding output slots with the individual values from each block. If the
- * blocks are of unequal size, missing values of blocks that have the less number of elements than
- * the block that maximum number of elements will be filled with Nothing. The number of valsOut must
- * be the same as the number of input blocks. This stage checks for interrupts.
+ * populates the corresponding output slots with the individual values from each block. Each input
+ * block must be the same size.
+ *
+ * This stage also takes an optional bitmapSlotId argument. When present, the bitmap slot must
+ * contain a block of all booleans, identical in size to the input blocks. Values that lie at an
+ * index with a corresponding '0' in the bitmap will be omitted from the output.
  *
  * Debug string representation:
  *
- *  block_to_row blocks[blocks[0], ..., blocks[N]] row[valsOut[0], ..., valsOut[N]]
+ *  block_to_row blocks[blocks[0], ..., blocks[N]] row[valsOut[0], ..., valsOut[N]] bitset
  */
 class BlockToRowStage final : public PlanStage {
 public:
     BlockToRowStage(std::unique_ptr<PlanStage> input,
                     value::SlotVector blocks,
                     value::SlotVector valsOut,
+                    boost::optional<value::SlotId> bitmapSlotId,
                     PlanNodeId nodeId,
                     PlanYieldPolicy* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
@@ -79,10 +82,15 @@ private:
 
     const value::SlotVector _blockSlotIds;
     const value::SlotVector _valsOutSlotIds;
+    const boost::optional<value::SlotId> _bitmapSlotId;
 
     std::vector<std::unique_ptr<value::ValueBlock>> _blocks;
-    std::vector<value::DeblockedTagVals> _deblockedValueRuns;
+    // Values extracted from the blocks. The memory for these values are owned by the blocks in the
+    // '_blocks' member.
+    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> _deblockedValueRuns;
+
     std::vector<value::SlotAccessor*> _blockAccessors;
+    value::SlotAccessor* _bitmapAccessor = nullptr;
     std::vector<value::ViewOfValueAccessor> _valsOutAccessors;
 
     // Keeps track of the current reading index of the blocks.
