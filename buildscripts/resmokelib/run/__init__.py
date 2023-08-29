@@ -271,7 +271,7 @@ class TestRunner(Subcommand):
             print("Skipping local invocation because evergreen task id was not provided.")
             return
 
-        evg_conf = parse_evergreen_file("etc/evergreen.yml")
+        evg_conf = parse_evergreen_file("etc/evergreen_nightly.yml")
 
         suite = self._get_suites()[0]
         suite_name = config.ORIGIN_SUITE or suite.get_name()
