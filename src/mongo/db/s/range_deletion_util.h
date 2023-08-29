@@ -43,6 +43,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/service_context.h"
@@ -53,6 +54,8 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+namespace rangedeletionutil {
 
 constexpr auto kRangeDeletionThreadName = "range-deleter"_sd;
 
@@ -112,37 +115,78 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
 void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid);
 
 /**
- * Wrapper to run a safer step up/step down killable task within an operation context
+ * Creates a query object that can used to find overlapping ranges in the pending range deletions
+ * collection.
  */
-template <typename Callable>
-auto withTemporaryOperationContext(Callable&& callable,
-                                   const DatabaseName dbName,
-                                   const UUID& collectionUUID,
-                                   bool writeToRangeDeletionNamespace = false) {
-    ThreadClient tc(kRangeDeletionThreadName, getGlobalServiceContext());
-    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-    auto opCtx = uniqueOpCtx.get();
+BSONObj overlappingRangeDeletionsQuery(const ChunkRange& range, const UUID& uuid);
 
-    // Ensure that this operation will be killed by the RstlKillOpThread during step-up or stepdown.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+/**
+ * Checks the pending range deletions collection to see if there are any pending ranges that
+ * conflict with the passed in range.
+ */
+size_t checkForConflictingDeletions(OperationContext* opCtx,
+                                    const ChunkRange& range,
+                                    const UUID& uuid);
+/**
+ * Writes the range deletion task document to config.rangeDeletions and waits for majority write
+ * concern.
+ */
+void persistRangeDeletionTaskLocally(OperationContext* opCtx,
+                                     const RangeDeletionTask& deletionTask,
+                                     const WriteConcernOptions& writeConcern);
 
-    {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        Lock::GlobalLock lock(opCtx, MODE_IX);
-        uassert(
-            ErrorCodes::PrimarySteppedDown,
-            str::stream()
-                << "Not primary while running range deletion task for collection with UUID "
-                << collectionUUID,
-            replCoord->getSettings().isReplSet() &&
-                replCoord->canAcceptWritesFor(opCtx,
-                                              NamespaceStringOrUUID(dbName, collectionUUID)) &&
-                (!writeToRangeDeletionNamespace ||
-                 replCoord->canAcceptWritesFor(opCtx, NamespaceString::kRangeDeletionNamespace)));
-    }
+/**
+ * Retrieves the value of 'numOrphanedDocs' from the recipient shard's range deletion task document.
+ */
+long long retrieveNumOrphansFromShard(OperationContext* opCtx,
+                                      const ShardId& shardId,
+                                      const UUID& migrationId);
 
-    return callable(opCtx);
-}
+/**
+ * Retrieves the shard key pattern from the local range deletion task.
+ */
+boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationContext* opCtx,
+                                                                    const UUID& migrationId);
 
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions and
+ * waits for majority write concern.
+ */
+void deleteRangeDeletionTaskLocally(
+    OperationContext* opCtx,
+    const UUID& collectionUuid,
+    const ChunkRange& range,
+    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernShardingTimeout);
+
+/**
+ * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
+ * specified shard and waits for majority write concern.
+ */
+void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                        const ShardId& recipientId,
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range,
+                                        const UUID& migrationId);
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
+ * deletion.
+ */
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
+                                         const UUID& collectionUuid,
+                                         const ChunkRange& range);
+
+
+/**
+ * Removes the 'pending' flag from the range deletion task document with the specified id from
+ * config.rangeDeletions on the specified shard and waits for majority write concern. This marks the
+ * range as ready for deletion.
+ */
+void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                             const ShardId& recipientId,
+                                             const UUID& collectionUuid,
+                                             const ChunkRange& range,
+                                             const UUID& migrationId);
+}  // namespace rangedeletionutil
 }  // namespace mongo

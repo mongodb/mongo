@@ -155,7 +155,7 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     donorDeletionTask.setKeyPattern(*_shardKeyPattern);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
-    migrationutil::persistRangeDeletionTaskLocally(
+    rangedeletionutil::persistRangeDeletionTaskLocally(
         opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }
 
@@ -250,10 +250,11 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                 "Retrieving number of orphan documents from recipient",
                 "migrationId"_attr = _migrationInfo.getId());
 
-    const auto numOrphans = migrationutil::retrieveNumOrphansFromRecipient(opCtx, _migrationInfo);
+    const auto numOrphans = rangedeletionutil::retrieveNumOrphansFromShard(
+        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
 
     if (numOrphans > 0) {
-        persistUpdatedNumOrphans(
+        rangedeletionutil::persistUpdatedNumOrphans(
             opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange(), numOrphans);
     }
 
@@ -261,11 +262,11 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                 2,
                 "Deleting range deletion task on recipient",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
-                                                      _migrationInfo.getRecipientShardId(),
-                                                      _migrationInfo.getCollectionUuid(),
-                                                      _migrationInfo.getRange(),
-                                                      _migrationInfo.getId());
+    rangedeletionutil::deleteRangeDeletionTaskOnRecipient(opCtx,
+                                                          _migrationInfo.getRecipientShardId(),
+                                                          _migrationInfo.getCollectionUuid(),
+                                                          _migrationInfo.getRange(),
+                                                          _migrationInfo.getId());
 
     RangeDeletionTask deletionTask(_migrationInfo.getId(),
                                    _migrationInfo.getNss(),
@@ -307,7 +308,7 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
 
     // Mark the range deletion task document as non-pending in order to unblock the previously
     // registered range deletion
-    migrationutil::markAsReadyRangeDeletionTaskLocally(
+    rangedeletionutil::markAsReadyRangeDeletionTaskLocally(
         opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     return rangeDeletionCompletionFuture;
@@ -330,7 +331,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                 2,
                 "Deleting range deletion task on donor",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteRangeDeletionTaskLocally(
+    rangedeletionutil::deleteRangeDeletionTaskLocally(
         opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
 
     try {
@@ -365,11 +366,11 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                 2,
                 "Marking range deletion task on recipient as ready for processing",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
-                                                           _migrationInfo.getRecipientShardId(),
-                                                           _migrationInfo.getCollectionUuid(),
-                                                           _migrationInfo.getRange(),
-                                                           _migrationInfo.getId());
+    rangedeletionutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
+                                                               _migrationInfo.getRecipientShardId(),
+                                                               _migrationInfo.getCollectionUuid(),
+                                                               _migrationInfo.getRange(),
+                                                               _migrationInfo.getId());
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {

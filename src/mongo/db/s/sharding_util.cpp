@@ -68,6 +68,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -78,6 +79,8 @@ namespace mongo {
 namespace sharding_util {
 
 using namespace fmt::literals;
+
+const auto kLogRetryAttemptThreshold = 20;
 
 void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::vector<ShardId>& shardIds,
@@ -279,6 +282,77 @@ Status createShardCollectionCatalogIndexes(OperationContext* opCtx) {
     }
 
     return Status::OK();
+}
+
+void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
+                                                   const ShardId& recipientId,
+                                                   const DatabaseName& dbName,
+                                                   const BSONObj& cmd) {
+    auto recipientShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
+
+    LOGV2_DEBUG(22023, 1, "Sending request to recipient", "commandToSend"_attr = redact(cmd));
+
+    auto response = recipientShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        dbName,
+        cmd,
+        Shard::RetryPolicy::kIdempotent);
+
+    uassertStatusOK(response.getStatus());
+    uassertStatusOK(getStatusFromWriteCommandReply(response.getValue().response));
+}
+
+void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+    OperationContext* opCtx,
+    StringData taskDescription,
+    std::function<void(OperationContext*)> doWork,
+    boost::optional<Backoff> backoff) {
+    const std::string newClientName = "{}-{}"_format(getThreadName(), taskDescription);
+    const auto initialTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+    for (int attempt = 1;; attempt++) {
+        // Since we can't differenciate if a shutdown exception is coming from a remote node or
+        // locally we need to directly inspect the the global shutdown state to correctly
+        // interrupt this task in case this node is shutting down.
+        if (globalInShutdownDeprecated()) {
+            uasserted(ErrorCodes::ShutdownInProgress, "Shutdown in progress");
+        }
+
+        // If the node is no longer primary, stop retrying.
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Stepped down while {}"_format(taskDescription),
+                repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                    repl::MemberState::RS_PRIMARY);
+
+        // If the term changed, that means that the step up recovery could have run or is
+        // running so stop retrying in order to avoid duplicate work.
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Term changed while {}"_format(taskDescription),
+                initialTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm());
+
+        try {
+            auto newClient = opCtx->getServiceContext()->makeClient(newClientName);
+            auto newOpCtx = newClient->makeOperationContext();
+            AlternativeClientRegion altClient(newClient);
+
+            doWork(newOpCtx.get());
+            break;
+        } catch (DBException& ex) {
+            if (backoff) {
+                sleepFor(backoff->nextSleep());
+            }
+
+            if (attempt % kLogRetryAttemptThreshold == 1) {
+                LOGV2_WARNING(23937,
+                              "Retrying task after failed attempt",
+                              "taskDescription"_attr = redact(taskDescription),
+                              "attempt"_attr = attempt,
+                              "error"_attr = redact(ex));
+            }
+        }
+    }
 }
 
 }  // namespace sharding_util

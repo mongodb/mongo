@@ -1307,7 +1307,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             outerOpCtx->getServiceContext()->getFastClockSource()->now() +
             Milliseconds(receiveChunkWaitForRangeDeleterTimeoutMS.load());
 
-        while (migrationutil::checkForConflictingDeletions(
+        while (rangedeletionutil::checkForConflictingDeletions(
             outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid)) {
             uassert(ErrorCodes::ResumableRangeDeleterDisabled,
                     "Failing migration because the disableResumableRangeDeleter server "
@@ -1408,7 +1408,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             // It is illegal to wait for write concern with a session checked out, so persist the
             // range deletion task with an immediately satsifiable write concern and then wait for
             // majority after yielding the session.
-            migrationutil::persistRangeDeletionTaskLocally(
+            rangedeletionutil::persistRangeDeletionTaskLocally(
                 outerOpCtx, recipientDeletionTask, WriteConcernOptions());
 
             runWithoutSession(outerOpCtx, [&] {
@@ -1856,7 +1856,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     }
 
     if (changeInOrphans != 0) {
-        persistUpdatedNumOrphans(opCtx, *_collectionUuid, ChunkRange(_min, _max), changeInOrphans);
+        rangedeletionutil::persistUpdatedNumOrphans(
+            opCtx, *_collectionUuid, ChunkRange(_min, _max), changeInOrphans);
     }
 
     ShardingStatistics::get(opCtx).countDocsClonedOnCatchUpOnRecipient.addAndFetch(totalDocs);

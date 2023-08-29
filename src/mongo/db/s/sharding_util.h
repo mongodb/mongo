@@ -41,6 +41,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace sharding_util {
@@ -109,6 +110,29 @@ Status createIndexOnCollection(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const BSONObj& keys,
                                bool unique);
+/**
+ * Helper function to send a command to one shard
+ */
+void invokeCommandOnShardWithIdempotentRetryPolicy(OperationContext* opCtx,
+                                                   const ShardId& recipientId,
+                                                   const DatabaseName& dbName,
+                                                   const BSONObj& cmd);
 
+/**
+ * Runs doWork until it doesn't throw an error, the node is shutting down, the node has stepped
+ * down, or the node has stepped down and up.
+ *
+ * Note that it is not guaranteed that 'doWork' will not be executed while the node is secondary
+ * or after the node has stepped down and up, only that 'doWork' will eventually stop being retried
+ * if one of those events has happened.
+ *
+ * Requirements:
+ * - doWork must be idempotent.
+ */
+void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+    OperationContext* opCtx,
+    StringData taskDescription,
+    std::function<void(OperationContext*)> doWork,
+    boost::optional<Backoff> backoff = boost::none);
 }  // namespace sharding_util
 }  // namespace mongo

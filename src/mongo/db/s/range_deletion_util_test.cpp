@@ -239,6 +239,30 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
     return insertRangeDeletionTask(opCtx, kNss, uuid, range, numOrphans);
 }
 
+template <typename ShardKey>
+RangeDeletionTask createDeletionTask(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const UUID& uuid,
+                                     ShardKey min,
+                                     ShardKey max,
+                                     ShardId donorShard = ShardId("donorShard"),
+                                     bool pending = true) {
+    auto task = RangeDeletionTask(UUID::gen(),
+                                  nss,
+                                  uuid,
+                                  donorShard,
+                                  ChunkRange{BSON("_id" << min), BSON("_id" << max)},
+                                  CleanWhenEnum::kNow);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    task.setTimestamp(currentTime.clusterTime().asTimestamp());
+
+    if (pending)
+        task.setPending(true);
+
+    return task;
+}
+}  // namespace
+
 /**
  *  Tests that the rename range deletion flow:
  *  - Renames range deletions from source to target collection
@@ -261,9 +285,9 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
     }
 
     // Rename range deletions
-    snapshotRangeDeletionsForRename(_opCtx, kNss, kToNss);
-    restoreRangeDeletionTasksForRename(_opCtx, kToNss);
-    deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
+    rangedeletionutil::snapshotRangeDeletionsForRename(_opCtx, kNss, kToNss);
+    rangedeletionutil::restoreRangeDeletionTasksForRename(_opCtx, kToNss);
+    rangedeletionutil::deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
 
     const auto targetRangeDeletionsQuery =
         BSON(RangeDeletionTask::kNssFieldName << kToNss.ns_forTest());
@@ -317,15 +341,15 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     // Rename range deletions, repeating idempotent steps several times
     auto randomLoopNTimes = generateRandomNumberFrom1To10();
     for (int i = 0; i < randomLoopNTimes; i++) {
-        snapshotRangeDeletionsForRename(_opCtx, kNss, kToNss);
+        rangedeletionutil::snapshotRangeDeletionsForRename(_opCtx, kNss, kToNss);
     }
     randomLoopNTimes = generateRandomNumberFrom1To10();
     for (int i = 0; i < randomLoopNTimes; i++) {
-        restoreRangeDeletionTasksForRename(_opCtx, kToNss);
+        rangedeletionutil::restoreRangeDeletionTasksForRename(_opCtx, kToNss);
     }
     randomLoopNTimes = generateRandomNumberFrom1To10();
     for (int i = 0; i < randomLoopNTimes; i++) {
-        deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
+        rangedeletionutil::deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
     }
 
     const auto targetRangeDeletionsQuery =
@@ -353,5 +377,275 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     ASSERT_EQ(0, forRenameStore.count(_opCtx, BSONObj()));
 }
 
-}  // namespace
+// Test that rangedeletionutil::overlappingRangeDeletionsQuery() can handle the cases that we expect
+// to encounter.
+//           1    1    2    2    3    3    4    4    5
+// 0----5----0----5----0----5----0----5----0----5----0
+//                          |---------O                Range 1 [25, 35)
+//      |---------O                                    Range 2 [5, 15)
+//           |---------O                               Range 4 [10, 20)
+// |----O                                              Range 5 [0, 5)
+//             |-----O                                 Range 7 [12, 18)
+//                               |---------O           Range 8 [30, 40)
+// Ranges in store
+// |---------O                                         [0, 10)
+//           |---------O                               [10, 20)
+//                                         |---------O [40 50)
+//           1    1    2    2    3    3    4    4    5
+// 0----5----0----5----0----5----0----5----0----5----0
+TEST_F(RenameRangeDeletionsTest, overlappingRangeDeletionsQueryWithIntegerShardKey) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("two"), uuid, 10, 20));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("three"), uuid, 40, 50));
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    // 1. Non-overlapping range
+    auto range1 = ChunkRange{BSON("_id" << 25), BSON("_id" << 35)};
+    auto results =
+        store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range1, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range1, uuid));
+
+    // 2, 3. Find overlapping ranges, either direction.
+    auto range2 = ChunkRange{BSON("_id" << 5), BSON("_id" << 15)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range2, uuid));
+    ASSERT_EQ(results, 2);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range2, uuid));
+
+    // 4. Identical range
+    auto range4 = ChunkRange{BSON("_id" << 10), BSON("_id" << 20)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range4, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range4, uuid));
+
+    // 5, 6. Find overlapping edge, either direction.
+    auto range5 = ChunkRange{BSON("_id" << 0), BSON("_id" << 5)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range5, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range5, uuid));
+    auto range6 = ChunkRange{BSON("_id" << 5), BSON("_id" << 10)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range6, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range6, uuid));
+
+    // 7. Find fully enclosed range
+    auto range7 = ChunkRange{BSON("_id" << 12), BSON("_id" << 18)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range7, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range7, uuid));
+
+    // 8, 9. Open max doesn't overlap closed min, either direction.
+    auto range8 = ChunkRange{BSON("_id" << 30), BSON("_id" << 40)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range8, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range8, uuid));
+    auto range9 = ChunkRange{BSON("_id" << 20), BSON("_id" << 30)};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range9, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range9, uuid));
+}
+
+TEST_F(RenameRangeDeletionsTest,
+       overlappingRangeDeletionsQueryWithCompoundShardKeyWhereFirstValueIsConstant) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    auto deletionTasks = {
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("one"),
+                           uuid,
+                           BSON("a" << 0 << "b" << 0),
+                           BSON("a" << 0 << "b" << 10)),
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("two"),
+                           uuid,
+                           BSON("a" << 0 << "b" << 10),
+                           BSON("a" << 0 << "b" << 20)),
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("one"),
+                           uuid,
+                           BSON("a" << 0 << "b" << 40),
+                           BSON("a" << 0 << "b" << 50)),
+    };
+
+    for (auto&& task : deletionTasks) {
+        store.add(opCtx, task);
+    }
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    // 1. Non-overlapping range
+    auto range1 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 25)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 35))};
+    auto results =
+        store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range1, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range1, uuid));
+
+    // 2, 3. Find overlapping ranges, either direction.
+    auto range2 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 5)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 15))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range2, uuid));
+    ASSERT_EQ(results, 2);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range2, uuid));
+
+    // 4. Identical range
+    auto range4 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 10)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 20))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range4, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range4, uuid));
+
+    // 5, 6. Find overlapping edge, either direction.
+    auto range5 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 5))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range5, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range5, uuid));
+    auto range6 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 5)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 10))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range6, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range6, uuid));
+
+    // 7. Find fully enclosed range
+    auto range7 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 12)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 18))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range7, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range7, uuid));
+
+    // 8, 9. Open max doesn't overlap closed min, either direction.
+    auto range8 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 30)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 40))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range8, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range8, uuid));
+    auto range9 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 20)),
+                             BSON("_id" << BSON("a" << 0 << "b" << 30))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range9, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range9, uuid));
+}
+
+TEST_F(RenameRangeDeletionsTest,
+       overlappingRangeDeletionsQueryWithCompoundShardKeyWhereSecondValueIsConstant) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    auto deletionTasks = {
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("one"),
+                           uuid,
+                           BSON("a" << 0 << "b" << 0),
+                           BSON("a" << 10 << "b" << 0)),
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("two"),
+                           uuid,
+                           BSON("a" << 10 << "b" << 0),
+                           BSON("a" << 20 << "b" << 0)),
+        createDeletionTask(opCtx,
+                           NamespaceString::createNamespaceString_forTest("one"),
+                           uuid,
+                           BSON("a" << 40 << "b" << 0),
+                           BSON("a" << 50 << "b" << 0)),
+    };
+
+    for (auto&& task : deletionTasks) {
+        store.add(opCtx, task);
+    }
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    // 1. Non-overlapping range
+    auto range1 = ChunkRange{BSON("_id" << BSON("a" << 25 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 35 << "b" << 0))};
+    auto results =
+        store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range1, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range1, uuid));
+
+    // 2, 3. Find overlapping ranges, either direction.
+    auto range2 = ChunkRange{BSON("_id" << BSON("a" << 5 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 15 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range2, uuid));
+    ASSERT_EQ(results, 2);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range2, uuid));
+
+    // 4. Identical range
+    auto range4 = ChunkRange{BSON("_id" << BSON("a" << 10 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 20 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range4, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range4, uuid));
+
+    // 5, 6. Find overlapping edge, either direction.
+    auto range5 = ChunkRange{BSON("_id" << BSON("a" << 0 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 5 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range5, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range5, uuid));
+    auto range6 = ChunkRange{BSON("_id" << BSON("a" << 5 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 10 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range6, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range6, uuid));
+
+    // 7. Find fully enclosed range
+    auto range7 = ChunkRange{BSON("_id" << BSON("a" << 12 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 18 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range7, uuid));
+    ASSERT_EQ(results, 1);
+    ASSERT(rangedeletionutil::checkForConflictingDeletions(opCtx, range7, uuid));
+
+    // 8, 9. Open max doesn't overlap closed min, either direction.
+    auto range8 = ChunkRange{BSON("_id" << BSON("a" << 30 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 40 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range8, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range8, uuid));
+    auto range9 = ChunkRange{BSON("_id" << BSON("a" << 20 << "b" << 0)),
+                             BSON("_id" << BSON("a" << 30 << "b" << 0))};
+    results = store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range9, uuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range9, uuid));
+}
+
+TEST_F(RenameRangeDeletionsTest, TestInvalidUUID) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("two"), uuid, 10, 20));
+    store.add(opCtx,
+              createDeletionTask(
+                  opCtx, NamespaceString::createNamespaceString_forTest("three"), uuid, 40, 50));
+
+    ASSERT_EQ(store.count(opCtx), 3);
+
+    const auto wrongUuid = UUID::gen();
+    auto range = ChunkRange{BSON("_id" << 5), BSON("_id" << 15)};
+    auto results =
+        store.count(opCtx, rangedeletionutil::overlappingRangeDeletionsQuery(range, wrongUuid));
+    ASSERT_EQ(results, 0);
+    ASSERT_FALSE(rangedeletionutil::checkForConflictingDeletions(opCtx, range, wrongUuid));
+}
 }  // namespace mongo

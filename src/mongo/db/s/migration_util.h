@@ -44,15 +44,12 @@
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 
@@ -119,25 +116,11 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
 
 /**
  * Returns an executor to be used to run commands related to submitting tasks to the range deleter.
- * The executor is initialized on the first call to this function. Uses a shared_ptr
- * because a shared_ptr is required to work with ExecutorFutures.
+ * The executor is initialized on the first call to this function. Uses a shared_ptr because a
+ * shared_ptr is required to work with ExecutorFutures.
  */
 std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
     ServiceContext* serviceContext);
-
-/**
- * Creates a query object that can used to find overlapping ranges in the pending range deletions
- * collection.
- */
-BSONObj overlappingRangeQuery(const ChunkRange& range, const UUID& uuid);
-
-/**
- * Checks the pending range deletions collection to see if there are any pending ranges that
- * conflict with the passed in range.
- */
-size_t checkForConflictingDeletions(OperationContext* opCtx,
-                                    const ChunkRange& range,
-                                    const UUID& uuid);
 
 /**
  * Writes the migration coordinator document to config.migrationCoordinators and waits for majority
@@ -145,26 +128,6 @@ size_t checkForConflictingDeletions(OperationContext* opCtx,
  */
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
                                         const MigrationCoordinatorDocument& migrationDoc);
-
-/**
- * Writes the range deletion task document to config.rangeDeletions and waits for majority write
- * concern.
- */
-void persistRangeDeletionTaskLocally(OperationContext* opCtx,
-                                     const RangeDeletionTask& deletionTask,
-                                     const WriteConcernOptions& writeConcern);
-
-/**
- * Retrieves the value of 'numOrphanedDocs' from the recipient shard's range deletion task document.
- */
-long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
-                                          const MigrationCoordinatorDocument& migrationInfo);
-
-/**
- * Retrieves the shard key pattern from the local range deletion task.
- */
-boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(
-    OperationContext* opCtx, const MigrationCoordinatorDocument& migrationInfo);
 
 /**
  * Updates the migration coordinator document to set the decision field to "committed" and waits for
@@ -180,25 +143,6 @@ void persistCommitDecision(OperationContext* opCtx,
 void persistAbortDecision(OperationContext* opCtx,
                           const MigrationCoordinatorDocument& migrationDoc);
 
-/**
- * Deletes the range deletion task document with the specified id from config.rangeDeletions and
- * waits for majority write concern.
- */
-void deleteRangeDeletionTaskLocally(
-    OperationContext* opCtx,
-    const UUID& collectionUuid,
-    const ChunkRange& range,
-    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernShardingTimeout);
-
-/**
- * Deletes the range deletion task document with the specified id from config.rangeDeletions on the
- * specified shard and waits for majority write concern.
- */
-void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
-                                        const ShardId& recipientId,
-                                        const UUID& collectionUuid,
-                                        const ChunkRange& range,
-                                        const UUID& migrationId);
 
 /**
  * Advances the optime for the current transaction by performing a write operation as a retryable
@@ -208,27 +152,6 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
                                    const ShardId& recipientId,
                                    const LogicalSessionId& lsid,
                                    TxnNumber txnNumber);
-
-/**
- * Removes the 'pending' flag from the range deletion task document with the specified id from
- * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
- * deletion.
- */
-void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
-                                         const UUID& collectionUuid,
-                                         const ChunkRange& range);
-
-
-/**
- * Removes the 'pending' flag from the range deletion task document with the specified id from
- * config.rangeDeletions on the specified shard and waits for majority write concern. This marks the
- * range as ready for deletion.
- */
-void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
-                                             const ShardId& recipientId,
-                                             const UUID& collectionUuid,
-                                             const ChunkRange& range,
-                                             const UUID& migrationId);
 
 /**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
@@ -267,8 +190,8 @@ void persistMigrationRecipientRecoveryDocument(
 void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUID& migrationId);
 
 /**
- * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the critical
- * section stage), restores the MigrationDestinationManager state.
+ * If there was any ongoing receiveChunk that requires recovery (i.e that has reached the
+ * critical section stage), restores the MigrationDestinationManager state.
  */
 void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 
@@ -286,7 +209,7 @@ void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
 
 /**
  * This function writes a no-op message to the oplog when migrating a first chunk to the recipient
- * (i.e., the recipient didn't have any * chunks), so that change stream will notice  that and close
+ * (i.e., the recipient didn't have any * chunks), so that change stream will notice that and close
  * the cursor in order to notify mongos to target the new shard as well.
  */
 void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,

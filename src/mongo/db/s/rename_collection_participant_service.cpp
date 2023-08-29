@@ -144,7 +144,7 @@ void renameOrDropTarget(OperationContext* opCtx,
                     "Source namespace not found while trying to rename collection on participant",
                     logAttrs(fromNss));
         dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
-        deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
+        rangedeletionutil::deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
 }
 
@@ -364,7 +364,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     scopedCsr->clearFilteringMetadata(opCtx);
                 }
 
-                snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());
+                rangedeletionutil::snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameLocalAndRestoreRangeDeletions,
@@ -393,14 +393,14 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 renameOrDropTarget(
                     opCtx, fromNss(), toNss(), options, _doc.getSourceUUID(), _doc.getTargetUUID());
 
-                restoreRangeDeletionTasksForRename(opCtx, toNss());
+                rangedeletionutil::restoreRangeDeletionTasksForRename(opCtx, toNss());
             }))
         .then(_buildPhaseHandler(
             Phase::kDeleteFromRangeDeletions,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                deleteRangeDeletionTasksForRename(opCtx, fromNss(), toNss());
+                rangedeletionutil::deleteRangeDeletionTasksForRename(opCtx, fromNss(), toNss());
 
                 {
                     stdx::lock_guard<Latch> lg(_mutex);

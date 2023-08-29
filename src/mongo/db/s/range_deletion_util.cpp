@@ -47,7 +47,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
@@ -61,6 +60,7 @@
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -88,7 +88,12 @@ MONGO_FAIL_POINT_DEFINE(hangAfterDoingDeletion);
 MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInDeleteRange);
 MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
-
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyInterruptible);
+MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible);
 /**
  * Performs the deletion of up to numDocsToRemovePerBatch entries within the range in progress. Must
  * be called under the collection lock.
@@ -293,7 +298,20 @@ BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const Chu
                 << range.getMax());
 }
 
+// Add `migrationId` to the query filter in order to be resilient to delayed network retries: only
+// relying on collection's UUID and range may lead to undesired updates/deletes on tasks created by
+// future migrations.
+BSONObj getQueryFilterForRangeDeletionTaskOnRecipient(const UUID& collectionUuid,
+                                                      const ChunkRange& range,
+                                                      const UUID& migrationId) {
+    return getQueryFilterForRangeDeletionTask(collectionUuid, range)
+        .addFields(BSON(RangeDeletionTask::kIdFieldName << migrationId));
+}
+
+
 }  // namespace
+
+namespace rangedeletionutil {
 
 Status deleteRangeInBatches(OperationContext* opCtx,
                             const DatabaseName& dbName,
@@ -472,12 +490,12 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
                                        const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-    auto overlappingRangeQuery = BSON(
+    auto overlappingRangeDeletionsQuery = BSON(
         RangeDeletionTask::kCollectionUuidFieldName
         << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << GTE
         << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
         << range.getMax());
-    store.remove(opCtx, overlappingRangeQuery);
+    store.remove(opCtx, overlappingRangeDeletionsQuery);
 }
 
 void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid) {
@@ -501,4 +519,191 @@ void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUI
     uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
 }
 
+BSONObj overlappingRangeDeletionsQuery(const ChunkRange& range, const UUID& uuid) {
+    return BSON(RangeDeletionTask::kCollectionUuidFieldName
+                << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << LT
+                << range.getMax() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                << GT << range.getMin());
+}
+
+size_t checkForConflictingDeletions(OperationContext* opCtx,
+                                    const ChunkRange& range,
+                                    const UUID& uuid) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+
+    return store.count(opCtx, overlappingRangeDeletionsQuery(range, uuid));
+}
+
+void persistRangeDeletionTaskLocally(OperationContext* opCtx,
+                                     const RangeDeletionTask& deletionTask,
+                                     const WriteConcernOptions& writeConcern) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    try {
+        store.add(opCtx, deletionTask, writeConcern);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        // Convert a DuplicateKey error to an anonymous error.
+        uasserted(31375,
+                  str::stream() << "While attempting to write range deletion task for migration "
+                                << ", found document with the same migration id. Attempted range "
+                                   "deletion task: "
+                                << deletionTask.toBSON());
+    }
+}
+
+long long retrieveNumOrphansFromShard(OperationContext* opCtx,
+                                      const ShardId& shardId,
+                                      const UUID& migrationId) {
+    const auto recipientShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+    FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+    findCommand.setFilter(BSON("_id" << migrationId));
+    findCommand.setReadConcern(BSONObj());
+    Shard::QueryResponse rangeDeletionResponse =
+        uassertStatusOK(recipientShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            NamespaceString::kRangeDeletionNamespace.dbName(),
+            findCommand.toBSON(BSONObj()),
+            Milliseconds(-1)));
+    if (rangeDeletionResponse.docs.empty()) {
+        // In case of shutdown/stepdown, the recipient may have already deleted its range deletion
+        // document. A previous call to this function will have already returned the correct number
+        // of orphans, so we can simply return 0.
+        LOGV2_DEBUG(6376301,
+                    2,
+                    "No matching document found for migration",
+                    "recipientId"_attr = shardId,
+                    "migrationId"_attr = migrationId);
+        return 0;
+    }
+    const auto numOrphanDocsElem =
+        rangeDeletionResponse.docs[0].getField(RangeDeletionTask::kNumOrphanDocsFieldName);
+    return numOrphanDocsElem.safeNumberLong();
+}
+
+boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(OperationContext* opCtx,
+                                                                    const UUID& migrationId) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+    findCommand.setFilter(BSON("_id" << migrationId));
+    auto cursor = client.find(std::move(findCommand));
+    if (!cursor->more()) {
+        // If the range deletion task doesn't exist then the migration must have been aborted, so
+        // we won't need the shard key pattern anyways.
+        return boost::none;
+    }
+    auto rdt = RangeDeletionTask::parse(IDLParserContext("MigrationRecovery"), cursor->next());
+    return rdt.getKeyPattern();
+}
+
+void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                        const ShardId& recipientId,
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range,
+                                        const UUID& migrationId) {
+    const auto queryFilter =
+        getQueryFilterForRangeDeletionTaskOnRecipient(collectionUuid, range, migrationId);
+    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
+    write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
+    deleteOp.setDeletes({query});
+
+    hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
+
+    auto cmd = deleteOp.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    sharding_util::invokeCommandOnShardWithIdempotentRetryPolicy(
+        opCtx, recipientId, NamespaceString::kRangeDeletionNamespace.dbName(), cmd);
+
+    if (hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInDeleteRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when deleting range deletion on recipient");
+    }
+}
+
+void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
+                                    const UUID& collectionUuid,
+                                    const ChunkRange& range,
+                                    const WriteConcernOptions& writeConcern) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+    store.remove(opCtx, query, writeConcern);
+
+    if (hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when deleting range deletion locally");
+    }
+}
+
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
+                                         const UUID& collectionUuid,
+                                         const ChunkRange& range) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+             << range.getMax());
+    auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
+
+    hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);
+    try {
+        store.update(opCtx, query, update);
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // If we are recovering the migration, the range-deletion may have already finished. So its
+        // associated document may already have been removed.
+    }
+
+    if (hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response when initiating range deletion locally");
+    }
+}
+
+void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
+                                             const ShardId& recipientId,
+                                             const UUID& collectionUuid,
+                                             const ChunkRange& range,
+                                             const UUID& migrationId) {
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kRangeDeletionNamespace);
+    const auto queryFilter =
+        getQueryFilterForRangeDeletionTaskOnRecipient(collectionUuid, range, migrationId);
+    auto updateModification =
+        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "") << "$set"
+                          << BSON(RangeDeletionTask::kWhenToCleanFieldName
+                                  << CleanWhen_serializer(CleanWhenEnum::kNow)))));
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(false);
+    updateOp.setUpdates({updateEntry});
+
+    sharding_util::retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
+        opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
+            auto cmd = updateOp.toBSON(
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+            try {
+                sharding_util::invokeCommandOnShardWithIdempotentRetryPolicy(
+                    newOpCtx, recipientId, NamespaceString::kRangeDeletionNamespace.dbName(), cmd);
+            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
+                LOGV2_DEBUG(4620232,
+                            1,
+                            "Failed to mark range deletion task on recipient shard as ready",
+                            "collectionUuid"_attr = collectionUuid,
+                            "range"_attr = range,
+                            "error"_attr = exShardNotFound);
+                return;
+            }
+
+            if (hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
+                hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(
+                    newOpCtx);
+                uasserted(ErrorCodes::InternalError,
+                          "simulate an error response when initiating range deletion on recipient");
+            }
+        });
+}
+}  // namespace rangedeletionutil
 }  // namespace mongo

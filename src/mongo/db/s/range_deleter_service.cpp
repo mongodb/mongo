@@ -173,7 +173,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_completedRangeDeletion(
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
-    ThreadClient threadClient(kRangeDeletionThreadName, _service);
+    ThreadClient threadClient(rangedeletionutil::kRangeDeletionThreadName, _service);
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -231,7 +231,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                             (optKeyPattern ? (*optKeyPattern).toBSON()
                                            : getShardKeyPattern(opCtx, dbName, collectionUuid));
 
-                        uassertStatusOK(deleteRangeInBatches(
+                        uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
                             opCtx, dbName, collectionUuid, shardKeyPattern, range));
                         orphansRemovalCompleted = true;
                     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -289,7 +289,8 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
                 // Remove persistent range deletion task
                 try {
-                    removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
+                    rangedeletionutil::removePersistentRangeDeletionTask(
+                        opCtx, collectionUuid, range);
 
                     LOGV2_DEBUG(6872504,
                                 2,

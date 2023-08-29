@@ -194,7 +194,7 @@ void MigrationBatchInserter::run(Status status) const try {
             // Revert to the original DocumentValidationSettings for opCtx
         }
 
-        persistUpdatedNumOrphans(opCtx, _collectionUuid, _range, batchNumCloned);
+        rangedeletionutil::persistUpdatedNumOrphans(opCtx, _collectionUuid, _range, batchNumCloned);
         _migrationProgress->updateMaxOptime(
             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
 
