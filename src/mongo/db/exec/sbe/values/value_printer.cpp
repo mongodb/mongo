@@ -41,6 +41,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -194,6 +195,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
             break;
         case TypeTags::timeZone:
             stream << "TimeZone";
+            break;
+        case TypeTags::valueBlock:
+            stream << "ValueBlock";
             break;
         default:
             stream << "unknown tag";
@@ -539,6 +543,12 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::timeZone:
             stream << getTimeZoneView(val)->toString();
             break;
+        case TypeTags::valueBlock: {
+            auto* valueBlock = getValueBlock(val);
+            stream << valueBlock->extract();
+            break;
+        }
+
         case TypeTags::pcreRegex:
         case TypeTags::jsFunction:
         case TypeTags::shardFilterer:

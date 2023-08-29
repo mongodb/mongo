@@ -81,11 +81,16 @@ struct DeblockedTagVals {
         tassert(7888701, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
     }
 
+    std::pair<TypeTags, Value> operator[](size_t idx) const {
+        return {tags[idx], vals[idx]};
+    }
+
     size_t count;
     const TypeTags* tags;
     const Value* vals;
 };
 std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked);
+str::stream& operator<<(str::stream& str, const DeblockedTagVals& deblocked);
 
 /**
  * A block that is a run of repeated values.
@@ -177,6 +182,10 @@ struct HeterogeneousBlock : public ValueBlock {
         _tags.push_back(t);
         _vals.push_back(v);
         guard.reset();
+    }
+
+    void push_back(std::pair<TypeTags, Value> tv) {
+        push_back(tv.first, tv.second);
     }
 
     boost::optional<size_t> tryCount() const override {

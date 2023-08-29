@@ -30,10 +30,19 @@
 #include "mongo/db/exec/sbe/values/block_interface.h"
 
 namespace mongo::sbe::value {
-std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked) {
+
+template <class Stream>
+Stream& streamInsertionImpl(Stream& s, const DeblockedTagVals& deblocked) {
     for (size_t i = 0; i < deblocked.count; ++i) {
         s << std::pair(deblocked.tags[i], deblocked.vals[i]) << " ";
     }
     return s;
 }
+std::ostream& operator<<(std::ostream& stream, const DeblockedTagVals& vals) {
+    return streamInsertionImpl(stream, vals);
+}
+str::stream& operator<<(str::stream& stream, const DeblockedTagVals& vals) {
+    return streamInsertionImpl(stream, vals);
+}
+
 }  // namespace mongo::sbe::value

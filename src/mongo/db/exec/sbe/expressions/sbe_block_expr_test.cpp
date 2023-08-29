@@ -45,13 +45,28 @@ namespace mongo::sbe {
 class SBEBlockExpressionTest : public EExpressionTestFixture {
 public:
     void assertBlockOfBool(value::TypeTags tag, value::Value val, std::vector<bool> expected) {
-        ASSERT_EQ(tag, value::TypeTags::valueBlock);
-        auto* block = value::bitcastTo<value::ValueBlock*>(val);
+        std::vector<std::pair<value::TypeTags, value::Value>> tvPairs;
+        for (auto b : expected) {
+            tvPairs.push_back({value::TypeTags::Boolean, value::bitcastFrom<bool>(b)});
+        }
+        assertBlockEq(tag, val, tvPairs);
+    }
+
+    void assertBlockEq(value::TypeTags blockTag,
+                       value::Value blockVal,
+                       const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
+        ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
+        auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
         auto extracted = block->extract();
+        ASSERT_EQ(expected.size(), extracted.count);
 
         for (size_t i = 0; i < extracted.count; ++i) {
-            ASSERT_EQ(extracted.tags[i], value::TypeTags::Boolean);
-            ASSERT_EQ(value::bitcastTo<bool>(extracted.vals[i]), expected[i]) << extracted;
+            auto [t, v] = value::compareValue(
+                extracted.tags[i], extracted.vals[i], expected[i].first, expected[i].second);
+            ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
+            ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
+                << "Got " << extracted[i] << " expected " << expected[i] << " full extracted output"
+                << extracted;
         }
     }
 };
@@ -64,11 +79,11 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     auto compiledExpr = compileExpression(*existsExpr);
 
     value::HeterogeneousBlock block;
-    block.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(42));
-    block.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(43));
-    block.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(44));
-    block.push_back(value::TypeTags::Nothing, value::Value(0));
-    block.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(46));
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(46));
 
     blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                         value::bitcastFrom<value::ValueBlock*>(&block));
@@ -76,6 +91,39 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     value::ValueGuard guard(runTag, runVal);
 
     assertBlockOfBool(runTag, runVal, std::vector{true, true, true, false, true});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+
+    FrameId frame = 10;
+    // Multiply each value by two.
+    auto expr = makeE<sbe::EFunction>(
+        "valueBlockApplyLambda",
+        sbe::makeEs(makeE<EVariable>(blockSlot),
+                    makeE<ELocalLambda>(frame,
+                                        makeE<EPrimBinary>(EPrimBinary::Op::mul,
+                                                           makeE<EVariable>(frame, 0),
+                                                           makeC(makeInt32(2))))));
+    auto compiledExpr = compileExpression(*expr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(46));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeInt32(84), makeInt32(86), makeInt32(88), makeNothing(), makeInt32(92)});
 }
 
 }  // namespace mongo::sbe

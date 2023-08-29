@@ -210,6 +210,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // fail
 
     0,  // dateTruncImm
+
+    -1,  // valueBlockApplyLambda
 };
 
 void ByteCode::allocStack(size_t size) noexcept {
@@ -986,6 +988,10 @@ void CodeFragment::appendDateTrunc(TimeUnit unit,
     offset += writeToMemory(offset, startOfWeek);
 
     adjustStackSimple(i);
+}
+
+void CodeFragment::appendValueBlockApplyLambda() {
+    appendSimpleInstruction(Instruction::valueBlockApplyLambda);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -9986,6 +9992,11 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
                 break;
             }
+            case Instruction::valueBlockApplyLambda: {
+                valueBlockApplyLambda(code);
+                break;
+            }
+
             default:
                 MONGO_UNREACHABLE;
         }

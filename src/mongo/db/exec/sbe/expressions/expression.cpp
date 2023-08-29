@@ -1149,6 +1149,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"isMinKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMinKey>, false}},
     {"isMaxKey", InstrFn{1, generator<1, &vm::CodeFragment::appendIsMaxKey>, false}},
     {"isTimestamp", InstrFn{1, generator<1, &vm::CodeFragment::appendIsTimestamp>, false}},
+    {"valueBlockApplyLambda",
+     InstrFn{2, generatorLegacy<&vm::CodeFragment::appendValueBlockApplyLambda>, false}},
 };
 }  // namespace
 

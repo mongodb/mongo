@@ -147,4 +147,51 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLteSca
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombine(ArityType arity) {
     MONGO_UNREACHABLE;
 }
+
+/**
+ * Implementation of the valueBlockApplyLambda instruction. This instruction takes a block and an
+ * SBE lambda f(), and produces a new block with the result of f() applied to each element of
+ * the input.
+ */
+void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
+    auto [lamOwn, lamTag, lamVal] = moveFromStack(0);
+    popAndReleaseStack();
+    value::ValueGuard lamGuard(lamOwn, lamTag, lamVal);
+
+    auto [blockOwn, blockTag, blockVal] = moveFromStack(0);
+    popAndReleaseStack();
+    value::ValueGuard blockGuard(blockOwn, blockTag, blockVal);
+
+    if (lamTag != value::TypeTags::LocalLambda) {
+        pushStack(false, value::TypeTags::Nothing, 0);
+        return;
+    }
+
+    if (blockTag != value::TypeTags::valueBlock) {
+        pushStack(false, value::TypeTags::Nothing, 0);
+        return;
+    }
+
+    const auto lamPos = value::bitcastTo<int64_t>(lamVal);
+    auto outBlock = std::make_unique<value::HeterogeneousBlock>();
+
+    auto* block = value::getValueBlock(blockVal);
+    auto extracted = block->extract();
+    for (size_t i = 0; i < extracted.count; ++i) {
+        pushStack(false, extracted.tags[i], extracted.vals[i]);
+        runLambdaInternal(code, lamPos);
+
+        auto [retOwn, retTag, retVal] = moveFromStack(0);
+
+        if (!retOwn) {
+            std::tie(retTag, retVal) = value::copyValue(retTag, retVal);
+        }
+        popStack();
+
+        outBlock->push_back(retTag, retVal);
+    }
+    pushStack(true,
+              value::TypeTags::valueBlock,
+              value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
+}
 }  // namespace mongo::sbe::vm
