@@ -159,8 +159,12 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
     /*
      * Fail if the page is flagged for forced eviction (so we periodically release pages grown too
      * large).
+     *
+     * If we are resolving a prepared transaction we cannot release the page otherwise validating
+     * whether we correctly resolved the transaction becomes hard. It is easier to skip this check
+     * in that instance.
      */
-    if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
+    if (cbt->ref->page->read_gen == WT_READGEN_OLDEST && !F_ISSET(session->txn, WT_TXN_PREPARE))
         return (false);
 
     return (true);
