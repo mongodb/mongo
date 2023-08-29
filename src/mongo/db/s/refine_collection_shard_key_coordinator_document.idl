@@ -46,7 +46,8 @@ enums:
             kRemoteIndexValidation: "RemoteIndexValidation"
             kBlockCrud: "BlockCrud"
             kCommit: "Commit"
-            kCommitOnShardsAndUnblock: "CommitOnShardsAndUnblock"
+            kReleaseCritSec: "ReleaseCritSec"
+            kResumeMigrations: "ResumeMigrations"
 
     # TODO SERVER-79064: Remove once 8.0 becomes last LTS
     RefineCollectionShardKeyCoordinatorPhasePre71Compatible:
