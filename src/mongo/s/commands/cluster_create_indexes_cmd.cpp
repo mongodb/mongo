@@ -153,7 +153,7 @@ public:
 
         BSONObjBuilder rawResBuilder;
         std::string errmsg;
-        bool isShardedCollection = isShardedColl(opCtx, nss);
+        bool isShardedCollection = routingInfo.cm.isSharded();
         const bool ok =
             appendRawResponses(opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection)
                 .responseOK;

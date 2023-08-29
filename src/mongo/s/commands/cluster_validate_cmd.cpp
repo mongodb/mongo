@@ -162,7 +162,7 @@ public:
         rawResBuilder.done();
 
         if (firstFailedShardStatus.isOK()) {
-            if (!isShardedColl(opCtx, nss)) {
+            if (!cri.cm.isSharded()) {
                 CommandHelpers::filterCommandReplyForPassthrough(
                     results[0].swResponse.getValue().data, &output);
             } else {

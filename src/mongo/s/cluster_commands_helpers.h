@@ -381,9 +381,4 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
                                                                    const NamespaceString& nss);
 
-/**
- * Returns a boolean indicating whether the collection is sharded or not.
- */
-bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss);
-
 }  // namespace mongo

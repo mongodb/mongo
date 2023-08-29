@@ -242,7 +242,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
             std::string errmsg;
             BSONObjBuilder output, rawResBuilder;
-            bool isShardedCollection = isShardedColl(opCtx, resolvedNs);
+            bool isShardedCollection = cri.cm.isSharded();
             const auto aggregateResponse = appendRawResponses(
                 opCtx, &errmsg, &rawResBuilder, shardResponses, isShardedCollection);
 

@@ -90,6 +90,18 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 
 namespace {
 
+// This method requires callers to hold the DDL lock to ensure no concurrent DDL operations
+// interfere with the stability.
+bool isShardedCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        return true;
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is not sharded or doesn't exist.
+        return false;
+    }
+}
+
 bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     if (!request.getTimeseries().has_value()) {
         return false;
@@ -157,7 +169,7 @@ void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationCo
         info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, originalNss(), true);
         info.nsForTargeting =
             info.timeSeriesOptions ? originalNss().makeTimeseriesBucketsNamespace() : originalNss();
-        info.isSharded = isShardedColl(opCtx, info.nsForTargeting);
+        info.isSharded = isShardedCollection(opCtx, info.nsForTargeting);
         _collInfo = std::move(info);
     }
 }

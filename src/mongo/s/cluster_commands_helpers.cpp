@@ -838,15 +838,4 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
         listIndexesCmd,
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 }
-
-bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-        return true;
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist.
-        return false;
-    }
-}
-
 }  // namespace mongo
