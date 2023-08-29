@@ -149,7 +149,7 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
             conn->cache->evict_max_ms = eviction_time_milliseconds;
         if (eviction_time_milliseconds > WT_MINUTE * WT_THOUSAND)
             __wt_verbose_warning(session, WT_VERB_EVICT,
-              "Eviction took more than 1 minute (%" PRIu64 "). Building disk image took %" PRIu64
+              "Eviction took more than 1 minute (%" PRIu64 "us). Building disk image took %" PRIu64
               "us. History store wrapup took %" PRIu64 "us.",
               eviction_time,
               WT_CLOCKDIFF_US(session->reconcile_timeline.image_build_finish,
