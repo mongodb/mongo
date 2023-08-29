@@ -60,9 +60,17 @@ const connTenant1Secondary =
 const connTenant2Secondary =
     getTenantConnection(secondary.host, tenant2Info.tenantId, tenant2Info.user);
 
-// Returns the number of documents in the pre-images collection from 'conn'.
+// Using fast-count relies on reading the metadata document count. Depending on whether removal uses
+// replicated deletes or unreplicated truncates, this count may or may not be correct since it's
+// only an approximation. To avoid accuracy issues, we perform a slow count which will provide an
+// accurate document count.
 function getPreImageCount(conn) {
-    return conn.getDB("config")["system.preimages"].count();
+    const countRes =
+        conn.getDB("config")["system.preimages"].aggregate([{$count: "count"}]).toArray();
+    if (countRes.length == 0) {
+        return 0;
+    }
+    return countRes[0].count;
 }
 
 function setExpireAfterSeconds(conn, seconds) {

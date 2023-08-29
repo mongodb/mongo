@@ -65,8 +65,11 @@ assert.commandWorked(tenantConn.adminCommand(
 
 // Ensure purging job deletes the expired oplog entries about insertion into test collection.
 assert.soon(() => {
-    // All change collection entries are removed but one.
-    return changeCollection.count() === 1;
+    // Using fast-count relies on reading the metadata document count. Depending on whether removal
+    // uses replicated deletes or unreplicated truncates, this count may or may not be correct since
+    // it's only an approximation. To avoid accuracy issues, we perform a slow count which will
+    // provide an accurate document count.
+    return changeCollection.aggregate([{$count: "count"}]).toArray()[0].count == 1;
 });
 
 // Ensure that FTDC collected the purging job information of the change collection.
