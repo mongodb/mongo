@@ -202,7 +202,7 @@ public:
                                              [&] {
                                                  if (!opCtx->getLogicalSessionId())
                                                      return OperationSessionInfoFromClient();
-                                                 // TODO (SERVER-77506): This code path does not
+                                                 // TODO (SERVER-80525): This code path does not
                                                  // clear the setAutocommit field on the presence of
                                                  // TransactionRouter::get
                                                  return OperationSessionInfoFromClient(

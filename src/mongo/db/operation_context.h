@@ -226,7 +226,7 @@ public:
      */
     void releaseOperationKey();
 
-    // TODO (SERVER-77506): BEGIN Expose OperationSessionInfoFromClient as a decoration instead of
+    // TODO (SERVER-80523): BEGIN Expose OperationSessionInfoFromClient as a decoration instead of
     // projecting all its fields as properties
 
     /**
@@ -295,7 +295,7 @@ public:
              isInternalSessionForRetryableWrite(*getLogicalSessionId()));
     }
 
-    // TODO (SERVER-77506): END Expose OperationSessionInfoFromClient as a decoration instead of
+    // TODO (SERVER-80523): END Expose OperationSessionInfoFromClient as a decoration instead of
     // projecting all its fields as properties
 
     /**

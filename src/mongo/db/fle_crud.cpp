@@ -332,7 +332,7 @@ EncryptionInformation makeEmptyProcessEncryptionInformation() {
 }
 
 void assertTransactionCompatibilty(OperationContext* opCtx) {
-    // TODO SERVER-77506: On any node in a shard, we only permit snapshot transactions with QE
+    // TODO SERVER-78952: On any node in a shard, we only permit snapshot transactions with QE
     //
     if (!serverGlobalParams.clusterRole.has(ClusterRole::None) &&
         opCtx->inMultiDocumentTransaction()) {
@@ -1167,7 +1167,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
         auto readConcern = repl::ReadConcernArgs::get(opCtx);
 
-        // TODO SERVER-77506 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
+        // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
         // transactions
         if (!opCtx->inMultiDocumentTransaction()) {
             repl::ReadConcernArgs::get(opCtx) =
@@ -1196,7 +1196,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
 
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
 
-        // TODO SERVER-77506 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
+        // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
         // transactions
         if (!opCtx->inMultiDocumentTransaction()) {
             repl::ReadConcernArgs::get(opCtx) =
@@ -1475,7 +1475,7 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
         return FLEBatchResult::kNotProcessed;
     }
 
-    // TODO SERVER-77506 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
+    // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
     // transactions
     if (!opCtx->inMultiDocumentTransaction()) {
         repl::ReadConcernArgs::get(opCtx) =

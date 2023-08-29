@@ -131,7 +131,7 @@ structs:
         optional: true
         stability: stable
 
-  # TODO (SERVER-77506): This class is only used for OpLog persistence and should be moved to the OpLog's IDL files
+  # TODO (SERVER-80524): This class is only used for OpLog persistence and should be moved to the OpLog's IDL files
   OperationSessionInfo:
     description: "Parser for serializing session transaction metadata"
     strict: false

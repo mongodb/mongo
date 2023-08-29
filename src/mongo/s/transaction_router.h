@@ -756,7 +756,7 @@ public:
      * The 'atClusterTimeForSnapshotReadConcern' will be boost::none in all cases except when the
      * read concern level is 'snapshot' or the caller provided `atClusterTime`.
      *
-     * TODO (SERVER-77506): This code re-checks that the input cmdObj is in sync with the parsed
+     * TODO (SERVER-80526): This code re-checks that the input cmdObj is in sync with the parsed
      * readConcernArgs (i.e., that we didn't swap majority for local or snapshot somewhere along the
      * command execution path). This is very error prone and wasteful and a better architecture
      * would be if cmdObj was not allowed to contain any read concern arguments so that we can just
