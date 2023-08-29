@@ -112,13 +112,11 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            auto authorizationSession = AuthorizationSession::get(opCtx->getClient());
-            uassert(
-                ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authorizationSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(authorizationSession->getUserTenantId()),
-                    ActionType::fsyncUnlock));
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                           ActionType::fsyncUnlock));
         }
     };
 

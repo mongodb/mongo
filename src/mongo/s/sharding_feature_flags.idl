@@ -122,4 +122,3 @@ feature_flags:
     description: "Feature flag to enable locking of a cluster through mongos"
     cpp_varname: feature_flags::gClusterFsyncLock
     default: false
-    shouldBeFCVGated: true

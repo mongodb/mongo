@@ -394,6 +394,7 @@ pipelineEnv.Library(
         'lite_parsed_document_source',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/fsync_locked',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbdirectclient',

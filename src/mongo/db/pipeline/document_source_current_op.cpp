@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_current_op.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-
+#include "mongo/s/sharding_feature_flags_gen.h"
 namespace mongo {
 
 namespace {
@@ -145,6 +146,11 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
 
         // Add the shard name to the output document.
         doc.addField(kShardFieldName, Value(_shardName));
+
+        if (feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility) &&
+            mongo::lockedForWriting()) {
+            doc.addField(StringData("fsyncLock"), Value(true));
+        }
 
         // For operations on a shard, we change the opid from the raw numeric form to
         // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate
