@@ -210,10 +210,10 @@ public:
 
         auto metaType = expr->getMetaType();
         if (metaType == MetaType::kSearchScore || metaType == MetaType::kSearchHighlights ||
-            metaType == MetaType::kSearchScoreDetails) {
-            // We do not add the dependencies for searchScore, searchHighlights, or
-            // searchScoreDetails because those values are not stored in the collection (or in
-            // mongod at all).
+            metaType == MetaType::kSearchScoreDetails || metaType == MetaType::kVectorSearchScore) {
+            // We do not add the dependencies for searchScore, searchHighlights,
+            // searchScoreDetails, or vectorSearchScore because those values are not stored in
+            // the collection (or in mongod at all).
             return;
         }
 

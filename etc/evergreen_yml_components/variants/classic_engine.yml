@@ -149,6 +149,9 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
   display_name: "* ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"

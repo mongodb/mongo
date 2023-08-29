@@ -3274,6 +3274,18 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScoreDetails) {
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), Document(details));
 }
+
+TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"vectorSearchScore\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    MutableDocument doc;
+    doc.metadata().setVectorSearchScore(1.23);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_EQ(val.getDouble(), 1.23);
+}
 }  // namespace expression_meta_test
 
 namespace ExpressionRegexTest {

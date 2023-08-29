@@ -27,4 +27,14 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$searchMeta: {}}]}),
     [6047401]);
+
+// Check that a query with a $listSearchIndexes stage errors without enterprise.
+assert.commandFailedWithCode(
+    coll.runCommand({aggregate: coll.getName(), pipeline: [{$listSearchIndexes: {}}], cursor: {}}),
+    [6047401]);
+
+// Check that a query with a $vectorSearch stage errors without enterprise.
+assert.commandFailedWithCode(
+    coll.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$vectorSearch: {}}]}),
+    [6047401]);
 })();

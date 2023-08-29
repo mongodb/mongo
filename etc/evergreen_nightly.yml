@@ -315,6 +315,9 @@ buildvariants:
   - name: .serverless
     distros:
     - rhel80-xlarge
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - &rhel80-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency

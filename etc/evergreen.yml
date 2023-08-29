@@ -282,6 +282,9 @@ variables:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel7_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1067,6 +1070,9 @@ buildvariants:
   - name: .serverless
     distros:
     - rhel80-xlarge
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
@@ -1183,6 +1189,9 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
@@ -1316,6 +1325,9 @@ buildvariants:
   - name: .shard_merge
   - name: streams
   - name: telemetry_passthrough
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -1422,6 +1434,9 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: test_api_version_compatibility
   - name: unittest_shell_hang_analyzer_gen
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - <<: *linux_x86_dynamic_compile_variant_dependency
   name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
@@ -1606,6 +1621,9 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1894,7 +1912,9 @@ buildvariants:
   - name: .shard_split
   - name: .shard_merge
   - name: telemetry_passthrough
-
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 ###########################################
 #     Experimental buildvariants          #
@@ -2359,6 +2379,9 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel80-debug-complete-tsan-template
@@ -2902,6 +2925,9 @@ buildvariants:
   - name: noPassthrough_gen
   - name: query_golden_cqf
   - name: retryable_writes_jscore_passthrough_gen
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only
