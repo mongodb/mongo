@@ -81,6 +81,7 @@ public:
         constraints.canSwapWithMatch = false;
         constraints.canSwapWithSkippingOrLimitingStage = true;
         constraints.isAllowedWithinUpdatePipeline = true;
+        constraints.checkExistenceForDiffInsertOperations = true;
         constraints.isIndependentOfAnyCollection = false;
         return constraints;
     }

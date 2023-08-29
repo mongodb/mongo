@@ -127,6 +127,10 @@ public:
 
     virtual void setCollator(const CollatorInterface* collator){};
 
+    virtual bool getCheckExistenceForDiffInsertOperations() const {
+        return false;
+    }
+
     /**
      * Applies the update to 'applyParams.element'. Returns an ApplyResult specifying whether the
      * operation was a no-op and whether indexes are affected.

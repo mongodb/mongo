@@ -71,7 +71,14 @@ public:
 
     Value serialize() const final;
 
+    bool getCheckExistenceForDiffInsertOperations() const override final {
+        return _checkExistenceForDiffInsertOperations;
+    }
+
 private:
+    // Sets to true if the pipeline contains '$_internalApplyOplogUpdate'.
+    bool _checkExistenceForDiffInsertOperations = false;
+
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };
