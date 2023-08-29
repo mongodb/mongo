@@ -373,8 +373,10 @@ DocumentSourceCursor::DocumentSourceCursor(
       _queryFramework(_exec->getQueryFramework()) {
     // It is illegal for both 'kEmptyDocuments' to be set and _resumeTrackingType to be other than
     // 'kNone'.
-    invariant(cursorType != CursorType::kEmptyDocuments ||
-              resumeTrackingType == ResumeTrackingType::kNone);
+    uassert(ErrorCodes::InvalidOptions,
+            "The resumeToken is not compatible with this query",
+            cursorType != CursorType::kEmptyDocuments ||
+                resumeTrackingType == ResumeTrackingType::kNone);
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();
