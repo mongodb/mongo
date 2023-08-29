@@ -5,6 +5,10 @@
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
  *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   # This test inserts uncompressed buckets directly into the buckets collection. This may cause
+ *   # intermittent failures on tenant migration passthroughs when validation checks that all
+ *   # buckets are compressed.
+ *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # This test depends on stats read from the primary node in replica sets.
@@ -315,10 +319,7 @@ const checkIfBucketReopened = function(
             "closed": false
         },
         "meta": "NonSuitableBucket2",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBjCRwwE46SYf1wqQMA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
     };
     const closedAndCompressedBucketDoc = {
         "_id": ObjectId("06091c2c050b7495eaef4584"),
@@ -335,10 +336,7 @@ const checkIfBucketReopened = function(
             "closed": true
         },
         "meta": "NonSuitableBucket3",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBjCRwwE46SYf1wqQMA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
     };
     const year2000BucketDoc = {
         "_id": ObjectId("07091c2c050b7495eaef4585"),
