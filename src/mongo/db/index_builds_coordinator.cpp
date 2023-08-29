@@ -139,6 +139,8 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
 
+extern FailPoint skipWriteConflictRetries;
+
 IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
     : ServerStatusSection("indexBuilds"),
       registered(0),
@@ -1648,6 +1650,24 @@ void IndexBuildsCoordinator::_completeExternalAbort(OperationContext* opCtx,
     try {
         _completeAbort(opCtx, replState, indexBuildEntryColl, signalAction);
     } catch (const DBException& e) {
+        // In production code, we should not encounter any write conflict exceptions from
+        // the abort logic. It is only through the use of a fail point that the internal write
+        // conflict retry logic is disabled and we may get a WriteConflict here.
+        // This index build is now in an inconsistent state and we should continue to crash the
+        // server. But we will log a warning message to alert users of the CI system that this is
+        // fine.
+        if (e.code() == ErrorCodes::WriteConflict &&
+            MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
+            opCtx->getClient()->isFromUserConnection()) {
+            LOGV2_WARNING(
+                7912300,
+                "Failed to abort index build due to write conflict. This is only possible "
+                "in a test environment with the  skipWriteConflictRetries fail point "
+                "enabled. Index build is now in  an inconsistent and unrecoverable state. "
+                "Proceeding to shut down server with a fatal assertion.",
+                "buildUUID"_attr = replState->buildUUID);
+        }
+
         LOGV2_FATAL(4656011,
                     "Failed to abort index build after partially tearing-down index build state",
                     "buildUUID"_attr = replState->buildUUID,
