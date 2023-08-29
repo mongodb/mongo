@@ -234,6 +234,7 @@ let testCases = {
         checkWriteConcern: true,
         useLogs: true,
     },
+    abortUnshardCollection: {skip: "does not accept read or write concern"},
     addShard: {skip: "does not accept read or write concern"},
     addShardToZone: {skip: "does not accept read or write concern"},
     aggregate: {

@@ -12,6 +12,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "_clusterQueryWithoutShardKey",
     "_clusterWriteWithoutShardKey",
     "abortMoveCollection",
+    "abortUnshardCollection",
     "cleanupStructuredEncryptionData",
     "cpuload",
     "createUnsplittableCollection",

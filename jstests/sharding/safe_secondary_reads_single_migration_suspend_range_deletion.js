@@ -111,6 +111,7 @@ let testCases = {
     abortMoveCollection: {skip: "primary only"},
     abortReshardCollection: {skip: "primary only"},
     abortTransaction: {skip: "primary only"},
+    abortUnshardCollection: {skip: "primary only"},
     addShard: {skip: "primary only"},
     addShardToZone: {skip: "primary only"},
     aggregate: {

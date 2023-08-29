@@ -31,6 +31,7 @@ env.Library(
     source=[
         'cluster_abort_move_collection_cmd.cpp',
         'cluster_abort_reshard_collection_cmd.cpp',
+        'cluster_abort_unshard_collection_cmd.cpp',
         'cluster_abort_transaction_cmd_s.cpp',
         'cluster_analyze_cmd.cpp',
         'cluster_build_info.cpp',

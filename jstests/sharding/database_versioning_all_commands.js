@@ -275,6 +275,7 @@ let testCases = {
     abortMoveCollection: {skip: "always targets the config server"},
     abortReshardCollection: {skip: "always targets the config server"},
     abortTransaction: {skip: "unversioned and uses special targetting rules"},
+    abortUnshardCollection: {skip: "always targets the config server"},
     addShard: {skip: "not on a user database"},
     addShardToZone: {skip: "not on a user database"},
     aggregate: {

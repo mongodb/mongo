@@ -185,6 +185,10 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         }
     },
+    abortUnshardCollection: {
+        // Skipping command because it requires testing through a parallel shell.
+        skip: requiresParallelShell,
+    },
     addShard: {
         skip: "cannot add shard while in downgrading FCV state",
     },

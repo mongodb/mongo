@@ -221,6 +221,7 @@ let viewsCommandTests = {
     abortMoveCollection: {skip: isUnrelated},
     abortReshardCollection: {skip: isUnrelated},
     abortTransaction: {skip: isUnrelated},
+    abortUnshardCollection: {skip: isUnrelated},
     addShard: {skip: isUnrelated},
     addShardToZone: {skip: isUnrelated},
     aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}], cursor: {}}},

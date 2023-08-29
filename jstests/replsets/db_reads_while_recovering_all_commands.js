@@ -146,6 +146,7 @@ const allCommands = {
     abortMoveCollection: {skip: isPrimaryOnly},
     abortReshardCollection: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},
+    abortUnshardCollection: {skip: isPrimaryOnly},
     aggregate: {
         command: {aggregate: collName, pipeline: [{$match: {}}], cursor: {}},
         expectFailure: true,
