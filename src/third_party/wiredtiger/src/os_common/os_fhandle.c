@@ -517,21 +517,15 @@ __wt_close_connection_close(WT_SESSION_IMPL *session)
  *     Zero out the file from offset for size bytes.
  */
 int
-__wt_file_zero(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t start_off, wt_off_t size)
+__wt_file_zero(
+  WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t start_off, wt_off_t size, WT_THROTTLE_TYPE type)
 {
     WT_DECL_ITEM(zerobuf);
     WT_DECL_RET;
-    WT_THROTTLE_TYPE type;
     uint64_t bufsz, off, partial, wrlen;
 
     zerobuf = NULL;
     bufsz = WT_MIN((uint64_t)size, WT_MEGABYTE);
-    /*
-     * For now logging is the only type and statistic. This needs updating if block manager decides
-     * to use this function.
-     */
-    type = WT_THROTTLE_LOG;
-    WT_STAT_CONN_INCR(session, log_zero_fills);
     WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
     memset(zerobuf->mem, 0, zerobuf->memsize);
     off = (uint64_t)start_off;

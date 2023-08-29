@@ -289,6 +289,9 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes, WT_THROTTLE_TYP
     capacity = steal_capacity = 0;
     reservation = steal = NULL;
     switch (type) {
+    case WT_THROTTLE_CHUNKCACHE:
+        /* At the moment, chunk cache usages are not throttled. */
+        return;
     case WT_THROTTLE_CKPT:
         capacity = cap->ckpt;
         reservation = &cap->reservation_ckpt;
@@ -410,6 +413,13 @@ again:
             WT_STAT_CONN_INCRV(session, capacity_time_total, sleep_us);
         else
             switch (type) {
+            case WT_THROTTLE_CHUNKCACHE:
+                /*
+                 * This section is not expected to be reached as we should have already returned
+                 * earlier in case of chunk cache usage throttling.
+                 */
+                WT_ASSERT(session, false);
+                break;
             case WT_THROTTLE_CKPT:
                 WT_STAT_CONN_INCRV(session, capacity_time_ckpt, sleep_us);
                 break;

@@ -7,10 +7,11 @@
  */
 
 typedef enum {
-    WT_THROTTLE_CKPT,  /* Checkpoint throttle */
-    WT_THROTTLE_EVICT, /* Eviction throttle */
-    WT_THROTTLE_LOG,   /* Logging throttle */
-    WT_THROTTLE_READ   /* Read throttle */
+    WT_THROTTLE_CHUNKCACHE, /* Chunkcache throttle */
+    WT_THROTTLE_CKPT,       /* Checkpoint throttle */
+    WT_THROTTLE_EVICT,      /* Eviction throttle */
+    WT_THROTTLE_LOG,        /* Logging throttle */
+    WT_THROTTLE_READ        /* Read throttle */
 } WT_THROTTLE_TYPE;
 
 #define WT_THROTTLE_MIN WT_MEGABYTE /* Config minimum size */

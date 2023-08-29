@@ -812,8 +812,8 @@ extern int __wt_extra_diagnostics_config(WT_SESSION_IMPL *session, const char *c
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *uri, const char *config,
   WT_EXTRACTOR **extractorp, int *ownp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_file_zero(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t start_off, wt_off_t size)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_file_zero(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t start_off, wt_off_t size,
+  WT_THROTTLE_TYPE type) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_filename_construct(WT_SESSION_IMPL *session, const char *path,
