@@ -385,6 +385,14 @@ last-continuous:
     ticket: SERVER-78813
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
+  - test_file: jstests/sharding/fsync_deadlock.js
+    ticket: SERVER-78793
+  - test_file: jstests/sharding/fsync_lock_ddl_lock.js
+    ticket: SERVER-78157
+  - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
+    ticket: SERVER-78157
+  - test_file: jstests/sharding/fsync_lock_unlock.js
+    ticket: SERVER-78149
   suites: null
 last-lts:
   all:
@@ -822,4 +830,13 @@ last-lts:
     ticket: SERVER-78855
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
+  - test_file: jstests/sharding/fsync_deadlock.js
+    ticket: SERVER-78793
+  - test_file: jstests/sharding/fsync_lock_ddl_lock.js
+    ticket: SERVER-78157
+  - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
+    ticket: SERVER-78157
+  - test_file: jstests/sharding/fsync_lock_unlock.js
+    ticket: SERVER-78149
+
   suites: null

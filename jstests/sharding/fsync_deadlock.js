@@ -4,7 +4,7 @@ runs an fsyncLock which should fail and timeout as the global S lock cannot be t
  * @tags: [
  *   requires_sharding,
  *   requires_fsync,
- *   featureFlagClusterFsyncLock,
+ *   requires_fcv_70
  * ]
  */
 
@@ -14,7 +14,6 @@ load('jstests/libs/parallelTester.js');
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    mongosOptions: {setParameter: {featureFlagClusterFsyncLock: true}},
     config: 1,
 });
 const shard0Primary = st.rs0.getPrimary();
