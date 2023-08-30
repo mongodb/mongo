@@ -145,7 +145,6 @@ public:
         ShardsvrDropIndexes shardsvrDropIndexCmd(nss);
         shardsvrDropIndexCmd.setDropIndexesRequest(requestParser.request().getDropIndexesRequest());
 
-        // TODO SERVER-67797 Change CatalogCache to use DatabaseName object
         const CachedDatabaseInfo dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
