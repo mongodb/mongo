@@ -866,7 +866,7 @@ HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
 }
 
 void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-    _service->getServiceEntryPoint()->endAllSessions(transport::Session::kKeepOpen);
+    _service->getSessionManager()->endAllSessions(transport::Session::kKeepOpen);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {

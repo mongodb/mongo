@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,23 +29,13 @@
 
 #pragma once
 
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_manager_common.h"
 
 namespace mongo {
 
-class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
-    ServiceEntryPointEmbedded(const ServiceEntryPointEmbedded&) = delete;
-    ServiceEntryPointEmbedded& operator=(const ServiceEntryPointEmbedded&) = delete;
-
-public:
-    ServiceEntryPointEmbedded() = default;
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override;
-
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() override;
-
-private:
-    class Hooks;
-};
+/**
+ * mongod uses the common implementation of SessionManager without modifications.
+ */
+using SessionManagerMongod = transport::SessionManagerCommon;
 
 }  // namespace mongo

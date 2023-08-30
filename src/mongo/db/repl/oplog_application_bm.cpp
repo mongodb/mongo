@@ -91,6 +91,7 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -140,7 +141,8 @@ public:
         setGlobalServiceContext(ServiceContext::make());
         _svcCtx = getGlobalServiceContext();
 
-        _svcCtx->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(_svcCtx));
+        _svcCtx->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+        _svcCtx->setSessionManager(std::make_unique<SessionManagerMongod>(_svcCtx));
 
         auto fastClock = std::make_unique<ClockSourceMock>();
         // Timestamps are split into two 32-bit integers, seconds and "increments". Currently (but

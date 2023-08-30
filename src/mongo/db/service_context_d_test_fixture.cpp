@@ -49,6 +49,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -141,7 +142,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         serviceContext->setTickSource(std::move(options._mockTickSource));
     }
 
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     serviceContext->setOpObserver(std::move(observerRegistry));

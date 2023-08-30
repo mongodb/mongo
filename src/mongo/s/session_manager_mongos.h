@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,23 +29,27 @@
 
 #pragma once
 
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/base/counter.h"
+#include "mongo/transport/session_manager_common.h"
 
 namespace mongo {
 
-class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
-    ServiceEntryPointEmbedded(const ServiceEntryPointEmbedded&) = delete;
-    ServiceEntryPointEmbedded& operator=(const ServiceEntryPointEmbedded&) = delete;
-
+/**
+ * The SessionManager accepts new Sessions from the TransportLayer,
+ * The mongos version of this class additionally tracks and reports
+ * the number of active load balanced connections.
+ */
+class SessionManagerMongos final : public transport::SessionManagerCommon {
 public:
-    ServiceEntryPointEmbedded() = default;
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override;
+    using SessionManagerCommon::SessionManagerCommon;
 
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() override;
+    void appendStats(BSONObjBuilder* bob) const final;
+
+    void onClientConnect(Client* client) final;
+    void onClientDisconnect(Client* client) final;
 
 private:
-    class Hooks;
+    Counter64 _loadBalancedConnections;
 };
 
 }  // namespace mongo

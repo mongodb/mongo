@@ -55,6 +55,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -101,8 +102,8 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _serviceContext = getGlobalServiceContext();
     _setAuthorizationManager();
-    _serviceContext->setServiceEntryPoint(
-        std::make_unique<ServiceEntryPointMongod>(_serviceContext));
+    _serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    _serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(_serviceContext));
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));

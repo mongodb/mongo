@@ -151,30 +151,29 @@ tlEnv.Library(
 )
 
 env.Library(
-    target='service_entry_point',
+    target='session_manager',
     source=[
-        'service_entry_point_impl.cpp',
-        'service_entry_point_impl.idl',
+        'session_manager_common.idl',
+        'session_manager_common.cpp',
         'session_workflow.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
-        '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/rpc/message',
-        '$BUILD_DIR/mongo/util/processinfo',
-        'service_executor',
-        'transport_layer_common',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/traffic_recorder',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/rpc/message',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/processinfo',
         'ingress_handshake_metrics',
         'message_compressor',
+        'service_executor',
+        'transport_layer_common',
     ],
 )
 
@@ -252,8 +251,8 @@ tlEnv.CppUnitTest(
         '$BUILD_DIR/third_party/shim_grpc' if shouldBuildGRPC(tlEnv) else [],
         'message_compressor',
         'message_compressor_options_server',
-        'service_entry_point',
         'service_executor',
+        'session_manager',
         'transport_layer',
         'transport_layer_common',
         'transport_layer_manager',
@@ -309,8 +308,8 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'service_entry_point',
         'service_executor',
+        'session_manager',
         'transport_layer_mock',
     ],
 )

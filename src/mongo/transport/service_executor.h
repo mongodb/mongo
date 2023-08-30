@@ -38,8 +38,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/utility.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -163,7 +163,7 @@ public:
 
 private:
     Client* _client = nullptr;
-    ServiceEntryPoint* _sep = nullptr;
+    SessionManager* _sessionManager = nullptr;
 
     bool _useDedicatedThread = true;
     bool _canUseReserved = false;
