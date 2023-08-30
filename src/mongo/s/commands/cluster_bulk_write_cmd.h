@@ -127,6 +127,10 @@ public:
         return false;
     }
 
+    LogicalOp getLogicalOp() const final {
+        return LogicalOp::opBulkWrite;
+    }
+
     std::string help() const override {
         return "command to apply inserts, updates and deletes in bulk";
     }
