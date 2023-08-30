@@ -283,12 +283,6 @@ private:
 
 MultiUpdateDeleteMetrics collectMultiUpdateDeleteMetrics;
 
-void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
-    if (containsRetry) {
-        RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
-    }
-}
-
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
         curOp->done();
@@ -314,20 +308,9 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
                         "error"_attr = curOp->debug().errInfo.toString());
         }
 
-        // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
-        // this op should be sampled for profiling.
-        const bool shouldProfile = curOp->completeAndLogOperation(
-            MONGO_LOGV2_DEFAULT_COMPONENT,
-            CollectionCatalog::get(opCtx)
-                ->getDatabaseProfileSettings(curOp->getNSS().dbName())
-                .filter);
+        // Mark the op as complete, log it and profile if the op should be sampled for profiling.
+        logOperationAndProfileIfNeeded(opCtx, curOp);
 
-        if (shouldProfile) {
-            // Stash the current transaction so that writes to the profile collection are not
-            // done as part of the transaction.
-            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-            profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
-        }
     } catch (const DBException& ex) {
         // We need to ignore all errors here. We don't want a successful op to fail because of a
         // failure to record stats. We also don't want to replace the error reported for an op that
@@ -773,7 +756,6 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 UpdateResult performUpdate(OperationContext* opCtx,
                            const NamespaceString& nss,
                            CurOp* curOp,
-                           OpDebug* opDebug,
                            bool inTransaction,
                            bool remove,
                            bool upsert,
@@ -813,11 +795,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
         return autoDb.ensureDbExists(opCtx);
     }();
 
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
-    }
+    invariant(DatabaseHolder::get(opCtx)->getDb(opCtx, dbName));
+    curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
 
     assertCanWrite_inlock(opCtx, nsString);
 
@@ -857,7 +836,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
-        getExecutorUpdate(opDebug, collection, &parsedUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(&curOp->debug(), collection, &parsedUpdate, boost::none /* verbosity
+        */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -877,8 +857,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
             .notifyOfQuery(opCtx, collection.getCollectionPtr(), summaryStats);
     }
     auto updateResult = exec->getUpdateResult();
-    write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
-    opDebug->setPlanSummaryMetrics(summaryStats);
+    write_ops_exec::recordUpdateResultInOpDebug(updateResult, &curOp->debug());
+    curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (updateResult.containsDotsAndDollarsField) {
         // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
@@ -908,7 +888,6 @@ long long performDelete(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const DeleteRequest& deleteRequest,
                         CurOp* curOp,
-                        OpDebug* opDebug,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
                         boost::optional<BSONObj>& docFound) {
@@ -947,16 +926,16 @@ long long performDelete(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+    auto dbName = nsString.dbName();
+    if (DatabaseHolder::get(opCtx)->getDb(opCtx, dbName)) {
+        curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(opDebug, collection, &parsedDelete, boost::none /* verbosity */));
+        getExecutorDelete(&curOp->debug(), collection, &parsedDelete, boost::none /* verbosity
+        */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -973,11 +952,11 @@ long long performDelete(OperationContext* opCtx,
     if (const auto& coll = collectionPtr) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
     }
-    opDebug->setPlanSummaryMetrics(summaryStats);
+    curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     // Fill out OpDebug with the number of deleted docs.
     auto nDeleted = exec->getDeleteResult();
-    opDebug->additiveMetrics.ndeleted = nDeleted;
+    curOp->debug().additiveMetrics.ndeleted = nDeleted;
 
     if (curOp->shouldDBProfile()) {
         auto&& explainer = exec->getPlanExplainer();
@@ -1044,6 +1023,25 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
         return write_ops::WriteError(index, status);
 }
 
+void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
+    if (containsRetry) {
+        RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
+    }
+}
+
+void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
+    const bool shouldProfile = curOp->completeAndLogOperation(
+        MONGO_LOGV2_DEFAULT_COMPONENT,
+        CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(curOp->getNSS().dbName()).filter);
+
+    if (shouldProfile) {
+        // Stash the current transaction so that writes to the profile collection are not
+        // done as part of the transaction.
+        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+        profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
+    }
+}
+
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::InsertCommandRequest& wholeOp,
                            OperationSource source) {
@@ -1053,21 +1051,26 @@ WriteResult performInserts(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
+
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
-        // This is the only part of finishCurOp we need to do for inserts because they reuse the
-        // top-level curOp. The rest is handled by the top-level entrypoint.
-        curOp.done();
-        Top::get(opCtx->getServiceContext())
-            .record(opCtx,
-                    wholeOp.getNamespace(),
-                    LogicalOp::opInsert,
-                    Top::LockType::WriteLocked,
-                    durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
-                    curOp.isCommand(),
-                    curOp.getReadWriteType());
+        // Timeseries inserts already did as part of performTimeseriesWrites.
+        if (source != OperationSource::kTimeseriesInsert) {
+            // This is the only part of finishCurOp we need to do for inserts because they
+            // reuse the top-level curOp. The rest is handled by the top-level entrypoint.
+            curOp.done();
+            Top::get(opCtx->getServiceContext())
+                .record(opCtx,
+                        wholeOp.getNamespace(),
+                        LogicalOp::opInsert,
+                        Top::LockType::WriteLocked,
+                        durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
+                        curOp.isCommand(),
+                        curOp.getReadWriteType());
+        }
     });
 
+    // Timeseries inserts already did as part of performTimeseriesWrites.
     if (source != OperationSource::kTimeseriesInsert) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(wholeOp.getNamespace());
@@ -2869,6 +2872,7 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
 
 write_ops::InsertCommandReply performTimeseriesWrites(
     OperationContext* opCtx, const write_ops::InsertCommandRequest& request) {
+
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse
@@ -2884,12 +2888,6 @@ write_ops::InsertCommandReply performTimeseriesWrites(
                     curOp.getReadWriteType());
     });
 
-    uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot insert into a time-series collection in a multi-document "
-                             "transaction: "
-                          << ns(request).toStringForErrorMsg(),
-            !opCtx->inMultiDocumentTransaction());
-
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(ns(request));
@@ -2897,6 +2895,18 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         curOp.ensureStarted();
         curOp.debug().additiveMetrics.ninserted = 0;
     }
+
+    return performTimeseriesWrites(opCtx, request, &curOp);
+}
+
+write_ops::InsertCommandReply performTimeseriesWrites(
+    OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp) {
+
+    uassert(ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Cannot insert into a time-series collection in a multi-document "
+                             "transaction: "
+                          << ns(request).toStringForErrorMsg(),
+            !opCtx->inMultiDocumentTransaction());
 
     std::vector<write_ops::WriteError> errors;
     boost::optional<repl::OpTime> opTime;
@@ -2934,7 +2944,7 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
     }
 
-    curOp.debug().additiveMetrics.ninserted = baseReply.getN();
+    curOp->debug().additiveMetrics.ninserted = baseReply.getN();
     globalOpCounters.gotInserts(baseReply.getN());
 
     return insertReply;

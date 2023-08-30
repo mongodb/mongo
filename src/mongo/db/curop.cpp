@@ -656,6 +656,7 @@ Command::ReadWriteType CurOp::getReadWriteType() const {
         case LogicalOp::opGetMore:
         case LogicalOp::opQuery:
             return Command::ReadWriteType::kRead;
+        case LogicalOp::opBulkWrite:
         case LogicalOp::opUpdate:
         case LogicalOp::opInsert:
         case LogicalOp::opDelete:

@@ -277,8 +277,8 @@ let testCases = {
         // },
         // checkReadConcern: false,
         // checkWriteConcern: true,
-        // // TODO SERVER-78258: Depending on what profiling behavior we implement we may be able to
-        // // use profiler output here instead rather than logs.
+        // // TODO SERVER-23266: If the overall batch command if profiled, then it would be better
+        // // to use profiling.  In the meantime, use logs.
         // useLogs: true,
         skip: "requires feature flag"
     },

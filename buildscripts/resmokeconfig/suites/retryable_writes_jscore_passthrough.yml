@@ -17,6 +17,7 @@ selector:
   - jstests/core/**/profile_findandmodify.js
   - jstests/core/**/top.js
   - jstests/core/views/views_stats.js
+  - jstests/core/write/bulk/bulk_write_profile.js
 
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/**/comment_field.js

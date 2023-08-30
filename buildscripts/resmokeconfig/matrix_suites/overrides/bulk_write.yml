@@ -9,9 +9,6 @@
 - name: single_op_core_excluded_files
   value:
     exclude_files:
-    # TODO (SERVER-78258): Enable the following test(s) after fixing bulkWrite currentOp output.
-    - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
-    - jstests/core/timeseries/timeseries_update_concurrent.js
     # TODO (SERVER-80146): Enable the following test(s).
     - jstests/core/timeseries/timeseries_bucket_index.js
     - jstests/core/timeseries/timeseries_bucket_manual_removal.js
@@ -23,16 +20,12 @@
     # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
     # server parameter.
     - jstests/core/**/set_param1.js
-    # TODO (SERVER-78258): Enable these when profiling is supported in bulkWrite.
-    - jstests/core/**/top*.js
+    # BulkWrite profiling and currentOp output format is not the same as normal writes.
     - jstests/core/**/profile*.js
-    - jstests/core/**/*histogram*.js
-    - jstests/core/views/views_stats.js
-    - jstests/core/write/update/update_metrics.js
     - jstests/core/comment_field.js
-    # TODO (SERVER-78258): CurOp currently does not display the correct metrics for the individual writes done under bulkWrite.
-    - jstests/core/administrative/current_op/currentop.js
     - jstests/core/fsync.js
+    # TODO (SERVER-79610) Enable these when we support updateMetrics in bulkWrite.
+    - jstests/core/write/update/update_metrics.js
     # TODO (SERVER-76497): Enable these when explain is supported in bulkWrite.
     - jstests/core/**/explain*.js
     # Runs an update with illegal format (no 'updates'). We could work around this in the override
@@ -68,10 +61,10 @@
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
 
-# TODO (SERVER-78258): Remove this exclusion when profiling is supported in bulkWrite.
 - name: txn_passthrough_runner_selftest
   value:
     exclude_files:
+    # BulkWrite profiling output format is not the same as normal writes.
     - jstests/libs/txns/txn_passthrough_runner_selftest.js
 
 - name: causal_consistency_exclude_tags
