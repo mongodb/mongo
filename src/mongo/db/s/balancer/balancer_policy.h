@@ -231,6 +231,7 @@ struct CollectionDataSizeInfoForBalancing {
 class ZoneInfo {
 public:
     ZoneInfo();
+    ZoneInfo(ZoneInfo&&) = default;
 
     /**
      * Appends the specified range to the set of ranges tracked for this collection and checks if
@@ -285,9 +286,7 @@ class DistributionStatus final {
     DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
-    DistributionStatus(NamespaceString nss,
-                       ShardToChunksMap shardToChunksMap,
-                       ZoneInfo zoneInfo = {});
+    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap, ZoneInfo zoneInfo);
     DistributionStatus(DistributionStatus&&) = default;
     ~DistributionStatus() {}
 
@@ -297,12 +296,6 @@ public:
     const NamespaceString& nss() const {
         return _nss;
     }
-
-    /**
-     * Appends the specified range to the set of ranges tracked for this collection and checks if
-     * it overlaps with existing ranges.
-     */
-    Status addRangeToZone(const ZoneRange& range);
 
     /**
      * Returns number of chunks in the specified shard.

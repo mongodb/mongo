@@ -145,9 +145,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return swZoneInfo.getStatus();
     }
 
-    DistributionStatus distribution(nss, std::move(shardToChunksMap), swZoneInfo.getValue());
-
-    return {std::move(distribution)};
+    return {DistributionStatus{nss, std::move(shardToChunksMap), std::move(swZoneInfo.getValue())}};
 }
 
 stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>
@@ -291,12 +289,12 @@ private:
  * range boundaries.
  */
 void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
-                                           const DistributionStatus& distribution,
+                                           const ZoneInfo& zoneInfo,
                                            SplitCandidatesBuffer* splitCandidates) {
     const auto& globalMax = cm.getShardKeyPattern().getKeyPattern().globalMax();
 
     // For each zone range, find chunks that need to be split.
-    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+    for (const auto& zoneRangeEntry : zoneInfo.zoneRanges()) {
         const auto& zoneRange = zoneRangeEntry.second;
 
         const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
@@ -625,54 +623,6 @@ StatusWith<boost::optional<MigrateInfo>> BalancerChunkSelectionPolicy::selectSpe
     return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution, dataSizeInfo);
 }
 
-Status BalancerChunkSelectionPolicy::checkMoveAllowed(OperationContext* opCtx,
-                                                      const ChunkType& chunk,
-                                                      const ShardId& newShardId) {
-    auto shardStatsStatus = _clusterStats->getStats(opCtx);
-    if (!shardStatsStatus.isOK()) {
-        return shardStatsStatus.getStatus();
-    }
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    const CollectionType collection = catalogClient->getCollection(
-        opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
-    const auto& nss = collection.getNss();
-
-
-    auto shardStats = std::move(shardStatsStatus.getValue());
-
-    auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
-    }
-
-    const auto& [cm, _] = routingInfoStatus.getValue();
-
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);
-    if (!collInfoStatus.isOK()) {
-        return collInfoStatus.getStatus();
-    }
-
-    const DistributionStatus& distribution = collInfoStatus.getValue();
-
-    auto newShardIterator =
-        std::find_if(shardStats.begin(),
-                     shardStats.end(),
-                     [&newShardId](const ClusterStatistics::ShardStatistics& stat) {
-                         return stat.shardId == newShardId;
-                     });
-    if (newShardIterator == shardStats.end()) {
-        return {ErrorCodes::ShardNotFound,
-                str::stream() << "Unable to find constraints information for shard " << newShardId
-                              << ". Move to this shard will be disallowed."};
-    }
-
-    return BalancerPolicy::isShardSuitableReceiver(*newShardIterator,
-                                                   distribution.getZoneForChunk(chunk));
-}
-
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
     auto routingInfoStatus =
@@ -684,23 +634,24 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::_getSplitCandidatesFor
 
     const auto& [cm, _] = routingInfoStatus.getValue();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);
-    if (!collInfoStatus.isOK()) {
-        return collInfoStatus.getStatus();
+    auto swZoneInfo =
+        ZoneInfo::getZonesForCollection(opCtx, nss, cm.getShardKeyPattern().getKeyPattern());
+    if (!swZoneInfo.isOK()) {
+        return swZoneInfo.getStatus();
     }
 
-    const DistributionStatus& distribution = collInfoStatus.getValue();
+    const auto& zoneInfo = swZoneInfo.getValue();
 
     // Accumulate split points for the same chunk together
     SplitCandidatesBuffer splitCandidates(nss, cm.getVersion());
 
-    if (nss == NamespaceString::kLogicalSessionsNamespace && !distribution.zones().empty()) {
+    if (nss == NamespaceString::kLogicalSessionsNamespace && !zoneInfo.allZones().empty()) {
         LOGV2_WARNING(4562401,
                       "Ignoring zones for the internal sessions collection.",
                       "nss"_attr = NamespaceString::kLogicalSessionsNamespace,
-                      "zones"_attr = distribution.zones());
+                      "zones"_attr = zoneInfo.allZones());
     } else {
-        getSplitCandidatesToEnforceZoneRanges(cm, distribution, &splitCandidates);
+        getSplitCandidatesToEnforceZoneRanges(cm, zoneInfo, &splitCandidates);
     }
 
     return splitCandidates.done();
