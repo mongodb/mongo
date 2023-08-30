@@ -62,7 +62,7 @@ public:
      */
     static JsExecution* get(OperationContext* opCtx,
                             const BSONObj& scope,
-                            StringData database,
+                            const DatabaseName& database,
                             bool loadStoredProcedures,
                             boost::optional<int> jsHeapLimitMB);
     /**

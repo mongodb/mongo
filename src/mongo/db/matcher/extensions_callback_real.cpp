@@ -80,7 +80,7 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
     } else {
         expCtx->hasWhereClause = true;
         return std::make_unique<WhereMatchExpression>(
-            _opCtx, std::move(where), expCtx->ns.db_deprecated());
+            _opCtx, std::move(where), expCtx->ns.dbName());
     }
 }
 

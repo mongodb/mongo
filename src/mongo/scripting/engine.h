@@ -94,8 +94,8 @@ public:
     }
 
     virtual void externalSetup() = 0;
-    virtual void setLocalDB(StringData localDBName) {
-        _localDBName = localDBName.toString();
+    virtual void setLocalDB(const DatabaseName& localDBName) {
+        _localDBName = localDBName;
     }
 
     virtual BSONObj getObject(const char* field) = 0;
@@ -222,7 +222,7 @@ protected:
 
     virtual ScriptingFunction _createFunction(const char* code) = 0;
 
-    std::string _localDBName;
+    DatabaseName _localDBName;
     int64_t _loadedVersion;
     std::set<std::string> _storedNames;
     static AtomicWord<long long> _lastVersion;
@@ -282,7 +282,7 @@ public:
      * @return the scope
      */
     std::unique_ptr<Scope> getPooledScope(OperationContext* opCtx,
-                                          const std::string& db,
+                                          const DatabaseName& db,
                                           const std::string& scopeType);
 
     void setScopeInitCallback(void (*func)(Scope&)) {

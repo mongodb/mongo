@@ -101,7 +101,7 @@ ScriptEngine::ScriptEngine(bool disableLoadStored)
 ScriptEngine::~ScriptEngine() {}
 
 Scope::Scope()
-    : _localDBName(""),
+    : _localDBName(DatabaseName::kEmpty),
       _loadedVersion(0),
       _createTime(Date_t::now()),
       _lastRetIsNativeCode(false) {}
@@ -258,7 +258,7 @@ void Scope::validateObjectIdString(const string& str) {
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (!getGlobalScriptEngine()->_disableLoadStored)
         return;
-    if (_localDBName.size() == 0) {
+    if (_localDBName.isEmpty()) {
         if (ignoreNotConnected)
             return;
         uassert(10208, "need to have locallyConnected already", _localDBName.size());
@@ -268,7 +268,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_loadedVersion == lastVersion)
         return;
 
-    const auto collNss = NamespaceStringUtil::deserialize(boost::none, _localDBName, "system.js");
+    const auto collNss = NamespaceStringUtil::deserialize(_localDBName, "system.js");
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
@@ -391,9 +391,11 @@ void Scope::execCoreFiles() {
 }
 
 namespace {
+
 class ScopeCache {
 public:
-    void release(const string& poolName, const std::shared_ptr<Scope>& scope) {
+    using PoolName = std::tuple<DatabaseName, string>;
+    void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
         stdx::lock_guard<Latch> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
@@ -421,7 +423,7 @@ public:
         _pools.push_front(toStore);
     }
 
-    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const string& poolName) {
+    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const PoolName& poolName) {
         stdx::lock_guard<Latch> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
@@ -446,7 +448,7 @@ public:
 private:
     struct ScopeAndPool {
         std::shared_ptr<Scope> scope;
-        string poolName;
+        std::tuple<DatabaseName, string /*scopeType*/> poolName;
     };
 
     // Note: if these numbers change, reconsider choice of datastructure for _pools
@@ -467,7 +469,7 @@ void ScriptEngine::dropScopeCache() {
 
 class PooledScope : public Scope {
 public:
-    PooledScope(const std::string& pool, const std::shared_ptr<Scope>& real)
+    PooledScope(const ScopeCache::PoolName& pool, const std::shared_ptr<Scope>& real)
         : _pool(pool), _real(real) {}
 
     virtual ~PooledScope() {
@@ -494,7 +496,7 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void setLocalDB(StringData dbName) {
+    void setLocalDB(const DatabaseName& dbName) {
         _real->setLocalDB(dbName);
     }
     void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {
@@ -621,15 +623,15 @@ protected:
     }
 
 private:
-    string _pool;
+    ScopeCache::PoolName _pool;
     std::shared_ptr<Scope> _real;
 };
 
 /** Get a scope from the pool of scopes matching the supplied pool name */
 unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
-                                               const string& db,
+                                               const DatabaseName& db,
                                                const string& scopeType) {
-    const string fullPoolName = db + scopeType;
+    const auto fullPoolName = std::make_tuple(db, scopeType);
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());

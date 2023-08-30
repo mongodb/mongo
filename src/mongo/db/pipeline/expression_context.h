@@ -413,8 +413,7 @@ public:
             invariant(scopeVar.isObject());
             scopeObj = scopeVar.getDocument().toBson();
         }
-        return JsExecution::get(
-            opCtx, scopeObj, ns.db_deprecated(), loadStoredProcedures, jsHeapLimitMB);
+        return JsExecution::get(opCtx, scopeObj, ns.dbName(), loadStoredProcedures, jsHeapLimitMB);
     }
 
     /**

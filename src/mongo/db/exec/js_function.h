@@ -43,7 +43,7 @@ namespace mongo {
  */
 class JsFunction {
 public:
-    JsFunction(OperationContext* opCtx, std::string code, std::string dbName);
+    JsFunction(OperationContext* opCtx, std::string code, const DatabaseName& dbName);
     JsFunction(const JsFunction& other);
     JsFunction(JsFunction&& other) = delete;
 
@@ -56,17 +56,17 @@ public:
         return _code;
     }
 
-    const std::string& getDbName() const {
+    const DatabaseName& getDbName() const {
         return _dbName;
     }
 
     size_t getApproximateSize() const;
 
 private:
-    void _init(OperationContext* opCtx, std::string code, std::string dbName);
+    void _init(OperationContext* opCtx, std::string code, const DatabaseName& dbName);
 
     std::string _code;
-    std::string _dbName;
+    DatabaseName _dbName;
     std::unique_ptr<Scope> _scope;
     ScriptingFunction _func;
 };

@@ -45,7 +45,7 @@ const auto getExec = OperationContext::declareDecoration<std::unique_ptr<JsExecu
 
 JsExecution* JsExecution::get(OperationContext* opCtx,
                               const BSONObj& scope,
-                              StringData database,
+                              const DatabaseName& database,
                               bool loadStoredProcedures,
                               boost::optional<int> jsHeapLimitMB) {
     auto& exec = getExec(opCtx);

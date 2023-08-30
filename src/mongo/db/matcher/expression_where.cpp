@@ -44,10 +44,10 @@ using std::unique_ptr;
 
 WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
-                                           StringData dbName)
+                                           const DatabaseName& dbName)
     : WhereMatchExpressionBase(std::move(params)),
       _opCtx(opCtx),
-      _jsFunction(std::make_unique<JsFunction>(_opCtx, getCode(), dbName.toString())) {}
+      _jsFunction(std::make_unique<JsFunction>(_opCtx, getCode(), dbName)) {}
 
 bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
     validateState();
