@@ -2713,7 +2713,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         printAllThreadStacksBlocking();
 #endif
 
-        fassertFailedNoTrace(7152000);
+        fassertFailed(7152000);
     });
     callReplCoordExit.dismiss();
 };
