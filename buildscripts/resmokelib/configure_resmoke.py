@@ -166,7 +166,14 @@ def _set_up_tracing(
         parent_span_id: Optional[str],
         extra_context: Optional[Dict[str, object]],
 ) -> bool:
-    """Try to set up otel tracing. On success return True. On failure return False."""
+    """Try to set up otel tracing. On success return True. On failure return False.
+
+    This method does 4 things.
+    1. If a user has passed in a grpc OTel endpoint then we set up an OTLPSpanExporter to send OTEL metrics to that endpoint.
+    2. If a user passes in a filename to store OTel metrics in then we are going to export metrics to that file. It is perfectly valid to have an OTel metrics endpoint and a OTel metrics file. We use a custom exporter `FileSpanExporter` to write data to the passed in file.
+    3. If a user passes in a parent trace id and a child trace id we assume both of those. This allows us to tie resmoke metrics to a parent metric.
+    4. If a user passes in extra_baggage, we add these "global" values to our baggage. This allows us to propagate these values to all child spans in resmoke using our custom span processor `BatchedBaggageSpanProcessor`.
+    """
 
     success = True
     # Service name is required for most backends

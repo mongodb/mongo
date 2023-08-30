@@ -34,3 +34,11 @@ Note that this wrapper is unavailable in packaged installations of MongoDB
 Server, such as those provided by Homebrew, and other package managers. If you
 would like to run tests against a packaged installation, you must explicitly
 pass `--installDir` to resmoke.py
+
+### Resmoke test telemetry
+
+We capture telemetry from resmoke using two systems: mongo-tooling-metrics and open telemetry.
+
+Using mongo-tooling-metrics we capture the invocation, results, and timing data from internal developers. This data is used to see what developers are doing. We can study what people are running to make it work better or faster.
+
+Using open telemetry (OTel) we capture more specific information about the internals of resmoke. This data is used for improvements specifically when running in evergreen. This data is captured on every resmoke invocation but only sent to honeycomb when running in evergreen. More info about how we use OTel in resmoke can be found [here](otel_resmoke.md).
