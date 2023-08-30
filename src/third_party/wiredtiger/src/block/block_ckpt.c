@@ -288,9 +288,11 @@ __wt_block_checkpoint(
     if (buf == NULL) {
         ci->root_offset = WT_BLOCK_INVALID_OFFSET;
         ci->root_objectid = ci->root_size = ci->root_checksum = 0;
-    } else
-        WT_ERR(__wt_block_write_off(session, block, buf, &ci->root_objectid, &ci->root_offset,
-          &ci->root_size, &ci->root_checksum, data_checksum, true, false));
+    } else {
+        WT_ERR(__wt_block_write_off(session, block, buf, &ci->root_offset, &ci->root_size,
+          &ci->root_checksum, data_checksum, true, false));
+        ci->root_objectid = block->objectid;
+    }
 
     /*
      * Checkpoints are potentially reading/writing/merging lots of blocks, pre-allocate structures
