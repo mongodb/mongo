@@ -86,6 +86,7 @@ typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 class ZoneInfo {
 public:
     ZoneInfo();
+    ZoneInfo(ZoneInfo&&) = default;
 
     /**
      * Appends the specified range to the set of ranges tracked for this collection and checks if
@@ -131,7 +132,7 @@ class DistributionStatus {
     DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
-    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap);
+    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap, ZoneInfo zoneInfo);
     DistributionStatus(DistributionStatus&&) = default;
 
     /**
@@ -140,12 +141,6 @@ public:
     const NamespaceString& nss() const {
         return _nss;
     }
-
-    /**
-     * Appends the specified range to the set of ranges tracked for this collection and checks if
-     * it overlaps with existing ranges.
-     */
-    Status addRangeToZone(const ZoneRange& range);
 
     /**
      * Returns total number of chunks across all shards.

@@ -60,8 +60,12 @@ const size_t kDefaultImbalanceThreshold = 1;
 
 }  // namespace
 
-DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
-    : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
+DistributionStatus::DistributionStatus(NamespaceString nss,
+                                       ShardToChunksMap shardToChunksMap,
+                                       ZoneInfo zoneInfo)
+    : _nss(std::move(nss)),
+      _shardChunks(std::move(shardToChunksMap)),
+      _zoneInfo(std::move(zoneInfo)) {}
 
 size_t DistributionStatus::totalChunks() const {
     size_t total = 0;
@@ -108,10 +112,6 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
     invariant(i != _shardChunks.end());
 
     return i->second;
-}
-
-Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
-    return _zoneInfo.addRangeToZone(range);
 }
 
 string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
