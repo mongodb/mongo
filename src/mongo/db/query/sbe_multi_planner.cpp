@@ -303,7 +303,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     // around this limitation, we clone the tree from the original tree. If there is a pipeline in
     // "_cq" the winning candidate will be extended by building a new SBE tree below, so we don't
     // need to clone a new copy here if the winner exited early.
-    if (winner.exitedEarly && _cq.pipeline().empty()) {
+    if (winner.exitedEarly && _cq.cqPipeline().empty()) {
         // Remove all the registered plans from _yieldPolicy's list of trees.
         _yieldPolicy->clearRegisteredPlans();
 
@@ -337,7 +337,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     // the trial was done with find-only part of the query, we cannot reuse the results. The
     // non-winning plans are only used in 'explain()' so, to save on unnecessary work, we extend
     // them only if this is an 'explain()' request.
-    if (!_cq.pipeline().empty()) {
+    if (!_cq.cqPipeline().empty()) {
         winner.root->close();
         _yieldPolicy->clearRegisteredPlans();
         auto solution = QueryPlanner::extendWithAggPipeline(

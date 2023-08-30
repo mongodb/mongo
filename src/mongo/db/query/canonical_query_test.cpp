@@ -246,7 +246,7 @@ void testNormalizeQuery(const char* queryStr,
                         const char* expectedExprStr,
                         bool skipHashTest = false) {
     unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
-    MatchExpression* me = cq->root();
+    MatchExpression* me = cq->getPrimaryMatchExpression();
     BSONObj expectedExprObj = fromjson(expectedExprStr);
     unique_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
     assertEquivalent(queryStr, expectedExpr.get(), me, skipHashTest);
@@ -312,7 +312,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     auto baseCq =
         assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand), isExplain));
 
-    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), firstClauseExpr->serialize());
@@ -355,7 +355,7 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
     // Note: be sure to use the second child to get $text, since we 'normalize' and sort the
     // MatchExpression tree as part of canonicalization. This will put the text search clause
     // second.
-    MatchExpression* secondClauseExpr = baseCq->root()->getChild(1);
+    MatchExpression* secondClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(1);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, secondClauseExpr));
 
     ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), secondClauseExpr->serialize());
@@ -395,7 +395,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
-    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
     ASSERT_TRUE(baseCq->getCollator() == nullptr);
     ASSERT_TRUE(childCq->getCollator() == nullptr);
@@ -410,7 +410,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     findCommand->setCollation(BSON("locale"
                                    << "reverse"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
-    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
     ASSERT(baseCq->getCollator());
     ASSERT(childCq->getCollator());
@@ -424,9 +424,9 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{a: 'foo', b: {$in: ['bar', 'baz']}}"));
     auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
-    ASSERT_EQUALS(2U, cq->root()->numChildren());
-    auto firstChild = cq->root()->getChild(0);
-    auto secondChild = cq->root()->getChild(1);
+    ASSERT_EQUALS(2U, cq->getPrimaryMatchExpression()->numChildren());
+    auto firstChild = cq->getPrimaryMatchExpression()->getChild(0);
+    auto secondChild = cq->getPrimaryMatchExpression()->getChild(1);
     auto equalityExpr = static_cast<EqualityMatchExpression*>(
         firstChild->matchType() == MatchExpression::EQ ? firstChild : secondChild);
     auto inExpr = static_cast<InMatchExpression*>(
@@ -451,7 +451,7 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
 
 TEST(CanonicalQueryTest, NorWithOneChildNormalizedToNot) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}]}"));
-    auto root = cq->root();
+    auto root = cq->getPrimaryMatchExpression();
     ASSERT_EQ(MatchExpression::NOT, root->matchType());
     ASSERT_EQ(1U, root->numChildren());
     ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());
@@ -459,13 +459,13 @@ TEST(CanonicalQueryTest, NorWithOneChildNormalizedToNot) {
 
 TEST(CanonicalQueryTest, NorWithTwoChildrenNotNormalized) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}, {b: 1}]}"));
-    auto root = cq->root();
+    auto root = cq->getPrimaryMatchExpression();
     ASSERT_EQ(MatchExpression::NOR, root->matchType());
 }
 
 TEST(CanonicalQueryTest, NorWithOneChildNormalizedAfterNormalizingChild) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{$or: [{a: 1}]}]}"));
-    auto root = cq->root();
+    auto root = cq->getPrimaryMatchExpression();
     ASSERT_EQ(MatchExpression::NOT, root->matchType());
     ASSERT_EQ(1U, root->numChildren());
     ASSERT_EQ(MatchExpression::EQ, root->getChild(0)->matchType());

@@ -60,7 +60,7 @@ class MultiPlanner final : public BaseRuntimePlanner {
 public:
     MultiPlanner(OperationContext* opCtx,
                  const MultipleCollectionAccessor& collections,
-                 const CanonicalQuery& cq,
+                 CanonicalQuery& cq,
                  const QueryPlannerParams& qpp,
                  PlanCachingMode cachingMode,
                  PlanYieldPolicySBE* yieldPolicy)

@@ -101,7 +101,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {
         << solns[0]->root()->toString();
 
     // Check the plan after lowering $group into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution =
         QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
@@ -128,7 +128,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoGroups) {
         << solns[0]->root()->toString();
 
     // Check the plan after lowering $group into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution =
         QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
@@ -156,7 +156,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfOneGroupWithMultipleAccumulat
         << solns[0]->root()->toString();
 
     // Check the plan after lowering $group into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution =
         QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
@@ -183,7 +183,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookup) {
         << solns[0]->root()->toString();
 
     // Check the plan after lowering $lookup into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
@@ -212,7 +212,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
         << solns[0]->root()->toString();
 
     // Check the plan after lowering both $lookups into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
@@ -246,7 +246,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {
         << solns[0]->root()->toString();
 
     // Check the plan after lowering the $groups and $lookups into the find subsystem.
-    ASSERT(!cq->pipeline().empty());
+    ASSERT(!cq->cqPipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$c'}, accs: [{count: {$min: '$count'}}], node: "

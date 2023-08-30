@@ -172,10 +172,7 @@ if (checkSBEEnabled(db)) {
 
     // $$NOW is not in SBE query.
     verifyPlanCacheSize(fromViewWithNow);
-    // TODO SERVER-78817 remove checkSBEEnabled() call once caching of $match pushdown is enabled.
-    if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-        verifyPlanCacheSize(withExprNow);
-    }
+    verifyPlanCacheSize(withExprNow);
 
     // $$NOW could not be pushed down into SBE.
     verifyPlanCacheSize(baseCollectionNowAgg);

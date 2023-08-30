@@ -565,7 +565,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
             // too many fields output, so we need to trim them down.
             return std::make_unique<ProjectionNodeSimple>(
                 addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-                query.root(),
+                query.getPrimaryMatchExpression(),
                 projection);
         }
         if (isInclusionOnly) {
@@ -575,7 +575,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
                 // projection can cover.
                 return std::make_unique<ProjectionNodeCovered>(
                     addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-                    query.root(),
+                    query.getPrimaryMatchExpression(),
                     projection,
                     std::move(coveredKeyObj));
             }
@@ -585,7 +585,7 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
     // No fast path available, we need to add this generic projection node.
     return std::make_unique<ProjectionNodeDefault>(
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
-        query.root(),
+        query.getPrimaryMatchExpression(),
         projection);
 }
 

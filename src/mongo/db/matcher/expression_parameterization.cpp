@@ -38,8 +38,10 @@
 
 namespace mongo {
 void MatchExpressionParameterizationVisitor::visitBitTestExpression(BitTestMatchExpression* expr) {
-    expr->setBitPositionsParamId(_context->nextInputParamId(expr));
-    expr->setBitMaskParamId(_context->nextInputParamId(expr));
+    if (_context->availableParamIds(2)) {
+        expr->setBitPositionsParamId(_context->nextInputParamId(expr));
+        expr->setBitMaskParamId(_context->nextInputParamId(expr));
+    }
 }
 
 void MatchExpressionParameterizationVisitor::visit(BitsAllClearMatchExpression* expr) {
@@ -79,13 +81,17 @@ void MatchExpressionParameterizationVisitor::visit(LTMatchExpression* expr) {
 }
 
 void MatchExpressionParameterizationVisitor::visit(ModMatchExpression* expr) {
-    expr->setDivisorInputParamId(_context->nextInputParamId(expr));
-    expr->setRemainderInputParamId(_context->nextInputParamId(expr));
+    if (_context->availableParamIds(2)) {
+        expr->setDivisorInputParamId(_context->nextInputParamId(expr));
+        expr->setRemainderInputParamId(_context->nextInputParamId(expr));
+    }
 }
 
 void MatchExpressionParameterizationVisitor::visit(RegexMatchExpression* expr) {
-    expr->setSourceRegexInputParamId(_context->nextInputParamId(expr));
-    expr->setCompiledRegexInputParamId(_context->nextInputParamId(expr));
+    if (_context->availableParamIds(2)) {
+        expr->setSourceRegexInputParamId(_context->nextInputParamId(expr));
+        expr->setCompiledRegexInputParamId(_context->nextInputParamId(expr));
+    }
 }
 
 void MatchExpressionParameterizationVisitor::visit(SizeMatchExpression* expr) {

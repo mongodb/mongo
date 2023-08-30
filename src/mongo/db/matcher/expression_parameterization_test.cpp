@@ -144,7 +144,7 @@ public:
     }
     void visit(const ModMatchExpression* expr) final {
         countParam(expr->getDivisorInputParamId());
-        countParam(expr->getRemainder());
+        countParam(expr->getRemainderInputParamId());
     }
     void visit(const NorMatchExpression* expr) final {}
     void visit(const NotMatchExpression* expr) final {}
@@ -543,7 +543,7 @@ TEST(MatchExpressionParameterizationVisitor,
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
-        auto expression = result.getValue().get();
+        MatchExpression* expression = result.getValue().get();
 
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
@@ -554,7 +554,7 @@ TEST(MatchExpressionParameterizationVisitor,
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
-        auto expression = result.getValue().get();
+        MatchExpression* expression = result.getValue().get();
 
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 6);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
@@ -565,11 +565,30 @@ TEST(MatchExpressionParameterizationVisitor,
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
-        auto expression = result.getValue().get();
+        MatchExpression* expression = result.getValue().get();
 
+        // This tests the optional limit on the maximum number of parameters allowed.
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 5);
-        ASSERT_EQ(0, inputParamIdToExpressionMap.size());
-        ASSERT_EQ(0, countInputParams(expression));
+        ASSERT_EQ(5, inputParamIdToExpressionMap.size());
+        ASSERT_EQ(5, countInputParams(expression));
+    }
+
+    {
+        // Test that the optional number of parameters limit is all-or-nothing for a binary op.
+        BSONObj query2 = BSON("a" << BSON("$mod" << BSON_ARRAY(1 << 2)) << "b"
+                                  << BSON("$mod" << BSON_ARRAY(3 << 4)));
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query2, expCtx);
+        ASSERT_TRUE(result.isOK());
+        MatchExpression* expression = result.getValue().get();
+
+        // Both operands of a binary op must be parameterized or not parameterized. There are two
+        // binary ops for a total of four possible parameters, each of which has a unique value so
+        // cannot share a prior parameter. With a limit of 3, the first two get parameterized but
+        // the last two do not.
+        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 3);
+        ASSERT_EQ(2, inputParamIdToExpressionMap.size());
+        ASSERT_EQ(2, countInputParams(expression));
     }
 }
 }  // namespace mongo

@@ -54,8 +54,10 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
                                  PrefixId& prefixId) {
-    auto matchExpr = generateMatchExpression(
-        canonicalQuery.root(), true /* allowAggExpression */, scanProjName, prefixId);
+    auto matchExpr = generateMatchExpression(canonicalQuery.getPrimaryMatchExpression(),
+                                             true /* allowAggExpression */,
+                                             scanProjName,
+                                             prefixId);
 
     {
         // Decompose conjunction in the filter into a serial chain of FilterNodes.

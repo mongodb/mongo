@@ -57,7 +57,7 @@ class SubPlanner final : public BaseRuntimePlanner {
 public:
     SubPlanner(OperationContext* opCtx,
                const MultipleCollectionAccessor& collections,
-               const CanonicalQuery& cq,
+               CanonicalQuery& cq,
                const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy} {}

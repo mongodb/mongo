@@ -105,7 +105,7 @@ public:
     };
 
     static std::unique_ptr<QuerySolution> extendWithAggPipeline(
-        const CanonicalQuery& query,
+        CanonicalQuery& query,
         std::unique_ptr<QuerySolution>&& solution,
         const std::map<NamespaceString, SecondaryCollectionInfo>& secondaryCollInfos);
 

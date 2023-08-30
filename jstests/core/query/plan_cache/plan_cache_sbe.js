@@ -68,6 +68,20 @@ if (isSbeEnabled) {
 }
 
 if (isSbeEnabled) {
+    // Test that the plan cached for a query with a $match pushed down to SBE via
+    // 'CanonicalQuery::_cqPipeline' is shared across queries with the same shape but different
+    // constants.
+    let pipeline = [{$addFields: {a: 0}}, {$match: {a: {$gt: 0}}}];
+    coll.getPlanCache().clear();
+    for (let val = 0; val < 5; ++val) {
+        pipeline[1]["$match"]["a"]["$gt"] = val;
+        coll.aggregate(pipeline);
+    }
+    const planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    assert.eq(1, planCacheStats.length, planCacheStats);
+}
+
+if (isSbeEnabled) {
     // Test that a plan whose match expression has > 512 predicates does not get cached for SBE,
     // because in that case it will not be auto-parameterized, so caching the plan would cause cache
     // flooding with plans that will likely never be resused (SERVER-79867). Also verify the results
@@ -104,7 +118,7 @@ if (isSbeEnabled) {
     }
 
     // There should be zero SBE plan cache entries.
-    let planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    const planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
     assert.eq(0, planCacheStats.length, planCacheStats);
 }
 
@@ -146,6 +160,6 @@ if (isSbeEnabled) {
 
     // There should be one SBE plan cache entry as the above aggreegations are parameterized and
     // thus all share the same plan.
-    let planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    const planCacheStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
     assert.eq(1, planCacheStats.length, planCacheStats);
 }

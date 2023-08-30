@@ -220,7 +220,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         matchDetails.requestElemMatchKey();
 
         dassert(cq);
-        MONGO_verify(cq->root()->matchesBSON(oldObjValue, &matchDetails));
+        MONGO_verify(cq->getPrimaryMatchExpression()->matchesBSON(oldObjValue, &matchDetails));
 
         std::string matchedField;
         if (matchDetails.hasElemMatchKey())
@@ -713,14 +713,14 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
                     _params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
         }
     } else {
-        uassert(31025,
-                "Shard key update is not allowed without specifying the full shard key in the "
-                "query",
-                (_params.canonicalQuery &&
-                 pathsupport::extractFullEqualityMatches(
-                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
-                     .isOK() &&
-                 equalities.size() == shardKeyPathsVector.size()));
+        uassert(
+            31025,
+            "Shard key update is not allowed without specifying the full shard key in the query",
+            (_params.canonicalQuery &&
+             pathsupport::extractFullEqualityMatches(
+                 *(_params.canonicalQuery->getPrimaryMatchExpression()), shardKeyPaths, &equalities)
+                 .isOK() &&
+             equalities.size() == shardKeyPathsVector.size()));
 
         // If this node is a replica set primary node, an attempted update to the shard key value
         // must either be a retryable write or inside a transaction. An update without a transaction

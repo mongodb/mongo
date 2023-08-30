@@ -52,45 +52,97 @@ namespace mongo {
 struct MatchExpressionParameterizationVisitorContext {
     using InputParamId = MatchExpression::InputParamId;
 
+    MatchExpressionParameterizationVisitorContext(
+        boost::optional<size_t> inputMaxParamCount = boost::none, InputParamId startingParamId = 0)
+        : maxParamCount(inputMaxParamCount), nextParamId(startingParamId) {}
+
     /**
-     * Assigns a parameter id to `expr` with the ability to reuse an already-assigned parameter id
+     * Reports whether the requested number of parameter IDs can be assigned within the
+     * 'maxParamCount' limit. Used by callers that need to parameterize all or none of the arguments
+     * of an expression because MatchExpressionSbePlanCacheKeySerializationVisitor visit() methods
+     * expect those to either be fully parameterized or unparameterized. This must set
+     * 'parameterized' to false if the requested IDs are not available, as the caller will then not
+     * parameterize any of its arguments, which means the query will not be fully parameterized
+     * even if we do not end up using all the allowed parameter IDs.
+     */
+    bool availableParamIds(int numIds) {
+        if (!parameterized) {
+            return false;
+        }
+        if (maxParamCount &&
+            (static_cast<size_t>(nextParamId) + static_cast<size_t>(numIds)) > *maxParamCount) {
+            parameterized = false;
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Assigns a parameter ID to `expr` with the ability to reuse an already-assigned parameter id
      * if `expr` is equivalent to an expression we have seen before. This is used to model
      * dependencies within a query (e.g. $or[{a:1}, {a:1, b:1}] --> $or[{a:P0}, {a:P0, b:P1}]) and
      * to reduce the number of parameters. The reusable parameters use the same vector for tracking
      * as the non-reusable to ensure uniqueness of the parameterId.
+     *
+     * If 'maxParamCount' was specified, this stops creating new parameters once that limit has been
+     * reached and returns boost::none instead.
      */
     boost::optional<InputParamId> nextReusableInputParamId(const MatchExpression* expr) {
-        // Check to see if the expression is in the 'map' already.
-        if (expr && !revertMode) {
+        if (!parameterized) {
+            return boost::none;
+        }
+
+        if (expr) {
+            // Check to see if the expression is in the map already.
             auto it = std::find_if(
                 inputParamIdToExpressionMap.begin(),
                 inputParamIdToExpressionMap.end(),
                 [expr](const MatchExpression* m) -> bool { return m->equivalent(expr); });
             if (it == inputParamIdToExpressionMap.end()) {
-                return nextInputParamId(expr);
+                return nextInputParamId(expr);  // not found; create new param
             }
-            return it - inputParamIdToExpressionMap.begin();
+            return it - inputParamIdToExpressionMap.begin();  // found; reuse old param
         }
         return boost::none;
     }
 
+    /**
+     * Assigns a parameter ID to 'expr'. This is not only a helper for nextReusableInputParamId();
+     * it is also called directly by visit() methods whose expressions are deemed non-shareable.
+     *
+     * If 'maxParamCount' was specified, this stops creating new parameters once that limit has been
+     * reached and returns boost::none instead.
+     */
     boost::optional<InputParamId> nextInputParamId(const MatchExpression* expr) {
-        if (!revertMode) {
-            inputParamIdToExpressionMap.push_back(expr);
-            return inputParamIdToExpressionMap.size() - 1;
-        } else {
+        if (!parameterized) {
             return boost::none;
         }
+        if (maxParamCount && static_cast<size_t>(nextParamId) >= *maxParamCount) {
+            parameterized = false;
+            return boost::none;
+        }
+
+        inputParamIdToExpressionMap.emplace_back(expr);
+        return nextParamId++;
     }
 
-    // Map to from assigned InputParamId to parameterised MatchExpression. Although it is called a
-    // map, it can be safely represented as a vector because in this class we control that
-    // inputParamId is an increasing sequence of integers starting from 0.
+    // Map from assigned InputParamId to parameterised MatchExpression. Although it is called a map,
+    // it can be safely represented as a vector because in this class we control that inputParamId
+    // is an increasing sequence of integers starting from 0.
     std::vector<const MatchExpression*> inputParamIdToExpressionMap;
 
-    // Whether instead of setting parameters on MatchExpression tree nodes, the visitor should
-    // clear them instead.
-    bool revertMode{false};
+    // This is the maximumum number of MatchExpression parameters a single CanonicalQuery may have.
+    // A value of boost::none means unlimited.
+    boost::optional<size_t> maxParamCount;
+
+    // This is the next input parameter ID to assign. It may be initialized to a value > 0 to enable
+    // a forest of match expressions to be parameterized by allowing each tree to continue parameter
+    // IDs from where the prior tree left off.
+    InputParamId nextParamId;
+
+    // This is changed to false if an attempt to parameterize ever failed (because it would exceed
+    // 'maxParamCount').
+    bool parameterized = true;
 };
 
 /**
@@ -100,6 +152,7 @@ struct MatchExpressionParameterizationVisitorContext {
  *  - BitsAllSetMatchExpression
  *  - BitsAnyClearMatchExpression
  *  - BitsAnySetMatchExpression
+ *  - BitTestMatchExpression (two parameter IDs for the position and mask)
  *  - Comparison expressions, unless compared against MinKey, MaxKey, null or NaN value or array
  *      - EqualityMatchExpression
  *      - GTEMatchExpression

@@ -821,10 +821,11 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
-    scopedCq->root()->setTag(new IndexTag(1));
+    scopedCq->getPrimaryMatchExpression()->setTag(new IndexTag(1));
 
-    ASSERT_NOT_OK(
-        QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices).getStatus());
+    ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(scopedCq->getPrimaryMatchExpression(),
+                                                        relevantIndices)
+                      .getStatus());
 }
 
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
@@ -846,16 +847,18 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     ASSERT_NOT_OK(s);
 
     // Null indexTree.
-    s = QueryPlanner::tagAccordingToCache(scopedCq->root(), nullptr, indexMap);
+    s = QueryPlanner::tagAccordingToCache(scopedCq->getPrimaryMatchExpression(), nullptr, indexMap);
     ASSERT_NOT_OK(s);
 
     // Index not found.
-    s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
+    s = QueryPlanner::tagAccordingToCache(
+        scopedCq->getPrimaryMatchExpression(), indexTree.get(), indexMap);
     ASSERT_NOT_OK(s);
 
     // Index found once added to the map.
     indexMap[IndexEntry::Identifier{"a_1"}] = 0;
-    s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
+    s = QueryPlanner::tagAccordingToCache(
+        scopedCq->getPrimaryMatchExpression(), indexTree.get(), indexMap);
     ASSERT_OK(s);
 
     // Regenerate canonical query in order to clear tags.
@@ -869,7 +872,8 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     auto child = std::make_unique<PlanCacheIndexTree>();
     child->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
     indexTree->children.push_back(std::move(child));
-    s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
+    s = QueryPlanner::tagAccordingToCache(
+        scopedCq->getPrimaryMatchExpression(), indexTree.get(), indexMap);
     ASSERT_NOT_OK(s);
 }
 

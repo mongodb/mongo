@@ -89,7 +89,7 @@ class BaseRuntimePlanner : public RuntimePlanner {
 public:
     BaseRuntimePlanner(OperationContext* opCtx,
                        const MultipleCollectionAccessor& collections,
-                       const CanonicalQuery& cq,
+                       CanonicalQuery& cq,
                        const QueryPlannerParams& queryParams,
                        PlanYieldPolicySBE* yieldPolicy)
         : _opCtx(opCtx),
@@ -134,7 +134,7 @@ protected:
 
     OperationContext* const _opCtx;
     const MultipleCollectionAccessor& _collections;
-    const CanonicalQuery& _cq;
+    CanonicalQuery& _cq;
     const QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
     const AllIndicesRequiredChecker _indexExistenceChecker;

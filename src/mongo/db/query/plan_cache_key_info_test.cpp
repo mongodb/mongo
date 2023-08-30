@@ -81,7 +81,8 @@ PlanCacheKeyInfo makeKey(const CanonicalQuery& cq,
     indexabilityState.updateDiscriminators(indexCores);
 
     StringBuilder indexabilityKeyBuilder;
-    plan_cache_detail::encodeIndexability(cq.root(), indexabilityState, &indexabilityKeyBuilder);
+    plan_cache_detail::encodeIndexability(
+        cq.getPrimaryMatchExpression(), indexabilityState, &indexabilityKeyBuilder);
 
     return {cq.encodeKey(), indexabilityKeyBuilder.str()};
 }

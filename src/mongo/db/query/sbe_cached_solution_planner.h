@@ -60,7 +60,7 @@ class CachedSolutionPlanner final : public BaseRuntimePlanner {
 public:
     CachedSolutionPlanner(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
-                          const CanonicalQuery& cq,
+                          CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           boost::optional<size_t> decisionReads,
                           PlanYieldPolicySBE* yieldPolicy)

@@ -1989,7 +1989,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
 
     deprioritizeUnboundedIndexScan(isn.get(), query.getFindCommandRequest());
 
-    unique_ptr<MatchExpression> filter = query.root()->clone();
+    unique_ptr<MatchExpression> filter = query.getPrimaryMatchExpression()->clone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
@@ -2119,7 +2119,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     isn->bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
     isn->queryCollator = query.getCollator();
 
-    unique_ptr<MatchExpression> filter = query.root()->clone();
+    unique_ptr<MatchExpression> filter = query.getPrimaryMatchExpression()->clone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {

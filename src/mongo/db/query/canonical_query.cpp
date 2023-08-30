@@ -65,7 +65,7 @@
 namespace mongo {
 namespace {
 
-boost::optional<size_t> loadMaxParameterCount() {
+boost::optional<size_t> loadMaxMatchExpressionParams() {
     auto value = internalQueryAutoParameterizationMaxParameterCount.load();
     if (value > 0) {
         return value;
@@ -85,7 +85,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
     bool isCountLike) {
     if (givenExpCtx) {
         // Caller provided an ExpressionContext, let's go ahead and use that.
@@ -100,7 +100,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         return canonicalize(std::move(givenExpCtx),
                             std::move(swParsedFind.getValue()),
                             explain,
-                            std::move(pipeline),
+                            std::move(cqPipeline),
                             isCountLike);
     } else {
         // No ExpressionContext provided, let's call the override that makes one for us.
@@ -111,7 +111,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         }
         auto&& [expCtx, parsedFind] = std::move(swResults.getValue());
         return canonicalize(
-            std::move(expCtx), std::move(parsedFind), explain, std::move(pipeline), isCountLike);
+            std::move(expCtx), std::move(parsedFind), explain, std::move(cqPipeline), isCountLike);
     }
 }
 
@@ -120,14 +120,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     std::unique_ptr<ParsedFindCommand> parsedFind,
     bool explain,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
     bool isCountLike) {
 
     // Make the CQ we'll hopefully return.
     auto cq = std::make_unique<CanonicalQuery>();
     cq->setExplain(explain);
-    if (auto initStatus =
-            cq->init(std::move(expCtx), std::move(parsedFind), std::move(pipeline), isCountLike);
+    if (auto initStatus = cq->initCq(
+            std::move(expCtx), std::move(parsedFind), std::move(cqPipeline), isCountLike);
         !initStatus.isOK()) {
         return initStatus;
     }
@@ -136,9 +136,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
+    OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* matchExpr) {
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
-    findCommand->setFilter(root->serialize());
+    findCommand->setFilter(matchExpr->serialize());
     findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
     findCommand->setSort(baseQuery.getFindCommandRequest().getSort().getOwned());
     findCommand->setCollation(baseQuery.getFindCommandRequest().getCollation().getOwned());
@@ -149,23 +149,23 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     auto swParsedFind = ParsedFindCommand::withExistingFilter(
         baseQuery.getExpCtx(),
         baseQuery.getCollator() ? baseQuery.getCollator()->clone() : nullptr,
-        root->clone(),
+        matchExpr->clone(),
         std::move(findCommand));
     if (!swParsedFind.isOK()) {
         return swParsedFind.getStatus();
     }
-    auto initStatus = cq->init(baseQuery.getExpCtx(),
-                               std::move(swParsedFind.getValue()),
-                               {} /* an empty pipeline */,
-                               baseQuery.isCountLike());
+    auto initStatus = cq->initCq(baseQuery.getExpCtx(),
+                                 std::move(swParsedFind.getValue()),
+                                 {} /* an empty cqPipeline */,
+                                 baseQuery.isCountLike());
     invariant(initStatus.isOK());
     return {std::move(cq)};
 }
 
-Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
-                            std::unique_ptr<ParsedFindCommand> parsedFind,
-                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
-                            bool isCountLike) {
+Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
+                              std::unique_ptr<ParsedFindCommand> parsedFind,
+                              std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
+                              bool isCountLike) {
     _expCtx = expCtx;
     _findCommand = std::move(parsedFind->findCommandRequest);
 
@@ -173,7 +173,7 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
         QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
         QueryFrameworkControlEnum::kForceClassicEngine;
 
-    _root = MatchExpression::normalize(std::move(parsedFind->filter));
+    _primaryMatchExpression = MatchExpression::normalize(std::move(parsedFind->filter));
     if (parsedFind->proj) {
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized
@@ -184,7 +184,7 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
             // MatchExpression, before we save this projection for later execution.
             _proj.emplace(projection_ast::parseAndAnalyze(expCtx,
                                                           _findCommand->getProjection(),
-                                                          _root.get(),
+                                                          _primaryMatchExpression.get(),
                                                           _findCommand->getFilter(),
                                                           *parsedFind->savedProjectionPolicies,
                                                           true /* optimize */));
@@ -196,35 +196,29 @@ Status CanonicalQuery::init(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (parsedFind->sort) {
         _sortPattern = std::move(parsedFind->sort);
     }
-    _pipeline = std::move(pipeline);
+    _cqPipeline = std::move(cqPipeline);
     _isCountLike = isCountLike;
 
-    // Perform auto-parameterization only if the query is SBE-compatible and caching is enabled.
+    // Perform SBE auto-parameterization if there is not already a reason not to.
+    _disablePlanCache = internalQueryDisablePlanCache.load();
+    _maxMatchExpressionParams = loadMaxMatchExpressionParams();
     if (expCtx->sbeCompatibility != SbeCompatibility::notCompatible &&
-        !internalQueryDisablePlanCache.load()) {
-        const bool hasNoTextNodes =
-            !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
-        if (hasNoTextNodes) {
-            // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
-            // caching a parameterized plan. Here we add parameter markers to the appropriate match
-            // expression leaf nodes unless it has too many predicates. If it did not actually get
-            // parameterized, we mark the query as uncacheable for SBE to avoid plan cache flooding.
-            bool parameterized;
-            _inputParamIdToExpressionMap =
-                MatchExpression::parameterize(_root.get(), loadMaxParameterCount(), &parameterized);
-            if (!parameterized) {
-                setUncacheableSbe();
-            }
-        } else {
-            LOGV2_DEBUG(6579310,
-                        5,
-                        "The query was not auto-parameterized since its match expression tree "
-                        "contains TEXT nodes");
+        shouldParameterizeSbe(_primaryMatchExpression.get())) {
+        // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of caching
+        // a parameterized plan. Here we add parameter markers to the appropriate match expression
+        // leaf nodes unless it has too many predicates. If it did not actually get parameterized,
+        // we mark the query as uncacheable for SBE to avoid plan cache flooding.
+        bool parameterized;
+        _inputParamIdToExpressionMap = MatchExpression::parameterize(
+            _primaryMatchExpression.get(), _maxMatchExpressionParams, 0, &parameterized);
+        if (!parameterized) {
+            // Avoid plan cache flooding by not fully parameterized plans.
+            setUncacheableSbe();
         }
     }
     // The tree must always be valid after normalization.
-    dassert(parsed_find_command::isValid(_root.get(), *_findCommand).isOK());
-    if (auto status = isValidNormalized(_root.get()); !status.isOK()) {
+    dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).isOK());
+    if (auto status = isValidNormalized(_primaryMatchExpression.get()); !status.isOK()) {
         return status;
     }
 
@@ -262,7 +256,7 @@ void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
 
     // The collator associated with the match expression tree is now invalid, since we have reset
     // the collator owned by the ExpressionContext.
-    _root->setCollator(collatorRaw);
+    _primaryMatchExpression->setCollator(collatorRaw);
 }
 
 // static
@@ -341,7 +335,7 @@ std::string CanonicalQuery::toString(bool forErrMsg) const {
     }
 
     // The expression tree puts an endl on for us.
-    ss << "Tree: " << _root->debugString();
+    ss << "Tree: " << _primaryMatchExpression->debugString();
     ss << "Sort: " << _findCommand->getSort().toString() << '\n';
     ss << "Proj: " << _findCommand->getProjection().toString() << '\n';
     if (!_findCommand->getCollation().isEmpty()) {
@@ -388,5 +382,13 @@ CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {
     return canonical_query_encoder::encodeForPlanCacheCommand(*this);
+}
+
+bool CanonicalQuery::shouldParameterizeSbe(MatchExpression* matchExpr) const {
+    if (_disablePlanCache || _isUncacheableSbe ||
+        QueryPlannerCommon::hasNode(matchExpr, MatchExpression::TEXT)) {
+        return false;
+    }
+    return true;
 }
 }  // namespace mongo

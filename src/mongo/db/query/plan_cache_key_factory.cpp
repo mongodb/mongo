@@ -149,8 +149,8 @@ PlanCacheKey make(const CanonicalQuery& query,
                   const CollectionPtr& collection,
                   PlanCacheKeyTag<PlanCacheKey> tag) {
     auto shapeString = canonical_query_encoder::encodeClassic(query);
-    return {
-        plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString), query.root(), collection)};
+    return {plan_cache_detail::makePlanCacheKeyInfo(
+        std::move(shapeString), query.getPrimaryMatchExpression(), collection)};
 }
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
@@ -177,8 +177,9 @@ sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAcce
     }
     secondaryCollectionStates.shrink_to_fit();
     auto shapeString = canonical_query_encoder::encodeSBE(query);
-    return {plan_cache_detail::makePlanCacheKeyInfo(
-                std::move(shapeString), query.root(), collections.getMainCollection()),
+    return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
+                                                    query.getPrimaryMatchExpression(),
+                                                    collections.getMainCollection()),
             std::move(mainCollectionState),
             std::move(secondaryCollectionStates)};
 }

@@ -160,7 +160,8 @@ bool ensureStillMatches(const CollectionPtr& collection,
         }
 
         // Make sure the re-fetched doc still matches the predicate.
-        if (cq && !cq->root()->matchesBSON(member->doc.value().toBson(), nullptr)) {
+        if (cq &&
+            !cq->getPrimaryMatchExpression()->matchesBSON(member->doc.value().toBson(), nullptr)) {
             // No longer matches.
             return false;
         }

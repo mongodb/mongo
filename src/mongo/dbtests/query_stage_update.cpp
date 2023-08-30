@@ -338,8 +338,11 @@ public:
             updateParams.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto cs = make_unique<CollectionScan>(
-                _expCtx.get(), collection, collScanParams, ws.get(), cq->root());
+            auto cs = make_unique<CollectionScan>(_expCtx.get(),
+                                                  collection,
+                                                  collScanParams,
+                                                  ws.get(),
+                                                  cq->getPrimaryMatchExpression());
 
             auto updateStage = make_unique<UpdateStage>(
                 _expCtx.get(), updateParams, ws.get(), collection, cs.release());

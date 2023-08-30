@@ -2088,7 +2088,7 @@ bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
         return false;
     }
 
-    auto matchExpr = cq.root();
+    auto matchExpr = cq.getPrimaryMatchExpression();
     invariant(matchExpr);
 
     // In order to be retryable, the update query must contain no expressions other than AND and EQ.

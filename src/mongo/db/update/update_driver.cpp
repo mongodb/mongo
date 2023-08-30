@@ -214,7 +214,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     }
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    return populateDocumentWithQueryFields(*cq->root(), immutablePaths, doc);
+    return populateDocumentWithQueryFields(*cq->getPrimaryMatchExpression(), immutablePaths, doc);
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(const MatchExpression& query,

@@ -454,25 +454,6 @@ void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuild
     // not be stable between versions.
 }
 
-void encodePipeline(const OperationContext* opCtx,
-                    const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& pipeline,
-                    BufBuilder* bufBuilder) {
-    bufBuilder->appendChar(kEncodeSectionDelimiter);
-    std::vector<Value> serializedArray;
-    for (auto& stage : pipeline) {
-        serializedArray.clear();
-        stage->documentSource()->serializeToArray(serializedArray);
-
-        for (const auto& value : serializedArray) {
-            tassert(6443201,
-                    "Expected pipeline stage to serialize to objects",
-                    value.getType() == Object);
-            const auto bson = value.getDocument().toBson();
-            bufBuilder->appendBuf(bson.objdata(), bson.objsize());
-        }
-    }
-}
-
 template <class RegexIterator>
 void encodeRegexFlagsForMatch(RegexIterator first, RegexIterator last, StringBuilder* keyBuilder) {
     // We sort the flags, so that queries with the same regex flags in different orders will have
@@ -701,27 +682,7 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
     }
     bufBuilder->appendChar(isAvailableReadConcern ? 't' : 'f');
 }
-}  // namespace
 
-namespace canonical_query_encoder {
-
-CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
-    StringBuilder keyBuilder;
-    encodeKeyForMatch(cq.root(), &keyBuilder);
-    encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
-    encodeKeyForProj(cq.getProj(), &keyBuilder);
-    encodeCollation(cq.getCollator(), &keyBuilder);
-
-    // The apiStrict flag can cause the query to see different set of indexes. For example, all
-    // sparse indexes will be ignored with apiStrict is used.
-    const bool apiStrict =
-        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
-    keyBuilder << (apiStrict ? "t" : "f");
-
-    return keyBuilder.str();
-}
-
-namespace {
 /**
  * A visitor intended for use in combination with the corresponding walker class below to encode a
  * 'MatchExpression' into the SBE plan cache key.
@@ -1115,7 +1076,53 @@ void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilde
     MatchExpressionSbePlanCacheKeySerializationWalker walker{builder};
     tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
+
+/**
+ * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
+ */
+void encodePipeline(const OperationContext* opCtx,
+                    const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline,
+                    BufBuilder* bufBuilder) {
+    bufBuilder->appendChar(kEncodeSectionDelimiter);
+    std::vector<Value> serializedArray;
+    for (auto& stage : cqPipeline) {
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage->documentSource());
+        if (matchStage) {
+            // Match expressions are parameterized so need to be encoded differently.
+            encodeKeyForAutoParameterizedMatchSBE(matchStage->getMatchExpression(), bufBuilder);
+        } else {
+            serializedArray.clear();
+            stage->documentSource()->serializeToArray(serializedArray);
+
+            for (const auto& value : serializedArray) {
+                tassert(6443201,
+                        "Expected pipeline stage to serialize to objects",
+                        value.getType() == Object);
+                const BSONObj bson = value.getDocument().toBson();
+                bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+            }
+        }
+    }  // for each stage in 'cqPipeline'
+}
 }  // namespace
+
+namespace canonical_query_encoder {
+
+CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
+    StringBuilder keyBuilder;
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
+    encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
+    encodeKeyForProj(cq.getProj(), &keyBuilder);
+    encodeCollation(cq.getCollator(), &keyBuilder);
+
+    // The apiStrict flag can cause the query to see different set of indexes. For example, all
+    // sparse indexes will be ignored with apiStrict is used.
+    const bool apiStrict =
+        cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
+    keyBuilder << (apiStrict ? "t" : "f");
+
+    return keyBuilder.str();
+}
 
 std::string encodeSBE(const CanonicalQuery& cq) {
     tassert(6142104,
@@ -1139,8 +1146,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
         kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
-    encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
-
+    encodeKeyForAutoParameterizedMatchSBE(cq.getPrimaryMatchExpression(), &bufBuilder);
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(kEncodeSectionDelimiter);
@@ -1164,14 +1170,14 @@ std::string encodeSBE(const CanonicalQuery& cq) {
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 
-    encodePipeline(cq.getOpCtx(), cq.pipeline(), &bufBuilder);
+    encodePipeline(cq.getOpCtx(), cq.cqPipeline(), &bufBuilder);
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
 CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
-    encodeKeyForMatch(cq.root(), &keyBuilder);
+    encodeKeyForMatch(cq.getPrimaryMatchExpression(), &keyBuilder);
     encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
     encodeKeyForProj(cq.getProj(), &keyBuilder);
 

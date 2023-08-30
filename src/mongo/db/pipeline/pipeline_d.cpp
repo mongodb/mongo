@@ -594,10 +594,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     auto extractAndAttachPipelineStages = [&collections, &pipeline, needsMerge{expCtx->needsMerge}](
                                               auto* canonicalQuery, bool attachOnly) {
         if (attachOnly) {
-            canonicalQuery->setPipeline(findSbeCompatibleStagesForPushdown(
+            canonicalQuery->setCqPipeline(findSbeCompatibleStagesForPushdown(
                 collections, canonicalQuery, needsMerge, pipeline));
         } else {
-            trimPipelineStages(pipeline, canonicalQuery->pipeline().size());
+            trimPipelineStages(pipeline, canonicalQuery->cqPipeline().size());
         }
     };
 

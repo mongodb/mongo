@@ -258,7 +258,18 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         }
     }
 
-    input_params::bind(cq, *data, preparingFromCache);
+    // This block binds parameters into the main MatchExpression and any additional ones that have
+    // been pushed down via 'cq._cqPipeline'. The corresponding SBE plan cache key construction was
+    // done in encodeSBE() (canonical_query_encoder.cpp). The main MatchExpression was parameterized
+    // in CanonicalQuery::cqInit() and the pushed-down ones in QueryPlanner::extendWithAggPipeline()
+    // (query_planner.cpp).
+    input_params::bind(cq.getPrimaryMatchExpression(), *data, preparingFromCache);
+    for (auto& innerStage : cq.cqPipeline()) {
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage->documentSource());
+        if (matchStage) {
+            input_params::bind(matchStage->getMatchExpression(), *data, preparingFromCache);
+        }
+    }
 
     interval_evaluation_tree::IndexBoundsEvaluationCache indexBoundsEvaluationCache;
     for (auto&& indexBoundsInfo : data->staticData->indexBoundsEvaluationInfos) {

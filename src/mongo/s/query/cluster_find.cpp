@@ -341,7 +341,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     bool appendGeoNearDistanceProjection = false;
     bool compareWholeSortKeyOnRouter = false;
     if (!query.getSortPattern() &&
-        QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+        QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR)) {
         // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
         // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
         // shards. Indicate to the AsyncResultsMerger that it should extract the sort key

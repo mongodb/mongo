@@ -202,9 +202,8 @@ void updatePlanCacheFromCandidates(
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
     QuerySolution* solution = winningPlan.solution.get();
-    // TODO SERVER-78817 remove isUncacheableSbe() call when binding is implemented.
-    if (canCache && shouldCacheQuery(query) && solution->isEligibleForPlanCache() &&
-        !query.isUncacheableSbe()) {
+    if (canCache && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
+        solution->isEligibleForPlanCache()) {
         const CollectionPtr& collection = collections.getMainCollection();
         auto rankingDecision = ranking.get();
         auto cacheClassicPlan = [&]() {

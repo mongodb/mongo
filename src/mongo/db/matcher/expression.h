@@ -351,8 +351,10 @@ public:
      * Assigns an optional input parameter ID to each node which is eligible for
      * auto-parameterization.
      * - tree - The MatchExpression to be parameterized.
-     * - maxParameterCount - Optional maximum number of parameters that can be created. If the
+     * - maxParamCount - Optional maximum number of parameters that can be created. If the
      *   number of parameters would exceed this value, no parameterization will be performed.
+     * - startingParamId - Optional first parameter ID to use. This enables parameterizing a forest
+     *   of match expressions, where each tree continues IDs where the prior one left off.
      * - parameterized - Optional output argument. If non-null, the method sets this output to
      *   indicate whether parameterization was actually done.
      *
@@ -361,7 +363,8 @@ public:
      */
     static std::vector<const MatchExpression*> parameterize(
         MatchExpression* tree,
-        boost::optional<size_t> maxParameterCount = boost::none,
+        boost::optional<size_t> maxParamCount = boost::none,
+        InputParamId startingParamId = 0,
         bool* parameterized = nullptr);
 
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);

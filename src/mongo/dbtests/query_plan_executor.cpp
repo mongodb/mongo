@@ -142,8 +142,8 @@ public:
         MONGO_verify(nullptr != cq.get());
 
         // Make the stage.
-        unique_ptr<PlanStage> root(
-            new CollectionScan(cq->getExpCtxRaw(), coll, csparams, ws.get(), cq.get()->root()));
+        unique_ptr<PlanStage> root(new CollectionScan(
+            cq->getExpCtxRaw(), coll, csparams, ws.get(), cq->getPrimaryMatchExpression()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = plan_executor_factory::make(std::move(cq),

@@ -1188,7 +1188,7 @@ bool isEligibleForBonsai(ServiceContext* serviceCtx,
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq, QueryFrameworkControlEnum frameworkControl) {
-    auto expression = cq.root();
+    auto expression = cq.getPrimaryMatchExpression();
 
     auto hint = cq.getFindCommandRequest().getHint();
     bool hasNaturalHint = !hint.isEmpty() &&

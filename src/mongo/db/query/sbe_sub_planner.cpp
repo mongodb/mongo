@@ -113,7 +113,7 @@ CandidatePlans SubPlanner::plan(
     auto compositeSolution = std::move(subplanSelectStat.getValue());
 
     // If some agg pipeline stages are being pushed down, extend the solution with them.
-    if (!_cq.pipeline().empty()) {
+    if (!_cq.cqPipeline().empty()) {
         compositeSolution = QueryPlanner::extendWithAggPipeline(
             _cq, std::move(compositeSolution), _queryParams.secondaryCollectionsInfo);
     }
@@ -145,7 +145,7 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     // Only one possible plan. Build the stages from the solution.
     if (solutions.size() == 1) {
         // If some agg pipeline stages are being pushed down, extend the solution with them.
-        if (!_cq.pipeline().empty()) {
+        if (!_cq.cqPipeline().empty()) {
             solutions[0] = QueryPlanner::extendWithAggPipeline(
                 _cq, std::move(solutions[0]), _queryParams.secondaryCollectionsInfo);
         }

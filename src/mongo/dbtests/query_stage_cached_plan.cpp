@@ -176,7 +176,7 @@ public:
 
             if (state == PlanStage::ADVANCED) {
                 auto member = ws.get(id);
-                ASSERT(cq->root()->matchesBSON(member->doc.value().toBson()));
+                ASSERT(cq->getPrimaryMatchExpression()->matchesBSON(member->doc.value().toBson()));
                 numResults++;
             }
         }

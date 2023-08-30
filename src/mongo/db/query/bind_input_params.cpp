@@ -473,12 +473,12 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
 }
 }  // namespace
 
-void bind(const CanonicalQuery& canonicalQuery,
+void bind(const MatchExpression* matchExpr,
           stage_builder::PlanStageData& data,
           const bool bindingCachedPlan) {
     MatchExpressionParameterBindingVisitor visitor{data, bindingCachedPlan};
     MatchExpressionParameterBindingWalker walker{&visitor};
-    tree_walker::walk<true, MatchExpression>(canonicalQuery.root(), &walker);
+    tree_walker::walk<true, MatchExpression>(matchExpr, &walker);
 }
 
 void bindIndexBounds(
@@ -510,7 +510,7 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
                                    sbe::RuntimeEnvironment* runtimeEnvironment) {
     // Arguments needed to mimic the original build-time bounds setting from the current query.
     auto clusteredBoundInfos = data->staticData->clusteredCollBoundsInfos;
-    const MatchExpression* conjunct = cq.root();  // this is csn->filter
+    const MatchExpression* conjunct = cq.getPrimaryMatchExpression();  // this is csn->filter
     bool minAndMaxEmpty = cq.getFindCommandRequest().getMin().isEmpty() &&
         cq.getFindCommandRequest().getMax().isEmpty();
 
@@ -519,7 +519,7 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
     // we cannot correctly calculate the correct bounds for the query using the cached plan.
     tassert(6125900,
             "OR queries with clustered collection scans are not supported by the SBE cache.",
-            cq.root()->matchType() != MatchExpression::OR || !minAndMaxEmpty);
+            cq.getPrimaryMatchExpression()->matchType() != MatchExpression::OR || !minAndMaxEmpty);
 
     tassert(7228000,
             "We only expect to cache plans with one clustered collection scan.",

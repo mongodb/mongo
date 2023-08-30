@@ -231,8 +231,8 @@ BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
         transitional_tools_do_not_use::unspool_vector(shardKeyPattern.getKeyPatternFields()));
     // We only care about extracting the full key pattern paths - if they don't exist (or are
     // conflicting), we don't contain the shard key.
-    Status eqStatus =
-        pathsupport::extractFullEqualityMatches(*query.root(), keyPatternPathSet, &equalities);
+    Status eqStatus = pathsupport::extractFullEqualityMatches(
+        *query.getPrimaryMatchExpression(), keyPatternPathSet, &equalities);
     // NOTE: Failure to extract equality matches just means we return no shard key - it's not
     // an error we propagate
     if (!eqStatus.isOK())
@@ -366,14 +366,16 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
     // $text is not allowed in planning since we don't have text index on mongos.
     // TODO: Treat $text query as a no-op in planning on mongos. So with shard key {a: 1},
     //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
-    if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
+    if (QueryPlannerCommon::hasNode(canonicalQuery.getPrimaryMatchExpression(),
+                                    MatchExpression::TEXT)) {
         IndexBounds bounds;
         IndexBoundsBuilder::allValuesBounds(key, &bounds, false);  // [minKey, maxKey]
         return bounds;
     }
 
     // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on mongos.
-    if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::GEO_NEAR)) {
+    if (QueryPlannerCommon::hasNode(canonicalQuery.getPrimaryMatchExpression(),
+                                    MatchExpression::GEO_NEAR)) {
         // If the GEO_NEAR predicate is a child of AND, remove the GEO_NEAR and continue building
         // bounds. Currently a CanonicalQuery can have at most one GEO_NEAR expression, and only at
         // the top-level, so this check is sufficient.
@@ -386,7 +388,7 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
                 }
             }
             return boost::none;
-        }(canonicalQuery.root());
+        }(canonicalQuery.getPrimaryMatchExpression());
 
         if (!geoIdx) {
             IndexBounds bounds;
@@ -394,8 +396,8 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
             return bounds;
         }
 
-        canonicalQuery.root()->getChildVector()->erase(
-            canonicalQuery.root()->getChildVector()->begin() + geoIdx.value());
+        canonicalQuery.getPrimaryMatchExpression()->getChildVector()->erase(
+            canonicalQuery.getPrimaryMatchExpression()->getChildVector()->begin() + geoIdx.value());
     }
 
     // Consider shard key as an index

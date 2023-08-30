@@ -75,14 +75,14 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
       _plannerParams(params),
       _query(cq) {
     invariant(cq);
-    invariant(_query->root()->matchType() == MatchExpression::OR);
-    invariant(_query->root()->numChildren(),
+    invariant(_query->getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
+    invariant(_query->getPrimaryMatchExpression()->numChildren(),
               "Cannot use a SUBPLAN stage for an $or with no children");
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
-    const MatchExpression* expr = query.root();
+    const MatchExpression* expr = query.getPrimaryMatchExpression();
 
     // Hint provided
     if (!findCommand.getHint().isEmpty()) {
@@ -113,7 +113,7 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
 Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     tassert(5842902,
             "Lowering parts of aggregation pipeline is only supported in SBE",
-            _query->pipeline().empty());
+            _query->cqPipeline().empty());
 
     // Clear out the working set. We'll start with a fresh working set.
     _ws->clear();
