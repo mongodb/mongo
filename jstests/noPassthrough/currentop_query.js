@@ -4,6 +4,8 @@
  * @tags: [
  *    requires_replication,
  *    requires_sharding,
+ *    # TODO SERVER-71280: Add test coverage for currentOp with CQF queries
+ *    cqf_incompatible
  * ]
  */
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";

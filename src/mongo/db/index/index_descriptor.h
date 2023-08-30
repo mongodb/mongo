@@ -248,6 +248,10 @@ public:
         return _shared->_isIdIndex;
     }
 
+    bool isHashedIdIndex() const {
+        return _shared->_isHashedIdIndex;
+    }
+
     // Return a (rather compact) std::string representation.
     std::string toString() const {
         return _shared->_infoObj.toString();
@@ -320,6 +324,23 @@ public:
         return intVal == 1 || intVal == -1;
     }
 
+    /**
+     * Returns true if the key pattern is for the _id index and is hashed.
+     * The _id index must have form exactly {_id : "hashed"}.
+     */
+    static bool isHashedIdIndex(const BSONObj& pattern) {
+        BSONObjIterator iter(pattern);
+        BSONElement firstElement = iter.next();
+        if (iter.next()) {
+            return false;
+        }
+        if (firstElement.fieldNameStringData() != "_id"_sd) {
+            return false;
+        }
+        auto strVal = firstElement.valueStringDataSafe();
+        return strVal == "hashed"_sd;
+    }
+
 private:
     /*
      * Holder of shared state between IndexDescriptor clones.
@@ -344,6 +365,7 @@ private:
             _normalizedProjection;  // for wildcardProjection / columnstoreProjection; never changes
         std::string _indexName;
         bool _isIdIndex;
+        bool _isHashedIdIndex;
         bool _sparse;
         bool _unique;
         bool _hidden;

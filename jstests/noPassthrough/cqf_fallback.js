@@ -454,11 +454,18 @@ assertSupportedByBonsaiFully(
 assertSupportedByBonsaiFully(
     {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}});
 
-// Queries on a collection with a hashed index are unsupported.
+// Queries on a collection with a hashed index are supported.
 coll.drop();
 assert.commandWorked(coll.createIndex({"_id": "hashed"}));
-assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
-assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// Queries on a collection with a hashed index that reference _id only experimentally supported,
+// tryBonsai falls back to classic engine
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {_id: 1}}, false);
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {a: 1}});
 
 // Query with $natural on a collection with a hashed index on _id is only eligible for CQF with a
 // $natural hint.

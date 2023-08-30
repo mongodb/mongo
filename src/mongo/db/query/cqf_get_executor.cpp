@@ -186,6 +186,12 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
             continue;
         }
 
+        // We support the presence of hashed id indexes in CQF. However. we don't add them to the
+        // optimizer metadata as we don't know how to generate plans that use them yet.
+        if (descriptor.isHashedIdIndex()) {
+            continue;
+        }
+
         // If there is a $natural hint, we should not assert here as we will not use the index.
         const bool isSpecialIndex =
             descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||

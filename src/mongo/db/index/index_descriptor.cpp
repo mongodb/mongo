@@ -175,6 +175,7 @@ IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, B
       _projection(createPathProjection(infoObj)),
       _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
       _isIdIndex(isIdIndexPattern(_keyPattern)),
+      _isHashedIdIndex(isHashedIdIndex(_keyPattern)),
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _hidden(infoObj[kHiddenFieldName].trueValue()),

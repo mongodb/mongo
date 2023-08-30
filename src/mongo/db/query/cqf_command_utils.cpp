@@ -1122,16 +1122,25 @@ bool isEligibleCommon(const RequestType& request,
                 continue;
             }
 
-            // In M2, we should fall back on any non-hidden, non-_id index on a query with no
+            // In M2, allow {id: 'hashed'} index for test coverage purposes, but we don't add it to
+            // the metadata.
+            if (descriptor.isHashedIdIndex()) {
+                continue;
+            }
+
+            // In M2, we should fallback on any non-hidden, non-_id index on a query with no
             // $natural hint.
             if (!descriptor.isIdIndex() &&
                 frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
                 return false;
             }
 
+            if (descriptor.getIndexType() != IndexType::INDEX_BTREE) {
+                return false;
+            }
+
             if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
                 descriptor.isPartial() || descriptor.isSparse() ||
-                descriptor.getIndexType() != IndexType::INDEX_BTREE ||
                 !descriptor.collation().isEmpty()) {
                 return false;
             }
