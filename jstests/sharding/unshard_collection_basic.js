@@ -28,7 +28,9 @@ const coll = st.s.getDB(dbName)["collName"];
 assert.commandWorked(coll.insert({oldKey: 1}));
 
 // Fail if collection is unsharded.
-assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
+let result = mongos.adminCommand(cmdObj);
+assert.commandFailedWithCode(result, ErrorCodes.NamespaceNotSharded);
+assert.eq(result.errmsg, "Namespace must be sharded to perform an unshardCollection command");
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 assert.commandWorked(coll.createIndex({oldKey: 1}));

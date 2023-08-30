@@ -59,6 +59,13 @@ public:
                     serverGlobalParams.featureCompatibility));
 
             const auto& nss = ns();
+            const auto& catalogCache = Grid::get(opCtx)->catalogCache();
+            const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    "Namespace must be sharded to perform an unshardCollection command",
+                    cri.cm.isSharded());
+
             ShardsvrReshardCollection shardsvrReshardCollection(nss);
             shardsvrReshardCollection.setDbName(request().getDbName());
 
@@ -86,7 +93,6 @@ public:
                   "dbName"_attr = request().getDbName(),
                   "toShard"_attr = request().getToShard());
 
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
