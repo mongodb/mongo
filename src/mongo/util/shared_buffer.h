@@ -113,7 +113,7 @@ public:
     }
 
     /**
-     * Returns true if this object has exclusive access to the underlying buffer.
+     * Returns false if this object has exclusive access to the underlying buffer.
      * (That is, reference count == 1).
      */
     bool isShared() const {
