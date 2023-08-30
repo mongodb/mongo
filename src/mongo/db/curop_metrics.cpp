@@ -54,6 +54,7 @@ CounterMetric writeConflictsCounter("operation.writeConflicts");
 
 // mongos and mongod metrics
 CounterMetric killedDueToClientDisconnectCounter("operation.killedDueToClientDisconnect");
+CounterMetric killedDueToMaxTimeMSExpiredCounter("operation.killedDueToMaxTimeMSExpired");
 
 }  // namespace
 
@@ -86,6 +87,11 @@ void recordCurOpMetrics(OperationContext* opCtx) {
 
     if (opCtx->getKillStatus() == ErrorCodes::ClientDisconnect) {
         killedDueToClientDisconnectCounter.increment();
+    }
+
+    if (opCtx->getKillStatus() == ErrorCodes::MaxTimeMSExpired ||
+        debug.errInfo == ErrorCodes::MaxTimeMSExpired) {
+        killedDueToMaxTimeMSExpiredCounter.increment();
     }
 }
 

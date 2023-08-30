@@ -21,6 +21,8 @@ var admin = mongos.getDB("admin");
 var cursor;
 var res;
 
+const defaultMaxTimeMS = 60 * 1000;
+
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
 // to throw if it receives an operation with a max time. See fail point declaration for complete
 // description.
@@ -70,7 +72,7 @@ assert.eq(nDocsPerShard, shards[1].getCollection(coll.getFullName()).count());
 // Positive test.
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 cursor = coll.find();
-cursor.maxTimeMS(60 * 1000);
+cursor.maxTimeMS(defaultMaxTimeMS);
 assert.throws(function() {
     cursor.next();
 }, [], "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point");
@@ -78,7 +80,7 @@ assert.throws(function() {
 // Negative test.
 configureMaxTimeAlwaysTimeOut("off");
 cursor = coll.find();
-cursor.maxTimeMS(60 * 1000);
+cursor.maxTimeMS(defaultMaxTimeMS);
 assert.doesNotThrow(function() {
     cursor.next();
 }, [], "expected query to not hit time limit in mongod");
@@ -128,11 +130,21 @@ configureMaxTimeNeverTimeOut("off");
 // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
 //
 
+let assertCommandFailedWithMaxTimeMSExpired =
+    (commandName, failMessage) => {
+        const maxTimeMSCounter = admin.serverStatus().metrics.operation.killedDueToMaxTimeMSExpired;
+        assert.commandFailedWithCode(coll.runCommand(commandName, {maxTimeMS: defaultMaxTimeMS}),
+                                     ErrorCodes.MaxTimeMSExpired,
+                                     failMessage);
+
+        assert.gt(admin.serverStatus().metrics.operation.killedDueToMaxTimeMSExpired,
+                  maxTimeMSCounter);
+    }
+
 // Positive test for "validate".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
-assert.commandFailedWithCode(
-    coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
-    ErrorCodes.MaxTimeMSExpired,
+assertCommandFailedWithMaxTimeMSExpired(
+    "validate",
     "expected vailidate to fail with code " + ErrorCodes.MaxTimeMSExpired +
         " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
@@ -143,9 +155,8 @@ assert.commandWorked(coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
 
 // Positive test for "count".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
-assert.commandFailedWithCode(
-    coll.runCommand("count", {maxTimeMS: 60 * 1000}),
-    ErrorCodes.MaxTimeMSExpired,
+assertCommandFailedWithMaxTimeMSExpired(
+    "count",
     "expected count to fail with code " + ErrorCodes.MaxTimeMSExpired +
         " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
@@ -156,9 +167,8 @@ assert.commandWorked(coll.runCommand("count", {maxTimeMS: 60 * 1000}),
 
 // Positive test for "collStats".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
-assert.commandFailedWithCode(
-    coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
-    ErrorCodes.MaxTimeMSExpired,
+assertCommandFailedWithMaxTimeMSExpired(
+    "collStats",
     "expected collStats to fail with code " + ErrorCodes.MaxTimeMSExpired +
         " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
@@ -177,7 +187,7 @@ res = coll.runCommand("mapReduce", {
         return 0;
     },
     out: {inline: 1},
-    maxTimeMS: 60 * 1000
+    maxTimeMS: defaultMaxTimeMS
 });
 assert.commandFailedWithCode(
     res,
@@ -195,22 +205,23 @@ assert.commandWorked(coll.runCommand("mapReduce", {
         return 0;
     },
     out: {inline: 1},
-    maxTimeMS: 60 * 1000
+    maxTimeMS: defaultMaxTimeMS
 }),
                      "expected mapReduce to not hit time limit in mongod");
 
 // Positive test for "aggregate".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assert.commandFailedWithCode(
-    coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
+    coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: defaultMaxTimeMS}),
     ErrorCodes.MaxTimeMSExpired,
     "expected aggregate to fail with code " + ErrorCodes.MaxTimeMSExpired +
         " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
 // Negative test for "aggregate".
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
-                     "expected aggregate to not hit time limit in mongod");
+assert.commandWorked(
+    coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: defaultMaxTimeMS}),
+    "expected aggregate to not hit time limit in mongod");
 
 // Positive test for "setFeatureCompatibilityVersion"
 configureMaxTimeAlwaysTimeOut("alwaysOn");
