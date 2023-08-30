@@ -350,8 +350,7 @@ private:
         // completed. Must be used in conjunction with the loader's mutex.
         std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
     };
-    // TODO SERVER-80342 change string type to DatabaseName.
-    typedef std::map<std::string, DbTaskList> DbTaskLists;
+    typedef std::map<DatabaseName, DbTaskList> DbTaskLists;
 
     typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;
 

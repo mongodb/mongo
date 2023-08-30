@@ -666,8 +666,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
-        // TODO SERVER-80342 _dbTaskLists to pass a DatabaseName
-        auto it = _dbTaskLists.find(DatabaseNameUtil::serialize(dbName));
+        auto it = _dbTaskLists.find(dbName);
 
         // If there are no tasks for the specified namespace, everything must have been completed
         if (it == _dbTaskLists.end())
@@ -712,7 +711,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             // It is only correct to wait again on condVar if the taskNum has not changed, meaning
             // that it must still be the same task list.
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
-                const auto it = _dbTaskLists.find(DatabaseNameUtil::serialize(dbName));
+                const auto it = _dbTaskLists.find(dbName);
                 return it == _dbTaskLists.end() || it->second.empty() ||
                     it->second.front().taskNum != activeTaskNum;
             });
@@ -1074,12 +1073,10 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
     // Ensure that this node is primary before using or persisting the information fetched from the
     // config server. This prevents using incorrect filtering information in split brain scenarios.
     performNoopMajorityWriteLocally(opCtx, "ensureMajorityPrimaryAndScheduleDbTask");
-    const auto db = DatabaseNameUtil::serialize(dbName);
     {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        // TODO SERVER-80342 _dbTaskLists handles DatabaseName objects.
-        auto& list = _dbTaskLists[db];
+        auto& list = _dbTaskLists[dbName];
         auto wasEmpty = list.empty();
         list.addTask(std::move(task));
 
@@ -1225,26 +1222,26 @@ void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
 
         // If task completed successfully, remove it from work queue.
         if (taskFinished) {
-            _dbTaskLists[db].pop_front();
+            _dbTaskLists[dbName].pop_front();
         }
 
         // Return if have no more work
-        if (_dbTaskLists[db].empty()) {
-            _dbTaskLists.erase(db);
+        if (_dbTaskLists[dbName].empty()) {
+            _dbTaskLists.erase(dbName);
             return;
         }
 
         // If shutting down need to remove tasks to end waiting on its completion.
         if (inShutdown) {
-            while (!_dbTaskLists[db].empty()) {
-                _dbTaskLists[db].pop_front();
+            while (!_dbTaskLists[dbName].empty()) {
+                _dbTaskLists[dbName].pop_front();
             }
-            _dbTaskLists.erase(db);
+            _dbTaskLists.erase(dbName);
             return;
         }
     }
 
-    _executor->schedule([this, name = db, dbName](auto status) {
+    _executor->schedule([this, dbName](auto status) {
         if (status.isOK()) {
             _runDbTasks(dbName);
             return;
@@ -1263,7 +1260,7 @@ void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);
-                _dbTaskLists.erase(name);
+                _dbTaskLists.erase(dbName);
             }
         } else {
             fassertFailedWithStatus(4826403, status);
@@ -1319,10 +1316,9 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
 
 void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext* opCtx,
                                                                const DatabaseName& dbName) {
-    const auto db = DatabaseNameUtil::serialize(dbName);
     stdx::unique_lock<Latch> lock(_mutex);
 
-    const DBTask& task = _dbTaskLists[db].front();
+    const DBTask& task = _dbTaskLists[dbName].front();
 
     // If this task is from an old term and no longer valid, do not execute and return true so that
     // the task gets removed from the task list
