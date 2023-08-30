@@ -104,7 +104,6 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
         OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
         BSON("_id"
              << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
@@ -128,7 +127,6 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
                    << "abc"
                    << "_id"
                    << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
@@ -151,7 +149,6 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
         BSON("key" << 100 << "_id"
                    << "hello"
                    << "key2" << true));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
@@ -171,7 +168,6 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
         OpObserverImpl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
         BSON("_id"
              << "hello"));
-    ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
 

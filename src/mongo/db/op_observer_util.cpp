@@ -31,6 +31,7 @@
 
 #include "mongo/db/op_observer_util.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
@@ -66,6 +67,16 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
     }
 
     return cmdObjBuilder.obj();
+}
+
+OpObserverImpl::DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern,
+                                           BSONObj const& doc) {
+    auto idField = doc["_id"];
+    BSONObj id = idField ? idField.wrap() : doc;
+
+    return {std::move(id),
+            dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern.toBSON())
+                .getOwned()};
 }
 
 }  // namespace mongo

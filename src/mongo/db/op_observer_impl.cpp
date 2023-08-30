@@ -325,6 +325,10 @@ BSONObj OpObserverImpl::DocumentKey::getId() const {
     return _id;
 }
 
+boost::optional<BSONObj> OpObserverImpl::DocumentKey::getShardKey() const {
+    return _shardKey;
+}
+
 BSONObj OpObserverImpl::DocumentKey::getShardKeyAndId() const {
     if (_shardKey) {
         BSONObjBuilder builder(_shardKey.get());
@@ -840,7 +844,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
             shardObserveDeleteOp(opCtx,
                                  nss,
-                                 documentKey.getShardKeyAndId(),
+                                 documentKey,
                                  opTime.writeOpTime,
                                  shardingWriteRouter,
                                  opTime.prePostImageOpTime,

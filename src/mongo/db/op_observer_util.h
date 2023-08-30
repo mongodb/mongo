@@ -32,9 +32,15 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
                           boost::optional<IndexCollModInfo> indexInfo);
+
+OpObserverImpl::DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern,
+                                           BSONObj const& doc);
+
 }  // namespace mongo
