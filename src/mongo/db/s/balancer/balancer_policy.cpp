@@ -97,10 +97,6 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
     return i->second;
 }
 
-Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
-    return _zoneInfo.addRangeToZone(range);
-}
-
 string DistributionStatus::getZoneForChunk(const ChunkType& chunk) const {
     return _zoneInfo.getZoneForChunk(chunk.getRange());
 }
@@ -198,7 +194,7 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
         }
     }
 
-    return zoneInfo;
+    return {std::move(zoneInfo)};
 }
 
 Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,

@@ -98,15 +98,6 @@ public:
                                                                        const NamespaceString& nss,
                                                                        const ChunkType& chunk);
 
-    /**
-     * Asks the chunk selection policy to validate that the specified chunk migration is allowed
-     * given the current rules. Returns `OK` if the migration won't violate any rules or any other
-     * failed status otherwise.
-     */
-    Status checkMoveAllowed(OperationContext* opCtx,
-                            const ChunkType& chunk,
-                            const ShardId& newShardId);
-
 private:
     /**
      * Synchronous method, which iterates the collection's chunks and uses the zones information to
