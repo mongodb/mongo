@@ -1031,7 +1031,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
         sc.setTenantIdSource(nonPrefixedTenantId);
 
         OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, {}, sc);
+            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
         ASSERT(msg.validatedTenancyScope);
         ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
         // Verify $tenant is added to the msg body, as the vts does not come from security token.
@@ -1066,7 +1066,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
         sc.setTenantIdSource(nonPrefixedTenantId);
 
         OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, {}, sc);
+            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
         ASSERT(msg.validatedTenancyScope);
         ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
         // Verify $tenant is added to the msg body, as the vts does not come from security token.
@@ -1103,7 +1103,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
         sc.setTenantIdSource(nonPrefixedTenantId);
 
         OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, {}, sc);
+            DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
         ASSERT(msg.validatedTenancyScope);
         ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
         // Verify $tenant is added to the msg body, as the vts does not come from security token.

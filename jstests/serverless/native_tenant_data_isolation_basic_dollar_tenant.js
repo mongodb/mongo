@@ -4,7 +4,7 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({
-    nodes: 3,
+    nodes: 2,
     nodeOptions: {
         auth: '',
         setParameter: {
@@ -29,6 +29,7 @@ const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
+const kViewName = "view1";
 const testDb = primary.getDB(kDbName);
 const testColl = testDb.getCollection(kCollName);
 
@@ -38,14 +39,13 @@ const testColl = testDb.getCollection(kCollName);
 
 // Test create and listCollections commands, plus $listCatalog aggregate, on collection.
 {
-    const viewName = "view1";
     const targetViews = 'system.views';
 
     // Create a collection for the tenant kTenant, and then create a view on the collection.
     assert.commandWorked(
         testColl.getDB().createCollection(testColl.getName(), {'$tenant': kTenant}));
     assert.commandWorked(testDb.runCommand(
-        {"create": viewName, "viewOn": kCollName, pipeline: [], '$tenant': kTenant}));
+        {"create": kViewName, "viewOn": kCollName, pipeline: [], '$tenant': kTenant}));
 
     const colls = assert.commandWorked(
         testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
@@ -53,7 +53,7 @@ const testColl = testDb.getCollection(kCollName);
     const expectedColls = [
         {"name": kCollName, "type": "collection"},
         {"name": targetViews, "type": "collection"},
-        {"name": viewName, "type": "view"}
+        {"name": kViewName, "type": "view"}
     ];
     assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
 
@@ -73,7 +73,7 @@ const testColl = testDb.getCollection(kCollName);
     // Also check that the resulting array contains views specific to our target database.
     assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)),
            tojson(resultArray));
-    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)),
+    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kViewName)),
            tojson(resultArray));
 
     // Get catalog when specifying our target collection, which should only return one result.
@@ -254,6 +254,13 @@ const testColl = testDb.getCollection(kCollName);
     const resDistinctOtherUser = assert.commandWorked(
         testDb.runCommand({distinct: kCollName, key: 'd', query: {}, '$tenant': kOtherTenant}));
     assert.eq([], resDistinctOtherUser.values, tojson(resDistinctOtherUser));
+}
+
+// Test count on view collection.
+{
+    const resCount = assert.commandWorked(
+        testDb.runCommand({count: kViewName, query: {c: 1}, '$tenant': kTenant}));
+    assert.eq(2, resCount.n, tojson(resCount));
 }
 
 // Test renameCollection command.

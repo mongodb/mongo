@@ -3,11 +3,11 @@
 // require the use of the expectPrefix field.
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";  // for isEnabled
 
 const kTenant = ObjectId();
 const kTestDb = 'testDb0';
 const kCollName = 'myColl0';
+const kViewName = `myView0`;
 
 function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField, options) {
     options = options || {};
@@ -41,13 +41,51 @@ function checkFindCommandFails(request, targetDb, options) {
 
 function checkDbStatsCommand(request, targetDb, {targetPass}) {
     let statsRes = assert.commandWorked(targetDb.runCommand(request));
-    assert.eq(statsRes.collections, targetPass ? 1 : 0, tojson(statsRes));
+    assert.eq(statsRes.collections, targetPass ? 2 : 0, tojson(statsRes));
+}
+
+function checkCountCommandPasses(request, targetDb, expectedCount) {
+    let countRes = assert.commandWorked(targetDb.runCommand(request));
+    assert.eq(countRes.n, expectedCount, tojson(countRes));
+}
+
+function checkExplainCountCommandPasses(request, targetDb, tenantId) {
+    let response = assert.commandWorked(targetDb.runCommand(request));
+    let nss = "";
+    if (response.hasOwnProperty("stages")) {
+        nss = response.stages[0].$cursor.queryPlanner.namespace;
+    } else {
+        nss = response.queryPlanner.namespace;
+    }
+    assert(nss.startsWith(tenantId + "_"), tojsononeline(response));
+}
+
+function createTenantCommand(request, options) {
+    const {injectDollarTenant = false} = options;
+    request = Object.assign(request, {'expectPrefix': true});
+    if (injectDollarTenant) {
+        request = Object.assign(request, {'$tenant': kTenant});
+    }
+    return request;
+}
+
+function testCountCommand(targetDb, options) {
+    let request = createTenantCommand({count: kCollName, query: {}}, options);
+    checkCountCommandPasses(request, targetDb, 1);
+
+    let viewRequest = createTenantCommand({count: kViewName, query: {}}, options);
+    checkCountCommandPasses(viewRequest, targetDb, 1);
+
+    // explain count command on view.
+    let explainRequest =
+        createTenantCommand({"explain": {"count": kViewName, "query": {}}}, options);
+    checkExplainCountCommandPasses(explainRequest, targetDb, kTenant);
 }
 
 function runTestWithSecurityTokenFlag() {
     // setup replSet that uses security token
     const rst = new ReplSetTest({
-        nodes: 3,
+        nodes: 2,
         nodeOptions: {
             auth: '',
             setParameter: {
@@ -85,15 +123,13 @@ function runTestWithSecurityTokenFlag() {
     // Logout the root user to avoid multiple authentication.
     tokenConn.getDB("admin").logout();
 
-    const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(
-        adminDb,
-        "RequireTenantID",
-    );
-
     // Create a collection by inserting a document to it.
     const testDocs = {_id: 0, a: 1, b: 1};
     assert.commandWorked(prefixedTokenDb.runCommand(
         {insert: kCollName, documents: [testDocs], 'expectPrefix': true}));
+    // Create a view.
+    assert.commandWorked(prefixedTokenDb.runCommand(
+        {create: kViewName, viewOn: kCollName, pipeline: [], expectPrefix: true}));
 
     // Run a sanity check to locate the collection
     checkDbStatsCommand({dbStats: 1, 'expectPrefix': true}, prefixedTokenDb, {targetPass: true});
@@ -143,13 +179,21 @@ function runTestWithSecurityTokenFlag() {
         assert.commandFailedWithCode(tokenDb.runCommand(request), 6545800);
     }
 
+    // count prefix DB with security token.
+    testCountCommand(prefixedTokenDb, {injectDollarTenant: false});
+
     rst.stopSet();
 }
 
-function runTestWithoutSecurityToken() {
+function runTestWithDollarTenant() {
     // setup regular replSet
-    const rst = new ReplSetTest(
-        {nodes: 3, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {
+            auth: '',
+            setParameter: {multitenancySupport: true, logComponentVerbosity: tojson({command: 3})}
+        }
+    });
     rst.startSet({keyFile: 'jstests/libs/key1'});
     rst.initiate();
 
@@ -163,15 +207,18 @@ function runTestWithoutSecurityToken() {
     let testDb = primary.getDB(kTestDb);
     let prefixedDb = primary.getDB(kTenant + '_' + kTestDb);
 
-    const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(
-        adminDb,
-        "RequireTenantID",
-    );
-
     // Create a collection by inserting a document to it.
     const testDocs = {_id: 0, a: 1, b: 1};
     assert.commandWorked(prefixedDb.runCommand(
         {insert: kCollName, documents: [testDocs], '$tenant': kTenant, 'expectPrefix': true}));
+    // Create a view.
+    assert.commandWorked(prefixedDb.runCommand({
+        create: kViewName,
+        viewOn: kCollName,
+        pipeline: [],
+        $tenant: kTenant,
+        expectPrefix: true
+    }));
 
     // Run a sanity check to locate the collection
     checkDbStatsCommand(
@@ -185,7 +232,6 @@ function runTestWithoutSecurityToken() {
 
         request = Object.assign(request, {'expectPrefix': false});
         checkFindCommandPasses(request, testDb, testDocs);
-
         // Expect this to fail since we set 'expectPrefix': true without providing a prefix.
         request = Object.assign(request, {'expectPrefix': true});
         assert.commandFailedWithCode(testDb.runCommand(request), 8423386);
@@ -216,6 +262,38 @@ function runTestWithoutSecurityToken() {
             kTestDb, kCollName, findRes.cursor.ns, {tenantId: kTenant, prefixed: true});
     }
 
+    // count with $tenant and prefixed DB using expectPrefix.
+    testCountCommand(prefixedDb, {injectDollarTenant: true});
+
+    rst.stopSet();
+}
+
+function runTestTenantPrefixAlone() {
+    // setup regular replSet
+    const rst = new ReplSetTest(
+        {nodes: 2, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});
+    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.initiate();
+
+    let primary = rst.getPrimary();
+    let adminDb = primary.getDB('admin');
+
+    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
+    assert(adminDb.auth('admin', 'pwd'));
+
+    let prefixedDb = primary.getDB(kTenant + '_' + kTestDb);
+
+    // Create a collection by inserting a document to it.
+    const testDocs = {_id: 0, a: 1, b: 1};
+    assert.commandWorked(prefixedDb.runCommand({insert: kCollName, documents: [testDocs]}));
+    // Create a view.
+    assert.commandWorked(
+        prefixedDb.runCommand({create: kViewName, viewOn: kCollName, pipeline: []}));
+
+    // Run a sanity check to locate the collection
+    checkDbStatsCommand({dbStats: 1}, prefixedDb, {targetPass: true});
+
     // find prefixed DB only (expectPrefix is ignored in parsing).
     {
         let request = {find: kCollName, filter: {a: 1}};
@@ -230,8 +308,12 @@ function runTestWithoutSecurityToken() {
         checkFindCommandPasses(request, prefixedDb, testDocs, {prefixed: true});
     }
 
+    // count prefixed DB only.
+    testCountCommand(prefixedDb, {injectDollarTenant: false});
+
     rst.stopSet();
 }
 
-runTestWithoutSecurityToken();
+runTestWithDollarTenant();
 runTestWithSecurityTokenFlag();
+runTestTenantPrefixAlone();

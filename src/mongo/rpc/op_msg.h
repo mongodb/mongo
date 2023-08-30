@@ -468,7 +468,6 @@ public:
         const DatabaseName& dbName,
         boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
         BSONObj body,
-        const BSONObj& extraFields = {},
         const SerializationContext& sc = SerializationContext::stateDefault());
 };
 

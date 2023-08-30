@@ -9,7 +9,7 @@ function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField) {
 }
 
 const rst = new ReplSetTest({
-    nodes: 3,
+    nodes: 2,
     nodeOptions: {
         auth: '',
         setParameter: {
@@ -38,6 +38,7 @@ const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
+const kViewName = "view1";
 const tokenConn = new Mongo(primary.host);
 const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
 const tokenDB = tokenConn.getDB(kDbName);
@@ -104,11 +105,10 @@ const tokenDB = tokenConn.getDB(kDbName);
     // collection, the view, and the system.views collection.  Then, call $listCatalog on
     // the collection and views and validate the results.
     {
-        const viewName = "view1";
         const targetViews = 'system.views';
 
         assert.commandWorked(
-            tokenDB.runCommand({"create": viewName, "viewOn": kCollName, pipeline: []}));
+            tokenDB.runCommand({"create": kViewName, "viewOn": kCollName, pipeline: []}));
 
         const colls =
             assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
@@ -116,7 +116,7 @@ const tokenDB = tokenConn.getDB(kDbName);
         const expectedColls = [
             {"name": kCollName, "type": "collection"},
             {"name": targetViews, "type": "collection"},
-            {"name": viewName, "type": "view"}
+            {"name": kViewName, "type": "view"}
         ];
         assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
         checkNsSerializedCorrectly(kDbName, "$cmd.listCollections", colls.cursor.ns);
@@ -139,7 +139,7 @@ const tokenDB = tokenConn.getDB(kDbName);
         // Also check that the resulting array contains views specific to our target database.
         assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)),
                tojson(resultArray));
-        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)),
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kViewName)),
                tojson(resultArray));
 
         // Get catalog when specifying our target collection, which should only return one
@@ -174,6 +174,13 @@ const tokenDB = tokenConn.getDB(kDbName);
         const resDistinct =
             assert.commandWorked(tokenDB.runCommand({distinct: kCollName, key: 'd', query: {}}));
         assert.eq([1, 2], resDistinct.values.sort(), tojson(resDistinct));
+    }
+
+    // Test count on view collection.
+    {
+        const resCount =
+            assert.commandWorked(tokenDB.runCommand({count: kViewName, query: {c: 1}}));
+        assert.eq(2, resCount.n, tojson(resCount));
     }
 
     // Rename the collection.

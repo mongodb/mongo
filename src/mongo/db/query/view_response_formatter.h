@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 class BSONObjBuilder;
@@ -58,7 +59,10 @@ public:
      * If '_response' is not a valid cursor-based response from the aggregation command, a non-OK
      * status is returned and 'resultBuilder' will not be modified.
      */
-    Status appendAsCountResponse(BSONObjBuilder* resultBuilder, boost::optional<TenantId> tenantId);
+    Status appendAsCountResponse(
+        BSONObjBuilder* resultBuilder,
+        boost::optional<TenantId> tenantId,
+        const SerializationContext& serializationCtxt = SerializationContext::stateCommandReply());
 
     /**
      * Appends fields to 'resultBuilder' as if '_response' were a response from the distinct

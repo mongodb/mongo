@@ -53,8 +53,10 @@ ViewResponseFormatter::ViewResponseFormatter(BSONObj aggregationResponse)
     : _response(std::move(aggregationResponse)) {}
 
 Status ViewResponseFormatter::appendAsCountResponse(BSONObjBuilder* resultBuilder,
-                                                    boost::optional<TenantId> tenantId) {
-    auto cursorResponse = CursorResponse::parseFromBSON(_response, nullptr, tenantId);
+                                                    boost::optional<TenantId> tenantId,
+                                                    const SerializationContext& serializationCtxt) {
+    auto cursorResponse =
+        CursorResponse::parseFromBSON(_response, nullptr, tenantId, serializationCtxt);
     if (!cursorResponse.isOK())
         return cursorResponse.getStatus();
 

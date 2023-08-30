@@ -332,8 +332,8 @@ bool appendDollarTenant(BSONObjBuilder& builder,
 
 BSONObj appendDollarDbAndTenant(const DatabaseName& dbName,
                                 BSONObj body,
-                                const BSONObj& extraFields,
-                                const SerializationContext& sc) {
+                                const SerializationContext& sc,
+                                const BSONObj& extraFields = {}) {
     auto existingDollarTenant = parseDollarTenant(body);
     BSONObjBuilder builder(std::move(body));
     builder.appendElements(extraFields);
@@ -372,11 +372,10 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
     const DatabaseName& dbName,
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
     BSONObj body,
-    const BSONObj& extraFields,
     const SerializationContext& sc) {
     OpMsgRequest request;
 
-    request.body = appendDollarDbAndTenant(dbName, std::move(body), extraFields, sc);
+    request.body = appendDollarDbAndTenant(dbName, std::move(body), sc);
     request.validatedTenancyScope = validatedTenancyScope;
     return request;
 }
@@ -413,7 +412,7 @@ OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
 
     OpMsgRequest request;
 
-    request.body = appendDollarDbAndTenant(dbName, std::move(body), extraFields, sc);
+    request.body = appendDollarDbAndTenant(dbName, std::move(body), sc, extraFields);
     return request;
 }
 
