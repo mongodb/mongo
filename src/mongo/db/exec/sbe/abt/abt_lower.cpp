@@ -238,6 +238,12 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     return sbe::makeE<sbe::EIf>(std::move(cond), std::move(thenBranch), std::move(elseBranch));
 }
 
+std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
+    return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::fillEmpty,
+                                        std::move(e),
+                                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
+}
+
 /*
  * In the ABT, the shard filtering operation is represented by a FunctionCall node with n
  * arguments, in which each argument is a projection of the value of one field of the
@@ -280,18 +286,14 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
         ++argIdx;
     }
 
-    // Fill out the values with SlotId variables. The specified slot will supply the values
-    // corresponding to the shard key.
+    // Each argument corresponds to one component of the shard key. This loop lowers an expression
+    // for each component. The ShardFilterer expects the BSONObj of the shard key to have values for
+    // each component of the shard key; since shard components may be missing, we must wrap the
+    // expression in a fillEmpty to coerce a missing shard key component to an explicit null. For
+    // example, if the shard key is {a: 1, b: 1} and the document is {b: 123}, the object we will
+    // generate is {a: null, b: 123}.
     for (const ABT& node : fn.nodes()) {
-        // If the child of FunctionCall['shardFilter'] is a Variable, look up the variable in the
-        // slot map.
-        if (node.is<Variable>()) {
-            projectValues.push_back(_varResolver(node.cast<Variable>()->name()));
-        } else {
-            // Otherwise, lower the expression to be referenced by the 'shardFilter' function call.
-            SBEExpressionLowering exprLower{_env, _varResolver, _namedSlots};
-            projectValues.push_back(exprLower.optimize(node));
-        }
+        projectValues.push_back(makeFillEmptyNull(this->optimize(node)));
     }
 
     auto fieldBehavior = sbe::MakeObjSpec::FieldBehavior::kOpen;
