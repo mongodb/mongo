@@ -252,7 +252,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (!request->isExplain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            args.criteria = collDesc.extractDocumentKey(newObj);
+            args.criteria = collDesc.extractDocumentKey(newObj).getShardKeyAndId();
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));

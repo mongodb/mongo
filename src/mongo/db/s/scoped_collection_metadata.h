@@ -96,7 +96,7 @@ public:
         return _impl->get().getMaxKey();
     }
 
-    BSONObj extractDocumentKey(const BSONObj& doc) const {
+    DocumentKey extractDocumentKey(const BSONObj& doc) const {
         return _impl->get().extractDocumentKey(doc);
     }
 

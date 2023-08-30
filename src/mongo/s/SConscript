@@ -86,6 +86,7 @@ env.Library(
     source=[
         'chunk.cpp',
         'chunk_manager.cpp',
+        'document_key.cpp',
         'shard_key_pattern.cpp',
     ],
     LIBDEPS=[

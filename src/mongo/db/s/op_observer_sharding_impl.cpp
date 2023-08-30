@@ -44,8 +44,6 @@
 namespace mongo {
 namespace {
 
-const auto getIsMigrating = OperationContext::declareDecoration<bool>();
-
 /**
  * Write operations do shard version checking, but if an update operation runs as part of a
  * 'readConcern:snapshot' transaction, the router could have used the metadata at the snapshot
@@ -74,13 +72,6 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     chunk.throwIfMoved();
 }
 
-bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
-                            CollectionShardingRuntime::CSRLock& csrLock,
-                            BSONObj const& docToDelete) {
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    return msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete);
-}
-
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     if (!nss.isNormalCollection() && nss.coll() != "system.views") {
         return;
@@ -105,19 +96,9 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 
 }  // namespace
 
-bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
-                                         NamespaceString const& nss,
-                                         BSONObj const& docToDelete) {
-    auto csr = CollectionShardingRuntime::get(opCtx, nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    return isMigratingWithCSRLock(csr, csrLock, docToDelete);
-}
-
 void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
                                                        NamespaceString const& nss,
-                                                       BSONObj const& docToDelete) {
-    getIsMigrating(opCtx) = isMigrating(opCtx, nss, docToDelete);
-}
+                                                       BSONObj const& docToDelete) {}
 
 void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
                                                   const NamespaceString nss,
@@ -141,16 +122,17 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
     }
 
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, csr, insertedDoc);
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    if (msm) {
-        msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
-    }
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogInsertForShardingHandler>(opCtx, nss, insertedDoc, opTime));
 }
 
 void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
@@ -169,21 +151,22 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
         return;
     }
 
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
     if (inMultiDocumentTransaction) {
         assertIntersectingChunkHasNotMoved(opCtx, csr, postImageDoc);
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    if (msm) {
-        msm->getCloner()->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
-    }
+    opCtx->recoveryUnit()->registerChange(std::make_unique<LogUpdateForShardingHandler>(
+        opCtx, nss, preImageDoc, postImageDoc, opTime, prePostImageOpTime));
 }
 
 void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
-                                                  const NamespaceString nss,
-                                                  const BSONObj& documentKey,
+                                                  const NamespaceString& nss,
+                                                  const DocumentKey& documentKey,
                                                   const repl::OpTime& opTime,
                                                   const repl::OpTime& preImageOpTime,
                                                   const bool inMultiDocumentTransaction) {
@@ -196,17 +179,17 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
         return;
     }
 
-    if (inMultiDocumentTransaction) {
-        assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey);
+    if (!opCtx->writesAreReplicated()) {
         return;
     }
 
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-
-    if (msm && getIsMigrating(opCtx)) {
-        msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
+    if (inMultiDocumentTransaction) {
+        assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey.getShardKeyAndId());
+        return;
     }
+
+    opCtx->recoveryUnit()->registerChange(std::make_unique<LogDeleteForShardingHandler>(
+        opCtx, nss, documentKey, opTime, preImageOpTime));
 }
 
 void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(

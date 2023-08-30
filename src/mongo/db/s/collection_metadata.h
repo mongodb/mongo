@@ -31,6 +31,7 @@
 
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/document_key.h"
 
 namespace mongo {
 
@@ -146,13 +147,14 @@ public:
      * Returns just the shard key fields, if the collection is sharded, and the _id field, from
      * `doc`. Does not alter any field values (e.g. by hashing); values are copied verbatim.
      */
-    BSONObj extractDocumentKey(const BSONObj& doc) const;
+    DocumentKey extractDocumentKey(const BSONObj& doc) const;
 
     /**
      * Static version of the function above. Only use this for internal sharding operations where
      * shard key pattern is fixed and cannot change.
      */
-    static BSONObj extractDocumentKey(const ShardKeyPattern* shardKeyPattern, const BSONObj& doc);
+    static DocumentKey extractDocumentKey(const ShardKeyPattern* shardKeyPattern,
+                                          const BSONObj& doc);
 
     /**
      * BSON output of the basic metadata information (chunk and shard version).

@@ -107,8 +107,6 @@ public:
 
     void cancelClone(OperationContext* opCtx) override;
 
-    bool isDocumentInMigratingChunk(const BSONObj& doc) override;
-
     void onInsertOp(OperationContext* opCtx,
                     const BSONObj& insertedDoc,
                     const repl::OpTime& opTime) override;
@@ -120,7 +118,7 @@ public:
                     const repl::OpTime& prePostImageOpTime) override;
 
     void onDeleteOp(OperationContext* opCtx,
-                    const BSONObj& deletedDocId,
+                    const DocumentKey& documentKey,
                     const repl::OpTime& opTime,
                     const repl::OpTime& preImageOpTime) override;
 

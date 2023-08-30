@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_util.h"
+#include "mongo/s/document_key.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -44,6 +47,75 @@ class UUID;
 namespace repl {
 class OpTime;
 }  // namespace repl
+
+/**
+ * Used to keep track of inserts that can be potentially added as xferMods of a migration.
+ */
+class LogInsertForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogInsertForShardingHandler(OperationContext* opCtx,
+                                NamespaceString nss,
+                                BSONObj doc,
+                                repl::OpTime opTime);
+
+    void commit(boost::optional<Timestamp>) override;
+
+    void rollback() override {}
+
+private:
+    OperationContext* _opCtx;
+    const NamespaceString _nss;
+    const BSONObj _doc;
+    const repl::OpTime _opTime;
+};
+
+/**
+ * Used to keep track of updates that can be potentially added as xferMods of a migration.
+ */
+class LogUpdateForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogUpdateForShardingHandler(OperationContext* opCtx,
+                                NamespaceString nss,
+                                boost::optional<BSONObj> preImageDoc,
+                                BSONObj postImageDoc,
+                                repl::OpTime opTime,
+                                repl::OpTime prePostImageOpTime);
+
+    void commit(boost::optional<Timestamp>) override;
+
+    void rollback() override {}
+
+private:
+    OperationContext* _opCtx;
+    const NamespaceString _nss;
+    const boost::optional<BSONObj> _preImageDoc;
+    const BSONObj _postImageDoc;
+    const repl::OpTime _opTime;
+    const repl::OpTime _prePostImageOpTime;
+};
+
+/**
+ * Used to keep track of deletes that can be potentially added as xferMods of a migration.
+ */
+class LogDeleteForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogDeleteForShardingHandler(OperationContext* opCtx,
+                                NamespaceString nss,
+                                DocumentKey documentKey,
+                                repl::OpTime opTime,
+                                repl::OpTime prePostImageOpTime);
+
+    void commit(boost::optional<Timestamp>) override;
+
+    void rollback() override {}
+
+private:
+    OperationContext* _opCtx;
+    const NamespaceString _nss;
+    const DocumentKey _documentKey;
+    const repl::OpTime _opTime;
+    const repl::OpTime _prePostImageOpTime;
+};
 
 /**
  * This class is responsible for producing chunk documents to be moved from donor to a recipient
@@ -122,14 +194,6 @@ public:
     // running list of changes, which need to be fetched.
 
     /**
-     * Checks whether the specified document is within the bounds of the chunk, which this cloner
-     * is responsible for.
-     *
-     * NOTE: Must be called with at least IS lock held on the collection.
-     */
-    virtual bool isDocumentInMigratingChunk(const BSONObj& doc) = 0;
-
-    /**
      * Notifies this cloner that an insert happened to the collection, which it owns. It is up to
      * the cloner's implementation to decide what to do with this information and it is valid for
      * the implementation to ignore it.
@@ -161,7 +225,7 @@ public:
      * NOTE: Must be called with at least IX lock held on the collection.
      */
     virtual void onDeleteOp(OperationContext* opCtx,
-                            const BSONObj& deletedDocId,
+                            const DocumentKey& documentKey,
                             const repl::OpTime& opTime,
                             const repl::OpTime& preImageOpTime) = 0;
 

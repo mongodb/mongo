@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer.h"
+#include "mongo/s/document_key.h"
 
 namespace mongo {
 
@@ -160,9 +161,11 @@ public:
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 
     // Contains the fields of the document that are in the collection's shard key, and "_id".
-    static BSONObj getDocumentKey(OperationContext* opCtx,
-                                  NamespaceString const& nss,
-                                  BSONObj const& doc);
+    static DocumentKey extractDocumentKey(OperationContext* opCtx,
+                                          NamespaceString const& nss,
+                                          BSONObj const& doc);
+
+    static const DocumentKey& getDocumentKey(OperationContext* opCtx);
 
 private:
     virtual void shardObserveAboutToDelete(OperationContext* opCtx,
@@ -182,8 +185,8 @@ private:
                                       const repl::OpTime& prePostImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
-                                      const BSONObj& documentKey,
+                                      const NamespaceString& nss,
+                                      const DocumentKey& documentKey,
                                       const repl::OpTime& opTime,
                                       const repl::OpTime& preImageOpTime,
                                       const bool inMultiDocumentTransaction) {}

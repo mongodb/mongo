@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,15 +27,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
-#include "mongo/s/shard_key_pattern.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/document_key.h"
 
 namespace mongo {
-BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
-                          const CollectionOptions& oldCollOptions,
-                          boost::optional<IndexCollModInfo> indexInfo);
+
+BSONObj DocumentKey::getId() const {
+    return _id;
+}
+
+boost::optional<BSONObj> DocumentKey::getShardKey() const {
+    return _shardKey;
+}
+
+BSONObj DocumentKey::getShardKeyAndId() const {
+    if (_shardKey) {
+        BSONObjBuilder builder(_shardKey.get());
+        builder.appendElementsUnique(_id);
+        return builder.obj();
+    }
+
+    // _shardKey is not set so just return the _id.
+    return getId();
+}
+
 }  // namespace mongo

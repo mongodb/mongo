@@ -34,6 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -135,6 +136,14 @@ protected:
         ASSERT_EQ("", client()->getLastError());
     }
 
+    void deleteDocsInShardedCollection(BSONObj query) {
+        client()->remove(kNss.ns(), query);
+    }
+
+    void updateDocsInShardedCollection(BSONObj filter, BSONObj updated) {
+        client()->update(kNss.ns(), filter, updated);
+    }
+
     /**
      * Creates a collection, which contains an index corresponding to kShardKeyPattern and insers
      * the specified initial documents.
@@ -174,6 +183,21 @@ protected:
         return BSON("_id" << value << "X" << value);
     }
 
+    /**
+     * Instantiates a BSON object with different "_id" and "X" values.
+     */
+    static BSONObj createCollectionDocumentForUpdate(int id, int value) {
+        return BSON("_id" << id << "X" << value);
+    }
+
+    /**
+     * Instantiates a BSON object with objsize close to size.
+     */
+    static BSONObj createSizedCollectionDocument(int id, long long size) {
+        std::string value(size, 'x');
+        return BSON("_id" << id << "X" << id << "Y" << value);
+    }
+
 protected:
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{0};
@@ -211,6 +235,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
                                            createCollectionDocument(100),
                                            createCollectionDocument(199),
                                            createCollectionDocument(200)};
+    const ShardKeyPattern shardKeyPattern(kShardKeyPattern);
 
     createShardedCollection(contents);
 
@@ -273,9 +298,21 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
         cloner.onInsertOp(operationContext(), createCollectionDocument(151), {});
         cloner.onInsertOp(operationContext(), createCollectionDocument(210), {});
 
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(80), {}, {});
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(199), {}, {});
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(220), {}, {});
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&shardKeyPattern, createCollectionDocument(80)),
+            {},
+            {});
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&shardKeyPattern, createCollectionDocument(199)),
+            {},
+            {});
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&shardKeyPattern, createCollectionDocument(220)),
+            {},
+            {});
 
         wuow.commit();
     }
@@ -299,12 +336,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
             ASSERT_BSONOBJ_EQ(createCollectionDocument(150), modsObj["reload"].Array()[0].Obj());
             ASSERT_BSONOBJ_EQ(createCollectionDocument(151), modsObj["reload"].Array()[1].Obj());
 
-            // The legacy chunk cloner cannot filter out deletes because we don't preserve the shard
-            // key on delete
-            ASSERT_EQ(3U, modsObj["deleted"].Array().size());
-            ASSERT_BSONOBJ_EQ(BSON("_id" << 80), modsObj["deleted"].Array()[0].Obj());
-            ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[1].Obj());
-            ASSERT_BSONOBJ_EQ(BSON("_id" << 220), modsObj["deleted"].Array()[2].Obj());
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[0].Obj());
         }
     }
 
@@ -389,6 +422,342 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
 
     // Cancel clone should not send a cancellation request to the donor because we failed to engage
     // it (see comment in the startClone method)
+    cloner.cancelClone(operationContext());
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetchedWithDottedShardKeyPattern) {
+    const ShardKeyPattern dottedShardKeyPattern(BSON("x.a" << 1 << "x.b" << 1));
+
+    auto createDoc =
+        ([](int val) { return BSON("_id" << val << "x" << BSON("a" << val << "b" << val)); });
+
+    const auto req = createMoveChunkRequest(
+        ChunkRange(BSON("x.a" << 100 << "x.b" << 100), BSON("x.a" << 200 << "x.b" << 200)));
+    MigrationChunkClonerSourceLegacy cloner(
+        req, dottedShardKeyPattern.toBSON(), kDonorConnStr, kRecipientConnStr.getServers()[0]);
+
+    // Insert some documents in the chunk range to be included for migration
+    insertDocsInShardedCollection({createDoc(150)});
+    insertDocsInShardedCollection({createDoc(151)});
+
+    // Insert some documents which are outside of the chunk range and should not be included for
+    // migration
+    insertDocsInShardedCollection({createDoc(90)});
+    insertDocsInShardedCollection({createDoc(210)});
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onInsertOp(operationContext(), createDoc(90), {});
+        cloner.onInsertOp(operationContext(), createDoc(150), {});
+        cloner.onInsertOp(operationContext(), createDoc(151), {});
+        cloner.onInsertOp(operationContext(), createDoc(210), {});
+
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&dottedShardKeyPattern, createDoc(80)),
+            {},
+            {});
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&dottedShardKeyPattern, createDoc(199)),
+            {},
+            {});
+        cloner.onDeleteOp(
+            operationContext(),
+            CollectionMetadata::extractDocumentKey(&dottedShardKeyPattern, createDoc(220)),
+            {},
+            {});
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(2U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createDoc(150), modsObj["reload"].Array()[0].Obj());
+            ASSERT_BSONOBJ_EQ(createDoc(151), modsObj["reload"].Array()[1].Obj());
+
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    cloner.cancelClone(operationContext());
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetchedWithHasheddShardKeyPattern) {
+    const ShardKeyPattern hashedShardKeyPattern(BSON("X"
+                                                     << "hashed"));
+
+    const auto req = createMoveChunkRequest(
+        ChunkRange(BSON("X" << 6000000000000000000ll), BSON("X" << 9003000000000000000ll)));
+    MigrationChunkClonerSourceLegacy cloner(
+        req, hashedShardKeyPattern.toBSON(), kDonorConnStr, kRecipientConnStr.getServers()[0]);
+
+    // Insert some documents in the chunk range to be included for migration
+    insertDocsInShardedCollection({createCollectionDocument(150)});
+    insertDocsInShardedCollection({createCollectionDocument(151)});
+
+    // Insert some documents which are outside of the chunk range and should not be included for
+    // migration
+    insertDocsInShardedCollection({createCollectionDocument(90)});
+    insertDocsInShardedCollection({createCollectionDocument(210)});
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onInsertOp(
+            operationContext(), createCollectionDocument(90), {});  // hashed = 1348713528393582036
+        cloner.onInsertOp(
+            operationContext(), createCollectionDocument(150), {});  // hashed = 9002984030040611364
+        cloner.onInsertOp(
+            operationContext(), createCollectionDocument(151), {});  // hashed = 6186237390842619770
+        cloner.onInsertOp(
+            operationContext(), createCollectionDocument(210), {});  // hashed = 4420792252088815836
+
+        cloner.onDeleteOp(operationContext(),
+                          CollectionMetadata::extractDocumentKey(&hashedShardKeyPattern,
+                                                                 createCollectionDocument(80)),
+                          {},
+                          {});  // hashed = 6910253216116676730
+        cloner.onDeleteOp(operationContext(),
+                          CollectionMetadata::extractDocumentKey(&hashedShardKeyPattern,
+                                                                 createCollectionDocument(199)),
+                          {},
+                          {});  // hashed = 3000073935277689405
+        cloner.onDeleteOp(operationContext(),
+                          CollectionMetadata::extractDocumentKey(&hashedShardKeyPattern,
+                                                                 createCollectionDocument(220)),
+                          {},
+                          {});  // hashed = -6432749148213749320
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(2U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(150), modsObj["reload"].Array()[0].Obj());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(151), modsObj["reload"].Array()[1].Obj());
+
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 80), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    cloner.cancelClone(operationContext());
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, UpdatedDocumentsFetched) {
+    const ShardKeyPattern shardKeyPattern(kShardKeyPattern);
+
+    const auto req = createMoveChunkRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSourceLegacy cloner(
+        req, kShardKeyPattern, kDonorConnStr, kRecipientConnStr.getServers()[0]);
+
+    // Insert some documents in the chunk range to be included for migration
+    insertDocsInShardedCollection({createCollectionDocument(150)});
+    insertDocsInShardedCollection({createCollectionDocument(151)});
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onUpdateOp(operationContext(), boost::none, createCollectionDocument(150), {}, {});
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(80),
+                          createCollectionDocument(151),
+                          {},
+                          {});
+
+        // From in doc in chunk range to outside of range will be converted to a delete xferMods.
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(199),
+                          createCollectionDocument(90),
+                          {},
+                          {});
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(2U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(150), modsObj["reload"].Array()[0].Obj());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(151), modsObj["reload"].Array()[1].Obj());
+
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    cloner.cancelClone(operationContext());
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, UpdatedDocumentsFetchedWithHashedShardKey) {
+    const ShardKeyPattern shardKeyPattern(BSON("X"
+                                               << "hashed"));
+
+    const auto req = createMoveChunkRequest(
+        ChunkRange(BSON("X" << 6000000000000000000ll), BSON("X" << 9003000000000000000ll)));
+    MigrationChunkClonerSourceLegacy cloner(
+        req, shardKeyPattern.toBSON(), kDonorConnStr, kRecipientConnStr.getServers()[0]);
+
+    // Insert some documents in the chunk range to be included for migration
+    insertDocsInShardedCollection({createCollectionDocument(150)});
+    insertDocsInShardedCollection({createCollectionDocument(151)});
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onUpdateOp(operationContext(),
+                          boost::none,
+                          createCollectionDocument(150),
+                          {},
+                          {});  // hashed = 9002984030040611364
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(90),
+                          createCollectionDocument(151),
+                          {},
+                          {});  // hashed = 1348713528393582036 -> 6186237390842619770
+
+        // From in doc in chunk range to outside of range will be converted to a delete xferMods.
+        cloner.onUpdateOp(operationContext(),
+                          createCollectionDocument(80),
+                          createCollectionDocument(199),
+                          {},
+                          {});  // hashed = 6910253216116676730 -> 3000073935277689405
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(2U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(150), modsObj["reload"].Array()[0].Obj());
+            ASSERT_BSONOBJ_EQ(createCollectionDocument(151), modsObj["reload"].Array()[1].Obj());
+
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 80), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
+    cloner.cancelClone(operationContext());
+}
+
+TEST_F(MigrationChunkClonerSourceLegacyTest, UpdatedDocumentsFetchedWithDottedShardKeyPattern) {
+    const ShardKeyPattern dottedShardKeyPattern(BSON("x.a" << 1 << "x.b" << 1));
+
+    auto createDoc =
+        ([](int val) { return BSON("_id" << val << "x" << BSON("a" << val << "b" << val)); });
+
+    const auto req = createMoveChunkRequest(
+        ChunkRange(BSON("x.a" << 100 << "x.b" << 100), BSON("x.a" << 200 << "x.b" << 200)));
+    MigrationChunkClonerSourceLegacy cloner(
+        req, dottedShardKeyPattern.toBSON(), kDonorConnStr, kRecipientConnStr.getServers()[0]);
+
+    // Insert some documents in the chunk range to be included for migration
+    insertDocsInShardedCollection({createDoc(150)});
+    insertDocsInShardedCollection({createDoc(151)});
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+
+        cloner.onUpdateOp(operationContext(), boost::none, createDoc(150), {}, {});
+        cloner.onUpdateOp(operationContext(), createDoc(80), createDoc(151), {}, {});
+
+        // From in doc in chunk range to outside of range will be converted to a delete xferMods.
+        cloner.onUpdateOp(operationContext(), createDoc(199), createDoc(90), {}, {});
+
+        wuow.commit();
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(
+                cloner.nextCloneBatch(operationContext(), autoColl.getCollection(), &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), autoColl.getDb(), &modsBuilder));
+
+            const auto modsObj = modsBuilder.obj();
+            ASSERT_EQ(2U, modsObj["reload"].Array().size());
+            ASSERT_BSONOBJ_EQ(createDoc(150), modsObj["reload"].Array()[0].Obj());
+            ASSERT_BSONOBJ_EQ(createDoc(151), modsObj["reload"].Array()[1].Obj());
+
+            ASSERT_EQ(1U, modsObj["deleted"].Array().size());
+            ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[0].Obj());
+        }
+    }
+
     cloner.cancelClone(operationContext());
 }
 

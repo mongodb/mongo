@@ -46,27 +46,21 @@ namespace mongo {
 CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
-BSONObj CollectionMetadata::extractDocumentKey(const ShardKeyPattern* shardKeyPattern,
-                                               const BSONObj& doc) {
-    BSONObj key;
+DocumentKey CollectionMetadata::extractDocumentKey(const ShardKeyPattern* shardKeyPattern,
+                                                   const BSONObj& doc) {
+    BSONObj id = doc["_id"] ? doc["_id"].wrap() : doc;
+    boost::optional<BSONObj> shardKey;
 
     if (shardKeyPattern) {
-        key = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern->toBSON());
-        if (shardKeyPattern->hasId()) {
-            return key;
-        }
-        // else, try to append an _id field from the document.
+        shardKey =
+            dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern->toBSON())
+                .getOwned();
     }
 
-    if (auto id = doc["_id"]) {
-        return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
-    }
-
-    // For legacy documents that lack an _id, use the document itself as its key.
-    return doc;
+    return {std::move(id), std::move(shardKey)};
 }
 
-BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
+DocumentKey CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     return extractDocumentKey(isSharded() ? &_cm->getShardKeyPattern() : nullptr, doc);
 }
 

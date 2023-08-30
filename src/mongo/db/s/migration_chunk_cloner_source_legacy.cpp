@@ -141,43 +141,6 @@ char getOpCharForCrudOpType(repl::OpTypeEnum opType) {
 
 }  // namespace
 
-/**
- * Used to commit work for LogOpForSharding. Used to keep track of changes in documents that are
- * part of a chunk being migrated.
- */
-class LogOpForShardingHandler final : public RecoveryUnit::Change {
-public:
-    /**
-     * Invariant: idObj should belong to a document that is part of the active chunk being migrated
-     */
-    LogOpForShardingHandler(MigrationChunkClonerSourceLegacy* cloner,
-                            const BSONObj& idObj,
-                            const char op,
-                            const repl::OpTime& opTime,
-                            const repl::OpTime& prePostImageOpTime)
-        : _cloner(cloner),
-          _idObj(idObj.getOwned()),
-          _op(op),
-          _opTime(opTime),
-          _prePostImageOpTime(prePostImageOpTime) {}
-
-    void commit(boost::optional<Timestamp>) override {
-        _cloner->_addToTransferModsQueue(_idObj, _op, _opTime, _prePostImageOpTime);
-        _cloner->_decrementOutstandingOperationTrackRequests();
-    }
-
-    void rollback() override {
-        _cloner->_decrementOutstandingOperationTrackRequests();
-    }
-
-private:
-    MigrationChunkClonerSourceLegacy* const _cloner;
-    const BSONObj _idObj;
-    const char _op;
-    const repl::OpTime _opTime;
-    const repl::OpTime _prePostImageOpTime;
-};
-
 LogTransactionOperationsForShardingHandler::LogTransactionOperationsForShardingHandler(
     ServiceContext* service,
     const std::vector<repl::OplogEntry>& stmts,
@@ -540,10 +503,6 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
     }
 }
 
-bool MigrationChunkClonerSourceLegacy::isDocumentInMigratingChunk(const BSONObj& doc) {
-    return isDocInRange(doc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern);
-}
-
 void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
                                                   const BSONObj& insertedDoc,
                                                   const repl::OpTime& opTime) {
@@ -568,13 +527,9 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
         return;
     }
 
-    if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'i', opTime, repl::OpTime()));
-    } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'i', repl::OpTime(), repl::OpTime()));
-    }
+    _addToTransferModsQueue(
+        idElement.wrap(), 'i', opCtx->getTxnNumber() ? opTime : repl::OpTime(), {});
+    _decrementOutstandingOperationTrackRequests();
 }
 
 void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
@@ -602,7 +557,10 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
         // outdated version of this document.
         if (preImageDoc &&
             isDocInRange(*preImageDoc, _args.getMinKey(), _args.getMaxKey(), _shardKeyPattern)) {
-            onDeleteOp(opCtx, *preImageDoc, opTime, prePostImageOpTime);
+            onDeleteOp(opCtx,
+                       CollectionMetadata::extractDocumentKey(&_shardKeyPattern, *preImageDoc),
+                       opTime,
+                       prePostImageOpTime);
         }
         return;
     }
@@ -612,28 +570,44 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
     }
 
     if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'u', opTime, prePostImageOpTime));
+        _addToTransferModsQueue(idElement.wrap(), 'u', opTime, prePostImageOpTime);
     } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'u', repl::OpTime(), repl::OpTime()));
+        _addToTransferModsQueue(idElement.wrap(), 'u', {}, {});
     }
+
+    _decrementOutstandingOperationTrackRequests();
 }
 
 void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
-                                                  const BSONObj& deletedDocId,
+                                                  const DocumentKey& documentKey,
                                                   const repl::OpTime& opTime,
                                                   const repl::OpTime& preImageOpTime) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IX));
 
-    BSONElement idElement = deletedDocId["_id"];
+    const auto shardKeyAndId = documentKey.getShardKeyAndId();
+
+    BSONElement idElement = documentKey.getId()["_id"];
     if (idElement.eoo()) {
         LOGV2_WARNING(
             21997,
             "logDeleteOp received a document without an _id field, ignoring deleted doc: "
-            "{deletedDocId}",
+            "{shardKeyAndId}",
             "logDeleteOp received a document without an _id field and will ignore that document",
-            "deletedDocId"_attr = redact(deletedDocId));
+            "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId));
+        return;
+    }
+
+    if (!documentKey.getShardKey()) {
+        LOGV2_WARNING(8023600,
+                      "logDeleteOp received a document without the shard key field and will ignore "
+                      "that document",
+                      "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId));
+        return;
+    }
+
+    const auto shardKeyValue =
+        _shardKeyPattern.extractShardKeyFromDocumentKey(*documentKey.getShardKey());
+    if (!isShardKeyValueInRange(shardKeyValue, _args.getMinKey(), _args.getMaxKey())) {
         return;
     }
 
@@ -642,12 +616,12 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
     }
 
     if (opCtx->getTxnNumber()) {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'd', opTime, preImageOpTime));
+        _addToTransferModsQueue(documentKey.getId(), 'd', opTime, preImageOpTime);
     } else {
-        opCtx->recoveryUnit()->registerChange(std::make_unique<LogOpForShardingHandler>(
-            this, idElement.wrap(), 'd', repl::OpTime(), repl::OpTime()));
+        _addToTransferModsQueue(documentKey.getId(), 'd', {}, {});
     }
+
+    _decrementOutstandingOperationTrackRequests();
 }
 
 void MigrationChunkClonerSourceLegacy::_addToSessionMigrationOptimeQueue(
@@ -918,7 +892,8 @@ void MigrationChunkClonerSourceLegacy::_processDeferredXferMods(OperationContext
         }
 
         auto postImageDocKey =
-            CollectionMetadata::extractDocumentKey(&_shardKeyPattern, newerVersionDoc);
+            CollectionMetadata::extractDocumentKey(&_shardKeyPattern, newerVersionDoc)
+                .getShardKeyAndId();
         static_cast<void>(_processUpdateForXferMod(preImageDocKey, postImageDocKey));
     }
 

@@ -31,10 +31,82 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
+
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/migration_source_manager.h"
+
 namespace mongo {
 
 MigrationChunkClonerSource::MigrationChunkClonerSource() = default;
 
 MigrationChunkClonerSource::~MigrationChunkClonerSource() = default;
+
+LogInsertForShardingHandler::LogInsertForShardingHandler(OperationContext* opCtx,
+                                                         NamespaceString nss,
+                                                         BSONObj doc,
+                                                         repl::OpTime opTime)
+    : _opCtx(opCtx), _nss(std::move(nss)), _doc(doc.getOwned()), _opTime(std::move(opTime)) {}
+
+void LogInsertForShardingHandler::commit(boost::optional<Timestamp>) {
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
+
+    auto csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(_opCtx, csr);
+
+    if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+        msm->getCloner()->onInsertOp(_opCtx, _doc, _opTime);
+    }
+}
+
+LogUpdateForShardingHandler::LogUpdateForShardingHandler(OperationContext* opCtx,
+                                                         NamespaceString nss,
+                                                         boost::optional<BSONObj> preImageDoc,
+                                                         BSONObj postImageDoc,
+                                                         repl::OpTime opTime,
+                                                         repl::OpTime prePostImageOpTime)
+    : _opCtx(opCtx),
+      _nss(std::move(nss)),
+      _preImageDoc(preImageDoc ? preImageDoc->getOwned() : boost::optional<BSONObj>(boost::none)),
+      _postImageDoc(postImageDoc.getOwned()),
+      _opTime(std::move(opTime)),
+      _prePostImageOpTime(std::move(prePostImageOpTime)) {}
+
+void LogUpdateForShardingHandler::commit(boost::optional<Timestamp>) {
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
+
+    auto csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(_opCtx, csr);
+
+    if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+        msm->getCloner()->onUpdateOp(
+            _opCtx, _preImageDoc, _postImageDoc, _opTime, _prePostImageOpTime);
+    }
+}
+
+LogDeleteForShardingHandler::LogDeleteForShardingHandler(OperationContext* opCtx,
+                                                         NamespaceString nss,
+                                                         DocumentKey documentKey,
+                                                         repl::OpTime opTime,
+                                                         repl::OpTime prePostImageOpTime)
+    : _opCtx(opCtx),
+      _nss(std::move(nss)),
+      _documentKey(std::move(documentKey)),
+      _opTime(std::move(opTime)),
+      _prePostImageOpTime(std::move(prePostImageOpTime)) {}
+
+void LogDeleteForShardingHandler::commit(boost::optional<Timestamp>) {
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
+
+    auto csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(_opCtx, csr);
+
+    if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+        msm->getCloner()->onDeleteOp(_opCtx, _documentKey, _opTime, _prePostImageOpTime);
+    }
+}
 
 }  // namespace mongo

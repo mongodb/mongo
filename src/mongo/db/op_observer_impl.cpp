@@ -66,6 +66,7 @@
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/document_key.h"
 #include "mongo/s/grid.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
@@ -80,7 +81,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
 
-const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentKeyDecoration =
+    OperationContext::declareDecoration<boost::optional<DocumentKey>>();
 
 constexpr auto kNumRecordsFieldName = "numRecords"_sd;
 constexpr auto kMsgFieldName = "msg"_sd;
@@ -207,6 +209,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
 OpTimeBundle replLogDelete(OperationContext* opCtx,
                            const NamespaceString& nss,
                            MutableOplogEntry* oplogEntry,
+                           const DocumentKey& documentKey,
                            OptionalCollectionUUID uuid,
                            StmtId stmtId,
                            bool fromMigrate,
@@ -228,7 +231,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     }
 
     oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry->setObject(documentKeyDecoration(opCtx));
+    oplogEntry->setObject(documentKey.getShardKeyAndId().getOwned());
+
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
     repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, stmtId);
@@ -257,11 +261,17 @@ void writeToImageCollection(OperationContext* opCtx,
 
 }  // namespace
 
-BSONObj OpObserverImpl::getDocumentKey(OperationContext* opCtx,
-                                       NamespaceString const& nss,
-                                       BSONObj const& doc) {
+DocumentKey OpObserverImpl::extractDocumentKey(OperationContext* opCtx,
+                                               NamespaceString const& nss,
+                                               BSONObj const& doc) {
     auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
-    return collDesc.extractDocumentKey(doc).getOwned();
+    return collDesc.extractDocumentKey(doc);
+}
+
+const DocumentKey& OpObserverImpl::getDocumentKey(OperationContext* opCtx) {
+    auto& documentKeyOpt = documentKeyDecoration(opCtx);
+    invariant(documentKeyOpt);
+    return *documentKeyOpt;
 }
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
@@ -532,7 +542,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             CollectionShardingState::get(opCtx, args.nss)->getCollectionDescription();
         if (collectionDescription.isSharded()) {
             operation.setPostImageDocumentKey(
-                collectionDescription.extractDocumentKey(args.updateArgs.updatedDoc).getOwned());
+                collectionDescription.extractDocumentKey(args.updateArgs.updatedDoc)
+                    .getShardKeyAndId()
+                    .getOwned());
         }
 
         txnParticipant.addTransactionOperation(opCtx, operation);
@@ -612,7 +624,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
-    documentKeyDecoration(opCtx) = getDocumentKey(opCtx, nss, doc);
+    documentKeyDecoration(opCtx) = extractDocumentKey(opCtx, nss, doc);
 
     shardObserveAboutToDelete(opCtx, nss, doc);
 }
@@ -622,8 +634,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
                               const OplogDeleteEntryArgs& args) {
-    auto& documentKey = documentKeyDecoration(opCtx);
-    invariant(!documentKey.isEmpty());
+    const auto& documentKey = getDocumentKey(opCtx);
+
+    auto shardKeyAndId = documentKey.getShardKeyAndId().getOwned();
+    invariant(!shardKeyAndId.isEmpty());
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -631,7 +645,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
-        auto operation = MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey);
+        auto operation = MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), shardKeyAndId);
         if (args.deletedDoc && args.preImageRecordingEnabledForCollection) {
             operation.setPreImage(args.deletedDoc->getOwned());
         }
@@ -654,8 +668,14 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             // `config.image_collection`, instead write it to the oplog.
             deletedDocForOplog = {*(args.deletedDoc)};
         }
-        opTime = replLogDelete(
-            opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDocForOplog);
+        opTime = replLogDelete(opCtx,
+                               nss,
+                               &oplogEntry,
+                               documentKey,
+                               uuid,
+                               stmtId,
+                               args.fromMigrate,
+                               deletedDocForOplog);
 
         if (oplogEntry.getNeedsRetryImage()) {
             writeToImageCollection(opCtx,
@@ -687,16 +707,16 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
     } else if (nss.isServerConfigurationCollection()) {
-        auto _id = documentKey["_id"];
+        auto _id = documentKey.getId().firstElement();
         if (_id.type() == BSONType::String &&
             _id.String() == FeatureCompatibilityVersionParser::kParameterName)
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, documentKey);
+        MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, shardKeyAndId);
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
-            opCtx, documentKey["_id"], boost::none);
+            opCtx, documentKey.getId().firstElement(), boost::none);
     }
 }
 

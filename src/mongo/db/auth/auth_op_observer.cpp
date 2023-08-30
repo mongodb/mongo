@@ -73,7 +73,7 @@ BSONObj AuthOpObserver::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
     const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
-    return collDesc.extractDocumentKey(doc).getOwned();
+    return collDesc.extractDocumentKey(doc).getShardKeyAndId().getOwned();
 }
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
