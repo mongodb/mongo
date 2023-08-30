@@ -68,7 +68,7 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
                                         const ChunkRange& range,
                                         const std::string& zoneName,
                                         const KeyPattern& shardKeyPattern) {
-    DistributionStatus chunkDist(nss, ShardToChunksMap{});
+    ZoneInfo zoneInfo;
 
     auto tagStatus = configServer->exhaustiveFindOnConfig(opCtx,
                                                           kConfigPrimarySelector,
@@ -91,7 +91,7 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
         // Always extend ranges to full shard key to be compatible with tags created before
         // the zone commands were implemented.
         const auto& parsedTagDoc = tagParseStatus.getValue();
-        auto overlapStatus = chunkDist.addRangeToZone(
+        auto overlapStatus = zoneInfo.addRangeToZone(
             ZoneRange(shardKeyPattern.extendRangeBound(parsedTagDoc.getMinKey(), false),
                       shardKeyPattern.extendRangeBound(parsedTagDoc.getMaxKey(), false),
                       parsedTagDoc.getTag()));
@@ -101,7 +101,7 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
     }
 
     auto overlapStatus =
-        chunkDist.addRangeToZone(ZoneRange(range.getMin(), range.getMax(), zoneName));
+        zoneInfo.addRangeToZone(ZoneRange(range.getMin(), range.getMax(), zoneName));
     if (!overlapStatus.isOK()) {
         return overlapStatus;
     }

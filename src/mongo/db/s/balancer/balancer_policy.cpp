@@ -76,10 +76,6 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
     return i->second;
 }
 
-Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
-    return _zoneInfo.addRangeToZone(range);
-}
-
 string DistributionStatus::getZoneForChunk(const ChunkType& chunk) const {
     return _zoneInfo.getZoneForChunk(chunk.getRange());
 }
@@ -152,10 +148,12 @@ string ZoneInfo::getZoneForChunk(const ChunkRange& chunk) const {
     return "";
 }
 
-
-StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const KeyPattern& keyPattern) {
+/**
+ * read all tags for collection via the catalog client and add to the zoneInfo
+ */
+StatusWith<ZoneInfo> createCollectionZoneInfo(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const KeyPattern& keyPattern) {
     const auto swCollectionZones =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getTagsForCollection(opCtx, nss);
     if (!swCollectionZones.isOK()) {
@@ -176,8 +174,7 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
             return status;
         }
     }
-
-    return zoneInfo;
+    return {std::move(zoneInfo)};
 }
 
 Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,

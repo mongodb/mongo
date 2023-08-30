@@ -91,17 +91,13 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return true;
     });
 
-    const auto& keyPattern = chunkMgr.getShardKeyPattern().getKeyPattern();
-
-    // Cache the collection zones
-    auto swZoneInfo = ZoneInfo::getZonesForCollection(opCtx, nss, keyPattern);
+    auto swZoneInfo =
+        createCollectionZoneInfo(opCtx, nss, chunkMgr.getShardKeyPattern().getKeyPattern());
     if (!swZoneInfo.isOK()) {
         return swZoneInfo.getStatus();
     }
 
-    DistributionStatus distribution(nss, std::move(shardToChunksMap), swZoneInfo.getValue());
-
-    return {std::move(distribution)};
+    return {DistributionStatus{nss, std::move(shardToChunksMap), std::move(swZoneInfo.getValue())}};
 }
 
 stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>
@@ -250,12 +246,12 @@ private:
  * range boundaries.
  */
 void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
-                                           const DistributionStatus& distribution,
+                                           const ZoneInfo& zoneInfo,
                                            SplitCandidatesBuffer* splitCandidates) {
     const auto& globalMax = cm.getShardKeyPattern().getKeyPattern().globalMax();
 
     // For each zone range, find chunks that need to be split.
-    for (const auto& zoneRangeEntry : distribution.zoneRanges()) {
+    for (const auto& zoneRangeEntry : zoneInfo.zoneRanges()) {
         const auto& zoneRange = zoneRangeEntry.second;
 
         const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
@@ -645,23 +641,23 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
 
     const auto& [cm, _] = routingInfoStatus.getValue();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, nss, shardStats, cm);
-    if (!collInfoStatus.isOK()) {
-        return collInfoStatus.getStatus();
+    const auto swCollZoneInfo =
+        createCollectionZoneInfo(opCtx, nss, cm.getShardKeyPattern().getKeyPattern());
+    if (!swCollZoneInfo.isOK()) {
+        return swCollZoneInfo.getStatus();
     }
-
-    const DistributionStatus& distribution = collInfoStatus.getValue();
+    const auto& collZoneInfo = swCollZoneInfo.getValue();
 
     // Accumulate split points for the same chunk together
     SplitCandidatesBuffer splitCandidates(nss, cm.getVersion());
 
-    if (nss == NamespaceString::kLogicalSessionsNamespace && !distribution.zones().empty()) {
+    if (nss == NamespaceString::kLogicalSessionsNamespace && !collZoneInfo.allZones().empty()) {
         LOGV2_WARNING(4562401,
                       "Ignoring zones for the internal sessions collection.",
                       "nss"_attr = NamespaceString::kLogicalSessionsNamespace,
-                      "zones"_attr = distribution.zones());
+                      "zones"_attr = collZoneInfo.allZones());
     } else {
-        getSplitCandidatesToEnforceZoneRanges(cm, distribution, &splitCandidates);
+        getSplitCandidatesToEnforceZoneRanges(cm, collZoneInfo, &splitCandidates);
     }
 
     return splitCandidates.done();
