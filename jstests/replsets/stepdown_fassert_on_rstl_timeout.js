@@ -74,5 +74,5 @@ bgInserter({checkExitSuccess: false});
 
 // We expect primary to have crashed with an fassert.
 replSet.stop(
-    primary.nodeId, undefined, {forRestart: false, allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    primary.nodeId, undefined, {forRestart: false, allowedExitCode: MongoRunner.EXIT_ABORT});
 replSet.stopSet();
