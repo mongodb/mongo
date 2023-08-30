@@ -1975,7 +1975,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-M60-like"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
@@ -1986,7 +1986,7 @@ buildvariants:
       - name: linkbench2
 
   - name: atlas-like-replica-query-stats.2022-10
-    display_name: M60-like-replica.2022-10 3-Node ReplSet (Query Stats)
+    display_name: M60-like-replica.2022-10 3-Node ReplSet (QueryStats)
     cron: *atlas-like-repl-cron
     modules: *modules
     expansions:
@@ -2002,7 +2002,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-M60-like"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
@@ -2039,7 +2039,7 @@ buildvariants:
         variant: compile-amazon-linux2-arm64
       - name: schedule_global_auto_tasks
         variant: task_generation
-    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
@@ -2073,11 +2073,11 @@ buildvariants:
         variant: compile-amazon-linux2-arm64
       - name: schedule_global_auto_tasks
         variant: task_generation
-    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
-        cron: "0 */4 * * 1-5"
+        cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
       - name: ycsb_60GB
       - name: tpcc
       - name: tpcc_majority
@@ -2177,9 +2177,9 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: array_traversal_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: filter_with_complex_logical_expression_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
 
   - name: linux-standalone-all-feature-flags.2022-11
     display_name: Linux Standalone (all feature flags) 2022-11
@@ -2739,9 +2739,9 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: medical_workload_diagnosis_50_50_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: ycsb_like_queryable_encrypt1_cfdefault_sharded_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
 
   - name: linux-1-node-replSet-audit-log-encryption-compression.2022-11
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression) 2022-11
@@ -2924,12 +2924,12 @@ buildvariants:
       - name: map_reduce_workloads
       - name: smoke_test
       - name: mongos_workloads
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: mongos_large_catalog_workloads
       - name: change_streams_latency
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: change_streams_listen_throughput
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: change_streams_multi_mongos
       - name: tsbs_query_sharded
       - name: tsbs_query_finance_sharded
@@ -3047,7 +3047,7 @@ buildvariants:
       - name: mongos_large_catalog_workloads
       - name: move_chunk_large_chunk_map_workloads
       - name: move_chunk_workloads
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: move_chunk_waiting_workloads
       - name: smoke_test
       - name: tsbs_query_sharded
@@ -3201,11 +3201,11 @@ buildvariants:
     run_on:
       - "rhel70-perf-replset"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: &3nodetasks
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
-        cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+        cron: *high-value-workload-cron
       - name: industry_benchmarks_w1
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -3265,7 +3265,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
-    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    cron: *linux-3-node-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3280,18 +3280,60 @@ buildvariants:
     run_on:
       - "rhel70-perf-replset"
     depends_on: *_compile_amazon2
-    tasks: &3nodetasks
+    tasks: &3node-intel-tasks
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
+        cron: *high-value-workload-cron
       - name: ycsb_60GB
+      - name: ycsb_60GB.long
+        cron: *high-value-workload-cron
       - name: crud_workloads_majority
       - name: smoke_test
+      - name: bestbuy_agg
+        cron: *high-value-workload-cron
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: tpcc_majority
+        cron: *high-value-workload-cron
       - name: linkbench
       - name: linkbench2
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
+      - name: tsbs_query
+        cron: *high-value-workload-cron
       - name: mixed_workloads_genny_rate_limited_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
+      - name: load_test_high_value
+        cron: *high-value-workload-cron
+      - name: majority_reads10_k_threads_high_value
+        cron: *high-value-workload-cron
+      - name: large_indexed_ins_high_value
+        cron: *high-value-workload-cron
+      - name: expressive_queries_high_value
+        cron: *high-value-workload-cron
+      - name: time_series_sort_high_value
+        cron: *high-value-workload-cron
+
+  - name: linux-3-node-replSet-intel-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (QueryStats)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-query-stats
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks: *3node-intel-tasks
 
   - name: linux-3-node-replSet-last-continuous-fcv.2022-11
     display_name: Linux 3-Node ReplSet (Last Continuous FCV) 2022-11
@@ -3764,7 +3806,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
-      cron: "0 */4 * * 1-5"
+      cron: *high-value-workload-cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
     - name: views-aggregation
