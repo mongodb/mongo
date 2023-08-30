@@ -184,6 +184,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/metadata_consistency_types_idl',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer_util',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/repl/abstract_async_component',

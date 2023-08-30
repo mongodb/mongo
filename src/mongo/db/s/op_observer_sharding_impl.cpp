@@ -42,8 +42,6 @@
 namespace mongo {
 namespace {
 
-const auto getIsMigrating = OperationContext::declareDecoration<bool>();
-
 /**
  * Write operations do shard version checking, but if an update operation runs as part of a
  * 'readConcern:snapshot' transaction, the router could have used the metadata at the snapshot
@@ -91,21 +89,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter)
     : OpObserverImpl(std::move(oplogWriter)) {}
 
-bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
-                                         NamespaceString const& nss,
-                                         BSONObj const& docToDelete) {
-    const auto scopedCsr =
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-    auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCsr);
-
-    return cloner && cloner->isDocumentInMigratingChunk(docToDelete);
-}
-
 void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
                                                        NamespaceString const& nss,
-                                                       BSONObj const& docToDelete) {
-    getIsMigrating(opCtx) = isMigrating(opCtx, nss, docToDelete);
-}
+                                                       BSONObj const& docToDelete) {}
 
 void OpObserverShardingImpl::shardObserveInsertsOp(
     OperationContext* opCtx,
@@ -146,10 +132,8 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
             continue;
         }
 
-        auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-        if (cloner) {
-            cloner->onInsertOp(opCtx, it->doc, opTime);
-        }
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogInsertForShardingHandler>(nss, it->doc, opTime));
     }
 }
 
@@ -184,15 +168,13 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner) {
-        cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
-    }
+    opCtx->recoveryUnit()->registerChange(std::make_unique<LogUpdateForShardingHandler>(
+        nss, preImageDoc, postImageDoc, opTime, prePostImageOpTime));
 }
 
 void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const NamespaceString& nss,
-                                                  const BSONObj& documentKey,
+                                                  const repl::DocumentKey& documentKey,
                                                   const repl::OpTime& opTime,
                                                   const ShardingWriteRouter& shardingWriteRouter,
                                                   const repl::OpTime& preImageOpTime,
@@ -213,17 +195,16 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
 
         if (atClusterTime) {
             const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(documentKey);
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(
+                    documentKey.getShardKeyAndId());
             assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
         }
 
         return;
     }
 
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner && getIsMigrating(opCtx)) {
-        cloner->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
-    }
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<LogDeleteForShardingHandler>(nss, documentKey, opTime, preImageOpTime));
 }
 
 void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(

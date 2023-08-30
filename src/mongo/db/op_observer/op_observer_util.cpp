@@ -85,6 +85,10 @@ BSONObj DocumentKey::getId() const {
     return _id;
 }
 
+boost::optional<BSONObj> DocumentKey::getShardKey() const {
+    return _shardKey;
+}
+
 BSONObj DocumentKey::getShardKeyAndId() const {
     if (_shardKey) {
         BSONObjBuilder builder(_shardKey.value());
@@ -108,6 +112,15 @@ DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, B
     }
 
     return {std::move(id), std::move(shardKey)};
+}
+
+DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const& doc) {
+    auto idField = doc["_id"];
+    BSONObj id = idField ? idField.wrap() : doc;
+
+    return {std::move(id),
+            dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern.toBSON())
+                .getOwned()};
 }
 
 }  // namespace mongo::repl

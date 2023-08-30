@@ -1120,7 +1120,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
             shardObserveDeleteOp(opCtx,
                                  nss,
-                                 documentKey.getShardKeyAndId(),
+                                 documentKey,
                                  opTime.writeOpTime,
                                  shardingWriteRouter,
                                  opTime.prePostImageOpTime,

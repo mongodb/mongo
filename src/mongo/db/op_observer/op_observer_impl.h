@@ -275,7 +275,7 @@ private:
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      const BSONObj& documentKey,
+                                      const repl::DocumentKey& documentKey,
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,
                                       const repl::OpTime& preImageOpTime,

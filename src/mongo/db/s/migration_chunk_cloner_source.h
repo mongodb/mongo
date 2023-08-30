@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
@@ -58,6 +59,7 @@ class BSONObjBuilder;
 class Collection;
 class CollectionPtr;
 class Database;
+class MigrationChunkClonerSource;
 class RecordId;
 
 // Overhead to prevent mods buffers from being too large
@@ -85,6 +87,67 @@ private:
     const LogicalSessionId _lsid;
     std::vector<repl::ReplOperation> _stmts;
     const repl::OpTime _prepareOrCommitOpTime;
+};
+
+/**
+ * Used to keep track of inserts that can be potentially added as xferMods of a migration.
+ */
+class LogInsertForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogInsertForShardingHandler(NamespaceString nss, BSONObj doc, repl::OpTime opTime);
+
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+
+    void rollback(OperationContext* opCtx) override {}
+
+private:
+    const NamespaceString _nss;
+    const BSONObj _doc;
+    const repl::OpTime _opTime;
+};
+
+/**
+ * Used to keep track of updates that can be potentially added as xferMods of a migration.
+ */
+class LogUpdateForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogUpdateForShardingHandler(NamespaceString nss,
+                                boost::optional<BSONObj> preImageDoc,
+                                BSONObj postImageDoc,
+                                repl::OpTime opTime,
+                                repl::OpTime prePostImageOpTime);
+
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+
+    void rollback(OperationContext* opCtx) override {}
+
+private:
+    const NamespaceString _nss;
+    const boost::optional<BSONObj> _preImageDoc;
+    const BSONObj _postImageDoc;
+    const repl::OpTime _opTime;
+    const repl::OpTime _prePostImageOpTime;
+};
+
+/**
+ * Used to keep track of deletes that can be potentially added as xferMods of a migration.
+ */
+class LogDeleteForShardingHandler final : public RecoveryUnit::Change {
+public:
+    LogDeleteForShardingHandler(NamespaceString nss,
+                                repl::DocumentKey documentKey,
+                                repl::OpTime opTime,
+                                repl::OpTime prePostImageOpTime);
+
+    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override;
+
+    void rollback(OperationContext* opCtx) override {}
+
+private:
+    const NamespaceString _nss;
+    const repl::DocumentKey _documentKey;
+    const repl::OpTime _opTime;
+    const repl::OpTime _prePostImageOpTime;
 };
 
 /**
@@ -164,14 +227,6 @@ public:
     void cancelClone(OperationContext* opCtx) noexcept;
 
     /**
-     * Checks whether the specified document is within the bounds of the chunk, which this cloner
-     * is responsible for.
-     *
-     * NOTE: Must be called with at least IS lock held on the collection.
-     */
-    bool isDocumentInMigratingChunk(const BSONObj& doc);
-
-    /**
      * Notifies this cloner that an insert happened to the collection, which it owns. It is up to
      * the cloner's implementation to decide what to do with this information and it is valid for
      * the implementation to ignore it.
@@ -203,7 +258,7 @@ public:
      * NOTE: Must be called with at least IX lock held on the collection.
      */
     void onDeleteOp(OperationContext* opCtx,
-                    const BSONObj& deletedDocId,
+                    const repl::DocumentKey& documentKey,
                     const repl::OpTime& opTime,
                     const repl::OpTime& preImageOpTime);
 
