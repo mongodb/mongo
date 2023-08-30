@@ -127,6 +127,61 @@ static bool canReturnSortedOutput(const CompoundIntervalReqExpr::Node& intervals
     return canBeSorted && !CompoundIntervalReqExpr::isSingletonDisjunction(intervals);
 }
 
+// Returns true if the given index contains entries for every component of the given shard key. For
+// each component of the shard key, ensures that the given FieldProjectionMap contains an entry for
+// it. Note that projections pushed down into the index scan have keys that encode the position of
+// the component in the index specification; for example, for an index {a: 1, "b.c": 1}, the "b.c"
+// projection is encoded as "<indexKey> 1" rather than "b.c". For this reason, this function also
+// populates 'shardKeyProjections' with the projection names generated and inserted into
+// 'indexProjections'; the i'th entry in 'shardKeyProjections' corresponds to the projection name
+// representing the i'th component of the shard key.
+// If the index does not cover the shard key, this function returns false.
+static bool addShardKeyProjectionsToIndexScan(const IndexCollationSpec& index,
+                                              const ShardingMetadata& shardingMetadata,
+                                              FieldProjectionMap& indexProjections,
+                                              ProjectionNameVector& shardKeyProjections,
+                                              PrefixId& prefixId) {
+    for (auto&& shardKeyField : shardingMetadata.shardKey()) {
+        bool found = false;
+        for (size_t i = 0; i < index.size(); ++i) {
+            const IndexCollationEntry& indexedField = index[i];
+            if (shardKeyField == indexedField) {
+                found = true;
+                FieldNameType indexComponent{encodeIndexKeyName(i)};
+                if (auto it = indexProjections._fieldProjections.find(indexComponent);
+                    it != indexProjections._fieldProjections.end()) {
+                    shardKeyProjections.push_back(it->second);
+                } else {
+                    ProjectionName skProj = prefixId.getNextId("shardKey");
+                    indexProjections._fieldProjections.emplace(indexComponent, skProj);
+                    shardKeyProjections.push_back(std::move(skProj));
+                }
+                break;
+            }
+        }
+        if (!found) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Builds filter node required to perform shard filtering on top of IndexScan. The function assumes
+// that 'builder' contains an IndexScanNode with 'fieldProjections' for each component of the shard
+// key.
+static void handleIndexScanRemoveOrphanRequirement(const IndexCollationSpec& shardKey,
+                                                   PhysPlanBuilder& builder,
+                                                   const ProjectionNameVector& shardKeyProjections,
+                                                   const CEType groupCE) {
+    ABTVector shardKeyComponentProjections;
+    for (auto&& name : shardKeyProjections) {
+        shardKeyComponentProjections.push_back(make<Variable>(name));
+    }
+    auto functionCallNode =
+        make<FunctionCall>("shardFilter", std::move(shardKeyComponentProjections));
+    builder.make<FilterNode>(groupCE, std::move(functionCallNode), std::move(builder._node));
+}
+
 /**
  * Takes a logical node and required physical properties, and creates zero or more physical subtrees
  * that can implement that logical node while satisfying those properties.
@@ -565,11 +620,10 @@ public:
         const CEType currentGroupCE = ceProperty.getEstimate();
         const PartialSchemaKeyCE& partialSchemaKeyCE = ceProperty.getPartialSchemaKeyCE();
 
+        const bool needsShardFilter =
+            getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove();
+
         if (indexReqTarget == IndexReqTarget::Index) {
-            if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
-                // TODO SERVER-79608: Implement this implementer for index target.
-                return;
-            }
             ProjectionCollationSpec requiredCollation;
             if (hasProperty<CollationRequirement>(_physProps)) {
                 requiredCollation =
@@ -620,6 +674,22 @@ public:
                 auto residualReqs = candidateIndexEntry._residualRequirements;
                 removeRedundantResidualPredicates(
                     requiredProjections, residualReqs, indexProjectionMap);
+
+                ProjectionNameVector shardKeyProjections;
+                if (needsShardFilter) {
+                    // Ensure that the current index under consideration can cover all components of
+                    // the shard key and 'indexProjectionMap' has entries for all components of the
+                    // shard key.
+                    const bool coversShardKey =
+                        addShardKeyProjectionsToIndexScan(indexDef.getCollationSpec(),
+                                                          scanDef.shardingMetadata(),
+                                                          indexProjectionMap,
+                                                          shardKeyProjections,
+                                                          _prefixId);
+                    if (!coversShardKey) {
+                        continue;
+                    }
+                }
 
                 // Compute the selectivities of predicates covered by index bounds and by residual
                 // predicates.
@@ -760,6 +830,13 @@ public:
                                              std::move(builder._node));
                 }
 
+                if (needsShardFilter) {
+                    handleIndexScanRemoveOrphanRequirement(scanDef.shardingMetadata().shardKey(),
+                                                           builder,
+                                                           std::move(shardKeyProjections),
+                                                           currentGroupCE);
+                }
+
                 optimizeChildrenNoAssert(_queue,
                                          kDefaultPriority,
                                          PhysicalRewriteType::SargableToIndex,
@@ -841,7 +918,7 @@ public:
 
             // Insert evaluation nodes to project the fields of the shard key if we couldn't push
             // them down to the PhysicalScan and insert a FilterNode which performs shard filtering.
-            if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
+            if (needsShardFilter) {
                 handleScanNodeRemoveOrphansRequirement(scanDef.shardingMetadata().shardKey(),
                                                        builder,
                                                        fieldProjectionMap,
@@ -2051,6 +2128,13 @@ private:
 
         setPropertyOverwrite<RemoveOrphansRequirement>(leftPhysPropsLocal, {false});
         setPropertyOverwrite<RemoveOrphansRequirement>(rightPhysPropsLocal, {true});
+        // Correct the cost of the inner side of the NLJ to account for the fact that the Seek side
+        // is responsible for filtering orphans and thus will encounter more documents than its CE
+        // indicates. This adjustment allows to prefer plans which perform shard filtering on the
+        // index side if possible, resulting in fewer calls to Seek.
+        auto repEst = getPropertyConst<RepetitionEstimate>(rightPhysPropsLocal).getEstimate();
+        setPropertyOverwrite<RepetitionEstimate>(rightPhysPropsLocal,
+                                                 {repEst * kOrphansCardinalityFudgeFactor});
         optimizeRIDIntersectHelper(isIndex,
                                    dedupRID,
                                    useMergeJoin,
