@@ -2,7 +2,7 @@
  * Tests for basic functionality of the abort move collection feature.
  *
  * @tags: [
- *  require_fcv_71,
+ *  requires_fcv_71,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection
  * ]
