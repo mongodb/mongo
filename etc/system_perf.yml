@@ -3110,7 +3110,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard-lite"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks: &shardlitetasks
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: bestbuy_agg
       - name: bestbuy_agg_merge_different_db
@@ -3152,7 +3152,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-shard-lite"
     depends_on: *_compile_amazon2
-    tasks: &shardlitetasks
+    tasks:
       - name: schedule_patch_auto_tasks
       - name: industry_benchmarks
       - name: mongos_workloads
