@@ -65,12 +65,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {
-
-// Used to coordinate delete operations between aboutToDelete() and onDelete().
-const auto getIsMigrating = OplogDeleteEntryArgs::declareDecoration<bool>();
-
-}  // namespace
 
 // static
 void MigrationChunkClonerSourceOpObserver::assertIntersectingChunkHasNotMoved(
@@ -206,10 +200,8 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
             continue;
         }
 
-        auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-        if (cloner) {
-            cloner->onInsertOp(opCtx, it->doc, opTime);
-        }
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<LogInsertForShardingHandler>(nss, it->doc, opTime));
     }
 }
 
@@ -268,20 +260,15 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner) {
-        cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime);
-    }
+    opCtx->recoveryUnit()->registerChange(std::make_unique<LogUpdateForShardingHandler>(
+        nss, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime));
 }
 
 void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                          const CollectionPtr& coll,
                                                          const BSONObj& docToDelete,
                                                          OplogDeleteEntryArgs* args,
-                                                         OpStateAccumulator* opAccumulator) {
-    const auto& nss = coll->ns();
-    getIsMigrating(args) = MigrationSourceManager::isMigrating(opCtx, nss, docToDelete);
-}
+                                                         OpStateAccumulator* opAccumulator) {}
 
 void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
                                                     const CollectionPtr& coll,
@@ -309,11 +296,9 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    auto getShardKeyAndId = [&nss](const OplogDeleteEntryArgs& args) -> BSONObj {
-        auto optDocKey = documentKeyDecoration(args);
-        invariant(optDocKey, nss.toStringForErrorMsg());
-        return optDocKey.value().getShardKeyAndId();
-    };
+    auto optDocKey = documentKeyDecoration(args);
+    invariant(optDocKey, nss.toStringForErrorMsg());
+    auto shardKeyAndId = optDocKey.value().getShardKeyAndId();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -323,19 +308,15 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
 
         if (atClusterTime) {
             const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(
-                    getShardKeyAndId(args));
+                metadata->getShardKeyPattern().extractShardKeyFromDocumentKeyThrows(shardKeyAndId);
             assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
         }
 
         return;
     }
 
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner && getIsMigrating(args)) {
-        const auto& opTime = opAccumulator->opTime.writeOpTime;
-        cloner->onDeleteOp(opCtx, getShardKeyAndId(args), opTime);
-    }
+    opCtx->recoveryUnit()->registerChange(std::make_unique<LogDeleteForShardingHandler>(
+        nss, *optDocKey, opAccumulator->opTime.writeOpTime));
 }
 
 void MigrationChunkClonerSourceOpObserver::postTransactionPrepare(

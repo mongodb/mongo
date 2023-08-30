@@ -102,15 +102,6 @@ public:
         const CollectionShardingRuntime& csr);
 
     /**
-     * Returns true if the document being deleted belongs to a chunk which, while still in the
-     * shard, is being migrated out. (Not to be confused with "fromMigrate", which tags
-     * operations that are steps in performing the migration.)
-     */
-    static bool isMigrating(OperationContext* opCtx,
-                            NamespaceString const& nss,
-                            BSONObj const& docToDelete);
-
-    /**
      * Instantiates a new migration source manager with the specified migration parameters.
      *
      * Loads the most up-to-date collection metadata and uses it as a starting point.

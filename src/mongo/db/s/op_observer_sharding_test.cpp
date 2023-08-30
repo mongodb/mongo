@@ -186,7 +186,6 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
     ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
@@ -215,7 +214,6 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                                  << "abc"
                                  << "_id"
                                  << "hello"));
-    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
@@ -243,7 +241,6 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2" << true));
-    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
@@ -268,7 +265,6 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
-    ASSERT_FALSE(MigrationSourceManager::isMigrating(operationContext(), kTestNss, doc));
 }
 
 TEST_F(DocumentKeyStateTest, CheckDBVersion) {
