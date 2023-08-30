@@ -48,10 +48,12 @@
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -125,6 +127,20 @@ public:
         actions.addAction(ActionType::fsync);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
+    virtual void checkForInProgressDDLOperations(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        const auto numDDLDocuments =
+            client.count(NamespaceString::kShardingDDLCoordinatorsNamespace);
+
+        if (numDDLDocuments != 0) {
+            LOGV2_WARNING(781541, "Cannot take lock while DDL operations is in progress");
+            releaseLock();
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot take lock while DDL operation is in progress");
+        }
+    }
+
     virtual bool errmsgRun(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
@@ -136,7 +152,12 @@ public:
         }
 
         const bool lock = cmdObj["lock"].trueValue();
-        LOGV2(20461, "CMD fsync: lock:{lock}", "CMD fsync", "lock"_attr = lock);
+        const bool forBackup = cmdObj["forBackup"].trueValue();
+        LOGV2(20461,
+              "CMD fsync: lock:{lock}",
+              "CMD fsync",
+              "lock"_attr = lock,
+              "forBackup"_attr = forBackup);
 
         // fsync + lock is sometimes used to block writes out of the system and does not care if
         // the `BackupCursorService::fsyncLock` call succeeds.
@@ -187,6 +208,11 @@ public:
                               "error"_attr = status);
                 uassertStatusOK(status);
             }
+        }
+
+        if (forBackup &&
+            feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
+            checkForInProgressDDLOperations(opCtx);
         }
 
         LOGV2(20462,

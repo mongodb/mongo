@@ -119,7 +119,7 @@ assert.commandWorked(coll.insert({x: 1}));
 
 // unlock before lock should fail
 let ret = assert.commandFailed(st.s.adminCommand({fsyncUnlock: 1}));
-const errmsg = "fsyncUnlock called when not locked";
+let errmsg = "fsyncUnlock called when not locked";
 assert.eq(ret.errmsg.includes(errmsg), true);
 
 performFsyncLockUnlockWithReadWriteOperations();

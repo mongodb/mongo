@@ -52,6 +52,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
+MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingCoordinatorDocument);
 
 namespace {
 
@@ -329,6 +330,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
 
             if (cleanup()) {
                 try {
+                    hangBeforeRemovingCoordinatorDocument.pauseWhileSet();
+
                     LOGV2(5565601,
                           "Releasing sharding DDL coordinator",
                           "coordinatorId"_attr = _coordId);
