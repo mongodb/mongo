@@ -3205,11 +3205,11 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
-        cron: "0 */4 * * 1-5"
+        cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
       - name: industry_benchmarks_w1
       - name: ycsb_60GB
       - name: ycsb_60GB.long
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads_majority
       - name: crud_workloads_w1
@@ -3220,7 +3220,7 @@ buildvariants:
       - name: secondary_performance  # Uses a special 2 node mongodb setup
       - name: non_sharded_workloads
       - name: bestbuy_agg
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
@@ -3233,7 +3233,7 @@ buildvariants:
       - name: secondary_reads
       - name: tpcc
       - name: tpcc_majority
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       # TODO: Enable in SERVER-66572.
@@ -3241,26 +3241,26 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: tsbs_load
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: tsbs_query
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
       - name: big_update_10k
       - name: mixed_workloads_genny_rate_limited_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: load_test_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: majority_reads10_k_threads_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: large_indexed_ins_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: expressive_queries_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
       - name: time_series_sort_high_value
-        cron: "0 */4 * * 1-5"
+        cron: *high-value-workload-cron
 
 
   - name: linux-3-node-replSet-intel.2022-11
@@ -3690,13 +3690,28 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
+        cron: *high-value-workload-cron
       - name: ycsb_60GB
       - name: ycsb_60GB.long
+        cron: *high-value-workload-cron
       - name: crud_workloads_majority
       - name: crud_workloads_w1
       - name: tpcc
+      - name: tpcc_majority
+        cron: *high-value-workload-cron
       - name: linkbench
       - name: linkbench2
+        cron: *high-value-workload-cron
+      - name: mixed_workloads_genny_rate_limited_high_value
+        cron: *high-value-workload-cron
+      - name: majority_reads10_k_threads_high_value
+        cron: *high-value-workload-cron
+      - name: bestbuy_agg
+        cron: *high-value-workload-cron
+      - name: large_indexed_ins_high_value
+        cron: *high-value-workload-cron
+      - name: expressive_queries_high_value
+        cron: *high-value-workload-cron
 
   - name: linux-3-node-replSet-250mbwtcache.2023-05
     display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
