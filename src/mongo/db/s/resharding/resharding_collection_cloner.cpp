@@ -661,7 +661,13 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                  auto resumeToken = cursorResponse.getPostBatchResumeToken();
                  if (!resumeToken)
                      resumeToken = BSONObj();
-                 writeOneBatch(opCtx, txnNumber, batch, shardId, donorHost, *resumeToken);
+                 writeOneBatch(opCtx,
+                               txnNumber,
+                               batch,
+                               shardId,
+                               donorHost,
+                               *resumeToken,
+                               true /*useNaturalOrderCloner*/);
              })
         .get();
 }
@@ -742,7 +748,8 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
                                                std::vector<InsertStatement>& batch,
                                                ShardId donorShard,
                                                HostAndPort donorHost,
-                                               BSONObj resumeToken) {
+                                               BSONObj resumeToken,
+                                               bool useNaturalOrderCloner) {
     Timer batchInsertTimer;
     int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
         // ReshardingOpObserver depends on the collection metadata being known when processing
@@ -751,8 +758,7 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         // information to be recovered.
         auto [_, sii] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (useNaturalOrderCloner) {
             return resharding::data_copy::insertBatchTransactionally(opCtx,
                                                                      _outputNss,
                                                                      sii,
@@ -790,40 +796,42 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     };
 
     auto chainCtx = std::make_shared<ChainContext>();
+    auto reshardingImprovementsEnabled = resharding::gFeatureFlagReshardingImprovements.isEnabled(
+        serverGlobalParams.featureCompatibility);
 
-    return resharding::WithAutomaticRetry([this, chainCtx, factory, executor, cancelToken] {
-               reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
-               if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                       serverGlobalParams.featureCompatibility)) {
+    return resharding::WithAutomaticRetry(
+               [this, chainCtx, factory, executor, cancelToken, reshardingImprovementsEnabled] {
+                   reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
+                   if (reshardingImprovementsEnabled) {
+                       auto opCtx = factory.makeOperationContext(&cc());
+                       // We can run into StaleConfig errors when cloning collections. To make it
+                       // safer during retry, we retry the whole cloning process and rely on the
+                       // resume token to be correct.
+                       resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                           _runOnceWithNaturalOrder(opCtx.get(),
+                                                    MongoProcessInterface::create(opCtx.get()),
+                                                    executor,
+                                                    cancelToken);
+                       });
+                       // If we got here, we succeeded and there is no more to come.  Otherwise
+                       // _runOnceWithNaturalOrder would uassert.
+                       chainCtx->moreToCome = false;
+                       return;
+                   }
+                   if (!chainCtx->pipeline) {
+                       auto opCtx = factory.makeOperationContext(&cc());
+                       chainCtx->pipeline = _restartPipeline(opCtx.get(), executor);
+                   }
+
                    auto opCtx = factory.makeOperationContext(&cc());
-                   // We can run into StaleConfig errors when cloning collections. To make it safer
-                   // during retry, we retry the whole cloning process and rely on the resume token
-                   // to be correct.
-                   resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
-                       _runOnceWithNaturalOrder(opCtx.get(),
-                                                MongoProcessInterface::create(opCtx.get()),
-                                                executor,
-                                                cancelToken);
+                   ScopeGuard guard([&] {
+                       chainCtx->pipeline->dispose(opCtx.get());
+                       chainCtx->pipeline.reset();
                    });
-                   // If we got here, we succeeded and there is no more to come.  Otherwise
-                   // _runOnceWithNaturalOrder would uassert.
-                   chainCtx->moreToCome = false;
-                   return;
-               }
-               if (!chainCtx->pipeline) {
-                   auto opCtx = factory.makeOperationContext(&cc());
-                   chainCtx->pipeline = _restartPipeline(opCtx.get(), executor);
-               }
-
-               auto opCtx = factory.makeOperationContext(&cc());
-               ScopeGuard guard([&] {
-                   chainCtx->pipeline->dispose(opCtx.get());
-                   chainCtx->pipeline.reset();
-               });
-               chainCtx->moreToCome =
-                   doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
-               guard.dismiss();
-           })
+                   chainCtx->moreToCome =
+                       doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
+                   guard.dismiss();
+               })
         .onTransientError([this](const Status& status) {
             LOGV2(5269300,
                   "Transient error while cloning sharded collection",
