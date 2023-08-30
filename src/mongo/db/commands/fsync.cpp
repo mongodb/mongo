@@ -71,10 +71,13 @@ Lock::ResourceMutex commandMutex("fsyncCommandMutex");
  */
 class FSyncLockThread : public BackgroundJob {
 public:
-    FSyncLockThread(ServiceContext* serviceContext, bool allowFsyncFailure)
+    FSyncLockThread(ServiceContext* serviceContext,
+                    bool allowFsyncFailure,
+                    const Milliseconds deadline)
         : BackgroundJob(false),
           _serviceContext(serviceContext),
-          _allowFsyncFailure(allowFsyncFailure) {}
+          _allowFsyncFailure(allowFsyncFailure),
+          _deadline(deadline) {}
 
     std::string name() const override {
         return "FSyncLockThread";
@@ -86,6 +89,7 @@ private:
     ServiceContext* const _serviceContext;
     bool _allowFsyncFailure;
     static bool _shutdownTaskRegistered;
+    const Milliseconds _deadline;
 };
 
 class FSyncCommand : public ErrmsgCommandDeprecated {
@@ -189,8 +193,25 @@ public:
                 stdx::unique_lock<Latch> lk(lockStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
-                _lockThread = std::make_unique<FSyncLockThread>(opCtx->getServiceContext(),
-                                                                allowFsyncFailure);
+
+                Milliseconds deadline = Milliseconds::max();
+                if (forBackup &&
+                    feature_flags::gClusterFsyncLock.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    // Set a default deadline of 90s for the fsyncLock to be acquired.
+                    deadline = Milliseconds(90000);
+                    // Parse the cmdObj and update the deadline if
+                    // "fsyncLockAcquisitionTimeoutMillis" exists.
+                    for (const auto& elem : cmdObj) {
+                        if (elem.fieldNameStringData() == "fsyncLockAcquisitionTimeoutMillis") {
+                            deadline = Milliseconds{uassertStatusOK(parseMaxTimeMS(elem))};
+                        }
+                    }
+                }
+
+                _lockThread = std::make_unique<FSyncLockThread>(
+                    opCtx->getServiceContext(), allowFsyncFailure, deadline);
+
                 _lockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {
@@ -375,7 +396,18 @@ void FSyncLockThread::run() {
     try {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
+
+        // If the deadline exists, set it on the opCtx and GlobalRead lock.
+        Date_t lockDeadline = Date_t::max();
+        if (_deadline < Milliseconds::max()) {
+            lockDeadline = Date_t::now() + _deadline;
+        }
+
+        opCtx.setDeadlineAfterNowBy(Milliseconds(_deadline), ErrorCodes::ExceededTimeLimit);
+        Lock::GlobalRead global(
+            &opCtx,
+            lockDeadline,
+            Lock::InterruptBehavior::kThrow);  // Block any writes in order to flush the files.
 
         StorageEngine* storageEngine = _serviceContext->getStorageEngine();
 
@@ -465,7 +497,16 @@ void FSyncLockThread::run() {
                 storageEngine->endBackup(&opCtx);
             }
         }
-
+    } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+        LOGV2_ERROR(204739, "Fsync timed out with ExceededTimeLimitError");
+        fsyncCmd.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
+        fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+        return;
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        LOGV2_ERROR(204740, "Fsync timed out with LockTimeout");
+        fsyncCmd.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
+        fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+        return;
     } catch (const std::exception& e) {
         LOGV2_FATAL(40350,
                     "FSyncLockThread exception: {error}",
