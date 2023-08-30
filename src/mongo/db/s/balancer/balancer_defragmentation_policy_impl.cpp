@@ -87,10 +87,7 @@ uint64_t getCollectionMaxChunkSizeBytes(OperationContext* opCtx, const Collectio
 }
 
 ZoneInfo getCollectionZones(OperationContext* opCtx, const CollectionType& coll) {
-    ZoneInfo zones;
-    uassertStatusOK(
-        ZoneInfo::addTagsFromCatalog(opCtx, coll.getNss(), coll.getKeyPattern(), zones));
-    return zones;
+    return uassertStatusOK(createCollectionZoneInfo(opCtx, coll.getNss(), coll.getKeyPattern()));
 }
 
 bool isRetriableForDefragmentation(const Status& status) {

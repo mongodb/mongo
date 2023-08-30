@@ -63,8 +63,12 @@ const size_t kDefaultImbalanceThreshold = 1;
 
 }  // namespace
 
-DistributionStatus::DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap)
-    : _nss(std::move(nss)), _shardChunks(std::move(shardToChunksMap)) {}
+DistributionStatus::DistributionStatus(NamespaceString nss,
+                                       ShardToChunksMap shardToChunksMap,
+                                       ZoneInfo zoneInfo)
+    : _nss(std::move(nss)),
+      _shardChunks(std::move(shardToChunksMap)),
+      _zoneInfo(std::move(zoneInfo)) {}
 
 size_t DistributionStatus::totalChunks() const {
     size_t total = 0;
@@ -111,10 +115,6 @@ const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) c
     invariant(i != _shardChunks.end());
 
     return i->second;
-}
-
-Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
-    return _zoneInfo.addRangeToZone(range);
 }
 
 string DistributionStatus::getTagForChunk(const ChunkType& chunk) const {
@@ -189,14 +189,13 @@ string ZoneInfo::getZoneForChunk(const ChunkRange& chunk) const {
     return "";
 }
 
-
 /**
  * read all tags for collection via the catalog client and add to the zoneInfo
  */
-Status ZoneInfo::addTagsFromCatalog(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const KeyPattern& keyPattern,
-                                    ZoneInfo& chunkMgr) {
+StatusWith<ZoneInfo> createCollectionZoneInfo(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const KeyPattern& keyPattern) {
+    ZoneInfo zoneInfo;
     const auto swCollectionTags =
         Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss);
     if (!swCollectionTags.isOK()) {
@@ -207,16 +206,14 @@ Status ZoneInfo::addTagsFromCatalog(OperationContext* opCtx,
 
     for (const auto& tag : collectionTags) {
         auto status =
-            chunkMgr.addRangeToZone(ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
+            zoneInfo.addRangeToZone(ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
                                               keyPattern.extendRangeBound(tag.getMaxKey(), false),
                                               tag.getTag()));
-
         if (!status.isOK()) {
             return status;
         }
     }
-
-    return Status::OK();
+    return {std::move(zoneInfo)};
 }
 
 void DistributionStatus::report(BSONObjBuilder* builder) const {
