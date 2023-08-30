@@ -31,16 +31,10 @@ export const $config = (function() {
         docCount: Array(collCount).fill(0),
         currentGranularityForEachColl: Array(collPerThread).fill('custom'),
         currentBucketRoundingSecondsForEachColl: Array(collPerThread).fill(1),
-        isTimeseriesScalabilityImprovementsEnabled: false,
     };
 
     const states = {
-        init: function(db, collName) {
-            if (!this.isTimeseriesScalabilityImprovementsEnabled) {
-                this.currentBucketRoundingSecondsForEachColl = Array(collPerThread).fill('seconds');
-                this.currentBucketRoundingSecondsForEachColl = Array(collPerThread).fill(60);
-            }
-        },
+        init: function(db, collName) {},
 
         read: function(db, collName) {
             const i = Random.randInt(collCount);
@@ -64,31 +58,29 @@ export const $config = (function() {
         },
 
         customBucketingUpdate: function(db, collName) {
-            if (this.isTimeseriesScalabilityImprovementsEnabled) {
-                const j = Random.randInt(collPerThread);
-                const i = this.tid * collPerThread + j;
+            const j = Random.randInt(collPerThread);
+            const i = this.tid * collPerThread + j;
 
-                const collGranularity = this.currentGranularityForEachColl[j];
-                let nextBucketingValue = this.currentBucketRoundingSecondsForEachColl[j] + 1;
-                if (collGranularity !== 'custom') {
-                    // The inputs to bucketMaxSpanSeconds and bucketRoundingSeconds must be greater
-                    // than their previous values, so we base the next bucketing value off of the
-                    // bucketMaxSpanSeconds since it is the higher of the two parameters when
-                    // derived from a granularity value.
-                    nextBucketingValue =
-                        TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(collGranularity) + 1;
-                }
-
-                assert.commandWorked(db.runCommand({
-                    collMod: shardedCollName(i),
-                    timeseries: {
-                        bucketMaxSpanSeconds: nextBucketingValue,
-                        bucketRoundingSeconds: nextBucketingValue
-                    }
-                }));
-                this.currentGranularityForEachColl[j] = 'custom';
-                this.currentBucketRoundingSecondsForEachColl[j] = nextBucketingValue;
+            const collGranularity = this.currentGranularityForEachColl[j];
+            let nextBucketingValue = this.currentBucketRoundingSecondsForEachColl[j] + 1;
+            if (collGranularity !== 'custom') {
+                // The inputs to bucketMaxSpanSeconds and bucketRoundingSeconds must be greater
+                // than their previous values, so we base the next bucketing value off of the
+                // bucketMaxSpanSeconds since it is the higher of the two parameters when
+                // derived from a granularity value.
+                nextBucketingValue =
+                    TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(collGranularity) + 1;
             }
+
+            assert.commandWorked(db.runCommand({
+                collMod: shardedCollName(i),
+                timeseries: {
+                    bucketMaxSpanSeconds: nextBucketingValue,
+                    bucketRoundingSeconds: nextBucketingValue
+                }
+            }));
+            this.currentGranularityForEachColl[j] = 'custom';
+            this.currentBucketRoundingSecondsForEachColl[j] = nextBucketingValue;
         },
 
         granularityUpdate: function(db, collName) {
@@ -129,27 +121,18 @@ export const $config = (function() {
     };
 
     const setup = function(db, collName, cluster) {
-        this.isTimeseriesScalabilityImprovementsEnabled =
-            TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo());
-
         for (let i = 0; i < collCount; i++) {
-            if (this.isTimeseriesScalabilityImprovementsEnabled) {
-                const timeseriesOptions = {
-                    timeField: timeField,
-                    metaField: metaField,
-                    bucketMaxSpanSeconds: 1,
-                    bucketRoundingSeconds: 1
-                };
-                assert.commandWorked(
-                    db.createCollection(unshardedCollName(i), {timeseries: timeseriesOptions}));
-                assert.commandWorked(
-                    db.createCollection(shardedCollName(i), {timeseries: timeseriesOptions}));
-            } else {
-                assert.commandWorked(db.createCollection(unshardedCollName(i)));
-                assert.commandWorked(db.createCollection(shardedCollName(i), {
-                    timeseries: {timeField: timeField, metaField: metaField, granularity: 'seconds'}
-                }));
-            }
+            const timeseriesOptions = {
+                timeField: timeField,
+                metaField: metaField,
+                bucketMaxSpanSeconds: 1,
+                bucketRoundingSeconds: 1
+            };
+            assert.commandWorked(
+                db.createCollection(unshardedCollName(i), {timeseries: timeseriesOptions}));
+            assert.commandWorked(
+                db.createCollection(shardedCollName(i), {timeseries: timeseriesOptions}));
+
             cluster.shardCollection(db[shardedCollName(i)], {[timeField]: 1}, false);
         }
     };

@@ -268,11 +268,6 @@ Status _createView(OperationContext* opCtx,
 }
 
 Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& collection) {
-    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return Status::OK();
-    }
-
     auto tsOptions = collection->getCollectionOptions().timeseries;
     if (!tsOptions->getMetaField()) {
         return Status::OK();

@@ -7,7 +7,6 @@
  *
  * @tags: [requires_replication]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
@@ -16,13 +15,6 @@ rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
 assert.commandWorked(db.dropDatabase());
-
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-    rst.stopSet();
-    jsTestLog(
-        'Skipping test because the TimeseriesScalabilityImprovements feature flag is disabled.');
-    quit();
-}
 
 const collNamePrefix = db.validate_timeseries_bucket_reopening_;
 const timeFieldName = 'time';

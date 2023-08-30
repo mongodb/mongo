@@ -137,59 +137,33 @@ testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
 testValidTimeseriesOptions({timeField: "time", granularity: "minutes"});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"});
 
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-    // A bucketMaxSpanSeconds may be provided, but only if they are the default for the granularity.
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "seconds",
-        bucketMaxSpanSeconds: 60 * 60
-    });
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "minutes",
-        bucketMaxSpanSeconds: 60 * 60 * 24
-    });
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "hours",
-        bucketMaxSpanSeconds: 60 * 60 * 24 * 30
-    });
-} else {
-    // Granularity can include a corresponding bucketMaxSpanSeconds value, but not a
-    // bucketRoundingSeconds value (even if the value corresponds to the granularity).
-    testInvalidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "seconds",
-        bucketMaxSpanSeconds: 60 * 60,
-        bucketRoundingSeconds: 60
-    },
-                                 ErrorCodes.InvalidOptions);
+// Granularity can include a corresponding bucketMaxSpanSeconds value, but not a
+// bucketRoundingSeconds value (even if the value corresponds to the granularity).
+testInvalidTimeseriesOptions({
+    timeField: "time",
+    metaField: "meta",
+    granularity: "seconds",
+    bucketMaxSpanSeconds: 60 * 60,
+    bucketRoundingSeconds: 60
+},
+                             ErrorCodes.InvalidOptions);
 
-    // Granularity may be provided with bucketMaxSpanSeconds as long as it corresponds to the
-    // granularity.
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "seconds",
-        bucketMaxSpanSeconds: 60 * 60
-    });
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "minutes",
-        bucketMaxSpanSeconds: 60 * 60 * 24
-    });
-    testValidTimeseriesOptions({
-        timeField: "time",
-        metaField: "meta",
-        granularity: "hours",
-        bucketMaxSpanSeconds: 60 * 60 * 24 * 30
-    });
-}
+// Granularity may be provided with bucketMaxSpanSeconds as long as it corresponds to the
+// granularity.
+testValidTimeseriesOptions(
+    {timeField: "time", metaField: "meta", granularity: "seconds", bucketMaxSpanSeconds: 60 * 60});
+testValidTimeseriesOptions({
+    timeField: "time",
+    metaField: "meta",
+    granularity: "minutes",
+    bucketMaxSpanSeconds: 60 * 60 * 24
+});
+testValidTimeseriesOptions({
+    timeField: "time",
+    metaField: "meta",
+    granularity: "hours",
+    bucketMaxSpanSeconds: 60 * 60 * 24 * 30
+});
 
 testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"});
 testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "hours"});

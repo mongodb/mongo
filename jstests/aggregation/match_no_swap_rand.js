@@ -135,26 +135,4 @@ function assertScanFilterEq({coll, pipeline, filter}) {
             {$match: {$sampleRate: 0.25}},
         ]
     });
-
-    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
-        assertScanFilterEq({
-            coll,
-            pipeline: [
-                {
-                    $match: {
-                        $and: [
-                            {$expr: {$lt: ["$m", 50]}},                    // Should split me out.
-                            {$expr: {$lt: [{$rand: {}}, {$const: 0.25}]}}  // Can't split me out.
-                        ]
-                    }
-                },
-            ],
-            filter: {
-                $and: [
-                    {$expr: {$lt: ["$meta", {$const: 50}]}},
-                    {meta: {$_internalExprLt: 50}},
-                ]
-            }
-        });
-    }
 }

@@ -357,34 +357,7 @@ void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns,
 }
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {
-    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
-        return;
-    }
-    for (auto& stripe : catalog.stripes) {
-        stdx::lock_guard stripeLock{stripe.mutex};
-        for (auto it = stripe.openBucketsById.begin(); it != stripe.openBucketsById.end();) {
-            auto nextIt = std::next(it);
-
-            const auto& bucket = it->second;
-            if (shouldClear(bucket->bucketId.ns)) {
-                {
-                    stdx::lock_guard catalogLock{catalog.mutex};
-                    catalog.executionStats.erase(bucket->bucketId.ns);
-                }
-                internal::abort(catalog,
-                                stripe,
-                                stripeLock,
-                                *bucket,
-                                nullptr,
-                                internal::getTimeseriesBucketClearedError(bucket->bucketId.ns,
-                                                                          bucket->bucketId.oid));
-            }
-
-            it = nextIt;
-        }
-    }
+    clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
 }
 
 void clear(BucketCatalog& catalog, const NamespaceString& ns) {

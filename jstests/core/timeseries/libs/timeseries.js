@@ -32,14 +32,6 @@ export var TimeseriesTest = class {
     }
 
     /**
-     * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
-     * TODO SERVER-66438 remove this helper.
-     */
-    static timeseriesScalabilityImprovementsEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesScalabilityImprovements");
-    }
-
-    /**
      * Returns whether time-series always use compressed buckets are enabled.
      * TODO SERVER-70605 remove this helper.
      */

@@ -804,10 +804,7 @@ void deleteDocument(OperationContext* opCtx,
         collection->getTimeseriesOptions() || nss.isTimeseriesBucketsCollection();
 
     if (shouldRecordPreImageForRetryableWrite ||
-        collection->isChangeStreamPreAndPostImagesEnabled() ||
-        (isTimeseriesCollection &&
-         feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-             serverGlobalParams.featureCompatibility))) {
+        collection->isChangeStreamPreAndPostImagesEnabled() || isTimeseriesCollection) {
         deletedDoc.emplace(doc.value().getOwned());
     }
     int64_t keysDeleted = 0;

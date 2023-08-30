@@ -103,14 +103,10 @@ TimeseriesTest.run((insert) => {
 
         // Check for the index.
         const keys = timeseriesListIndexesCursor.firstBatch.map(d => d.key);
-        let expectedKeys = [];
+        // The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
+        let expectedKeys = [{mm: 1, tm: 1}];
         if (FixtureHelpers.isSharded(bucketscoll)) {
             expectedKeys.push({tm: 1});
-        }
-        if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-            // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
-            // bucket collection.
-            expectedKeys.push({mm: 1, tm: 1});
         }
         expectedKeys.push(timeseriesIndexSpec);
 

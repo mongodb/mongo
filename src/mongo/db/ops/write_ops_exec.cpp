@@ -2537,26 +2537,17 @@ void rebuildOptionsWithGranularityFromConfigServer(OperationContext* opCtx,
             timeSeriesOptions.setGranularity(granularity.get());
             timeSeriesOptions.setBucketMaxSpanSeconds(
                 timeseries::getMaxSpanSecondsFromGranularity(*granularity));
-
-            if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                timeSeriesOptions.setBucketRoundingSeconds(
-                    timeseries::getBucketRoundingSecondsFromGranularity(*granularity));
-            }
+            timeSeriesOptions.setBucketRoundingSeconds(
+                timeseries::getBucketRoundingSecondsFromGranularity(*granularity));
         } else if (!bucketMaxSpanSeconds) {
             timeSeriesOptions.setGranularity(BucketGranularityEnum::Seconds);
             timeSeriesOptions.setBucketMaxSpanSeconds(
                 timeseries::getMaxSpanSecondsFromGranularity(*timeSeriesOptions.getGranularity()));
-            if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                timeSeriesOptions.setBucketRoundingSeconds(
-                    timeseries::getBucketRoundingSecondsFromGranularity(
-                        *timeSeriesOptions.getGranularity()));
-            }
+            timeSeriesOptions.setBucketRoundingSeconds(
+                timeseries::getBucketRoundingSecondsFromGranularity(
+                    *timeSeriesOptions.getGranularity()));
         } else {
-            invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                          serverGlobalParams.featureCompatibility) &&
-                      bucketMaxSpanSeconds);
+            invariant(bucketMaxSpanSeconds);
             timeSeriesOptions.setBucketMaxSpanSeconds(bucketMaxSpanSeconds);
 
             auto bucketRoundingSeconds = collDesc.getTimeseriesFields()->getBucketRoundingSeconds();

@@ -18,15 +18,13 @@ let collCount = 0;
 
 const bucketMaxSpanSecondsFromMinutes =
     TimeseriesTest.getBucketMaxSpanSecondsFromGranularity('minutes');
-const buckeRoundingSecondsFromMinutes =
-    TimeseriesTest.getBucketRoundingSecondsFromGranularity('minutes');
 
 const testOptions = function(options) {
-    const coll = db.getCollection(collNamePrefix + collCount++);
+    const coll = testDB.getCollection(collNamePrefix + collCount++);
     coll.drop();
 
     jsTestLog('Creating time-series collection with options: ' + tojson(options));
-    assert.commandWorked(db.createCollection(coll.getName(), options));
+    assert.commandWorked(testDB.createCollection(coll.getName(), options));
 
     if (!options.timeseries.hasOwnProperty('granularity')) {
         Object.assign(options.timeseries, {granularity: 'seconds'});
@@ -37,12 +35,10 @@ const testOptions = function(options) {
                 options.timeseries.granularity)
         });
     }
-    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-        // When we are using default 'granularity' values we won't actually set
-        // 'bucketRoundingSeconds' internally.
-        if (options.timeseries.hasOwnProperty('bucketRoundingSeconds')) {
-            delete options.timeseries.bucketRoundingSeconds;
-        }
+    // When we are using default 'granularity' values we won't actually set
+    // 'bucketRoundingSeconds' internally.
+    if (options.timeseries.hasOwnProperty('bucketRoundingSeconds')) {
+        delete options.timeseries.bucketRoundingSeconds;
     }
 
     if (options.hasOwnProperty('collation')) {
@@ -59,7 +55,8 @@ const testOptions = function(options) {
         });
     }
 
-    const collections = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
+    const collections =
+        assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
     jsTestLog('Checking listCollections result: ' + tojson(collections));
     // Expected number of collections >= system.views + 2 * timeseries collections
     // 'test' database may contain collections from other tests running in parallel.
@@ -79,23 +76,13 @@ testOptions({
         granularity: 'minutes',
     }
 });
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-    testOptions({
-        timeseries: {
-            timeField: timeFieldName,
-            granularity: 'minutes',
-            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-        }
-    });
-} else {
-    testOptions({
-        timeseries: {
-            timeField: timeFieldName,
-            granularity: 'minutes',
-            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-        }
-    });
-}
+testOptions({
+    timeseries: {
+        timeField: timeFieldName,
+        granularity: 'minutes',
+        bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+    }
+});
 testOptions({
     timeseries: {
         timeField: timeFieldName,
@@ -115,30 +102,15 @@ testOptions({
     collation: {locale: 'ja'},
 });
 testOptions({timeseries: {timeField: timeFieldName}, expireAfterSeconds: NumberLong(100)});
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-    testOptions({
-        timeseries: {
-            timeField: timeFieldName,
-            metaField: metaFieldName,
-            granularity: 'minutes',
-            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-        },
-        storageEngine: {wiredTiger: {}},
-        indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
-        collation: {locale: 'ja'},
-        expireAfterSeconds: NumberLong(100),
-    });
-} else {
-    testOptions({
-        timeseries: {
-            timeField: timeFieldName,
-            metaField: metaFieldName,
-            granularity: 'minutes',
-            bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-        },
-        storageEngine: {wiredTiger: {}},
-        indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
-        collation: {locale: 'ja'},
-        expireAfterSeconds: NumberLong(100),
-    });
-}
+testOptions({
+    timeseries: {
+        timeField: timeFieldName,
+        metaField: metaFieldName,
+        granularity: 'minutes',
+        bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
+    },
+    storageEngine: {wiredTiger: {}},
+    indexOptionDefaults: {storageEngine: {wiredTiger: {}}},
+    collation: {locale: 'ja'},
+    expireAfterSeconds: NumberLong(100),
+});

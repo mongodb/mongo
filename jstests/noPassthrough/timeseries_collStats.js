@@ -21,8 +21,6 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 const alwaysUseCompressedBuckets =
     TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB);
-const isTimeseriesScalabilityImprovementsEnabled =
-    TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB);
 
 assert.commandWorked(testDB.dropDatabase());
 
@@ -46,7 +44,7 @@ const clearCollection = function() {
     expectedStats.bucketCount = 0;
     expectedStats.numCompressedBuckets = 0;
     expectedStats.numSubObjCompressionRestart = 0;
-    if (!initialized || !isTimeseriesScalabilityImprovementsEnabled) {
+    if (!initialized) {
         expectedStats.numBucketInserts = 0;
         expectedStats.numBucketUpdates = 0;
         expectedStats.numBucketsOpenedDueToMetadata = 0;
@@ -55,19 +53,17 @@ const clearCollection = function() {
         expectedStats.numBucketsClosedDueToTimeForward = 0;
         expectedStats.numBucketsClosedDueToTimeBackward = 0;
         expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
-        if (isTimeseriesScalabilityImprovementsEnabled) {
-            expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
-            expectedStats.numBucketsArchivedDueToTimeBackward = 0;
-            expectedStats.numBucketsReopened = 0;
-            expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
-            expectedStats.numBucketsClosedDueToCachePressure = 0;
-            expectedStats.numBucketsFetched = 0;
-            expectedStats.numBucketsQueried = 0;
-            expectedStats.numBucketFetchesFailed = 0;
-            expectedStats.numBucketQueriesFailed = 0;
-            expectedStats.numBucketReopeningsFailed = 0;
-            expectedStats.numDuplicateBucketsReopened = 0;
-        }
+        expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
+        expectedStats.numBucketsArchivedDueToTimeBackward = 0;
+        expectedStats.numBucketsReopened = 0;
+        expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
+        expectedStats.numBucketsClosedDueToCachePressure = 0;
+        expectedStats.numBucketsFetched = 0;
+        expectedStats.numBucketsQueried = 0;
+        expectedStats.numBucketFetchesFailed = 0;
+        expectedStats.numBucketQueriesFailed = 0;
+        expectedStats.numBucketReopeningsFailed = 0;
+        expectedStats.numDuplicateBucketsReopened = 0;
         expectedStats.numCommits = 0;
         expectedStats.numWaits = 0;
         expectedStats.numMeasurementsCommitted = 0;
@@ -136,9 +132,7 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted += 3;
 expectedStats.avgNumMeasurementsPerCommit = 3;
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
@@ -149,9 +143,7 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
 expectedStats.avgNumMeasurementsPerCommit = 2;
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 assert.commandWorked(
@@ -175,18 +167,9 @@ assert.commandWorked(coll.insert(
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketsArchivedDueToTimeBackward++;
-} else {
-    expectedStats.numBucketsClosedDueToTimeBackward++;
-}
+expectedStats.numBucketsArchivedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
-if (!isTimeseriesScalabilityImprovementsEnabled && !alwaysUseCompressedBuckets) {
-    expectedStats.numCompressedBuckets++;
-}
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements.
@@ -205,9 +188,7 @@ expectedStats.avgNumMeasurementsPerCommit =
 if (!alwaysUseCompressedBuckets) {
     expectedStats.numCompressedBuckets++;
 }
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
@@ -231,9 +212,7 @@ if (!alwaysUseCompressedBuckets) {
     expectedStats.numCompressedBuckets++;
     expectedStats.numSubObjCompressionRestart += 2;
 }
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 
 checkCollStats();
 
@@ -256,9 +235,7 @@ expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed++;
-}
+expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes the measurements in each bucket span at most one hour (based on the time field).
@@ -279,9 +256,7 @@ expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (isTimeseriesScalabilityImprovementsEnabled) {
-    expectedStats.numBucketQueriesFailed += 1;
-}
+expectedStats.numBucketQueriesFailed += 1;
 checkCollStats();
 
 numDocs = 70;
@@ -300,19 +275,13 @@ const testIdleBucketExpiry = function(docFn) {
         expectedStats.numBucketInserts++;
         expectedStats.numBucketsOpenedDueToMetadata++;
         if (shouldExpire) {
-            if (isTimeseriesScalabilityImprovementsEnabled) {
-                expectedStats.numBucketsArchivedDueToMemoryThreshold++;
-            } else {
-                expectedStats.numBucketsClosedDueToMemoryThreshold++;
-            }
+            expectedStats.numBucketsArchivedDueToMemoryThreshold++;
         }
         expectedStats.numCommits++;
         expectedStats.numMeasurementsCommitted++;
         expectedStats.avgNumMeasurementsPerCommit =
             Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-        if (isTimeseriesScalabilityImprovementsEnabled) {
-            expectedStats.numBucketQueriesFailed++;
-        }
+        expectedStats.numBucketQueriesFailed++;
         checkCollStats();
 
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;

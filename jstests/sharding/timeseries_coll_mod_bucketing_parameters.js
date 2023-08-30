@@ -45,12 +45,6 @@ const checkConfigParametersAfterCollMod = function() {
     const mongos = st.s0;
     const db = mongos.getDB(dbName);
 
-    if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
-        jsTestLog("Skipping test because the timeseries scalability feature flag is disabled");
-        st.stop();
-        return;
-    }
-
     // Create and shard the time-series collection.
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
@@ -147,13 +141,6 @@ const checkShardRoutingAfterCollMod = function() {
     const shard0 = st.shard0;
     const shard1 = st.shard1;
     const db = mongos0.getDB(dbName);
-
-    if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(mongos0)) {
-        jsTestLog(
-            "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-        st.stop();
-        return;
-    }
 
     // Create and shard a time-series collection using custom bucketing parameters.
     assert.commandWorked(db.createCollection(collName, {

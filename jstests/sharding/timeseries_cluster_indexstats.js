@@ -8,8 +8,6 @@
  * ]
  */
 
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
 const st = new ShardingTest({shards: 2});
 
 const dbName = 'testDB';
@@ -61,19 +59,11 @@ function checkIndexStats(coll, keys, sharded) {
 }
 
 // Check indexStats before sharding.
-if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
-    checkIndexStats(mongosColl, [{[metaField]: 1, [timeField]: 1}, {[metaField]: 1}], false);
-    checkIndexStats(mongosBucketColl,
-                    [
-                        {"meta": 1, "control.min.tm": 1, "control.max.tm": 1},
-                        {"meta": 1},
-                        {"control.time.min": 1}
-                    ],
-                    false);
-} else {
-    checkIndexStats(mongosColl, [{[metaField]: 1}], false);
-    checkIndexStats(mongosBucketColl, [{"meta": 1}, {"control.time.min": 1}], false);
-}
+checkIndexStats(mongosColl, [{[metaField]: 1, [timeField]: 1}, {[metaField]: 1}], false);
+checkIndexStats(
+    mongosBucketColl,
+    [{"meta": 1, "control.min.tm": 1, "control.max.tm": 1}, {"meta": 1}, {"control.time.min": 1}],
+    false);
 
 // Shard the timeseries collection.
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -103,20 +93,14 @@ assert.eq(1, counts[otherShard.shardName], counts);
 assert.commandWorked(mongosBucketColl.createIndex({'control.time.max': 1}));
 
 // Check indexStats after sharding.
-if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
-    checkIndexStats(mongosColl, [{[metaField]: 1, [timeField]: 1}, {[metaField]: 1}], true);
-    checkIndexStats(mongosBucketColl,
-                    [
-                        {"meta": 1, "control.min.tm": 1, "control.max.tm": 1},
-                        {"meta": 1},
-                        {"control.time.min": 1},
-                        {"control.time.max": 1}
-                    ],
-                    true);
-} else {
-    checkIndexStats(mongosColl, [{[metaField]: 1}], true);
-    checkIndexStats(
-        mongosBucketColl, [{"meta": 1}, {"control.time.min": 1}, {"control.time.max": 1}], true);
-}
+checkIndexStats(mongosColl, [{[metaField]: 1, [timeField]: 1}, {[metaField]: 1}], true);
+checkIndexStats(mongosBucketColl,
+                [
+                    {"meta": 1, "control.min.tm": 1, "control.max.tm": 1},
+                    {"meta": 1},
+                    {"control.time.min": 1},
+                    {"control.time.max": 1}
+                ],
+                true);
 
 st.stop();

@@ -261,10 +261,6 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
 
         if (isTTLIndex) {
             uassert(ErrorCodes::InvalidOptions,
-                    "TTL indexes are not supported on time-series collections",
-                    feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            uassert(ErrorCodes::InvalidOptions,
                     "TTL indexes on time-series collections require a partialFilterExpression on "
                     "the metaField",
                     hasPartialFilterOnMetaField);

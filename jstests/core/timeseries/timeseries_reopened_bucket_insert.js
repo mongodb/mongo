@@ -18,12 +18,6 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    quit();
-}
-
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.timeseries_reopened_bucket_insert;
 const bucketsColl = testDB["system.buckets." + coll.getName()];

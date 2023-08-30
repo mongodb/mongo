@@ -156,25 +156,10 @@ function runTest(getShardKey, insert) {
     const thirdBatch = generateBatch(numDocs);
     assert.commandWorked(insert(coll, thirdBatch));
 
-    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(mainDB)) {
-        // With bucket reopening enabled, we can insert measurements into buckets after a chunk
-        // migration.
-        verifyBucketsOnShard(primaryShard, primaryBuckets);
-    } else {
-        // Primary shard should contain 4 (2 + 2) buckets.
-        verifyBucketsOnShard(primaryShard, primaryBuckets.concat(primaryBuckets));
-    }
-
-    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(mainDB)) {
-        // With bucket reopening enabled, we can insert measurements into buckets after a chunk
-        // migration.
-        verifyBucketsOnShard(otherShard, otherBuckets);
-    } else {
-        // During chunk migration, we have moved 2 buckets into the other shard. These migrated
-        // buckets cannot be modified, so after insertion of second and third batches, two more
-        // buckets are created.
-        verifyBucketsOnShard(otherShard, otherBuckets.concat(otherBuckets));
-    }
+    // With bucket reopening enabled, we can insert measurements into buckets after a chunk
+    // migration.
+    verifyBucketsOnShard(primaryShard, primaryBuckets);
+    verifyBucketsOnShard(otherShard, otherBuckets);
 
     // Check that both old documents and newly inserted documents are available.
     const allDocuments = firstBatch.concat(secondBatch).concat(thirdBatch);

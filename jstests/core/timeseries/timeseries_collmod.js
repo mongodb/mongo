@@ -11,8 +11,6 @@
  * ]
  */
 
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
 const collName = "timeseries_collmod";
 const coll = db.getCollection(collName);
 const bucketMaxSpanSecondsHours = 60 * 60 * 24 * 30;
@@ -74,141 +72,132 @@ assert.commandFailedWithCode(
         {"collMod": ("system.buckets." + collName), "timeseries": {"granularity": "hours"}}),
     [ErrorCodes.InvalidNamespace, 6201808 /* mongos error code */]);
 
-if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
-    // Tries to set one seconds parameter without the other (bucketMaxSpanSeconds or
-    // bucketRoundingSeconds).
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours}
-    }),
-                                 ErrorCodes.InvalidOptions);
+// Tries to set one seconds parameter without the other (bucketMaxSpanSeconds or
+// bucketRoundingSeconds).
+assert.commandFailedWithCode(
+    db.runCommand(
+        {"collMod": collName, "timeseries": {"bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand(
+        {"collMod": collName, "timeseries": {"bucketRoundingSeconds": bucketRoundingSecondsHours}}),
+    ErrorCodes.InvalidOptions);
 
-    // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds to a value less than the current
-    // maxSpanSeconds.
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "bucketMaxSpanSeconds": bucketRoundingSecondsHours,
-            "bucketRoundingSeconds": bucketRoundingSecondsHours
-        }
-    }),
-                                 ErrorCodes.InvalidOptions);
+// Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds to a value less than the current
+// maxSpanSeconds.
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "bucketMaxSpanSeconds": bucketRoundingSecondsHours,
+        "bucketRoundingSeconds": bucketRoundingSecondsHours
+    }
+}),
+                             ErrorCodes.InvalidOptions);
 
-    // Expect setting the bucketMaxSpanSeconds corresponding to the granularity default value to
-    // succeed.
-    assert.commandWorked(db.runCommand({
-        "collMod": collName,
-        "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
-    }));
+// Expect setting the bucketMaxSpanSeconds corresponding to the granularity default value to
+// succeed.
+assert.commandWorked(db.runCommand({
+    "collMod": collName,
+    "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
+}));
 
-    // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values
-    // corresponding to the granularity default values. This should fail since they are not equal.
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "granularity": "hours",
-            "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours,
-            "bucketRoundingSeconds": bucketRoundingSecondsHours
-        }
-    }),
-                                 ErrorCodes.InvalidOptions);
+// Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values
+// corresponding to the granularity default values. This should fail since they are not equal.
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "granularity": "hours",
+        "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours,
+        "bucketRoundingSeconds": bucketRoundingSecondsHours
+    }
+}),
+                             ErrorCodes.InvalidOptions);
 
-    // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values.
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
-            "bucketRoundingSeconds": bucketRoundingSecondsHours + 1
-        }
-    }),
-                                 ErrorCodes.InvalidOptions);
+// Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values.
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
+        "bucketRoundingSeconds": bucketRoundingSecondsHours + 1
+    }
+}),
+                             ErrorCodes.InvalidOptions);
 
-    // Tries to set granularity, bucketMaxSpanSeconds and bucketRoundingSeconds with different
-    // values from their default (60 * 60 * 24 and 60 * 60).
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "granularity": "hours",
-            "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
-            "bucketRoundingSeconds": bucketRoundingSecondsHours + 1
-        }
-    }),
-                                 ErrorCodes.InvalidOptions);
+// Tries to set granularity, bucketMaxSpanSeconds and bucketRoundingSeconds with different
+// values from their default (60 * 60 * 24 and 60 * 60).
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "granularity": "hours",
+        "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
+        "bucketRoundingSeconds": bucketRoundingSecondsHours + 1
+    }
+}),
+                             ErrorCodes.InvalidOptions);
 
-    // Successfully sets bucketMaxSpanSeconds, bucketRoundingSeconds and granularity to an equal
-    // value. This accepts the 3 parameters because they are the same as the current set values.
-    assert.commandWorked(db.runCommand({
-        "collMod": collName,
-        "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
-    }));
+// Successfully sets bucketMaxSpanSeconds, bucketRoundingSeconds and granularity to an equal
+// value. This accepts the 3 parameters because they are the same as the current set values.
+assert.commandWorked(db.runCommand({
+    "collMod": collName,
+    "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
+}));
 
-    // Successfully sets the bucketMaxSpanSeconds and bucketRoundingSeconds to a higher value for a
-    // timeseries collection. The granularity is currently set to 'hours' for this collection so we
-    // should be able to increase the value of bucketMaxSpanSeconds by one.
-    assert.commandWorked(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
-            "bucketRoundingSeconds": bucketMaxSpanSecondsHours + 1
-        }
-    }));
+// Successfully sets the bucketMaxSpanSeconds and bucketRoundingSeconds to a higher value for a
+// timeseries collection. The granularity is currently set to 'hours' for this collection so we
+// should be able to increase the value of bucketMaxSpanSeconds by one.
+assert.commandWorked(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours + 1,
+        "bucketRoundingSeconds": bucketMaxSpanSecondsHours + 1
+    }
+}));
 
-    // Verify seconds was correctly set on the collection and granularity removed since a custom
-    // value was added.
-    let collections = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
+// Verify seconds was correctly set on the collection and granularity removed since a custom
+// value was added.
+let collections = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
 
-    let collectionEntry =
-        collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
-    assert(collectionEntry);
+let collectionEntry = collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
+assert(collectionEntry);
 
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-              bucketMaxSpanSecondsHours + 1);
-    assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-              bucketMaxSpanSecondsHours + 1);
-    assert.isnull(collectionEntry.options.timeseries.granularity);
+assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketMaxSpanSecondsHours + 1);
+assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsHours + 1);
+assert.isnull(collectionEntry.options.timeseries.granularity);
 
-    collectionEntry = collections.find(entry => entry.name === coll.getName());
-    assert(collectionEntry);
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds,
-              bucketMaxSpanSecondsHours + 1);
-    assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-              bucketMaxSpanSecondsHours + 1);
-    assert.isnull(collectionEntry.options.timeseries.granularity);
+collectionEntry = collections.find(entry => entry.name === coll.getName());
+assert(collectionEntry);
+assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketMaxSpanSecondsHours + 1);
+assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsHours + 1);
+assert.isnull(collectionEntry.options.timeseries.granularity);
 
-    coll.drop();
-    // Create timeseries collection with custom maxSpanSeconds and bucketRoundingSeconds.
-    assert.commandWorked(db.createCollection(
-        collName,
-        {timeseries: {timeField: "time", bucketMaxSpanSeconds: 200, bucketRoundingSeconds: 200}}));
+coll.drop();
+// Create timeseries collection with custom maxSpanSeconds and bucketRoundingSeconds.
+assert.commandWorked(db.createCollection(
+    collName,
+    {timeseries: {timeField: "time", bucketMaxSpanSeconds: 200, bucketRoundingSeconds: 200}}));
 
-    // Successfully sets granularity from a collection created with custom maxSpanSeconds and
-    // bucketRoundingSeconds since the default values for 'minutes' are greater than the previous
-    // seconds.
-    assert.commandWorked(
-        db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+// Successfully sets granularity from a collection created with custom maxSpanSeconds and
+// bucketRoundingSeconds since the default values for 'minutes' are greater than the previous
+// seconds.
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
 
-    // Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
-    assert.commandFailedWithCode(db.runCommand({
-        "collMod": collName,
-        "timeseries": {
-            "bucketMaxSpanSeconds": bucketingValueMax + 1,
-            "bucketRoundingSeconds": bucketingValueMax + 1
-        }
-    }),
-                                 idlInvalidValueError);
+// Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "timeseries": {
+        "bucketMaxSpanSeconds": bucketingValueMax + 1,
+        "bucketRoundingSeconds": bucketingValueMax + 1
+    }
+}),
+                             idlInvalidValueError);
 
-    // Successfully set the bucketMaxSpanSeconds and bucketRoundingSeconds to the limit.
-    assert.commandWorked(db.runCommand({
-        "collMod": collName,
-        "timeseries":
-            {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax}
-    }));
+// Successfully set the bucketMaxSpanSeconds and bucketRoundingSeconds to the limit.
+assert.commandWorked(db.runCommand({
+    "collMod": collName,
+    "timeseries":
+        {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax}
+}));
 
-    // No-op command should succeed with empty time-series options.
-    assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {}}));
-}
+// No-op command should succeed with empty time-series options.
+assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {}}));

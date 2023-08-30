@@ -9,7 +9,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
@@ -151,8 +150,7 @@ TimeseriesTest.run((insert) => {
     // There are more indexes for sharded collections because it includes the shard key index. When
     // time-series scalability improvements are enabled, the {meta: 1, time: 1} index gets built by
     // default on the time-series bucket collection.
-    const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) +
-        (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesScalabilityImprovements") ? 1 : 0);
+    const numExtraIndexes = (FixtureHelpers.isSharded(bucketsColl) ? 1 : 0) + 1;
 
     userIndexes = coll.getIndexes();
     assert.eq(numExtraIndexes, userIndexes.length, tojson(userIndexes));

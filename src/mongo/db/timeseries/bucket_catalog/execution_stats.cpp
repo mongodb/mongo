@@ -180,27 +180,23 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
         builder.appendNumber("avgNumMeasurementsPerCommit", measurementsCommitted / commits);
     }
 
-    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        builder.appendNumber("numBucketsClosedDueToReopening",
-                             stats.numBucketsClosedDueToReopening.load());
-        builder.appendNumber("numBucketsArchivedDueToMemoryThreshold",
-                             stats.numBucketsArchivedDueToMemoryThreshold.load());
-        builder.appendNumber("numBucketsArchivedDueToTimeBackward",
-                             stats.numBucketsArchivedDueToTimeBackward.load());
-        builder.appendNumber("numBucketsReopened", stats.numBucketsReopened.load());
-        builder.appendNumber("numBucketsKeptOpenDueToLargeMeasurements",
-                             stats.numBucketsKeptOpenDueToLargeMeasurements.load());
-        builder.appendNumber("numBucketsClosedDueToCachePressure",
-                             stats.numBucketsClosedDueToCachePressure.load());
-        builder.appendNumber("numBucketsFetched", stats.numBucketsFetched.load());
-        builder.appendNumber("numBucketsQueried", stats.numBucketsQueried.load());
-        builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
-        builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
-        builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
-        builder.appendNumber("numDuplicateBucketsReopened",
-                             stats.numDuplicateBucketsReopened.load());
-    }
+    builder.appendNumber("numBucketsClosedDueToReopening",
+                         stats.numBucketsClosedDueToReopening.load());
+    builder.appendNumber("numBucketsArchivedDueToMemoryThreshold",
+                         stats.numBucketsArchivedDueToMemoryThreshold.load());
+    builder.appendNumber("numBucketsArchivedDueToTimeBackward",
+                         stats.numBucketsArchivedDueToTimeBackward.load());
+    builder.appendNumber("numBucketsReopened", stats.numBucketsReopened.load());
+    builder.appendNumber("numBucketsKeptOpenDueToLargeMeasurements",
+                         stats.numBucketsKeptOpenDueToLargeMeasurements.load());
+    builder.appendNumber("numBucketsClosedDueToCachePressure",
+                         stats.numBucketsClosedDueToCachePressure.load());
+    builder.appendNumber("numBucketsFetched", stats.numBucketsFetched.load());
+    builder.appendNumber("numBucketsQueried", stats.numBucketsQueried.load());
+    builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
+    builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
+    builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
+    builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
 }
 
 void addCollectionExecutionStats(ExecutionStatsController& stats, const ExecutionStats& collStats) {

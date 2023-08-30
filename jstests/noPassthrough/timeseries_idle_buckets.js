@@ -13,8 +13,6 @@ rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
 
-const isBucketReopeningEnabled = TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
-
 assert.commandWorked(db.dropDatabase());
 
 const coll = db.timeseries_idle_buckets;
@@ -66,40 +64,11 @@ for (let i = 0; i < numDocs; i++) {
     }));
 
     // Check buckets.
-    if (isBucketReopeningEnabled) {
-        let bucketDocs =
-            bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
-                .limit(1)
-                .toArray();
-        if (bucketDocs.length > 0) {
-            foundExpiredBucket = true;
-        }
-    } else {
-        let bucketDocs = bucketsColl.find({meta: {[i.toString()]: metaValue}})
-                             .sort({'control.min._id': 1})
-                             .toArray();
-        if (bucketDocs.length > 1) {
-            // If bucket compression is enabled the expired bucket should have been compressed.
-            assert.eq(TimeseriesTest.BucketVersion.kCompressed,
-                      bucketDocs[0].control.version,
-                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                      bucketDocs[1].control.version,
-                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-
-            foundExpiredBucket = true;
-            break;
-        } else {
-            // The insert landed in an existing bucket, verify that compression didn't take place
-            // yet.
-            assert.eq(bucketDocs.length,
-                      1,
-                      'Invalid number of buckets for metadata ' + (numDocs - 1) + ': ' +
-                          tojson(bucketDocs));
-            assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
-                      bucketDocs[0].control.version,
-                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-        }
+    let bucketDocs = bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
+                         .limit(1)
+                         .toArray();
+    if (bucketDocs.length > 0) {
+        foundExpiredBucket = true;
     }
 }
 assert(foundExpiredBucket, "Did not find an expired bucket");

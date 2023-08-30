@@ -189,8 +189,6 @@ public:
 
 
 TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with an untracked bucket in the registry.
     auto& bucket = createBucket(info1);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
@@ -227,8 +225,6 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with a 'kNormal' bucket in the registry.
     auto& bucket = createBucket(info1);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
@@ -263,8 +259,6 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with a 'kCleared' bucket in the registry.
     auto& bucket = createBucket(info1);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
@@ -300,8 +294,6 @@ TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with a 'kPrepared' bucket in the registry.
     auto& bucket = createBucket(info1);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
@@ -349,8 +341,6 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "inv
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with a 'kPreparedAndCleared' bucket in the registry.
     auto& bucket = createBucket(info1);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
@@ -386,8 +376,6 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     // Start with a bucket with a direct write in the registry.
     auto& bucket = createBucket(info1);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
@@ -419,10 +407,6 @@ TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
 }
 
 TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
-
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 0);
     auto& bucket1 = createBucket(info1);
@@ -454,9 +438,6 @@ TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
 }
 
 TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     // Creating a bucket in a new era should add a counter for that era to the map.
     auto& bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1.lastChecked, 0);
@@ -490,9 +471,6 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket1 = createBucket(info1);
     auto& bucket2 = createBucket(info2);
     ASSERT_EQ(bucket1.lastChecked, 0);
@@ -544,9 +522,6 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
 }
 
 TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket1 = createBucket(info1);
     auto& bucket2 = createBucket(info2);
     ASSERT_EQ(bucket1.lastChecked, 0);
@@ -615,9 +590,6 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1.lastChecked, 0);
     clearById(ns1, OID());
@@ -641,9 +613,6 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
 }
 
 TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
@@ -655,9 +624,6 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
 }
 
 TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
@@ -670,9 +636,6 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 }
 
 TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
@@ -704,18 +667,12 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
-
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
@@ -725,8 +682,6 @@ TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
 }
 
 TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 

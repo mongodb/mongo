@@ -287,11 +287,6 @@ let expectedChanges = [
     {"operationType": "drop", "ns": {"db": dbName, "coll": bucketsCollName}}
 ];
 
-if (!FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
-    // Remove implicitly create index
-    expectedChanges = [expectedChanges[0], ...expectedChanges.slice(2)];
-}
-
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     // Check for compressed bucket changes when using always compressed buckets.
     expectedChanges[4] = {

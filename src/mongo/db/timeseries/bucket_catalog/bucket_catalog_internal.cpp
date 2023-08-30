@@ -139,9 +139,7 @@ int32_t getCacheDerivedBucketMaxSize(StorageEngine* storageEngine, uint32_t work
     uint64_t storageCacheSize =
         static_cast<uint64_t>(storageEngine->getEngine()->getCacheSizeMB() * 1024 * 1024);
 
-    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
-        storageCacheSize == 0 || workloadCardinality == 0) {
+    if (storageCacheSize == 0 || workloadCardinality == 0) {
         return INT_MAX;
     }
 
@@ -346,8 +344,6 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     const TimeseriesOptions& options,
     const BucketToReopen& bucketToReopen,
     const BucketKey* expectedKey) {
-    invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility));
     const auto& [bucketDoc, validator, catalogEra] = bucketToReopen;
     if (catalogEra < getCurrentEra(registry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
@@ -1080,16 +1076,13 @@ void expireIdleBuckets(BucketCatalog& catalog,
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numExpired = 0;
 
-    const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
-
     while (!stripe.idleBuckets.empty() &&
            catalog.memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe.idleBuckets.back();
 
         auto state = getBucketState(catalog.bucketStateRegistry, bucket);
-        if (canArchive && state && !conflictsWithInsertions(state.value())) {
+        if (state && !conflictsWithInsertions(state.value())) {
             // Can archive a bucket if it's still eligible for insertions.
             archiveBucket(catalog, stripe, stripeLock, *bucket, closedBuckets);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
@@ -1104,7 +1097,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         ++numExpired;
     }
 
-    while (canArchive && !stripe.archivedBuckets.empty() &&
+    while (!stripe.archivedBuckets.empty() &&
            catalog.memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
 
@@ -1280,17 +1273,10 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         return {RolloverAction::kSoftClose, RolloverReason::kTimeForward};
     }
     if (info.time < bucketTime) {
-        const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility);
         if (shouldUpdateStats) {
-            if (canArchive) {
-                info.stats.incNumBucketsArchivedDueToTimeBackward();
-            } else {
-                info.stats.incNumBucketsClosedDueToTimeBackward();
-            }
+            info.stats.incNumBucketsArchivedDueToTimeBackward();
         }
-        return {canArchive ? RolloverAction::kArchive : RolloverAction::kSoftClose,
-                RolloverReason::kTimeBackward};
+        return {RolloverAction::kArchive, RolloverReason::kTimeBackward};
     }
     if (bucket.numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
         info.stats.incNumBucketsClosedDueToCount();
@@ -1316,9 +1302,7 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         bucket, doc, info.options.getMetaField(), newFieldNamesToBeInserted, sizeToBeAdded);
     if (bucket.size + sizeToBeAdded > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
-            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
-            feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
         if (keepBucketOpenForLargeMeasurements) {
             if (bucket.size + sizeToBeAdded > absoluteMaxSize) {
                 if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {

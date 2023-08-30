@@ -7,7 +7,6 @@
  *   requires_fcv_61,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -25,30 +24,18 @@ const resetCollection = (() => {
         jsTestName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 });
 
-const areTimeseriesScalabilityImprovementsEnabled =
-    TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
-
 const numMeasurements = 50;
 let expectedNumBucketsKeptOpenDueToLargeMeasurements = 0;
 const checkBucketSize = (() => {
     const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 
-    if (areTimeseriesScalabilityImprovementsEnabled) {
-        // Need at least 10 measurements before closing buckets exceeding timeseriesBucketMaxSize.
-        assert.eq(numMeasurements / 10, timeseriesStats.bucketCount);
+    // Need at least 10 measurements before closing buckets exceeding timeseriesBucketMaxSize.
+    assert.eq(numMeasurements / 10, timeseriesStats.bucketCount);
 
-        assert(timeseriesStats.hasOwnProperty("numBucketsKeptOpenDueToLargeMeasurements"));
-        expectedNumBucketsKeptOpenDueToLargeMeasurements += numMeasurements / 10;
-        assert.eq(expectedNumBucketsKeptOpenDueToLargeMeasurements,
-                  timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
-    } else {
-        // After accounting for the control.min and control.max summaries, one measurement of server
-        // status exceeds the bucket max size. Which means we'll only have one measurement per
-        // bucket.
-        assert.eq(numMeasurements, timeseriesStats.bucketCount);
-
-        assert(!timeseriesStats.hasOwnProperty("numBucketsKeptOpenDueToLargeMeasurements"));
-    }
+    assert(timeseriesStats.hasOwnProperty("numBucketsKeptOpenDueToLargeMeasurements"));
+    expectedNumBucketsKeptOpenDueToLargeMeasurements += numMeasurements / 10;
+    assert.eq(expectedNumBucketsKeptOpenDueToLargeMeasurements,
+              timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
 });
 
 jsTestLog("Testing single inserts");

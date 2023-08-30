@@ -601,9 +601,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     do {
         // Avoids reopening existing buckets for the inserts of the updated measurements from
         // time-series user updates.
-        if (!fromUpdates &&
-            feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (!fromUpdates) {
             swResult = bucket_catalog::tryInsert(opCtx,
                                                  bucketCatalog,
                                                  viewNs,

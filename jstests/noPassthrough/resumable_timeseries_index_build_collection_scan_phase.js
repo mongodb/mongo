@@ -9,7 +9,6 @@
  *   requires_replication,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 1});
@@ -26,12 +25,10 @@ const metaFieldName = 'meta';
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-    // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
-    // bucket collection. This test assumes that all of the indexes in the collection are not
-    // finished to ensure they are resumed when the node is restarted. Drop this index.
-    assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
-}
+// The {meta: 1, time: 1} index gets built by default on the time-series bucket collection. This
+// test assumes that all of the indexes in the collection are not finished to ensure they are
+// resumed when the node is restarted. Drop this index.
+assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
 
 // Use different metadata fields to guarantee creating three individual buckets in the buckets
 // collection.

@@ -6,7 +6,6 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   featureFlagTimeseriesScalabilityImprovements,
  *   requires_fcv_63,
  * ]
  */

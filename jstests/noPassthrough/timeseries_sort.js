@@ -6,7 +6,6 @@
  *   requires_sharding,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
@@ -90,11 +89,9 @@ assert.eq(1, counts[otherShard.shardName], counts);
 assert.eq(coll.count(), 100);
 assert.eq(bucketsColl.count(), 4);
 
-// When enabled, the {meta: 1, time: 1} index gets built by default on the time-series bucket
-// collection.
-const numExtraIndexes = TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0) ? 1 : 0;
-assert.eq(coll.getIndexes().length, 1 + numExtraIndexes);
-assert.eq(coll.getIndexes()[numExtraIndexes].name, "control.min.t_1");
+// The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
+assert.eq(coll.getIndexes().length, 2);
+assert.eq(coll.getIndexes()[1].name, "control.min.t_1");
 
 const forwardSort = {
     $sort: {t: 1}

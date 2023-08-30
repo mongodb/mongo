@@ -2,7 +2,6 @@
  * Tests that direct removal in a timeseries bucket collection synchronizes with bucket reopening.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
@@ -10,13 +9,6 @@ const conn = MongoRunner.runMongod();
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
-
-if (!FeatureFlagUtil.isEnabled(testDB, "TimeseriesScalabilityImprovements")) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 const collName = 'test';
 

@@ -68,8 +68,6 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
                                                 bool* shouldUpdateOptions) {
     auto currentGranularity = currentOptions.getGranularity();
     auto targetGranularity = targetOptions.getGranularity();
-    bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
 
     // If the timeseries options are completely empty, we can skip updating them.
     if (!targetGranularity.has_value() && !targetOptions.getBucketMaxSpanSeconds().has_value() &&
@@ -134,10 +132,6 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
         targetMaxSpanSeconds = getMaxSpanSecondsFromGranularity(targetGranularity.get());
         targetRoundingSeconds = getBucketRoundingSecondsFromGranularity(targetGranularity.get());
     } else {
-        if (!allowSecondsParameters) {
-            return Status{ErrorCodes::InvalidOptions, "No timeseries parameters were given"};
-        }
-
         if (!targetOptions.getBucketMaxSpanSeconds() || !targetOptions.getBucketRoundingSeconds()) {
             return Status{
                 ErrorCodes::InvalidOptions,
@@ -163,7 +157,7 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
     // Check if we are trying to set the bucketing parameters to the existing values. If so, we do
     // not need to update any existing options.
     if (currentMaxSpanSeconds == targetMaxSpanSeconds) {
-        if (!allowSecondsParameters || currentBucketRoundingSeconds == targetRoundingSeconds) {
+        if (currentBucketRoundingSeconds == targetRoundingSeconds) {
             if (shouldUpdateOptions)
                 *shouldUpdateOptions = false;
             return Status::OK();
@@ -176,7 +170,7 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
             "Timeseries 'bucketMaxSpanSeconds' needs to be equal or greater to transition"};
     }
 
-    if (allowSecondsParameters && (currentBucketRoundingSeconds > targetRoundingSeconds)) {
+    if (currentBucketRoundingSeconds > targetRoundingSeconds) {
         return Status{
             ErrorCodes::InvalidOptions,
             "Timeseries 'bucketRoundingSeconds' needs to be equal or greater to transition"};
@@ -333,8 +327,6 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
     auto maxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
     auto granularity = timeseriesOptions.getGranularity();
 
-    bool allowSecondsParameters = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
     auto maxSpanSecondsFromGranularity =
         getMaxSpanSecondsFromGranularity(granularity.get_value_or(BucketGranularityEnum::Seconds));
 
@@ -358,7 +350,7 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
 
         // If the granularity is specified, do not set the 'bucketRoundingSeconds' field.
         timeseriesOptions.setBucketRoundingSeconds(boost::none);
-    } else if (allowSecondsParameters && (maxSpanSeconds || roundingSeconds)) {
+    } else if (maxSpanSeconds || roundingSeconds) {
         if (roundingSeconds != maxSpanSeconds) {
             return Status{ErrorCodes::InvalidOptions,
                           "Timeseries 'bucketRoundingSeconds' needs to be equal to "

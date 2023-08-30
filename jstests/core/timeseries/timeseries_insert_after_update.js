@@ -48,14 +48,9 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, docs.slice(1)));
     assert.docEq(docs, coll.find({}, {_id: 0}).sort({[timeFieldName]: 1}).toArray());
 
-    if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
-        assert.eq(bucketsColl.find().itcount(), 2, bucketsColl.find().toArray());
-        stats = assert.commandWorked(coll.stats());
-        assert(stats.timeseries);
-        assert.eq(stats.timeseries['bucketCount'], 2);
-        assert.eq(stats.timeseries['numBucketsReopened'], expectedNumBucketsReopened);
-    } else {
-        // All three documents should be in their own buckets.
-        assert.eq(bucketsColl.find().itcount(), 3, bucketsColl.find().toArray());
-    }
+    assert.eq(bucketsColl.find().itcount(), 2, bucketsColl.find().toArray());
+    stats = assert.commandWorked(coll.stats());
+    assert(stats.timeseries);
+    assert.eq(stats.timeseries['bucketCount'], 2);
+    assert.eq(stats.timeseries['numBucketsReopened'], expectedNumBucketsReopened);
 });

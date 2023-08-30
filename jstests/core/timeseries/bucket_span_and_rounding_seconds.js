@@ -12,12 +12,6 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
-    jsTestLog(
-        "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    quit();
-}
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 

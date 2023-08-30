@@ -1286,9 +1286,6 @@ TEST_F(BucketCatalogTest, SchemaChanges) {
 }
 
 TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
@@ -1374,9 +1371,6 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
 }
 
 TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     {
@@ -1425,9 +1419,6 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1439,8 +1430,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
 
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = _bucketCatalog->memoryUsage.load();
     Status status = _reopenBucket(autoColl.getCollection(), bucketDoc);
@@ -1481,8 +1470,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurementWithMeta) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a642"},
@@ -1532,9 +1519,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
 }
 
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasurement) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1546,8 +1530,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
 
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = _bucketCatalog->memoryUsage.load();
     Status status = _reopenBucket(autoColl.getCollection(), bucketDoc);
@@ -1582,9 +1564,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1642,9 +1621,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
-
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1696,8 +1672,6 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
 }
 
 TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
-                                                     true};
     RAIIServerParameterControllerForTest memoryLimit{
         "timeseriesIdleBucketExpiryMemoryUsageThreshold", 10000};
 
@@ -1763,8 +1737,6 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
-    RAIIServerParameterControllerForTest flagController{
-        "featureFlagTimeseriesScalabilityImprovements", true};
     RAIIServerParameterControllerForTest memoryController{
         "timeseriesIdleBucketExpiryMemoryUsageThreshold",
         250};  // An absurdly low limit that only allows us one open bucket at a time.
@@ -1872,8 +1844,6 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Insert a document so we have a base bucket
@@ -1915,8 +1885,6 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
 }
 
 TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Insert a document so we have a base bucket and we can test that we soft close it when we
@@ -1988,8 +1956,6 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Insert a document so we have a base bucket and we can test that we archive it when we reopen

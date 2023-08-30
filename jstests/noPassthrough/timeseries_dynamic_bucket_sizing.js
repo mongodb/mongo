@@ -41,13 +41,6 @@ coll.drop();
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-    replSet.stopSet();
-    jsTestLog(
-        'Skipping test because the TimeseriesScalabilityImprovements feature flag is disabled.');
-    quit();
-}
-
 // Helper to log timeseries stats.
 const formatStatsLog = ((stats) => {
     return "Timeseries stats: " + tojson(stats);
