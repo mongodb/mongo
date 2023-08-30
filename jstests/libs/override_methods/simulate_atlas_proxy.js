@@ -10,8 +10,9 @@ import {
     createCmdObjWithTenantId,
     getTenantIdForDatabase,
     isCmdObjWithTenantId,
+    isDenylistedDb,
     prependTenantIdToDbNameIfApplicable,
-    removeTenantId,
+    removeTenantIdAndMaybeCheckPrefixes,
     usingMultipleTenants
 } from "jstests/serverless/libs/tenant_prefixing.js";
 
@@ -566,6 +567,9 @@ function runCommandRetryOnTenantMigrationErrors(
 }
 
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+    const useDollarTenant = !!TestData.useDollarTenant;
+    const useExpectPrefix = !!TestData.useExpectPrefix;
+
     const tenantId = getTenantIdForDatabase(dbName);
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName, tenantId);
 
@@ -575,13 +579,28 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     }
 
     // Prepend a tenant prefix to all database names and namespaces, where applicable.
-    const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj, tenantId);
+    const cmdObjWithTenantId = (function() {
+        const cmdWithTenantPrefix = createCmdObjWithTenantId(cmdObj, tenantId);
+        if (!useDollarTenant || isDenylistedDb(dbName)) {
+            return cmdWithTenantPrefix;
+        }
+
+        const cmdWithDollarTenant =
+            Object.assign(cmdWithTenantPrefix, {$tenant: ObjectId(tenantId)});
+        if (useExpectPrefix) {
+            Object.assign(cmdWithDollarTenant, {expectPrefix: true});
+        }
+
+        return cmdWithDollarTenant;
+    })();
+
     const resObj = runCommandRetryOnTenantMigrationErrors(
         this, dbNameWithTenantId, cmdObjWithTenantId, options);
 
     // Remove the tenant prefix from all database names and namespaces in the result since tests
     // assume the command was run against the original database.
-    removeTenantId(resObj);
+    removeTenantIdAndMaybeCheckPrefixes(
+        resObj, useExpectPrefix ? {checkPrefix: true, tenantId, dbName} : {});
 
     return resObj;
 };

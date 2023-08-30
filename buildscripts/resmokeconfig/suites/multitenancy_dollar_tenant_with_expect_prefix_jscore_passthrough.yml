@@ -1,0 +1,130 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+
+  exclude_files:
+  # $out
+  - jstests/core/query/explain/explain_agg_write_concern.js
+
+  # DBRef
+  - jstests/core/query/dbref/ref4.js
+  - jstests/core/query/dbref/ref.js
+  - jstests/core/query/dbref/dbref1.js
+  - jstests/core/query/dbref/dbref3.js
+
+  # $listCatalog not prefixing in response
+  - jstests/core/catalog/list_catalog.js
+
+  # currentOp / $currentOp not returning prefixed database names
+  - jstests/core/administrative/current_op/currentop_predicate.js
+  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+
+  # `validate` is not prefixing in responses
+  - jstests/core/compound_wildcard_index_validation.js
+  - jstests/core/write/delete/remove2.js
+  - jstests/core/index/wildcard/wildcard_index_update.js
+  - jstests/core/query/basic2.js
+  - jstests/core/index/index4.js
+  - jstests/core/query/js/js2.js
+  - jstests/core/query/sort/sort1.js
+  - jstests/core/query/sort/sort2.js
+  - jstests/core/query/sort/sort5.js
+  - jstests/core/index/index_partial_validate.js
+  - jstests/core/timeseries/timeseries_bucket_index.js
+  - jstests/core/index/index_partial_create_drop.js
+  - jstests/core/query/sort/sort_numeric.js
+  - jstests/core/index/index_partial_write_ops.js
+  - jstests/core/query/basic1.js
+  - jstests/core/index/index1.js
+  - jstests/core/index/index_bigkeys.js
+  - jstests/core/index/geo/geo_s2sparse.js
+  - jstests/core/write/update/update_numeric_field_name.js
+  - jstests/core/write/delete/remove.js
+  - jstests/core/doc_validation/doc_validation_encrypt_keywords.js
+
+  # Something wrong with explain for find
+  - jstests/core/query/explain/explain_db_mismatch.js
+
+  # `rolesInfo` is returning unprefixed database names
+  - jstests/core/administrative/builtin_roles_external.js
+
+  # TODO(SERVER-80397): Remove these test exclusions when we support explain for `distinct`
+  - jstests/core/query/explain/explain_includes_command.js
+  - jstests/core/query/distinct/distinct_compound_index.js
+  - jstests/core/query/distinct/distinct_hint.js
+  - jstests/core/query/distinct/distinct_index1.js
+  - jstests/core/query/explain/explain_multikey.js
+  - jstests/core/query/distinct/distinct_multikey_dotted_path.js
+  - jstests/core/query/regex/regex_distinct.js
+  - jstests/core/views/views_distinct.js
+  - jstests/core/views/views_distinct_with_arrays.js
+  - jstests/core/query/distinct/distinct_with_hashed_index.js
+  - jstests/core/query/explain/explain_multi_plan.js
+  - jstests/core/index/wildcard/wildcard_index_distinct_scan.js
+  - jstests/core/query/explain/explain_upsert.js
+  - jstests/core/query/explain/explain_shell_helpers.js
+  - jstests/core/query/explain/explain_distinct.js
+  - jstests/core/query/distinct/distinct_multikey.js
+
+  # TODO(SERVER-80407): Remove these test exclusions when we support explain for `count`
+  - jstests/core/query/agg_hint.js
+  - jstests/core/views/views_count.js
+  - jstests/core/views/views_collation.js
+
+  exclude_with_any_tags:
+  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
+  - simulate_atlas_proxy_incompatible
+  # Exclude tests which we know use commands that don't support a security token.
+  - not_allowed_with_security_token
+  # Exclude tests which use commands that aren't supported in Serverless.
+  - command_not_supported_in_serverless
+  # Theses tests expect replication is not enabled.
+  - assumes_standalone_mongod
+  # Capped collections are banned in Serverless.
+  - requires_capped
+  # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+  - requires_scripting
+  - requires_profiling
+  # Skip any tests that run with auth explicitly.
+  - requires_auth
+  # Skip any tests that use transactions
+  - uses_transactions
+
+executor:
+  archive:
+    tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+      global_vars:
+        TestData: &TestData
+          tenantId: "636d957b2646ddfaf9b5e13f"
+          hashTestNamesForMultitenancy: true
+          useDollarTenant: true
+          useExpectPrefix: true
+  hooks:
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 2
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        featureFlagSecurityToken: true
+        featureFlagRequireTenantID: true
+        logComponentVerbosity:
+          command: 2
+      noscripting: ''

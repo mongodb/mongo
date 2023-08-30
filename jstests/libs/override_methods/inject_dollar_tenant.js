@@ -8,7 +8,7 @@ import {
     removeTenantPrefixFromResponse
 } from "jstests/libs/override_methods/tenant_aware_response_checker.js";
 
-const kTenantId = ObjectId(TestData.tenant);
+const kTenantId = ObjectId(TestData.tenantId);
 
 // Override the runCommand to inject $tenant.
 function runCommandWithDollarTenant(
