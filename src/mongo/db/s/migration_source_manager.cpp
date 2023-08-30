@@ -208,7 +208,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << _args.getToShard())),
       _moveTimingHelper(_opCtx,
                         "from",
-                        NamespaceStringUtil::serialize(_args.getCommandParameter()),
+                        _args.getCommandParameter(),
                         _args.getMin(),
                         _args.getMax(),
                         6,  // Total number of steps
@@ -340,7 +340,7 @@ void MigrationSourceManager::startClone() {
     uassertStatusOK(ShardingLogging::get(_opCtx)->logChangeChecked(
         _opCtx,
         "moveChunk.start",
-        NamespaceStringUtil::serialize(nss()),
+        nss(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern));
@@ -652,7 +652,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.commit",
-        NamespaceStringUtil::serialize(nss()),
+        nss(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard() << "counts" << *_recipientCloneCounts),
         ShardingCatalogClient::kMajorityWriteConcern);
@@ -695,7 +695,7 @@ void MigrationSourceManager::_cleanupOnError() noexcept {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.error",
-        NamespaceStringUtil::serialize(_args.getCommandParameter()),
+        _args.getCommandParameter(),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern);

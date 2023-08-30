@@ -235,14 +235,13 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
 
                 auto catalogManager = ShardingCatalogManager::get(opCtx);
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "setClusterParameter.start",
-                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
-                    _doc.getParameter(),
-                    kMajorityWriteConcern,
-                    catalogManager->localConfigShard(),
-                    catalogManager->localCatalogClient());
+                ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                       "setClusterParameter.start",
+                                                       NamespaceString::kClusterParametersNamespace,
+                                                       _doc.getParameter(),
+                                                       kMajorityWriteConcern,
+                                                       catalogManager->localConfigShard(),
+                                                       catalogManager->localCatalogClient());
 
                 // If the parameter was already set on the config server, there is
                 // nothing else to do.
@@ -266,14 +265,13 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                     _commit(opCtx);
                 }
 
-                ShardingLogging::get(opCtx)->logChange(
-                    opCtx,
-                    "setClusterParameter.end",
-                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
-                    _doc.getParameter(),
-                    kMajorityWriteConcern,
-                    catalogManager->localConfigShard(),
-                    catalogManager->localCatalogClient());
+                ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                       "setClusterParameter.end",
+                                                       NamespaceString::kClusterParametersNamespace,
+                                                       _doc.getParameter(),
+                                                       kMajorityWriteConcern,
+                                                       catalogManager->localConfigShard(),
+                                                       catalogManager->localCatalogClient());
             }));
 }
 

@@ -62,7 +62,7 @@ public:
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;
-    SemiFuture<DatabaseType> getDatabase(StringData dbName) override;
+    SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) override;
 
 private:
     ConfigServerCatalogCacheLoader _configServerLoader;

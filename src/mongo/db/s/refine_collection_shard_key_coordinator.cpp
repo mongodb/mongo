@@ -115,9 +115,8 @@ void logRefineCollectionShardKey(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const std::string& eventStr,
                                  const BSONObj& obj) {
-    const auto serializedNss = NamespaceStringUtil::serialize(nss);
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, str::stream() << "refineCollectionShardKey." << eventStr, serializedNss, obj);
+        opCtx, str::stream() << "refineCollectionShardKey." << eventStr, nss, obj);
 }
 
 std::vector<ShardId> getShardsWithDataForCollection(OperationContext* opCtx,

@@ -1256,15 +1256,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     boost::optional<Timer> timeInCriticalSection;
 
     if (!skipToCritSecTaken) {
-        timing.emplace(outerOpCtx,
-                       "to",
-                       NamespaceStringUtil::serialize(_nss),
-                       _min,
-                       _max,
-                       8 /* steps */,
-                       &_errmsg,
-                       _toShard,
-                       _fromShard);
+        timing.emplace(
+            outerOpCtx, "to", _nss, _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
 
         LOGV2(22000,
               "Starting receiving end of chunk migration",

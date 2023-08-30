@@ -155,7 +155,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 long long numShardedCollsWithInconsistentIndexes = 0;
                 const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
                 auto collections = catalogClient->getCollections(
-                    opCtx, {}, repl::ReadConcernLevel::kLocalReadConcern);
+                    opCtx, DatabaseName::kEmpty, repl::ReadConcernLevel::kLocalReadConcern);
 
                 for (const auto& coll : collections) {
                     auto nss = coll.getNss();

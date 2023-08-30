@@ -413,7 +413,7 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
         details.append("error", status.toString());
     }
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "movePrimary.{}"_format(what), DatabaseNameUtil::serialize(_dbName), details.obj());
+        opCtx, "movePrimary.{}"_format(what), NamespaceString(_dbName), details.obj());
 }
 
 std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
@@ -441,9 +441,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
     const auto shardedCollections = [&] {
         auto colls = Grid::get(opCtx)->catalogClient()->getAllShardedCollectionsForDb(
-            opCtx,
-            DatabaseNameUtil::serialize(_dbName),
-            repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
         std::sort(colls.begin(), colls.end());
         return colls;

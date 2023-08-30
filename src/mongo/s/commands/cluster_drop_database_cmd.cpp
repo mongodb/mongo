@@ -102,10 +102,8 @@ public:
 
                 // Invalidate the database metadata so the next access kicks off a full reload, even
                 // if sending the command to the config server fails due to e.g. a NetworkError.
-                ON_BLOCK_EXIT([opCtx, dbName] {
-                    Grid::get(opCtx)->catalogCache()->purgeDatabase(
-                        DatabaseNameUtil::serializeForCatalog(dbName));
-                });
+                ON_BLOCK_EXIT(
+                    [opCtx, dbName] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
 
                 // Send it to the primary shard
                 ShardsvrDropDatabase dropDatabaseCommand;

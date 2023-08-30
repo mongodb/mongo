@@ -425,7 +425,7 @@ void linearizeCSRSReads(OperationContext* opCtx) {
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "Linearize CSRS reads",
-        NamespaceStringUtil::serialize(NamespaceString::kServerConfigurationNamespace),
+        NamespaceString::kServerConfigurationNamespace,
         {},
         ShardingCatalogClient::kMajorityWriteConcern));
 }

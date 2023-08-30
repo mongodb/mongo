@@ -798,12 +798,12 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
           "shardId"_attr = shardId);
 }
 
-void CatalogCache::purgeDatabase(StringData dbName) {
-    _databaseCache.invalidateKey(dbName);
+void CatalogCache::purgeDatabase(const DatabaseName& dbName) {
+    const auto db = DatabaseNameUtil::serialize(dbName);
+    _databaseCache.invalidateKey(db);
     _collectionCache.invalidateKeyIf(
-        [&](const NamespaceString& nss) { return nss.db_forSharding() == dbName; });
-    _indexCache.invalidateKeyIf(
-        [&](const NamespaceString& nss) { return nss.db_forSharding() == dbName; });
+        [&](const NamespaceString& nss) { return nss.dbName() == dbName; });
+    _indexCache.invalidateKeyIf([&](const NamespaceString& nss) { return nss.dbName() == dbName; });
 }
 
 void CatalogCache::purgeAllDatabases() {
@@ -882,7 +882,10 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 
     Timer t{};
     try {
-        auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
+        // TODO SERVER-80333 DatabaseCache to use a DatabaseName object.
+        auto newDb =
+            _catalogCacheLoader.getDatabase(DatabaseNameUtil::deserialize(boost::none, dbName))
+                .get();
         uassertStatusOKWithContext(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
             str::stream() << "The primary shard for database " << dbName << " does not exist");

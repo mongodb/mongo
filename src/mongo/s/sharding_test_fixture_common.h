@@ -126,7 +126,7 @@ protected:
                                       StringData collName,
                                       Date_t timestamp,
                                       const std::string& what,
-                                      const std::string& ns,
+                                      const NamespaceString& ns,
                                       const BSONObj& detail);
 
     virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {

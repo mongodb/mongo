@@ -91,8 +91,7 @@ public:
             const auto dbName = getDbName();
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            ScopeGuard purgeDatabaseOnExit(
-                [&] { catalogCache->purgeDatabase(DatabaseNameUtil::serialize(dbName)); });
+            ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
 
             ConfigsvrCreateDatabase configsvrCreateDatabase{DatabaseNameUtil::serialize(dbName)};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);

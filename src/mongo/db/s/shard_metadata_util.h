@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -129,7 +130,8 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 /**
  * Reads the shard server's databases collection entry identified by 'dbName'.
  */
-StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, StringData dbName);
+StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx,
+                                                      const DatabaseName& dbName);
 
 /**
  * Updates the collections collection entry matching 'query' with 'update' using local write
@@ -214,7 +216,7 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases
  * collection entry.
  */
-Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName);
+Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName);
 
 }  // namespace shardmetadatautil
 }  // namespace mongo

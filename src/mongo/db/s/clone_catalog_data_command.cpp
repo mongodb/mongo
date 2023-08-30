@@ -140,9 +140,7 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx,
-            DatabaseNameUtil::serialize(dbName),
-            repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
 
         DisableDocumentValidation disableValidation(opCtx);
 

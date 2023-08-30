@@ -181,10 +181,12 @@ TEST_F(ShardingCatalogClientTest, GetCollectionNotExisting) {
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabaseInvalidName) {
-    ASSERT_THROWS_CODE(catalogClient()->getDatabase(
-                           operationContext(), "b.c", repl::ReadConcernLevel::kMajorityReadConcern),
-                       DBException,
-                       ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(
+        catalogClient()->getDatabase(operationContext(),
+                                     DatabaseName::createDatabaseName_forTest(boost::none, "b.c"),
+                                     repl::ReadConcernLevel::kMajorityReadConcern),
+        DBException,
+        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
@@ -197,7 +199,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
 
     auto future = launchAsync([this, &expectedDb] {
         return catalogClient()->getDatabase(
-            operationContext(), expectedDb.getName(), repl::ReadConcernLevel::kMajorityReadConcern);
+            operationContext(),
+            DatabaseName::createDatabaseName_forTest(boost::none, expectedDb.getName()),
+            repl::ReadConcernLevel::kMajorityReadConcern);
     });
 
     onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
@@ -245,7 +249,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
 
     auto future = launchAsync([this, &expectedDb] {
         return catalogClient()->getDatabase(
-            operationContext(), expectedDb.getName(), repl::ReadConcernLevel::kMajorityReadConcern);
+            operationContext(),
+            DatabaseName::createDatabaseName_forTest(boost::none, expectedDb.getName()),
+            repl::ReadConcernLevel::kMajorityReadConcern);
     });
 
     // Return empty result set as if the database wasn't found
@@ -270,11 +276,12 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     configTargeter()->setFindHostReturnValue(testHost);
 
     auto future = launchAsync([this] {
-        ASSERT_THROWS_CODE(
-            catalogClient()->getDatabase(
-                operationContext(), "NonExistent", repl::ReadConcernLevel::kMajorityReadConcern),
-            DBException,
-            ErrorCodes::NotWritablePrimary);
+        ASSERT_THROWS_CODE(catalogClient()->getDatabase(
+                               operationContext(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "NonExistent"),
+                               repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           ErrorCodes::NotWritablePrimary);
     });
 
     // Return empty result set as if the database wasn't found
@@ -293,11 +300,12 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        ASSERT_THROWS_CODE(
-            catalogClient()->getDatabase(
-                operationContext(), "NonExistent", repl::ReadConcernLevel::kMajorityReadConcern),
-            DBException,
-            ErrorCodes::NamespaceNotFound);
+        ASSERT_THROWS_CODE(catalogClient()->getDatabase(
+                               operationContext(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "NonExistent"),
+                               repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           ErrorCodes::NamespaceNotFound);
     });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
@@ -833,8 +841,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
-    auto future = launchAsync(
-        [this, newOpTime] { return catalogClient()->getCollections(operationContext(), {}); });
+    auto future = launchAsync([this, newOpTime] {
+        return catalogClient()->getCollections(operationContext(), DatabaseName::kEmpty);
+    });
 
     onFindWithMetadataCommand([this, coll1, coll2, newOpTime](const RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
@@ -890,8 +899,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
                          BSON("_id" << 1));
     coll2.setUnique(false);
 
-    auto future =
-        launchAsync([this] { return catalogClient()->getCollections(operationContext(), "test"); });
+    auto future = launchAsync([this] {
+        return catalogClient()->getCollections(
+            operationContext(), DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    });
 
     onFindCommand([this, coll1, coll2](const RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
@@ -924,7 +935,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        ASSERT_THROWS(catalogClient()->getCollections(operationContext(), "test"), DBException);
+        ASSERT_THROWS(
+            catalogClient()->getCollections(
+                operationContext(), DatabaseName::createDatabaseName_forTest(boost::none, "test")),
+            DBException);
     });
 
     CollectionType validColl(NamespaceString::createNamespaceString_forTest("test.coll1"),
@@ -1198,11 +1212,12 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        ASSERT_THROWS_CODE(
-            catalogClient()->getDatabase(
-                operationContext(), "TestDB", repl::ReadConcernLevel::kMajorityReadConcern),
-            DBException,
-            ErrorCodes::HostUnreachable);
+        ASSERT_THROWS_CODE(catalogClient()->getDatabase(
+                               operationContext(),
+                               DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
+                               repl::ReadConcernLevel::kMajorityReadConcern),
+                           DBException,
+                           ErrorCodes::HostUnreachable);
     });
 
     for (int i = 0; i < kMaxCommandRetry; ++i) {
@@ -1219,7 +1234,9 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
 
     auto future = launchAsync([&] {
         catalogClient()->getDatabase(
-            operationContext(), "TestDB", repl::ReadConcernLevel::kMajorityReadConcern);
+            operationContext(),
+            DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"),
+            repl::ReadConcernLevel::kMajorityReadConcern);
     });
 
     for (int i = 0; i < kMaxCommandRetry - 1; ++i) {

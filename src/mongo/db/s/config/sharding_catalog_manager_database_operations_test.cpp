@@ -58,55 +58,65 @@ protected:
 
 TEST_F(ShardingCatalogManagerDatabaseOperationsTest, CreateDatabaseAdminFails) {
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "admin"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 
     // Alternative capitalizations are also invalid
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "Admin"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "Admin"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "aDmIn"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "aDmIn"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 }
 
 TEST_F(ShardingCatalogManagerDatabaseOperationsTest, CreateDatabaseLocalFails) {
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "local"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "local"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 
     // Alternative capitalizations are also invalid
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "Local"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "Local"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 
     ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "lOcAl"_sd, boost::none),
+        ShardingCatalogManager::get(_opCtx)->createDatabase(
+            _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "lOcAl"_sd), boost::none),
         DBException,
         ErrorCodes::InvalidOptions);
 }
 
 TEST_F(ShardingCatalogManagerDatabaseOperationsTest, CreateDatabaseConfig) {
     // It is allowed to create the "config" database.
-    ASSERT_DOES_NOT_THROW(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "config"_sd, boost::none));
+    ASSERT_DOES_NOT_THROW(ShardingCatalogManager::get(_opCtx)->createDatabase(
+        _opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "config"_sd), boost::none));
 
     // But alternative capitalizations are invalid.
-    ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "Config"_sd, boost::none),
-        DBException,
-        ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(_opCtx)->createDatabase(
+                           _opCtx,
+                           DatabaseName::createDatabaseName_forTest(boost::none, "Config"_sd),
+                           boost::none),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
 
-    ASSERT_THROWS_CODE(
-        ShardingCatalogManager::get(_opCtx)->createDatabase(_opCtx, "cOnFiG"_sd, boost::none),
-        DBException,
-        ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(_opCtx)->createDatabase(
+                           _opCtx,
+                           DatabaseName::createDatabaseName_forTest(boost::none, "cOnFiG"_sd),
+                           boost::none),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
 }
 
 }  // namespace

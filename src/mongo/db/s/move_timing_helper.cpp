@@ -54,7 +54,7 @@ namespace mongo {
 
 MoveTimingHelper::MoveTimingHelper(OperationContext* opCtx,
                                    const std::string& where,
-                                   StringData ns,
+                                   const NamespaceString& ns,
                                    const boost::optional<BSONObj>& min,
                                    const boost::optional<BSONObj>& max,
                                    int totalNumSteps,

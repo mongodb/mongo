@@ -41,6 +41,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -113,7 +114,8 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
         Status status = bsonExtractStringFieldWithDefault(source, ns.name(), "", &changeLogNs);
         if (!status.isOK())
             return status;
-        changeLog._ns = changeLogNs;
+        // TODO SERVER-80466 changeLogNs comes from BSON Extract.
+        changeLog._ns = NamespaceStringUtil::deserialize(boost::none, changeLogNs);
     }
 
     {
@@ -167,7 +169,7 @@ BSONObj ChangeLogType::toBSON() const {
     if (_what)
         builder.append(what.name(), getWhat());
     if (_ns)
-        builder.append(ns.name(), getNS());
+        builder.append(ns.name(), NamespaceStringUtil::serialize(getNS()));
     if (_details)
         builder.append(details.name(), getDetails());
 
@@ -199,7 +201,7 @@ void ChangeLogType::setWhat(const std::string& what) {
     _what = what;
 }
 
-void ChangeLogType::setNS(const std::string& ns) {
+void ChangeLogType::setNS(const NamespaceString& ns) {
     _ns = ns;
 }
 

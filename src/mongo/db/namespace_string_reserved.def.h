@@ -292,3 +292,5 @@ NSS_CONSTANT(kDefaultMinValidNamespace, DatabaseName::kLocal, "replset.minvalid"
 
 // Namespace used by the test command to pin the oldest timestamp.
 NSS_CONSTANT(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_timestamp"_sd)
+
+NSS_CONSTANT(kEmpty, DatabaseName::kEmpty, ""_sd)

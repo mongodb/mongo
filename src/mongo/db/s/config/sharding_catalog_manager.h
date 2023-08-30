@@ -459,7 +459,7 @@ public:
      * exists and matches all the prerequisites returns success, otherwise throws NamespaceNotFound.
      */
     DatabaseType createDatabase(OperationContext* opCtx,
-                                StringData dbName,
+                                const DatabaseName& dbName,
                                 const boost::optional<ShardId>& optPrimaryShard);
 
     /**
@@ -718,7 +718,7 @@ private:
      * it returns excluding those named local, config and admin, since they serve administrative
      * purposes.
      */
-    StatusWith<std::vector<std::string>> _getDBNamesListFromShard(
+    StatusWith<std::vector<DatabaseName>> _getDBNamesListFromShard(
         OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
@@ -847,7 +847,7 @@ private:
      */
     void _addShardInTransaction(OperationContext* opCtx,
                                 const ShardType& newShard,
-                                std::vector<std::string>&& databasesInNewShard);
+                                std::vector<DatabaseName>&& databasesInNewShard);
     /**
      * Use the internal transaction API to remove a shard.
      */

@@ -57,7 +57,7 @@ SemiFuture<CollectionAndChangedChunks> ReadOnlyCatalogCacheLoader::getChunksSinc
     return _configServerLoader.getChunksSince(nss, version);
 }
 
-SemiFuture<DatabaseType> ReadOnlyCatalogCacheLoader::getDatabase(StringData dbName) {
+SemiFuture<DatabaseType> ReadOnlyCatalogCacheLoader::getDatabase(const DatabaseName& dbName) {
     return _configServerLoader.getDatabase(dbName);
 }
 

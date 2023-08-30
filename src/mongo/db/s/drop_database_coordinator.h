@@ -62,8 +62,9 @@ public:
 
     DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
-          _dbName(nss().db_forSharding()),
-          _critSecReason(BSON("dropDatabase" << _dbName)) {}
+          _dbName(nss().dbName()),
+          _critSecReason(BSON("dropDatabase" << DatabaseNameUtil::serialize(
+                                  _dbName, SerializationContext::stateCommandRequest()))) {}
     ~DropDatabaseCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
@@ -89,8 +90,7 @@ private:
 
     void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
 
-    // TODO SERVER-80223 _dbName becomes a DatabaseName instead of StringData
-    StringData _dbName;
+    DatabaseName _dbName;
 
     const BSONObj _critSecReason;
 };

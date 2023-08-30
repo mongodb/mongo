@@ -136,24 +136,28 @@ ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardR
 }  // namespace
 
 DatabaseType ShardingCatalogManager::createDatabase(
-    OperationContext* opCtx, StringData dbName, const boost::optional<ShardId>& optPrimaryShard) {
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const boost::optional<ShardId>& optPrimaryShard) {
 
-    if (dbName == DatabaseName::kConfig.db()) {
-        return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+    if (dbName.isConfigDB()) {
+        return DatabaseType(DatabaseNameUtil::serialize(dbName),
+                            ShardId::kConfigServerId,
+                            DatabaseVersion::makeFixed());
     }
 
     // It is not allowed to create the 'admin' or 'local' databases, including any alternative
     // casing. It is allowed to create the 'config' database (handled by the early return above),
     // but only with that exact casing.
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Cannot manually create database '" << dbName << "'",
-            !dbName.equalCaseInsensitive(DatabaseName::kAdmin.db()) &&
-                !dbName.equalCaseInsensitive(DatabaseName::kLocal.db()) &&
-                !dbName.equalCaseInsensitive(DatabaseName::kConfig.db()));
+            str::stream() << "Cannot manually create database '" << dbName.toStringForErrorMsg()
+                          << "'",
+            !(dbName.equalCaseInsensitive(DatabaseName::kAdmin)) &&
+                !(dbName.equalCaseInsensitive(DatabaseName::kLocal)) &&
+                !(dbName.equalCaseInsensitive(DatabaseName::kConfig)));
 
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid db name specified: " << dbName,
+            str::stream() << "Invalid db name specified: " << dbName.toStringForErrorMsg(),
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // Make sure to force update of any stale metadata
@@ -175,10 +179,11 @@ DatabaseType ShardingCatalogManager::createDatabase(
         ? uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))
         : nullptr;
 
-
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
     const auto dbMatchFilter = [&] {
         BSONObjBuilder filterBuilder;
-        filterBuilder.append(DatabaseType::kNameFieldName, dbName);
+        filterBuilder.append(DatabaseType::kNameFieldName, dbNameStr);
         if (resolvedPrimaryShard) {
             filterBuilder.append(DatabaseType::kPrimaryFieldName, resolvedPrimaryShard->getId());
         }
@@ -204,7 +209,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
         // concurrent create database operations
         dbLock.emplace(opCtx,
                        opCtx->lockState(),
-                       DatabaseNameUtil::deserialize(boost::none, str::toLower(dbName)),
+                       DatabaseNameUtil::deserialize(boost::none,
+                                                     str::toLower(dbNameStr),
+                                                     SerializationContext::stateCommandRequest()),
                        "createDatabase" /* reason */,
                        MODE_X,
                        true /*waitForRecovery*/);
@@ -216,7 +223,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // the existing entry.
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(
-        DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbName)), "i");
+        DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
 
     auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
     auto const [primaryShardPtr, database] = [&] {
@@ -226,8 +233,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             uassert(ErrorCodes::DatabaseDifferCase,
                     str::stream() << "can't have 2 databases that just differ on case "
                                   << " have: " << actualDb.getName()
-                                  << " want to add: " << dbName.toString(),
-                    actualDb.getName() == dbName.toString());
+                                  << " want to add: " << dbName.toStringForErrorMsg(),
+                    actualDb.getName() == dbNameStr);
 
             uassert(
                 ErrorCodes::NamespaceExists,
@@ -254,7 +261,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             ShardingLogging::get(opCtx)->logChange(opCtx,
                                                    "createDatabase.start",
-                                                   dbName,
+                                                   NamespaceString(dbName),
                                                    /* details */ BSONObj(),
                                                    ShardingCatalogClient::kMajorityWriteConcern,
                                                    _localConfigShard,
@@ -264,7 +271,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             const auto clusterTime = now.clusterTime().asTimestamp();
 
             // Pick a primary shard for the new database.
-            DatabaseType db(dbName.toString(),
+            DatabaseType db(dbNameStr,
                             resolvedPrimaryShard->getId(),
                             DatabaseVersion(UUID::gen(), clusterTime));
 
@@ -284,9 +291,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             const auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
             {
                 DatabasesAdded prepareCommitEvent(
-                    {DatabaseNameUtil::deserialize(boost::none, dbName)},
-                    false /*areImported*/,
-                    CommitPhaseEnum::kPrepare);
+                    {dbName}, false /*areImported*/, CommitPhaseEnum::kPrepare);
                 prepareCommitEvent.setPrimaryShard(resolvedPrimaryShard->getId());
                 uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, prepareCommitEvent, allShards));
             }
@@ -326,9 +331,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             txn.run(opCtx, transactionChain);
 
             DatabasesAdded commitCompletedEvent(
-                {DatabaseNameUtil::deserialize(boost::none, dbName)},
-                false /*areImported*/,
-                CommitPhaseEnum::kSuccessful);
+                {dbName}, false /*areImported*/, CommitPhaseEnum::kSuccessful);
             const auto notificationOutcome =
                 _notifyClusterOnNewDatabases(opCtx, commitCompletedEvent, allShards);
             if (!notificationOutcome.isOK()) {
@@ -340,7 +343,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             ShardingLogging::get(opCtx)->logChange(opCtx,
                                                    "createDatabase",
-                                                   dbName,
+                                                   NamespaceString(dbName),
                                                    /* details */ BSONObj(),
                                                    ShardingCatalogClient::kMajorityWriteConcern,
                                                    _localConfigShard,
@@ -367,7 +370,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
-        BSON("_flushDatabaseCacheUpdates" << dbName),
+        BSON("_flushDatabaseCacheUpdates"
+             << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())),
         Shard::RetryPolicy::kIdempotent));
     uassertStatusOK(cmdResponse.commandStatus);
 

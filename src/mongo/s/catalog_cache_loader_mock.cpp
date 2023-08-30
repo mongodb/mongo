@@ -131,7 +131,7 @@ SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
         .semi();
 }
 
-SemiFuture<DatabaseType> CatalogCacheLoaderMock::getDatabase(StringData dbName) {
+SemiFuture<DatabaseType> CatalogCacheLoaderMock::getDatabase(const DatabaseName& dbName) {
     return makeReadyFutureWith([this] { return _swDatabaseReturnValue; }).semi();
 }
 

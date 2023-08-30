@@ -48,7 +48,7 @@ class MoveTimingHelper {
 public:
     MoveTimingHelper(OperationContext* opCtx,
                      const std::string& where,
-                     StringData ns,
+                     const NamespaceString& ns,
                      const boost::optional<BSONObj>& min,
                      const boost::optional<BSONObj>& max,
                      int totalNumSteps,
@@ -73,7 +73,7 @@ private:
 
     OperationContext* const _opCtx;
     const std::string _where;
-    const std::string _ns;
+    const NamespaceString _ns;
     const ShardId _to;
     const ShardId _from;
 

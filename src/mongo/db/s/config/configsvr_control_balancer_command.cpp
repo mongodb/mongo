@@ -134,7 +134,7 @@ private:
         ShardingLogging::get(opCtx)
             ->logAction(opCtx,
                         "balancer.start",
-                        "",
+                        NamespaceString::kEmpty,
                         BSONObj(),
                         catalogManager->localConfigShard(),
                         catalogManager->localCatalogClient())
@@ -164,7 +164,7 @@ private:
         ShardingLogging::get(opCtx)
             ->logAction(opCtx,
                         "balancer.stop",
-                        "",
+                        NamespaceString::kEmpty,
                         BSONObj(),
                         catalogManager->localConfigShard(),
                         catalogManager->localCatalogClient())

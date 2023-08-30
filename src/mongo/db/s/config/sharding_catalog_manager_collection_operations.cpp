@@ -456,7 +456,7 @@ void ShardingCatalogManager::refineCollectionShardKeyDEPRECATED(
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "refineCollectionShardKey.start",
-        NamespaceStringUtil::serialize(nss),
+        nss,
         BSON("oldKey" << oldShardKeyPattern.toBSON() << "newKey" << newShardKeyPattern.toBSON()
                       << "oldEpoch" << collType.getEpoch() << "newEpoch" << newEpoch),
         ShardingCatalogClient::kLocalWriteConcern,
@@ -480,7 +480,7 @@ void ShardingCatalogManager::refineCollectionShardKeyDEPRECATED(
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "refineCollectionShardKey.end",
-                                           NamespaceStringUtil::serialize(nss),
+                                           nss,
                                            BSONObj(),
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            _localConfigShard,
@@ -529,7 +529,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "configureCollectionBalancing",
-                                               NamespaceStringUtil::serialize(nss),
+                                               nss,
                                                logChangeDetail.obj(),
                                                ShardingCatalogClient::kMajorityWriteConcern,
                                                _localConfigShard,

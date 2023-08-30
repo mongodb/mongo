@@ -135,7 +135,7 @@ public:
      *  - NamespaceNotFound - database does not exist
      */
     virtual DatabaseType getDatabase(OperationContext* opCtx,
-                                     StringData db,
+                                     const DatabaseName& db,
                                      repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
@@ -174,7 +174,7 @@ public:
      */
     virtual std::vector<CollectionType> getCollections(
         OperationContext* opCtx,
-        StringData db,
+        const DatabaseName& db,
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
@@ -187,7 +187,7 @@ public:
      */
     virtual std::vector<NamespaceString> getAllShardedCollectionsForDb(
         OperationContext* opCtx,
-        StringData dbName,
+        const DatabaseName& dbName,
         repl::ReadConcernLevel readConcern,
         const BSONObj& sort = BSONObj()) = 0;
 
@@ -259,7 +259,7 @@ public:
      * Retrieves all namespaces that have zones associated with a database.
      */
     virtual std::vector<NamespaceString> getAllNssThatHaveZonesForDatabase(
-        OperationContext* opCtx, const StringData& dbName) = 0;
+        OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * Retrieves all shards in this sharded cluster.

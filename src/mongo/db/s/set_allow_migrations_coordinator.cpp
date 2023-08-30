@@ -139,10 +139,8 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
 
         uassertStatusOK(response.toStatus());
 
-        ShardingLogging::get(opCtx)->logChange(opCtx,
-                                               "setPermitMigrations",
-                                               NamespaceStringUtil::serialize(nss()),
-                                               BSON("permitMigrations" << _allowMigrations));
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx, "setPermitMigrations", nss(), BSON("permitMigrations" << _allowMigrations));
     });
 }
 

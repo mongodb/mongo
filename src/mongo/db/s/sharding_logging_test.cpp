@@ -53,6 +53,8 @@ namespace {
 
 using unittest::assertGet;
 
+const auto kFooBarNss = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
+
 class InfoLoggingTest : public ShardServerTestFixture {
 public:
     enum CollType { ActionLog, ChangeLog };
@@ -63,7 +65,7 @@ public:
 protected:
     void noRetryAfterSuccessfulCreate() {
         auto future = launchAsync([this] {
-            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+            log("moved a chunk", kFooBarNss, BSON("min" << 3 << "max" << 4)).transitional_ignore();
         });
 
         expectConfigCollectionCreate(
@@ -72,7 +74,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
-                                     "foo.bar",
+                                     kFooBarNss,
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logChange call to return
@@ -80,7 +82,7 @@ protected:
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
-            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+            log("moved a second chunk", kFooBarNss, BSON("min" << 4 << "max" << 5))
                 .transitional_ignore();
         });
 
@@ -88,7 +90,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
-                                     "foo.bar",
+                                     kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
@@ -97,7 +99,7 @@ protected:
 
     void noRetryCreateIfAlreadyExists() {
         auto future = launchAsync([this] {
-            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+            log("moved a chunk", kFooBarNss, BSON("min" << 3 << "max" << 4)).transitional_ignore();
         });
 
         BSONObjBuilder createResponseBuilder;
@@ -109,7 +111,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a chunk",
-                                     "foo.bar",
+                                     kFooBarNss,
                                      BSON("min" << 3 << "max" << 4));
 
         // Now wait for the logAction call to return
@@ -117,7 +119,7 @@ protected:
 
         // Now log another change and confirm that we don't re-attempt to create the collection
         future = launchAsync([this] {
-            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+            log("moved a second chunk", kFooBarNss, BSON("min" << 4 << "max" << 5))
                 .transitional_ignore();
         });
 
@@ -125,7 +127,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
-                                     "foo.bar",
+                                     kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
@@ -134,7 +136,7 @@ protected:
 
     void createFailure() {
         auto future = launchAsync([this] {
-            log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)).transitional_ignore();
+            log("moved a chunk", kFooBarNss, BSON("min" << 3 << "max" << 4)).transitional_ignore();
         });
 
         BSONObjBuilder createResponseBuilder;
@@ -148,7 +150,7 @@ protected:
 
         // Now log another change and confirm that we *do* attempt to create the collection
         future = launchAsync([this] {
-            log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5))
+            log("moved a second chunk", kFooBarNss, BSON("min" << 4 << "max" << 5))
                 .transitional_ignore();
         });
 
@@ -158,7 +160,7 @@ protected:
                                      getConfigCollName(),
                                      network()->now(),
                                      "moved a second chunk",
-                                     "foo.bar",
+                                     kFooBarNss,
                                      BSON("min" << 4 << "max" << 5));
 
         // Now wait for the logChange call to return
@@ -169,7 +171,7 @@ protected:
         return (_configCollType == ChangeLog ? "changelog" : "actionlog");
     }
 
-    Status log(const std::string& what, const std::string& ns, const BSONObj& detail) {
+    Status log(const std::string& what, const NamespaceString& ns, const BSONObj& detail) {
         if (_configCollType == ChangeLog) {
             return ShardingLogging::get(operationContext())
                 ->logChangeChecked(operationContext(),

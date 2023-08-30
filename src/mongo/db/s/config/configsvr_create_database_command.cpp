@@ -95,7 +95,10 @@ public:
             audit::logEnableSharding(opCtx->getClient(), dbname);
 
             auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(
-                opCtx, dbname, request().getPrimaryShardId());
+                opCtx,
+                DatabaseNameUtil::deserialize(
+                    boost::none, dbname, request().getSerializationContext()),
+                request().getPrimaryShardId());
 
             return {dbt.getVersion()};
         }

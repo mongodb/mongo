@@ -57,7 +57,7 @@ std::vector<BSONObj> ShardingCatalogClientMock::runCatalogAggregation(
 }
 
 DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
-                                                    StringData db,
+                                                    const DatabaseName& db,
                                                     repl::ReadConcernLevel readConcernLevel) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
@@ -81,7 +81,7 @@ CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
 
 std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     repl::ReadConcernLevel readConcernLevel,
     const BSONObj& sort) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
@@ -89,7 +89,7 @@ std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
 
 std::vector<NamespaceString> ShardingCatalogClientMock::getAllShardedCollectionsForDb(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     repl::ReadConcernLevel readConcern,
     const BSONObj& sort) {
     return {};
@@ -133,7 +133,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientMock::getTagsForCollectio
 }
 
 std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesForDatabase(
-    OperationContext* opCtx, const StringData& dbName) {
+    OperationContext* opCtx, const DatabaseName& dbName) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 

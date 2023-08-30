@@ -135,7 +135,7 @@ void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& 
                                                              StringData collName,
                                                              Date_t timestamp,
                                                              const std::string& what,
-                                                             const std::string& ns,
+                                                             const NamespaceString& ns,
                                                              const BSONObj& detail) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);

@@ -245,10 +245,8 @@ void DropCollectionCoordinator::_freezeMigrations(
         logChangeDetail.append("collectionUUID", _doc.getCollInfo()->getUuid().toBSON());
     }
 
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "dropCollection.start",
-                                           NamespaceStringUtil::serialize(nss()),
-                                           logChangeDetail.obj());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "dropCollection.start", nss(), logChangeDetail.obj());
 
     if (_doc.getCollInfo()) {
         const auto collUUID = _doc.getCollInfo()->getUuid();
@@ -339,8 +337,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss(), {primaryShardId}, **executor, getNewSession(opCtx), false /*fromMigrate*/);
 
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "dropCollection", NamespaceStringUtil::serialize(nss()));
+    ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));
 }
 

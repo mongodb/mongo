@@ -171,7 +171,7 @@ public:
      * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
      * shutdown), throws a DBException.
      */
-    virtual SemiFuture<DatabaseType> getDatabase(StringData dbName) = 0;
+    virtual SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) = 0;
 
     /**
      * Waits for any pending changes for the specified collection to be persisted locally (not

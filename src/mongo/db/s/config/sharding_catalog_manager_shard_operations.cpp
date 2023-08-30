@@ -629,7 +629,7 @@ Status ShardingCatalogManager::_dropSessionsCollection(
     return Status::OK();
 }
 
-StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFromShard(
+StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
     auto swCommandResponse =
@@ -648,13 +648,13 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFrom
 
     auto cmdResult = std::move(swCommandResponse.getValue().response);
 
-    std::vector<std::string> dbNames;
+    std::vector<DatabaseName> dbNames;
 
     for (const auto& dbEntry : cmdResult["databases"].Obj()) {
-        const auto& dbName = dbEntry["name"].String();
+        const auto& dbName = DatabaseNameUtil::deserialize(
+            boost::none, dbEntry["name"].String(), SerializationContext::stateCommandRequest());
 
-        if (!(dbName == DatabaseName::kAdmin.db() || dbName == DatabaseName::kLocal.db() ||
-              dbName == DatabaseName::kConfig.db())) {
+        if (!(dbName.isAdminDB() || dbName.isLocalDB() || dbName.isConfigDB())) {
             dbNames.push_back(dbName);
         }
     }
@@ -752,10 +752,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             auto dbt = _localCatalogClient->getDatabase(
                 opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
             return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "can't add shard "
-                                        << "'" << shardConnectionString.toString() << "'"
-                                        << " because a local database '" << dbName
-                                        << "' exists in another " << dbt.getPrimary());
+                          str::stream()
+                              << "can't add shard "
+                              << "'" << shardConnectionString.toString() << "'"
+                              << " because a local database '" << dbName.toStringForErrorMsg()
+                              << "' exists in another " << dbt.getPrimary());
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         }
     }
@@ -875,7 +876,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "addShard",
-                                               "",
+                                               NamespaceString::kEmpty,
                                                shardDetails.obj(),
                                                ShardingCatalogClient::kMajorityWriteConcern,
                                                _localConfigShard,
@@ -967,7 +968,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         uassertStatusOK(
             ShardingLogging::get(opCtx)->logChangeChecked(opCtx,
                                                           "removeShard.start",
-                                                          "",
+                                                          NamespaceString::kEmpty,
                                                           BSON("shard" << name),
                                                           ShardingCatalogClient::kLocalWriteConcern,
                                                           _localConfigShard,
@@ -1116,7 +1117,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Record finish in changelog
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "removeShard",
-                                           "",
+                                           NamespaceString::kEmpty,
                                            BSON("shard" << name),
                                            ShardingCatalogClient::kLocalWriteConcern,
                                            _localConfigShard,
@@ -1561,17 +1562,16 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
 void ShardingCatalogManager::_addShardInTransaction(
     OperationContext* opCtx,
     const ShardType& newShard,
-    std::vector<std::string>&& databasesInNewShard) {
+    std::vector<DatabaseName>&& databasesInNewShard) {
 
     const auto existingShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     // 1. Send out the "prepareCommit" notification
     std::vector<DatabaseName> importedDbNames;
-    std::transform(
-        databasesInNewShard.begin(),
-        databasesInNewShard.end(),
-        std::back_inserter(importedDbNames),
-        [](const std::string& s) { return DatabaseNameUtil::deserialize(boost::none, s); });
+    std::transform(databasesInNewShard.begin(),
+                   databasesInNewShard.end(),
+                   std::back_inserter(importedDbNames),
+                   [](const DatabaseName& dbName) { return dbName; });
     DatabasesAdded notification(
         std::move(importedDbNames), true /*addImported*/, CommitPhaseEnum::kPrepare);
     notification.setPrimaryShard(ShardId(newShard.getName()));
@@ -1599,8 +1599,8 @@ void ShardingCatalogManager::_addShardInTransaction(
                 std::transform(dbNames.begin(),
                                dbNames.end(),
                                std::back_inserter(databaseEntries),
-                               [&](const std::string dbName) {
-                                   return DatabaseType(dbName,
+                               [&](const DatabaseName& dbName) {
+                                   return DatabaseType(DatabaseNameUtil::serialize(dbName),
                                                        newShard.getName(),
                                                        DatabaseVersion(UUID::gen(),
                                                                        newShard.getTopologyTime()))
@@ -1624,11 +1624,10 @@ void ShardingCatalogManager::_addShardInTransaction(
                 std::transform(dbNames.begin(),
                                dbNames.end(),
                                std::back_inserter(placementEntries),
-                               [&](const std::string dbName) {
-                                   return NamespacePlacementType(
-                                              NamespaceStringUtil::deserialize(boost::none, dbName),
-                                              newShard.getTopologyTime(),
-                                              {ShardId(newShard.getName())})
+                               [&](const DatabaseName& dbName) {
+                                   return NamespacePlacementType(NamespaceString(dbName),
+                                                                 newShard.getTopologyTime(),
+                                                                 {ShardId(newShard.getName())})
                                        .toBSON();
                                });
                 write_ops::InsertCommandRequest insertPlacementEntries(

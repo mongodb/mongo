@@ -653,12 +653,13 @@ void logStartCreateCollection(OperationContext* opCtx,
                               const CreateCollectionRequest& request,
                               const NamespaceString& originalNss) {
     BSONObjBuilder collectionDetail;
-    const auto serializedNss = NamespaceStringUtil::serialize(originalNss);
     collectionDetail.append("shardKey", *request.getShardKey());
-    collectionDetail.append("collection", serializedNss);
+    collectionDetail.append(
+        "collection",
+        NamespaceStringUtil::serialize(originalNss, SerializationContext::stateCommandRequest()));
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.start", serializedNss, collectionDetail.obj());
+        opCtx, "shardCollection.start", originalNss, collectionDetail.obj());
 }
 
 void acquireCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -835,10 +836,8 @@ void logEndCreateCollection(
     if (initialChunks)
         collectionDetail.appendNumber("numChunks",
                                       static_cast<long long>(initialChunks->chunks.size()));
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "shardCollection.end",
-                                           NamespaceStringUtil::serialize(originalNss),
-                                           collectionDetail.obj());
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "shardCollection.end", originalNss, collectionDetail.obj());
 }
 
 /**

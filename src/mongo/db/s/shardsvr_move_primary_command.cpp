@@ -92,7 +92,7 @@ public:
                 !dbNss.isOnInternalDb());
 
             ScopeGuard onBlockExit(
-                [&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db_forSharding()); });
+                [&] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.dbName()); });
 
             const auto coordinatorFuture = [&] {
                 FixedFCVRegion fcvRegion(opCtx);

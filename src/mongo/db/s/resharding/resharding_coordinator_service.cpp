@@ -1444,7 +1444,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
                                            "resharding.coordinator.transition",
-                                           NamespaceStringUtil::serialize(doc.getSourceNss()),
+                                           doc.getSourceNss(),
                                            bob.obj(),
                                            kMajorityWriteConcern);
 }

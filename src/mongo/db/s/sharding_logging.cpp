@@ -91,7 +91,7 @@ ShardingLogging* ShardingLogging::get(OperationContext* operationContext) {
 
 Status ShardingLogging::logAction(OperationContext* opCtx,
                                   const StringData what,
-                                  const StringData ns,
+                                  const NamespaceString& ns,
                                   const BSONObj& detail,
                                   std::shared_ptr<Shard> configShard,
                                   ShardingCatalogClient* catalogClient) {
@@ -127,7 +127,7 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
 
 Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
                                          const StringData what,
-                                         const StringData ns,
+                                         const NamespaceString& ns,
                                          const BSONObj& detail,
                                          const WriteConcernOptions& writeConcern,
                                          std::shared_ptr<Shard> configShard,
@@ -168,7 +168,7 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
 Status ShardingLogging::_log(OperationContext* opCtx,
                              const StringData logCollName,
                              const StringData what,
-                             const StringData operationNS,
+                             const NamespaceString& operationNS,
                              const BSONObj& detail,
                              const WriteConcernOptions& writeConcern,
                              ShardingCatalogClient* catalogClient) {
@@ -193,7 +193,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     }
     changeLog.setClientAddr(opCtx->getClient()->clientAddress(true));
     changeLog.setTime(now);
-    changeLog.setNS(operationNS.toString());
+    changeLog.setNS(operationNS);
     changeLog.setWhat(what.toString());
     changeLog.setDetails(detail);
 

@@ -202,11 +202,13 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
     }
 }
 
-StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, StringData dbName) {
+StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx,
+                                                      const DatabaseName& dbName) {
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigDatabasesNamespace};
-        findRequest.setFilter(BSON(ShardDatabaseType::kNameFieldName << dbName.toString()));
+        findRequest.setFilter(BSON(ShardDatabaseType::kNameFieldName << DatabaseNameUtil::serialize(
+                                       dbName, SerializationContext::stateCommandRequest())));
         findRequest.setLimit(1);
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
@@ -220,14 +222,16 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
         if (!cursor->more()) {
             // The database has been dropped.
             return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "database " << dbName.toString() << " not found");
+                          str::stream()
+                              << "database " << dbName.toStringForErrorMsg() << " not found");
         }
 
         BSONObj document = cursor->nextSafe();
         return ShardDatabaseType(document);
     } catch (const DBException& ex) {
         return ex.toStatus(
-            str::stream() << "Failed to read the '" << dbName.toString() << "' entry locally from "
+            str::stream() << "Failed to read the '" << dbName.toStringForErrorMsg()
+                          << "' entry locally from "
                           << NamespaceString::kShardConfigDatabasesNamespace.toStringForErrorMsg());
     }
 }
@@ -483,7 +487,7 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
     LOGV2_DEBUG(22091, 1, "Dropped persisted chunk metadata", logAttrs(nss));
 }
 
-Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
+Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName) {
     try {
         DBDirectClient client(opCtx);
         auto deleteCommandResponse = client.runCommand([&] {
@@ -491,7 +495,8 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
                 NamespaceString::kShardConfigDatabasesNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardDatabaseType::kNameFieldName << dbName.toString()));
+                entry.setQ(BSON(ShardDatabaseType::kNameFieldName << DatabaseNameUtil::serialize(
+                                    dbName, SerializationContext::stateCommandRequest())));
                 entry.setMulti(false);
                 return entry;
             }()});

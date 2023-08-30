@@ -609,7 +609,9 @@ protected:
      */
     void assertDatabaseExists(const DatabaseType& expectedDB) {
         auto foundDB = catalogClient()->getDatabase(
-            operationContext(), expectedDB.getName(), repl::ReadConcernLevel::kMajorityReadConcern);
+            operationContext(),
+            DatabaseName::createDatabaseName_forTest(boost::none, expectedDB.getName()),
+            repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(expectedDB.getName(), foundDB.getName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
     }

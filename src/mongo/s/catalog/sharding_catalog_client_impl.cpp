@@ -392,32 +392,33 @@ ShardingCatalogClientImpl::ShardingCatalogClientImpl(std::shared_ptr<Shard> over
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
 
 DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
-                                                    StringData dbName,
+                                                    const DatabaseName& dbName,
                                                     repl::ReadConcernLevel readConcernLevel) {
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << dbName << " is not a valid db name",
+            str::stream() << dbName.toStringForErrorMsg() << " is not a valid db name",
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // The admin database is always hosted on the config server.
-    if (dbName == DatabaseName::kAdmin.db()) {
-        return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+    if (dbName.isAdminDB()) {
+        return DatabaseType(DatabaseNameUtil::serialize(dbName),
+                            ShardId::kConfigServerId,
+                            DatabaseVersion::makeFixed());
     }
 
     // The config database's primary shard is always config, and it is always sharded.
-    if (dbName == DatabaseName::kConfig.db()) {
-        return DatabaseType(
-            dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+    if (dbName.isConfigDB()) {
+        return DatabaseType(DatabaseNameUtil::serialize(dbName),
+                            ShardId::kConfigServerId,
+                            DatabaseVersion::makeFixed());
     }
 
-    auto result =
-        _fetchDatabaseMetadata(opCtx, dbName.toString(), kConfigReadSelector, readConcernLevel);
+    auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector, readConcernLevel);
     if (result == ErrorCodes::NamespaceNotFound) {
         // If we failed to find the database metadata on the 'nearest' config server, try again
         // against the primary, in case the database was recently created.
         return uassertStatusOK(
                    _fetchDatabaseMetadata(opCtx,
-                                          dbName.toString(),
+                                          dbName,
                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                           readConcernLevel))
             .value;
@@ -448,18 +449,20 @@ std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext*
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchDatabaseMetadata(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const ReadPreferenceSetting& readPref,
     repl::ReadConcernLevel readConcernLevel) {
-    invariant(dbName != DatabaseName::kAdmin.db() && dbName != DatabaseName::kConfig.db());
+    invariant(!dbName.isAdminDB() && !dbName.isConfigDB());
 
-    auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              readPref,
-                                              readConcernLevel,
-                                              NamespaceString::kConfigDatabasesNamespace,
-                                              BSON(DatabaseType::kNameFieldName << dbName),
-                                              BSONObj(),
-                                              boost::none);
+    auto findStatus =
+        _exhaustiveFindOnConfig(opCtx,
+                                readPref,
+                                readConcernLevel,
+                                NamespaceString::kConfigDatabasesNamespace,
+                                BSON(DatabaseType::kNameFieldName << DatabaseNameUtil::serialize(
+                                         dbName, SerializationContext::stateCommandRequest())),
+                                BSONObj(),
+                                boost::none);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -467,7 +470,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     const auto& docsWithOpTime = findStatus.getValue();
     if (docsWithOpTime.value.empty()) {
         return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "database " << dbName << " not found"};
+                str::stream() << "database " << dbName.toStringForErrorMsg() << " not found"};
     }
 
     invariant(docsWithOpTime.value.size() == 1);
@@ -598,12 +601,15 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
 
 std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     repl::ReadConcernLevel readConcernLevel,
     const BSONObj& sort) {
     BSONObjBuilder b;
-    if (!dbName.empty())
-        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(dbName)));
+    if (!dbName.isEmpty()) {
+        const auto db =
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    }
 
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                             kConfigReadSelector,
@@ -623,7 +629,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
 
 std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollectionsForDb(
     OperationContext* opCtx,
-    StringData dbName,
+    const DatabaseName& dbName,
     repl::ReadConcernLevel readConcern,
     const BSONObj& sort) {
     auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, sort);
@@ -896,7 +902,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
 }
 
 std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesForDatabase(
-    OperationContext* opCtx, const StringData& dbName) {
+    OperationContext* opCtx, const DatabaseName& dbName) {
     auto expCtx =
         make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, TagsType::ConfigNS);
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
@@ -914,7 +920,10 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
     //          {$group: {_id : "$ns"}}
     //      ])
     //
-    const std::string regex = "^" + pcre_util::quoteMeta(dbName) + "\\..*";
+    const std::string regex = "^" +
+        pcre_util::quoteMeta(DatabaseNameUtil::serialize(
+            dbName, SerializationContext::stateCommandRequest())) +
+        "\\..*";
     auto matchStageBson = BSON("ns" << BSON("$regex" << regex));
     auto matchStage = DocumentSourceMatch::createFromBson(
         Document{{"$match", std::move(matchStageBson)}}.toBson().firstElement(), expCtx);

@@ -116,10 +116,10 @@ public:
     }
     void setWhat(const std::string& what);
 
-    const std::string& getNS() const {
+    const NamespaceString& getNS() const {
         return _ns.get();
     }
-    void setNS(const std::string& ns);
+    void setNS(const NamespaceString& ns);
 
     const BSONObj& getDetails() const {
         return _details.get();
@@ -142,7 +142,7 @@ private:
     // (M)  description of the change
     boost::optional<std::string> _what;
     // (O) database or collection this change applies to
-    boost::optional<std::string> _ns;
+    boost::optional<NamespaceString> _ns;
     // (M)  A BSONObj containing extra information about some operations
     boost::optional<BSONObj> _details;
 };

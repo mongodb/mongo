@@ -180,7 +180,7 @@ public:
         }
 
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
-                                                   StringData dbName,
+                                                   const DatabaseName& dbName,
                                                    repl::ReadConcernLevel readConcernLevel,
                                                    const BSONObj& sort) override {
             return _colls;

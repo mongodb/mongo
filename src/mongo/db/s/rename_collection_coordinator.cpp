@@ -461,8 +461,10 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
 
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
-            "renameCollection.metadata",
             str::stream() << logMsg << ": dropped target collection and renamed source collection",
+            NamespaceStringUtil::deserialize(boost::none,
+                                             "renameCollection.metadata",
+                                             SerializationContext::stateCommandRequest()),
             BSON("newCollMetadata" << optFromCollType->toBSON()),
             ShardingCatalogClient::kMajorityWriteConcern,
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
@@ -510,14 +512,16 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         sharding_ddl_util::runTransactionOnShardingCatalog(
             opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
 
-        ShardingLogging::get(opCtx)->logChange(opCtx,
-                                               "renameCollection.metadata",
-                                               str::stream()
-                                                   << logMsg << " : dropped target collection.",
-                                               BSONObj(),
-                                               ShardingCatalogClient::kMajorityWriteConcern,
-                                               Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-                                               Grid::get(opCtx)->catalogClient());
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx,
+            str::stream() << logMsg << " : dropped target collection.",
+            NamespaceStringUtil::deserialize(boost::none,
+                                             "renameCollection.metadata",
+                                             SerializationContext::stateCommandRequest()),
+            BSONObj(),
+            ShardingCatalogClient::kMajorityWriteConcern,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+            Grid::get(opCtx)->catalogClient());
     }
 }
 }  // namespace
@@ -706,7 +710,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "renameCollection.start",
-                    NamespaceStringUtil::serialize(fromNss),
+                    fromNss,
                     BSON("source" << NamespaceStringUtil::serialize(fromNss) << "destination"
                                   << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
@@ -869,7 +873,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             ShardingLogging::get(opCtx)->logChange(
                 opCtx,
                 "renameCollection.end",
-                NamespaceStringUtil::serialize(nss()),
+                nss(),
                 BSON("source" << NamespaceStringUtil::serialize(nss()) << "destination"
                               << NamespaceStringUtil::serialize(_request.getTo())),
                 ShardingCatalogClient::kMajorityWriteConcern);

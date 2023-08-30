@@ -301,7 +301,7 @@ public:
      * Non-blocking method, which removes the entire specified database (including its collections)
      * from the cache.
      */
-    void purgeDatabase(StringData dbName);
+    void purgeDatabase(const DatabaseName& dbName);
 
     /**
      * Non-blocking method, which removes all databases (including their collections) from the

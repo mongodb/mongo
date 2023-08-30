@@ -113,14 +113,15 @@ public:
             catalogCache->purgeAllDatabases();
         } else {
             const auto ns = argumentElem.checkAndGetStringData();
+            const auto nss = NamespaceStringUtil::deserialize(
+                boost::none, ns, SerializationContext::stateCommandRequest());
             if (nsIsDbOnly(ns)) {
                 LOGV2(22762,
                       "Routing metadata flushed for database {db}",
                       "Routing metadata flushed for database",
-                      "db"_attr = ns);
-                catalogCache->purgeDatabase(ns);
+                      "db"_attr = toStringForLogging(nss));
+                catalogCache->purgeDatabase(nss.dbName());
             } else {
-                const auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
                 LOGV2(22763,
                       "Routing metadata flushed for collection {namespace}",
                       "Routing metadata flushed for collection",

@@ -865,7 +865,7 @@ void Balancer::_mainThread() {
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(),
                                     "balancer.round",
-                                    "",
+                                    NamespaceString::kEmpty,
                                     roundDetails.toBSON(),
                                     catalogManager->localConfigShard(),
                                     catalogManager->localCatalogClient())
@@ -893,7 +893,7 @@ void Balancer::_mainThread() {
             ShardingLogging::get(opCtx.get())
                 ->logAction(opCtx.get(),
                             "balancer.round",
-                            "",
+                            NamespaceString::kEmpty,
                             roundDetails.toBSON(),
                             catalogManager->localConfigShard(),
                             catalogManager->localCatalogClient())
