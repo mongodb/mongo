@@ -68,8 +68,6 @@
 
 namespace mongo::query_settings {
 namespace {
-static const auto kParameterName = "querySettings";
-
 QueryShapeConfiguration makeQueryShapeConfiguration(
     const QuerySettings& settings,
     QueryInstance query,
@@ -172,7 +170,8 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
     manager().appendQuerySettingsClusterParameterValue(opCtx(), &bob, tenantId);
     ASSERT_BSONOBJ_EQ(
         bob.done(),
-        BSON("_id" << kParameterName << QuerySettingsClusterParameterValue::kSettingsArrayFieldName
+        BSON("_id" << QuerySettingsManager::kQuerySettingsClusterParameterName
+                   << QuerySettingsClusterParameterValue::kSettingsArrayFieldName
                    << BSON_ARRAY(config.toBSON())
                    << QuerySettingsClusterParameterValue::kClusterParameterTimeFieldName
                    << clusterParameterTime.asTimestamp()));
@@ -245,8 +244,9 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
 TEST(QuerySettingsClusterParameter, ParameterValidation) {
     // Ensure validation fails for invalid input.
     TenantId tenantId(OID::gen());
-    QuerySettingsClusterParameter querySettingsParameter(kParameterName,
-                                                         ServerParameterType::kClusterWide);
+    QuerySettingsClusterParameter querySettingsParameter(
+        QuerySettingsManager::kQuerySettingsClusterParameterName,
+        ServerParameterType::kClusterWide);
     ASSERT_NOT_OK(querySettingsParameter.validate(BSON("" << BSON("a"
                                                                   << "b"))
                                                       .firstElement(),

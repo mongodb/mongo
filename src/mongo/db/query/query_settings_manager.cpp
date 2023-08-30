@@ -54,7 +54,6 @@
 namespace mongo::query_settings {
 
 namespace {
-static const auto kParameterName = "querySettings";
 const auto getQuerySettingsManager =
     ServiceContext::declareDecoration<boost::optional<QuerySettingsManager>>();
 }  // namespace
@@ -165,7 +164,7 @@ LogicalTime QuerySettingsManager::getClusterParameterTime_inlock(
 void QuerySettingsManager::appendQuerySettingsClusterParameterValue(
     OperationContext* opCtx, BSONObjBuilder* bob, const boost::optional<TenantId>& tenantId) {
     Lock::SharedLock readLock(opCtx, _mutex);
-    bob->append("_id"_sd, kParameterName);
+    bob->append("_id"_sd, QuerySettingsManager::kQuerySettingsClusterParameterName);
     BSONArrayBuilder arrayBuilder(
         bob->subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
     for (auto&& item : getAllQueryShapeConfigurations_inlock(opCtx, tenantId)) {

@@ -378,6 +378,7 @@ protected:
                 invocation.invoke(operationContext(),
                                   setClusterParameterRequest,
                                   boost::none,
+                                  boost::none,
                                   ShardingCatalogClient::kLocalWriteConcern);
             }
         }

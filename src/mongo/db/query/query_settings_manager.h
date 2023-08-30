@@ -104,6 +104,7 @@ struct VersionedQueryShapeConfigurations {
  */
 class QuerySettingsManager {
 public:
+    static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
     explicit QuerySettingsManager(ServiceContext* service) {}
 
     ~QuerySettingsManager() = default;

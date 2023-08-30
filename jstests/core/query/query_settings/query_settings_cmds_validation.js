@@ -10,39 +10,16 @@
 // ]
 //
 
-import {QuerySettingsUtils} from "jstests/core/libs/query_settings_utils.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
-const adminDB = db.getSiblingDB("admin");
-const coll = db[jsTestName()];
+const collName = jsTestName();
 
-const utils = new QuerySettingsUtils(db, coll)
+const qsutils = new QuerySettingsUtils(db, collName)
 
-const queryA = {
-    find: coll.getName(),
-    $db: db.getName(),
-    filter: {a: 1}
-};
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
-const nonExistentQueryShapeHash =
-    "0000000000000000000000000000000000000000000000000000000000000000";
-
-/**
- * Function used to reset the state of the DB after each test.
- */
-function removeAllQuerySettings() {
-    // Retrieve all querySettings hashes.
-    const hashes = adminDB.aggregate([{$querySettings: {}}]).toArray().map(el => el.queryShapeHash);
-
-    hashes.forEach(hash => {
-        // Remove query settings for each hash.
-        assert.commandWorked(adminDB.runCommand({removeQuerySettings: hash}));
-    });
-
-    // Check that no more querySettings exist.
-    assert.eq(adminDB.aggregate([{$querySettings: {}}]).toArray().length, 0);
-}
+const nonExistentQueryShapeHash = "0".repeat(64);
 
 {
     // Ensure that setQuerySettings command fails for invalid input.
@@ -54,7 +31,7 @@ function removeAllQuerySettings() {
         7746402);
     assert.commandFailedWithCode(
         db.adminCommand(
-            {setQuerySettings: utils.makeQueryInstance(), settings: {notAValid: "settings"}}),
+            {setQuerySettings: qsutils.makeQueryInstance(), settings: {notAValid: "settings"}}),
         40415);
 }
 
@@ -120,7 +97,7 @@ function removeAllQuerySettings() {
             }
         }
     }));
-    removeAllQuerySettings();
+    qsutils.removeAllQuerySettings();
 }
 
 {
@@ -159,23 +136,17 @@ function removeAllQuerySettings() {
         settings:
             {"indexHints": {"ns": {"db": "testDB", "coll": "order"}, "allowedIndexes": []}}
     }));
-    removeAllQuerySettings();
+    qsutils.removeAllQuerySettings();
 }
 
 {
     // Ensure that setQuerySettings command fails when multiple index hints refer to the same coll.
     assert.commandFailedWithCode(db.adminCommand({
-        setQuerySettings: {find: coll.getName(), filter: {a: 123}, $db: db.getName()},
+        setQuerySettings: {find: collName, filter: {a: 123}, $db: db.getName()},
         settings: {
             "indexHints": [
-                {
-                    "ns": {"db": db.getName(), "coll": coll.getName()},
-                    "allowedIndexes": [{"sku": 1}]
-                },
-                {
-                    "ns": {"db": db.getName(), "coll": coll.getName()},
-                    "allowedIndexes": [{"uks": 1}]
-                },
+                {"ns": {"db": db.getName(), "coll": collName}, "allowedIndexes": [{"sku": 1}]},
+                {"ns": {"db": db.getName(), "coll": collName}, "allowedIndexes": [{"uks": 1}]},
             ]
         }
     }),

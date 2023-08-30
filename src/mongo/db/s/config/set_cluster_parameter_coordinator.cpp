@@ -202,6 +202,7 @@ void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {
     invocation.invoke(opCtx,
                       setClusterParameterRequest,
                       _doc.getClusterParameterTime(),
+                      boost::none /* previousTime */,
                       kMajorityWriteConcern,
                       true /* skipValidation */);
 }

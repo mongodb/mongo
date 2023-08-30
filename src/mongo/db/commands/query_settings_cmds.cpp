@@ -51,8 +51,6 @@ namespace {
 
 using namespace query_settings;
 
-static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
-
 SetClusterParameter makeSetClusterParameterRequest(
     const std::vector<QueryShapeConfiguration>& settingsArray, const mongo::DatabaseName& dbName) {
     BSONObjBuilder bob;
@@ -63,7 +61,7 @@ SetClusterParameter makeSetClusterParameterRequest(
     }
     arrayBuilder.done();
     SetClusterParameter setClusterParameterRequest(
-        BSON(kQuerySettingsClusterParameterName << bob.done()));
+        BSON(QuerySettingsManager::kQuerySettingsClusterParameterName << bob.done()));
 
     // NOTE: Forward the 'dbName' for the SetClusterParameter::toBSON() not to fail on
     // the invariant.
@@ -75,9 +73,12 @@ SetClusterParameter makeSetClusterParameterRequest(
  * Invokes the setClusterParameter() weak function, which is an abstraction over the corresponding
  * command implementation in sharded clusters (mongos) vs. replica set deployments (mongod).
  */
-void setClusterParameter(OperationContext* opCtx, const SetClusterParameter& request) {
+void setClusterParameter(OperationContext* opCtx,
+                         const SetClusterParameter& request,
+                         boost::optional<Timestamp> clusterParameterTime,
+                         boost::optional<LogicalTime> previousTime) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(setClusterParameter);
-    w(opCtx, request);
+    w(opCtx, request, clusterParameterTime, previousTime);
 }
 
 /**
@@ -140,7 +141,11 @@ public:
             // Run SetClusterParameter command with the new value of the 'querySettings' cluster
             // parameter.
             setClusterParameter(
-                opCtx, makeSetClusterParameterRequest(settingsArray, request().getDbName()));
+                opCtx,
+                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
+                boost::none,
+                querySettingsManager.getClusterParameterTime(opCtx,
+                                                             request().getDbName().tenantId()));
             SetQuerySettingsCommandReply reply;
             reply.setQueryShapeConfiguration(std::move(queryShapeConfiguration));
             return reply;
@@ -177,7 +182,11 @@ public:
             // Run SetClusterParameter command with the new value of the 'querySettings' cluster
             // parameter.
             setClusterParameter(
-                opCtx, makeSetClusterParameterRequest(settingsArray, request().getDbName()));
+                opCtx,
+                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
+                boost::none,
+                querySettingsManager.getClusterParameterTime(opCtx,
+                                                             request().getDbName().tenantId()));
             SetQuerySettingsCommandReply reply;
             reply.setQueryShapeConfiguration(*updatedQueryShapeConfigurationIt);
             return reply;
@@ -340,7 +349,11 @@ public:
             // Run SetClusterParameter command with the new value of the 'querySettings' cluster
             // parameter.
             setClusterParameter(
-                opCtx, makeSetClusterParameterRequest(settingsArray, request().getDbName()));
+                opCtx,
+                makeSetClusterParameterRequest(settingsArray, request().getDbName()),
+                boost::none,
+                querySettingsManager.getClusterParameterTime(opCtx,
+                                                             request().getDbName().tenantId()));
         }
 
     private:

@@ -103,9 +103,9 @@ public:
 
                 invocation.normalizeParameter(opCtx,
                                               cmdParamObj,
-                                              boost::none,
+                                              boost::none /* clusterParameterTime */,
+                                              boost::none /* previousTime */,
                                               serverParameter,
-                                              parameterName,
                                               request().getDbName().tenantId(),
                                               false /* skipValidation */);
 

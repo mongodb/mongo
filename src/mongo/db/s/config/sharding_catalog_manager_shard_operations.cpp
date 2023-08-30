@@ -1404,6 +1404,7 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
         invocation.invoke(opCtx,
                           setClusterParameterRequest,
                           parameter["clusterParameterTime"].timestamp(),
+                          boost::none /* previousTime */,
                           kMajorityWriteConcern);
     }
 }

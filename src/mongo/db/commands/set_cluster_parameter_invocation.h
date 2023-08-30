@@ -44,6 +44,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
@@ -60,11 +61,18 @@ public:
 
 class DBClientService {
 public:
-    virtual StatusWith<bool> updateParameterOnDisk(OperationContext* opCtx,
-                                                   BSONObj query,
-                                                   BSONObj update,
-                                                   const WriteConcernOptions&,
-                                                   const boost::optional<TenantId>&) = 0;
+    virtual StatusWith<BatchedCommandResponse> updateParameterOnDisk(
+        OperationContext* opCtx,
+        BSONObj query,
+        BSONObj update,
+        bool upsert,
+        const WriteConcernOptions&,
+        const boost::optional<TenantId>&) = 0;
+    virtual StatusWith<BatchedCommandResponse> insertParameterOnDisk(
+        OperationContext* opCtx,
+        BSONObj update,
+        const WriteConcernOptions&,
+        const boost::optional<TenantId>&) = 0;
     virtual Timestamp getUpdateClusterTime(OperationContext*) = 0;
     virtual ~DBClientService() = default;
 };
@@ -72,11 +80,18 @@ public:
 class ClusterParameterDBClientService final : public DBClientService {
 public:
     ClusterParameterDBClientService(DBDirectClient& dbDirectClient) : _dbClient(dbDirectClient) {}
-    StatusWith<bool> updateParameterOnDisk(OperationContext* opCtx,
-                                           BSONObj query,
-                                           BSONObj update,
-                                           const WriteConcernOptions&,
-                                           const boost::optional<TenantId>&) override;
+    StatusWith<BatchedCommandResponse> updateParameterOnDisk(
+        OperationContext* opCtx,
+        BSONObj query,
+        BSONObj update,
+        bool upsert,
+        const WriteConcernOptions&,
+        const boost::optional<TenantId>&) override;
+    StatusWith<BatchedCommandResponse> insertParameterOnDisk(
+        OperationContext* opCtx,
+        BSONObj update,
+        const WriteConcernOptions&,
+        const boost::optional<TenantId>&) override;
     Timestamp getUpdateClusterTime(OperationContext*) override;
 
 private:
@@ -89,9 +104,17 @@ public:
                                   DBClientService& dbClientService)
         : _sps(std::move(serverParameterService)), _dbService(dbClientService) {}
 
+    // TODO SERVER-80534: Remove this overload once it is not used by the enterprise module.
     bool invoke(OperationContext*,
                 const SetClusterParameter&,
                 boost::optional<Timestamp>,
+                const WriteConcernOptions&,
+                bool skipValidation = false);
+
+    bool invoke(OperationContext*,
+                const SetClusterParameter&,
+                boost::optional<Timestamp>,
+                boost::optional<LogicalTime>,
                 const WriteConcernOptions&,
                 bool skipValidation = false);
 
@@ -99,9 +122,9 @@ public:
     // for the on-disk update.
     std::pair<BSONObj, BSONObj> normalizeParameter(OperationContext* opCtx,
                                                    BSONObj cmdParamObj,
-                                                   const boost::optional<Timestamp>& paramTime,
+                                                   boost::optional<Timestamp> clusterParameterTime,
+                                                   boost::optional<LogicalTime> previousTime,
                                                    ServerParameter* sp,
-                                                   StringData parameterName,
                                                    const boost::optional<TenantId>& tenantId,
                                                    bool skipValidation);
 

@@ -60,7 +60,10 @@
 namespace mongo {
 namespace {
 
-void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter& request) {
+void setClusterParameterImpl(OperationContext* opCtx,
+                             const SetClusterParameter& request,
+                             boost::optional<Timestamp>,
+                             boost::optional<LogicalTime>) {
     ConfigsvrSetClusterParameter configsvrSetClusterParameter(request.getCommandParameter());
     configsvrSetClusterParameter.setDbName(request.getDbName());
 
@@ -97,7 +100,12 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            setClusterParameterImpl(opCtx, request());
+            // TODO SERVER-78803: Handle concurrent cluster parameter updates correctly in sharded
+            // clusters.
+            setClusterParameterImpl(opCtx,
+                                    request(),
+                                    boost::none /* clusterParameterTime */,
+                                    boost::none /* previousTime */);
         }
 
     private:

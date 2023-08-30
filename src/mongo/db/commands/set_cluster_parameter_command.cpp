@@ -65,15 +65,15 @@
 
 
 namespace mongo {
-
 namespace {
-MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
-
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout};
 
-void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter& request) {
+void setClusterParameterImpl(OperationContext* opCtx,
+                             const SetClusterParameter& request,
+                             boost::optional<Timestamp> clusterParameterTime,
+                             boost::optional<LogicalTime> previousTime) {
     uassert(ErrorCodes::ErrorCodes::NotImplemented,
             "setClusterParameter can only run on mongos in sharded clusters",
             (serverGlobalParams.clusterRole.has(ClusterRole::None)));
@@ -89,8 +89,6 @@ void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter&
     // setClusterParameter is serialized against setFeatureCompatibilityVersion.
     FixedFCVRegion fcvRegion(opCtx);
 
-    hangInSetClusterParameter.pauseWhileSet();
-
     std::unique_ptr<ServerParameterService> parameterService =
         std::make_unique<ClusterParameterService>();
 
@@ -99,7 +97,7 @@ void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter&
 
     SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
 
-    invocation.invoke(opCtx, request, boost::none, kMajorityWriteConcern);
+    invocation.invoke(opCtx, request, clusterParameterTime, previousTime, kMajorityWriteConcern);
 }
 
 class SetClusterParameterCommand final : public TypedCommand<SetClusterParameterCommand> {
@@ -127,7 +125,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            setClusterParameterImpl(opCtx, request());
+            setClusterParameterImpl(opCtx,
+                                    request(),
+                                    boost::none /* clusterParameterTime */,
+                                    boost::none /* previousTime */);
         }
 
     private:
