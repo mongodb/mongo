@@ -633,7 +633,6 @@ export function testFindOneAndUpdate({
 }
 
 export function getRelevantProfilerEntries(db, coll, requestType) {
-    const collName = coll.getName();
     const sysCollName = sysCollNamePrefix + coll.getName();
     const profilerFilter = {
         $or: [
@@ -655,8 +654,8 @@ export function getRelevantProfilerEntries(db, coll, requestType) {
             // Targeted write command.
             {
                 "op": "command",
-                "ns": `${db.getName()}.${collName}`,
-                [`command.${requestType}`]: `${collName}`,
+                "ns": `${db.getName()}.${sysCollName}`,
+                [`command.${requestType}`]: `${coll.getName()}`,
             }
         ]
     };

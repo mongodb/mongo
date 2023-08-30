@@ -128,6 +128,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 UpdateResult performUpdate(OperationContext* opCtx,
                            const NamespaceString& nss,
                            CurOp* curOp,
+                           OpDebug* opDebug,
                            bool inTransaction,
                            bool remove,
                            bool upsert,
@@ -143,6 +144,7 @@ long long performDelete(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const DeleteRequest& deleteRequest,
                         CurOp* curOp,
+                        OpDebug* opDebug,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
                         boost::optional<BSONObj>& docFound);
@@ -154,16 +156,6 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
                                                      const Status& status,
                                                      int index,
                                                      size_t numErrors);
-
-/**
- * Updates the retryable write stats if the write op contains retry.
- */
-void updateRetryStats(OperationContext* opCtx, bool containsRetry);
-
-/**
- * Marks the op as complete, log it and profile if appropriate.
- */
-void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp);
 
 /**
  * Performs a batch of inserts, updates, or deletes.
@@ -227,9 +219,6 @@ bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
  */
 write_ops::InsertCommandReply performTimeseriesWrites(
     OperationContext* opCtx, const write_ops::InsertCommandRequest& request);
-
-write_ops::InsertCommandReply performTimeseriesWrites(
-    OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp);
 
 }  // namespace write_ops_exec
 }  // namespace mongo

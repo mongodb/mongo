@@ -452,10 +452,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     validate(req);
 
-    auto& curOp = *CurOp::get(opCtx);
-
     if (req.getEncryptionInformation().has_value()) {
-        curOp.debug().shouldOmitDiagnosticInformation = true;
+        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
         if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
             return processFLEFindAndModify(opCtx, req);
         }
@@ -463,6 +461,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     const NamespaceString& nsString = req.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+    auto const curOp = CurOp::get(opCtx);
+    OpDebug* const opDebug = &curOp->debug();
 
     // Collect metrics.
     CmdFindAndModify::collectMetrics(req);
@@ -504,13 +504,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         }
     }
 
-    // Initialize curOp information.
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(nsString);
-        curOp.ensureStarted();
-    }
-
     auto sampleId = analyze_shard_key::getOrGenerateSampleId(
         opCtx, ns(), analyze_shard_key::SampledCommandNameEnum::kFindAndModify, req);
     if (sampleId) {
@@ -537,8 +530,14 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 deleteRequest.setStmtId(stmtId);
             }
             boost::optional<BSONObj> docFound;
-            write_ops_exec::performDelete(
-                opCtx, nsString, deleteRequest, &curOp, inTransaction, boost::none, docFound);
+            write_ops_exec::performDelete(opCtx,
+                                          nsString,
+                                          deleteRequest,
+                                          curOp,
+                                          opDebug,
+                                          inTransaction,
+                                          boost::none,
+                                          docFound);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -571,7 +570,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                     auto updateResult =
                         write_ops_exec::performUpdate(opCtx,
                                                       nsString,
-                                                      &curOp,
+                                                      curOp,
+                                                      opDebug,
                                                       inTransaction,
                                                       req.getRemove().value_or(false),
                                                       req.getUpsert().value_or(false),

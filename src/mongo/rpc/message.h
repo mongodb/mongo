@@ -52,8 +52,7 @@ const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 
 enum NetworkOp : int32_t {
     opInvalid = 0,
-    opReply = 1, /* reply. responseTo is set. */
-    dbBulkWrite = 2000,
+    opReply = 1,     /* reply. responseTo is set. */
     dbUpdate = 2001, /* update object */
     dbInsert = 2002,
     // dbGetByOID = 2003,
@@ -71,7 +70,6 @@ enum NetworkOp : int32_t {
 
 inline bool isSupportedRequestNetworkOp(NetworkOp op) {
     switch (op) {
-        case dbBulkWrite:
         case dbUpdate:
         case dbInsert:
         case dbQuery:
@@ -91,7 +89,6 @@ inline bool isSupportedRequestNetworkOp(NetworkOp op) {
 
 enum class LogicalOp {
     opInvalid,
-    opBulkWrite,
     opUpdate,
     opInsert,
     opQuery,
@@ -104,8 +101,6 @@ enum class LogicalOp {
 
 inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
     switch (networkOp) {
-        case dbBulkWrite:
-            return LogicalOp::opBulkWrite;
         case dbUpdate:
             return LogicalOp::opUpdate;
         case dbInsert:
@@ -137,8 +132,6 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "none";
         case opReply:
             return "reply";
-        case dbBulkWrite:
-            return "bulkWrite";
         case dbUpdate:
             return "update";
         case dbInsert:
@@ -163,8 +156,6 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
     switch (logicalOp) {
         case LogicalOp::opInvalid:
             return "none";
-        case LogicalOp::opBulkWrite:
-            return "bulkWrite";
         case LogicalOp::opUpdate:
             return "update";
         case LogicalOp::opInsert:

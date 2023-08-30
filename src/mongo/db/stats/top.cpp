@@ -153,8 +153,6 @@ void Top::_record(OperationContext* opCtx,
         case LogicalOp::opInvalid:
             // use 0 for unknown, non-specific
             break;
-        case LogicalOp::opBulkWrite:
-            break;
         case LogicalOp::opUpdate:
             c.update.inc(micros);
             break;
