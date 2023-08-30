@@ -215,11 +215,11 @@ struct ServerGlobalParams {
         }
 
         // This function is to be used for generic FCV references only, and not for FCV-gating.
-        bool isUpgradingOrDowngrading(boost::optional<FCV> version = boost::none) const {
-            if (version == boost::none) {
-                version = getVersion();
-            }
+        bool isUpgradingOrDowngrading() const {
+            return isUpgradingOrDowngrading(getVersion());
+        }
 
+        static bool isUpgradingOrDowngrading(FCV version) {
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             return version != multiversion::GenericFCV::kLatest &&
                 version != multiversion::GenericFCV::kLastContinuous &&
