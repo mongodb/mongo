@@ -12,6 +12,8 @@
  * ]
  */
 
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
@@ -54,7 +56,8 @@ export const $config = (function() {
         killInsert: function(db, collNameSuffix) {
             let collName = getCollectionName(collNameSuffix);
             const inprog =
-                assert.commandWorked(db.currentOp({ns: db[collName].getFullName(), op: 'insert'}))
+                assertAlways
+                    .commandWorked(db.currentOp({ns: db[collName].getFullName(), op: 'insert'}))
                     .inprog;
             if (inprog.length) {
                 assert.commandWorked(
@@ -84,7 +87,7 @@ export const $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 0,  // TODO SERVER-80143: Re-enable with 100 iterations.
+        iterations: 100,
         setup: setup,
         states: states,
         transitions: transitions,
