@@ -522,7 +522,7 @@ server_parameters:
         default:
             expr: 24 * 60 * 60   # 24 hours
         validator:
-            gte: 1
+            gte: 0
 
     maxShardSplitDonorServiceThreadPoolSize:
         description: >-

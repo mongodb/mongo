@@ -2253,10 +2253,10 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_waitForAllNodesToFinishI
     // sleep timeout source is executed. However, the scoped task executor shutdown will also
     // cancel all pending tasks, including this sleep task. So, no concern about orphaned
     // pending tasks after migration task completion.
+    const auto deadline =
+        (*_scopedExecutor)->now() + Seconds(repl::importQuorumTimeoutSeconds.load());
     auto deadlineReachedFuture =
-        (**_scopedExecutor)
-            ->sleepFor(Milliseconds(repl::importQuorumTimeoutSeconds.load()),
-                       cancelTimeoutSource.token());
+        (**_scopedExecutor)->sleepUntil(deadline, cancelTimeoutSource.token());
 
     return whenAny(std::move(deadlineReachedFuture),
                    _importQuorumPromise.getFuture().thenRunOn(**_scopedExecutor),
@@ -2270,7 +2270,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_waitForAllNodesToFinishI
                 LOGV2(7675003,
                       "Wait for import vote quorum timeout expired",
                       "migrationId"_attr = _migrationUuid,
-                      "timeoutMs"_attr = repl::importQuorumTimeoutSeconds.load());
+                      "timeoutSecs"_attr = repl::importQuorumTimeoutSeconds.load());
                 uasserted(ErrorCodes::ExceededTimeLimit, "Import vote quoroum timeout expired");
             } else {
                 // Cancel the sleep task.
