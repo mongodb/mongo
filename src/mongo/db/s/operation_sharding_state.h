@@ -204,7 +204,7 @@ private:
         DatabaseVersion v;
         int recursion{0};
     };
-    StringMap<DatabaseVersionTracker> _databaseVersions;
+    stdx::unordered_map<DatabaseName, DatabaseVersionTracker> _databaseVersions;
 
     // This value can only be set when a rerouting exception occurs during a write operation, and
     // must be handled before this object gets destructed.
