@@ -19,8 +19,9 @@ function cannotStartShardSplitWithMigrationInProgress(
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 
-    let fp = configureFailPoint(test.getDonorRst().getPrimary(),
-                                "pauseTenantMigrationBeforeLeavingDataSyncState");
+    let fp = configureFailPoint(test.getRecipientRst().getPrimary(),
+                                "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                                {action: "hang"});
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(tenantMigrationId),
         protocol,
@@ -46,8 +47,8 @@ function cannotStartShardSplitWithMigrationInProgress(
 
     fp.off();
 
-    TenantMigrationTest.assertCommitted(test.waitForMigrationToComplete(migrationOpts));
-    assert.commandWorked(test.forgetMigration(migrationOpts.migrationIdString));
+    assert.commandWorked(test.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* forgetMigration */));
 
     jsTestLog("cannotStartShardSplitWithMigrationInProgress test completed");
 }
@@ -56,7 +57,8 @@ const sharedOptions = {};
 sharedOptions["setParameter"] = {
     shardSplitGarbageCollectionDelayMS: 0,
     tenantMigrationGarbageCollectionDelayMS: 0,
-    ttlMonitorSleepSecs: 1
+    // To avoid recipient node crash from missing import done marker during shard merge.
+    importQuorumTimeoutSeconds: 0,
 };
 
 const recipientTagName = "recipientTag";
