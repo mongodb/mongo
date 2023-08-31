@@ -1,8 +1,8 @@
 /**
  * @tags: [
  *   serverless,
- *   requires_fcv_62,
- *   featureFlagShardMerge
+ *   requires_fcv_71,
+ *   requires_shard_merge
  * ]
  */
 
@@ -43,7 +43,8 @@ function cannotStartShardSplitWithMigrationInProgress(
         recipientSetName,
         migrationId: splitMigrationId
     });
-    assert.commandFailed(commitThread.returnData());
+    assert.commandFailedWithCode(commitThread.returnData(),
+                                 ErrorCodes.ConflictingServerlessOperation);
 
     fp.off();
 

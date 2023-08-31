@@ -1313,7 +1313,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
-  - name: .shard_merge
   - name: streams
   - name: streams_auth
   - name: vector_search
@@ -1563,7 +1562,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
-  - name: .shard_merge
   - name: streams
   - name: streams_auth
   - name: query_stats_passthrough
@@ -2007,7 +2005,6 @@ buildvariants:
     - amazon2-arm64-large
   - name: session_jscore_passthrough
   - name: .shard_split
-  - name: .shard_merge
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: sharding_api_version_jscore_passthrough_gen
   - name: sharding_api_strict_passthrough_gen
@@ -2231,7 +2228,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .serverless
   - name: .shard_split
-  - name: .shard_merge
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
