@@ -151,8 +151,8 @@ namespace {
 
 /**
  * Consults the routing info to build requests for:
- * 1. If sharded, shards that own chunks for the namespace, or
- * 2. If unsharded, the primary shard for the database.
+ *  - If it has a routing table, shards that own chunks for the namespace, or
+ *  - If it doesn't have a routing table, the primary shard for the database.
  *
  * If a shard is included in shardsToSkip, it will be excluded from the list returned to the
  * caller.
@@ -173,9 +173,9 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
     const auto& cm = cri.cm;
 
-    if (!cm.isSharded()) {
-        // The collection is unsharded. Target only the primary shard for the database.
-
+    if (!cm.hasRoutingTable()) {
+        // The collection does not have a routing table. Target only the primary shard for the
+        // database.
         auto primaryShardId = cm.dbPrimary();
 
         if (shardsToSkip.find(primaryShardId) != shardsToSkip.end()) {
@@ -202,7 +202,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
     std::vector<AsyncRequestsSender::Request> requests;
 
-    // The collection is sharded. Target all shards that own chunks that match the query.
+    // The collection has a routing table. Target all shards that own chunks that match the query.
     std::set<ShardId> shardIds;
     std::unique_ptr<CollatorInterface> collator;
     if (!collation.isEmpty()) {
@@ -737,15 +737,15 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
                                             const ChunkManager& cm,
                                             const BSONObj& query,
                                             const BSONObj& collation) {
-    if (cm.isSharded()) {
-        // The collection is sharded. Use the routing table to decide which shards to target based
-        // on the query and collation.
+    if (cm.hasRoutingTable()) {
+        // The collection has a routing table. Use it to decide which shards to target based on the
+        // query and collation.
         std::set<ShardId> shardIds;
         getShardIdsForQuery(expCtx, query, collation, cm, &shardIds, nullptr /* info */);
         return shardIds;
     }
 
-    // The collection is unsharded. Target only the primary shard for the database.
+    // The collection does not have a routing table. Target only the primary shard for the database.
     return {cm.dbPrimary()};
 }
 
@@ -812,16 +812,17 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                    BSON(ReadConcernArgs::kLevelFieldName << repl::readConcernLevels::kLocalName));
         cmdNoVersion = bob.obj();
 
-        if (cm.isSharded()) {
-            // For a sharded collection we must load indexes from a shard with chunks. For
-            // consistency with cluster listIndexes, load from the shard that owns the minKey chunk.
+        if (cm.hasRoutingTable()) {
+            // For a collection that has a routing table, we must load indexes from a shard with
+            // chunks. For consistency with cluster listIndexes, load from the shard that owns the
+            // minKey chunk.
             const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
                 appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
         } else {
-            // For an unsharded collection, the primary shard will have correct indexes. We attach
-            // unsharded shard version to detect if the collection has become sharded.
+            // For a collection without routing table, the primary shard will have correct indexes.
+            // Attach dbVersion + shardVersion: UNSHARDED.
             const auto cmdObjWithShardVersion = !cm.dbVersion().isFixed()
                 ? appendShardVersion(cmdNoVersion, ShardVersion::UNSHARDED())
                 : cmdNoVersion;

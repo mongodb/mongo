@@ -245,7 +245,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         BSONObjBuilder cmdBuilder;
         findCommandToForward->serialize(BSONObj(), &cmdBuilder);
 
-        if (cm.isSharded()) {
+        if (cm.hasRoutingTable()) {
             cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
