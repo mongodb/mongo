@@ -103,7 +103,7 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
     auto waitForWC = [service, executor, cancelToken](repl::OpTime opTime) {
         return WaitForMajorityService::get(service)
-            .waitUntilMajority(opTime, cancelToken)
+            .waitUntilMajorityForWrite(opTime, cancelToken)
             .thenRunOn(executor);
     };
 

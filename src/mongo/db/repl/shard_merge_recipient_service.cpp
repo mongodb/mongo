@@ -987,7 +987,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_initializeAndDurablyPers
 
     auto waitOptime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajority(waitOptime, CancellationToken::uncancelable());
+        .waitUntilMajorityForWrite(waitOptime, CancellationToken::uncancelable());
 }
 
 void ShardMergeRecipientService::Instance::_killBackupCursor() {
@@ -1874,7 +1874,7 @@ ShardMergeRecipientService::Instance::_advanceMajorityCommitTsToBkpCursorCheckpo
     // Get the timestamp of the no-op. This will have ts > donorBkpCursorCkptTs.
     auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(noOpTs, CancellationToken::uncancelable());
+        .waitUntilMajorityForWrite(noOpTs, CancellationToken::uncancelable());
 }
 
 SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistConsistentState() {
@@ -2070,7 +2070,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_updateStateDocForMajorit
             _updateStateDoc(opCtx.get(), stateDoc);
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
+                .waitUntilMajorityForWrite(writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -2433,7 +2433,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
 
     auto waitOptime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajority(waitOptime, CancellationToken::uncancelable());
+        .waitUntilMajorityForWrite(waitOptime, CancellationToken::uncancelable());
 }
 
 SemiFuture<void>

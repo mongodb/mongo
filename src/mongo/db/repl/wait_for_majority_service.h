@@ -195,14 +195,6 @@ public:
     void shutDown();
 
     /**
-     * Identical to waitUntilMajorityForWrite, which should be used instead.
-     *
-     * TODO(SERVER-74754): Remove this method and replace all uses with waitUntilMajorityForWrite.
-     */
-    SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
-                                       const CancellationToken& cancelToken);
-
-    /**
      * Enqueue a request to wait for the given opTime to be majority committed.
      */
     SemiFuture<void> waitUntilMajorityForRead(const repl::OpTime& opTime,

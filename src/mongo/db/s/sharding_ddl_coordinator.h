@@ -396,7 +396,7 @@ protected:
             const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
             WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(lastLocalOpTime, opCtx->getCancellationToken())
+                .waitUntilMajorityForWrite(lastLocalOpTime, opCtx->getCancellationToken())
                 .get(opCtx);
         }
 

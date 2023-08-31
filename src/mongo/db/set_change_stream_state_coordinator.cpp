@@ -75,11 +75,11 @@ constexpr auto kSetChangeStreamStateCoordinatorName = "setChangeStreamStateCoord
 /**
  * Waits until the oplog entry has been majority committed.
  */
-void waitForMajority(OperationContext* opCtx) {
+void waitUntilMajorityForWrite(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
     WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(lastLocalOpTime, opCtx->getCancellationToken())
+        .waitUntilMajorityForWrite(lastLocalOpTime, opCtx->getCancellationToken())
         .get(opCtx);
 }
 
@@ -124,7 +124,7 @@ private:
                                                                                      tenantId);
 
         // Wait until the create requests are majority committed.
-        waitForMajority(opCtx);
+        waitUntilMajorityForWrite(opCtx);
     }
 
     /**
@@ -138,7 +138,7 @@ private:
         ChangeStreamPreImagesCollectionManager::get(opCtx).dropPreImagesCollection(opCtx, tenantId);
 
         // Wait until the drop requests are majority committed.
-        waitForMajority(opCtx);
+        waitUntilMajorityForWrite(opCtx);
     }
 
     const SetChangeStreamStateCoordinatorDocument _stateDoc;
@@ -193,7 +193,7 @@ ExecutorFuture<void> SetChangeStreamStateCoordinator::_runImpl(
             // A series of retries, step-up and step-down events can cause a node to try and insert
             // the document when it has already been persisted locally, but we must still wait for
             // majority commit.
-            waitForMajority(opCtx);
+            waitUntilMajorityForWrite(opCtx);
         }
 
         hangSetChangeStreamStateCoordinatorBeforeCommandProcessor.pauseWhileSet(

@@ -138,11 +138,6 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajorityForWrite(
     return _writeService.waitUntilMajority(opTime, cancelToken);
 }
 
-SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& opTime,
-                                                           const CancellationToken& cancelToken) {
-    return _writeService.waitUntilMajority(opTime, cancelToken);
-}
-
 void WaitForMajorityServiceImplBase::shutDown() {
     {
         stdx::lock_guard lk(_mutex);
