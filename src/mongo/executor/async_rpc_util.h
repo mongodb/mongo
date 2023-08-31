@@ -34,6 +34,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
@@ -58,31 +59,25 @@ namespace mongo::async_rpc {
  * Mirrors command helper methods found in commands.h or cluster_command_helpers.h.
  */
 struct AsyncRPCCommandHelpers {
-    // TODO SERVER-78237 Remove ignoreMinimumAcceptableWTimeout, clarify logic.
     static void appendMajorityWriteConcern(GenericArgs& args,
-                                           WriteConcernOptions defaultWC = WriteConcernOptions(),
-                                           bool ignoreMinimumAcceptableWTimeout = true) {
-        WriteConcernOptions newWC = CommandHelpers::kMajorityWriteConcern;
-        if (auto wc = args.stable.getWriteConcern()) {
+                                           WriteConcernOptions defaultWC = WriteConcernOptions()) {
+        if (auto parsedWC = args.stable.getWriteConcern()) {
             // The command has a writeConcern field and it's majority, so we can return it as-is.
-            if (wc->isMajority()) {
+            if (parsedWC->isMajority()) {
                 return;
             }
 
-            newWC = WriteConcernOptions{
-                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wc->wTimeout};
+            parsedWC->w = WriteConcernOptions::kMajority;
+            args.stable.setWriteConcern(parsedWC);
         } else if (!defaultWC.usedDefaultConstructedWC) {
-            auto minimumAcceptableWTimeout = newWC.wTimeout;
-            newWC = defaultWC;
-            newWC.w = "majority";
-
-            // Some code may choose to serialize write concern with timeout = 0 (no timeout).
-            if (!ignoreMinimumAcceptableWTimeout &&
-                defaultWC.wTimeout < minimumAcceptableWTimeout) {
-                newWC.wTimeout = minimumAcceptableWTimeout;
+            defaultWC.w = WriteConcernOptions::kMajority;
+            if (defaultWC.wTimeout < CommandHelpers::kMajorityWriteConcern.wTimeout) {
+                defaultWC.wTimeout = CommandHelpers::kMajorityWriteConcern.wTimeout;
             }
+            args.stable.setWriteConcern(defaultWC);
+        } else {
+            args.stable.setWriteConcern(CommandHelpers::kMajorityWriteConcern);
         }
-        args.stable.setWriteConcern(newWC);
     }
 
     static void appendDbVersionIfPresent(GenericArgs& args, DatabaseVersion dbVersion) {

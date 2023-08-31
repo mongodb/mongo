@@ -55,6 +55,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -460,29 +461,7 @@ BSONObj CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGene
     return b.obj();
 }
 
-BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
-                                                   WriteConcernOptions defaultWC) {
-    WriteConcernOptions newWC = kMajorityWriteConcern;
-    if (cmdObj.hasField(kWriteConcernField)) {
-        auto wc = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(cmdObj));
-
-        // The command has a writeConcern field and it's majority, so we can return it as-is.
-        if (wc.isMajority()) {
-            return cmdObj;
-        }
-
-        newWC = WriteConcernOptions{
-            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wc.wTimeout};
-    } else if (!defaultWC.usedDefaultConstructedWC) {
-        auto minimumAcceptableWTimeout = newWC.wTimeout;
-        newWC = defaultWC;
-        newWC.w = "majority";
-
-        if (defaultWC.wTimeout < minimumAcceptableWTimeout) {
-            newWC.wTimeout = minimumAcceptableWTimeout;
-        }
-    }
-
+BSONObj appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
     // Append all original fields except the writeConcern field to the new command.
     BSONObjBuilder cmdObjWithWriteConcern;
     for (const auto& elem : cmdObj) {
@@ -495,6 +474,29 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
     // Finally, add the new write concern.
     cmdObjWithWriteConcern.append(kWriteConcernField, newWC.toBSON());
     return cmdObjWithWriteConcern.obj();
+}
+
+BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
+                                                   WriteConcernOptions defaultWC) {
+    if (cmdObj.hasField(kWriteConcernField)) {
+        auto parsedWC = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(cmdObj));
+
+        // The command has a writeConcern field and it's majority, so we can return it as-is.
+        if (parsedWC.isMajority()) {
+            return cmdObj;
+        }
+
+        parsedWC.w = WriteConcernOptions::kMajority;
+        return appendWCToObj(cmdObj, parsedWC);
+    } else if (!defaultWC.usedDefaultConstructedWC) {
+        defaultWC.w = WriteConcernOptions::kMajority;
+        if (defaultWC.wTimeout < kMajorityWriteConcern.wTimeout) {
+            defaultWC.wTimeout = kMajorityWriteConcern.wTimeout;
+        }
+        return appendWCToObj(cmdObj, defaultWC);
+    } else {
+        return appendWCToObj(cmdObj, kMajorityWriteConcern);
+    }
 }
 
 BSONObj CommandHelpers::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {

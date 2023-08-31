@@ -2666,8 +2666,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
     }
 
     async_rpc::GenericArgs args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(
-        args, kMajorityWriteConcern, true);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = createFlushReshardingStateChangeOptions(nssToRefresh,
                                                         _coordinatorDoc.getReshardingUUID(),
                                                         **executor,
@@ -2680,8 +2679,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
 void ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     async_rpc::GenericArgs args;
-    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(
-        args, kMajorityWriteConcern, true);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args, kMajorityWriteConcern);
     auto opts = createFlushReshardingStateChangeOptions(_coordinatorDoc.getSourceNss(),
                                                         _coordinatorDoc.getReshardingUUID(),
                                                         **executor,
