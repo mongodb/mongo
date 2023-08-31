@@ -1380,7 +1380,18 @@ functions:
       args:
       - "src/evergreen/get_bazelisk.sh"
 
-  "bazel compile":
+  "bazel compile (gcc)":
+  - *get_version_expansions
+  - *apply_version_expansions
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/bazel_compile.sh"
+
+  "bazel compile (clang)":
   - *get_version_expansions
   - *apply_version_expansions
   - *f_expansions_write
@@ -2633,9 +2644,14 @@ tasks:
   commands:
   # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
   - func: "fetch bazel"
-  - func: "bazel compile"
+  - func: "bazel compile (gcc)"
     vars:
       targets: src/mongo/db/commands:fsync_locked
+      compiler: gcc
+  - func: "bazel compile (clang)"
+    vars:
+      targets: src/mongo/db/commands:fsync_locked
+      compiler: clang
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half
