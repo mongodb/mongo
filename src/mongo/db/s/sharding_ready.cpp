@@ -83,7 +83,7 @@ void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
                 if (!status.isOK()) {
                     LOGV2_WARNING(7910801,
                                   "Failed to transition to config shard during "
-                                  "autobootstrap due to {error}. Retrying.",
+                                  "autobootstrap due to error. Retrying.",
                                   "error"_attr = status);
                 }
                 // Keep retrying until the transition to config shard succeeds, the
@@ -101,6 +101,9 @@ void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
     // 'transitionFromDedicatedConfigServer'.
     auto clientGuard = ClientStrand::make(serviceContext->makeClient("ShardingReady"))->bind();
     auto uniqueOpCtx = clientGuard->makeOperationContext();
+
+    auto as = AuthorizationSession::get(uniqueOpCtx->getClient());
+    as->grantInternalAuthorization(uniqueOpCtx.get());
 
     ShardingCatalogManager::get(uniqueOpCtx.get())->addConfigShard(uniqueOpCtx.get());
     LOGV2(7910800, "Auto-bootstrap to config shard complete.");

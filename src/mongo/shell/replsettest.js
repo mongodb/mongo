@@ -2981,6 +2981,18 @@ var ReplSetTest = function ReplSetTest(opts) {
         // Attach the original node properties to the connection object.
         Object.assign(conn, node);
 
+        // Delete the session since it's linked to the other mongo object.
+        delete conn._defaultSession;
+
+        // Authenticate again since this is a new connection.
+        if ((jsTestOptions().keyFile || this.clusterAuthMode === "x509")) {
+            // The sslSpecial suite sets up cluster with x509 but the shell was not started with TLS
+            // so we need to rely on the test to auth if needed.
+            if (!(this.clusterAuthMode === "x509" && !conn.isTLS())) {
+                jsTest.authenticate(conn);
+            }
+        }
+
         // Save the new connection object. If we are using a bridge, then we need to connect to it.
         if (this._useBridge) {
             this.nodes[n].connectToBridge();
