@@ -400,16 +400,12 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
 
     // The admin database is always hosted on the config server.
     if (dbName.isAdminDB()) {
-        return DatabaseType(DatabaseNameUtil::serialize(dbName),
-                            ShardId::kConfigServerId,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName.isConfigDB()) {
-        return DatabaseType(DatabaseNameUtil::serialize(dbName),
-                            ShardId::kConfigServerId,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     auto result = _fetchDatabaseMetadata(opCtx, dbName, kConfigReadSelector, readConcernLevel);
@@ -459,7 +455,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
                                 readPref,
                                 readConcernLevel,
                                 NamespaceString::kConfigDatabasesNamespace,
-                                BSON(DatabaseType::kNameFieldName << DatabaseNameUtil::serialize(
+                                BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
                                          dbName, SerializationContext::stateCommandRequest())),
                                 BSONObj(),
                                 boost::none);
@@ -709,7 +705,7 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     return versionTypeResult.getValue();
 }
 
-StatusWith<std::vector<std::string>> ShardingCatalogClientImpl::getDatabasesForShard(
+StatusWith<std::vector<DatabaseName>> ShardingCatalogClientImpl::getDatabasesForShard(
     OperationContext* opCtx, const ShardId& shardId) {
     auto findStatus =
         _exhaustiveFindOnConfig(opCtx,
@@ -724,16 +720,18 @@ StatusWith<std::vector<std::string>> ShardingCatalogClientImpl::getDatabasesForS
     }
 
     const std::vector<BSONObj>& values = findStatus.getValue().value;
-    std::vector<std::string> dbs;
+    std::vector<DatabaseName> dbs;
     dbs.reserve(values.size());
     for (const BSONObj& obj : values) {
         std::string dbName;
-        Status status = bsonExtractStringField(obj, DatabaseType::kNameFieldName, &dbName);
+        Status status = bsonExtractStringField(obj, DatabaseType::kDbNameFieldName, &dbName);
         if (!status.isOK()) {
             return status;
         }
 
-        dbs.push_back(std::move(dbName));
+        // TODO SERVER-80466 use the IDL parser instead of parsing BSON objects from
+        // _exhaustiveFindOnConfig returned values.
+        dbs.push_back(DatabaseNameUtil::deserialize(boost::none, std::move(dbName)));
     }
 
     return dbs;

@@ -1044,15 +1044,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         auto trackedDBs =
             _localCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
         for (auto&& db : trackedDBs) {
-            // Assume no multitenancy since we're dropping all user namespaces.
-            const auto dbName = DatabaseNameUtil::deserialize(boost::none, db.getName());
             tassert(7783700,
                     "Cannot drop admin or config database from the config server",
-                    dbName != DatabaseName::kConfig && dbName != DatabaseName::kAdmin);
+                    !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
 
             DBDirectClient client(opCtx);
             BSONObj result;
-            if (!client.dropDatabase(dbName, ShardingCatalogClient::kLocalWriteConcern, &result)) {
+            if (!client.dropDatabase(
+                    db.getDbName(), ShardingCatalogClient::kLocalWriteConcern, &result)) {
                 uassertStatusOK(getStatusFromCommandResult(result));
             }
 
@@ -1142,9 +1141,9 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
 
         BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-        for (const auto& db : databases) {
-            if (db != DatabaseName::kLocal.db()) {
-                dbs.append(db);
+        for (const auto& dbName : databases) {
+            if (!dbName.isLocalDB()) {
+                dbs.append(DatabaseNameUtil::serialize(dbName));
             }
         }
         dbs.doneFast();
@@ -1600,7 +1599,7 @@ void ShardingCatalogManager::_addShardInTransaction(
                                dbNames.end(),
                                std::back_inserter(databaseEntries),
                                [&](const DatabaseName& dbName) {
-                                   return DatabaseType(DatabaseNameUtil::serialize(dbName),
+                                   return DatabaseType(dbName,
                                                        newShard.getName(),
                                                        DatabaseVersion(UUID::gen(),
                                                                        newShard.getTopologyTime()))

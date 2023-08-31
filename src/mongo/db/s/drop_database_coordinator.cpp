@@ -139,7 +139,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
                                       ExecutorPtr txnExec) {
         // Making the dbVersion timestamp part of the query ensures idempotency.
         write_ops::DeleteOpEntry deleteDatabaseEntryOp{
-            BSON(DatabaseType::kNameFieldName
+            BSON(DatabaseType::kDbNameFieldName
                  << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())
                  << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kTimestampFieldName
                  << dbVersion.getTimestamp()),
@@ -285,7 +285,7 @@ void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCt
 void DropDatabaseCoordinator::_clearDatabaseInfoOnSecondaries(OperationContext* opCtx) {
     Status signalStatus = shardmetadatautil::updateShardDatabasesEntry(
         opCtx,
-        BSON(ShardDatabaseType::kNameFieldName
+        BSON(ShardDatabaseType::kDbNameFieldName
              << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateCommandRequest())),
         BSONObj(),
         BSON(ShardDatabaseType::kEnterCriticalSectionCounterFieldName << 1),

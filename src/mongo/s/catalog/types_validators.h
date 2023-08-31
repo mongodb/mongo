@@ -43,4 +43,11 @@ inline Status validateDatabaseName(const std::string& value) {
     return Status::OK();
 }
 
+inline Status validateDatabaseName(const DatabaseName& value) {
+    if (value.isEmpty()) {
+        return {ErrorCodes::NoSuchKey, "Database name cannot be empty"};
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo

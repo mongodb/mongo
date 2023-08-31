@@ -252,7 +252,7 @@ ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
 
 void ShardServerCatalogCacheLoaderTest::refreshDatabaseOnRemoteLoader() {
     DatabaseType databaseType(
-        kNss.db_forTest().toString(), kShardId, DatabaseVersion{UUID::gen(), Timestamp{1, 1}});
+        kNss.dbName(), kShardId, DatabaseVersion{UUID::gen(), Timestamp{1, 1}});
     _remoteLoaderMock->setDatabaseRefreshReturnValue(std::move(databaseType));
 }
 

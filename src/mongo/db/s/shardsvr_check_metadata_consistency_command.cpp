@@ -132,9 +132,8 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     }
     if (thisShardId == ShardId::kConfigServerId) {
         // Config database
-        databases.emplace_back(DatabaseName::kConfig.db().toString(),
-                               ShardId::kConfigServerId,
-                               DatabaseVersion::makeFixed());
+        databases.emplace_back(
+            DatabaseName::kConfig, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
     return databases;
 }
@@ -212,8 +211,7 @@ public:
             // Need to retrieve a list of databases which this shard is primary for and run the
             // command on each of them.
             for (const auto& db : getDatabasesThisShardIsPrimaryFor(opCtx)) {
-                const auto dbNss =
-                    NamespaceStringUtil::deserialize(boost::none, db.getName(), nss.coll());
+                const auto dbNss = NamespaceStringUtil::deserialize(db.getDbName(), nss.coll());
                 ScopedSetShardRole scopedSetShardRole(opCtx,
                                                       dbNss,
                                                       boost::none /* shardVersion */,

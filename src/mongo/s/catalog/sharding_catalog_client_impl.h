@@ -131,8 +131,8 @@ public:
                                                                repl::ReadConcernLevel readConcern,
                                                                const BSONObj& sort) override;
 
-    StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
-                                                              const ShardId& shardName) override;
+    StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
+                                                               const ShardId& shardName) override;
 
     StatusWith<std::vector<ChunkType>> getChunks(
         OperationContext* opCtx,

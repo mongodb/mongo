@@ -145,10 +145,8 @@ class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoa
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();
 
         // The config database's primary shard is always config, and it is always sharded.
-        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
-            DatabaseType{DatabaseName::kConfig.toString(),
-                         ShardId::kConfigServerId,
-                         DatabaseVersion::makeFixed()});
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(DatabaseType{
+            DatabaseName::kConfig, ShardId::kConfigServerId, DatabaseVersion::makeFixed()});
 
         // The config.transactions collection is always unsharded.
         getCatalogCacheLoaderMock()->setCollectionRefreshReturnValue(

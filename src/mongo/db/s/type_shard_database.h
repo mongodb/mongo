@@ -37,11 +37,11 @@ namespace mongo {
 class ShardDatabaseType : private ShardDatabaseTypeBase {
 public:
     // Make field names accessible.
+    using ShardDatabaseTypeBase::kDbNameFieldName;
     using ShardDatabaseTypeBase::kEnterCriticalSectionCounterFieldName;
-    using ShardDatabaseTypeBase::kNameFieldName;
 
     // Make getters and setters accessible.
-    using ShardDatabaseTypeBase::getName;
+    using ShardDatabaseTypeBase::getDbName;
     using ShardDatabaseTypeBase::getPrimary;
     using ShardDatabaseTypeBase::getVersion;
 

@@ -58,13 +58,13 @@ TEST(DatabaseType, Empty) {
 TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
     Timestamp timestamp = Timestamp(1, 1);
-    const auto dbObj = BSON(DatabaseType::kNameFieldName
+    const auto dbObj = BSON(DatabaseType::kDbNameFieldName
                             << "mydb" << DatabaseType::kPrimaryFieldName << "shard"
                             << DatabaseType::kVersionFieldName
                             << BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp));
 
     const auto db = DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
-    ASSERT_EQUALS(db.getName(), "mydb");
+    ASSERT_EQUALS(db.getDbName(), DatabaseName::createDatabaseName_forTest(boost::none, "mydb"));
     ASSERT_EQUALS(db.getPrimary(), "shard");
     ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
     ASSERT_EQUALS(db.getVersion().getLastMod(), 0);
@@ -72,13 +72,13 @@ TEST(DatabaseType, Basic) {
 
 TEST(DatabaseType, BadType) {
     // Cosntructing from an BSON object with a malformed database must fails
-    const auto dbObj = BSON(DatabaseType::kNameFieldName << 0);
+    const auto dbObj = BSON(DatabaseType::kDbNameFieldName << 0);
     ASSERT_THROWS(DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj), AssertionException);
 }
 
 TEST(DatabaseType, MissingRequired) {
     // Cosntructing from an BSON object without all the required fields must fails
-    const auto dbObj = BSON(DatabaseType::kNameFieldName << "mydb");
+    const auto dbObj = BSON(DatabaseType::kDbNameFieldName << "mydb");
     ASSERT_THROWS(DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj), AssertionException);
 }
 

@@ -196,8 +196,8 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
-                                                                      const ShardId& shardId) = 0;
+    virtual StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
+                                                                       const ShardId& shardId) = 0;
 
     /**
      * Gets the requested number of chunks (of type ChunkType) that satisfy a query.

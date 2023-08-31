@@ -608,11 +608,10 @@ protected:
      * corresponding to 'expectedDB'.
      */
     void assertDatabaseExists(const DatabaseType& expectedDB) {
-        auto foundDB = catalogClient()->getDatabase(
-            operationContext(),
-            DatabaseName::createDatabaseName_forTest(boost::none, expectedDB.getName()),
-            repl::ReadConcernLevel::kMajorityReadConcern);
-        ASSERT_EQUALS(expectedDB.getName(), foundDB.getName());
+        auto foundDB = catalogClient()->getDatabase(operationContext(),
+                                                    expectedDB.getDbName(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern);
+        ASSERT_EQUALS(expectedDB.getDbName(), foundDB.getDbName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
     }
 
@@ -696,10 +695,12 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectedShard.setHost("StandaloneHost:12345");
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
 
@@ -726,11 +727,12 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
         std::vector<BSONObj>{BSON("name"
                                   << "local"
                                   << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 2000),
+                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -787,10 +789,12 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
     expectedShard.setHost("StandaloneHost:12345");
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
 
@@ -817,11 +821,12 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
         std::vector<BSONObj>{BSON("name"
                                   << "local"
                                   << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 2000),
+                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -872,10 +877,12 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
     expectedShard.setHost("StandaloneHost:12345");
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
 
@@ -902,11 +909,12 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
         std::vector<BSONObj>{BSON("name"
                                   << "local"
                                   << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 2000),
+                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -979,10 +987,12 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
     expectedShard.setHost("StandaloneHost:12345");
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
+                               ShardId("StandaloneShard"),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto expectWriteConcern = ShardingCatalogClient::kMajorityWriteConcern;
 
@@ -1009,11 +1019,12 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
         std::vector<BSONObj>{BSON("name"
                                   << "local"
                                   << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 2000),
+                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -1079,10 +1090,12 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     expectedShard.setHost(shardTarget.toString());
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId(expectedShardName), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId(expectedShardName), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB1(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"),
+                               ShardId(expectedShardName),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB2(DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"),
+                               ShardId(expectedShardName),
+                               DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
         ThreadClient tc(getServiceContext());
@@ -1103,11 +1116,12 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         std::vector<BSONObj>{BSON("name"
                                   << "local"
                                   << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+                             BSON("name" << discoveredDB1.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 2000),
+                             BSON("name" << discoveredDB2.getDbName().toString_forTest()
+                                         << "sizeOnDisk" << 5000)});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -1433,8 +1447,9 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
-    DatabaseType existingDB(
-        "existing", ShardId("existingShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType existingDB(DatabaseName::createDatabaseName_forTest(boost::none, "existing"),
+                            ShardId("existingShard"),
+                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     // Add a pre-existing database.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
@@ -1464,7 +1479,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
                                         << WireVersion::LATEST_WIRE_VERSION);
     expectHello(shardTarget, commandResponse);
 
-    expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
+    expectListDatabases(shardTarget, {BSON("name" << existingDB.getDbName().toString_forTest())});
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1487,8 +1502,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectedShard.setHost(connString.toString());
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB(
-        "shardDB", ShardId(expectedShardName), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
+                              ShardId(expectedShardName),
+                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
         ThreadClient tc(getServiceContext());
@@ -1508,10 +1524,11 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
-    expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
+    expectListDatabases(
+        shardTarget,
+        std::vector<BSONObj>{BSON("name" << discoveredDB.getDbName().toString_forTest())});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);
@@ -1561,8 +1578,9 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     expectedShard.setHost(connString.toString());
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB(
-        "shardDB", ShardId(expectedShardName), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
+                              ShardId(expectedShardName),
+                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
         ThreadClient tc(getServiceContext());
@@ -1583,10 +1601,11 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
-    expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
+    expectListDatabases(
+        shardTarget,
+        std::vector<BSONObj>{BSON("name" << discoveredDB.getDbName().toString_forTest())});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // Should not run _addShard command, touch user_writes_critical_sections, setParameter, setFCV
 
@@ -1622,8 +1641,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectedShard.setHost(fullConnString.toString());
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB(
-        "shardDB", ShardId(expectedShardName), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
+                              ShardId(expectedShardName),
+                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, &expectedShardName, &seedString] {
         ThreadClient tc(getServiceContext());
@@ -1643,10 +1663,11 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
-    expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
+    expectListDatabases(
+        shardTarget,
+        std::vector<BSONObj>{BSON("name" << discoveredDB.getDbName().toString_forTest())});
 
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+    expectCollectionDrop(shardTarget, NamespaceString::kLogicalSessionsNamespace);
 
     // The shard receives a find to pull all clusterTime keys from the new shard.
     expectClusterTimeKeysPullRequest(shardTarget);

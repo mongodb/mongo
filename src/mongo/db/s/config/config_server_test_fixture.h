@@ -205,7 +205,7 @@ protected:
     /**
      * Inserts a document for the database into the config.databases collection.
      */
-    DatabaseType setupDatabase(const std::string& dbName,
+    DatabaseType setupDatabase(const DatabaseName& dbName,
                                const ShardId& primaryShard,
                                const DatabaseVersion& dbVersion = DatabaseVersion(UUID::gen(),
                                                                                   Timestamp()));

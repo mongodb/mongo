@@ -383,10 +383,19 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
     }
 
     // (dbname, primaryShard, timestamp field of DatabaseVersion)
-    const std::vector<std::tuple<std::string, ShardId, Timestamp>> databaseInfos{
-        std::make_tuple("dbWithoutCollections", ShardId("shard1"), Timestamp(1, 1)),
-        std::make_tuple("dbWithCollections_1_2", ShardId("shard2"), Timestamp(2, 1)),
-        std::make_tuple("dbWithCorruptedCollection", ShardId("shard3"), Timestamp(3, 1))};
+    const std::vector<std::tuple<DatabaseName, ShardId, Timestamp>> databaseInfos{
+        std::make_tuple(
+            DatabaseName::createDatabaseName_forTest(boost::none, "dbWithoutCollections"),
+            ShardId("shard1"),
+            Timestamp(1, 1)),
+        std::make_tuple(
+            DatabaseName::createDatabaseName_forTest(boost::none, "dbWithCollections_1_2"),
+            ShardId("shard2"),
+            Timestamp(2, 1)),
+        std::make_tuple(
+            DatabaseName::createDatabaseName_forTest(boost::none, "dbWithCorruptedCollection"),
+            ShardId("shard3"),
+            Timestamp(3, 1))};
 
     for (const auto& [dbName, primaryShard, timestamp] : databaseInfos) {
         setupDatabase(dbName, ShardId(primaryShard), DatabaseVersion(UUID::gen(), timestamp));
@@ -451,7 +460,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
             const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << dbName));
+                BSON("nss" << dbName.toString_forTest()));
 
             assertSamePlacementInfo(expectedEntry, generatedEntry);
         }

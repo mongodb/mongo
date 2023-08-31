@@ -252,7 +252,8 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     chunk3.setJumbo(true);
 
     setupShards(std::vector<ShardType>{shard1, shard2});
-    setupDatabase("testDB", shard1.getName());
+    setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+                  shard1.getName());
     setupCollection(NamespaceString::createNamespaceString_forTest("testDB.testColl"),
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});
@@ -286,7 +287,8 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     shard2.setState(ShardType::ShardState::kShardAware);
 
     setupShards(std::vector<ShardType>{shard1, shard2});
-    setupDatabase("testDB", shard1.getName());
+    setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+                  shard1.getName());
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
@@ -335,7 +337,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};
 
     setupShards(std::vector<ShardType>{shard1, shard2});
-    setupDatabase("testDB", shard2.getName());
+    setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
+                  shard2.getName());
     setupCollection(NamespaceString::createNamespaceString_forTest("testDB.testColl"),
                     kKeyPattern,
                     std::vector<ChunkType>{chunk1, chunk2, chunk3});

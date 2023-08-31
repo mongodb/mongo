@@ -141,9 +141,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     const boost::optional<ShardId>& optPrimaryShard) {
 
     if (dbName.isConfigDB()) {
-        return DatabaseType(DatabaseNameUtil::serialize(dbName),
-                            ShardId::kConfigServerId,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     // It is not allowed to create the 'admin' or 'local' databases, including any alternative
@@ -183,7 +181,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
     const auto dbMatchFilter = [&] {
         BSONObjBuilder filterBuilder;
-        filterBuilder.append(DatabaseType::kNameFieldName, dbNameStr);
+        filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
         if (resolvedPrimaryShard) {
             filterBuilder.append(DatabaseType::kPrimaryFieldName, resolvedPrimaryShard->getId());
         }
@@ -223,7 +221,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
     // the existing entry.
     BSONObjBuilder queryBuilder;
     queryBuilder.appendRegex(
-        DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
+        DatabaseType::kDbNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbNameStr)), "i");
 
     auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
     auto const [primaryShardPtr, database] = [&] {
@@ -232,9 +230,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
             uassert(ErrorCodes::DatabaseDifferCase,
                     str::stream() << "can't have 2 databases that just differ on case "
-                                  << " have: " << actualDb.getName()
+                                  << " have: " << actualDb.getDbName().toStringForErrorMsg()
                                   << " want to add: " << dbName.toStringForErrorMsg(),
-                    actualDb.getName() == dbNameStr);
+                    actualDb.getDbName() == dbName);
 
             uassert(
                 ErrorCodes::NamespaceExists,
@@ -271,9 +269,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
             const auto clusterTime = now.clusterTime().asTimestamp();
 
             // Pick a primary shard for the new database.
-            DatabaseType db(dbNameStr,
-                            resolvedPrimaryShard->getId(),
-                            DatabaseVersion(UUID::gen(), clusterTime));
+            DatabaseType db(
+                dbName, resolvedPrimaryShard->getId(), DatabaseVersion(UUID::gen(), clusterTime));
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",
@@ -307,7 +304,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                               const BatchedCommandResponse& insertDatabaseEntryResponse) {
                         uassertStatusOK(insertDatabaseEntryResponse.toStatus());
                         NamespacePlacementType placementInfo(
-                            NamespaceStringUtil::deserialize(boost::none, db.getName()),
+                            NamespaceString(db.getDbName()),
                             db.getVersion().getTimestamp(),
                             std::vector<mongo::ShardId>{db.getPrimary()});
                         write_ops::InsertCommandRequest insertPlacementHistoryOp(
@@ -405,7 +402,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
         const auto updateDatabaseEntryOp = [&] {
             const auto query = [&] {
                 BSONObjBuilder bsonBuilder;
-                bsonBuilder.append(DatabaseType::kNameFieldName,
+                bsonBuilder.append(DatabaseType::kDbNameFieldName,
                                    DatabaseNameUtil::serialize(dbName));
                 // Include the version in the update filter to be resilient to potential network
                 // retries and delayed messages.

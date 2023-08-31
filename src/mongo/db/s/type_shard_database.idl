@@ -43,8 +43,8 @@ structs:
         fields:
             _id:
                 description: "Database name."
-                cpp_name: name
-                type: string
+                cpp_name: dbName
+                type: database_name
                 validator:
                     callback: "validateDatabaseName"
                 optional: false

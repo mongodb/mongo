@@ -623,7 +623,8 @@ protected:
         // Create original collection's catalog entry as well as both config.chunks and config.tags
         // collections.
         {
-            setupDatabase("db", ShardId("shard0000"));
+            setupDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                          ShardId("shard0000"));
             auto opCtx = operationContext();
             DBDirectClient client(opCtx);
 

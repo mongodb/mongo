@@ -136,7 +136,10 @@ public:
         for (int i = 1; i <= nDbs; i++) {
             const std::string dbName = "db" + std::to_string(i);
             const std::string shardName = "shard" + std::to_string(i);
-            const DatabaseType dbEntry(dbName, ShardId(shardName), DatabaseVersion::makeFixed());
+            const DatabaseType dbEntry(
+                DatabaseName::createDatabaseName_forTest(boost::none, dbName),
+                ShardId(shardName),
+                DatabaseVersion::makeFixed());
             ASSERT_OK(insertToConfigCollection(
                 operationContext(), NamespaceString::kConfigDatabasesNamespace, dbEntry.toBSON()));
         }

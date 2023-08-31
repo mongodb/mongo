@@ -168,7 +168,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
     boost::optional<bool> unsplittable) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
-    DatabaseType db(nss.db_forTest().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto uuid = UUID::gen();
     boost::optional<Timestamp> indexVersion =
@@ -261,7 +261,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeUnshardedCollectionRoutingInf
 CollectionRoutingInfo CatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
     const NamespaceString& nss) {
     setupNShards(1);
-    DatabaseType db(nss.db_forTest().toString(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = scheduleRoutingInfoUnforcedRefresh(nss);
     expectFindSendBSONObjVector(kConfigHostAndPort, {db.toBSON()});
@@ -271,8 +271,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeUntrackedCollectionRoutingInf
 
 void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(
-            nss.db_forTest().toString(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
+        DatabaseType db(nss.dbName(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }

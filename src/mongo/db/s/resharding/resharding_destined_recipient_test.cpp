@@ -278,7 +278,7 @@ protected:
         coll.setAllowMigrations(false);
 
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
-            DatabaseType(kNss.db_forTest().toString(), kShardList[0].getName(), env.dbVersion));
+            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
         getCatalogCacheLoaderMock()->setCollectionRefreshValues(
             kNss,
             coll,

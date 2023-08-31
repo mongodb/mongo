@@ -132,8 +132,7 @@ public:
     }
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
-        return DatabaseType(
-            kDbName.toString_forTest(), kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
+        return DatabaseType(kDbName, kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
     }
 };
 

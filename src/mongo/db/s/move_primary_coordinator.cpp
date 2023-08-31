@@ -588,7 +588,7 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
             NamespaceString::kConfigDatabasesNamespace,
-            BSON(DatabaseType::kNameFieldName << DatabaseNameUtil::serialize(_dbName)),
+            BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(_dbName)),
             BSONObj(),
             1));
 

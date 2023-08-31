@@ -196,12 +196,12 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
  */
 Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
     // Update the databases collection entry for 'dbName' in case there are any new updates.
-    Status status =
-        updateShardDatabasesEntry(opCtx,
-                                  BSON(ShardDatabaseType::kNameFieldName << dbt.getName()),
-                                  dbt.toBSON(),
-                                  BSONObj(),
-                                  true /*upsert*/);
+    Status status = updateShardDatabasesEntry(
+        opCtx,
+        BSON(ShardDatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(dbt.getDbName())),
+        dbt.toBSON(),
+        BSONObj(),
+        true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }
@@ -543,9 +543,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
 SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const DatabaseName& dbName) {
     // The admin and config database have fixed metadata that does not need to be refreshed.
     if (dbName.isAdminDB() || dbName.isConfigDB()) {
-        return DatabaseType(DatabaseNameUtil::serialize(dbName),
-                            ShardId::kConfigServerId,
-                            DatabaseVersion::makeFixed());
+        return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
     }
 
     const auto [isPrimary, term] = [&] {
@@ -870,7 +868,7 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase
 
     const auto& shardDatabase = swShardDatabase.getValue();
     DatabaseType dbt;
-    dbt.setName(shardDatabase.getName());
+    dbt.setDbName(shardDatabase.getDbName());
     dbt.setPrimary(shardDatabase.getPrimary());
     dbt.setVersion(shardDatabase.getVersion());
 

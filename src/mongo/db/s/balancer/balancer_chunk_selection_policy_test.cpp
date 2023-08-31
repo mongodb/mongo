@@ -87,7 +87,7 @@ namespace {
 
 using executor::RemoteCommandRequest;
 
-const std::string kDbName = "TestDb";
+const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "TestDb");
 const auto kNamespace = NamespaceString::createNamespaceString_forTest(kDbName, "TestColl");
 const int kSizeOnDisk = 1;
 
@@ -128,7 +128,7 @@ protected:
             ASSERT(request.cmdObj["listDatabases"]);
             std::vector<BSONObj> dbInfos;
             BSONObjBuilder b;
-            b.append("name", kDbName);
+            b.append("name", kDbName.toString_forTest());
             b.append("sizeOnDisk", kSizeOnDisk);
             b.append("empty", kSizeOnDisk > 0);
             resultBuilder.append("databases", dbInfos);
