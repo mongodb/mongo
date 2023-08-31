@@ -30,6 +30,7 @@ const mongod = MongoRunner.runMongod({
 
 if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
     jsTestLog("Skipping shell_grpc_uri.js test due to featureFlagGRPC being disabled");
+    MongoRunner.stopMongod(mongod);
     quit();
 }
 
