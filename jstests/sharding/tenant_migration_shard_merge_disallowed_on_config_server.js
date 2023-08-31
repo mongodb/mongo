@@ -7,27 +7,17 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   does_not_support_stepdowns,
- *   featureFlagShardMerge,
+ *   requires_fcv_71,
+ *   requires_shard_merge,
  *   serverless,
  * ]
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
 const donorRstConfig = st.configRS;
-
-// Note: including this explicit early return here due to the fact that multiversion
-// suites will execute this test without featureFlagShardMerge enabled (despite the
-// presence of the featureFlagShardMerge tag above), which means the test will attempt
-// to run a multi-tenant migration and fail.
-if (!isShardMergeEnabled(donorRstShard.getPrimary().getDB("admin"))) {
-    jsTestLog("Skipping Shard Merge-specific test");
-    st.stop();
-    quit();
-}
 
 const recipientRst = new ReplSetTest({nodes: 1});
 recipientRst.startSet();

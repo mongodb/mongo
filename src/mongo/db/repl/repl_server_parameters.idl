@@ -778,7 +778,8 @@ feature_flags:
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
-        default: false
+        default: true
+        version: 7.1
         shouldBeFCVGated: true
 
     featureFlagSecondaryIndexChecksInDbCheck:

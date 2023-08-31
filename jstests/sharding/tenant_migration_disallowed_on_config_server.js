@@ -13,10 +13,17 @@
  * ]
  */
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
 const donorRstConfig = st.configRS;
+
+if (isShardMergeEnabled(donorRstShard.getPrimary().getDB("admin"))) {
+    st.stop();
+    jsTestLog("Skipping this shard merge incompatible test.");
+    quit();
+}
 
 const recipientRst = new ReplSetTest({nodes: 1});
 recipientRst.startSet();
