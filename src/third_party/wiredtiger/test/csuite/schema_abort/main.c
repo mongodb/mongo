@@ -469,7 +469,7 @@ test_upgrade(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
-    /* FIXME-WT-9423 Remove this return when tiered storage supports upgrade. */
+    /* FIXME-WT-11366 Remove this return when tiered storage supports upgrade. */
     if (opts->tiered_storage)
         return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
@@ -491,7 +491,7 @@ test_verify(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
-    /* FIXME-WT-9423 Remove this return when tiered storage supports verify. */
+    /* FIXME-WT-10520 Remove this return when tiered storage supports verify. */
     if (opts->tiered_storage)
         return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
