@@ -196,7 +196,7 @@ __wt_rts_btree_walk_btree_apply(
         }
         WT_RET_NOTFOUND_OK(ret);
         ret = __wt_config_subgets(session, &cval, "newest_txn", &value);
-        if (value.len != 0)
+        if (ret == 0)
             rollback_txnid = (uint64_t)value.val;
         WT_RET_NOTFOUND_OK(ret);
         ret = __wt_config_subgets(session, &cval, "addr", &value);
