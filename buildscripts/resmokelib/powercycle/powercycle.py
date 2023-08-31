@@ -981,7 +981,7 @@ def rsync(src_dir, dest_dir, exclude_files=None):
             exclude_options = "{} --exclude '{}'".format(exclude_options, exclude_file)
 
     LOGGER.info("Rsync'ing %s to %s%s", src_dir, dest_dir, exclude_str)
-    if not distutils.spawn.find_executable("rsync"):
+    if shutil.which("rsync") is None:
         return 1, "No rsync exists on the host, not rsync'ing"
 
     # We retry running the rsync command up to 'max_attempts' times in order to work around how it
@@ -1372,9 +1372,9 @@ def main(parser_actions, options):
     backup_path_after = f"{backup_path_after}-1"
 
     # Setup the mongo client, mongo_path is required if there are local clients.
-    mongo_executable = distutils.spawn.find_executable(
-        "dist-test/bin/mongo",
-        os.getcwd() + os.pathsep + os.environ["PATH"])
+    mongo_executable = shutil.which(cmd="dist-test/bin/mongo",
+                                    path=os.getcwd() + os.pathsep + os.environ["PATH"])
+    # Note: No check for `if mongo_executable is None`
     mongo_path = os.path.abspath(os.path.normpath(mongo_executable))
 
     # Setup the CRUD & FSM clients.
