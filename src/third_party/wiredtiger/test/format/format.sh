@@ -161,7 +161,7 @@ while :; do
 	-R)
 		stress_split_test=1
 		shift ;;
-        -r)
+	-r)
 		live_record_binary="$2"
 		if [ ! $(command -v "$live_record_binary") ]; then
 			msg "-r option argument \"${live_record_binary}\" does not exist in path"
@@ -282,6 +282,7 @@ msg "configuration: $format_binary [-c $config]\
 failure=0
 success=0
 running=0
+timeouts=0
 status="format.sh-status"
 
 # skip_known_errors
@@ -644,8 +645,10 @@ check_timer()
 		elapsed=$(($now - $start_time))
 
 		# If we've run out of time, terminate all running jobs.
-		[[ $elapsed -ge $seconds ]] &&
+		[[ $elapsed -ge $seconds ]] && {
+			timeouts="$(($timeouts + 1))"
 			force_quit_reason "run timed out at $(date), after $elapsed seconds"
+		}
 	}
 }
 
@@ -693,5 +696,5 @@ msg "$success successful jobs, $failure failed jobs"
 
 msg "run ending at $(date)"
 [[ $failure -ne 0 ]] && exit 1
-[[ $success -eq 0 ]] && exit 1
+[[ $success -eq 0 && $timeouts -eq 0 ]] && exit 1
 exit 0
