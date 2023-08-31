@@ -3046,28 +3046,28 @@ buildvariants:
   - name: external_auth_aws
   - name: external_auth_oidc
 
-- name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar
-  display_name: "~ Enterprise Ubuntu 18.04 w/ libvoidstar"
+- name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
+  display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-large
+  - ubuntu2204-large
   stepback: false
   expansions:
-    compile_variant: *enterprise-ubuntu1804-64-libvoidstar
+    compile_variant: *enterprise-ubuntu2204-64-libvoidstar
     # Do not set link-model=dynamic on this build. The antithesis image builder
     # scripts cannot handle the shared library build
     compile_flags: >-
       --ssl
-      --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804
+      --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       CCFLAGS="-fsanitize-coverage=trace-pc-guard"
       LIBS="voidstar"
-    multiversion_platform: ubuntu1804
+    multiversion_platform: ubuntu2204
     multiversion_edition: enterprise
     repo_edition: enterprise
-    large_distro_name: ubuntu1804-build
+    large_distro_name: ubuntu2204-large
     scons_cache_scope: shared
   tasks:
   - name: compile_and_archive_dist_test_TG

@@ -1,2 +1,0 @@
-tzdata tzdata/Areas select America
-tzdata tzdata/Zones/America select New_York

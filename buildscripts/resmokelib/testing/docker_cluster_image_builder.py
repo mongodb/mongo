@@ -156,7 +156,7 @@ class DockerComposeImageBuilder:
             # Use `db-contrib-tool` to get MongoDB binaries for this image
             print("Fetching MongoDB binaries for image build...")
             subprocess.run([
-                "db-contrib-tool", "setup-repro-env", "--variant", "ubuntu1804", "--linkDir",
+                "db-contrib-tool", "setup-repro-env", "--variant", "ubuntu2204", "--linkDir",
                 mongodb_binaries_destination, "master"
             ], stdout=sys.stdout, stderr=sys.stderr, check=True)
 
