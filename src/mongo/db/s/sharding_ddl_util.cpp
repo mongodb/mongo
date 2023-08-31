@@ -581,17 +581,22 @@ void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
             fromDB->getPrimary() == toDB->getPrimary());
 }
 
-boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOptions(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& key,
     const BSONObj& collation,
-    bool unique) {
+    bool unique,
+    bool unsplittable) {
     auto cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     const auto& cm = cri.cm;
 
-    if (!cm.isSharded()) {
+    if (!cm.hasRoutingTable()) {
+        return boost::none;
+    }
+
+    if (cm.isUnsplittable() && !unsplittable) {
         return boost::none;
     }
 
@@ -601,11 +606,11 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection "
+            str::stream() << "collection already tracked with different options for collection "
                           << nss.toStringForErrorMsg(),
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() == key) &&
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
-                cm.isUnique() == unique);
+                cm.isUnique() == unique && cm.isUnsplittable() == unsplittable);
 
     CreateCollectionResponse response(cri.getCollectionVersion());
     response.setCollectionUUID(cm.getUUID());

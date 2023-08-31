@@ -604,9 +604,13 @@ private:
         }
 
         // TODO SERVER-79304 Remove once shardCollection authoritative version becomes LTS
+        // TODO (SERVER-77915): Remove once 8.0 (trackUnshardedCollections) becomes lastLTS.
         if (isDowngrading &&
-            feature_flags::gAuthoritativeShardCollection
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            (feature_flags::gAuthoritativeShardCollection
+                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion) ||
+             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                               originalVersion))) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kCreateCollection);

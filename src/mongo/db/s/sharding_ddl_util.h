@@ -223,17 +223,21 @@ void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
                                     const NamespaceString& toNss);
 
 /**
- * Throws an exception if the collection is already sharded with different options.
+ * Throws an exception if the collection is already tracked with different options.
  *
- * If the collection is already sharded with the same options, returns the existing collection's
+ * If the collection is already tracked with the same options, returns the existing collection's
  * full spec, else returns boost::none.
+ *
+ * If the collection is tracked as unsplittable and the request is for a splittable collection,
+ * returns boost::none.
  */
-boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
+boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOptions(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& key,
     const BSONObj& collation,
-    bool unique);
+    bool unique,
+    bool unsplittable);
 
 /**
  * Stops ongoing migrations and prevents future ones to start for the given nss.
