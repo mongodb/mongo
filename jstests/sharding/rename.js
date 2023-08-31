@@ -85,4 +85,20 @@ assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
         s.s0.getDB('test').goodcollection.renameCollection('superbadcollection', true));
 }
 
+// Renaming of system collections must fail
+{
+    function assertRenameFailed(dbName, fromCollName) {
+        const fromColl = s.s0.getDB(dbName).getCollection(fromCollName);
+        const initDocNum = fromColl.find().itcount();
+        assert.commandFailedWithCode(fromColl.renameCollection('new'), ErrorCodes.IllegalOperation);
+        assert.eq(initDocNum, fromColl.find().itcount());
+    }
+
+    assertRenameFailed('config', 'shards');
+    assertRenameFailed('config', 'inexistent');
+
+    assertRenameFailed('admin', 'system.version');
+    assertRenameFailed('admin', 'inexistent');
+}
+
 s.stop();
