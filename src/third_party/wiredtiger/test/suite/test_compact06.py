@@ -28,11 +28,18 @@
 
 import time
 import wiredtiger, wttest
+from wiredtiger import stat
 
 # test_compact06.py
 # Test background compaction API usage.
 class test_compact06(wttest.WiredTigerTestCase):
     uri = 'file:test_compact06'
+
+    def get_bg_compaction_running(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        compact_running = stat_cursor[stat.conn.background_compact_running][2]
+        stat_cursor.close()
+        return compact_running
     
     def test_background_compact_api(self):
         # Create a table.
@@ -55,9 +62,12 @@ class test_compact06(wttest.WiredTigerTestCase):
         #   4. Enable the background compaction server.
         self.session.compact(None, 'background=true')
 
-        # Need to pause to make sure the signal sent to the background compaction server has been
-        # processed.
-        time.sleep(2)
+        # Wait for the background server to wake up.
+        compact_running = self.get_bg_compaction_running()
+        while not compact_running:
+            time.sleep(1)
+            compact_running = self.get_bg_compaction_running()
+        self.assertEqual(compact_running, 1)
 
         #   5. We cannot reconfigure the background server.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
