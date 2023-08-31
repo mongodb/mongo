@@ -8,7 +8,7 @@
 const st = new ShardingTest({});
 const coll = st.s.getDB(jsTestName())['coll'];
 
-assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
+st.shardColl(coll, {x: 1});
 
 assert.commandWorked(coll.insert({x: MaxKey}));
 assert.eq(1, coll.countDocuments({}));
