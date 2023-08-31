@@ -43,7 +43,7 @@ donorRst.startSet();
 donorRst.initiate();
 
 if (isShardMergeEnabled(donorRst.getPrimary().getDB("admin"))) {
-    donorRst.stop();
+    donorRst.stopSet();
     jsTestLog("Skipping this shard merge incompatible test.");
     quit();
 }
