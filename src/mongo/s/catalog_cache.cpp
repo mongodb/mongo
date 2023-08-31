@@ -336,9 +336,8 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
 
     const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
     try {
-        // TODO SERVER-80333 _databaseCache to accept a DatabaseName
         auto dbEntryFuture =
-            _databaseCache.acquireAsync(dbNameStr, CacheCausalConsistency::kLatestKnown);
+            _databaseCache.acquireAsync(dbName, CacheCausalConsistency::kLatestKnown);
 
         if (allowLocks) {
             // When allowLocks is true we may be holding a lock, so we don't want to block the
@@ -619,10 +618,8 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     const DatabaseName& dbName) {
-    // TODO SERVER-80333 _databaseCache to accept a DatabaseName
     _databaseCache.advanceTimeInStore(
-        DatabaseNameUtil::serialize(dbName),
-        ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh());
+        dbName, ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh());
     return getDatabase(opCtx, dbName);
 }
 
@@ -719,10 +716,9 @@ void CatalogCache::onStaleDatabaseVersion(const DatabaseName& dbName,
                                   "Registering new database version",
                                   "db"_attr = dbName,
                                   "version"_attr = version);
-        _databaseCache.advanceTimeInStore(DatabaseNameUtil::serialize(dbName), version);
+        _databaseCache.advanceTimeInStore(dbName, version);
     } else {
-        // TODO SERVER-80333 _databaseCache to accept a DatabaseName
-        _databaseCache.invalidateKey(DatabaseNameUtil::serialize(dbName));
+        _databaseCache.invalidateKey(dbName);
     }
 }
 
@@ -770,7 +766,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
                 "shardId"_attr = shardId);
 
     _databaseCache.invalidateLatestCachedValueIf_IgnoreInProgress(
-        [&](const std::string&, const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
+        [&](const DatabaseName&, const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
 
     // Invalidate collections which contain data on this shard.
     _collectionCache.invalidateLatestCachedValueIf_IgnoreInProgress(
@@ -799,8 +795,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 }
 
 void CatalogCache::purgeDatabase(const DatabaseName& dbName) {
-    const auto db = DatabaseNameUtil::serialize(dbName);
-    _databaseCache.invalidateKey(db);
+    _databaseCache.invalidateKey(dbName);
     _collectionCache.invalidateKeyIf(
         [&](const NamespaceString& nss) { return nss.dbName() == dbName; });
     _indexCache.invalidateKeyIf([&](const NamespaceString& nss) { return nss.dbName() == dbName; });
@@ -827,7 +822,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     _collectionCache.reportStats(&cacheStatsBuilder);
 }
 
-void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName) {
+void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const DatabaseName& dbName) {
     _databaseCache.invalidateKey(dbName);
 }
 
@@ -856,7 +851,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
           service,
           threadPool,
           [this](OperationContext* opCtx,
-                 const std::string& dbName,
+                 const DatabaseName& dbName,
                  const ValueHandle& db,
                  const ComparableDatabaseVersion& previousDbVersion) {
               return _lookupDatabase(opCtx, dbName, db, previousDbVersion);
@@ -866,7 +861,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
     OperationContext* opCtx,
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const DatabaseTypeValueHandle& previousDbType,
     const ComparableDatabaseVersion& previousDbVersion) {
     if (MONGO_unlikely(blockDatabaseCacheLookup.shouldFail())) {
@@ -882,13 +877,11 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
 
     Timer t{};
     try {
-        // TODO SERVER-80333 DatabaseCache to use a DatabaseName object.
-        auto newDb =
-            _catalogCacheLoader.getDatabase(DatabaseNameUtil::deserialize(boost::none, dbName))
-                .get();
+        auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
         uassertStatusOKWithContext(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
-            str::stream() << "The primary shard for database " << dbName << " does not exist");
+            str::stream() << "The primary shard for database " << dbName.toStringForErrorMsg()
+                          << " does not exist");
 
         newDbVersion.setDatabaseVersion(newDb.getVersion());
 

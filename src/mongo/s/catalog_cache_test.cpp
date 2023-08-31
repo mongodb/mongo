@@ -420,7 +420,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo
 
     loadDatabases({DatabaseType(kNss.db_forTest().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
-    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.db_forTest());
+    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.dbName());
 
     {
         FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
@@ -434,7 +434,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo
         ASSERT(refreshInfo);
     }
     // Cancel ongoing refresh
-    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.db_forTest());
+    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.dbName());
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {

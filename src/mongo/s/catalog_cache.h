@@ -67,7 +67,7 @@ static constexpr int kMaxNumStaleVersionRetries = 10;
 
 class ComparableDatabaseVersion;
 
-using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion>;
+using DatabaseTypeCache = ReadThroughCache<DatabaseName, DatabaseType, ComparableDatabaseVersion>;
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
 using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
@@ -319,7 +319,7 @@ public:
      * refresh. Will cause all further targetting attempts to block on a catalog cache refresh,
      * even if they do not require causal consistency.
      */
-    void invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName);
+    void invalidateDatabaseEntry_LINEARIZABLE(const DatabaseName& dbName);
 
     /**
      * Non-blocking method that marks the current collection entry for the namespace as needing
@@ -339,7 +339,7 @@ private:
 
     private:
         LookupResult _lookupDatabase(OperationContext* opCtx,
-                                     const std::string& dbName,
+                                     const DatabaseName& dbName,
                                      const ValueHandle& dbType,
                                      const ComparableDatabaseVersion& previousDbVersion);
 
