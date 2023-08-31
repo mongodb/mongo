@@ -10,6 +10,7 @@ from buildscripts.resmokelib.generate_fcv_constants import \
 from buildscripts.resmokelib.generate_docker_compose import GenerateDockerComposePlugin
 from buildscripts.resmokelib.generate_fuzz_config import GenerateFuzzConfigPlugin
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
+from buildscripts.resmokelib.hang_analyzer.core_analyzer import CoreAnalyzerPlugin
 from buildscripts.resmokelib.multiversion import MultiversionPlugin
 from buildscripts.resmokelib.powercycle import PowercyclePlugin
 from buildscripts.resmokelib.run import RunPlugin
@@ -17,6 +18,7 @@ from buildscripts.resmokelib.undodb import UndoDbPlugin
 
 _PLUGINS = [
     RunPlugin(),
+    CoreAnalyzerPlugin(),
     HangAnalyzerPlugin(),
     UndoDbPlugin(),
     PowercyclePlugin(),

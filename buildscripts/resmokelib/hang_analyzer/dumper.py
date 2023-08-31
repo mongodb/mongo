@@ -1,14 +1,18 @@
 """Tools to dump debug info for each OS."""
 
+import collections
+import glob
 import itertools
 import logging
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from distutils import spawn
+from typing import List
 
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
@@ -38,6 +42,14 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str):
         jstack = JstackDumper()
 
     return Dumpers(dbg=dbg, jstack=jstack)
+
+
+def find_files(file_name: str, path: str) -> List[str]:
+    found_files = glob.glob(f"{path}/**/{file_name}", recursive=True)
+    if not found_files:
+        raise RuntimeError(f"No file with the name {file_name} found in {path}")
+
+    return found_files
 
 
 class Dumper(metaclass=ABCMeta):
@@ -73,12 +85,8 @@ class Dumper(metaclass=ABCMeta):
         raise NotImplementedError("get_dump_ext must be implemented in OS-specific subclasses")
 
     @abstractmethod
-    def _find_debugger(self, debugger):
-        """
-        Find the installed debugger.
-
-        :param debugger: debugger executable.
-        """
+    def _find_debugger(self):
+        """Find the installed debugger."""
         raise NotImplementedError("_find_debugger must be implemented in OS-specific subclasses")
 
     @abstractmethod
@@ -98,6 +106,16 @@ class Dumper(metaclass=ABCMeta):
         raise NotImplementedError("_process_specific must be implemented in OS-specific subclasses")
 
     @abstractmethod
+    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+        """
+        Analyzes the inputted core dumps.
+
+        :param core_file_dir: Directory to be scanned for core dumps
+        :param install_dir: Directory to be scanned for binaries and debugsymbols
+        """
+        raise NotImplementedError("analyze_cores must be implemented in OS-specific subclasses")
+
+    @abstractmethod
     def _postfix(self):
         """Return the commands to exit the debugger."""
         raise NotImplementedError("_postfix must be implemented in OS-specific subclasses")
@@ -106,9 +124,10 @@ class Dumper(metaclass=ABCMeta):
 class WindowsDumper(Dumper):
     """WindowsDumper class."""
 
-    def _find_debugger(self, debugger):
+    def _find_debugger(self):
         """Find the installed debugger."""
         # We are looking for c:\Program Files (x86)\Windows Kits\8.1\Debuggers\x64
+        debugger = "cdb.exe"
         cdb = spawn.find_executable(debugger)
         if cdb is not None:
             return cdb
@@ -178,12 +197,10 @@ class WindowsDumper(Dumper):
 
     def dump_info(self, pinfo, take_dump):
         """Dump useful information to the console."""
-        debugger = "cdb.exe"
-        dbg = self._find_debugger(debugger)
+        dbg = self._find_debugger()
 
         if dbg is None:
-            self._root_logger.warning("Debugger %s not found, skipping dumping of %s", debugger,
-                                      str(pinfo.pidv))
+            self._root_logger.warning("Debugger not found, skipping dumping of %s", str(pinfo.pidv))
             return
 
         self._root_logger.info("Debugger %s, analyzing %s processes with PIDs %s", dbg, pinfo.name,
@@ -199,6 +216,55 @@ class WindowsDumper(Dumper):
 
             self._root_logger.info("Done analyzing %s process with PID %d", pinfo.name, pid)
 
+    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+        install_dir = os.path.abspath(install_dir)
+        for filename in find_files(f"*.{self.get_dump_ext()}", core_file_dir):
+            file_path = os.path.abspath(filename)
+            try:
+                self.analyze_core(file_path, install_dir)
+            except Exception as e:
+                self._root_logger.error("Failed to process core dump: %s", filename)
+                self._root_logger.error(e)
+
+    def analyze_core(self, core_file_path: str, install_dir: str):
+        filename = os.path.basename(core_file_path)
+        regex = re.search(fr"dump_(.+)\.([0-9]+)\.{self.get_dump_ext()}", filename)
+
+        if not regex:
+            self._root_logger.warning(
+                "Core dump file name does not match expected pattern, skipping %s", filename)
+            return
+
+        binary_name = f"{regex.group(1)}.exe"
+        pid = int(regex.group(2))
+        binary_files = find_files(binary_name, install_dir)
+        logger = _get_process_logger(self._dbg_output, binary_name, pid)
+        logger.info("analyzing %s", filename)
+
+        if len(binary_files) > 1:
+            logger.error("More than one file found in %s matching %s", install_dir, binary_name)
+            raise RuntimeError(f"More than one file found in {install_dir} matching {binary_name}")
+
+        binary_path = binary_files[0]
+        symbol_path = binary_path.replace(".exe", ".pdb")
+
+        dbg = self._find_debugger()
+
+        if dbg is None:
+            self._root_logger.warning("Debugger not found, skipping dumping of %s", filename)
+            return
+
+        cmds = self._prefix() + [
+            "!peb",  # Dump current exe, & environment variables
+            "lm",  # Dump loaded modules
+            "!uniqstack -pn",  # Dump All unique Threads with function arguments
+            "!cs -l",  # Dump all locked critical sections
+        ] + self._postfix()
+
+        call(
+            [dbg, "-i", binary_path, "-z", core_file_path, "-y", symbol_path, "-v", ";".join(cmds)],
+            logger)
+
     def get_dump_ext(self):
         """Return the dump file extension."""
         return "mdmp"
@@ -209,8 +275,9 @@ class LLDBDumper(Dumper):
     """LLDBDumper class."""
 
     @staticmethod
-    def _find_debugger(debugger):
+    def _find_debugger():
         """Find the installed debugger."""
+        debugger = "lldb"
         return find_program(debugger, ['/usr/bin'])
 
     def _prefix(self):
@@ -259,13 +326,11 @@ class LLDBDumper(Dumper):
 
     def dump_info(self, pinfo, take_dump):
         """Dump info."""
-        debugger = "lldb"
-        dbg = self._find_debugger(debugger)
+        dbg = self._find_debugger()
         logger = _get_process_logger(self._dbg_output, pinfo.name)
 
         if dbg is None:
-            self._root_logger.warning("Debugger %s not found, skipping dumping of %s", debugger,
-                                      str(pinfo.pidv))
+            self._root_logger.warning("Debugger not found, skipping dumping of %s", str(pinfo.pidv))
             return
 
         self._root_logger.info("Debugger %s, analyzing %s processes with PIDs %s", dbg, pinfo.name,
@@ -315,6 +380,9 @@ class LLDBDumper(Dumper):
             if need_sigabrt:
                 raise DumpError(need_sigabrt)
 
+    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+        raise NotImplementedError("analyze_cores is not implemented on macos")
+
     def get_dump_ext(self):
         """Return the dump file extension."""
         return "core"
@@ -345,8 +413,9 @@ class GDBDumper(Dumper):
         """Reduce timeout for remaining gdb processes."""
         self._timeout_seconds_for_gdb_process -= timeout_period
 
-    def _find_debugger(self, debugger):
+    def _find_debugger(self):
         """Find the installed debugger."""
+        debugger = "gdb"
         return find_program(debugger, ['/opt/mongodbtoolchain/v4/bin', '/usr/bin'])
 
     def _prefix(self):
@@ -456,14 +525,13 @@ class GDBDumper(Dumper):
 
     def dump_info(self, pinfo, take_dump):
         """Dump info."""
-        debugger = "gdb"
-        dbg = self._find_debugger(debugger)
+
+        dbg = self._find_debugger()
         logger = _get_process_logger(self._dbg_output, pinfo.name)
         _start_time = datetime.now()
 
         if dbg is None:
-            self._root_logger.warning("Debugger %s not found, skipping dumping of %s", debugger,
-                                      str(pinfo.pidv))
+            self._root_logger.warning("Debugger not found, skipping dumping of %s", str(pinfo.pidv))
             return
 
         if self._timeout_seconds_for_gdb_process <= 0:
@@ -501,6 +569,72 @@ class GDBDumper(Dumper):
         self._root_logger.info("Done analyzing %s processes with PIDs %s", pinfo.name,
                                str(pinfo.pidv))
 
+    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+        cmds = []
+        dbg = self._find_debugger()
+        if dbg is None:
+            self._root_logger.error("Debugger not found, skipping dumping of %s", filename)
+            raise RuntimeError(f"Debugger not found, skipping dumping of {filename}")
+
+        # ensure debugger version is loggged
+        call([dbg, "--version"], self._root_logger)
+
+        binaries = {}
+        core_dumps = {}
+        lib_dir = None
+        for filename in find_files(f"*.{self.get_dump_ext()}", core_file_dir):
+            file_path = os.path.abspath(filename)
+            basename = os.path.basename(file_path)
+            regex = re.search(fr"dump_(.+)\.([0-9]+)\.{self.get_dump_ext()}", basename)
+
+            if not regex:
+                self._root_logger.error(
+                    f"Core dump could not be processed because the name did not match the expected pattern: {basename}"
+                )
+                continue
+
+            binary_name = regex.group(1)
+            if binary_name not in binaries:
+                binary_files = find_files(binary_name, install_dir)
+
+                if len(binary_files) > 1:
+                    self._root_logger.error("More than one file found in %s matching %s",
+                                            install_dir, binary_name)
+                    raise RuntimeError(
+                        f"More than one file found in {install_dir} matching {binary_name}")
+
+                binaries[binary_name] = binary_files[0]
+                lib_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(binary_files[0]), "..", "lib"))
+                core_dumps[binary_name] = []
+
+            core_dumps[binary_name].append(file_path)
+
+        cmds += [f"set solib-search-path {lib_dir}"]
+        for binary in core_dumps:
+            cmds += [f"file {binaries[binary]}"]
+            for core_dump in core_dumps[binary]:
+                basename = os.path.basename(core_dump)
+                logging_dir = os.path.join(analysis_dir, basename)
+                os.makedirs(logging_dir, exist_ok=True)
+                raw_stacks_filename = os.path.join(logging_dir, "raw_stacks.txt")
+                cmds += [
+                    f"core-file {core_dump}",
+                    f'echo \\nWriting raw stacks to {raw_stacks_filename}.\\n',
+                    # This sends output to log file rather than stdout until we turn logging off.
+                    'set logging redirect on',
+                    f'set logging file {raw_stacks_filename}',
+                    'set logging enabled on',
+                    'thread apply all bt',
+                    'set logging enabled off',
+                    'set logging redirect off',
+                ]
+
+        cmds = self._prefix() + cmds + self._postfix()
+
+        call([dbg] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
+             self._root_logger)
+
     def get_dump_ext(self):
         """Return the dump file extension."""
         return "core"
@@ -520,18 +654,18 @@ class JstackDumper(object):
     """JstackDumper class."""
 
     @staticmethod
-    def _find_debugger(debugger):
+    def _find_debugger():
         """Find the installed jstack debugger."""
+        debugger = "jstack"
         return find_program(debugger, ['/usr/bin'])
 
     def dump_info(self, root_logger, dbg_output, pid, process_name):
         """Dump java thread stack traces to the console."""
-        debugger = "jstack"
-        jstack = self._find_debugger(debugger)
+        jstack = self._find_debugger()
         logger = _get_process_logger(dbg_output, process_name, pid=pid)
 
         if jstack is None:
-            logger.warning("Debugger %s not found, skipping dumping of %d", debugger, pid)
+            logger.warning("Debugger not found, skipping dumping of %d", pid)
             return
 
         root_logger.info("Debugger %s, analyzing %s process with PID %d", jstack, process_name, pid)
