@@ -313,11 +313,8 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                 if (s.code() == ErrorCodes::RemoteCommandExecutionError) {
                     return s;
                 }
-                // TODO(SERVER-72974): Replace with named error codes.
-                const auto IDLParserDuplicateFieldError = 40413;
-                const auto IDLParserMissingFieldError = 40414;
-                if (s.code() == IDLParserDuplicateFieldError ||
-                    s.code() == IDLParserMissingFieldError) {
+
+                if (s.code() == ErrorCodes::IDLFailedToParse) {
                     // Failing here indicates that an IDL struct type may be incorrectly defined
                     // and we were unable to parse a generic reply field from the response.
                     tasserted(

@@ -86,14 +86,14 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testParserErrors) {
     ASSERT_THROWS_CODE(DocumentSourceSetVariableFromSubPipeline::createFromBson(
                            missingSetVar.firstElement(), expCtx),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 
     auto missingPipeline = BSON("$setVariableFromSubPipeline" << BSON("setVariable"
                                                                       << "$$SEARCH_META"));
     ASSERT_THROWS_CODE(DocumentSourceSetVariableFromSubPipeline::createFromBson(
                            missingPipeline.firstElement(), expCtx),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 
     auto wrongType =
         BSON("$setVariableFromSubPipeline"

@@ -182,7 +182,8 @@ assert.commandFailedWithCode(
 // Need to specify 'unique' field.
 assertDropCollection(db, clusteredCollName);
 assert.commandFailedWithCode(
-    db.runCommand({create: clusteredCollName, clusteredIndex: {key: kKeyPattern}}), 40414);
+    db.runCommand({create: clusteredCollName, clusteredIndex: {key: kKeyPattern}}),
+    ErrorCodes.IDLFailedToParse);
 // Even with unique it still should not work.
 assert.commandFailedWithCode(
     db.runCommand({create: clusteredCollName, clusteredIndex: {key: kKeyPattern, unique: true}}),

@@ -1522,8 +1522,14 @@ TEST(FLE_EDC, Range_Disallowed_Types) {
         illegalRangeBSONType(typePair.first, typePair.second);
     }
 
-    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kRange, 40414);
-    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kRange, 40414);
+    illegalBSONType(BSON("sample" << BSONNULL),
+                    jstNULL,
+                    Fle2AlgorithmInt::kRange,
+                    ErrorCodes::IDLFailedToParse);
+    illegalBSONType(BSON("sample" << BSONUndefined),
+                    Undefined,
+                    Fle2AlgorithmInt::kRange,
+                    ErrorCodes::IDLFailedToParse);
 }
 
 BSONObj transformBSON(

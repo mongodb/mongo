@@ -333,7 +333,7 @@ TEST(QueryRequestTest, FailsToParseDistinctWithMissingKey) {
 
     auto parsedDistinct =
         ParsedDistinct::parse(opCtx, testns, cmdObj, ExtensionsCallbackNoop(), false);
-    ASSERT_EQ(parsedDistinct.getStatus().code(), 40414);
+    ASSERT_EQ(parsedDistinct.getStatus().code(), ErrorCodes::IDLFailedToParse);
 }
 
 TEST(QueryRequestTest, FailsToParseDistinctWithInvalidKeyType) {

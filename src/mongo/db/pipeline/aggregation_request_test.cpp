@@ -759,9 +759,8 @@ TEST(AggregationRequestTest, ShouldRejectExchangeInvalidSpec) {
         "exchange: {policy: 'roundrobin', consumers: 2}, "
         "$db: 'a'}");
     const BSONObj invalidExchangeSpec = fromjson("{exchange: {}}");
-    auto missingFieldErrorCode = ErrorCodes::duplicateCodeForTest(40414);
     aggregationRequestParseFailureHelper(
-        nss, validRequest, invalidExchangeSpec, missingFieldErrorCode);
+        nss, validRequest, invalidExchangeSpec, ErrorCodes::IDLFailedToParse);
 }
 
 TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {

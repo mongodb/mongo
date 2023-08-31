@@ -179,11 +179,11 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIncorrectMergeSpecType) {
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfMergeSpecObjectWithoutInto) {
     auto spec = BSON("$merge" << BSONObj());
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40414);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::IDLFailedToParse);
 
     spec = BSON("$merge" << BSON("whenMatched"
                                  << "replace"));
-    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, 40414);
+    ASSERT_THROWS_CODE(createMergeStage(spec), AssertionException, ErrorCodes::IDLFailedToParse);
 }
 
 TEST_F(DocumentSourceMergeTest, FailsToParseIfIntoIsNotStringAndNotObject) {

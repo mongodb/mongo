@@ -398,7 +398,7 @@ TEST(CollatorFactoryICUTest, MissingLocaleStringFailsToParse) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSONObj());
     ASSERT_NOT_OK(collator.getStatus());
-    ASSERT_EQ(collator.getStatus().code(), 40414);
+    ASSERT_EQ(collator.getStatus().code(), ErrorCodes::IDLFailedToParse);
 }
 
 TEST(CollatorFactoryICUTest, UnknownSpecFieldFailsToParse) {

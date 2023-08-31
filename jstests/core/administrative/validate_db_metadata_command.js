@@ -17,7 +17,8 @@ const coll1 = testDB.getCollection(jsTestName());
 const coll2 = testDB.getCollection(jsTestName() + "2");
 
 // Verify that the 'apiParameters' field is required.
-const res = assert.commandFailedWithCode(testDB.runCommand({validateDBMetadata: 1}), 40414);
+const res = assert.commandFailedWithCode(testDB.runCommand({validateDBMetadata: 1}),
+                                         ErrorCodes.IDLFailedToParse);
 
 function validate({dbName, coll, apiStrict, error}) {
     dbName = dbName ? dbName : null;

@@ -47,7 +47,8 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
 {
     session.startTransaction();
     assert.commandFailedWithCode(
-        session.getDatabase("test").runCommand({_shardsvrWriteGlobalIndexKeys: 1}), 40414);
+        session.getDatabase("test").runCommand({_shardsvrWriteGlobalIndexKeys: 1}),
+        ErrorCodes.IDLFailedToParse);
     session.abortTransaction();
 }
 
@@ -107,7 +108,7 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
         _shardsvrWriteGlobalIndexKeys: 1,
         ops: [{"_shardsvrInsertGlobalIndexKey": globalIndexUUID, docKey: {sk: 3, _id: 3}}]
     }),
-                                 40414);
+                                 ErrorCodes.IDLFailedToParse);
     session.abortTransaction();
 }
 
@@ -118,7 +119,7 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
         _shardsvrWriteGlobalIndexKeys: 1,
         ops: [{"_shardsvrInsertGlobalIndexKey": globalIndexUUID, key: {a: "hola"}}]
     }),
-                                 40414);
+                                 ErrorCodes.IDLFailedToParse);
     session.abortTransaction();
 }
 

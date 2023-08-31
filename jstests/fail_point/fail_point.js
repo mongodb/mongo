@@ -91,7 +91,7 @@ function runBasicTest(adminDB) {
 
     // Test that waitForFailPoint throws an error when maxTimeMS is not provided.
     assert.commandFailedWithCode(adminDB.adminCommand({waitForFailPoint: "dummy", timesEntered: 1}),
-                                 40414);
+                                 ErrorCodes.IDLFailedToParse);
 }
 
 // Test the parameter handling.

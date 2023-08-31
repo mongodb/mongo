@@ -56,7 +56,7 @@ TEST_F(UglyBSONFixture, DuplicateFields) {
                                BSON("insert"
                                     << "test"
                                     << "documents" << BSONArray() << "documents" << BSONArray()),
-                               ErrorCodes::duplicateCodeForTest(40413));
+                               ErrorCodes::IDLFailedToParse);
 }
 
 }  // namespace

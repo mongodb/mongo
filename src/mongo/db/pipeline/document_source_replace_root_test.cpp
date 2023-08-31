@@ -362,7 +362,8 @@ TEST_F(ReplaceRootSpec, OnlyValidOptionInObjectSpecIsNewRoot) {
 
 // Verify that $replaceRoot requires a valid expression as input to the newRoot option.
 TEST_F(ReplaceRootSpec, RequiresExpressionForNewRootOption) {
-    ASSERT_THROWS_CODE(createReplaceRoot(createSpec(BSONObj())), AssertionException, 40414);
+    ASSERT_THROWS_CODE(
+        createReplaceRoot(createSpec(BSONObj())), AssertionException, ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS(createReplaceRoot(createSpec(BSON("newRoot"
                                                     << "$$$a"))),
                   AssertionException);

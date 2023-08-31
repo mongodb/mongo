@@ -43,7 +43,8 @@ assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {n
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 jsTest.log("Fail if missing required key.");
-assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns}), 40414);
+assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns}),
+                             ErrorCodes.IDLFailedToParse);
 
 jsTest.log("Fail if unique is specified and is true.");
 assert.commandFailedWithCode(

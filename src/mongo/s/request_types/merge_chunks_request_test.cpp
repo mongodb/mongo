@@ -110,7 +110,7 @@ TEST(ConfigSvrMergeChunks, MissingNameSpaceErrors) {
                                                     << "$db"
                                                     << "admin")),
         mongo::DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 }
 
 TEST(ConfigSvrMergeChunks, MissingcollUUIDErrors) {
@@ -123,7 +123,7 @@ TEST(ConfigSvrMergeChunks, MissingcollUUIDErrors) {
                                          << "$db"
                                          << "admin")),
         mongo::DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
     // ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
@@ -138,7 +138,7 @@ TEST(ConfigSvrMergeChunks, MissingChunkRangeErrors) {
                                          << "$db"
                                          << "admin")),
         DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 }
 
 TEST(ConfigSvrMergeChunks, MissingShardIdErrors) {
@@ -151,7 +151,7 @@ TEST(ConfigSvrMergeChunks, MissingShardIdErrors) {
                                          << chunkRange.toBSON() << "$db"
                                          << "admin")),
         DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 }
 
 TEST(ConfigSvrMergeChunks, WrongNamespaceTypeErrors) {

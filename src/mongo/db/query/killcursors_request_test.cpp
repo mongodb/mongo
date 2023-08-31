@@ -82,7 +82,9 @@ TEST(KillCursorsRequestTest, parseInvalidNamespace) {
     auto bsonObj = BSON("killCursors"
                         << "coll"
                         << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)));
-    ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj), AssertionException, 40414);
+    ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(KillCursorsRequestTest, parseCursorsFieldMissing) {
@@ -90,7 +92,9 @@ TEST(KillCursorsRequestTest, parseCursorsFieldMissing) {
                         << "coll"
                         << "$db"
                         << "db");
-    ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj), AssertionException, 40414);
+    ASSERT_THROWS_CODE(KillCursorsCommandRequest::parse(ctxt, bsonObj),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(KillCursorsRequestTest, parseCursorFieldNotArray) {

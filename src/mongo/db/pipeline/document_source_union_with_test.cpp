@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include <absl/container/node_hash_set.h>
 #include <array>
 #include <deque>
@@ -251,7 +252,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                                .firstElement(),
                            expCtx),
                        AssertionException,
-                       40413);
+                       ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"
@@ -261,7 +262,7 @@ TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        40413);
+        ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS_CODE(
         DocumentSourceUnionWith::createFromBson(
             BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"

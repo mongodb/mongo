@@ -277,10 +277,10 @@ assert.commandFailedWithCode(
 // 'unique' field must be present and set to true.
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}}}),
-    40414);
+    ErrorCodes.IDLFailedToParse);
 assert.commandFailedWithCode(
     nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1}}}),
-    40414);
+    ErrorCodes.IDLFailedToParse);
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(),
                                   {clusteredIndex: {key: {_id: 1}, unique: false}}),

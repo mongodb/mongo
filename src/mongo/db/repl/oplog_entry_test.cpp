@@ -167,7 +167,7 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     ASSERT_THROWS_CODE(
         OplogEntryBase::parse(IDLParserContext("OplogEntryBase"), oplogEntryMissingTimestamp),
         AssertionException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 }
 
 TEST(OplogEntryTest, InsertIncludesTidField) {

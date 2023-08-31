@@ -109,7 +109,7 @@ TEST(ExplainTest, ParsingFailsIfFirstElementIsNotAnObject) {
         ExplainCommandRequest::parse(IDLParserContext("explain"),
                                      fromjson("{explain: 1, verbosity: 'queryPlanner'}")),
         DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 }
 
 TEST(ExplainTest, ParsingFailsIfUnknownFieldInCommandObject) {

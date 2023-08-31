@@ -39,7 +39,6 @@ function saslStartFailure(mechanism, expectedCode) {
 saslStartFailure('scram-sha-1', ErrorCodes.MechanismUnavailable);
 saslStartFailure('MONGODB-CR', ErrorCodes.MechanismUnavailable);
 
-const kIDLParserMissingRequiredField = 40414;
-saslStartFailure(undefined, kIDLParserMissingRequiredField);
+saslStartFailure(undefined, ErrorCodes.IDLFailedToParse);
 
 MongoRunner.stopMongod(mongod);

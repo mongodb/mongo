@@ -1721,7 +1721,7 @@ TEST_F(InitialSyncerTest,
 
     // OpTimeAndWallTime now uses the IDL parser, so the status code returned is from
     // IDLParserContext
-    ASSERT_EQUALS(_lastApplied.getStatus().code(), 40414);
+    ASSERT_EQUALS(_lastApplied.getStatus().code(), ErrorCodes::IDLFailedToParse);
 }
 
 TEST_F(InitialSyncerTest,
@@ -2026,7 +2026,7 @@ TEST_F(InitialSyncerTest, InitialSyncerReturnsParseErrorWhenFCVFetcherReturnsNoV
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     auto docs = {BSON("_id" << multiversion::kParameterName << "targetVersion"
                             << multiversion::toString(multiversion::GenericFCV::kLatest))};
-    runInitialSyncWithBadFCVResponse(docs, ((ErrorCodes::Error)40414));
+    runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IDLFailedToParse);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) {

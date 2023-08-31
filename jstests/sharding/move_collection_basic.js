@@ -36,7 +36,8 @@ assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 // Fail if missing required field toShard.
-assert.commandFailedWithCode(mongos.adminCommand({moveCollection: ns}), 40414);
+assert.commandFailedWithCode(mongos.adminCommand({moveCollection: ns}),
+                             ErrorCodes.IDLFailedToParse);
 
 // Succeed if command called on mongos.
 assert.commandWorked(mongos.adminCommand(cmdObj));

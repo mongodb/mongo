@@ -43,7 +43,7 @@ assert.eq(options, res.cursor.firstBatch[0].options);
 assert.commandWorked(testDB.dropDatabase());
 
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}),
-                             [ErrorCodes.TypeMismatch, 40414]);
+                             [ErrorCodes.TypeMismatch, ErrorCodes.IDLFailedToParse]);
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: 'a'}),
                              ErrorCodes.TypeMismatch);
 assert.commandFailedWithCode(

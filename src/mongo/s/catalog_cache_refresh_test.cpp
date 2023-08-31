@@ -245,8 +245,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
                            << cri.cm.toString());
     } catch (const DBException& ex) {
-        constexpr int kParseError = 40414;
-        ASSERT_EQ(ErrorCodes::Error(kParseError), ex.code());
+        ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
 }
 
@@ -279,8 +278,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
                            << cri.cm.toString());
     } catch (const DBException& ex) {
-        constexpr int kParseError = 40414;
-        ASSERT_EQ(ErrorCodes::Error(kParseError), ex.code());
+        ASSERT_EQ(ErrorCodes::IDLFailedToParse, ex.code());
     }
 }
 

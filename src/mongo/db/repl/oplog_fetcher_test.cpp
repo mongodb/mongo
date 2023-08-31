@@ -1875,9 +1875,8 @@ TEST_F(OplogFetcherTest,
     auto firstEntry = makeNoopOplogEntry(lastFetched);
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
 
-    auto missingFieldErrorCode = ErrorCodes::duplicateCodeForTest(40414);
     ASSERT_EQUALS(
-        missingFieldErrorCode,
+        ErrorCodes::IDLFailedToParse,
         processSingleBatch(makeFirstBatch(cursorId,
                                           {firstEntry,
                                            BSON("o" << BSON("msg"
@@ -2144,8 +2143,7 @@ TEST_F(OplogFetcherTest, ValidateDocumentsReturnsNoSuchKeyIfTimestampIsNotFoundI
     auto secondEntry = BSON("o" << BSON("msg"
                                         << "oplog entry without optime"));
 
-    auto missingFieldErrorCode = ErrorCodes::duplicateCodeForTest(40414);
-    ASSERT_EQUALS(missingFieldErrorCode,
+    ASSERT_EQUALS(ErrorCodes::IDLFailedToParse,
                   OplogFetcher::validateDocuments(
                       {firstEntry, secondEntry},
                       true,

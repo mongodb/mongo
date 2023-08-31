@@ -145,7 +145,7 @@ clusteredColl.drop();
 assertDropCollection(db, clusteredCollName);
 assert.commandFailedWithCode(
     db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": 1}}}),
-    40414);  // Need to specify 'unique'.
+    ErrorCodes.IDLFailedToParse);  // Need to specify 'unique'.
 assert.commandFailedWithCode(
     db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": 1}, unique: true}}),
     ErrorCodes.InvalidIndexSpecificationOption);

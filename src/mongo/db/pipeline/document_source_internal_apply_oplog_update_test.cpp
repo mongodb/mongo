@@ -114,7 +114,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldRejectMalformedSpecs) {
     ASSERT_THROWS_CODE(
         DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx()),
         DBException,
-        40414);
+        ErrorCodes::IDLFailedToParse);
 
     spec =
         fromjson(R"({$_internalApplyOplogUpdate: {foo: {"$v": NumberInt(2), diff: {u: {b: 3}}}}})");

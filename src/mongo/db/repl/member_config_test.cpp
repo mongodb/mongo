@@ -90,7 +90,7 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
                                          << "localhost:12345"),
                                     &tagConfig),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(MemberConfig, ParseMemberConfigId) {
@@ -129,7 +129,7 @@ TEST(MemberConfig, ParseFailsWithBadIdField) {
                                          << "localhost:12345"),
                                     &tagConfig),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
     ASSERT_THROWS(MemberConfig(BSON("_id"
                                     << "0"
                                     << "host"
@@ -190,7 +190,9 @@ TEST(MemberConfig, ParseAcceptsAnyNumberId) {
 
 TEST(MemberConfig, ParseFailsWithMissingHostField) {
     ReplSetTagConfig tagConfig;
-    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0), &tagConfig), AssertionException, 40414);
+    ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0), &tagConfig),
+                       AssertionException,
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(MemberConfig, ParseFailsWithBadHostField) {

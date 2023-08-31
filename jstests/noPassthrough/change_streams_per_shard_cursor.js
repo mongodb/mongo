@@ -76,7 +76,7 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     sdb.runCommand(
         {aggregate: "coll", cursor: {}, pipeline: [{$changeStream: {}}], $_passthroughToShard: {}}),
-    40414);
+    ErrorCodes.IDLFailedToParse);
 
 // The shardId field should be a string.
 assert.commandFailedWithCode(assert.throws(() => pscWatch(sdb, "coll", 42)),

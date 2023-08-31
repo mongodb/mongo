@@ -626,7 +626,7 @@ TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
                         {});
 
     auto status = future.getNoThrow();
-    ASSERT_EQ(status, static_cast<ErrorCodes::Error>(40414));
+    ASSERT_EQ(status, ErrorCodes::IDLFailedToParse);
 }
 
 TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {

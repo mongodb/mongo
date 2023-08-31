@@ -76,7 +76,7 @@ assert.commandFailedWithCode(primary.adminCommand({
     hostAndPort: rst.getSecondary().host,
     writeConcern: {w: "majority"}
 }),
-                             40414);
+                             ErrorCodes.IDLFailedToParse);
 
 // Running 'voteAbortIndexBuild' as data-bearing secondary, should succeed.
 assert.commandWorked(primary.adminCommand({

@@ -168,7 +168,8 @@ std::string IDLParserContext::getElementPath(StringData fieldName) const {
 
 void IDLParserContext::throwDuplicateField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
-    uasserted(40413, str::stream() << "BSON field '" << path << "' is a duplicate field");
+    uasserted(ErrorCodes::IDLFailedToParse,
+              str::stream() << "BSON field '" << path << "' is a duplicate field");
 }
 
 void IDLParserContext::throwDuplicateField(const BSONElement& element) const {
@@ -177,7 +178,7 @@ void IDLParserContext::throwDuplicateField(const BSONElement& element) const {
 
 void IDLParserContext::throwMissingField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
-    uasserted(40414,
+    uasserted(ErrorCodes::IDLFailedToParse,
               str::stream() << "BSON field '" << path << "' is missing but a required field");
 }
 

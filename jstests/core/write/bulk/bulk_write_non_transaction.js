@@ -88,14 +88,16 @@ assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 // Missing ops
-assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, nsInfo: [{ns: "mydb.coll"}]}), [40414]);
+assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, nsInfo: [{ns: "mydb.coll"}]}),
+                             [ErrorCodes.IDLFailedToParse]);
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
 // Missing nsInfo
 assert.commandFailedWithCode(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}]}), [40414]);
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}]}),
+    [ErrorCodes.IDLFailedToParse]);
 
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);

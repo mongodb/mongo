@@ -90,7 +90,7 @@ TEST(KeysCollectionDocument, MissingKeyIdShouldFailToParse) {
     auto serializedObj = builder.done();
     ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(KeysCollectionDocument, MissingPurposeShouldFailToParse) {
@@ -110,7 +110,7 @@ TEST(KeysCollectionDocument, MissingPurposeShouldFailToParse) {
     auto serializedObj = builder.done();
     ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(KeysCollectionDocument, MissingKeyShouldFailToParse) {
@@ -128,7 +128,7 @@ TEST(KeysCollectionDocument, MissingKeyShouldFailToParse) {
     auto serializedObj = builder.done();
     ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 TEST(KeysCollectionDocument, MissingExpiresAtShouldFailToParse) {
@@ -148,7 +148,7 @@ TEST(KeysCollectionDocument, MissingExpiresAtShouldFailToParse) {
     auto serializedObj = builder.done();
     ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 
 }  // namespace

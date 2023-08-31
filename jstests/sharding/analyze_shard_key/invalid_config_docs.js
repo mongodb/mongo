@@ -12,13 +12,13 @@ function runAnalyzerDocTest(conn) {
     const ns = dbName + "." + collName;
 
     assert.commandFailedWithCode(configColl.insert({_id: ns, unknownField: 0}),
-                                 40414 /* IDL required field error */);
+                                 ErrorCodes.IDLFailedToParse /* IDL required field error */);
 
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
     assert.commandFailedWithCode(configColl.update({}, {unknownField: 0}),
-                                 40414 /* IDL required field error */);
+                                 ErrorCodes.IDLFailedToParse /* IDL required field error */);
 }
 
 function runMongosDocTest(conn) {

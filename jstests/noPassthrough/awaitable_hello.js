@@ -133,7 +133,7 @@ function runTest(db, cmd, logFailpoint) {
         topologyVersion: {processId: topologyVersionField.processId},
         maxAwaitTimeMS: 0
     }),
-                                 40414);
+                                 ErrorCodes.IDLFailedToParse);
 
     // Check that a topologyVersion with a missing processId and valid counter fails.
     assert.commandFailedWithCode(db.runCommand({
@@ -141,7 +141,7 @@ function runTest(db, cmd, logFailpoint) {
         topologyVersion: {counter: topologyVersionField.counter},
         maxAwaitTimeMS: 0
     }),
-                                 40414);
+                                 ErrorCodes.IDLFailedToParse);
 
     // Check that a topologyVersion with a valid processId and negative counter fails.
     assert.commandFailedWithCode(db.runCommand({

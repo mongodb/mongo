@@ -186,7 +186,7 @@ TEST_F(DocumentSourceQueryStatsTest,
     })");
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
                        AssertionException,
-                       40414);
+                       ErrorCodes::IDLFailedToParse);
 }
 }  // namespace
 }  // namespace mongo

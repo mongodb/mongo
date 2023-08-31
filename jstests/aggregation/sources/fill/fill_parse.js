@@ -20,7 +20,7 @@ function buildAndRunCommand(stage) {
 assert.commandFailedWithCode(buildAndRunCommand({$fill: "test"}), ErrorCodes.FailedToParse);
 
 // Fail if 'output' is missing.
-assert.commandFailedWithCode(buildAndRunCommand({$fill: {}}), 40414);
+assert.commandFailedWithCode(buildAndRunCommand({$fill: {}}), ErrorCodes.IDLFailedToParse);
 
 // Fail if 'output' is present but empty.
 assert.commandFailedWithCode(buildAndRunCommand({$fill: {output: {}}}), 6050203);

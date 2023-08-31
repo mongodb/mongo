@@ -43,7 +43,7 @@ assert.throwsWithCode(() => {
             dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe"}]
         }]
     });
-}, 40414);
+}, ErrorCodes.IDLFailedToParse);
 
 // Unknown file type
 assert.throwsWithCode(() => {
@@ -63,7 +63,7 @@ assert.throwsWithCode(() => {
             {collName: "coll", dataSources: [{url: kUrlProtocolFile + pipeName1, fileType: "bson"}]}
         ]
     });
-}, 40414);
+}, ErrorCodes.IDLFailedToParse);
 
 // Unknown storage type
 assert.throwsWithCode(() => {
@@ -82,7 +82,7 @@ assert.throwsWithCode(() => {
         $_externalDataSources:
             [{collName: "coll", dataSources: [{storageType: "pipe", fileType: "bson"}]}]
     });
-}, 40414);
+}, ErrorCodes.IDLFailedToParse);
 
 // Invalid url #1: Unsupported protocol for 'pipe'
 assert.throwsWithCode(() => {

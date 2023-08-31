@@ -320,7 +320,8 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue);
 
 // Should fail because shard key is not specified.
-assert.commandFailedWithCode(mongos.adminCommand({refineCollectionShardKey: kNsName}), 40414);
+assert.commandFailedWithCode(mongos.adminCommand({refineCollectionShardKey: kNsName}),
+                             ErrorCodes.IDLFailedToParse);
 assert.commandFailedWithCode(mongos.adminCommand({refineCollectionShardKey: kNsName, key: {}}),
                              ErrorCodes.BadValue);
 

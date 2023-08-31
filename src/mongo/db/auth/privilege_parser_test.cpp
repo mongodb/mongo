@@ -70,22 +70,25 @@ const BSONObj kClusterResource = BSON("cluster"_sd << true);
 const BSONArray kFindActions = BSON_ARRAY("find"_sd);
 
 TEST(PrivilegeParserTest, IsNotValidTest) {
-    const ErrorCodes::Error kParseFailure{40414};
     IDLParserContext ctx("IsNotValidTest");
 
     // must have resource
     const BSONObj noRsrc = BSON(kActions << kFindActions);
     constexpr auto noRsrcExpect =
         "BSON field 'IsNotValidTest.resource' is missing but a required field"_sd;
-    ASSERT_THROWS_CODE_AND_WHAT(
-        ParsedPrivilege::parse(ctx, noRsrc), DBException, kParseFailure, noRsrcExpect);
+    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(ctx, noRsrc),
+                                DBException,
+                                ErrorCodes::IDLFailedToParse,
+                                noRsrcExpect);
 
     // must have actions
     const BSONObj noActions = BSON(kResource << kClusterResource);
     constexpr auto noActionsExpect =
         "BSON field 'IsNotValidTest.actions' is missing but a required field"_sd;
-    ASSERT_THROWS_CODE_AND_WHAT(
-        ParsedPrivilege::parse(ctx, noActions), DBException, kParseFailure, noActionsExpect);
+    ASSERT_THROWS_CODE_AND_WHAT(ParsedPrivilege::parse(ctx, noActions),
+                                DBException,
+                                ErrorCodes::IDLFailedToParse,
+                                noActionsExpect);
 }
 
 Privilege resolvePrivilege(BSONObj obj, std::vector<std::string>* unrecognized = nullptr) {
