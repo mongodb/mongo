@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,31 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search_helper.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_cursor.h"
 
-#include <boost/preprocessor/control/iif.hpp>
-#include <list>
-#include <set>
-#include <string>
-#include <utility>
+namespace mongo::search_mongot_mock {
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+/**
+ * A class that contains methods that are mock implementations of mongot search.
+ * This will be used in SearchCursorStage unit tests to avoid remote call to mongot or mongot_mock.
+ */
+class SearchMockHelperFunctions : public SearchDefaultHelperFunctions {
+public:
+    boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<UUID>& uuid,
+        const boost::optional<ExplainOptions::Verbosity>& explain,
+        const BSONObj& query,
+        CursorResponse&& response,
+        boost::optional<long long> docsRequested = boost::none,
+        std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
+        const boost::optional<int>& protocolVersion = boost::none) override;
+};
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/util/assert_util.h"
-
-namespace mongo {
-MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
-
-ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =
-    ServiceContext::declareDecoration<std::unique_ptr<SearchDefaultHelperFunctions>>();
-
-void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
-    const Pipeline::SourceContainer& pipeline, ExpressionContext* expCtx) {
-    // Any access of $$SEARCH_META is invalid.
-    for (const auto& source : pipeline) {
-        std::set<Variables::Id> stageRefs;
-        source->addVariableRefs(&stageRefs);
-        uassert(6347903,
-                "Can't access $$SEARCH_META without a $search stage earlier in the pipeline",
-                !Variables::hasVariableReferenceTo(stageRefs, {Variables::kSearchMetaId}));
-    }
-}
-
-ServiceContext::ConstructorActionRegisterer searchQueryHelperRegisterer{
-    "searchQueryHelperRegisterer", [](ServiceContext* context) {
-        invariant(context);
-        getSearchHelpers(context) = std::make_unique<SearchDefaultHelperFunctions>();
-    }};
-}  // namespace mongo
+}  // namespace mongo::search_mongot_mock
