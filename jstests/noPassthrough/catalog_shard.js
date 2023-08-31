@@ -4,8 +4,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_fcv_70,
- *   # TODO SERVER-71169: Re-enable this test
- *   cqf_incompatible,
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
