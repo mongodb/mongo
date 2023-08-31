@@ -1,6 +1,8 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+. ./notary_env.sh
+
 set -o verbose
 
 packagesfile=packages.tgz
@@ -15,8 +17,6 @@ podman run \
   -key=${version_id}/${build_id}/packages/${packagesfile} -tag=task-id=${EVERGREEN_TASK_ID} ${packagesfile}
 
 cd src
-
-. ./notary_env.sh
 
 set -o errexit
 
