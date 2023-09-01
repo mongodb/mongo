@@ -49,7 +49,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
-void logWriteConflictAndBackoff(int attempt,
+void logWriteConflictAndBackoff(size_t attempt,
                                 StringData operation,
                                 StringData reason,
                                 const NamespaceStringOrUUID& nssOrUUID) {
@@ -79,28 +79,36 @@ CounterMetric transactionTooLargeForCacheErrorsConvertedToWriteConflict{
 
 void handleTemporarilyUnavailableException(
     OperationContext* opCtx,
-    int attempts,
+    size_t tempUnavailAttempts,
     StringData opStr,
     const NamespaceStringOrUUID& nssOrUUID,
-    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {
+    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e,
+    size_t& writeConflictAttempts) {
     CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
 
     opCtx->recoveryUnit()->abandonSnapshot();
     temporarilyUnavailableErrors.increment(1);
 
-    // Internal operations cannot escape a TUE to the client. Convert them to write conflict
-    // exceptions for unbounded retriability.
+    // Internal operations cannot escape a TUE to the client. Convert it to a write conflict
+    // exception and handle it accordingly.
     if (!opCtx->getClient()->isFromUserConnection()) {
-        convertToWCEAndRethrow(opCtx, opStr, e);
+        temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
+        CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+        logWriteConflictAndBackoff(
+            writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
+        ++writeConflictAttempts;
+        return;
     }
+
     invariant(opCtx->getClient()->isFromUserConnection());
 
-    if (attempts > gTemporarilyUnavailableExceptionMaxRetryAttempts.load()) {
+    if (tempUnavailAttempts >
+        static_cast<size_t>(gTemporarilyUnavailableExceptionMaxRetryAttempts.load())) {
         LOGV2_DEBUG(6083901,
                     1,
                     "Too many TemporarilyUnavailableException's, giving up",
                     "reason"_attr = e.reason(),
-                    "attempts"_attr = attempts,
+                    "attempts"_attr = tempUnavailAttempts,
                     "operation"_attr = opStr,
                     "namespace"_attr = toStringForLogging(nssOrUUID));
         temporarilyUnavailableErrorsEscaped.increment(1);
@@ -108,13 +116,13 @@ void handleTemporarilyUnavailableException(
     }
 
     // Back off linearly with the retry attempt number.
-    auto sleepFor =
-        Milliseconds(gTemporarilyUnavailableExceptionRetryBackoffBaseMs.load()) * attempts;
+    auto sleepFor = Milliseconds(gTemporarilyUnavailableExceptionRetryBackoffBaseMs.load()) *
+        static_cast<int64_t>(tempUnavailAttempts);
     LOGV2_DEBUG(6083900,
                 1,
                 "Caught TemporarilyUnavailableException",
                 "reason"_attr = e.reason(),
-                "attempts"_attr = attempts,
+                "attempts"_attr = tempUnavailAttempts,
                 "operation"_attr = opStr,
                 "sleepFor"_attr = sleepFor,
                 "namespace"_attr = toStringForLogging(nssOrUUID));
@@ -128,18 +136,16 @@ void convertToWCEAndRethrow(OperationContext* opCtx,
     // TransientTransactionErrors and TemporarilyUnavailable errors are not, convert the error to a
     // WriteConflict to allow users of multi-document transactions to retry without changing
     // any behavior.
-    // For internal system operations, convert a temporarily unavailable error into a write
-    // conflict, because unlike user operations, the error cannot eventually escape to the client.
     temporarilyUnavailableErrorsConvertedToWriteConflict.increment(1);
     throwWriteConflictException(e.reason());
 }
 
 void handleTransactionTooLargeForCacheException(
     OperationContext* opCtx,
-    int* writeConflictAttempts,
     StringData opStr,
     const NamespaceStringOrUUID& nssOrUUID,
-    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e) {
+    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e,
+    size_t& writeConflictAttempts) {
     transactionTooLargeForCacheErrors.increment(1);
     if (opCtx->writesAreReplicated()) {
         // Surface error on primaries.
@@ -154,8 +160,8 @@ void handleTransactionTooLargeForCacheException(
     // Handle as write conflict.
     CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
     logWriteConflictAndBackoff(
-        *writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
-    ++(*writeConflictAttempts);
+        writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
+    ++writeConflictAttempts;
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
