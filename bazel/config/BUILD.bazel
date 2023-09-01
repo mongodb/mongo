@@ -1,4 +1,4 @@
-load("//bazel_config:configs.bzl", "compiler_type")
+load("//bazel/config:configs.bzl", "compiler_type")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,13 +10,13 @@ compiler_type(
 config_setting(
     name = "compiler_type_clang",
     flag_values = {
-        "//bazel_config:compiler_type": "clang",
+        "//bazel/config:compiler_type": "clang",
     },
 )
 
 config_setting(
     name = "compiler_type_gcc",
     flag_values = {
-        "//bazel_config:compiler_type": "gcc",
+        "//bazel/config:compiler_type": "gcc",
     },
 )

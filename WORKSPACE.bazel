@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "mongo_toolchain",
-    build_file = "@//toolchains:mongo_toolchain.BUILD",
+    build_file = "@//bazel/toolchains:mongo_toolchain.BUILD",
     patch_cmds = [
         # Alter each symlink to point to a canonical (rather than relative) path.
         r"""

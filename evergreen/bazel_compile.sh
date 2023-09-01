@@ -14,4 +14,7 @@ cd src
 set -o errexit
 set -o verbose
 
-./bazelisk build --verbose_failures --//bazel_config:compiler_type={$compiler} ${targets}
+# Use `eval` to force evaluation of the environment variables in the echo statement:
+eval echo "Execution environment: Compiler: ${compiler} Targets: ${targets}"
+
+./bazelisk build --verbose_failures --//bazel/config:compiler_type=${compiler} ${targets}

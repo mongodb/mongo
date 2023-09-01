@@ -100,8 +100,8 @@ cc_toolchain(
     objcopy_files = ":all",
     strip_files = ":all",
     toolchain_config = select({
-        "@//bazel_config:compiler_type_clang": ":cc_clang_toolchain_config",
-        "@//bazel_config:compiler_type_gcc": ":cc_gcc_toolchain_config",
+        "@//bazel/config:compiler_type_clang": ":cc_clang_toolchain_config",
+        "@//bazel/config:compiler_type_gcc": ":cc_gcc_toolchain_config",
     }),
 )
 
