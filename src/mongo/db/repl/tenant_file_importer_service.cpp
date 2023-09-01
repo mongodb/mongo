@@ -234,6 +234,8 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
             opCtx, nss, importResult.catalogId, md, std::move(importResult.rs));
         ownedCollection->init(opCtx);
+        historicalIDTrackerAllowsMixedModeWrites(ownedCollection->getSharedDecorations())
+            .store(true);
 
         // Update the number of records and data size on commit.
         opCtx->recoveryUnit()->registerChange(
