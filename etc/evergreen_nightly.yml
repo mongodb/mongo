@@ -302,6 +302,9 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
@@ -581,6 +584,9 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: snmp
   - name: test_api_version_compatibility
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: security-daily-cron
   modules:

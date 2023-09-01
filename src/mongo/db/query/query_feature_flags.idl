@@ -157,3 +157,8 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
       default: true
       version: 6.0
+
+    featureFlagVectorSearchPublicPreview:
+      description: "Feature flag to enable vector search for public preview."
+      cpp_varname: gFeatureFlagVectorSearchPublicPreview
+      default: false

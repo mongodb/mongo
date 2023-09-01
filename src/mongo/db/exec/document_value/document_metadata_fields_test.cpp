@@ -52,6 +52,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     metadata.setSearchScoreDetails(BSON("scoreDetails"
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
+    metadata.setVectorSearchScore(7.6);
 
     BufBuilder builder;
     metadata.serializeForSorter(builder);
@@ -72,6 +73,7 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
                       BSON("scoreDetails"
                            << "foo"));
     ASSERT_BSONOBJ_EQ(deserialized.getSearchSortValues(), BSON("a" << 1));
+    ASSERT_EQ(deserialized.getVectorSearchScore(), 7.6);
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
@@ -87,6 +89,7 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
     ASSERT_FALSE(metadata.hasIndexKey());
     ASSERT_FALSE(metadata.hasSearchScoreDetails());
     ASSERT_FALSE(metadata.hasSearchSortValues());
+    ASSERT_FALSE(metadata.hasVectorSearchScore());
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
@@ -133,6 +136,10 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_FALSE(metadata.hasSearchSortValues());
     metadata.setSearchSortValues(BSON("a" << 1));
     ASSERT_TRUE(metadata.hasSearchSortValues());
+
+    ASSERT_FALSE(metadata.hasVectorSearchScore());
+    metadata.setVectorSearchScore(7.6);
+    ASSERT_TRUE(metadata.hasVectorSearchScore());
 }
 
 TEST(DocumentMetadataFieldsTest, MoveConstructor) {
@@ -148,6 +155,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     metadata.setSearchScoreDetails(BSON("scoreDetails"
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
+    metadata.setVectorSearchScore(7.6);
 
     DocumentMetadataFields moveConstructed(std::move(metadata));
     ASSERT_TRUE(moveConstructed);
@@ -164,6 +172,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
                       BSON("scoreDetails"
                            << "foo"));
     ASSERT_BSONOBJ_EQ(moveConstructed.getSearchSortValues(), BSON("a" << 1));
+    ASSERT_EQ(moveConstructed.getVectorSearchScore(), 7.6);
 
     ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
@@ -181,6 +190,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     metadata.setSearchScoreDetails(BSON("scoreDetails"
                                         << "foo"));
     metadata.setSearchSortValues(BSON("a" << 1));
+    metadata.setVectorSearchScore(7.6);
 
     DocumentMetadataFields moveAssigned;
     moveAssigned.setTextScore(12.3);
@@ -200,6 +210,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
                       BSON("scoreDetails"
                            << "foo"));
     ASSERT_BSONOBJ_EQ(moveAssigned.getSearchSortValues(), BSON("a" << 1));
+    ASSERT_EQ(moveAssigned.getVectorSearchScore(), 7.6);
 
     ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
@@ -254,6 +265,7 @@ TEST(DocumentMetadataFieldsTest, MergeWithOnlyCopiesMetadataThatDestinationDoesN
     ASSERT_FALSE(destination.hasIndexKey());
     ASSERT_FALSE(destination.hasSearchScoreDetails());
     ASSERT_FALSE(destination.hasSearchSortValues());
+    ASSERT_FALSE(destination.hasVectorSearchScore());
 }
 
 TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
@@ -280,6 +292,7 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
     ASSERT_FALSE(destination.hasIndexKey());
     ASSERT_FALSE(destination.hasSearchScoreDetails());
     ASSERT_FALSE(destination.hasSearchSortValues());
+    ASSERT_FALSE(destination.hasVectorSearchScore());
 }
 
 TEST(DocumentMetadataFieldsTest, GetTimeseriesBucketMinTimeExists) {
@@ -323,6 +336,7 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnSetMetadataField) {
     testFieldSetter([](DocumentMetadataFields& md) { md.setTimeseriesBucketMinTime(Date_t()); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setTimeseriesBucketMaxTime(Date_t()); });
     testFieldSetter([](DocumentMetadataFields& md) { md.setSearchSortValues(BSON("a" << 1)); });
+    testFieldSetter([](DocumentMetadataFields& md) { md.setVectorSearchScore(60.0); });
 }
 
 TEST(DocumentMetadataFieldsTest, MetadataIsConstructedUnmodified) {

@@ -907,7 +907,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
                  << "h" << 1 << "$indexKey" << BSON("y" << 1) << "$searchScoreDetails"
                  << BSON("scoreDetails"
                          << "foo")
-                 << "$searchSortValues" << BSON("a" << 1)));
+                 << "$searchSortValues" << BSON("a" << 1) << "$vectorSearchScore" << 6.7));
 
     MutableDocument destination{};
     destination.copyMetaDataFrom(source);
@@ -925,6 +925,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
                       BSON("scoreDetails"
                            << "foo"));
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchSortValues(), BSON("a" << 1));
+    ASSERT_EQ(result.metadata().getVectorSearchScore(), 6.7);
 }
 
 class SerializationTest : public unittest::Test {
@@ -945,6 +946,8 @@ protected:
         ASSERT_EQ(output.metadata().hasSearchScore(), input.metadata().hasSearchScore());
         ASSERT_EQ(output.metadata().hasSearchHighlights(), input.metadata().hasSearchHighlights());
         ASSERT_EQ(output.metadata().hasIndexKey(), input.metadata().hasIndexKey());
+        ASSERT_EQ(output.metadata().hasVectorSearchScore(),
+                  input.metadata().hasVectorSearchScore());
         if (input.metadata().hasTextScore()) {
             ASSERT_EQ(output.metadata().getTextScore(), input.metadata().getTextScore());
         }
@@ -965,6 +968,10 @@ protected:
             ASSERT_BSONOBJ_EQ(output.metadata().getSearchScoreDetails(),
                               input.metadata().getSearchScoreDetails());
         }
+        if (input.metadata().hasVectorSearchScore()) {
+            ASSERT_EQ(output.metadata().getVectorSearchScore(),
+                      input.metadata().getVectorSearchScore());
+        }
 
         ASSERT(output.toBson().binaryEqual(input.toBson()));
     }
@@ -979,6 +986,7 @@ TEST_F(SerializationTest, MetaSerializationNoVals) {
                                                         << "def"_sd));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                      << "foo"));
+    docBuilder.metadata().setVectorSearchScore(40.0);
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -993,6 +1001,7 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setIndexKey(BSON("key" << 42));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                      << "foo"));
+    docBuilder.metadata().setVectorSearchScore(40.0);
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -1016,6 +1025,7 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                      << "foo"));
     docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
+    docBuilder.metadata().setVectorSearchScore(40.0);
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -1028,6 +1038,7 @@ TEST(MetaFields, ToAndFromBson) {
                       BSON("scoreDetails"
                            << "foo"));
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
+    ASSERT_EQ(40.0, obj[Document::metaFieldVectorSearchScore].Double());
     Document fromBson = Document::fromBsonWithMetaData(obj);
     ASSERT_TRUE(fromBson.metadata().hasTextScore());
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
@@ -1037,6 +1048,7 @@ TEST(MetaFields, ToAndFromBson) {
                            << "foo"),
                       fromBson.metadata().getSearchScoreDetails());
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), fromBson.metadata().getSearchSortValues());
+    ASSERT_EQ(40.0, fromBson.metadata().getVectorSearchScore());
 }
 
 TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {

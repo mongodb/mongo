@@ -269,6 +269,9 @@ buildvariants:
     - amazon2-arm64-large
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: debian10
   display_name: Debian 10
@@ -709,6 +712,9 @@ buildvariants:
   - name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: rhel-82-arm64
   display_name: RHEL 8.2 arm64
@@ -809,6 +815,9 @@ buildvariants:
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
 
 - name: rhel90
   display_name: RHEL 9.0
@@ -927,6 +936,9 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: selinux_rhel9_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1027,6 +1039,9 @@ buildvariants:
     distros:
     - rhel90-arm64-large
   - name: .publish_crypt
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
