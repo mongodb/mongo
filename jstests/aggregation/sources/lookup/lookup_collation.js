@@ -13,7 +13,7 @@
  *  2. 'collation' option overrides local collection's collation
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -151,7 +151,7 @@ let explain;
     function assertIndexJoinStrategy(explain) {
         // Check join strategy when $lookup is pushed down.
         if (getAggPlanStages(explain, "$cursor").length === 0) {
-            const winningPlan = getWinningPlan(explain.queryPlanner);
+            const winningPlan = getWinningPlan(getQueryPlanner(explain));
             assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
             assert.eq("IndexedLoopJoin", winningPlan.strategy, explain);
             // Will choose the index with the matching collation.
@@ -162,7 +162,7 @@ let explain;
     function assertNestedLoopJoinStrategy(explain) {
         // Check join strategy when $lookup is pushed down.
         if (getAggPlanStages(explain, "$cursor").length === 0) {
-            const winningPlan = getWinningPlan(explain.queryPlanner);
+            const winningPlan = getWinningPlan(getQueryPlanner(explain));
             assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
             assert.eq("NestedLoopJoin", winningPlan.strategy, explain);
         }

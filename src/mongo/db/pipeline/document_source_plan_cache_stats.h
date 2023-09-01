@@ -91,11 +91,6 @@ public:
             return true;
         }
 
-        bool allowedToPassthroughFromMongos() const override {
-            // $planCacheStats must be run locally on a mongod.
-            return false;
-        }
-
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);

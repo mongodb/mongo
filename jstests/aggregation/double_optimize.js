@@ -13,6 +13,7 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
@@ -26,7 +27,7 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 
 // will test that the $match stage gets optimized and removes the $or to realize that the predicate
 // is independent of the field "b".
 const inputPipe = [{$project: {b: 0}}, {$match: {$or: [{_id: 4, b: 3}]}}];
-const explain = coll.explain().aggregate(inputPipe);
+const explain = getSingleNodeExplain(coll.explain().aggregate(inputPipe));
 if (featureFlagSbeFull) {
     assert.eq(undefined, explain.stages, "Entire pipeline should be pushed down to SBE. ", explain);
 } else {

@@ -520,15 +520,18 @@ mongosDB.fourthColl.drop();
 
 runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
-// Verify that the command is sent only to the primary shard when both the local and foreign
-// collections are unsharded.
-assert(
-    !assert
-         .commandWorked(mongosDB.lookup.explain().aggregate([{
-             $lookup:
-                 {from: mongosDB.from.getName(), localField: "a", foreignField: "b", as: "results"}
-         }]))
-         .hasOwnProperty("shards"));
+// Verify that the command targets exactly one shard when both the local and foreign collections are
+// unsharded.
+const explain = assert.commandWorked(mongosDB.lookup.explain().aggregate([
+    {$lookup: {from: mongosDB.from.getName(), localField: "a", foreignField: "b", as: "results"}}
+]));
+
+// Note that in a mixed version cluster, the presence of the 'shards' field will depend on the
+// binary version of the shard that the 'lookup' collection belongs to.
+if (explain.hasOwnProperty("shards")) {
+    assert.eq(Object.keys(explain.shards).length, 1, explain);
+}
+
 // Enable sharding on the test DB and ensure its primary is shard0000.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);

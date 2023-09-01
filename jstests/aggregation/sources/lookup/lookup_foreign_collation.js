@@ -6,6 +6,7 @@
  * ]
  */
 import {anyEq} from "jstests/aggregation/extras/utils.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const localColl = testDB.local_no_collation;
@@ -163,7 +164,8 @@ function setup() {
     let results = localColl.aggregate(pipeline).toArray();
     assert.eq(0, results.length);
 
-    let explain = localColl.explain().aggregate(pipeline);
+    let explain = getSingleNodeExplain(localColl.explain().aggregate(pipeline));
+    assert(explain.hasOwnProperty("stages"), explain);
     let lastStage = explain.stages[explain.stages.length - 1];
     assert(lastStage.hasOwnProperty("$match"), tojson(explain));
     assert.eq({$match: {"foreignMatch._id": {$eq: "b"}}},
@@ -185,7 +187,8 @@ function setup() {
     results = localColl.aggregate(pipeline, {collation: caseInsensitiveCollation}).toArray();
     assert(anyEq(results, expectedResults), tojson(results));
 
-    explain = localColl.explain().aggregate(pipeline, {collation: caseInsensitiveCollation});
+    explain = getSingleNodeExplain(
+        localColl.explain().aggregate(pipeline, {collation: caseInsensitiveCollation}));
     lastStage = explain.stages[explain.stages.length - 1];
     assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
 
@@ -204,7 +207,7 @@ function setup() {
     results = localCaseInsensitiveColl.aggregate(pipeline).toArray();
     assert(anyEq(results, expectedResults), tojson(results));
 
-    explain = localCaseInsensitiveColl.explain().aggregate(pipeline);
+    explain = getSingleNodeExplain(localCaseInsensitiveColl.explain().aggregate(pipeline));
     lastStage = explain.stages[explain.stages.length - 1];
     assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
 })();

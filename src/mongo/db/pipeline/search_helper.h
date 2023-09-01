@@ -59,6 +59,13 @@ public:
      */
     virtual void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
                                              ExpressionContext* expCtx);
+    /**
+     * Overload used to check that $$SEARCH_META is being referenced correctly in a pipeline split
+     * for execution on a sharded cluster.
+     */
+    virtual void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline,
+                                             const Pipeline::SourceContainer& mergePipeline,
+                                             ExpressionContext* expCtx);
 
     /**
      * This method works on preparation for $search in top level pipeline, or inner pipeline that is
@@ -164,4 +171,5 @@ public:
  */
 extern ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers;
 
+extern FailPoint searchReturnEofImmediately;
 }  // namespace mongo

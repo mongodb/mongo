@@ -22,6 +22,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
@@ -59,7 +60,7 @@ function setupCollections() {
 
 function test({agg, requiresRowStoreExpr, requiredRowstoreReads}) {
     // Check that columnstore index is used, and we skip the row store expression appropriately.
-    const explainPlan = indexedColl.explain("queryPlanner").aggregate(agg);
+    const explainPlan = getSingleNodeExplain(indexedColl.explain("queryPlanner").aggregate(agg));
     let sbeStages = ('queryPlanner' in explainPlan)
         // entirely SBE plan
         ? explainPlan.queryPlanner.winningPlan.slotBasedPlan.stages

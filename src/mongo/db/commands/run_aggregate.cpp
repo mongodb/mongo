@@ -821,7 +821,6 @@ Status runAggregate(OperationContext* opCtx,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result,
                     ExternalDataSourceScopeGuard externalDataSourceGuard) {
-
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);

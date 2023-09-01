@@ -8,6 +8,7 @@
 //   requires_fcv_63,
 // ]
 
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const sbeEnabled = checkSBEEnabled(db);
@@ -61,6 +62,7 @@ assert.commandWorked(lessThanSevenView.explain().count());
 assert.commandWorked(greaterThanThreeView.explain().count({x: 6}));
 let explainPlan = lessThanSevenView.explain().count({foo: "bar"});
 assert.commandWorked(explainPlan);
+explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;
 }
@@ -68,6 +70,7 @@ assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
 
 // Count with explicit explain modes works on a view.
 explainPlan = assert.commandWorked(lessThanSevenView.explain("queryPlanner").count({x: {$gte: 5}}));
+explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;
 }
@@ -76,6 +79,7 @@ assert(!explainPlan.hasOwnProperty("executionStats"));
 
 explainPlan =
     assert.commandWorked(lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}));
+explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;
 }
@@ -88,6 +92,7 @@ assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
 explainPlan =
     assert.commandWorked(lessThanSevenView.explain("allPlansExecution").count({x: {$gte: 5}}));
+explainPlan = getSingleNodeExplain(explainPlan);
 if (explainPlan.hasOwnProperty("stages")) {
     explainPlan = explainPlan.stages[0].$cursor;
 }

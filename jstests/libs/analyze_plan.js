@@ -5,6 +5,43 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
+ * Utility to return the 'queryPlanner' section of 'explain'.
+ */
+export function getQueryPlanner(explain) {
+    explain = getSingleNodeExplain(explain);
+    if ("queryPlanner" in explain) {
+        const qp = explain.queryPlanner;
+        // Sharded case.
+        if ("winningPlan" in qp && "shards" in qp.winningPlan) {
+            return qp.winningPlan.shards[0];
+        }
+        return qp;
+    }
+    assert(explain.hasOwnProperty("stages"), explain);
+    const stage = explain.stages[0];
+    assert(stage.hasOwnProperty("$cursor"), explain);
+    const cursorStage = stage.$cursor
+    assert(cursorStage.hasOwnProperty("queryPlanner"), explain);
+    return cursorStage.queryPlanner;
+}
+
+/**
+ * Returns the output from a single shard if 'explain' was obtained from an unsharded collection;
+ * returns 'explain' as is otherwise.
+ */
+export function getSingleNodeExplain(explain) {
+    if ("shards" in explain) {
+        const shards = explain.shards;
+        const shardNames = Object.keys(shards);
+        // There should only be one shard given that this function assumes that 'explain' was
+        // obtained from an unsharded collection.
+        assert.eq(shardNames.length, 1, explain);
+        return shards[shardNames[0]];
+    }
+    return explain;
+}
+
+/**
  * Returns a sub-element of the 'queryPlanner' explain output which represents a winning plan.
  */
 export function getWinningPlan(queryPlanner) {
@@ -13,16 +50,6 @@ export function getWinningPlan(queryPlanner) {
     // field itself.
     return queryPlanner.winningPlan.hasOwnProperty("queryPlan") ? queryPlanner.winningPlan.queryPlan
                                                                 : queryPlanner.winningPlan;
-}
-
-/**
- * Returns the query planner information from the explain output.
- */
-export function getQueryPlanner(explain) {
-    if (explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-        return explain.queryPlanner.winningPlan.shards[0];
-    }
-    return explain.queryPlanner;
 }
 
 /**
@@ -573,6 +600,7 @@ export function getFieldValueFromExplain(explainRes, getValueCallback) {
  * Get the 'planCacheKey' from 'explainRes'.
  */
 export function getPlanCacheKeyFromExplain(explainRes, db) {
+    explainRes = getSingleNodeExplain(explainRes);
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
         return FixtureHelpers.isMongos(db) && plannerOutput.hasOwnProperty("winningPlan") &&
                 plannerOutput.winningPlan.hasOwnProperty("shards")

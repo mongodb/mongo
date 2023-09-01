@@ -79,10 +79,6 @@ public:
                                            bool bypassDocumentValidation) const final {
             return {};
         }
-
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
-        }
     };
 
     static constexpr StringData kStageName = "$_internalShardServerInfo"_sd;

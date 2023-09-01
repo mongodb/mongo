@@ -16,6 +16,7 @@
  */
 import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
 import {arrayEq, assertErrorCode, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 import {
     FixtureHelpers
 } from "jstests/libs/fixture_helpers.js";  // For arrayEq, assertErrorCode, and
@@ -166,6 +167,7 @@ assert.commandWorked(viewsDB.runCommand({
 (function testExplainOnView() {
     let explainPlan = assert.commandWorked(
         viewsDB.popSortedView.explain("queryPlanner").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
@@ -174,6 +176,7 @@ assert.commandWorked(viewsDB.runCommand({
 
     explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("executionStats")
                                            .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
@@ -184,6 +187,7 @@ assert.commandWorked(viewsDB.runCommand({
 
     explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("allPlansExecution")
                                            .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
@@ -196,6 +200,7 @@ assert.commandWorked(viewsDB.runCommand({
     // shell explain helper, should continue to work.
     explainPlan = assert.commandWorked(
         viewsDB.popSortedView.aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true}));
+    explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
@@ -205,6 +210,7 @@ assert.commandWorked(viewsDB.runCommand({
     // Test allPlansExecution explain mode on the base collection.
     explainPlan = assert.commandWorked(
         viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    explainPlan = getSingleNodeExplain(explainPlan);
     if (explainPlan.hasOwnProperty("stages")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
