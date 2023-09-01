@@ -916,4 +916,6 @@ last-lts:
     ticket: SERVER-71520
   - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
     ticket: SERVER-79912
+  - test_file: jstests/sharding/features3.js
+    ticket: SERVER-80678
   suites: null
