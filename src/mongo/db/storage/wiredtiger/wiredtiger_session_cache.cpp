@@ -299,6 +299,9 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
     if (current != start) {
         // Someone else synced already since we read lastSyncTime, so we're done!
+        if (token) {
+            journalListener->onDurable(token.value());
+        }
         return;
     }
     _lastSyncTime.store(current + 1);
