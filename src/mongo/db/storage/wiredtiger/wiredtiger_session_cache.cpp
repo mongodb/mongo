@@ -246,19 +246,9 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // For inMemory storage engines, the data is "as durable as it's going to get".
     // That is, a restart is equivalent to a complete node failure.
     if (isEphemeral()) {
-        auto journalListener = [&]() -> JournalListener* {
-            // The JournalListener may not be set immediately, so we must check under a mutex so as
-            // not to access the variable while setting a JournalListener. A JournalListener is only
-            // allowed to be set once, so using the pointer outside of a mutex is safe.
-            stdx::unique_lock<Latch> lk(_journalListenerMutex);
-            return _journalListener;
-        }();
-        if (journalListener && useListener == UseJournalListener::kUpdate) {
-            // Update the JournalListener before we return. Does a write while fetching the
-            // timestamp if primary. As far as listeners are concerned, all writes are as 'durable'
-            // as they are ever going to get on an inMemory storage engine.
-            auto token = _journalListener->getToken(opCtx);
-            journalListener->onDurable(token);
+        auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
+        if (token) {
+            journalListener->onDurable(token.value());
         }
         return;
     }
@@ -284,51 +274,23 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         !isEphemeral()) {
         UniqueWiredTigerSession session = getSession();
         WT_SESSION* s = session->getSession();
-        {
-            auto journalListener = [&]() -> JournalListener* {
-                // The JournalListener may not be set immediately, so we must check under a mutex so
-                // as not to access the variable while setting a JournalListener. A JournalListener
-                // is only allowed to be set once, so using the pointer outside of a mutex is safe.
-                stdx::unique_lock<Latch> lk(_journalListenerMutex);
-                return _journalListener;
-            }();
-            boost::optional<JournalListener::Token> token;
-            if (journalListener && useListener == UseJournalListener::kUpdate) {
-                // Update a persisted value with the latest write timestamp that is safe across
-                // startup recovery in the repl layer. Then report that timestamp as durable to the
-                // repl layer below after we have flushed in-memory data to disk.
-                // Note: only does a write if primary, otherwise just fetches the timestamp.
-                token = journalListener->getToken(opCtx);
-            }
 
-            auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
-                                                                        : "use_timestamp=false";
+        auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
 
-            invariantWTOK(s->checkpoint(s, config), s);
+        auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
+                                                                    : "use_timestamp=false";
 
-            if (token) {
-                journalListener->onDurable(token.value());
-            }
+        invariantWTOK(s->checkpoint(s, config), s);
+
+        if (token) {
+            journalListener->onDurable(token.value());
         }
+
         LOGV2_DEBUG(22418, 4, "created checkpoint (forced)");
         return;
     }
 
-    auto journalListener = [&]() -> JournalListener* {
-        // The JournalListener may not be set immediately, so we must check under a mutex so as not
-        // to access the variable while setting a JournalListener. A JournalListener is only allowed
-        // to be set once, so using the pointer outside of a mutex is safe.
-        stdx::unique_lock<Latch> lk(_journalListenerMutex);
-        return _journalListener;
-    }();
-    boost::optional<JournalListener::Token> token;
-    if (journalListener && useListener == UseJournalListener::kUpdate) {
-        // Update a persisted value with the latest write timestamp that is safe across startup
-        // recovery in the repl layer. Then report that timestamp as durable to the repl layer below
-        // after we have flushed in-memory data to disk.
-        // Note: only does a write if primary, otherwise just fetches the timestamp.
-        token = journalListener->getToken(opCtx);
-    }
+    auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
 
     uint32_t start = _lastSyncTime.load();
     // Do the remainder in a critical section that ensures only a single thread at a time
@@ -559,6 +521,27 @@ bool WiredTigerSessionCache::isEngineCachingCursors() {
 void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
     WiredTigerSession* session) const {
     session->_cache->releaseSession(session);
+}
+
+std::pair<JournalListener*, boost::optional<JournalListener::Token>>
+WiredTigerSessionCache::_getJournalListenerWithToken(OperationContext* opCtx,
+                                                     UseJournalListener useListener) {
+    auto journalListener = [&]() -> JournalListener* {
+        // The JournalListener may not be set immediately, so we must check under a mutex so
+        // as not to access the variable while setting a JournalListener. A JournalListener
+        // is only allowed to be set once, so using the pointer outside of a mutex is safe.
+        stdx::unique_lock<Latch> lk(_journalListenerMutex);
+        return _journalListener;
+    }();
+    boost::optional<JournalListener::Token> token;
+    if (journalListener && useListener == UseJournalListener::kUpdate) {
+        // Update a persisted value with the latest write timestamp that is safe across
+        // startup recovery in the repl layer. Then report that timestamp as durable to the
+        // repl layer below after we have flushed in-memory data to disk.
+        // Note: only does a write if primary, otherwise just fetches the timestamp.
+        token = journalListener->getToken(opCtx);
+    }
+    return std::make_pair(journalListener, token);
 }
 
 }  // namespace mongo

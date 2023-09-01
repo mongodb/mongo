@@ -368,6 +368,14 @@ public:
     }
 
 private:
+    /**
+     * Looks up the journal listener under a mutex along.
+     * Returns JournalListener along with an optional token if requested
+     * by the UseJournalListener value.
+     */
+    std::pair<JournalListener*, boost::optional<JournalListener::Token>>
+    _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
+
     WiredTigerKVEngine* _engine;      // not owned, might be NULL
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
