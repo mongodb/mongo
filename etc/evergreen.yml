@@ -994,7 +994,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -1119,7 +1119,7 @@ buildvariants:
   - name: .multi_shard !.no_debug_mode
   - name: multiversion_gen
   - name: .ocsp
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - rhel80-medium
@@ -1266,7 +1266,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -1365,7 +1365,7 @@ buildvariants:
   - name: .jstestfuzz !.flow_control
   - name: .misc_js
   - name: .multi_shard
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.cqf_only
   - name: query_golden_classic
   - name: .random_multiversion_ds
   - name: .read_only
@@ -1475,7 +1475,7 @@ buildvariants:
   #     variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer
+  - name: .aggfuzzer .cqf_only
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -1485,7 +1485,6 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
-  - name: .change_stream_fuzzer
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
@@ -1521,7 +1520,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer
+  - name: .query_fuzzer .cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -1559,7 +1558,6 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
@@ -1978,7 +1976,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
   - name: .read_write_concern !.large
@@ -2128,7 +2126,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .multi_shard .common
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.cqf_only
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
@@ -2210,7 +2208,7 @@ buildvariants:
   - name: .misc_js
   - name: .multi_shard .common
   - name: query_golden_classic
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.cqf_only
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
@@ -2325,7 +2323,7 @@ buildvariants:
   # - name: .multi_shard # Not passing
   # - name: multi_stmt_txn_jscore_passthrough_with_migration_gen # Not passing
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: query_golden_classic
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: .read_write_concern .large # Not passing
@@ -2937,7 +2935,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
   - name: .read_write_concern !.large

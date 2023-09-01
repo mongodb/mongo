@@ -105,7 +105,7 @@ buildvariants:
   - name: multiversion_gen
   - name: .multiversion_fuzzer
   - name: .multiversion_passthrough
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .random_multiversion_ds
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough

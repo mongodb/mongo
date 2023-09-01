@@ -258,7 +258,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - amazon2-arm64-large
@@ -425,7 +425,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - amazon2023.0-large
@@ -537,7 +537,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - amazon2023.0-large
@@ -705,7 +705,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - amazon2023.0-arm64-large
@@ -823,7 +823,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern .large
     distros:
     - amazon2023.0-arm64-large
@@ -1224,7 +1224,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -2392,7 +2392,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough_gen
@@ -2471,7 +2471,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough
@@ -2523,7 +2523,7 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -2575,7 +2575,7 @@ buildvariants:
   - name: .jstestfuzz .interrupt
   - name: .jstestfuzz .common
   - name: .jstestfuzz .session
-  - name: .query_fuzzer
+  - name: .query_fuzzer !.feature_flag_guarded
   - name: .read_write_concern !.linearize
   - name: replica_sets_gen
   - name: replica_sets_kill_secondaries_jscore_passthrough
