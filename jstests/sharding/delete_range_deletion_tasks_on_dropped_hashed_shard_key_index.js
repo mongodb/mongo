@@ -7,6 +7,7 @@
  *   featureFlagShardKeyIndexOptionalHashedSharding
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const rangeDeleterBatchSize = 50;
@@ -45,9 +46,12 @@ function setUpCollection(collectionName, nss) {
         db.adminCommand({moveChunk: nss, bounds: [chunk.min, chunk.max], to: st.shard1.shardName}));
 }
 
+// Pause range deletion on shard0.
+let suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRangeDeletion");
 setUpCollection(coll, coll.getFullName());
 setUpCollection(collWithIndex, collWithIndex.getFullName());
 assert.commandWorked(coll.dropIndex({"_id": "hashed"}));
+suspendRangeDeletionFailpoint.off();
 
 // Verify that the range deletion document for db.test persists while the document for
 // db.collWithIndex is successfully deleted.
