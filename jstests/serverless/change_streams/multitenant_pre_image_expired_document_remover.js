@@ -19,11 +19,13 @@ const kVeryShortPreImageExpirationIntervalSecs = 1;
 // enabled and run expired pre-image removal job every 'kPreImageRemovalJobSleepSecs' seconds.
 const rst = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 2,
-    setParameter: {
-        expiredChangeStreamPreImageRemovalJobSleepSecs: kPreImageRemovalJobSleepSecs,
-        // If 'UseUnreplicatedTruncatesForDeletions' feature flag is enabled, the test expects
-        // documents to be removed 1 by 1.
-        preImagesCollectionTruncateMarkersMinBytes: 1,
+    nodeOptions: {
+        setParameter: {
+            expiredChangeStreamPreImageRemovalJobSleepSecs: kPreImageRemovalJobSleepSecs,
+            // If 'UseUnreplicatedTruncatesForDeletions' feature flag is enabled, the test expects
+            // documents to be removed 1 by 1.
+            preImagesCollectionTruncateMarkersMinBytes: 1,
+        }
     }
 });
 
