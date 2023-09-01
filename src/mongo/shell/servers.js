@@ -616,6 +616,14 @@ MongoRunner.mongoOptions = function(opts) {
 
     opts.port = opts.port || allocatePort();
 
+    // If gRPC is enabled and we have a TLS configuration, allocate an explicit port for gRPC.
+    const keyDefined =
+        (opts.tlsCertificateKeyFile !== undefined) || (opts.sslPEMKeyFile !== undefined);
+    const setParameters = jsTestOptions().setParameters || {};
+    if (setParameters.featureFlagGRPC && keyDefined) {
+        opts.grpcPort = opts.grpcPort || allocatePort();
+    }
+
     opts.pathOpts =
         Object.merge(opts.pathOpts || {}, {port: "" + opts.port, runId: "" + opts.runId});
 

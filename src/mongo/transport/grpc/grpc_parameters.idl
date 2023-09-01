@@ -27,11 +27,34 @@
 #
 
 global:
-  cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/server_options.h"
+    configs:
+        section: GRPC Options
+        source: [ cli, ini, yaml ]
+
+configs:
+    "net.grpc.port":
+        description: gRPC listener port
+        short_name: grpcPort
+        arg_vartype: Int
+        cpp_varname: serverGlobalParams.grpcPort
+        validator: { gte: 1 }
+        # Default is defined in mongo/db/server_options.h
+        # default: 27021
+    "net.grpc.serverMaxThreads":
+        description: Limit of maximum number of gRPC session threads
+        short_name: grpcServerMaxThreads
+        arg_vartype: Int
+        cpp_varname: serverGlobalParams.grpcServerMaxThreads
+        validator: { gte: 1 }
+        # Default is defined in mongo/db/server_options.h
+        # default: 1000
 
 feature_flags:
-  featureFlagGRPC:
-    description: "Feature flag to enable listening for ingress gRPC connections"
-    cpp_varname: feature_flags::gFeatureFlagGRPC
-    default: false
-    shouldBeFCVGated: false
+    featureFlagGRPC:
+        description: "Feature flag to enable listening for ingress gRPC connections"
+        cpp_varname: feature_flags::gFeatureFlagGRPC
+        default: false
+        shouldBeFCVGated: false

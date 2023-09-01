@@ -17,13 +17,15 @@ env.Library(
         'util.cpp',
         'wire_version_provider.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/net/ssl_util',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_grpc',
     ],
 )
@@ -38,6 +40,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/third_party/shim_grpc',
         'grpc_transport_layer',
     ],
 )
