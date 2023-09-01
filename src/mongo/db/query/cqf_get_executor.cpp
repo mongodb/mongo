@@ -323,7 +323,7 @@ static std::pair<IndexDefinitions, MultikeynessTrie> buildIndexSpecsOptimizer(
         // collection), but still be multikey on the overall collection.
         if (psr::isNoop(indexDef.getPartialReqMap())) {
             for (const auto& component : indexDef.getCollationSpec()) {
-                result.second.add(component._path.ref());
+                result.second.add(component._path);
             }
         }
         // For now we assume distribution is Centralized.

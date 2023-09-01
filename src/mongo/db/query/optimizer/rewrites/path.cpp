@@ -63,7 +63,7 @@ ABT::reference_type PathFusion::follow(ABT::reference_type n) {
 bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
     if (auto rhsComposeM = rhs.cast<PathComposeM>(); rhsComposeM != nullptr) {
         for (const auto& branch : collectComposed(rhs)) {
-            if (_info[branch.cast<PathSyntaxSort>()]._isConst && fuse(lhs, branch)) {
+            if (_info[branch.cast<PathSyntaxSort>()]._isConst && fuse(lhs, branch.copy())) {
                 return true;
             }
         }
@@ -352,7 +352,7 @@ void PathFusion::tryFuseComposition(ABT& n, ABT& input) {
             }
 
             // Overwrite field with the latest value.
-            if (fieldMap.insert_or_assign(fieldPtr->name(), branch).second) {
+            if (fieldMap.insert_or_assign(fieldPtr->name(), branch.copy()).second) {
                 orderedFieldNames.push_back(fieldPtr->name());
             } else {
                 updated = true;

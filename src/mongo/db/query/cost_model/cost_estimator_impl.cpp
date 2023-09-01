@@ -64,25 +64,26 @@ struct CostAndCEInternal {
 
 class CostDerivation {
 public:
-    CostAndCEInternal operator()(const ABT& /*n*/, const PhysicalScanNode& /*node*/) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/,
+                                 const PhysicalScanNode& /*node*/) {
         // Default estimate for scan.
         const double collectionScanCost = _coefficients.getScanStartupCost() +
             _coefficients.getScanIncrementalCost() * _cardinalityEstimate._value;
         return {collectionScanCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const CoScanNode& /*node*/) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const CoScanNode& /*node*/) {
         // Assumed to be free.
         return {_coefficients.getDefaultStartupCost(), _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const IndexScanNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const IndexScanNode& node) {
         const double indexScanCost = _coefficients.getIndexScanStartupCost() +
             _coefficients.getIndexScanIncrementalCost() * _cardinalityEstimate._value;
         return {indexScanCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const SeekNode& /*node*/) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const SeekNode& /*node*/) {
         // SeekNode should deliver one result via cardinality estimate override.
         // TODO: consider using node.getProjectionMap()._fieldProjections.size() to make the cost
         // dependent on the size of the projection
@@ -91,7 +92,8 @@ public:
         return {seekCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const MemoLogicalDelegatorNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/,
+                                 const MemoLogicalDelegatorNode& node) {
         const LogicalProps& childLogicalProps = _memo.getLogicalProps(node.getGroupId());
         // Notice that unlike all physical nodes, this logical node takes it cardinality directly
         // from the memo group logical property, ignoring _cardinalityEstimate.
@@ -125,11 +127,12 @@ public:
         return {0.0, getAdjustedCE(baseCE, _physProps)};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const MemoPhysicalDelegatorNode& /*node*/) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/,
+                                 const MemoPhysicalDelegatorNode& /*node*/) {
         uasserted(7034002, "Should not be costing physical delegator nodes.");
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const FilterNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const FilterNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double filterCost = childResult._cost;
         if (getTrivialExprPtr<EvalFilter>(node.getFilter()).empty()) {
@@ -140,7 +143,7 @@ public:
         return {filterCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const EvaluationNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const EvaluationNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double evalCost = childResult._cost;
         if (getTrivialExprPtr<EvalPath>(node.getProjection()).empty()) {
@@ -151,7 +154,7 @@ public:
         return {evalCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const NestedLoopJoinNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const NestedLoopJoinNode& node) {
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
         const double nestedLoopjoinCost = _coefficients.getNestedLoopJoinStartupCost() +
@@ -161,7 +164,7 @@ public:
         return {nestedLoopjoinCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const HashJoinNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const HashJoinNode& node) {
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
 
@@ -173,7 +176,7 @@ public:
         return {hashJoinCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const MergeJoinNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const MergeJoinNode& node) {
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
 
@@ -186,7 +189,7 @@ public:
     }
 
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const SortedMergeNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const SortedMergeNode& node) {
         const ABTVector& children = node.nodes();
         double totalCost = _coefficients.getSortedMergeStartupCost();
         // The cost of a sorted merge is the sum of the cost of its children, plus the overhead of
@@ -199,7 +202,7 @@ public:
         return {totalCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const UnionNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const UnionNode& node) {
         const ABTVector& children = node.nodes();
         // UnionNode with one child is optimized away before lowering, therefore
         // its cost is the cost of its child.
@@ -218,7 +221,7 @@ public:
         return {totalCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const GroupByNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const GroupByNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double groupByCost = _coefficients.getGroupByStartupCost();
 
@@ -233,7 +236,7 @@ public:
         return {groupByCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const UnwindNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const UnwindNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // Unwind probably depends mostly on its output size.
         const double unwindCost =
@@ -242,27 +245,27 @@ public:
         return {unwindCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const UniqueNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const UniqueNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         const double uniqueCost = _coefficients.getUniqueStartupCost() +
             _coefficients.getUniqueIncrementalCost() * childResult._ce._value + childResult._cost;
         return {uniqueCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const SpoolProducerNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const SpoolProducerNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // TODO: SERVER-71821: Calibration for Spool producer node.
         const double cost = _coefficients.getDefaultStartupCost() + childResult._cost;
         return {cost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const SpoolConsumerNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const SpoolConsumerNode& node) {
         // TODO: SERVER-71822: Calibration for Spool consumer node.
         const double cost = _coefficients.getDefaultStartupCost();
         return {cost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const CollationNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const CollationNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // TODO: consider RepetitionEstimate since this is a stateful operation.
 
@@ -287,7 +290,7 @@ public:
         return {sortCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const LimitSkipNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const LimitSkipNode& node) {
         // Assumed to be free.
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         const double limitCost = _coefficients.getLimitSkipStartupCost() + childResult._cost +
@@ -295,7 +298,7 @@ public:
         return {limitCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const ExchangeNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const ExchangeNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double localCost = _coefficients.getExchangeStartupCost() +
             _coefficients.getExchangeIncrementalCost() * _cardinalityEstimate._value;
@@ -317,7 +320,7 @@ public:
         return {localCost + childResult._cost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const RootNode& node) {
+    CostAndCEInternal operator()(const ABT::reference_type /*n*/, const RootNode& node) {
         return deriveChild(node.getChild(), 0);
     }
 
@@ -325,7 +328,7 @@ public:
      * Other ABT types.
      */
     template <typename T, typename... Ts>
-    CostAndCEInternal operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
+    CostAndCEInternal operator()(ABT::reference_type /*n*/, const T& /*node*/, Ts&&...) {
         static_assert(!canBePhysicalNode<T>(), "Physical node must implement its cost derivation.");
         return {0.0, {0.0}};
     }

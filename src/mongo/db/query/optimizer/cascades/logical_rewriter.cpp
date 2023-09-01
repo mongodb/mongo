@@ -309,7 +309,7 @@ ReorderDependencies computeDependencies(ABT::reference_type aboveNodeRef,
     // child.
     const auto aboveNodeVarNames = collectVariableReferences(aboveNodeRef);
 
-    ABT belowNode = belowNodeRef;
+    ABT belowNode{belowNodeRef};
     VariableEnvironment env = VariableEnvironment::build(belowNode, &ctx.getMemo());
     const DefinitionsMap belowNodeDefs = env.hasDefinitions(belowNode.ref())
         ? env.getDefinitions(belowNode.ref())
@@ -357,7 +357,7 @@ static void addEmptyValueScanNode(RewriteContext& ctx) {
     ctx.addNode(newNode, true /*substitute*/);
 }
 
-static void defaultPropagateEmptyValueScanNode(const ABT& n, RewriteContext& ctx) {
+static void defaultPropagateEmptyValueScanNode(const ABT::reference_type n, RewriteContext& ctx) {
     if (n.cast<ValueScanNode>()->getArraySize() == 0) {
         addEmptyValueScanNode(ctx);
     }
@@ -371,8 +371,8 @@ template <class AboveType,
 void defaultReorder(ABT::reference_type aboveNode,
                     ABT::reference_type belowNode,
                     RewriteContext& ctx) {
-    ABT newParent = belowNode;
-    ABT newChild = aboveNode;
+    ABT newParent{belowNode};
+    ABT newChild{aboveNode};
 
     std::swap(BelowChildAccessor<BelowType>()(newParent),
               AboveChildAccessor<AboveType>()(newChild));
@@ -418,10 +418,10 @@ struct SubstituteReorder<FilterNode, UnionNode> {
     void operator()(ABT::reference_type aboveNode,
                     ABT::reference_type belowNode,
                     RewriteContext& ctx) const {
-        ABT newParent = belowNode;
+        ABT newParent{belowNode};
 
         for (auto& childOfChild : newParent.cast<UnionNode>()->nodes()) {
-            ABT aboveCopy = aboveNode;
+            ABT aboveCopy{aboveNode};
             std::swap(aboveCopy.cast<FilterNode>()->getChild(), childOfChild);
             std::swap(childOfChild, aboveCopy);
         }
@@ -561,7 +561,7 @@ struct SubstituteMerge<CollationNode, CollationNode> {
     void operator()(ABT::reference_type aboveNode,
                     ABT::reference_type belowNode,
                     RewriteContext& ctx) const {
-        ABT newRoot = aboveNode;
+        ABT newRoot{aboveNode};
         // Retain above property.
         newRoot.cast<CollationNode>()->getChild() = belowNode.cast<CollationNode>()->getChild();
 
@@ -576,7 +576,7 @@ struct SubstituteMerge<LimitSkipNode, LimitSkipNode> {
                     RewriteContext& ctx) const {
         using namespace properties;
 
-        ABT newRoot = aboveNode;
+        ABT newRoot{aboveNode};
         LimitSkipNode& aboveCollationNode = *newRoot.cast<LimitSkipNode>();
         const LimitSkipNode& belowCollationNode = *belowNode.cast<LimitSkipNode>();
 
@@ -762,7 +762,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         // keep the original Filter node. But this means the Filter-to-Sargable rewrite could apply
         // again, to avoid rewriting endlessly we need to avoid scheduling this rewrite. So we pass
         // 'addExistingNodeWithNewChild = true'.
-        ABT newNode = node;
+        ABT newNode{node};
         newNode.cast<FilterNode>()->getChild() = std::move(sargableNode);
         ctx.addNode(newNode, true /*substitute*/, true /*addExistingNodeWithNewChild*/);
     } else {

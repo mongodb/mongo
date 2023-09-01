@@ -1320,7 +1320,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                     // Only regular requirements are added to residual predicates.
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                         prefixId, FieldNameType{encodeIndexKeyName(indexField)}, fieldProjMap);
-                    residualReqs.atom(PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)},
+                    residualReqs.atom(PartialSchemaKey{tempProjName, fusedPath._suffix->copy()},
                                       req->second,
                                       index);
                 }

@@ -232,7 +232,7 @@ static bool equalityOnShardKey(const IndexCollationSpec& shardKey, const PSRExpr
  */
 class ImplementationVisitor {
 public:
-    void operator()(const ABT& /*n*/, const ScanNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const ScanNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // Cannot satisfy limit-skip.
             return;
@@ -349,7 +349,7 @@ public:
                                  std::move(builder._nodeCEMap));
     }
 
-    void operator()(const ABT& n, const ValueScanNode& node) {
+    void operator()(const ABT::reference_type n, const ValueScanNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // Cannot satisfy limit-skip.
             return;
@@ -444,12 +444,12 @@ public:
                                  std::move(builder._nodeCEMap));
     }
 
-    void operator()(const ABT& /*n*/, const MemoLogicalDelegatorNode& /*node*/) {
+    void operator()(const ABT::reference_type /*n*/, const MemoLogicalDelegatorNode& /*node*/) {
         uasserted(6624041,
                   "Must not have logical delegator nodes in the list of the logical nodes");
     }
 
-    void operator()(const ABT& n, const FilterNode& node) {
+    void operator()(const ABT::reference_type n, const FilterNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy here.
             return;
@@ -467,12 +467,12 @@ public:
         addProjectionsToProperties(newProps, std::move(references));
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
-        ABT physicalFilter = n;
+        ABT physicalFilter{n};
         optimizeChild<FilterNode, PhysicalRewriteType::Filter>(
             _queue, kDefaultPriority, std::move(physicalFilter), std::move(newProps));
     }
 
-    void operator()(const ABT& n, const EvaluationNode& node) {
+    void operator()(const ABT::reference_type n, const EvaluationNode& node) {
         const ProjectionName& projectionName = node.getProjectionName();
 
         if (const auto* varPtr = node.getProjection().cast<Variable>(); varPtr != nullptr) {
@@ -508,7 +508,7 @@ public:
                 }
             }
 
-            ABT physicalEval = n;
+            ABT physicalEval{n};
             optimizeChild<EvaluationNode, PhysicalRewriteType::RenameProjection>(
                 _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
             return;
@@ -546,12 +546,12 @@ public:
             newProps, std::move(references), ProjectionNameVector{projectionName});
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
-        ABT physicalEval = n;
+        ABT physicalEval{n};
         optimizeChild<EvaluationNode, PhysicalRewriteType::Evaluation>(
             _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
     }
 
-    void operator()(const ABT& n, const SargableNode& node) {
+    void operator()(const ABT::reference_type n, const SargableNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // Cannot satisfy limit-skip.
             return;
@@ -971,7 +971,7 @@ public:
         }
     }
 
-    void operator()(const ABT& /*n*/, const RIDIntersectNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const RIDIntersectNode& node) {
 
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
         const std::string& scanDefName = indexingAvailability.getScanDefName();
@@ -1216,7 +1216,7 @@ public:
     }
 
 
-    void operator()(const ABT& /*n*/, const RIDUnionNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const RIDUnionNode& node) {
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
         const std::string& scanDefName = indexingAvailability.getScanDefName();
         {
@@ -1342,7 +1342,7 @@ public:
         }
     }
 
-    void operator()(const ABT& n, const BinaryJoinNode& node) {
+    void operator()(const ABT::reference_type n, const BinaryJoinNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy limit-skip requirements.
             return;
@@ -1437,7 +1437,7 @@ public:
                            {&newNode.getRightChild(), std::move(rightPhysProps)}});
     }
 
-    void operator()(const ABT& /*n*/, const UnionNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const UnionNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy limit-skip requirements.
             return;
@@ -1464,7 +1464,7 @@ public:
             _queue, kDefaultPriority, std::move(physicalUnion), std::move(childProps));
     }
 
-    void operator()(const ABT& n, const GroupByNode& node) {
+    void operator()(const ABT::reference_type n, const GroupByNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // We cannot satisfy limit-skip requirements.
             // TODO: consider an optimization where we keep track of at most "limit" groups.
@@ -1573,7 +1573,7 @@ public:
             _queue, kDefaultPriority, std::move(physicalGroupBy), std::move(newProps));
     }
 
-    void operator()(const ABT& n, const UnwindNode& node) {
+    void operator()(const ABT::reference_type n, const UnwindNode& node) {
         const ProjectionName& pidProjectionName = node.getPIDProjectionName();
         const ProjectionNameVector& projectionNames = {(node.getProjectionName()),
                                                        pidProjectionName};
@@ -1601,12 +1601,12 @@ public:
 
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
-        ABT physicalUnwind = n;
+        ABT physicalUnwind{n};
         optimizeChild<UnwindNode, PhysicalRewriteType::Unwind>(
             _queue, kDefaultPriority, std::move(physicalUnwind), std::move(newProps));
     }
 
-    void operator()(const ABT& /*n*/, const CollationNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const CollationNode& node) {
         if (getPropertyConst<DistributionRequirement>(_physProps)
                 .getDistributionAndProjections()
                 ._type != DistributionType::Centralized) {
@@ -1620,7 +1620,7 @@ public:
                                    PhysicalRewriteType::Collation>(node);
     }
 
-    void operator()(const ABT& /*n*/, const LimitSkipNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const LimitSkipNode& node) {
         // We can pick-up limit-skip under any distribution (but enforce under centralized or
         // replicated).
 
@@ -1646,13 +1646,13 @@ public:
             _queue, kDefaultPriority, node.getChild(), std::move(newProps));
     }
 
-    void operator()(const ABT& /*n*/, const ExchangeNode& node) {
+    void operator()(const ABT::reference_type /*n*/, const ExchangeNode& node) {
         optimizeSimplePropertyNode<ExchangeNode,
                                    DistributionRequirement,
                                    PhysicalRewriteType::Exchange>(node);
     }
 
-    void operator()(const ABT& n, const RootNode& node) {
+    void operator()(const ABT::reference_type n, const RootNode& node) {
         PhysProps newProps = _physProps;
 
         ABT rootNode = make<Blackhole>();
@@ -1664,7 +1664,7 @@ public:
             rootNode = make<RootNode>(projections, n.cast<RootNode>()->getChild());
         } else {
             setPropertyOverwrite<ProjectionRequirement>(newProps, node.getProperty());
-            rootNode = n;
+            rootNode = n.copy();
         }
 
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
@@ -1674,7 +1674,7 @@ public:
     }
 
     template <typename T>
-    void operator()(const ABT& /*n*/, const T& /*node*/) {
+    void operator()(ABT::reference_type /*n*/, const T& /*node*/) {
         static_assert(!canBeLogicalNode<T>(), "Logical node must implement its visitor.");
     }
 

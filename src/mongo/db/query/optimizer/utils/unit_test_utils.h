@@ -53,7 +53,7 @@ namespace mongo::optimizer {
 // Default selectivity of predicates used by HintedCE to force certain plans.
 constexpr SelectivityType kDefaultSelectivity{0.1};
 
-void maybePrintABT(const ABT& abt);
+void maybePrintABT(ABT::reference_type abt);
 
 std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
 

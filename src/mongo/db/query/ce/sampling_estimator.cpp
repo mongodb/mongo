@@ -164,7 +164,7 @@ public:
           _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)),
           _fallbackCE(std::move(fallbackCE)) {}
 
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const FilterNode& node,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
@@ -172,17 +172,17 @@ public:
                      CEType childResult,
                      CEType /*exprResult*/) {
         if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         // Create a plan with all eval nodes so far and the filter last.
-        ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n));
+        ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n.copy()));
 
         return estimateFilterCE(metadata, memo, logicalProps, n, std::move(abtTree), childResult);
     }
 
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const SargableNode& node,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
@@ -191,11 +191,11 @@ public:
                      CEType /*bindResult*/,
                      CEType /*refsResult*/) {
         if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
 
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
-        ABT extracted = planExtractor.extract(n);
+        ABT extracted = planExtractor.extract(n.copy());
 
         // Estimate individual requirements separately by potentially re-using cached results.
         // TODO: consider estimating together the entire set of requirements (but caching!)
@@ -231,14 +231,14 @@ public:
      * Other ABT types.
      */
     template <typename T, typename... Ts>
-    CEType transport(const ABT& n,
+    CEType transport(ABT::reference_type n,
                      const T& /*node*/,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
                      const properties::LogicalProps& logicalProps,
                      Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
         return {0.0};
     }
@@ -254,7 +254,7 @@ private:
     CEType estimateFilterCE(const Metadata& metadata,
                             const cascades::Memo& memo,
                             const properties::LogicalProps& logicalProps,
-                            const ABT& n,
+                            const ABT::reference_type n,
                             ABT abtTree,
                             CEType childResult) {
         auto it = _selectivityCacheMap.find(abtTree);
@@ -265,7 +265,7 @@ private:
 
         const auto selectivity = estimateSelectivity(abtTree);
         if (!selectivity) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
 
         _selectivityCacheMap.emplace(std::move(abtTree), *selectivity);

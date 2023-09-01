@@ -51,7 +51,7 @@ bool PartialSchemaIntervalComparator::operator()(const PartialSchemaInterval& k1
 
 class HintedTransport {
 public:
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const SargableNode& node,
                      CEType childResult,
                      CEType /*bindsResult*/,
@@ -73,10 +73,11 @@ public:
         return estimator.estimateCE(node.getReqMap());
     }
 
+    // Handle any node type that doesn't have a specific overload.
     template <typename T, typename... Ts>
-    CEType transport(const ABT& n, const T& /*node*/, Ts&&...) {
+    CEType transport(ABT::reference_type n, const T& /*node*/, Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n.ref());
+            return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n);
         }
         return {0.0};
     }

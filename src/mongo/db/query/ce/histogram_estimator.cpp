@@ -232,7 +232,7 @@ public:
     }
 };
 
-std::string serializePath(const ABT& path) {
+std::string serializePath(const ABT::reference_type path) {
     PathDescribeTransport pdt;
     auto str = algebra::transport<false>(path, pdt);
     return str;
@@ -289,7 +289,7 @@ public:
           _fallbackCE(std::move(fallbackCE)),
           _arrayOnlyInterval(*defaultConvertPathToInterval(make<PathArr>())) {}
 
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const ScanNode& node,
                      const cascades::Memo& memo,
                      const properties::LogicalProps& logicalProps,
@@ -297,7 +297,7 @@ public:
         return {_stats->getCardinality()};
     }
 
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const SargableNode& node,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
@@ -330,7 +330,7 @@ public:
         return childResult;
     }
 
-    CEType transport(const ABT& n,
+    CEType transport(const ABT::reference_type n,
                      const RootNode& node,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
@@ -345,14 +345,14 @@ public:
      * Use fallback for other ABT types.
      */
     template <typename T, typename... Ts>
-    CEType transport(const ABT& n,
+    CEType transport(ABT::reference_type n,
                      const T& /*node*/,
                      const Metadata& metadata,
                      const cascades::Memo& memo,
                      const properties::LogicalProps& logicalProps,
                      Ts&&...) {
         if (canBeLogicalNode<T>()) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
         return {0.0};
     }

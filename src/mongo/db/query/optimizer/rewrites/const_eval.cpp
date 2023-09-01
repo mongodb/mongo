@@ -133,7 +133,7 @@ void ConstEval::transport(ABT& n, const Variable& var) {
 
         if (auto constant = def.definition.cast<Constant>(); constant && !_inRefBlock) {
             // If we find the definition and it is a simple constant then substitute the variable.
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (auto variable = def.definition.cast<Variable>(); variable && !_inRefBlock) {
             // This is a indirection to another variable. So we can skip, but first remember that we
             // inlined this variable so that we won't try to replace it with a common expression and
@@ -142,13 +142,13 @@ void ConstEval::transport(ABT& n, const Variable& var) {
                 _renamedProj(var.name(), variable->name());
             }
             _inlinedDefs.emplace(def.definition);
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (_singleRef.erase(&var)) {
             // If this is the only reference to some expression then substitute the variable, but
             // first remember that we inlined this expression so that we won't try to replace it
             // with a common expression and revert the inlining.
             _inlinedDefs.emplace(def.definition);
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (auto let = def.definedBy.cast<Let>(); let) {
             invariant(_letRefs.count(let));
             _letRefs[let].emplace_back(&var);

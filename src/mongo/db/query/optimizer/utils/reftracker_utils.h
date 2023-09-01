@@ -39,6 +39,6 @@ namespace mongo::optimizer {
 /**
  * Used to extract variable references from a node.
  */
-ProjectionNameSet collectVariableReferences(const ABT& n);
+ProjectionNameSet collectVariableReferences(ABT::reference_type n);
 
 }  // namespace mongo::optimizer

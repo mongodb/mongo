@@ -243,7 +243,7 @@ bool checkPathContainsTraverse(const ABT& path);
 /**
  * This helper checks to see if we have a PathTraverse + PathId at the end of the path.
  */
-bool pathEndsInTraverse(const optimizer::ABT& path);
+bool pathEndsInTraverse(optimizer::ABT::reference_type path);
 
 /**
  * This helper checks if a path contains valid Traverse elements.

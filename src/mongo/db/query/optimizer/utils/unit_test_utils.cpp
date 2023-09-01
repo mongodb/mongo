@@ -56,7 +56,7 @@ namespace mongo::optimizer {
 static constexpr bool kDebugAsserts = false;
 
 
-void maybePrintABT(const ABT& abt) {
+void maybePrintABT(const ABT::reference_type abt) {
     // Always print using the supported versions to make sure we don't crash.
     const std::string strV1 = ExplainGenerator::explain(abt);
     const std::string strV2 = ExplainGenerator::explainV2(abt);

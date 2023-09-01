@@ -94,12 +94,12 @@ void ExpressionConstEval::transport(optimizer::ABT& n, const optimizer::Variable
 
         if (auto constant = def.definition.cast<optimizer::Constant>(); constant && !_inRefBlock) {
             // If we find the definition and it is a simple constant then substitute the variable.
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (auto variable = def.definition.cast<optimizer::Variable>();
                    variable && !_inRefBlock) {
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (_singleRef.erase(&var)) {
-            swapAndUpdate(n, def.definition);
+            swapAndUpdate(n, def.definition.copy());
         } else if (auto let = def.definedBy.cast<optimizer::Let>(); let) {
             invariant(_letRefs.count(let));
             _letRefs[let].emplace_back(&var);

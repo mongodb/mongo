@@ -289,6 +289,7 @@ private:
     class Reference {
         ControlBlock<Ts...>* _object{nullptr};
 
+
         auto tag() const noexcept {
             return _object->getRuntimeTag();
         }
@@ -296,6 +297,12 @@ private:
     public:
         Reference() = default;
         Reference(ControlBlock<Ts...>* object) : _object(object) {}
+
+        // Reference is implicitly convertible from PolyValue. This conversion is equivalent to the
+        // caller using .ref() explicitly. Having this conversion makes it easier to call functions
+        // that take a Reference, which encourages functions that minimize their dependencies, by
+        // taking Reference instead of 'const PolyValue&' where possible.
+        Reference(const PolyValue& n) : Reference(n.ref()) {}
 
         template <int I>
         using get_t = detail::get_type_by_index<I, Ts...>;
@@ -380,6 +387,12 @@ private:
             return CompareHelper(_object);
         }
 
+        // PolyValue is constructible from Reference, but only explicitly.
+        // This .copy() helper may be clearer than an explicit constructor call.
+        PolyValue copy() const {
+            return PolyValue{*this};
+        }
+
         friend class PolyValue;
     };
 
@@ -404,7 +417,7 @@ public:
         }
     }
 
-    PolyValue(const Reference& other) {
+    explicit PolyValue(const Reference& other) {
         if (other._object) {
             _object = cloneTbl[other.tag()](other._object);
         }

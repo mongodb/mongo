@@ -208,7 +208,7 @@ public:
         return extractFromABT(refs);
     }
 
-    static ProjectionNameSet collect(const ABT& n) {
+    static ProjectionNameSet collect(const ABT::reference_type n) {
         NodeVariableTracker tracker;
         return algebra::walk<false>(n, tracker);
     }
@@ -237,7 +237,7 @@ private:
     }
 };
 
-ProjectionNameSet collectVariableReferences(const ABT& n) {
+ProjectionNameSet collectVariableReferences(const ABT::reference_type n) {
     return NodeVariableTracker::collect(n);
 }
 

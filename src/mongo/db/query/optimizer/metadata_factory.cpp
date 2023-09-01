@@ -59,7 +59,7 @@ MultikeynessTrie createTrie(const IndexDefinitions& indexDefs) {
         }
 
         for (const auto& component : indexDef.getCollationSpec()) {
-            multikeynessTrie.add(component._path.ref());
+            multikeynessTrie.add(component._path);
         }
     }
     // The empty path refers to the whole document, which can't be an array.

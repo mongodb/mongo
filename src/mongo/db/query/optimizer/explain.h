@@ -70,14 +70,14 @@ class ExplainGenerator {
 public:
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
-    static std::string explain(const ABT& node,
+    static std::string explain(ABT::reference_type node,
                                bool displayProperties = false,
                                const cascades::MemoExplainInterface* memoInterface = nullptr,
                                const NodeToGroupPropsMap& nodeMap = {});
 
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
-    static std::string explainV2(const ABT& node,
+    static std::string explainV2(ABT::reference_type node,
                                  bool displayProperties = false,
                                  const cascades::MemoExplainInterface* memoInterface = nullptr,
                                  const NodeToGroupPropsMap& nodeMap = {});
@@ -85,25 +85,25 @@ public:
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
     static std::string explainV2Compact(
-        const ABT& node,
+        ABT::reference_type node,
         bool displayProperties = false,
         const cascades::MemoExplainInterface* memoInterface = nullptr,
         const NodeToGroupPropsMap& nodeMap = {});
 
-    static std::string explainNode(const ABT& node);
+    static std::string explainNode(ABT::reference_type node);
 
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainBSON(
-        const ABT& node,
+        ABT::reference_type node,
         bool displayProperties = false,
         const cascades::MemoExplainInterface* memoInterface = nullptr,
         const NodeToGroupPropsMap& nodeMap = {});
 
-    static BSONObj explainBSONObj(const ABT& node,
+    static BSONObj explainBSONObj(ABT::reference_type node,
                                   bool displayProperties = false,
                                   const cascades::MemoExplainInterface* memoInterface = nullptr,
                                   const NodeToGroupPropsMap& nodeMap = {});
 
-    static std::string explainBSONStr(const ABT& node,
+    static std::string explainBSONStr(ABT::reference_type node,
                                       bool displayProperties = false,
                                       const cascades::MemoExplainInterface* memoInterface = nullptr,
                                       const NodeToGroupPropsMap& nodeMap = {});
