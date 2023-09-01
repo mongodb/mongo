@@ -452,7 +452,8 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
     // index.
-    if (!isIdHackEligibleQuery(collection, *canonicalQuery)) {
+    if (!isIdHackEligibleQuery(
+            collection, canonicalQuery->getFindCommandRequest(), canonicalQuery->getCollator())) {
         // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
         fillOutIndexEntries(opCtx,
                             apiStrict,
@@ -1047,7 +1048,8 @@ protected:
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() final {
         initializePlannerParamsIfNeeded();
-        if (!isIdHackEligibleQuery(getMainCollection(), *_cq))
+        if (!isIdHackEligibleQuery(
+                getMainCollection(), _cq->getFindCommandRequest(), _cq->getCollator()))
             return nullptr;
 
         const IndexDescriptor* descriptor =

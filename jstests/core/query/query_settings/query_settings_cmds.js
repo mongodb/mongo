@@ -4,12 +4,18 @@
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
 //   does_not_support_stepdowns,
+//   tenant_migration_incompatible,
+//   command_not_supported_in_serverless,
 // ]
 //
 
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const qsutils = new QuerySettingsUtils(db, jsTestName());
+
+// Creating the collection, because some sharding passthrough suites are failing when explain
+// command is issued on the nonexistent database and collection.
+assert.commandWorked(db.createCollection(jsTestName()));
 
 const adminDB = db.getSiblingDB("admin");
 
@@ -32,6 +38,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after invoking
 // setQuerySettings command.
 {
+    qsutils.assertExplainQuerySettings(queryA, undefined);
     assert.commandWorked(db.adminCommand({setQuerySettings: queryA, settings: querySettingsA}));
     qsutils.assertQueryShapeConfiguration(
         [qsutils.makeQueryShapeConfiguration(querySettingsA, queryA)]);
@@ -40,6 +47,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 // Ensure that 'querySettings' cluster parameter contains both QueryShapeConfigurations after
 // invoking setQuerySettings command.
 {
+    qsutils.assertExplainQuerySettings(queryB, undefined);
     assert.commandWorked(db.adminCommand({setQuerySettings: queryB, settings: querySettingsB}));
     qsutils.assertQueryShapeConfiguration([
         qsutils.makeQueryShapeConfiguration(querySettingsA, queryA),
@@ -80,6 +88,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
         db.adminCommand({removeQuerySettings: qsutils.makeQueryInstance({b: "shape"})}));
     qsutils.assertQueryShapeConfiguration(
         [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)]);
+    qsutils.assertExplainQuerySettings(queryB, undefined);
 }
 
 // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings command
@@ -87,6 +96,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 {
     qsutils.removeAllQuerySettings();
     qsutils.assertQueryShapeConfiguration([]);
+    qsutils.assertExplainQuerySettings(queryA, undefined);
 }
 
 // Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.

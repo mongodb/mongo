@@ -470,6 +470,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interfaces',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
+        '$BUILD_DIR/mongo/db/query/query_settings_manager',
         '$BUILD_DIR/mongo/db/query/query_shape',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/query/stats/stats',

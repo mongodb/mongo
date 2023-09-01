@@ -73,7 +73,7 @@ void QuerySettingsManager::create(ServiceContext* service) {
 boost::optional<std::pair<QuerySettings, QueryInstance>>
 QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     OperationContext* opCtx,
-    const query_shape::QueryShapeHash& queryShapeHash,
+    std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
     const boost::optional<TenantId>& tenantId) const {
     Lock::SharedLock readLock(opCtx, _mutex);
 
@@ -85,10 +85,15 @@ QuerySettingsManager::getQuerySettingsForQueryShapeHash(
         return {};
     }
 
-    // Lookup query settings for 'queryShapeHash'.
+    // Avoid computing the query settings, if no query settings are set for the tenant.
     auto& queryShapeConfigurationsMap =
         versionedQueryShapeConfigurationsIt->second.queryShapeConfigurationsMap;
-    auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHash);
+    if (queryShapeConfigurationsMap.empty()) {
+        return {};
+    }
+
+    // Lookup query settings for the QueryShapeHash.
+    auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHashFn());
     if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
         return {};
     }

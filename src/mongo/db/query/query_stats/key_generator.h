@@ -113,6 +113,10 @@ public:
         return _parseableQueryShape;
     }
 
+    query_shape::QueryShapeHash getQueryShapeHash() const {
+        return _queryShapeHash;
+    }
+
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,

@@ -100,10 +100,12 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -189,6 +191,42 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     curOp->setOpDescription_inlock(queryObj);
     curOp->setNS_inlock(nss);
+}
+
+/**
+ * Performs the lookup for the QuerySettings given the 'parsedRequest'.
+ */
+query_settings::QuerySettings lookupQuerySettingsForFind(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const ParsedFindCommand& parsedRequest,
+    const CollectionPtr& collection,
+    const NamespaceString& nss) {
+    // No QuerySettings lookup for IDHACK queries.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        (collection &&
+         isIdHackEligibleQuery(
+             collection, *parsedRequest.findCommandRequest, parsedRequest.collator.get()))) {
+        return query_settings::QuerySettings();
+    }
+    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsKeyGenerator) {
+            return opDebug.queryStatsKeyGenerator->getQueryShapeHash();
+        }
+
+        return query_shape::hash(query_shape::extractQueryShape(
+            parsedRequest,
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+            expCtx));
+    };
+
+    // Return the found query settings or an empty one.
+    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss.tenantId())
+        .get_value_or({})
+        .first;
 }
 
 /**
@@ -422,14 +460,15 @@ public:
                     findCommand->getResumeAfter(), isClusteredCollection));
             }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collectionPtr, verbosity);
-            const bool isExplain = true;
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto parsedRequest = uassertStatusOK(
+                parsed_find_command::parse(expCtx,
+                                           std::move(findCommand),
+                                           extensionsCallback,
+                                           MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto querySettings =
+                lookupQuerySettingsForFind(opCtx, expCtx, *parsedRequest, collectionPtr, nss);
+            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+                std::move(expCtx), std::move(parsedRequest), true /* explain */));
 
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.
@@ -477,8 +516,14 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(
-                exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection,
+                                   verbosity,
+                                   BSONObj(),
+                                   respSc,
+                                   _request.body,
+                                   querySettings,
+                                   &bodyBuilder);
         }
 
         /**

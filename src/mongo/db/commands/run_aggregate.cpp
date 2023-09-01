@@ -1330,6 +1330,8 @@ Status runAggregate(OperationContext* opCtx,
                 BSON("optimizedPipeline" << true),
                 SerializationContext::stateCommandReply(request.getSerializationContext()),
                 cmdObj,
+                // TODO: SERVER-79231 Apply QuerySettings for aggregate commands.
+                query_settings::QuerySettings(),
                 &bodyBuilder);
         }
     } else {

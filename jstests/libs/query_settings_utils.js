@@ -1,6 +1,7 @@
 /**
  * Utility class for testing query settings.
  */
+import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export class QuerySettingsUtils {
@@ -56,6 +57,22 @@ export class QuerySettingsUtils {
             },
             "current query settings = " + tojson(this.getQuerySettings()) +
                 ", expected query settings = " + tojson(expectedQueryShapeConfigurations));
+
+        for (let {representativeQuery, settings} of expectedQueryShapeConfigurations) {
+            this.assertExplainQuerySettings(representativeQuery, settings);
+        }
+    }
+
+    /**
+     * Asserts that the explain output for 'query' contains 'expectedQuerySettings'.
+     */
+    assertExplainQuerySettings(query, expectedQuerySettings) {
+        // Pass query without the $db field to explain command, because it injects the $db field
+        // inside the query before processing.
+        const {$db: _, ...queryWithoutDollarDb} = query;
+        const explain = assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
+        assert.docEq(
+            expectedQuerySettings, getQueryPlanner(explain).querySettings, explain.queryPlanner);
     }
 
     // Adjust the 'clusterServerParameterRefreshIntervalSecs' value for faster fetching of

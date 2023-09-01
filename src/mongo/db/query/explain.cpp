@@ -64,6 +64,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -86,9 +87,11 @@ namespace {
  * - 'out' is a builder for the explain output.
  */
 void generatePlannerInfo(PlanExecutor* exec,
+                         const BSONObj& cmd,
                          const MultipleCollectionAccessor& collections,
                          BSONObj extraInfo,
                          const SerializationContext& serializationContext,
+                         const query_settings::QuerySettings& querySettings,
                          BSONObjBuilder* out) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
@@ -97,13 +100,20 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet' field
     // will always be false in the case of EOF or idhack plans.
-    bool indexFilterSet = false;
     boost::optional<uint32_t> queryHash;
     boost::optional<uint32_t> planCacheKeyHash;
     const auto& mainCollection = collections.getMainCollection();
-    if (mainCollection && exec->getCanonicalQuery()) {
+    auto indexFilterSet = [&]() {
+        if (!mainCollection || !exec->getCanonicalQuery()) {
+            return false;
+        }
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
+        return querySettings
+            ->getAllowedIndicesFilter(exec->getCanonicalQuery()->encodeKeyForPlanCacheCommand())
+            .has_value();
+    }();
+    if (mainCollection && exec->getCanonicalQuery()) {
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             !exec->getCanonicalQuery()->getForceClassicEngine()) {
             const auto planCacheKeyInfo =
@@ -115,11 +125,6 @@ void generatePlannerInfo(PlanExecutor* exec,
                 *exec->getCanonicalQuery(), mainCollection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
-        }
-        if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(
-                exec->getCanonicalQuery()->encodeKeyForPlanCacheCommand())) {
-            // Found an index filter set on the query shape.
-            indexFilterSet = true;
         }
     }
     plannerBob.append("indexFilterSet", indexFilterSet);
@@ -144,6 +149,10 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     if (planCacheKeyHash) {
         plannerBob.append("planCacheKey", zeroPaddedHex(*planCacheKeyHash));
+    }
+
+    if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
+        plannerBob.append("querySettings", querySettingsBSON);
     }
 
     if (!extraInfo.isEmpty()) {
@@ -353,6 +362,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
+                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     //
     // Use the stats trees to produce explain BSON.
@@ -362,7 +372,8 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, collections, extraInfo, serializationContext, out);
+        generatePlannerInfo(
+            exec, command, collections, extraInfo, serializationContext, querySettings, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -406,6 +417,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
+                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     auto&& explainer = exec->getPlanExplainer();
     auto winningPlanTrialStats = explainer.getWinningPlanTrialStats();
@@ -437,6 +449,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
+                  querySettings,
                   out);
 
     explain_common::generateServerInfo(out);
@@ -449,6 +462,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
+                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     explainStages(exec,
                   MultipleCollectionAccessor(collection),
@@ -456,6 +470,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
+                  querySettings,
                   out);
 }
 
@@ -465,6 +480,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
+                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     explainStages(exec,
                   MultipleCollectionAccessor(collection),
@@ -472,6 +488,7 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
+                  querySettings,
                   out);
 }
 

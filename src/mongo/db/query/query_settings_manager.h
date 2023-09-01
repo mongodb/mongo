@@ -118,13 +118,25 @@ public:
     static QuerySettingsManager& get(OperationContext* opCtx);
 
     /**
+     * Performs the QuerySettings lookup by computing QueryShapeHash only in cases when at least one
+     * QueryShapeConfiguration is set.
+     */
+    boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
+        OperationContext* opCtx,
+        std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
+        const boost::optional<TenantId>& tenantId) const;
+
+    /**
      * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given
      * tenant.
      */
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
         OperationContext* opCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
-        const boost::optional<TenantId>& tenantId) const;
+        const boost::optional<TenantId>& tenantId) const {
+        return getQuerySettingsForQueryShapeHash(
+            opCtx, [&]() { return queryShapeHash; }, tenantId);
+    }
 
     /**
      * Returns all QueryShapeConfigurations stored for the given tenant.

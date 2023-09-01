@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
@@ -43,7 +44,9 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
  */
-bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query);
+bool isIdHackEligibleQuery(const CollectionPtr& collection,
+                           const FindCommandRequest& findCommand,
+                           const CollatorInterface* queryCollator);
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,

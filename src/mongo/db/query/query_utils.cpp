@@ -67,9 +67,11 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
     return false;
 }
 
-bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& query) {
-    return isIdHackEligibleQueryWithoutCollator(query.getFindCommandRequest()) &&
-        CollatorInterface::collatorsMatch(query.getCollator(), collection->getDefaultCollator());
+bool isIdHackEligibleQuery(const CollectionPtr& collection,
+                           const FindCommandRequest& findCommand,
+                           const CollatorInterface* queryCollator) {
+    return isIdHackEligibleQueryWithoutCollator(findCommand) &&
+        CollatorInterface::collatorsMatch(queryCollator, collection->getDefaultCollator());
 }
 
 bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand) {
@@ -96,7 +98,8 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
     if (!expCtx || expCtx->sbeCompatibility == SbeCompatibility::notCompatible ||
         expCtx->sbePipelineCompatibility == SbeCompatibility::notCompatible ||
-        (*collection && isIdHackEligibleQuery(*collection, *cq))) {
+        (*collection &&
+         isIdHackEligibleQuery(*collection, cq->getFindCommandRequest(), cq->getCollator()))) {
         return false;
     }
 

@@ -91,6 +91,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/stage_types.h"
@@ -588,6 +589,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                            BSONObj(),
                            SerializationContext::stateCommandReply(),
                            BSONObj(),
+                           query_settings::QuerySettings(),
                            &bob);
     BSONObj explained = bob.done();
 

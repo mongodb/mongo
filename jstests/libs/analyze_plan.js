@@ -16,6 +16,16 @@ export function getWinningPlan(queryPlanner) {
 }
 
 /**
+ * Returns the query planner information from the explain output.
+ */
+export function getQueryPlanner(explain) {
+    if (explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        return explain.queryPlanner.winningPlan.shards[0];
+    }
+    return explain.queryPlanner;
+}
+
+/**
  * Returns the winning plan from the corresponding sub-node of classic/SBE explain output. Takes
  * into account that the plan may or may not have agg stages.
  */

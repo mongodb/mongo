@@ -1,12 +1,9 @@
-// # TODO: SERVER-79909 Add multitenant support for aggregation commands using setQuerySettings -
-// remove 'tenant_migration_incompatible' and 'command_not_supported_in_serverless' flags
-
 // Tests query settings validation rules.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
 //   tenant_migration_incompatible,
-//   command_not_supported_in_serverless
+//   command_not_supported_in_serverless,
 // ]
 //
 
