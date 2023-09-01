@@ -2926,6 +2926,8 @@ buildvariants:
       - name: mongos_workloads
         cron: *high-value-workload-cron
       - name: mongos_large_catalog_workloads
+      - name: move_chunk_workloads
+        cron: *high-value-workload-cron
       - name: change_streams_latency
         cron: *high-value-workload-cron
       - name: change_streams_listen_throughput
@@ -3047,7 +3049,6 @@ buildvariants:
       - name: mongos_large_catalog_workloads
       - name: move_chunk_large_chunk_map_workloads
       - name: move_chunk_workloads
-        cron: *high-value-workload-cron
       - name: move_chunk_waiting_workloads
       - name: smoke_test
       - name: tsbs_query_sharded
