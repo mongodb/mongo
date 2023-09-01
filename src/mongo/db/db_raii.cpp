@@ -1160,6 +1160,22 @@ void assertReadConcernSupported(const CollectionPtr& coll,
                                 const repl::ReadConcernArgs& readConcernArgs,
                                 const RecoveryUnit::ReadSource& readSource) {
     const auto readConcernLevel = readConcernArgs.getLevel();
+    NamespaceString ns = coll->ns();
+
+    // Pre-images and change collection tables prune old content using untimestamped truncates. A
+    // read establishing a snapshot at a point in time (PIT) may see data inconsistent with that
+    // PIT: data that should have been present at that PIT will be missing if it was truncated,
+    // since a non-truncated operation effectively overwrites history.
+    uassert(7829600,
+            "Reading with readConcern snapshot from pre-images collection is "
+            "not supported",
+            !ns.isChangeStreamPreImagesCollection() ||
+                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+    uassert(7829601,
+            "Reading with readConcern snapshot from change collection is "
+            "not supported",
+            !ns.isChangeCollection() ||
+                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
     // Ban snapshot reads on capped collections.
     uassert(ErrorCodes::SnapshotUnavailable,
             "Reading from capped collections with readConcern snapshot is not supported",
@@ -1172,8 +1188,7 @@ void assertReadConcernSupported(const CollectionPtr& coll,
     // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
     // reads because they must be from internal readers given the snapshot/majority readConcern
     // (e.g. for session checkout).
-
-    if (coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
+    if (ns == NamespaceString::kSessionTransactionsTableNamespace &&
         readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
         readSource != RecoveryUnit::ReadSource::kLastApplied &&
         ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
