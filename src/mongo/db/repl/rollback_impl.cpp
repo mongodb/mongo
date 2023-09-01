@@ -492,7 +492,7 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
             case OplogEntry::CommandType::kEmptyCapped: {
                 // These commands do not need to be supported by rollback. 'convertToCapped' should
                 // always be converted to lower level DDL operations, and 'emptycapped' is a
-                // testing-only command.
+                // test-only command.
                 std::string message = str::stream()
                     << "Encountered unsupported command type '" << firstElem.fieldName()
                     << "' during rollback.";

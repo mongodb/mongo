@@ -28,7 +28,7 @@ subcommand, can be used to indicate the location of the mongod/mongos binaries.
 
 As an alternative, you may instead prefer to use the resmoke.py wrapper script
 located in the same directory as the mongod binary, which will automatically
-set `installDir` for you. 
+set `installDir` for you.
 
 Note that this wrapper is unavailable in packaged installations of MongoDB
 Server, such as those provided by Homebrew, and other package managers. If you

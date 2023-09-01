@@ -91,7 +91,11 @@ using std::endl;
 using std::string;
 using std::stringstream;
 
-/* For testing only, not for general use. Enabled via command-line */
+/**
+ * The commands in this file are for testing only, not for general use.
+ * For more on this topic and how to enable these commands, see docs/test_commands.md.
+ */
+
 class GodInsert : public BasicCommand {
 public:
     GodInsert() : BasicCommand("godinsert") {}
@@ -117,6 +121,7 @@ public:
     std::string help() const override {
         return "internal. for testing only.";
     }
+
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
@@ -157,7 +162,6 @@ public:
 
 MONGO_REGISTER_COMMAND(GodInsert).testOnly();
 
-// Testing only, enabled via command-line.
 class CapTrunc : public BasicCommand {
 public:
     CapTrunc() : BasicCommand("captrunc") {}
@@ -237,7 +241,6 @@ public:
 
 MONGO_REGISTER_COMMAND(CapTrunc).testOnly();
 
-// Testing-only, enabled via command line.
 class EmptyCapped : public BasicCommand {
 public:
     EmptyCapped() : BasicCommand("emptycapped") {}

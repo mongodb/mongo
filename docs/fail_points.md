@@ -6,6 +6,8 @@ branches, enhance diagnostics, or achieve any number of other aims. Fail points 
 configured, and disabled via command request to a remote process or via an API within the same
 process.
 
+For more on what test-only means and how to enable the `configureFailPoint` command, see [test_commands][test_only].
+
 ## Using Fail Points
 
 A fail point must first be defined using `MONGO_FAIL_POINT_DEFINE(myFailPoint)`. This statement
@@ -45,9 +47,9 @@ command implementations, see [here][fail_point_commands].
 
 ## The `failCommand` Fail Point
 
-The `failCommand` fail point is an especially developed fail point used to mock arbitrary response
-behaviors to requests filtered by command, appName, etc. It is most often used to simulate specific
-conditions between nodes like invalid replica set configurations. For examples of use, see the
+The `failCommand` fail point is a special fail point used to mock arbitrary response behaviors to
+requests filtered by command, appName, etc. It is most often used to simulate specific conditions
+between nodes like invalid replica set configurations. For examples of use, see the
 [failCommand JavaScript tests][fail_command_javascript_test].
 
 [fail_point]: ../src/mongo/util/fail_point.h
@@ -56,3 +58,4 @@ conditions between nodes like invalid replica set configurations. For examples o
 [fail_point_util]: ../jstests/libs/fail_point_util.js
 [fail_point_javascript_test]: ../jstests/fail_point/fail_point.js
 [fail_command_javascript_test]: ../jstests/core/failcommand_failpoint.js
+[test_only]: test_commands.md

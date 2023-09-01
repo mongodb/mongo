@@ -130,9 +130,11 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
+
     std::string help() const override {
         return {};
     }
@@ -140,8 +142,8 @@ public:
     Status checkAuthForOperation(OperationContext*,
                                  const DatabaseName&,
                                  const BSONObj&) const override {
-        // Command is testing-only, and can only be enabled at command line.
-        //  Hence, no auth check needed.
+        // Command is test-only, and can only be enabled on command line. See docs/test_commands.md.
+        // Hence, no auth check needed.
         return Status::OK();
     }
 

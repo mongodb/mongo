@@ -124,7 +124,7 @@ public:
 
 auto& replExecutorSSM = addMetricToTree(std::make_unique<ReplExecutorSSM>());
 
-// Testing only, enabled via command-line.
+// Test-only, enabled via command-line. See docs/test_commands.md.
 class CmdReplSetTest : public ReplSetCommand {
 public:
     std::string help() const override {

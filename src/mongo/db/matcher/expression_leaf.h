@@ -967,7 +967,7 @@ private:
     // Used to perform bit tests against numbers using a single bitwise operation.
     uint64_t _bitMask = 0;
 
-    // When this expression is parameterized, we require two parmeter markers, not one: a parameter
+    // When this expression is parameterized, we require two parameter markers, not one: a parameter
     // marker for the vector of bit positions and a second for the bitmask. The runtime plan
     // needs both values so that it can operate against either BinData or numerical inputs.
     boost::optional<InputParamId> _bitPositionsParamId;

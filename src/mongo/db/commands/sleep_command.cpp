@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-/* for diagnostic / testing purposes. Enabled via command line. */
+/* For diagnostic / testing purposes. Enabled via command line. See docs/test_commands.md. */
 class CmdSleep : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

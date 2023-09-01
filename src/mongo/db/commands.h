@@ -1501,6 +1501,9 @@ public:
 
     EntryBuilder() = default;
 
+    /**
+     * Denotes a test-only command. See docs/test_commands.md.
+     */
     EntryBuilder testOnly() && {
         _entry->testOnly = true;
         return std::move(*this);
