@@ -47,12 +47,19 @@ extern FailPoint skipWriteConflictRetries;
  */
 void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns);
 
+/**
+ * Retries the operation for a fixed number of attempts with linear backoff.
+ * For internal system operations, converts the temporarily unavailable error into a write
+ * conflict and handles it, because unlike user operations, the error cannot eventually escape to
+ * the client.
+ */
 void handleTemporarilyUnavailableException(
     OperationContext* opCtx,
-    int attempts,
+    size_t tempUnavailAttempts,
     StringData opStr,
     StringData ns,
-    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
+    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e,
+    size_t& writeConflictAttempts);
 
 /**
  * Convert `e` into a `WriteConflictException` and throw it.
@@ -64,10 +71,10 @@ void convertToWCEAndRethrow(OperationContext* opCtx,
 
 void handleTransactionTooLargeForCacheException(
     OperationContext* opCtx,
-    int* writeConflictAttempts,
     StringData opStr,
     StringData ns,
-    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e);
+    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e,
+    size_t& writeConflictAttempts);
 
 namespace error_details {
 /**
@@ -146,8 +153,8 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
         }
     }
 
-    int writeConflictAttempts = 0;
-    int attemptsTempUnavailable = 0;
+    size_t writeConflictAttempts = 0;
+    size_t attemptsTempUnavailable = 0;
     while (true) {
         try {
             return f();
@@ -157,9 +164,10 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
         } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
-            handleTemporarilyUnavailableException(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
+            handleTemporarilyUnavailableException(
+                opCtx, ++attemptsTempUnavailable, opStr, ns, e, writeConflictAttempts);
         } catch (ExceptionFor<ErrorCodes::TransactionTooLargeForCache> const& e) {
-            handleTransactionTooLargeForCacheException(opCtx, &writeConflictAttempts, opStr, ns, e);
+            handleTransactionTooLargeForCacheException(opCtx, opStr, ns, e, writeConflictAttempts);
         }
     }
 }
