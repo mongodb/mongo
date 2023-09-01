@@ -12,6 +12,9 @@ if not gdb:
 
 OPTIMIZER_NS = "mongo::optimizer"
 
+# Tracks the indentation for Op* tree types.
+operator_indent_level = 0
+
 
 def strip_namespace(value):
     return str(value).split("::")[-1]
@@ -138,15 +141,16 @@ class FixedArityNodePrinter(object):
 
     def children(self):
         """children."""
+        global operator_indent_level
 
-        prior_indent = ABTPrinter.indent_level
-        current_indent = ABTPrinter.indent_level + self.arity + len(self.custom_children) - 1
+        prior_indent = operator_indent_level
+        current_indent = operator_indent_level + self.arity + len(self.custom_children) - 1
         for child in self.custom_children:
             lhs = "\n"
             for _ in range(current_indent):
                 lhs += "|   "
 
-            ABTPrinter.indent_level = current_indent
+            operator_indent_level = current_indent
             yield lhs, child
             current_indent -= 1
 
@@ -156,10 +160,10 @@ class FixedArityNodePrinter(object):
                 lhs += "|   "
 
             # A little weird, but most ABTs prefer to print the last child first.
-            ABTPrinter.indent_level = current_indent
+            operator_indent_level = current_indent
             yield lhs, self.val["_nodes"][self.arity - i - 1]
             current_indent -= 1
-        ABTPrinter.indent_level = prior_indent
+        operator_indent_level = prior_indent
 
     # Adds a custom child node which is not directly contained in the "_nodes" member variable.
     def add_child(self, child):
@@ -206,22 +210,23 @@ class DynamicArityNodePrinter(FixedArityNodePrinter):
 
     def children(self):
         """children."""
+        global operator_indent_level
 
-        prior_indent = ABTPrinter.indent_level
-        ABTPrinter.indent_level += self.dynamic_count
+        prior_indent = operator_indent_level
+        operator_indent_level += self.dynamic_count
         for res in super().children():
             yield res
 
-        current_indent = ABTPrinter.indent_level - 1
+        current_indent = operator_indent_level - 1
         for child in self.dynamic_nodes:
             lhs = "\n"
             for _ in range(current_indent):
                 lhs += "|   "
 
-            ABTPrinter.indent_level = current_indent
+            operator_indent_level = current_indent
             yield lhs, child
             current_indent -= 1
-        ABTPrinter.indent_level = prior_indent
+        operator_indent_level = prior_indent
 
 
 class ExpressionBinderPrinter(DynamicArityNodePrinter):
@@ -269,7 +274,10 @@ class ScanNodePrinter(object):
         _, self.binder = next(FixedArityNodePrinter(self.val, 1, "Scan").children())
 
     def get_bound_projection(self):
-        bound_projections = ABTPrinter.get_bound_projections(self.binder)
+        pp = PolyValuePrinter(self.binder)
+        dynamic_type = lookup_type(pp.get_dynamic_type()).strip_typedefs()
+        binder = pp.cast_control_block(dynamic_type)
+        bound_projections = Vector(binder["_names"])
         if bound_projections.count() != 1:
             return "<unknown>"
         return str(bound_projections.get(0))
@@ -961,23 +969,25 @@ class ReferencesPrinter(DynamicArityNodePrinter):
 class PolyValuePrinter(object):
     """Pretty-printer for PolyValue."""
 
-    # This printer must be given the full set of variant types that the PolyValue can hold in
-    # 'type_set'.
-    def __init__(self, type_set, type_namespace, val):
+    def __init__(self, val):
         """Initialize PolyValuePrinter."""
         self.val = val
         self.control_block = self.val["_object"]
         self.tag = self.control_block.dereference()["_tag"]
-        self.type_set = type_set
-        self.type_namespace = type_namespace
+
+        if self.val.type.code == gdb.TYPE_CODE_REF:
+            self.poly_type = self.val.type.target().strip_typedefs()
+        else:
+            self.poly_type = self.val.type.strip_typedefs()
+        self.type_set = str(self.poly_type).split("<", 1)[1]
 
         if self.tag < 0:
             raise gdb.GdbError("Invalid PolyValue tag: {}, must be at least 0".format(self.tag))
 
         # Check if the tag is out of range for the set of types that we know about.
-        if self.tag > len(self.type_set):
+        if self.tag > len(self.type_set.split(",")):
             raise gdb.GdbError("Unknown PolyValue tag: {} (max: {}), did you add a new one?".format(
-                self.tag, len(self.type_set)))
+                self.tag, str(self.type_set)))
 
     @staticmethod
     def display_hint():
@@ -994,9 +1004,9 @@ class PolyValuePrinter(object):
         # of ControlBlockVTable<T, Ts...>::ConcreteType where T is the template argument derived
         # from the _tag member variable.
         poly_type = self.val.type.template_argument(self.tag)
-        dynamic_type = f"{OPTIMIZER_NS}::algebra::ControlBlockVTable<{poly_type.name},"
-        dynamic_type += ", ".join(self.type_namespace + "::" + t for t in self.type_set)
-        dynamic_type += ">::ConcreteType"
+        dynamic_type = f"{OPTIMIZER_NS}::algebra::ControlBlockVTable<{poly_type.name}, "
+        dynamic_type += self.type_set
+        dynamic_type += "::ConcreteType"
         return dynamic_type
 
     def to_string(self):
@@ -1012,12 +1022,109 @@ class PolyValuePrinter(object):
                                                                                          "}", "")
 
 
-class ABTPrinter(PolyValuePrinter):
-    """Pretty-printer for ABT."""
+class AtomPrinter(object):
+    """Pretty-printer for Atom."""
 
-    indent_level = 0
-    abt_namespace = OPTIMIZER_NS
+    def __init__(self, val):
+        """Initialize AtomPrinter."""
+        self.val = val
 
+    def to_string(self):
+        return self.val["_expr"]
+
+
+class ConjunctionPrinter(object):
+    """Pretty-printer for Conjunction."""
+
+    def __init__(self, val, separator=" ^ "):
+        """Initialize ConjunctionPrinter."""
+        self.val = val
+        self.dynamic_nodes = Vector(self.val["_dyNodes"])
+        self.dynamic_count = self.dynamic_nodes.count()
+        self.separator = separator
+
+    def to_string(self):
+        if self.dynamic_count == 0:
+            return "<empty>"
+
+        res = ""
+        first = True
+        for child in self.dynamic_nodes:
+            if first:
+                first = False
+            else:
+                res += self.separator
+
+            res += str(child)
+        return res
+
+
+class DisjunctionPrinter(ConjunctionPrinter):
+    """Pretty-printer for Disjunction."""
+
+    def __init__(self, val):
+        super().__init__(val, " U ")
+
+
+def bool_expr_type(T):
+    return (f"{OPTIMIZER_NS}::algebra::PolyValue<" + f"{OPTIMIZER_NS}::BoolExpr<{T}>::Atom, " +
+            f"{OPTIMIZER_NS}::BoolExpr<{T}>::Conjunction, " +
+            f"{OPTIMIZER_NS}::BoolExpr<{T}>::Disjunction>")
+
+
+def register_optimizer_printers(pp):
+    """Registers a number of pretty printers related to the CQF optimizer."""
+
+    # IntervalRequirement printer.
+    pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
+    pp.add("CompoundInterval", f"{OPTIMIZER_NS}::CompoundIntervalRequirement", False,
+           CompoundIntervalPrinter)
+
+    # IntervalReqExpr::Node printer.
+    pp.add(
+        "IntervalExpr",
+        bool_expr_type(f"{OPTIMIZER_NS}::IntervalRequirement"),
+        False,
+        IntervalExprPrinter,
+    )
+
+    # PSRExpr printer.
+    pp.add(
+        "PSRExpr",
+        bool_expr_type(
+            f"std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement> "
+        ),
+        False,
+        PSRExprPrinter,
+    )
+
+    # Memo printer.
+    pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
+
+    # ResidualRequirement printer.
+    pp.add("ResidualRequirement", f"{OPTIMIZER_NS}::ResidualRequirement", False,
+           ResidualRequirementPrinter)
+
+    # CandidateIndexEntry printer.
+    pp.add("CandidateIndexEntry", f"{OPTIMIZER_NS}::CandidateIndexEntry", False,
+           CandidateIndexEntryPrinter)
+
+    # BoolExpr<ResidualRequirement> is handled by the PolyValue printer, but still need to add
+    # printers for each of the possible bool expr types.
+    bool_expr_types = ["Atom", "Conjunction", "Disjunction"]
+    bool_exprs = ["ResidualRequirement"]
+    for bool_type in bool_expr_types:
+        for expr in bool_exprs:
+            pp.add(bool_type, f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::{expr}>::{bool_type}",
+                   False, getattr(sys.modules[__name__], bool_type + "Printer"))
+
+    # Utility types within the optimizer.
+    pp.add("StrongStringAlias", f"{OPTIMIZER_NS}::StrongStringAlias", True,
+           StrongStringAliasPrinter)
+    pp.add("FieldProjectionMap", f"{OPTIMIZER_NS}::FieldProjectionMap", False,
+           FieldProjectionMapPrinter)
+
+    # Add the sub-printers for each of the possible ABT types.
     # This is the set of known ABT variants that GDB is aware of. When adding to this list, ensure
     # that a corresponding printer class exists with the name MyNewNodePrinter where "MyNewNode"
     # exactly matches the entry in this list. The printer class may choose to derive from one of
@@ -1083,176 +1190,10 @@ class ABTPrinter(PolyValuePrinter):
         "References",
         "ExpressionBinder",
     ]
-
-    @staticmethod
-    def build_abt_type():
-        abt_type = f"{OPTIMIZER_NS}::algebra::PolyValue<"
-        abt_type += ", ".join(OPTIMIZER_NS + "::" + t for t in ABTPrinter.abt_type_set)
-        abt_type += ">"
-        return abt_type
-
-    @staticmethod
-    def get_bound_projections(node):
-        # Casts the input node to an ExpressionBinder and returns the set of bound projection names.
-        pp = PolyValuePrinter(ABTPrinter.abt_type_set, ABTPrinter.abt_namespace, node)
-        dynamic_type = lookup_type(pp.get_dynamic_type()).strip_typedefs()
-        binder = pp.cast_control_block(dynamic_type)
-        return Vector(binder["_names"])
-
-    def __init__(self, val):
-        """Initialize ABTPrinter."""
-        super().__init__(ABTPrinter.abt_type_set, ABTPrinter.abt_namespace, val)
-
-
-class AtomPrinter(object):
-    """Pretty-printer for Atom."""
-
-    def __init__(self, val):
-        """Initialize AtomPrinter."""
-        self.val = val
-
-    def to_string(self):
-        return self.val["_expr"]
-
-
-class ConjunctionPrinter(object):
-    """Pretty-printer for Conjunction."""
-
-    def __init__(self, val, separator=" ^ "):
-        """Initialize ConjunctionPrinter."""
-        self.val = val
-        self.dynamic_nodes = Vector(self.val["_dyNodes"])
-        self.dynamic_count = self.dynamic_nodes.count()
-        self.separator = separator
-
-    def to_string(self):
-        if self.dynamic_count == 0:
-            return "<empty>"
-
-        res = ""
-        first = True
-        for child in self.dynamic_nodes:
-            if first:
-                first = False
-            else:
-                res += self.separator
-
-            res += str(child)
-        return res
-
-
-class DisjunctionPrinter(ConjunctionPrinter):
-    """Pretty-printer for Disjunction."""
-
-    def __init__(self, val):
-        super().__init__(val, " U ")
-
-
-class BoolExprPrinter(PolyValuePrinter):
-    """Pretty-printer for BoolExpr."""
-
-    type_set = ["Atom", "Conjunction", "Disjunction"]
-
-    def __init__(self, val, template_type):
-        """Initialize BoolExprPrinter."""
-        namespace = f"{OPTIMIZER_NS}::BoolExpr<{template_type}>::"
-        super().__init__(BoolExprPrinter.type_set, namespace, val)
-
-
-class ResidualReqExprPrinter(BoolExprPrinter):
-    """Pretty-printer for BoolExpr<ResidualRequirement>."""
-
-    def __init__(self, val):
-        """Initialize ResidualReqExprPrinter."""
-        super().__init__(val, f"{OPTIMIZER_NS}::ResidualRequirement")
-
-
-def register_abt_printers(pp):
-    """Registers a number of pretty printers related to the CQF optimizer."""
-
-    # IntervalRequirement printer.
-    pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
-    pp.add("CompoundInterval", f"{OPTIMIZER_NS}::CompoundIntervalRequirement", False,
-           CompoundIntervalPrinter)
-
-    # IntervalReqExpr::Node printer.
-    pp.add(
-        "IntervalExpr",
-        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Atom, " +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Conjunction, " +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Disjunction>"),
-        False,
-        IntervalExprPrinter,
-    )
-
-    # PSRExpr printer.
-    pp.add(
-        "PSRExpr",
-        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
-         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Atom, "
-         +
-         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Conjunction, "
-         +
-         f"{OPTIMIZER_NS}::BoolExpr<std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement>>::Disjunction>"
-         ),
-        False,
-        PSRExprPrinter,
-    )
-
-    # Memo printer.
-    pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
-
-    # ResidualRequirement printer.
-    pp.add("ResidualRequirement", f"{OPTIMIZER_NS}::ResidualRequirement", False,
-           ResidualRequirementPrinter)
-
-    # CandidateIndexEntry printer.
-    pp.add("CandidateIndexEntry", f"{OPTIMIZER_NS}::CandidateIndexEntry", False,
-           CandidateIndexEntryPrinter)
-
-    pp.add(
-        "ResidualRequirementExpr",
-        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Atom, " +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Conjunction, " +
-         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Disjunction>"),
-        False,
-        ResidualReqExprPrinter,
-    )
-    for bool_type in BoolExprPrinter.type_set:
-        pp.add(bool_type,
-               f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::{bool_type}", False,
-               getattr(sys.modules[__name__], bool_type + "Printer"))
-
-    # Utility types within the optimizer.
-    pp.add("StrongStringAlias", f"{OPTIMIZER_NS}::StrongStringAlias", True,
-           StrongStringAliasPrinter)
-    pp.add("FieldProjectionMap", f"{OPTIMIZER_NS}::FieldProjectionMap", False,
-           FieldProjectionMapPrinter)
-
-    # Attempt to dynamically load the ABT type since it has a templated type set that is bound to
-    # change. This may fail on certain builds, such as those with dynamically linked libraries, so
-    # we catch the lookup error and fallback to registering the static type name which may be
-    # stale.
-    try:
-        # ABT printer.
-        abt_type = lookup_type(OPTIMIZER_NS + "::ABT").strip_typedefs()
-        pp.add('ABT', abt_type.name, False, ABTPrinter)
-
-        abt_ref_type = abt_type.name + "::Reference"
-        # We can re-use the same printer since an ABT is contructable from an ABT::Reference.
-        pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
-    except gdb.error:
-        # ABT printer.
-        abt_type = ABTPrinter.build_abt_type()
-        pp.add('ABT', abt_type, False, ABTPrinter)
-
-        abt_ref_type = abt_type + "::Reference"
-        # We can re-use the same printer since an ABT is contructable from an ABT::Reference.
-        pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
-
-    # Add the sub-printers for each of the possible ABT types.
-    for abt_type in ABTPrinter.abt_type_set:
+    for abt_type in abt_type_set:
         pp.add(abt_type, f"{OPTIMIZER_NS}::{abt_type}", False,
                getattr(sys.modules[__name__], abt_type + "Printer"))
+
+    # Add the generic PolyValue printer which determines the exact type at runtime and attempts to
+    # invoke the printer for that type.
+    pp.add('PolyValue', OPTIMIZER_NS + "::algebra::PolyValue", True, PolyValuePrinter)

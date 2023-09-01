@@ -3,11 +3,6 @@
 
 import gdb
 import traceback
-try:
-    from buildscripts.gdb.optimizer_printers import ABTPrinter
-except Exception as err:
-    gdb.write('TEST FAILED -- {!s}\n'.format(traceback.format_exc()))
-    gdb.execute('quit 1', to_string=True)
 
 def verify_type_lookup(type_name):
     try:
@@ -22,7 +17,6 @@ gdb.execute('break main')
 gdb.execute('run')
 
 # These types are pretty printed entirely in python, so just verify that we're able to lookup the type.
-verify_type_lookup(ABTPrinter.build_abt_type())
 verify_type_lookup("mongo::optimizer::ABT")
 verify_type_lookup("mongo::optimizer::ResidualRequirement")
 verify_type_lookup(

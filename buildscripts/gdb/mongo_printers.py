@@ -16,7 +16,7 @@ from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIt
 
 if not gdb:
     from buildscripts.gdb.mongo import get_boost_optional, lookup_type
-    from buildscripts.gdb.optimizer_printers import register_abt_printers
+    from buildscripts.gdb.optimizer_printers import register_optimizer_printers
 
 try:
     import bson
@@ -1054,7 +1054,7 @@ def build_pretty_printer():
     pp.add('LazyInit', 'mongo::decorable_detail::LazyInit', True, LazyInitPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
-    register_abt_printers(pp)
+    register_optimizer_printers(pp)
 
     return pp
 
