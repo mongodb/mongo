@@ -57,7 +57,7 @@ template <typename T>
 class StatusWith;
 
 /**
- * Set of functions used to introspect and manipulate the state of individual shards.
+ * Set of functions used to introspect and manipulate the state of shards.
  */
 namespace shardutil {
 
@@ -126,6 +126,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const Timestamp& timestamp,
     const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints);
+
+/**
+ * Selects the shard with the least amount of data by checking the total size of each shard in the
+ * shard registry. Will return ShardNotFound if no shard is found.
+ */
+ShardId selectLeastLoadedShard(OperationContext* opCtx);
 
 }  // namespace shardutil
 }  // namespace mongo

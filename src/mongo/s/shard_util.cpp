@@ -293,5 +293,28 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     return boost::optional<ChunkRange>();
 }
 
+ShardId selectLeastLoadedShard(OperationContext* opCtx) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto allShardIds = shardRegistry->getAllShardIds(opCtx);
+    uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
+
+    ShardId candidateShardId = allShardIds[0];
+
+    auto candidateSize = uassertStatusOK(retrieveTotalShardSize(opCtx, candidateShardId));
+
+    for (size_t i = 1; i < allShardIds.size(); i++) {
+        const ShardId shardId = allShardIds[i];
+
+        const auto currentSize = uassertStatusOK(retrieveTotalShardSize(opCtx, shardId));
+
+        if (currentSize < candidateSize) {
+            candidateSize = currentSize;
+            candidateShardId = shardId;
+        }
+    }
+
+    return candidateShardId;
+}
+
 }  // namespace shardutil
 }  // namespace mongo

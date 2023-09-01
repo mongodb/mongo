@@ -35,6 +35,7 @@
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -73,16 +74,15 @@ public:
             reshardCollectionRequest.setKey(BSON("_id" << 1));
             reshardCollectionRequest.setProvenance(StringData("unshardCollection"));
 
-            std::vector<mongo::ShardKeyRange> destinationShard;
+            ShardId toShard;
             if (request().getToShard().has_value()) {
-                destinationShard.push_back(ShardKeyRange(request().getToShard().get()));
-                reshardCollectionRequest.setShardDistribution(destinationShard);
+                toShard = request().getToShard().get();
             } else {
-                // TODO (SERVER-80265) : Calculate emptiest shard for unshard collection.
-                // This uassert is temporary until we have implemented this ticket.
-                uassert(8018401, "Need to specify toShard option", false);
+                toShard = shardutil::selectLeastLoadedShard(opCtx);
             }
 
+            std::vector<mongo::ShardKeyRange> destinationShard = {toShard};
+            reshardCollectionRequest.setShardDistribution(destinationShard);
             reshardCollectionRequest.setForceRedistribution(true);
 
             shardsvrReshardCollection.setReshardCollectionRequest(

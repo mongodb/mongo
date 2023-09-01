@@ -37,8 +37,7 @@ assert.commandWorked(coll.createIndex({oldKey: 1}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
 // Unshard collection should succeed with and without toShard option.
-// TODO (SERVER-80265): Update once we support not passing in toShard.
-assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}), 8018401);
+assert.commandWorked(mongos.adminCommand({unshardCollection: ns}));
 assert.commandWorked(mongos.adminCommand(cmdObj));
 
 // Fail if command called on shard.

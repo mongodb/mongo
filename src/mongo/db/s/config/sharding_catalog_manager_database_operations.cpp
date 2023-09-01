@@ -104,35 +104,6 @@ namespace {
 
 using namespace fmt::literals;
 
-/**
- * Selects an optimal shard on which to place a newly created database from the set of available
- * shards. Will return ShardNotFound if shard could not be found.
- */
-ShardId selectShardForNewDatabase(OperationContext* opCtx, ShardRegistry* shardRegistry) {
-    // Ensure the shard registry contains the most up-to-date list of available shards
-    shardRegistry->reload(opCtx);
-    auto allShardIds = shardRegistry->getAllShardIds(opCtx);
-    uassert(ErrorCodes::ShardNotFound, "No shards found", !allShardIds.empty());
-
-    ShardId candidateShardId = allShardIds[0];
-
-    auto candidateSize =
-        uassertStatusOK(shardutil::retrieveTotalShardSize(opCtx, candidateShardId));
-
-    for (size_t i = 1; i < allShardIds.size(); i++) {
-        const ShardId shardId = allShardIds[i];
-
-        const auto currentSize = uassertStatusOK(shardutil::retrieveTotalShardSize(opCtx, shardId));
-
-        if (currentSize < candidateSize) {
-            candidateSize = currentSize;
-            candidateShardId = shardId;
-        }
-    }
-
-    return candidateShardId;
-}
-
 }  // namespace
 
 DatabaseType ShardingCatalogManager::createDatabase(
@@ -253,8 +224,10 @@ DatabaseType ShardingCatalogManager::createDatabase(
             // The database does not exist. Insert an entry for the new database into the sharding
             // catalog. Assign also a primary shard if the caller hasn't specified one.
             if (!resolvedPrimaryShard) {
-                resolvedPrimaryShard = uassertStatusOK(shardRegistry->getShard(
-                    opCtx, selectShardForNewDatabase(opCtx, shardRegistry)));
+                // Assigns an optimal shard on which to place a newly created database from the set
+                // of available shards.
+                resolvedPrimaryShard = uassertStatusOK(
+                    shardRegistry->getShard(opCtx, shardutil::selectLeastLoadedShard(opCtx)));
             }
 
             ShardingLogging::get(opCtx)->logChange(opCtx,
