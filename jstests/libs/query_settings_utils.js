@@ -103,5 +103,6 @@ export class QuerySettingsUtils {
             .forEach(el => assert.commandWorked(
                          this.adminDB.runCommand({removeQuerySettings: el.queryShapeHash})),
                      this);
+        this.assertQueryShapeConfiguration([]);
     }
 }
