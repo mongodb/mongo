@@ -158,8 +158,7 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
         // Add the shard name to the output document.
         doc.addField(kShardFieldName, Value(_shardName));
 
-        if (feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility) &&
-            mongo::lockedForWriting()) {
+        if (mongo::lockedForWriting()) {
             doc.addField(StringData("fsyncLock"), Value(true));
         }
 

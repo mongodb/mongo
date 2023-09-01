@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   requires_fsync,
- *   requires_fcv_71
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
