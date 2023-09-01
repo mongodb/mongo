@@ -70,6 +70,48 @@ typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 
 /**
+ * Keeps track of zones for a collection.
+ */
+class ZoneInfo {
+public:
+    ZoneInfo();
+    ZoneInfo(ZoneInfo&&) = default;
+
+    /**
+     * Appends the specified range to the set of ranges tracked for this collection and checks if
+     * it overlaps with existing ranges.
+     */
+    Status addRangeToZone(const ZoneRange& range);
+
+    /**
+     * Returns all zones added so far.
+     */
+    const std::set<std::string>& allZones() const {
+        return _allZones;
+    }
+
+    /**
+     * Using the set of zones added so far, returns what zone corresponds to the specified chunk.
+     * Returns an empty string if the chunk doesn't fall into any zone.
+     */
+    std::string getZoneForChunk(const ChunkRange& chunkRange) const;
+
+    /**
+     * Returns all zone ranges defined.
+     */
+    const BSONObjIndexedMap<ZoneRange>& zoneRanges() const {
+        return _zoneRanges;
+    }
+
+private:
+    // Map of zone max key to the zone description
+    BSONObjIndexedMap<ZoneRange> _zoneRanges;
+
+    // Set of all zones defined for this collection
+    std::set<std::string> _allZones;
+};
+
+/**
  * This class constitutes a cache of the chunk distribution across the entire cluster along with the
  * zone boundaries imposed on it. This information is stored in format, which makes it efficient to
  * query utilization statististics and to decide what to balance.
@@ -79,7 +121,7 @@ class DistributionStatus {
     DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
-    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap);
+    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap, ZoneInfo zoneInfo);
     DistributionStatus(DistributionStatus&&) = default;
 
     /**
@@ -88,12 +130,6 @@ public:
     const NamespaceString& nss() const {
         return _nss;
     }
-
-    /**
-     * Appends the specified range to the set of ranges tracked for this collection and checks if
-     * it overlaps with existing ranges.
-     */
-    Status addRangeToZone(const ZoneRange& range);
 
     /**
      * Returns total number of chunks across all shards.
@@ -125,14 +161,14 @@ public:
      * Returns all tag ranges defined for the collection.
      */
     const BSONObjIndexedMap<ZoneRange>& tagRanges() const {
-        return _zoneRanges;
+        return _zoneInfo.zoneRanges();
     }
 
     /**
      * Returns all tags defined for the collection.
      */
     const std::set<std::string>& tags() const {
-        return _allTags;
+        return _zoneInfo.allZones();
     }
 
     /**
@@ -154,11 +190,8 @@ private:
     // Map of what chunks are owned by each shard
     ShardToChunksMap _shardChunks;
 
-    // Map of zone max key to the zone description
-    BSONObjIndexedMap<ZoneRange> _zoneRanges;
-
-    // Set of all zones defined for this collection
-    std::set<std::string> _allTags;
+    // Info for zones.
+    ZoneInfo _zoneInfo;
 };
 
 class BalancerPolicy {
