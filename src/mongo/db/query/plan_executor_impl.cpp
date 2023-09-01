@@ -490,7 +490,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     "plan executor",
                     NamespaceStringOrUUID(_nss),
                     ExceptionFor<ErrorCodes::TemporarilyUnavailable>(
-                        Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")));
+                        Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")),
+                    writeConflictsInARow);
             } else {
                 // We're yielding because of a WriteConflictException.
                 if (!_yieldPolicy->canAutoYield() ||
