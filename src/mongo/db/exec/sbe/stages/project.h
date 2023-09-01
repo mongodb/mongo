@@ -75,6 +75,9 @@ public:
 
 protected:
     void doSaveState(bool relinquishCursor) final;
+    bool shouldOptimizeSaveState(size_t) const final {
+        return true;
+    }
 
 private:
     const SlotExprPairVector _projects;

@@ -77,6 +77,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    bool shouldOptimizeSaveState(size_t idx) const final {
+        return _currentStageIndex == idx;
+    }
+
 private:
     struct UnionBranch {
         PlanStage* const stage{nullptr};

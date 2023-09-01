@@ -106,6 +106,9 @@ public:
 protected:
     void doSaveState(bool relinquishCursor) final;
     void doRestoreState(bool relinquishCursor) final;
+    bool shouldOptimizeSaveState(size_t) const final {
+        return true;
+    }
 
 private:
     void openInner(value::TypeTags tag, value::Value val);

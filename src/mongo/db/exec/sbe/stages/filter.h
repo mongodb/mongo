@@ -195,6 +195,11 @@ public:
         return size;
     }
 
+protected:
+    bool shouldOptimizeSaveState(size_t) const final {
+        return true;
+    }
+
 private:
     const std::unique_ptr<EExpression> _filter;
     std::unique_ptr<vm::CodeFragment> _filterCode;

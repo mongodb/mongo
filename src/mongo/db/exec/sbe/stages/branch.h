@@ -79,6 +79,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    bool shouldOptimizeSaveState(size_t idx) const final {
+        return _activeBranch && (static_cast<size_t>(*_activeBranch) == idx);
+    }
+
 private:
     const std::unique_ptr<EExpression> _filter;
     const value::SlotVector _inputThenVals;

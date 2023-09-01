@@ -101,7 +101,12 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) final;
+    bool shouldOptimizeSaveState(size_t idx) const final {
+        // LoopJoinStage::getNext() only guarantees that the inner child's getNext() was called.
+        // Thus, it is safe to propagate disableSlotAccess to the inner child, but not to the outer
+        // child.
+        return idx == 1;
+    }
 
 private:
     PlanState getNextOuterSide() {

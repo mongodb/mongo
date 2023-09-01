@@ -181,8 +181,12 @@ public:
         }
 
         stage->doSaveState(relinquishCursor);
-        if (!stage->_children.empty()) {
-            saveChildrenState(relinquishCursor, disableSlotAccess);
+        // Save the children in a right to left order so dependent stages (i.e. one using correlated
+        // slots) are saved first.
+        auto& children = stage->_children;
+        for (auto idx = children.size(); idx-- > 0;) {
+            children[idx]->saveState(relinquishCursor,
+                                     disableSlotAccess ? shouldOptimizeSaveState(idx) : false);
         }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -236,30 +240,22 @@ protected:
     SaveState _saveState{SaveState::kNotSaved};
 #endif
 
-    virtual void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) {
-        // clang-format off
-        static const StringDataSet propagateSet = {
-            "branch", "cfilter", "efilter", "exchangep", "filter",   "limit", "limitskip",
-            "lspool", "mkbson",  "mkobj",   "project",   "traverse", "union", "unique"};
-        // clang-format on
-
-        auto stage = static_cast<T*>(this);
-        if (!propagateSet.count(stage->getCommonStats()->stageType)) {
-            disableSlotAccess = false;
-        }
-
-        // Save the children in a right to left order so dependent stages (i.e. one using correlated
-        // slots) are saved first.
-        for (auto it = stage->_children.rbegin(); it != stage->_children.rend(); ++it) {
-            (*it)->saveState(relinquishCursor, disableSlotAccess);
-        }
+    virtual bool shouldOptimizeSaveState(size_t idx) const {
+        return false;
     }
 
     static bool shouldCopyValue(value::TypeTags tag) {
+        if (isShallowType(tag)) {
+            return false;
+        }
         switch (tag) {
+            case value::TypeTags::NumberDecimal:
+            case value::TypeTags::StringBig:
             case value::TypeTags::Array:
             case value::TypeTags::ArraySet:
             case value::TypeTags::Object:
+            case value::TypeTags::ObjectId:
+            case value::TypeTags::RecordId:
                 return false;
 
             default:

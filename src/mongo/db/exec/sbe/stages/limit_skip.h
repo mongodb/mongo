@@ -77,6 +77,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    bool shouldOptimizeSaveState(size_t) const final {
+        return true;
+    }
+
 private:
     const boost::optional<long long> _limit;
     const boost::optional<long long> _skip;
