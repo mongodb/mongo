@@ -9,6 +9,7 @@ const rst = new ReplSetTest({
         auth: '',
         setParameter: {
             multitenancySupport: true,
+            dbCheckHealthLogEveryNBatches: 1,  // needed for health log entries check.
         }
     }
 });
@@ -467,8 +468,19 @@ const testColl = testDb.getCollection(kCollName);
     assert(validateRes.valid, tojson(validateRes));
 }
 
-// Test dbCheck command.
-{ assert.commandWorked(testDb.runCommand({dbCheck: kCollName, '$tenant': kTenant})); }
+// Test dbCheck command and health log.
+{
+    assert.commandWorked(testDb.runCommand({dbCheck: kCollName, '$tenant': kTenant}));
+
+    const healthlog = primary.getDB('local').system.healthlog;
+    rst.awaitSecondaryNodes();
+    rst.awaitReplication();
+    assert.soon(function() {
+        return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1)
+    });
+    const tenantNss = kTenant + "_" + kDbName + "." + kCollName;
+    assert.eq(1, healthlog.find({"namespace": tenantNss}).count());
+}
 
 // fail server-side javascript commands/stages, all unsupported in serverless
 {

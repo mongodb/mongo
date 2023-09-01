@@ -1686,8 +1686,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('firstFieldFound = true;')
             self._writer.write_line('continue;')
 
-    def _gen_initializer_vars(self, constructor, is_command):
-        # type: (struct_types.MethodInfo, bool) -> List[str]
+    def _gen_initializer_vars(self, constructor, is_command, is_catalog_ctxt):
+        # type: (struct_types.MethodInfo, bool, bool) -> List[str]
         """
         Iterate through our list of constructor arguments, which includes serializationContext.
 
@@ -1696,12 +1696,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         parseProtected().
 
         If the structure is not a top-level struct (ie. not a command or is_command_reply resolves
-        to false), we want to grab the context from the incoming argument. If the incoming argument
-        isn't set we want to use the default constructor. Once we have our expression, we need to
-        put it at the beginning of the list.  This is important because we will be consuming the
-        local copy of the _serializationContext in the same initializer list when we are passing it
-        into the constructor of a nested struct.  In C++, initializer lists are ordered by
-        declaration order, which also identifies the order of initialization.
+        to false), we want to grab the context from the incoming argument. If we set the structure
+        to use a catalog context through the `is_catalog_ctxt` IDL flag, serialze for catalog instead.
+        If the incoming argument isn't set we want to use the default constructor. Once we have our 
+        expression, we need to put it at the beginning of the list.  This is important because we 
+        will be consuming the local copy of the _serializationContext in the same initializer list 
+        when we are passing it into the constructor of a nested struct.  In C++, initializer lists 
+        are ordered by declaration order, which also identifies the order of initialization.
         """
 
         initializer_vars = []  # type: List[str]
@@ -1714,8 +1715,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # For now, _serializationContext is the only internal_only type, so additional work
             # around this will be deferred.
             if arg.name == 'serializationContext':
-                sc_conditional = 'SerializationContext::stateCommandRequest()' if is_command \
-                    else '_isCommandReply ? SerializationContext::stateCommandReply() : SerializationContext()'
+                if is_catalog_ctxt:
+                    sc_conditional = 'SerializationContext::stateCatalog()'
+                elif is_command:
+                    sc_conditional = 'SerializationContext::stateCommandRequest()'
+                else:
+                    sc_conditional = '_isCommandReply ? SerializationContext::stateCommandReply() : SerializationContext::stateDefault()'
 
                 # this obj is passed in as a boost::optional, so we set the default if no value
                 initializer_var = arg.name + '.value_or(%s)' % sc_conditional
@@ -1732,7 +1737,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct, struct_types.MethodInfo, bool) -> None
         """Generate the C++ constructor definition."""
 
-        initializers = self._gen_initializer_vars(constructor, isinstance(struct, ast.Command))
+        initializers = self._gen_initializer_vars(constructor, isinstance(struct, ast.Command),
+                                                  struct.is_catalog_ctxt)
 
         # Serialize non-has fields first
         # Initialize int and other primitive fields to -1 to prevent Coverity warnings.
@@ -1880,11 +1886,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         'setSerializationContext(SerializationContext::stateCommandRequest());')
 
         else:
-            # set the local serializer flags according to the constexpr set by is_command_reply
-            self._writer.write_empty_line()
-            self._writer.write_line(
-                'setSerializationContext(_isCommandReply ? SerializationContext::stateCommandReply() : ctxt.getSerializationContext());'
-            )
+            if struct.is_catalog_ctxt:
+                self._writer.write_line(
+                    'setSerializationContext(ctxt.getSerializationContext() == SerializationContext::stateDefault() ? SerializationContext::stateCatalog() : ctxt.getSerializationContext());'
+                )
+            else:
+                # set the local serializer flags according to the constexpr set by is_command_reply
+                self._writer.write_line(
+                    'setSerializationContext(_isCommandReply ? SerializationContext::stateCommandReply() : ctxt.getSerializationContext());'
+                )
 
         self._writer.write_empty_line()
 

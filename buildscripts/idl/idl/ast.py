@@ -142,6 +142,7 @@ class Struct(common.SourceLocation):
         self.non_const_getter = False  # type: bool
         self.cpp_validator_func = None  # type: str
         self.is_command_reply = False  # type: bool
+        self.is_catalog_ctxt = False  # type: bool
         self.generic_list_type = None  # type: Optional[GenericListType]
         # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
         self.query_shape_component = False  # type: bool

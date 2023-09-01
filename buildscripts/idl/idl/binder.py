@@ -272,6 +272,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     ast_struct.non_const_getter = struct.non_const_getter
     ast_struct.is_command_reply = struct.is_command_reply
+    ast_struct.is_catalog_ctxt = struct.is_catalog_ctxt
     ast_struct.query_shape_component = struct.query_shape_component
     ast_struct.unsafe_dangerous_disable_extra_field_duplicate_checks = struct.unsafe_dangerous_disable_extra_field_duplicate_checks
 

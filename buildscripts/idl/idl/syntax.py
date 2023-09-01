@@ -555,6 +555,7 @@ class Struct(common.SourceLocation):
         self.non_const_getter = False  # type: bool
         self.cpp_validator_func = None  # type: str
         self.is_command_reply = False  # type: bool
+        self.is_catalog_ctxt = False  # type: bool
         self.is_generic_cmd_list = None  # type: Optional[str]
         # pylint: disable=invalid-name
         self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool

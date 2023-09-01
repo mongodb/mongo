@@ -578,6 +578,7 @@ def _parse_struct(ctxt, spec, name, node):
             "non_const_getter": _RuleDesc('bool_scalar'),
             "cpp_validator_func": _RuleDesc('scalar'),
             "is_command_reply": _RuleDesc('bool_scalar'),
+            "is_catalog_ctxt": _RuleDesc('bool_scalar'),
             "is_generic_cmd_list": _RuleDesc('scalar'),
             "query_shape_component": _RuleDesc('bool_scalar'),
             "unsafe_dangerous_disable_extra_field_duplicate_checks": _RuleDesc("bool_scalar"),

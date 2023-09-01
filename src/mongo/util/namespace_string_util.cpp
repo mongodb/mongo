@@ -77,6 +77,11 @@ std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) 
 
 std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
                                                      const SerializationContext& context) {
+    if (context.getSource() == SerializationContext::Source::Catalog) {
+        // always return prefixed namespace for catalog.
+        return ns.toStringWithTenantId();
+    }
+
     if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         return ns.toString();
     }
