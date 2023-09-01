@@ -56,6 +56,7 @@
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -99,14 +100,20 @@ protected:
         return clockSource()->now();
     }
 
-    void insertDocumentToChangeCollection(OperationContext* opCtx,
-                                          const TenantId& tenantId,
-                                          const BSONObj& obj) {
+    Timestamp insertDocumentToChangeCollection(OperationContext* opCtx,
+                                               const TenantId& tenantId,
+                                               const BSONObj& obj) {
+        AutoGetChangeCollection changeCollection{
+            opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+
+        WriteUnitOfWork wunit(opCtx);
+
         const auto wallTime = now();
-        Timestamp timestamp{wallTime};
+        const auto opTime = repl::getNextOpTime(opCtx);
+        const Timestamp timestamp = opTime.getTimestamp();
 
         repl::MutableOplogEntry oplogEntry;
-        oplogEntry.setOpTime(repl::OpTime{timestamp, 0});
+        oplogEntry.setOpTime(opTime);
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setNss(NamespaceString::makeChangeCollectionNSS(tenantId));
         oplogEntry.setObject(obj);
@@ -117,14 +124,11 @@ protected:
         RecordData recordData{oplogEntryBson.objdata(), oplogEntryBson.objsize()};
         RecordId recordId =
             record_id_helpers::keyForOptime(timestamp, KeyFormat::String).getValue();
-
-        AutoGetChangeCollection changeCollection{
-            opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
-
-        WriteUnitOfWork wunit(opCtx);
         ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
             opCtx, {Record{recordId, recordData}}, {timestamp});
         wunit.commit();
+
+        return timestamp;
     }
 
     std::vector<repl::OplogEntry> readChangeCollection(OperationContext* opCtx,
@@ -188,6 +192,23 @@ protected:
 class ChangeCollectionTruncateExpirationTest : public ChangeCollectionExpiredChangeRemoverTest {
 protected:
     ChangeCollectionTruncateExpirationTest() : ChangeCollectionExpiredChangeRemoverTest() {}
+
+    // Forces the 'lastApplied' Timestamp to be 'targetTimestamp'. The ReplicationCoordinator keeps
+    // track of OpTimeAndWallTime for 'lastApplied'. This method exclusively changes the
+    // 'opTime.timestamp', but not the other values (term, wallTime, etc) associated with
+    // 'lastApplied'.
+    void forceLastAppliedTimestamp(OperationContext* opCtx, Timestamp targetTimestamp) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto lastAppliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
+        auto newOpTime =
+            repl::OpTime(targetTimestamp, lastAppliedOpTimeAndWallTime.opTime.getTerm());
+        replCoord->setMyLastAppliedOpTimeAndWallTime(
+            repl::OpTimeAndWallTime(newOpTime, lastAppliedOpTimeAndWallTime.wallTime));
+
+        // Verify the Timestamp is set accordingly.
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime().opTime.getTimestamp(),
+                  targetTimestamp);
+    }
 
     void setExpireAfterSeconds(OperationContext* opCtx, Seconds seconds) {
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
@@ -350,6 +371,10 @@ TEST_F(ChangeCollectionTruncateExpirationTest, ShouldRemoveOnlyExpiredDocument_M
     clockSource()->advance(Hours(1));
     insertDocumentToChangeCollection(opCtx, _tenantId, notExpired);
 
+    const auto allDurableTimestamp =
+        storageInterface()->getAllDurableTimestamp(getServiceContext());
+    forceLastAppliedTimestamp(opCtx, allDurableTimestamp);
+
     // Verify that only the required documents are removed.
     ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, expirationTime), 2);
 
@@ -374,6 +399,10 @@ TEST_F(ChangeCollectionTruncateExpirationTest, ShouldLeaveAtLeastOneDocument_Mar
         clockSource()->advance(Seconds{1});
     }
 
+    const auto allDurableTimestamp =
+        storageInterface()->getAllDurableTimestamp(getServiceContext());
+    forceLastAppliedTimestamp(opCtx, allDurableTimestamp);
+
     // Verify that all but the last document is removed.
     ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, now()), 99);
 
@@ -381,5 +410,54 @@ TEST_F(ChangeCollectionTruncateExpirationTest, ShouldLeaveAtLeastOneDocument_Mar
     const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
     ASSERT_EQ(changeCollectionEntries.size(), 1);
     ASSERT_BSONOBJ_EQ(changeCollectionEntries[0].getObject(), BSON("_id" << 99));
+}
+
+TEST_F(ChangeCollectionTruncateExpirationTest, TruncatesAreOnlyAfterAllDurable) {
+    RAIIServerParameterControllerForTest minBytesPerMarker{
+        "changeCollectionTruncateMarkersMinBytes", 1};
+    const auto opCtx = operationContext();
+    dropAndRecreateChangeCollection(opCtx, _tenantId);
+
+    setExpireAfterSeconds(opCtx, Seconds{1});
+
+    int lastId = 0;
+    for (int i = 0; i < 100; ++i) {
+        insertDocumentToChangeCollection(opCtx, _tenantId, BSON("_id" << lastId++));
+        clockSource()->advance(Seconds{1});
+    }
+
+    // Create an oplog hole in an alternate client.
+    auto altClient = getServiceContext()->makeClient("alt-client");
+    auto altOpCtx = altClient->makeOperationContext();
+
+    // Wrap insertDocumentToChangeCollection call in WUOW to prevent inner WUOW from commiting.
+    WriteUnitOfWork wuow(altOpCtx.get());
+    const auto tsAtHole =
+        insertDocumentToChangeCollection(altOpCtx.get(), _tenantId, BSON("_id" << lastId++));
+    clockSource()->advance(Seconds{1});
+
+    ASSERT_LT(storageInterface()->getAllDurableTimestamp(getServiceContext()), tsAtHole);
+
+    // Insert 20 additional documents after the hole, which should not be truncated.
+    for (int i = 0; i < 20; ++i) {
+        insertDocumentToChangeCollection(opCtx, _tenantId, BSON("_id" << lastId++));
+        clockSource()->advance(Seconds{1});
+    }
+
+    const auto allDurableTSPostHoleInserts =
+        storageInterface()->getAllDurableTimestamp(getServiceContext());
+    ASSERT_LT(allDurableTSPostHoleInserts, tsAtHole);
+    // Set a lastApplied > allDurable.
+    forceLastAppliedTimestamp(opCtx, Timestamp(allDurableTSPostHoleInserts.getSecs() + 1, 0));
+
+    // Verify that all documents before all_durable have been deleted.
+    ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, now()), 100);
+
+    wuow.commit();
+
+    // The documents added after the oplog hole have not been truncated.
+    const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
+    ASSERT_EQ(changeCollectionEntries.size(), 21);
+    ASSERT_BSONOBJ_EQ(changeCollectionEntries[0].getObject(), BSON("_id" << 100));
 }
 }  // namespace mongo

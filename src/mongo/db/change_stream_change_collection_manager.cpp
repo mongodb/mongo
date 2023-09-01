@@ -221,6 +221,31 @@ bool usesUnreplicatedTruncates() {
     return feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         .isEnabledAndIgnoreFCVUnsafe();
 }
+
+/**
+ * Truncate ranges must be consistent data - no record within a truncate range should be written
+ * after the truncate. Otherwise, the data viewed by an open change stream could be corrupted,
+ * only seeing part of the range post truncate. The node can either be a secondary or primary at
+ * this point. Restrictions must be in place to ensure consistent ranges in both scenarios.
+ *      - Primaries can't truncate past the 'allDurable' Timestamp. 'allDurable'
+ *      guarantees out-of-order writes on the primary don't leave oplog holes.
+ *
+ *      - Secondaries can't truncate past the 'lastApplied' timestamp. Within an oplog batch,
+ *      entries are applied out of order, thus truncate markers may be created before the entire
+ *      batch is finished.
+ *      The 'allDurable' Timestamp is not sufficient given it is computed from within WT, which
+ *      won't always know there are entries with opTime < 'allDurable' which have yet to enter
+ *      the storage engine during secondary oplog application.
+ *
+ * Returns the maximum 'ts' a change collection document is allowed to have in order to be safely
+ * truncated.
+ **/
+Timestamp getMaxTSEligibleForTruncate(OperationContext* opCtx) {
+    Timestamp allDurable =
+        Timestamp(opCtx->getServiceContext()->getStorageEngine()->getAllDurableTimestamp());
+    auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
+    return std::min(lastAppliedOpTime.getTimestamp(), allDurable);
+}
 }  // namespace
 
 /**
@@ -708,6 +733,14 @@ std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
 
     return truncateMarkers;
 }
+
+Timestamp recordIdToTimestamp(const RecordId& rid) {
+    static constexpr auto kTopLevelFieldName = "ridAsBSON"_sd;
+    auto ridAsNestedBSON = record_id_helpers::toBSONAs(rid, kTopLevelFieldName);
+    auto t = ridAsNestedBSON.getField(kTopLevelFieldName).timestamp();
+    return t;
+}
+
 }  // namespace
 
 size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
@@ -731,7 +764,16 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
 
     auto removeExpiredMarkers = [&] {
         auto rs = changeCollectionPtr->getRecordStore();
+        const Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
+
         while (auto marker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
+            if (recordIdToTimestamp(marker->lastRecord) > maxTSEligibleForTruncate) {
+                // The truncate marker contains part of a data range not yet consistent
+                // (i.e. there could be oplog holes or partially applied ranges of the oplog in the
+                // range).
+                return;
+            }
+
             writeConflictRetry(opCtx, "truncate change collection", changeCollectionPtr->ns(), [&] {
                 // The session might be in use from marker initialisation so we must reset it
                 // here in order to allow an untimestamped write.
