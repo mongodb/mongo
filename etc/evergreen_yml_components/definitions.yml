@@ -6067,7 +6067,7 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_with_config_shard_gen
+  name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
@@ -6093,7 +6093,7 @@ tasks:
   - func: "run tests"
 
 - <<: *gen_task_template
-  name: sharding_jscore_passthrough_with_config_shard_gen
+  name: sharding_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["sharding", "jscore", "common"]
   commands:
   - func: "generate resmoke tasks"

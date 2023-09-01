@@ -69,6 +69,8 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: 1
     num_rs_nodes_per_shard: 1
+    use_auto_bootstrap_procedure: 1
     enable_sharding:
     - test

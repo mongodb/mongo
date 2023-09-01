@@ -109,3 +109,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagAllMongodsAreSharded: 1
+    use_auto_bootstrap_procedure: 1

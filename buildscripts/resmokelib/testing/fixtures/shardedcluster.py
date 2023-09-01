@@ -199,6 +199,26 @@ class ShardedClusterFixture(interface.Fixture):
                                 .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
                         time.sleep(0.1)
 
+    # TODO: Remove with SERVER-80100.
+    def _await_auto_bootstrapped_config_shard(self, config_shard_rs):
+        deadline = time.time() + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
+        timeout_occurred = lambda: deadline - time.time() <= 0.0
+
+        while True:
+            client = interface.build_client(config_shard_rs.get_primary(), self.auth_options)
+            config_shard_count = client.get_database("config").command(
+                {"count": "shards", "query": {"_id": "config"}})
+
+            if config_shard_count['n'] == 1:
+                break
+
+            if timeout_occurred():
+                port = config_shard_rs.get_primary().port
+                raise self.fixturelib.ServerFailure(
+                    "mongod on port: {} failed waiting for auto-bootstrapped config shard success after {} seconds"
+                    .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+            time.sleep(0.1)
+
     # TODO SERVER-76343 remove the join_migrations parameter and the if clause depending on it.
     def stop_balancer(self, timeout_ms=300000, join_migrations=True):
         """Stop the balancer."""
@@ -417,9 +437,16 @@ class ShardedClusterFixture(interface.Fixture):
         See https://docs.mongodb.org/manual/reference/command/addShard for more details.
         """
         connection_string = shard.get_internal_connection_string()
-        if is_config_shard and not self.use_auto_bootstrap_procedure:
-            self.logger.info("Adding %s as config shard...", connection_string)
-            client.admin.command({"transitionFromDedicatedConfigServer": 1})
+        if is_config_shard:
+            if self.use_auto_bootstrap_procedure:
+                self.logger.info("Waiting for %s to auto-bootstrap as a config shard...",
+                                 connection_string)
+                self._await_auto_bootstrapped_config_shard(shard)
+                self.logger.info("%s successfully auto-bootstrapped as a config shard...",
+                                 connection_string)
+            else:
+                self.logger.info("Adding %s as config shard...", connection_string)
+                client.admin.command({"transitionFromDedicatedConfigServer": 1})
         else:
             self.logger.info("Adding %s as a shard...", connection_string)
             client.admin.command({"addShard": connection_string})
