@@ -200,6 +200,10 @@ public:
         return _sbeCompatibility;
     }
 
+    void setSbeCompatibility(SbeCompatibility sbeCompatibility) {
+        _sbeCompatibility = sbeCompatibility;
+    }
+
 protected:
     DocumentSourceGroupBase(StringData stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,

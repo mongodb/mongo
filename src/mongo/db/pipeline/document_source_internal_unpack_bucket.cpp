@@ -87,6 +87,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -1085,6 +1086,20 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
 std::pair<bool, Pipeline::SourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer::iterator itr,
                                                       Pipeline::SourceContainer* container) {
+    // Rewriting a group might make it incompatible with SBE (e.g. if the rewrite is using
+    // accumulator exprs that are not supported in SBE yet). Rather than tracking the specific
+    // exprs, we temporarily reset the context to be fully SBE compatible and check later if any of
+    // the exprs created by the rewrite mark it as incompatible, so that we can transfer the flag
+    // onto the group.
+    const SbeCompatibility origSbeCompat = pExpCtx->sbeCompatibility;
+    pExpCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+
+    // We destruct 'this' object when we replace it with the new group, so the guard has to capture
+    // the context's intrusive pointer by value.
+    const ScopeGuard guard([=, ctx = pExpCtx] {
+        ctx->sbeCompatibility = std::min(origSbeCompat, ctx->sbeCompatibility);
+    });
+
     // The computed min/max for each bucket uses the default collation. If the collation of the
     // query doesn't match the default we cannot rely on the computed values as they might differ
     // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
@@ -1145,10 +1160,15 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
                                     std::move(accumulationStatementsBucket),
                                     groupPtr->getMaxMemoryUsageBytes());
 
+    // The exprs used in the rewritten group might or might not be supported by SBE, so we have to
+    // transfer the state from the expr context onto the group.
+    newGroup->setSbeCompatibility(pExpCtx->sbeCompatibility);
+
     // Replace the current stage (DocumentSourceInternalUnpackBucket) and the following group stage
     // with the new group.
     container->erase(std::next(itr));
     *itr = std::move(newGroup);
+    // NB: Below this point any access to members of 'this' is invalid!
 
     if (itr == container->begin()) {
         // Optimize the new group stage.
