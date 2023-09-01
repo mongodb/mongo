@@ -42,8 +42,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
-
 ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =
     ServiceContext::declareDecoration<std::unique_ptr<SearchDefaultHelperFunctions>>();
 
