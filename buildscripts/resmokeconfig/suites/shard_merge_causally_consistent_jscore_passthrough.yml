@@ -286,7 +286,7 @@ executor:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
             causalConsistency: false
-          # TODO SERVER-68643 No longer needed when we only use shard merge protocol.
+          # TODO SERVER-63517 No longer needed when we only use shard merge protocol.
           useLocalDBForDBCheck: true
           # Shard Merge does not support fastcount. When we call CheckTenantMigrationDBHash after
           # each migration we would potentially fail when enforcing using the fast count during that
@@ -332,7 +332,6 @@ executor:
         # only runs donorForgetMigration against the donor of each migration when it is safe to do
         # so. Therefore, the garbage collection delay doesn't need to be large.
         tenantMigrationGarbageCollectionDelayMS: 1
-        ttlMonitorSleepSecs: 1
         minSnapshotHistoryWindowInSeconds: 30
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem

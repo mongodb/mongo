@@ -16,11 +16,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-    makeTenantDB,
-    runMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 import {createRstArgs} from "jstests/replsets/rslib.js";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -35,19 +31,9 @@ const donorDb = donorPrimary.getDB(kDbName);
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const recipientDb = recipientPrimary.getDB(kDbName);
 
-// TODO (SERVER-61677): Currently, when we call replSetStepUp below, the new recipient secondary
-// wrongly restarts the Shard Merge protocol. It copies and imports donor files again, and
-// eventually hits an invariant in TenantFileImporterService, which doesn't support restart.
-// Once we fix Shard Merge to not resume on stepup, this test will work as-is.
-if (isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
-    jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive stepup");
-    tenantMigrationTest.stop();
-    quit();
-}
-
 jsTestLog("Run a migration to the end of cloning");
-const waitBeforeFetchingTransactions =
-    configureFailPoint(recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
+const pauseDonorBeforeLeavingDataSyncData =
+    configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
 const migrationId = UUID();
 const migrationOpts = {
@@ -170,7 +156,7 @@ assert.commandWorked(
 const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
 const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
-waitBeforeFetchingTransactions.wait();
+pauseDonorBeforeLeavingDataSyncData.wait();
 
 jsTestLog("Run retryable writes during the migration");
 
@@ -185,7 +171,7 @@ assert.commandWorked(
 
 // Wait for the migration to complete.
 jsTest.log("Waiting for migration to complete");
-waitBeforeFetchingTransactions.off();
+pauseDonorBeforeLeavingDataSyncData.off();
 TenantMigrationTest.assertCommitted(migrationThread.returnData());
 tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 

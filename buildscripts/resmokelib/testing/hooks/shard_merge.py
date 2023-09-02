@@ -225,7 +225,6 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
 
     WAIT_SECS_RANGES = [[0.05, 0.1], [0.1, 0.5], [1, 5], [5, 15]]
     POLL_INTERVAL_SECS = 0.1
-    WAIT_PENDING_IDENT_SECS = 0.3
 
     NO_SUCH_MIGRATION_ERR_CODE = 327
     INTERNAL_ERR_CODE = 1
@@ -356,7 +355,7 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
 
     def _is_fail_point_abort_reason(self, abort_reason):
         return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
-            "errmsg"] == "simulate a shard merge error"
+            "errmsg"] == "simulate a tenant migration error"
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._shard_merge_fixture.get_replset(donor_rs_index)
@@ -434,27 +433,6 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 migration_opts.migration_id, migration_opts.get_donor_name())
             raise
 
-    def _override_abort_failpoint_shard_merge(self, donor_primary):  # noqa: D205,D400
-        """Override the abortTenantMigrationBeforeLeavingBlockingState failpoint so the shard merge
-        does not abort since it is currently not supported. Only use this method for shard merge.
-        """
-        while True:
-            try:
-                donor_primary_client = self._create_client(donor_primary)
-                donor_primary_client.admin.command(
-                    bson.SON([("configureFailPoint",
-                               "pauseTenantMigrationBeforeLeavingBlockingState"), ("mode", "off")]))
-                donor_primary_client.admin.command(
-                    bson.SON([("configureFailPoint",
-                               "abortTenantMigrationBeforeLeavingBlockingState"), ("mode", "off")]))
-                return
-            except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError):
-                self.logger.info(
-                    "Retrying connection to donor primary in order to disable abort failpoint for shard merge."
-                )
-                continue
-            time.sleep(self.POLL_INTERVAL_SECS)
-
     def _start_and_wait_for_migration(self, migration_opts):  # noqa: D205,D400
         """Run donorStartMigration to start a shard merge based on 'migration_opts', wait for
         the migration decision and return the last response for donorStartMigration.
@@ -469,18 +447,6 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         }
 
         donor_primary = migration_opts.get_donor_primary()
-        # TODO(SERVER-68643) We no longer need to override the failpoint once milestone 3 is done
-        # for shard merge.
-        self._override_abort_failpoint_shard_merge(donor_primary)
-        # For shard merge protocol we need to wait for the ident to be removed before starting a
-        # new migration with a shard merge otherwise, due to the two phase drop, the stored
-        # files will be marked to be deleted but not deleted fast enough and we would end up
-        # moving a file that still exists.
-        while self._get_pending_drop_idents(migration_opts.recipient_rs_index) > 0:
-            time.sleep(self.WAIT_PENDING_IDENT_SECS)
-        # Some tests also do drops on collection which we need to wait on before doing a new migration
-        while self._get_pending_drop_idents(migration_opts.donor_rs_index) > 0:
-            time.sleep(self.WAIT_PENDING_IDENT_SECS)
 
         self.logger.info(
             "Starting shard merge '%s' on donor primary on port %d of replica set '%s'.",
@@ -697,30 +663,3 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                     " port %d of replica set '%s' to be garbage collection.", str(self._tenant_ids),
                     primary.port, rs.replset_name)
                 raise
-
-    def _get_pending_drop_idents(self, replica_set_index):  # noqa: D205,D400
-        """Returns the number of pending idents to be dropped. This is necessary for the shard
-        merge protocol since we need to wait for the idents to be dropped before starting a new
-        shard merge.
-        """
-        primary = self._shard_merge_fixture.get_replset(replica_set_index).get_primary()
-        pending_drop_idents = None
-        while True:
-            try:
-                client = self._create_client(primary)
-                server_status = client.admin.command({"serverStatus": 1})
-                pending_drop_idents = server_status["storageEngine"]["dropPendingIdents"]
-                break
-            except (pymongo.errors.AutoReconnect, pymongo.errors.NotPrimaryError,
-                    pymongo.errors.WriteConcernError) as err:
-                self.logger.info(
-                    "Retrying getting dropPendingIdents against primary on port %d after error %s.",
-                    primary.port, str(err))
-                continue
-            except pymongo.errors.PyMongoError:
-                self.logger.exception(
-                    "Error creating client waiting for pending drop idents on " +
-                    " primary on port %d.", primary.port)
-                raise
-
-        return pending_drop_idents
