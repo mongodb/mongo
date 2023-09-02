@@ -74,20 +74,26 @@ const nonExistentQueryShapeHash = "0".repeat(64);
               }
               ), 7746602);
 
-    const queryInstance = {
-        aggregate: "order",
-        $db: "someDb",
-        pipeline: [{
-            $lookup:
-                {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
-        }]
-    };
-    const settings = {
-        "indexHints": {"ns": {"db": "someDb", "coll": "inventory"}, "allowedIndexes": [{"sku": 1}]}
-    };
-    assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(settings, queryInstance)]);
+    assert.commandWorked(db.adminCommand({
+        setQuerySettings: {
+            aggregate: "order",
+            $db: "someDb",
+            pipeline: [{
+            $lookup: {
+                from: "inventory",
+                localField: "item",
+                foreignField: "sku",
+                as: "inventory_docs"
+            }
+            }]
+        },
+        settings: {
+            "indexHints": {
+            "ns": { "db": "someDb", "coll": "inventory" },
+            "allowedIndexes": [{ "sku": 1 }]
+            }
+        }
+    }));
     qsutils.removeAllQuerySettings();
 }
 
@@ -111,20 +117,22 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     }),
                                  7746603);
 
-    const queryInstance = {
-        aggregate: "order",
-        $db: "testDB",
-        pipeline: [{
-            $lookup:
-                {from: "inventory", localField: "item", foreignField: "sku", as: "inventory_docs"}
-        }]
-    };
-    const settings = {
-        "indexHints": {"ns": {"db": "testDB", "coll": "order"}, "allowedIndexes": []}
-    };
-    assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings: settings}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(settings, queryInstance)]);
+    assert.commandWorked(db.adminCommand({
+        setQuerySettings: {
+            aggregate: "order",
+            $db: "testDB",
+            pipeline: [{
+            $lookup: {
+                from: "inventory",
+                localField: "item",
+                foreignField: "sku",
+                as: "inventory_docs"
+            }
+            }]
+        },
+        settings:
+            {"indexHints": {"ns": {"db": "testDB", "coll": "order"}, "allowedIndexes": []}}
+    }));
     qsutils.removeAllQuerySettings();
 }
 

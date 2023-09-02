@@ -95,6 +95,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 // providing a query shape hash.
 {
     qsutils.removeAllQuerySettings();
+    qsutils.assertQueryShapeConfiguration([]);
     qsutils.assertExplainQuerySettings(queryA, undefined);
 }
 
