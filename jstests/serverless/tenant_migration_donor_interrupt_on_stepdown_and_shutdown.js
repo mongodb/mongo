@@ -17,7 +17,6 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     forgetMigrationAsync,
-    isShardMergeEnabled,
     runMigrationAsync,
     tryAbortMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
@@ -42,14 +41,6 @@ function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) 
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-
-    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
-        // TODO SERVER-63390: Remove this conditional and ensure test(s) run
-        // successfully for shard merge.
-        jsTestLog("Skipping Shard Merge-incompatible test");
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -84,14 +75,6 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-
-    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
-        // TODO SERVER-63390: Remove this conditional and ensure test(s) run
-        // successfully for shard merge.
-        jsTestLog("Skipping Shard Merge-incompatible test");
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -132,14 +115,6 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
-
-    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
-        // TODO SERVER-63390: Remove this conditional and ensure test(s) run
-        // successfully for shard merge.
-        jsTestLog("Skipping Shard Merge-incompatible test");
-        tenantMigrationTest.stop();
-        return;
-    }
 
     const migrationId = UUID();
     const migrationOpts = {
