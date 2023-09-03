@@ -737,11 +737,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         // collection is sharded.
         if (optMetadata) {
             const auto& metadata = optMetadata->get();
-            if (metadata.isSharded()) {
-                auto chunks = metadata.getOwnedChunks();
-                if (chunks.empty()) {
-                    return true;
-                }
+            if (metadata.isSharded() && !metadata.currentShardHasAnyChunks()) {
+                return true;
             }
         }
         return false;

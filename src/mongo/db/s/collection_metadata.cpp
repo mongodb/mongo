@@ -141,6 +141,14 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
 
     return Status::OK();
 }
+
+bool CollectionMetadata::currentShardHasAnyChunks() const {
+    invariant(isSharded());
+    std::set<ShardId> shards;
+    _cm->getAllShardIds(&shards);
+    return shards.find(_thisShardId) != shards.end();
+}
+
 boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
     const RangeMap& chunksMap,
     const RangeMap& receivingChunks,
