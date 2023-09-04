@@ -407,24 +407,6 @@ struct PlanStatsNumReadsVisitor : PlanStatsVisitorBase<true> {
     size_t numReads = 0;
 };
 
-struct SearchStats : public SpecificStats {
-    std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<SearchStats>(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const final {
-        return sizeof(*this);
-    }
-
-    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
-        visitor->visit(this);
-    }
-
-    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
-        visitor->visit(this);
-    }
-};
-
 /**
  * Calculates the total number of physical reads in the given plan stats tree. If a stage can do
  * a physical read (e.g. COLLSCAN or IXSCAN), then its 'numReads' stats is added to the total.

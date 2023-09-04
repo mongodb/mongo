@@ -123,15 +123,12 @@ public:
     /**
      * Establish a cursor given the search query and CursorResponse from the initial execution.
      */
-    virtual boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const boost::optional<UUID>& uuid,
-        const boost::optional<ExplainOptions::Verbosity>& explain,
+    boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const BSONObj& query,
         CursorResponse&& response,
         boost::optional<long long> docsRequested = boost::none,
-        std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
+        std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
         const boost::optional<int>& protocolVersion = boost::none) {
         return boost::none;
     }

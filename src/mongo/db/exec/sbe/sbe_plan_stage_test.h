@@ -137,9 +137,8 @@ public:
     /**
      * Makes a new CompileCtx suitable for preparing an sbe::PlanStage tree.
      */
-    std::unique_ptr<CompileCtx> makeCompileCtx(
-        std::unique_ptr<RuntimeEnvironment> env = std::make_unique<RuntimeEnvironment>()) {
-        return std::make_unique<CompileCtx>(std::move(env));
+    std::unique_ptr<CompileCtx> makeCompileCtx() {
+        return std::make_unique<CompileCtx>(std::make_unique<RuntimeEnvironment>());
     }
 
     /**
@@ -278,10 +277,6 @@ public:
                       value::TypeTags expectedTag,
                       value::Value expectedVal,
                       const MakeStageFn<value::SlotVector>& makeStageMulti);
-
-    value::SlotIdGenerator* getSlotIdGenerator() {
-        return _slotIdGenerator.get();
-    }
 
 protected:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
