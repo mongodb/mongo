@@ -70,9 +70,13 @@ export class QuerySettingsUtils {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
         const {$db: _, ...queryWithoutDollarDb} = query;
-        const explain = assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
-        assert.docEq(
-            expectedQuerySettings, getQueryPlanner(explain).querySettings, explain.queryPlanner);
+        if (query.find) {
+            const explain =
+                assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
+            assert.docEq(expectedQuerySettings,
+                         getQueryPlanner(explain).querySettings,
+                         explain.queryPlanner);
+        }
     }
 
     // Adjust the 'clusterServerParameterRefreshIntervalSecs' value for faster fetching of
@@ -103,5 +107,6 @@ export class QuerySettingsUtils {
             .forEach(el => assert.commandWorked(
                          this.adminDB.runCommand({removeQuerySettings: el.queryShapeHash})),
                      this);
+        this.assertQueryShapeConfiguration([]);
     }
 }
