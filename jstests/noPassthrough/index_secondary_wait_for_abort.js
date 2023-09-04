@@ -64,9 +64,6 @@ try {
     testDB.adminCommand({configureFailPoint: 'hangAfterSettingUpIndexBuild', mode: 'off'});
 }
 
-// Wait for the index build to stop.
-IndexBuildTest.waitForIndexBuildToStop(testDB);
-
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build failing');
 
@@ -74,13 +71,14 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build fa
 // "Ambiguous field name found in array ..."
 checkLog.checkContainsOnceJsonStringMatch(secondary, 20649, "error", "\"code\":16746");
 
-// Check indexes on primary.
-rst.awaitReplication();
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+// Wait for the index build to eventually disappear. Due to an external abort thread doing the
+// cleanup, we can't rely on waitForIndexBuildToStop as it checks for the opId of the builder
+// thread.
+IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_']);
 
 // Check that index was not created on the secondary.
 const secondaryColl = secondaryDB.getCollection(coll.getName());
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_']);
 
 const cmdNs = testDB.getCollection('$cmd').getFullName();
 const ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
