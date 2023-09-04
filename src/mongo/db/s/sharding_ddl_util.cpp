@@ -101,6 +101,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -523,48 +524,47 @@ void checkCatalogConsistencyAcrossShardsForRename(
 }
 
 void checkRenamePreconditions(OperationContext* opCtx,
-                              bool sourceIsSharded,
+                              const NamespaceString& fromNss,
+                              const boost::optional<CollectionType>& fromCollType,
                               const NamespaceString& toNss,
+                              const boost::optional<CollectionType>& optToCollType,
                               const bool dropTarget) {
-    if (sourceIsSharded) {
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace of target collection too long. Namespace: "
-                              << toNss.toStringForErrorMsg()
-                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-                toNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
-    }
 
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Namespace of target collection too long. Namespace: "
+                          << toNss.toStringForErrorMsg()
+                          << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+            toNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
+
     if (!dropTarget) {
-        // Check that the sharded target collection doesn't exist
-        try {
-            catalogClient->getCollection(opCtx, toNss);
-            // If no exception is thrown, the collection exists and is sharded
-            uasserted(ErrorCodes::NamespaceExists,
-                      str::stream() << "Sharded target collection " << toNss.toStringForErrorMsg()
-                                    << " exists but dropTarget is not set");
-        } catch (const DBException& ex) {
-            auto code = ex.code();
-            if (code != ErrorCodes::NamespaceNotFound && code != ErrorCodes::NamespaceNotSharded) {
-                throw;
-            }
-        }
-
-        // Check that the unsharded target collection doesn't exist
-        auto collectionCatalog = CollectionCatalog::get(opCtx);
-        auto targetColl = collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
+        // Check that the target collection doesn't exist if dropTarget is not set
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "Target collection " << toNss.toStringForErrorMsg()
                               << " exists but dropTarget is not set",
-                !targetColl);
+                !optToCollType.has_value() &&
+                    !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
     }
 
     // Check that there are no tags associated to the target collection
-    auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, toNss));
+    auto tags =
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, toNss));
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "Can't rename to target collection " << toNss.toStringForErrorMsg()
                           << " because it must not have associated tags",
             tags.empty());
+
+    // The restrictions about renaming across DB are the following ones:
+    //    - Both collections have to be from the same database when source collection is sharded
+    //    - Both collections must have the same DB primary shard if source collection is unsharded
+    if (!fromCollType || fromCollType->getUnsplittable().value_or(false)) {
+        sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
+    } else {
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "Source and destination collections must be on "
+                                 "the same database because "
+                              << fromNss.toStringForErrorMsg() << " is sharded.",
+                fromNss.db_forSharding() == toNss.db_forSharding());
+    }
 }
 
 void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,

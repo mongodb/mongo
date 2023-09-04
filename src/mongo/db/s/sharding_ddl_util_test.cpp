@@ -105,8 +105,28 @@ private:
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }
+
+public:
+    CollectionType setupShardedCollection(const NamespaceString& nss) {
+
+        // Initialize a chunk
+        ChunkVersion chunkVersion({OID::gen(), Timestamp(2, 1)}, {1, 1});
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setCollectionUUID(UUID::gen());
+        chunk.setVersion(chunkVersion);
+        chunk.setShard(shard0.getName());
+        chunk.setOnCurrentShardSince(Timestamp(1, 1));
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
+        chunk.setMin(kMinBSONKey);
+        chunk.setMax(kMaxBSONKey);
+
+        // Initialize the sharded collection
+        return setupCollection(nss, KeyPattern(BSON("x" << 1)), {chunk});
+    }
 };
 
+const NamespaceString kFromNss = NamespaceString::createNamespaceString_forTest("test.from");
 const NamespaceString kToNss = NamespaceString::createNamespaceString_forTest("test.to");
 
 // Query 'limit' objects from the database into an array.
@@ -223,27 +243,19 @@ TEST_F(ShardingDDLUtilTest, SerializeErrorStatusTooBig) {
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     auto opCtx = operationContext();
 
+    // Initialize the sharded FROM collection
+    const auto fromColl = setupShardedCollection(kFromNss);
+
     // No exception is thrown if the TO collection does not exist and has no associated tags
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */);
-
-    // Initialize a chunk
-    ChunkVersion chunkVersion({OID::gen(), Timestamp(2, 1)}, {1, 1});
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setCollectionUUID(UUID::gen());
-    chunk.setVersion(chunkVersion);
-    chunk.setShard(shard0.getName());
-    chunk.setOnCurrentShardSince(Timestamp(1, 1));
-    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
-    chunk.setMin(kMinBSONKey);
-    chunk.setMax(kMaxBSONKey);
+        opCtx, kFromNss, fromColl, kToNss, boost::none /*toColl*/, false /* dropTarget */);
 
     // Initialize the sharded TO collection
-    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
+    const auto toColl = setupShardedCollection(kToNss);
 
+    // No exception is thrown if the TO collection exists and dropTarget is `true`
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, false /* sourceIsSharded */, kToNss, true /* dropTarget */);
+        opCtx, kFromNss, fromColl, kToNss, toColl, true /* dropTarget */);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
@@ -251,49 +263,50 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
 
     const std::string dbName{"test"};
 
+    // Initialize the sharded FROM collection
+    const auto fromColl = setupShardedCollection(kFromNss);
+
     // Check that no exception is thrown if the namespace of the target collection is long enough
     const NamespaceString longEnoughNss = NamespaceString::createNamespaceString_forTest(
         dbName + "." +
         std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, true /* sourceIsSharded */, longEnoughNss, false /* dropTarget */);
+        opCtx, kFromNss, fromColl, longEnoughNss, boost::none, false /* dropTarget */);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
-    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
-                       AssertionException,
-                       ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::checkRenamePreconditions(
+            opCtx, kFromNss, fromColl, tooLongNss, boost::none, false /* dropTarget */),
+        AssertionException,
+        ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     auto opCtx = operationContext();
 
-    // Initialize a chunk
-    ChunkVersion chunkVersion({OID::gen(), Timestamp(2, 1)}, {1, 1});
-    ChunkType chunk;
-    chunk.setName(OID::gen());
-    chunk.setCollectionUUID(UUID::gen());
-    chunk.setVersion(chunkVersion);
-    chunk.setShard(shard0.getName());
-    chunk.setOnCurrentShardSince(Timestamp(1, 1));
-    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
-    chunk.setMin(kMinBSONKey);
-    chunk.setMax(kMaxBSONKey);
+    // Initialize the sharded FROM collection
+    const auto fromColl = setupShardedCollection(kFromNss);
 
-    // Initialize the sharded collection
-    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
+    // Initialize the sharded TO collection
+    const auto toColl = setupShardedCollection(kToNss);
 
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */),
+                           opCtx, kFromNss, fromColl, kToNss, toColl, false /* dropTarget */),
                        AssertionException,
                        ErrorCodes::NamespaceExists);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     auto opCtx = operationContext();
+
+    // Initialize the sharded FROM collection
+    const auto fromColl = setupShardedCollection(kFromNss);
+
+    // Initialize the sharded TO collection
+    const auto toColl = setupShardedCollection(kToNss);
 
     // Associate a tag to the target collection
     TagsType tagDoc;
@@ -305,7 +318,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
 
     // Check that an exception is thrown if some tag is associated to the target collection
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */),
+                           opCtx, kFromNss, fromColl, kToNss, toColl, true /* dropTarget */),
                        AssertionException,
                        ErrorCodes::CommandFailed);
 }

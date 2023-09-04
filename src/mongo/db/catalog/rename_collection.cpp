@@ -608,7 +608,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
           "sourceCollection"_attr = source);
 
     // Renaming across databases will result in a new UUID.
-    NamespaceStringOrUUID tmpCollUUID{tmpName.dbName(), UUID::gen()};
+    NamespaceStringOrUUID tmpCollUUID{tmpName.dbName(),
+                                      options.newTargetCollectionUuid.get_value_or(UUID::gen())};
 
     {
         auto collectionOptions = sourceColl->getCollectionOptions();

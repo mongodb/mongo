@@ -208,8 +208,10 @@ void checkCatalogConsistencyAcrossShardsForRename(
  * - Check that no tags exist for the destination collection
  */
 void checkRenamePreconditions(OperationContext* opCtx,
-                              bool sourceIsSharded,
+                              const NamespaceString& fromNss,
+                              const boost::optional<CollectionType>& sourceCollType,
                               const NamespaceString& toNss,
+                              const boost::optional<CollectionType>& optTargetCollType,
                               bool dropTarget);
 
 /**

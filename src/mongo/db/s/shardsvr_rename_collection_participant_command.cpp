@@ -113,6 +113,7 @@ public:
             RenameCollectionParticipantDocument participantDoc(
                 fromNss, ForwardableOperationMetadata(opCtx), req.getSourceUUID());
             participantDoc.setTargetUUID(req.getTargetUUID());
+            participantDoc.setNewTargetCollectionUuid(req.getNewTargetCollectionUuid());
             participantDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);

@@ -53,7 +53,8 @@ class OpTime;
 /**
  * Renames the collection from "source" to "target" and drops the existing collection if
  * "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
- * temporariness.
+ * temporariness. "newTargetCollectionUUID" is the UUID set to the final collection when renaming
+ * across DBs (if not present, a random UUID will be assigned).
  */
 struct RenameCollectionOptions {
     bool dropTarget = false;
@@ -61,6 +62,7 @@ struct RenameCollectionOptions {
     bool markFromMigrate = false;
     boost::optional<UUID> expectedSourceUUID;
     boost::optional<UUID> expectedTargetUUID;
+    boost::optional<UUID> newTargetCollectionUuid;
 };
 
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,

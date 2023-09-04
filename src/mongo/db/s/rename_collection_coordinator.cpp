@@ -99,6 +99,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future_impl.h"
@@ -112,14 +113,24 @@
 namespace mongo {
 namespace {
 
-boost::optional<CollectionType> getShardedCollection(OperationContext* opCtx,
-                                                     const NamespaceString& nss) {
+boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
+                                                              const NamespaceString& nss) {
     try {
         return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is unsharded or doesn't exist
+        // The collection is untracked or doesn't exist
         return boost::none;
     }
+}
+
+// TODO (SERVER-80704): Get rid of isCollectionSharded function once targetIsSharded field is
+// deprecated.
+bool isCollectionSharded(boost::optional<CollectionType> const& optCollectionType) {
+    if (!optCollectionType.has_value()) {
+        return false;
+    }
+    const bool isUnsplittable = optCollectionType->getUnsplittable().value_or(false);
+    return !isUnsplittable;
 }
 
 boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
@@ -156,12 +167,14 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
     }();
 
     // Bump the index version only if there are indexes in the source collection.
-    auto optShardedCollInfo = doc->getOptShardedCollInfo();
-    if (optShardedCollInfo && optShardedCollInfo->getIndexVersion()) {
+    auto optTrackedCollInfo = doc->getOptTrackedCollInfo();
+    if (optTrackedCollInfo && optTrackedCollInfo->getIndexVersion()) {
         // Bump sharding catalog's index version on the config server if the source collection is
         // sharded. It will be updated later on.
-        optShardedCollInfo->setIndexVersion({optShardedCollInfo->getUuid(), newIndexVersion});
-        doc->setOptShardedCollInfo(optShardedCollInfo);
+        optTrackedCollInfo->setIndexVersion(
+            {doc->getNewTargetCollectionUuid().get_value_or(optTrackedCollInfo->getUuid()),
+             newIndexVersion});
+        doc->setOptTrackedCollInfo(optTrackedCollInfo);
     }
 
     // Update global index metadata in shards.
@@ -169,7 +182,10 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     ShardsvrRenameIndexMetadata renameIndexCatalogReq(
-        nss, toNss, {doc->getSourceUUID().value(), newIndexVersion});
+        nss,
+        toNss,
+        {doc->getNewTargetCollectionUuid().get_value_or(doc->getSourceUUID().value()),
+         newIndexVersion});
     renameIndexCatalogReq.setDbName(toNss.dbName());
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
@@ -217,7 +233,7 @@ SemiFuture<BatchedCommandResponse> noOpStatement() {
     return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
 }
 
-SemiFuture<BatchedCommandResponse> deleteShardedCollectionStatement(
+SemiFuture<BatchedCommandResponse> deleteTrackedCollectionStatement(
     const txn_api::TransactionClient& txnClient,
     const NamespaceString& nss,
     const boost::optional<UUID>& uuid,
@@ -242,16 +258,20 @@ SemiFuture<BatchedCommandResponse> deleteShardedCollectionStatement(
     }
 }
 
-SemiFuture<BatchedCommandResponse> renameShardedCollectionStatement(
+SemiFuture<BatchedCommandResponse> renameTrackedCollectionStatement(
     const txn_api::TransactionClient& txnClient,
     const CollectionType& oldCollection,
     const NamespaceString& newNss,
+    const boost::optional<UUID>& newTargetCollectionUuid,
     const Timestamp& timeInsertion,
     int stmtId) {
     auto newCollectionType = oldCollection;
     newCollectionType.setNss(newNss);
     newCollectionType.setTimestamp(timeInsertion);
     newCollectionType.setEpoch(OID::gen());
+    if (newTargetCollectionUuid.has_value()) {
+        newCollectionType.setUuid(newTargetCollectionUuid.get());
+    }
 
     // Implemented as an upsert to be idempotent
     auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(newNss));
@@ -267,6 +287,38 @@ SemiFuture<BatchedCommandResponse> renameShardedCollectionStatement(
     }()});
 
     return txnClient.runCRUDOp(updateOp, {stmtId} /*stmtIds*/);
+}
+
+SemiFuture<BatchedCommandResponse> updateChunksUuid(
+    const txn_api::TransactionClient& txnClient,
+    const CollectionType& oldCollection,
+    const boost::optional<UUID>& newTargetCollectionUuid) {
+    if (newTargetCollectionUuid.has_value() &&
+        newTargetCollectionUuid.get() != oldCollection.getUuid()) {
+        const auto query = BSON(ChunkType::collectionUUID() << oldCollection.getUuid());
+        const auto update =
+            BSON("$set" << BSON(ChunkType::collectionUUID() << *newTargetCollectionUuid));
+
+        // This query is expected to target unsplittable collections with one chunk.
+        // Don't use this for updating a high amount of chunks because the transaction
+        // may abort due to hitting the `transactionLifetimeLimitSeconds`.
+        BatchedCommandRequest request([&] {
+            write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(query);
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+                entry.setUpsert(false);
+                entry.setMulti(true);
+                return entry;
+            }()});
+            return updateOp;
+        }());
+
+        return txnClient.runCRUDOp(request, {-1} /*stmtIds*/);
+    }
+
+    return noOpStatement();
 }
 
 SemiFuture<BatchedCommandResponse> insertToPlacementHistoryStatement(
@@ -366,6 +418,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const NamespaceString& fromNss,
                                            const NamespaceString& toNss,
                                            const boost::optional<UUID>& droppedTargetUUID,
+                                           const boost::optional<UUID>& newTargetCollectionUuid,
                                            const WriteConcernOptions& writeConcern,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
@@ -373,7 +426,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
     std::string logMsg = str::stream()
         << toStringForLogging(fromNss) << " to " << toStringForLogging(toNss);
     if (optFromCollType) {
-        // Case sharded FROM collection
+        // Case FROM collection is tracked by the config server
         auto fromUUID = optFromCollType->getUuid();
 
         // Every statement in the transaction runs under the same clusterTime. To ensure in the
@@ -395,13 +448,18 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
             // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to
             // the 'uuid') delete TO collection if exists.
-            return deleteShardedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
+            return deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& deleteCollResponse) {
                     uassertStatusOK(deleteCollResponse.toStatus());
 
-                    return insertToPlacementHistoryStatement(
-                        txnClient, toNss, droppedTargetUUID, timeDrop, {}, 2, deleteCollResponse);
+                    return insertToPlacementHistoryStatement(txnClient,
+                                                             toNss,
+                                                             droppedTargetUUID,
+                                                             timeDrop,
+                                                             {} /*shards*/,
+                                                             2,
+                                                             deleteCollResponse);
                 })
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& response) {
@@ -414,33 +472,39 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& response) {
                     uassertStatusOK(response.toStatus());
-                    return deleteShardedCollectionStatement(txnClient, fromNss, fromUUID, 3);
+                    return deleteTrackedCollectionStatement(txnClient, fromNss, fromUUID, 3);
                 })
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& deleteCollResponse) {
                     uassertStatusOK(deleteCollResponse.toStatus());
 
-                    return insertToPlacementHistoryStatement(
-                        txnClient, fromNss, fromUUID, timeDrop, {}, 4, deleteCollResponse);
+                    return insertToPlacementHistoryStatement(txnClient,
+                                                             fromNss,
+                                                             fromUUID,
+                                                             timeDrop,
+                                                             {} /*shards*/,
+                                                             4,
+                                                             deleteCollResponse);
                 })
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& deleteCollResponse) {
                     uassertStatusOK(deleteCollResponse.toStatus());
                     // Use the modified entries to insert collection and placement entries for "TO".
-                    return renameShardedCollectionStatement(
-                        txnClient, *optFromCollType, toNss, timeInsert, 5);
+                    return renameTrackedCollectionStatement(
+                        txnClient, *optFromCollType, toNss, newTargetCollectionUuid, timeInsert, 5);
                 })
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& upsertCollResponse) {
                     uassertStatusOK(upsertCollResponse.toStatus());
 
-                    return insertToPlacementHistoryStatement(txnClient,
-                                                             toNss,
-                                                             fromUUID,
-                                                             timeInsert,
-                                                             fromNssShards,
-                                                             6,
-                                                             upsertCollResponse);
+                    return insertToPlacementHistoryStatement(
+                        txnClient,
+                        toNss,
+                        newTargetCollectionUuid.get_value_or(fromUUID),
+                        timeInsert,
+                        fromNssShards,
+                        6,
+                        upsertCollResponse);
                 })
                 // update tags and check it was successful
                 .thenRunOn(txnExec)
@@ -452,6 +516,14 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& response) {
                     uassertStatusOK(response.toStatus());
+                    return updateChunksUuid(txnClient, *optFromCollType, newTargetCollectionUuid);
+                })
+                .thenRunOn(txnExec)
+                .then([&](const BatchedCommandResponse& updateChunksResponse) {
+                    uassertStatusOK(updateChunksResponse.toStatus());
+                    // Make sure the chunks update query must target unsplittable collections with
+                    // one chunk.
+                    dassert(updateChunksResponse.getN() <= 1);
                 })
                 .semi();
         };
@@ -470,13 +542,14 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient());
     } else {
-        // Case unsharded FROM collection : just delete the target collection if sharded
+        // Case FROM collection is not tracked by the config server: just delete the target
+        // collection if it was registered in the CSRS
         auto now = VectorClock::get(opCtx)->getTime();
         auto newTimestamp = now.clusterTime().asTimestamp();
 
         auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                     ExecutorPtr txnExec) {
-            return deleteShardedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
+            return deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, 1)
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& deleteCollResponse) {
                     uassertStatusOK(deleteCollResponse.toStatus());
@@ -608,33 +681,35 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     }
 
                     // Make sure the source collection exists
-                    const auto optSourceCollType = getShardedCollection(opCtx, fromNss);
-                    const bool sourceIsSharded = (bool)optSourceCollType;
+                    const auto optSourceCollType = getCollectionFromConfigServer(opCtx, fromNss);
+                    const auto sourceCollUuid =
+                        getCollectionUUID(opCtx, fromNss, optSourceCollType);
+                    _doc.setSourceUUID(sourceCollUuid);
+                    _doc.setOptTrackedCollInfo(optSourceCollType);
 
-                    _doc.setSourceUUID(getCollectionUUID(opCtx, fromNss, optSourceCollType));
-                    if (sourceIsSharded) {
-                        uassert(ErrorCodes::CommandFailed,
-                                str::stream() << "Source and destination collections must be on "
-                                                 "the same database because "
-                                              << fromNss.toStringForErrorMsg() << " is sharded.",
-                                fromNss.db_forSharding() == toNss.db_forSharding());
-                        _doc.setOptShardedCollInfo(optSourceCollType);
-                    } else if (fromNss.db_forSharding() != toNss.db_forSharding()) {
-                        sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-                    }
-
-                    const auto optTargetCollType = getShardedCollection(opCtx, toNss);
-                    const bool targetIsSharded = (bool)optTargetCollType;
-                    _doc.setTargetIsSharded(targetIsSharded);
+                    const auto optTargetCollType = getCollectionFromConfigServer(opCtx, toNss);
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
-                    if (!targetIsSharded) {
+                    // TODO (SERVER-80704): Get rid of targetIsSharded and optShardedCollInfo fields
+                    // once v8.0 branches out
+                    _doc.setTargetIsSharded(isCollectionSharded(optTargetCollType));
+                    _doc.setOptShardedCollInfo(optSourceCollType);
+
+                    if (fromNss.db_forSharding() != toNss.db_forSharding()) {
+                        // Renaming across databases will result in a new UUID that is generated by
+                        // the coordinator and will be propagated to the participants.
+                        _doc.setNewTargetCollectionUuid(UUID::gen());
+                    } else {
+                        _doc.setNewTargetCollectionUuid(sourceCollUuid);
+                    }
+
+                    if (!optTargetCollType) {
                         // (SERVER-67325) Acquire critical section on the target collection in order
-                        // to disallow concurrent `createCollection`. In case the collection does
-                        // not exist, it will be later released by the rename participant. In case
-                        // the collection exists and is unsharded, the critical section can be
-                        // released right away as the participant will re-acquire it when needed.
+                        // to disallow concurrent local `createCollection`. In case the collection
+                        // does not exist, it will be later released by the rename participant. In
+                        // the collection exists, the critical section can be released right away as
+                        // the participant will re-acquire it when needed.
                         auto criticalSection = ShardingRecoveryService::get(opCtx);
                         criticalSection->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx,
@@ -647,15 +722,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
 
-                        // Make sure the target namespace is not a view
-                        uassert(ErrorCodes::NamespaceExists,
-                                str::stream() << "a view already exists with that name: "
-                                              << toNss.toStringForErrorMsg(),
-                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
-
                         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
                                                                                        toNss)) {
-                            // Release the critical section because the unsharded target collection
+                            // Release the critical section because the untracked target collection
                             // already exists, hence no risk of concurrent `createCollection`
                             criticalSection->releaseRecoverableCriticalSection(
                                 opCtx,
@@ -665,8 +734,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         }
                     }
 
-                    sharding_ddl_util::checkRenamePreconditions(
-                        opCtx, sourceIsSharded, toNss, _doc.getDropTarget());
+                    sharding_ddl_util::checkRenamePreconditions(opCtx,
+                                                                fromNss,
+                                                                optSourceCollType,
+                                                                toNss,
+                                                                optTargetCollType,
+                                                                _doc.getDropTarget());
 
                     sharding_ddl_util::checkCatalogConsistencyAcrossShardsForRename(
                         opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
@@ -679,6 +752,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             AutoGetCollection::Options{}
                                 .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                 .expectedUUID(_doc.getExpectedTargetUUID())};
+
+                        uassert(ErrorCodes::NamespaceExists,
+                                str::stream() << "a view already exists with that name: "
+                                              << toNss.toStringForErrorMsg(),
+                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
+
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename to an existing encrypted collection",
                                 !coll || !coll->getCollectionOptions().encryptedFieldConfig ||
@@ -707,6 +786,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
 
+                _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
+
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "renameCollection.start",
@@ -715,15 +796,21 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                   << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
 
-                // Block migrations on involved sharded collections
-                if (_doc.getOptShardedCollInfo()) {
+                // Block migrations on involved collections.
+                try {
                     const auto& osi = getNewSession(opCtx);
                     sharding_ddl_util::stopMigrations(opCtx, fromNss, _doc.getSourceUUID(), osi);
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // stopMigrations is allowed to fail when the source collection is not tracked
+                    // by the sharding catalog.
                 }
 
-                if (_doc.getTargetIsSharded()) {
+                try {
                     const auto& osi = getNewSession(opCtx);
                     sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID(), osi);
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // stopMigrations is allowed to fail when the target collection doesn't exist or
+                    // is not tracked by the sharding catalog.
                 }
             }))
         .then(_buildPhaseHandler(
@@ -738,17 +825,21 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, getNewSession(opCtx), **executor);
                 }
 
+                _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
+
                 const auto& fromNss = nss();
 
                 // On participant shards:
                 // - Block CRUD on source and target collection in case at least one of such
-                //   collections is currently sharded
+                //   collections is currently tracked by the config server
                 // - Locally drop the target collection
                 // - Locally rename source to target
                 ShardsvrRenameCollectionParticipant renameCollParticipantRequest(
                     fromNss, _doc.getSourceUUID().value());
                 renameCollParticipantRequest.setDbName(fromNss.dbName());
                 renameCollParticipantRequest.setTargetUUID(_doc.getTargetUUID());
+                renameCollParticipantRequest.setNewTargetCollectionUuid(
+                    _doc.getNewTargetCollectionUuid());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
 
                 // We need to send the command to all the shards because both movePrimary and
@@ -779,6 +870,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
+
                 // Remove the query sampling configuration documents for the source and destination
                 // collections, if they exist.
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
@@ -788,28 +881,34 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                      NamespaceStringUtil::serialize(nss())
                                      << NamespaceStringUtil::serialize(_request.getTo())))));
 
-                // For an unsharded collection the CSRS server can not verify the targetUUID.
+                // For an untracked collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getNewSession(opCtx), **executor);
                 }
 
-                if ((_doc.getTargetIsSharded() || _doc.getOptShardedCollInfo())) {
+                {
                     const auto& osi = getNewSession(opCtx);
                     renameIndexMetadataInShards(
                         opCtx, nss(), _request, osi, **executor, &_doc, token);
                 }
 
-                const auto& osi = getNewSession(opCtx);
-                renameCollectionMetadataInTransaction(opCtx,
-                                                      _doc.getOptShardedCollInfo(),
-                                                      nss(),
-                                                      _request.getTo(),
-                                                      _doc.getTargetUUID(),
-                                                      ShardingCatalogClient::kMajorityWriteConcern,
-                                                      **executor,
-                                                      osi);
+                // Update the collection metadata after the rename.
+                // Renaming the metadata will also resume migrations for the resulting collection.
+                {
+                    const auto& osi = getNewSession(opCtx);
+                    renameCollectionMetadataInTransaction(
+                        opCtx,
+                        _doc.getOptTrackedCollInfo(),
+                        nss(),
+                        _request.getTo(),
+                        _doc.getTargetUUID(),
+                        _doc.getNewTargetCollectionUuid(),
+                        ShardingCatalogClient::kMajorityWriteConcern,
+                        **executor,
+                        osi);
+                }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
                 // primary will start-up from a configTime that is inclusive of the renamed
@@ -827,6 +926,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getNewSession(opCtx), **executor);
                 }
+
+                _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
 
                 const auto& fromNss = nss();
                 // On participant shards:
@@ -863,12 +964,14 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
+            _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
+
             // Retrieve the new collection version
             const auto catalog = Grid::get(opCtx)->catalogCache();
             const auto cri = uassertStatusOK(
                 catalog->getCollectionRoutingInfoWithRefresh(opCtx, _request.getTo()));
-            _response = RenameCollectionResponse(cri.cm.isSharded() ? cri.getCollectionVersion()
-                                                                    : ShardVersion::UNSHARDED());
+            _response = RenameCollectionResponse(
+                cri.cm.hasRoutingTable() ? cri.getCollectionVersion() : ShardVersion::UNSHARDED());
 
             ShardingLogging::get(opCtx)->logChange(
                 opCtx,
@@ -879,6 +982,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 ShardingCatalogClient::kMajorityWriteConcern);
             LOGV2(5460504, "Collection renamed", logAttrs(nss()));
         }));
+}
+
+// TODO (SERVER-80704): Get rid of this method once v8.0 branches out
+void RenameCollectionCoordinator::_updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade() {
+    // `optTrackedCollInfo` is a new field added on v7.1, so we need to make sure it' set to the
+    // proper value in case the rename operation started its execution on a previous binary version.
+    if (!_doc.getOptTrackedCollInfo() && _doc.getOptShardedCollInfo()) {
+        _doc.setOptTrackedCollInfo(_doc.getOptShardedCollInfo());
+    }
 }
 
 }  // namespace mongo

@@ -385,6 +385,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 RenameCollectionOptions options;
                 options.dropTarget = _doc.getDropTarget();
                 options.stayTemp = _doc.getStayTemp();
+                options.newTargetCollectionUuid = _doc.getNewTargetCollectionUuid();
                 // Use the "markFromMigrate" option so that change streams capturing events about
                 // fromNss/toNss won't receive duplicate drop notifications.
                 options.markFromMigrate = (thisShardId != primaryShardId);

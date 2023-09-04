@@ -594,6 +594,20 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
         }
 
+        // TODO SERVER-77915: Remove once v8.0 branches out
+        if ((isUpgrading &&
+             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                               originalVersion)) ||
+            (isDowngrading &&
+             feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
+                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                               originalVersion))) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+        }
+
         // TODO SERVER-79064: Remove once 8.0 becomes last LTS.
         if (isDowngrading &&
             feature_flags::gAuthoritativeRefineCollectionShardKey
