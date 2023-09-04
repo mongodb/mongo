@@ -882,6 +882,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
          [](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevSampFinalize, false}},
     {"aggRemovableStdDevPopFinalize",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableStdDevPopFinalize, false}},
+    {"aggRemovableAvgFinalize",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRemovableAvgFinalize, false}},
     {"valueBlockExists",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockExists, false}},
     {"valueBlockFillEmpty",

@@ -291,6 +291,61 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevPop(StageBuilderState
     return makeE<sbe::EFunction>("aggRemovableStdDevPopFinalize", std::move(exprs));
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddAvg(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+
+    exprs.push_back(makeFunction("aggRemovableSumAdd", arg->clone()));
+
+    // For the counter we need to skip non-numeric values ourselves.
+    auto addend = sbe::makeE<sbe::EIf>(makeFunction("isNumber", makeFillEmptyNull(std::move(arg))),
+                                       makeInt64Constant(1),
+                                       makeInt64Constant(0));
+
+    auto counterExpr = makeFunction("sum", std::move(addend));
+    exprs.push_back(std::move(counterExpr));
+
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveAvg(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableSumRemove", arg->clone()));
+
+    // For the counter we need to skip non-numeric values ourselves.
+    auto subtrahend =
+        sbe::makeE<sbe::EIf>(makeFunction("isNumber", makeFillEmptyNull(std::move(arg))),
+                             makeInt64Constant(-1),
+                             makeInt64Constant(0));
+    auto counterExpr = makeFunction("sum", std::move(subtrahend));
+    exprs.push_back(std::move(counterExpr));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeAvg(StageBuilderState& state,
+                                                         const WindowFunctionStatement& stmt,
+                                                         sbe::value::SlotVector slots) {
+
+
+    // Slot 0 contains the accumulated sum, and slot 1 contains the count of summed items.
+    tassert(7965900,
+            str::stream() << "Expected two slots to finalize avg, got: " << slots.size(),
+            slots.size() == 2);
+
+    sbe::EExpression::Vector exprs;
+    for (auto slot : slots) {
+        exprs.push_back(makeVariable(slot));
+    }
+
+    return makeFunction("aggRemovableAvgFinalize", std::move(exprs));
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -307,6 +362,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
         {"$derivative", &buildWindowInitializeDerivative},
         {"$stdDevSamp", &emptyInitializer<1>},
         {"$stdDevPop", &emptyInitializer<1>},
+        {AccumulatorAvg::kName, &emptyInitializer<2>},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -329,6 +385,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
         {"$push", &buildWindowAddPush},
         {"$stdDevSamp", &buildWindowAddStdDev},
         {"$stdDevPop", &buildWindowAddStdDev},
+        {AccumulatorAvg::kName, &buildWindowAddAvg},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -375,6 +432,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
         {"$push", &buildWindowRemovePush},
         {"$stdDevSamp", &buildWindowRemoveStdDev},
         {"$stdDevPop", &buildWindowRemoveStdDev},
+        {AccumulatorAvg::kName, &buildWindowRemoveAvg},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -424,6 +482,7 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
         {"$derivative", &buildWindowFinalizeDerivative},
         {"$stdDevSamp", &buildWindowFinalizeStdDevSamp},
         {"$stdDevPop", &buildWindowFinalizeStdDevPop},
+        {AccumulatorAvg::kName, &buildWindowFinalizeAvg},
     };
 
     auto opName = stmt.expr->getOpName();

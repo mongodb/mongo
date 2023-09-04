@@ -835,6 +835,7 @@ enum class Builtin : uint8_t {
     aggRemovableStdDevRemove,
     aggRemovableStdDevSampFinalize,
     aggRemovableStdDevPopFinalize,
+    aggRemovableAvgFinalize,
 
     valueBlockExists,
     valueBlockFillEmpty,
@@ -1942,6 +1943,7 @@ private:
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevPopFinalize(
         ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAvgFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);

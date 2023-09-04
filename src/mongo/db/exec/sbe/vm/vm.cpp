@@ -7628,10 +7628,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggRemovableAvgFinalize
     }
     auto [sumOwned, sumTag, sumVal] = aggRemovableSumFinalizeImpl(sumState);
 
-    if (sumTag == value::TypeTags::NumberInt32 || sumTag == value::TypeTags::NumberInt64) {
-        auto [doubleSumOwned, doubleSumTag, doubleSumVal] =
-            genericNumConvert(sumTag, sumVal, value::TypeTags::NumberDouble);
-        auto sum = value::bitcastTo<double>(doubleSumVal);
+    if (sumTag == value::TypeTags::NumberInt32) {
+        auto sum = static_cast<double>(value::bitcastTo<int>(sumVal));
+        auto avg = sum / static_cast<double>(count);
+        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(avg)};
+    } else if (sumTag == value::TypeTags::NumberInt64) {
+        auto sum = static_cast<double>(value::bitcastTo<long long>(sumVal));
         auto avg = sum / static_cast<double>(count);
         return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(avg)};
     } else if (sumTag == value::TypeTags::NumberDouble) {
@@ -8100,6 +8102,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableStdD
     return builtinAggRemovableStdDevFinalize(arity, false /* isSamp */);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAvgFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    auto [countOwned, countTag, countVal] = getFromStack(1);
+
+    tassert(7965901,
+            "The avg accumulator state should be an array",
+            stateTag == value::TypeTags::Array);
+
+    return aggRemovableAvgFinalizeImpl(value::getArrayView(stateVal), countVal);
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity,
                                                                          const CodeFragment* code) {
@@ -8473,6 +8487,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableStdDevSampFinalize(arity);
         case Builtin::aggRemovableStdDevPopFinalize:
             return builtinAggRemovableStdDevPopFinalize(arity);
+        case Builtin::aggRemovableAvgFinalize:
+            return builtinAggRemovableAvgFinalize(arity);
         case Builtin::valueBlockExists:
             return builtinValueBlockExists(arity);
         case Builtin::valueBlockFillEmpty:
