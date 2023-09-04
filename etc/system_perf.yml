@@ -1272,26 +1272,6 @@ tasks:
           test_control: "initialsync"
           mongodb_setup: "replica-2node-fcbis"
 
-  - name: initialsync-logkeeper-short
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "initialsync-logkeeper"
-          mongodb_setup: "initialsync-logkeeper-short"
-          # Logkeeper dataset with FCV set to 7.1
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.1.tgz"
-
-  - name: initialsync-logkeeper-short-fcbis
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "initialsync-logkeeper"
-          mongodb_setup: "initialsync-logkeeper-short-fcbis"
-          # Logkeeper dataset with FCV set to 7.1
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.1.tgz"
-
   - name: initialsync-logkeeper
     priority: 5
     exec_timeout_secs: 43200 # 12 hours
@@ -1314,15 +1294,6 @@ tasks:
   # The following two initial sync logkeeper automation tasks are only used in the commented-out
   # "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
   # run in patch builds to update FCV for logkeeper datasets.
-  - name: initialsync-logkeeper-short-s3-update
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "initialsync-logkeeper-short-s3-update"
-          mongodb_setup: "initialsync-logkeeper-short-s3-update"
-          # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.1.tgz"
 
   - name: initialsync-logkeeper-snapshot-update
     priority: 5
@@ -3665,7 +3636,6 @@ buildvariants:
   #    - name: schedule_patch_auto_tasks
   #    - name: schedule_variant_auto_tasks
   #    - name: initialsync-logkeeper-snapshot-update
-  #    - name: initialsync-logkeeper-short-s3-update
 
   - name: linux-replSet-audit.2022-11
     display_name: Linux 3-Node ReplSet Audit 2022-11
