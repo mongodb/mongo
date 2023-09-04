@@ -1622,11 +1622,6 @@ const allCommands = {
     waitForFailPoint: {
         skip: isAnInternalCommand,
     },
-    waitForOngoingChunkSplits: {
-        command: {waitForOngoingChunkSplits: 1},
-        isShardedOnly: true,
-        isShardSvrOnly: true,
-    },
     whatsmysni: {
         command: {whatsmysni: 1},
         isAdminCommand: true,

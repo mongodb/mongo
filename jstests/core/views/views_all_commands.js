@@ -778,7 +778,6 @@ let viewsCommandTests = {
     validate: {command: {validate: "view"}, expectFailure: true},
     validateDBMetadata:
         {command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}}},
-    waitForOngoingChunkSplits: {skip: isUnrelated},
     voteAbortIndexBuild: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},

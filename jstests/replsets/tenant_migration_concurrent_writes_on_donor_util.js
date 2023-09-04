@@ -711,7 +711,6 @@ export const TenantMigrationConcurrentWriteUtil = {
         voteAbortIndexBuild: {skip: isNotRunOnUserDatabase},
         voteCommitIndexBuild: {skip: isNotRunOnUserDatabase},
         waitForFailPoint: {skip: isNotRunOnUserDatabase},
-        waitForOngoingChunkSplits: {skip: isNotRunOnUserDatabase},
         whatsmysni: {skip: isNotRunOnUserDatabase},
         whatsmyuri: {skip: isNotRunOnUserDatabase}
     }
