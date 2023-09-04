@@ -3212,9 +3212,6 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     ASSERT(opCtx()->lockState());
     ASSERT(opCtx()->recoveryUnit());
 
-    const auto autocommit = false;
-    auto sessionCheckout = checkOutSession();
-
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(
         readConcernArgs.initialize(BSON("find"
@@ -3222,6 +3219,9 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
                                         << BSON(repl::ReadConcernArgs::kLevelFieldName
                                                 << "snapshot"))));
     repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    const auto autocommit = false;
+    auto sessionCheckout = checkOutSession();
 
     // Perform initial unstash which sets up a WriteUnitOfWork.
     auto txnParticipant = TransactionParticipant::get(opCtx());

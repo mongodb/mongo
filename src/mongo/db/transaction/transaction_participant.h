@@ -433,7 +433,7 @@ public:
         // builder.
         void _reportTransactionStats(OperationContext* opCtx,
                                      BSONObjBuilder* builder,
-                                     repl::ReadConcernArgs readConcernArgs) const;
+                                     const repl::ReadConcernArgs& readConcernArgs) const;
 
         TransactionParticipant* _tp;
     };  // class Observer
@@ -1197,6 +1197,15 @@ private:
 
         // Contains a list of affected namespaces to be reported to transaction coordinator.
         std::vector<NamespaceString> affectedNamespaces;
+
+        // Maintains a copy of ReadConcernArgs, this allows the worker thread to perform
+        // intermediate changes to its own ReadConcernArgs when fetching the transaction state or
+        // reading retryability history. Those changes would race with monitoring and are inocuous
+        // in nature.
+        //
+        // This value is set at the beginning of a transaction and reflects the user's ReadConcern
+        // preferences.
+        repl::ReadConcernArgs readConcernArgs;
     } _o;
 
     /**

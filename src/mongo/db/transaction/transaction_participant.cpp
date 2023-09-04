@@ -999,6 +999,8 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
             tickSource,
             now,
             *o().transactionExpireDate);
+        o(lk).readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+
         invariant(p().transactionOperations.isEmpty());
     }
 }
@@ -2549,7 +2551,7 @@ void TransactionParticipant::Observer::reportUnstashedState(OperationContext* op
     // of the TransactionParticipant.
     if (!o().txnResourceStash) {
         BSONObjBuilder transactionBuilder;
-        _reportTransactionStats(opCtx, &transactionBuilder, repl::ReadConcernArgs::get(opCtx));
+        _reportTransactionStats(opCtx, &transactionBuilder, o().readConcernArgs);
         builder->append("transaction", transactionBuilder.obj());
     }
 }
@@ -2682,7 +2684,9 @@ void TransactionParticipant::TransactionState::transitionTo(StateFlag newState,
 }
 
 void TransactionParticipant::Observer::_reportTransactionStats(
-    OperationContext* opCtx, BSONObjBuilder* builder, repl::ReadConcernArgs readConcernArgs) const {
+    OperationContext* opCtx,
+    BSONObjBuilder* builder,
+    const repl::ReadConcernArgs& readConcernArgs) const {
     const auto tickSource = opCtx->getServiceContext()->getTickSource();
     o().transactionMetricsObserver.getSingleTransactionStats().report(
         builder, readConcernArgs, tickSource, tickSource->getTicks());
