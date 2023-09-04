@@ -6,17 +6,17 @@
  *   cqf_incompatible,
  * ]
  */
-import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
-(function() {
 "use strict";
+
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     const expectedDocsExamined = 1;
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, internalQueryPlanTieBreakingWithIndexHeuristics: breakTies}));
     const stats = assert.commandWorked(
-        coll.find({a: "mouse", b: /not rat/, c: "capybara", d: "degu"}).explain(true));
+        coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true));
 
     // Check we're generating the expected number of plans.
     assert.eq(stats.executionStats.allPlansExecution.length, expectedPlanCount);
@@ -86,4 +86,3 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
 testTieBreakingScenarios(4, false);
 
 MongoRunner.stopMongod(conn);
-})();

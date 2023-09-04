@@ -109,6 +109,11 @@ struct OrderedIntervalList {
      * and a point predicate on 'a', then the index provides a sort on {b: 1}.
      */
     bool isPoint() const;
+
+    /**
+     * Returns true if this OIL contains only point intervals (such as [N, N]).
+     */
+    bool containsOnlyPointIntervals() const;
 };
 
 /**
