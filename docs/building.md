@@ -48,12 +48,16 @@ modules must be installed. Python 3 is included in macOS 10.15 and later.
 For earlier macOS versions, Python 3 can be installed using Homebrew or
 MacPorts or similar.
 
-To install the required Python modules, run:
-
-    $ python3 -m pip install -r etc/pip/compile-requirements.txt
+MongoDB manages our python dependencies with poetry.
+You can see other install instructions for poetry by reading this [install guide](https://python-poetry.org/).
 
 Installing the requirements inside a python3 based virtualenv
-dedicated to building MongoDB is recommended.
+dedicated to building MongoDB is optional but recommended.
+
+    $ python3 -m venv <venv_path> --prompt mongo # Optional (venv_path can be a path of your choice)
+    $ source <venv_path>/bin/activate # Optional (might be slightly different based on the your shell)
+    $ python3 -m pip install poetry
+    $ python3 -m poetry install --no-root --sync
 
 Note: In order to compile C-based Python modules, you'll also need the
 Python and OpenSSL C headers. Run:
@@ -62,6 +66,9 @@ Python and OpenSSL C headers. Run:
 * Ubuntu (20.04 and newer)/Debian (Bullseye and newer) - `apt install python-dev-is-python3 libssl-dev`
 * Ubuntu (18.04 and older)/Debian (Buster and older) - `apt install python3.7-dev libssl-dev`
 
+Note: If you are seeing errors involving "Prompt dismissed.." you might need to run the following command before poetry install.
+
+    $ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 SCons
 ---------------

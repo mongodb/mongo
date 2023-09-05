@@ -1,7 +1,0 @@
--r components/platform.req
--r components/core.req
--r components/evergreen.req
--r components/testing.req
-
--r components/aws.req
--r components/tooling_metrics.req

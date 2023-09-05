@@ -1,2 +1,0 @@
--r components/platform.req
--r components/core.req

@@ -294,7 +294,7 @@ The libdeps linter also has the `--libdeps-linting=print` option which will perf
 The dependency graph can be analyzed post-build by leveraging the completeness of the graph to perform more extensive analysis. You will need to install the libdeps requirements file to python when attempting to use the post-build analysis tools:
 
 ```
-python3 -m pip install -r etc/pip/libdeps-requirements.txt
+python3 -m poetry install --no-root --sync -E libdeps
 ```
 
 The command line interface tool (gacli) has a comprehensive help text which will describe the available analysis options and interface. The visualizer tool includes a GUI which displays the available analysis options graphically. These tools will be briefly covered in the following sections.

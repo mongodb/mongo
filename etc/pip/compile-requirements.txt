@@ -1,6 +1,0 @@
--r components/platform.req
--r components/core.req
-
--r components/compile.req
-
--r components/tooling_metrics.req

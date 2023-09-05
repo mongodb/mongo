@@ -5,6 +5,8 @@
 # should be used for finding such external modules or
 # missing dependencies.
 import sys
+import subprocess
+import re
 
 
 class MissingRequirements(Exception):
@@ -12,7 +14,7 @@ class MissingRequirements(Exception):
     pass
 
 
-def verify_requirements(requirements_file: str, silent: bool = False, executable=sys.executable):
+def verify_requirements(silent: bool = False, executable=sys.executable):
     """Check if the modules in a pip requirements file are installed.
     This allows for a more friendly user message with guidance on how to
     resolve the missing dependencies.
@@ -32,40 +34,36 @@ def verify_requirements(requirements_file: str, silent: bool = False, executable
                                   f"Try running:\n"
                                   f"    {executable} -m pip install {pip_pkg}") from ex
 
-    # Import the prequisites for this function, providing hints on failure.
+    # Import poetry. If this fails then we know the next function will fail.
+    # This is so the user will have an easier time diagnosing the problem
     try:
-        import requirements
+        import poetry
     except ModuleNotFoundError as ex:
-        raiseSuggestion(ex, "requirements_parser")
-
-    try:
-        import pkg_resources
-    except ModuleNotFoundError as ex:
-        raiseSuggestion(ex, "setuptools")
+        raiseSuggestion(ex, "'poetry==1.5.1'")
 
     verbose("Checking required python packages...")
 
-    # Reduce a pip requirements file to its PEP 508 requirement specifiers.
-    with open(requirements_file) as fd:
-        pip_lines = [p.line for p in requirements.parse(fd)]
+    poetry_dry_run_proc = subprocess.run(
+        [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run"], check=True,
+        capture_output=True, text=True)
 
-    # The PEP 508 requirement specifiers can be parsed by the `pkg_resources`.
-    pkg_requirements = list(pkg_resources.parse_requirements(pip_lines))
-
+    # String match should look like the following
+    # Package operations: 2 installs, 3 updates, 0 removals, 165 skipped
+    match = re.search(r"Package operations: (\d+) \w+, (\d+) \w+, (\d+) \w+, (\d+) \w+",
+                      poetry_dry_run_proc.stdout)
     verbose("Requirements list:")
-    for req in sorted(set([str(req) for req in pkg_requirements])):
-        verbose(f"    {req}")
-
-    # Resolve all the requirements at once.
-    # This should help expose dependency hell among the requirements.
-    try:
-        dists = pkg_resources.working_set.resolve(pkg_requirements)
-    except pkg_resources.ResolutionError as ex:
-        raiseSuggestion(
-            ex,
-            f"-r {requirements_file}",
-        )
-
-    verbose("Resolved to these distributions:")
-    for dist in sorted(set([f"    {dist.key} {dist.version}" for dist in dists])):
-        verbose(dist)
+    verbose(poetry_dry_run_proc.stdout)
+    installs = int(match[1])
+    updates = int(match[2])
+    removals = int(match[3])
+    if updates == 1 and sys.platform == 'win32' and "Updating pywin32" in poetry_dry_run_proc.stdout:
+        # We have no idea why pywin32 thinks it needs to be updated
+        # We could use some more investigation into this
+        verbose(
+            "Windows detected a single update to pywin32 which is known to be buggy. Continuing.")
+    elif installs + updates + removals > 0:
+        raise MissingRequirements(
+            f"Detected one or more packages are out of date. "
+            f"Try running:\n"
+            f"    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring\n"
+            f"    {executable} -m poetry install --no-root --sync")

@@ -28,7 +28,7 @@ RUN python -m pip install --upgrade pip wheel
 # copy resmoke, make the venv, and pip install
 COPY src /resmoke
 
-RUN bash -c "cd /resmoke && python -m venv python3-venv && . python3-venv/bin/activate && pip install --upgrade pip wheel && pip install -r ./buildscripts/requirements.txt"
+RUN bash -c "cd /resmoke && python3 -m venv python3-venv && . python3-venv/bin/activate && python3 -m pip install 'poetry==1.5.1' && python3 -m poetry install --no-root --sync"
 
 # copy the mongo binary -- make sure it is executable
 COPY mongo /usr/bin

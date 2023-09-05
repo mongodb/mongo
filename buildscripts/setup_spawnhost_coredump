@@ -180,7 +180,15 @@ fi' >> .bash_profile
         ln -s ${SRC_DIR}/buildscripts buildscripts
 
         # Install pymongo to get the bson library for pretty-printers.
-        ${TOOLCHAIN_ROOT}/bin/pip3 install -r ${SRC_DIR}/etc/pip/dev-requirements.txt &
+        # This is copied from evergreen/functions/venv_setup.sh
+        if [ "Windows_NT" = "$OS" ]; then
+           ${TOOLCHAIN_ROOT}/bin/python3 -m pip install "poetry==1.5.1" "charset-normalizer==2.0.12"
+        else
+           ${TOOLCHAIN_ROOT}/bin/python3 -m pip install "poetry==1.5.1"
+        fi
+        pushd ${SRC_DIR}
+        ${TOOLCHAIN_ROOT}/bin/python3 -m poetry install --no-root --sync &
+        popd
     else
         archive_fail "src"
     fi

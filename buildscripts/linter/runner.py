@@ -138,7 +138,7 @@ Could not find the correct version of linter '%s', expected '%s'. Check your
 PATH environment variable or re-run with --verbose for more information.
 
 To fix, install the needed python modules for Python 3.x:
-   python3 -m pip install -r etc/pip/lint-requirements.txt
+   python3 -m poetry install --no-root --sync
 
 These commands are typically available via packages with names like python-pip,
 or python3-pip. See your OS documentation for help.

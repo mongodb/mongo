@@ -1,2 +1,0 @@
-unittest-xml-reporting >= 2.2.0, <= 3.0.4
-packaging <= 21.3

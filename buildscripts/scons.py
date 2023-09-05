@@ -22,7 +22,7 @@ sys.path = [SCONS_DIR, SITE_TOOLS_DIR] + sys.path
 from mongo.pip_requirements import verify_requirements, MissingRequirements
 
 try:
-    verify_requirements('etc/pip/compile-requirements.txt')
+    verify_requirements()
 except MissingRequirements as ex:
     print(ex)
     sys.exit(1)

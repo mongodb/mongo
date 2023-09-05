@@ -133,6 +133,7 @@ def main():
                 FunctionCall("kill processes"),
                 FunctionCall("cleanup environment"),
                 FunctionCall("set up venv"),
+                FunctionCall("set up libdeps venv"),
                 FunctionCall("upload pip requirements"),
                 FunctionCall("f_expansions_write"),
                 FunctionCall("configure evergreen api credentials"),

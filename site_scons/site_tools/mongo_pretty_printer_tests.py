@@ -122,7 +122,7 @@ def build_pretty_printer_test(env, target, **kwargs):
                 "gdb.execute('set confirm off')",
                 "gdb.execute('source .gdbinit')",
                 "try:",
-                "    verify_requirements('etc/pip/components/core.req', executable=f'@python_executable@')",
+                "    verify_requirements(executable=f'@python_executable@')",
                 "except MissingRequirements as ex:",
                 "    print(ex)",
                 "    print('continuing testing anyways!')",

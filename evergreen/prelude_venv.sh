@@ -18,6 +18,7 @@ function activate_venv {
       exit 1
     fi
     python=${python}
+    echo "Could not find venv. Setting python to $python."
   fi
 
   if [ "Windows_NT" = "$OS" ]; then
@@ -42,5 +43,5 @@ function activate_venv {
     python -c "import sys; print(sys.path)"
   fi
 
-  echo "python set to $(which $python)"
+  echo "python set to $(which $python) and python version: $($python --version)"
 }

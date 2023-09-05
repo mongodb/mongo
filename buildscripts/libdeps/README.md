@@ -51,7 +51,7 @@ Which will give an output similar to this:
 
 The graph visualizer tools starts up a web service to provide a frontend GUI to navigating and examining the graph files. The Visualizer used a Python Flask backend and React Javascript frontend. You will need to install the libdeps requirements file to python to run the backend:
 
-    python3 -m pip install -r etc/pip/libdeps-requirements.txt
+    python3 -m poetry install --no-root --sync -E libdeps
 
 For installing the dependencies for the frontend, you will need node >= 12.0.0 and npm installed and in the PATH. To install the dependencies navigate to directory where package.json lives, and run:
 

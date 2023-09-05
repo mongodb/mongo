@@ -293,10 +293,13 @@ functions:
 
           mkdir -p mongodb/bin
 
-          /opt/mongodbtoolchain/v4/bin/virtualenv --python /opt/mongodbtoolchain/v4/bin/python3 "${workdir}/compile_venv"
+          # This is copied from evergreen/functions/venv_setup.sh
+          # Consider consolidating this in the future
+          /opt/mongodbtoolchain/v4/bin/python3 -m venv "${workdir}/compile_venv"
           source "${workdir}/compile_venv/bin/activate"
 
-          python -m pip install -r etc/pip/compile-requirements.txt
+          python -m pip install "poetry==1.5.1"
+          python -m poetry install --no-root --sync
     - command: expansions.write
       params:
          file: expansions.yml

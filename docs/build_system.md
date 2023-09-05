@@ -229,7 +229,7 @@ To use the post-build tools, you must first build the libdeps dependency graph b
 You must also install the requirements file:
 
 ```
-python3 -m pip install -r etc/pip/libdeps-requirements.txt
+python3 -m poetry install --no-root --sync -E libdeps
 ```
 
 After the graph file is created, it can be used as input into the `gacli` tool to perform linting and analysis on the complete dependency graph. The `gacli` tool has options for what types of analysis to perform. A complete list can be found using the `--help` option. Minimally, you can run the `gacli` tool by just passing the graph file you wish to analyze:
