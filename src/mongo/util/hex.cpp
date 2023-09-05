@@ -124,4 +124,13 @@ std::string hexdump(StringData data) {
     return out;
 }
 
+std::ostream& StreamableHexdump::_streamTo(std::ostream& os) const {
+    StringData sep;
+    for (auto p = _data; p != _data + _size; ++p) {
+        os << sep << kHexLower[(*p >> 4) & 0x0f] << kHexLower[*p & 0x0f];
+        sep = " "_sd;
+    }
+    return os;
+}
+
 }  // namespace mongo
