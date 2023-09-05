@@ -49,6 +49,7 @@ static void config_map_backup_incr(const char *, u_int *);
 static void config_map_checkpoint(const char *, u_int *);
 static void config_map_file_type(const char *, u_int *);
 static void config_mirrors(void);
+static void config_mirrors_disable_reverse(void);
 static void config_off(TABLE *, const char *);
 static void config_off_all(const char *);
 static void config_pct(TABLE *);
@@ -1159,6 +1160,18 @@ config_mirrors(void)
     bool already_set, explicit_mirror;
 
     g.mirror_col_store = false;
+
+    /*
+     * In theory, mirroring should work with predictable replay, although there's some overlap in
+     * functionality. That is, we usually do multiple runs with the same key with predictable replay
+     * and would notice if data was different or missing. We disable it to keep runs simple.
+     */
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        WARN("%s", "turning off mirroring for predictable replay");
+        config_off_all("runs.mirror");
+        return;
+    }
+
     /* Check for a CONFIG file that's already set up for mirroring. */
     for (already_set = false, i = 1; i <= ntables; ++i)
         if (NTV(tables[i], RUNS_MIRROR)) {
@@ -1171,6 +1184,10 @@ config_mirrors(void)
     if (already_set) {
         if (g.base_mirror == NULL)
             testutil_die(EINVAL, "no table configured that can act as the base mirror");
+
+        /* A custom collator would complicate the cursor traversal when comparing tables. */
+        config_mirrors_disable_reverse();
+
         /*
          * Assume that mirroring is already configured if one of the tables has explicitly
          * configured it on. This isn't optimal since there could still be other tables that haven't
@@ -1191,17 +1208,6 @@ config_mirrors(void)
      */
     explicit_mirror = config_explicit(NULL, "runs.mirror");
     if (!explicit_mirror && mmrand(&g.data_rnd, 1, 10) < 9) {
-        config_off_all("runs.mirror");
-        return;
-    }
-
-    /*
-     * In theory, mirroring should work with predictable replay, although there's some overlap in
-     * functionality. That is, we usually do multiple runs with the same key with predictable replay
-     * and would notice if data was different or missing. We disable it to keep runs simple.
-     */
-    if (GV(RUNS_PREDICTABLE_REPLAY)) {
-        WARN("%s", "turning off mirroring for predictable replay");
         config_off_all("runs.mirror");
         return;
     }
@@ -1239,13 +1245,7 @@ config_mirrors(void)
     }
 
     /* A custom collator would complicate the cursor traversal when comparing tables. */
-    for (i = 1; i <= ntables; ++i)
-        if (NTV(tables[i], BTREE_REVERSE) && config_explicit(tables[i], "btree.reverse")) {
-            WARN(
-              "%s", "mirroring incompatible with reverse collation, turning off reverse collation");
-            break;
-        }
-    config_off_all("btree.reverse");
+    config_mirrors_disable_reverse();
 
     /* Good to go: pick the first non-FLCS table that allows mirroring as our base. */
     for (i = 1; i <= ntables; ++i)
@@ -1281,6 +1281,24 @@ config_mirrors(void)
     for (i = 1; i <= ntables; ++i)
         if (tables[i]->mirror && tables[i] != g.base_mirror)
             config_single(tables[i], buf, false);
+}
+
+/*
+ * config_mirrors_disable_reverse --
+ *     Disable reverse if mirroring enabled.
+ */
+static void
+config_mirrors_disable_reverse(void)
+{
+    u_int i;
+
+    for (i = 1; i <= ntables; ++i)
+        if (NTV(tables[i], BTREE_REVERSE) && config_explicit(tables[i], "btree.reverse")) {
+            WARN(
+              "%s", "mirroring incompatible with reverse collation, turning off reverse collation");
+            break;
+        }
+    config_off_all("btree.reverse");
 }
 
 /*
