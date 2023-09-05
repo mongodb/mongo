@@ -1185,7 +1185,6 @@ void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock(
             continue;
         }
 
-        LOGV2_FOR_HEARTBEATS(5031802, 2, "Restarting heartbeat", "target"_attr = hbHandle.target);
         _replExecutor->cancel(hbHandle.handle);
 
         // Track the members that we have cancelled heartbeats.
@@ -1193,6 +1192,7 @@ void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock(
     }
 
     for (const auto& target : restartedTargets) {
+        LOGV2_FOR_HEARTBEATS(5031802, 2, "Restarting heartbeat", "target"_attr = target);
         _scheduleHeartbeatToTarget_inlock(target, now, replSetName);
         _topCoord->restartHeartbeat(now, target);
     }
