@@ -116,12 +116,15 @@ public:
     /**
      * Establish a cursor given the search query and CursorResponse from the initial execution.
      */
-    boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    virtual boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<UUID>& uuid,
+        const boost::optional<ExplainOptions::Verbosity>& explain,
         const BSONObj& query,
         CursorResponse&& response,
         boost::optional<long long> docsRequested = boost::none,
-        std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
+        std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
         const boost::optional<int>& protocolVersion = boost::none) {
         return boost::none;
     }
@@ -163,5 +166,7 @@ public:
  * A 'ServiceContext' decorator that allows enterprise to set its own version of the above class.
  */
 extern ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers;
+
+extern FailPoint searchReturnEofImmediately;
 
 }  // namespace mongo

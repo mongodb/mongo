@@ -41,20 +41,25 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo::sbe {
 /**
- * TODO: Description of search_cursor_stage.
- *
+ * A stage for $search which maintains a mongot cursor, retrieves one response from mongot in each
+ * getNext() call, and puts the whole response (without metadata) along with specific
+ * fields/metadata into the given slots.
  *
  * Debug string representation:
  *
- *  search_cursor_stage optionalIdSlot optionalResultSlot [metaSlot1, …, metadataSlotN] [fieldSlot1,
- * …, fieldSlotN] optionalSearchMetaSlot
+ * search_cursor_stage resultSlot? [metaSlot1, ..., metadataSlotN] [fieldSlot1, ..., fieldSlotN]
+ *     searchMetaSlot? cursorIdSlot firstBatchSlot limitSlot searchMetaSlot?
  */
 class SearchCursorStage final : public PlanStage {
 public:
-    SearchCursorStage(boost::optional<value::SlotId> idSlot,
+    static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
+
+    SearchCursorStage(NamespaceString nss,
+                      boost::optional<UUID> collUuid,
                       boost::optional<value::SlotId> resultSlot,
                       std::vector<std::string> metadataNames,
                       value::SlotVector metadataSlots,
@@ -63,9 +68,13 @@ public:
                       boost::optional<value::SlotId> searchMetaSlot,
                       value::SlotId cursorIdSlot,
                       value::SlotId firstBatchSlot,
+                      value::SlotId searchQuerySlot,
+                      boost::optional<value::SlotId> sortSpecSlot,
+                      value::SlotId limitSlot,
+                      value::SlotId protocolVersionSlot,
+                      boost::optional<ExplainOptions::Verbosity> explain,
                       PlanYieldPolicy* yieldPolicy,
-                      PlanNodeId planNodeId,
-                      bool participateInTrialRunTracking = true);
+                      PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -80,23 +89,74 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final override;
     size_t estimateCompileTimeSize() const final;
 
+    /**
+     * Calculate the number of documents needed to satisfy a user-defined limit. This information
+     * can be used in a getMore sent to mongot.
+     */
+    boost::optional<long long> calcDocsNeeded();
+
+    auto isStoredSource() const {
+        return _searchQuery.hasField(kReturnStoredSourceArg)
+            ? _searchQuery[kReturnStoredSourceArg].Bool()
+            : false;
+    }
+
+    void setDocsReturnedStats(const CommonStats* docsReturnedStats) {
+        _docsReturnedStats = docsReturnedStats;
+    }
+
 private:
-    const boost::optional<value::SlotId> _idSlot;
+    bool shouldReturnEOF();
+    void tryToSetSearchMetaVar();
+
+private:
+    const NamespaceString _namespace;
+    const boost::optional<UUID> _collUuid;
+    // Output slots.
     const boost::optional<value::SlotId> _resultSlot;
     const IndexedStringVector _metadataNames;
     const value::SlotVector _metadataSlots;
     const IndexedStringVector _fieldNames;
     const value::SlotVector _fieldSlots;
     const boost::optional<value::SlotId> _searchMetaSlot;
+
+    // Input slots.
     const value::SlotId _cursorIdSlot;
     const value::SlotId _firstBatchSlot;
-};
+    const value::SlotId _searchQuerySlot;
+    const boost::optional<value::SlotId> _sortSpecSlot;
+    const value::SlotId _limitSlot;
+    const value::SlotId _protocolVersionSlot;
 
-template <typename... Ts>
-inline auto makeSearchCursorStage(std::unique_ptr<PlanStage> input,
-                                  PlanNodeId nodeId,
-                                  Ts&&... pack) {
-    return makeS<SearchCursorStage>(
-        std::move(input), makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
-}
+    // Output slot accessors.
+    value::OwnedValueAccessor _resultAccessor;
+    absl::InlinedVector<value::OwnedValueAccessor, 3> _metadataAccessors;
+    value::SlotAccessorMap _metadataAccessorsMap;
+    absl::InlinedVector<value::OwnedValueAccessor, 3> _fieldAccessors;
+    value::SlotAccessorMap _fieldAccessorsMap;
+    value::OwnedValueAccessor _searchMetaAccessor;
+
+    // Input slot accessors.
+    value::SlotAccessor* _cursorIdAccessor;
+    value::SlotAccessor* _firstBatchAccessor;
+    value::SlotAccessor* _searchQueryAccessor;
+    value::SlotAccessor* _sortSpecAccessor{nullptr};
+    value::SlotAccessor* _limitAccessor{nullptr};
+    value::SlotAccessor* _protocolVersionAccessor{nullptr};
+
+    // Variables to save the value from input slots.
+    boost::optional<BSONObj> _response;
+    BSONObj _searchQuery;
+    uint64_t _limit{0};
+
+    boost::optional<SortKeyGenerator> _sortKeyGen;
+    boost::optional<executor::TaskExecutorCursor> _cursor;
+    SearchStats _specificStats;
+    const boost::optional<ExplainOptions::Verbosity> _explain;
+    // A CommonStats that tracks how many documents is returned for $search, in the stored source
+    // case, _docsReturnedStats ptr points to current stage, otherwise it points to another stage to
+    // skip the docs that been filtered out.
+    // TODO: SERVER-80648 to have a better way to track count of idx scan stage.
+    const CommonStats* _docsReturnedStats;
+};
 }  // namespace mongo::sbe
