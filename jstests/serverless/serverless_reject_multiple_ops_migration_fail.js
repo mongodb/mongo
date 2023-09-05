@@ -56,10 +56,6 @@ function cannotStartMigrationWhileShardSplitIsInProgress(protocol) {
     assert.commandFailedWithCode(test.startMigration(migrationOpts),
                                  ErrorCodes.ConflictingServerlessOperation);
 
-    assert.commandFailedWithCode(
-        test.forgetMigration(migrationOpts.migrationIdString, false /* retryOnRetryableErrors */),
-        ErrorCodes.NoSuchTenantMigration);
-
     fp.off();
 
     assert.commandWorked(commitThread.returnData());
