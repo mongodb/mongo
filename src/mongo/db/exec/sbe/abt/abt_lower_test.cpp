@@ -181,13 +181,18 @@ protected:
         ShardingMetadata shardingMetadata = ShardingMetadata{}) {
         ScanDefOptions opts;
         opts.insert({"type", "mongod"});
-        opts.insert({"database", "test"});
-        opts.insert({"uuid", UUID::gen().toString()});
-
         MultikeynessTrie trie;
         bool exists = true;
         CEType ce{false};
-        return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce, shardingMetadata);
+        return ScanDefinition(DatabaseNameUtil::deserialize(boost::none, "test"),
+                              UUID::gen(),
+                              opts,
+                              indexDefs,
+                              trie,
+                              dnp,
+                              exists,
+                              ce,
+                              shardingMetadata);
     }
 
     // Does not add the node to the Node map, must be called inside '_node()'.

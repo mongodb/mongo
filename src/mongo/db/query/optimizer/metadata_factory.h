@@ -52,7 +52,9 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              boost::optional<CEType> ce = boost::none,
                              const PathToIntervalFn& pathToInterval = {});
 
-ScanDefinition createScanDef(ScanDefOptions options,
+ScanDefinition createScanDef(DatabaseName dbName,
+                             boost::optional<UUID> uuid,
+                             ScanDefOptions options,
                              IndexDefinitions indexDefs,
                              MultikeynessTrie multikeynessTrie,
                              const ConstFoldFn& constFold,

@@ -506,8 +506,6 @@ static void populateAdditionalScanDefs(
         AutoGetCollectionForReadCommandMaybeLockFree ctx(opCtx, involvedNss);
         const CollectionPtr& collection = ctx ? ctx.getCollection() : CollectionPtr::null;
         const bool collectionExists = static_cast<bool>(collection);
-        const std::string uuidStr =
-            collectionExists ? collection->uuid().toString() : "<missing_uuid>";
         const std::string collNameStr = involvedNss.coll().toString();
 
         // TODO SERVER-70349: Make this consistent with the base collection scan def name.
@@ -538,17 +536,20 @@ static void populateAdditionalScanDefs(
         if (collectionExists) {
             collectionCE = collection->numRecords(opCtx);
         }
-        scanDefs.emplace(scanDefName,
-                         createScanDef({{"type", "mongod"},
-                                        {"database", involvedNss.db_deprecated().toString()},
-                                        {"uuid", uuidStr},
-                                        {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
-                                       std::move(indexDefs),
-                                       std::move(multikeynessTrie),
-                                       constFold,
-                                       std::move(distribution),
-                                       collectionExists,
-                                       collectionCE));
+
+
+        scanDefs.emplace(
+            scanDefName,
+            createScanDef(involvedNss.dbName(),
+                          collectionExists ? boost::optional<UUID>{collection->uuid()}
+                                           : boost::optional<UUID>{},
+                          {{"type", "mongod"}, {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
+                          std::move(indexDefs),
+                          std::move(multikeynessTrie),
+                          constFold,
+                          std::move(distribution),
+                          collectionExists,
+                          collectionCE));
     }
 }
 
@@ -684,18 +685,19 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     ShardingMetadata shardingMetadata(shardKey, isSharded);
 
-    scanDefs.emplace(scanDefName,
-                     createScanDef({{"type", "mongod"},
-                                    {"database", nss.db_deprecated().toString()},
-                                    {"uuid", uuidStr},
-                                    {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
-                                   std::move(indexDefs),
-                                   std::move(multikeynessTrie),
-                                   constFold,
-                                   std::move(distribution),
-                                   collectionExists,
-                                   numRecords,
-                                   std::move(shardingMetadata)));
+    scanDefs.emplace(
+        scanDefName,
+        createScanDef(
+            nss.dbName(),
+            collectionExists ? boost::optional<UUID>{collection->uuid()} : boost::optional<UUID>{},
+            {{"type", "mongod"}, {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
+            std::move(indexDefs),
+            std::move(multikeynessTrie),
+            constFold,
+            std::move(distribution),
+            collectionExists,
+            numRecords,
+            std::move(shardingMetadata)));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.

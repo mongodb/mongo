@@ -185,7 +185,9 @@ PSRExpr::Node& IndexDefinition::getPartialReqMap() {
 }
 
 ScanDefinition::ScanDefinition()
-    : ScanDefinition({} /*options*/,
+    : ScanDefinition({}, /*dbName*/
+                     {}, /*UUID*/
+                     {} /*options*/,
                      {} /*indexDefs*/,
                      {} /*nonMultiKeyPathSet*/,
                      {DistributionType::Centralized},
@@ -193,7 +195,9 @@ ScanDefinition::ScanDefinition()
                      boost::none /*ce*/,
                      {} /*shardingMetadata*/) {}
 
-ScanDefinition::ScanDefinition(ScanDefOptions options,
+ScanDefinition::ScanDefinition(DatabaseName dbName,
+                               boost::optional<UUID> uuid,
+                               ScanDefOptions options,
                                opt::unordered_map<std::string, IndexDefinition> indexDefs,
                                MultikeynessTrie multikeynessTrie,
                                DistributionAndPaths distributionAndPaths,
@@ -202,6 +206,8 @@ ScanDefinition::ScanDefinition(ScanDefOptions options,
                                ShardingMetadata shardingMetadata)
     : _options(std::move(options)),
       _distributionAndPaths(std::move(distributionAndPaths)),
+      _dbName(std::move(dbName)),
+      _uuid(std::move(uuid)),
       _indexDefs(std::move(indexDefs)),
       _multikeynessTrie(std::move(multikeynessTrie)),
       _exists(exists),
@@ -214,6 +220,14 @@ const ScanDefOptions& ScanDefinition::getOptionsMap() const {
 
 const DistributionAndPaths& ScanDefinition::getDistributionAndPaths() const {
     return _distributionAndPaths;
+}
+
+const DatabaseName& ScanDefinition::getDatabaseName() const {
+    return _dbName;
+}
+
+const boost::optional<UUID>& ScanDefinition::getUUID() const {
+    return _uuid;
 }
 
 const opt::unordered_map<std::string, IndexDefinition>& ScanDefinition::getIndexDefs() const {

@@ -70,7 +70,9 @@ MultikeynessTrie createTrie(const IndexDefinitions& indexDefs) {
 ScanDefinition createScanDef(ScanDefOptions options, IndexDefinitions indexDefs) {
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
-    return createScanDef(std::move(options),
+    return createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         std::move(options),
                          std::move(indexDefs),
                          std::move(multikeynessTrie),
                          ConstEval::constFold,
@@ -88,7 +90,9 @@ ScanDefinition createScanDef(ScanDefOptions options,
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
 
-    return createScanDef(std::move(options),
+    return createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         std::move(options),
                          std::move(indexDefs),
                          std::move(multikeynessTrie),
                          constFold,
@@ -99,7 +103,9 @@ ScanDefinition createScanDef(ScanDefOptions options,
                          pathToInterval);
 }
 
-ScanDefinition createScanDef(ScanDefOptions options,
+ScanDefinition createScanDef(DatabaseName dbName,
+                             boost::optional<UUID> uuid,
+                             ScanDefOptions options,
                              IndexDefinitions indexDefs,
                              MultikeynessTrie multikeynessTrie,
                              const ConstFoldFn& constFold,
@@ -126,7 +132,9 @@ ScanDefinition createScanDef(ScanDefOptions options,
         // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
         // condition, which is thus guaranteed to never contain any documents.
     }
-    return {std::move(options),
+    return {std::move(dbName),
+            std::move(uuid),
+            std::move(options),
             std::move(indexDefs),
             std::move(multikeynessTrie),
             std::move(distributionAndPaths),

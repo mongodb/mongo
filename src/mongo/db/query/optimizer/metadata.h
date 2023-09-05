@@ -233,7 +233,9 @@ class ScanDefinition {
 public:
     ScanDefinition();
 
-    ScanDefinition(ScanDefOptions options,
+    ScanDefinition(DatabaseName dbName,
+                   boost::optional<UUID> uuid,
+                   ScanDefOptions options,
                    IndexDefinitions indexDefs,
                    MultikeynessTrie multikeynessTrie,
                    DistributionAndPaths distributionAndPaths,
@@ -244,6 +246,10 @@ public:
     const ScanDefOptions& getOptionsMap() const;
 
     const DistributionAndPaths& getDistributionAndPaths() const;
+
+    const DatabaseName& getDatabaseName() const;
+
+    const boost::optional<UUID>& getUUID() const;
 
     const opt::unordered_map<std::string, IndexDefinition>& getIndexDefs() const;
     opt::unordered_map<std::string, IndexDefinition>& getIndexDefs();
@@ -257,9 +263,13 @@ public:
     const ShardingMetadata& shardingMetadata() const;
     ShardingMetadata& shardingMetadata();
 
+    const NamespaceStringOrUUID& getNamespaceStringOrUUID() const;
+
 private:
     ScanDefOptions _options;
     DistributionAndPaths _distributionAndPaths;
+    DatabaseName _dbName;
+    boost::optional<UUID> _uuid;
 
     /**
      * Indexes associated with this collection.

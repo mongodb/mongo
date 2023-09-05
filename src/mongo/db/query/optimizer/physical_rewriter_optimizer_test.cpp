@@ -3799,6 +3799,7 @@ TEST(PhysRewriter, NestedElemMatch) {
         prefixId,
         {{{"coll1",
            createScanDef(
+
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
@@ -5728,7 +5729,9 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
     auto prefixId = PrefixId::createForTests();
 
     auto scanDef1 =
-        createScanDef(ScanDefOptions{},
+        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                      UUID::gen(),
+                      ScanDefOptions{},
                       IndexDefinitions{},
                       MultikeynessTrie{},
                       ConstEval::constFold,
@@ -5739,7 +5742,9 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
                       ShardingMetadata({{_get("a", _id())._n, CollationOp::Ascending}}, true));
 
     auto scanDef2 =
-        createScanDef(ScanDefOptions{},
+        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test2"),
+                      UUID::gen(),
+                      ScanDefOptions{},
                       IndexDefinitions{},
                       MultikeynessTrie{},
                       ConstEval::constFold,
@@ -5781,7 +5786,9 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
 ABT optimizeABTWithShardingMetadataNoIndexes(ABT& rootNode, ShardingMetadata shardingMetadata) {
     auto prefixId = PrefixId::createForTests();
 
-    auto scanDef = createScanDef(ScanDefOptions{},
+    auto scanDef = createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                                 UUID::gen(),
+                                 ScanDefOptions{},
                                  IndexDefinitions{},
                                  MultikeynessTrie{},
                                  ConstEval::constFold,
@@ -5926,7 +5933,9 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetBasic) {
 
     ShardingMetadata sm({{_get("b", _id())._n, CollationOp::Ascending}}, true);
 
-    auto scanDef = createScanDef({},
+    auto scanDef = createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                                 UUID::gen(),
+                                 {},
                                  {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
                                  MultikeynessTrie{},
                                  ConstEval::constFold,
@@ -5985,7 +5994,9 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix)
                          {_get("a", _get("b", _get("d", _id())))._n, CollationOp::Ascending}},
                         true);
     auto shardScanDef =
-        createScanDef(ScanDefOptions{},
+        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                      UUID::gen(),
+                      ScanDefOptions{},
                       {{"index1", makeIndexDefinition("e", CollationOp::Ascending)}},
                       MultikeynessTrie{},
                       ConstEval::constFold,
@@ -6105,7 +6116,9 @@ TEST(PhysRewriter, RemoveOrphansSargableNodeIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef({},
+           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
                          MultikeynessTrie{},
                          ConstEval::constFold,
@@ -6148,7 +6161,9 @@ TEST(PhysRewriter, RemoveOrphansCovered) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef({},
+           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
                          MultikeynessTrie::fromIndexPath(_get("a", _id())._n),
                          ConstEval::constFold,
@@ -6195,7 +6210,9 @@ TEST(PhysRewriter, RemoveOrphansIndexDoesntCoverShardKey) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef({},
+           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
                          MultikeynessTrie{},
                          ConstEval::constFold,
@@ -6247,7 +6264,9 @@ TEST(PhysRewriter, RemoveOrphansDottedPathIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef({},
+           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         {},
                          {{"index1", {indexSpec, false}}},
                          MultikeynessTrie{},
                          ConstEval::constFold,
@@ -6303,7 +6322,9 @@ TEST(PhysRewriter, RemoveOrphanedMultikeyIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef({},
+           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                         UUID::gen(),
+                         {},
                          {{"index1", {indexSpec, false}}},
                          std::move(multikeyTrie),
                          ConstEval::constFold,
@@ -6358,7 +6379,9 @@ TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
              OptPhase::MemoImplementationPhase},
             prefixId,
             {{{"c1",
-               createScanDef({},
+               createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+                             UUID::gen(),
+                             {},
                              {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
                              MultikeynessTrie{},
                              ConstEval::constFold,

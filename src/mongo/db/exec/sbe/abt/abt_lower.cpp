@@ -1127,14 +1127,6 @@ void SBENodeLowering::generateSlots(SlotVarMap& slotMap,
     }
 }
 
-static NamespaceStringOrUUID parseFromScanDef(const ScanDefinition& def) {
-    const auto& dbName = def.getOptionsMap().at("database");
-    const auto& uuidStr = def.getOptionsMap().at("uuid");
-    // TODO SERVER-79427 we should no longer deserialize in this method since NamespaceStringOrUUID
-    // should be part of the ScanDefinition.
-    return {DatabaseNameUtil::deserialize(boost::none, dbName), UUID::parse(uuidStr).getValue()};
-}
-
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                                       SlotVarMap& slotMap,
@@ -1152,14 +1144,15 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     if (typeSpec == "mongod") {
-        NamespaceStringOrUUID nss = parseFromScanDef(def);
+        tassert(8423400, "ScanDefinition must have a UUID", def.getUUID().has_value());
+        const UUID& uuid = def.getUUID().get();
 
         // Unused.
         boost::optional<sbe::value::SlotId> seekRecordIdSlot;
 
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (n.useParallelScan()) {
-            return sbe::makeS<sbe::ParallelScanStage>(nss.uuid(),
+            return sbe::makeS<sbe::ParallelScanStage>(uuid,
                                                       rootSlot,
                                                       scanRidSlot,
                                                       boost::none,
@@ -1184,7 +1177,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             MONGO_UNREACHABLE;
         }();
         return sbe::makeS<sbe::ScanStage>(
-            nss.uuid(),
+            uuid,
             rootSlot,
             scanRidSlot,
             boost::none,
@@ -1266,7 +1259,8 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     tassert(6624232, "Collection must exist to lower IndexScan", scanDef.exists());
     const IndexDefinition& indexDef = scanDef.getIndexDefs().at(indexDefName);
 
-    NamespaceStringOrUUID nss = parseFromScanDef(scanDef);
+    tassert(8423399, "ScanDefinition must have a UUID", scanDef.getUUID().has_value());
+    const UUID& uuid = scanDef.getUUID().get();
 
     boost::optional<sbe::value::SlotId> scanRidSlot;
     boost::optional<sbe::value::SlotId> rootSlot;
@@ -1313,7 +1307,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
 
-    return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid(),
+    return sbe::makeS<sbe::SimpleIndexScanStage>(uuid,
                                                  indexDefName,
                                                  !reverse,
                                                  resultSlot,
@@ -1338,7 +1332,9 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
 
     auto& typeSpec = def.getOptionsMap().at("type");
     tassert(6624236, "SeekNode only supports mongod collections", typeSpec == "mongod");
-    NamespaceStringOrUUID nss = parseFromScanDef(def);
+
+    tassert(8423398, "ScanDefinition must have a UUID", def.getUUID().has_value());
+    const UUID& uuid = def.getUUID().get();
 
     boost::optional<sbe::value::SlotId> seekRidSlot;
     boost::optional<sbe::value::SlotId> rootSlot;
@@ -1350,7 +1346,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
 
     sbe::ScanCallbacks callbacks({}, {}, {});
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
-    return sbe::makeS<sbe::ScanStage>(nss.uuid(),
+    return sbe::makeS<sbe::ScanStage>(uuid,
                                       rootSlot,
                                       seekRidSlot,
                                       boost::none,
