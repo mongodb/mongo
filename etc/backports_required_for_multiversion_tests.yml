@@ -113,10 +113,6 @@ last-continuous:
     ticket: SERVER-79136
   - test_file: jstests/sharding/fsync_deadlock.js
     ticket: SERVER-78793
-  - test_file: jstests/sharding/fsync_lock_ddl_lock.js
-    ticket: SERVER-78157
-  - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
-    ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
   suites:
@@ -294,10 +290,6 @@ last-lts:
     ticket: SERVER-79136
   - test_file: jstests/sharding/fsync_deadlock.js
     ticket: SERVER-78793
-  - test_file: jstests/sharding/fsync_lock_ddl_lock.js
-    ticket: SERVER-78157
-  - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
-    ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
   suites:

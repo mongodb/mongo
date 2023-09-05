@@ -140,7 +140,12 @@ public:
         }
 
         const bool lock = cmdObj["lock"].trueValue();
-        LOGV2(20461, "CMD fsync: lock:{lock}", "CMD fsync", "lock"_attr = lock);
+        const bool forBackup = cmdObj["forBackup"].trueValue();
+        LOGV2(20461,
+              "CMD fsync: lock:{lock}",
+              "CMD fsync",
+              "lock"_attr = lock,
+              "forBackup"_attr = forBackup);
 
         // fsync + lock is sometimes used to block writes out of the system and does not care if
         // the `BackupCursorService::fsyncLock` call succeeds.
@@ -174,9 +179,7 @@ public:
                 threadStarted = false;
 
                 Milliseconds deadline = Milliseconds::max();
-                if (forBackup &&
-                    feature_flags::gClusterFsyncLock.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                if (forBackup) {
                     // Set a default deadline of 90s for the fsyncLock to be acquired.
                     deadline = Milliseconds(90000);
                     // Parse the cmdObj and update the deadline if

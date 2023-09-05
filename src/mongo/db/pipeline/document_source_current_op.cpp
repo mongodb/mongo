@@ -33,7 +33,6 @@
 #include "mongo/db/pipeline/document_source_current_op.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 namespace mongo {
 
@@ -147,8 +146,7 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
         // Add the shard name to the output document.
         doc.addField(kShardFieldName, Value(_shardName));
 
-        if (feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility) &&
-            mongo::lockedForWriting()) {
+        if (mongo::lockedForWriting()) {
             doc.addField(StringData("fsyncLock"), Value(true));
         }
 

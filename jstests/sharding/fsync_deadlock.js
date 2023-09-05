@@ -4,9 +4,10 @@ runs an fsyncLock which should fail and timeout as the global S lock cannot be t
  * @tags: [
  *   requires_sharding,
  *   requires_fsync,
- *   requires_fcv_60,
  * ]
  */
+(function() {
+"use strict";
 
 load('jstests/libs/fail_point_util.js');  // For configureFailPoint
 load('jstests/libs/parallelTester.js');
@@ -17,17 +18,22 @@ const st = new ShardingTest({
     config: 1,
 });
 const shard0Primary = st.rs0.getPrimary();
+const shard1Primary = st.rs1.getPrimary();
 
 // Set up a sharded collection with two chunks
 const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
+
+// Force the recipient shard to refresh its routing table for the collection since the recipient
+// refresh during chunk migration is only best-effort, and mongos would only retry a transaction on
+// a StaleConfig error if the error is thrown by the first participant shard.
+assert.commandWorked(shard1Primary.adminCommand({_flushRoutingTableCacheUpdates: ns}));
 
 function waitForFsyncLockToWaitForLock(st, numThreads) {
     assert.soon(() => {
@@ -105,3 +111,4 @@ writeDecisionFp.off();
 fsyncLockThread.join();
 txnThread.join();
 st.stop();
+})();
