@@ -39,6 +39,7 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::optimizer::algebra {
 
@@ -141,6 +142,7 @@ public:
         return child0 + child1 + std::accumulate(children.begin(), children.end(), 0.0);
     }
 };
+static_assert(std::is_same_v<double, detail::deduced_t<TreeTransporter, true, Tree&>>);
 
 TEST(PolyValueTest, SumTransportFixedArity) {
     NodeTransporter nodeTransporter;
@@ -571,6 +573,154 @@ TEST(PolyValueTest, WalkerBasic) {
     ASSERT(!walk<false>(tree, walker));
     ASSERT(walk<false>(tree.cast<BinaryNode>()->get<0>(), walker));
     ASSERT(walk<false>(tree.cast<BinaryNode>()->get<1>(), walker));
+}
+
+TEST(TreeCursorTest, CursorPostorder) {
+    Tree demoTree = Tree::make<AtLeastBinaryNode>(
+        std::vector<Tree>{
+            Tree::make<Leaf>(1.0),
+            Tree::make<BinaryNode>(Tree::make<Leaf>(2.0),
+                                   Tree::make<NaryNode>(std::vector<Tree>{Tree::make<Leaf>(3.0)}))},
+        Tree::make<Leaf>(4.0),
+        Tree::make<BinaryNode>(Tree::make<NaryNode>(std::vector<Tree>{Tree::make<Leaf>(5.0)}),
+                               Tree::make<Leaf>(6.0)));
+
+    std::stringstream result;
+    for (detail::TreeCursor cur{demoTree}; !cur.done(); cur.advance()) {
+        // To get postorder, only pay attention when we're leaving a node.
+        if (!cur.isEntering()) {
+            cur.current().visit(OverloadedVisitor{
+                [&](auto&&, const Leaf& node) { result << " Leaf " << (int)node.x; },
+                [&](auto&&, const BinaryNode& node) { result << " BinaryNode"; },
+                [&](auto&&, const NaryNode& node) { result << " NaryNode"; },
+                [&](auto&&, const AtLeastBinaryNode& node) { result << " AtLeastBinaryNode"; },
+            });
+        }
+    }
+
+    ASSERT_EQ(result.str(),
+              " Leaf 1 Leaf 2 Leaf 3 NaryNode BinaryNode Leaf 4 Leaf 5 NaryNode Leaf 6 BinaryNode "
+              "AtLeastBinaryNode");
+}
+
+TEST(TreeCursorTest, CursorPreorder) {
+    Tree demoTree = Tree::make<AtLeastBinaryNode>(
+        std::vector<Tree>{
+            Tree::make<Leaf>(1.0),
+            Tree::make<BinaryNode>(Tree::make<Leaf>(2.0),
+                                   Tree::make<NaryNode>(std::vector<Tree>{Tree::make<Leaf>(3.0)}))},
+        Tree::make<Leaf>(4.0),
+        Tree::make<BinaryNode>(Tree::make<NaryNode>(std::vector<Tree>{Tree::make<Leaf>(5.0)}),
+                               Tree::make<Leaf>(6.0)));
+
+    std::stringstream result;
+    for (detail::TreeCursor cur{demoTree}; !cur.done(); cur.advance()) {
+        // To get preorder, only pay attention when we're entering a node.
+        if (cur.isEntering()) {
+            cur.current().visit(OverloadedVisitor{
+                [&](auto&&, const Leaf& node) { result << " Leaf " << (int)node.x; },
+                [&](auto&&, const BinaryNode& node) { result << " BinaryNode"; },
+                [&](auto&&, const NaryNode& node) { result << " NaryNode"; },
+                [&](auto&&, const AtLeastBinaryNode& node) { result << " AtLeastBinaryNode"; },
+            });
+        }
+    }
+
+    ASSERT_EQ(result.str(),
+              " AtLeastBinaryNode Leaf 1 BinaryNode Leaf 2 NaryNode Leaf 3 Leaf 4 BinaryNode "
+              "NaryNode Leaf 5 Leaf 6");
+}
+
+TEST(TreeCursorTest, CursorTypes) {
+    // A TreeCursor can walk:
+    // - PolyValue
+    // - const PolyValue
+    // - PolyValue::reference_type
+    // - const PolyValue::reference_type
+
+    // PolyValue lvalue
+    {
+        Tree tree = Tree::make<Leaf>(5);
+        detail::TreeCursor cur{tree};
+        static_assert(std::is_same_v<decltype(cur.current()), Tree&>);
+        ASSERT_EQ(&tree, &cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
+
+    // const PolyValue lvalue
+    {
+        const Tree tree = Tree::make<Leaf>(5);
+        detail::TreeCursor cur{tree};
+        static_assert(std::is_same_v<decltype(cur.current()), const Tree&>);
+        ASSERT_EQ(&tree, &cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
+
+    // reference_type lvalue
+    {
+        Tree tree = Tree::make<Leaf>(5);
+        Tree::reference_type ref = tree.ref();
+        detail::TreeCursor cur{ref};
+        static_assert(std::is_same_v<decltype(cur.current()), Tree::reference_type>);
+        ASSERT_EQ(ref, cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
+
+    // const reference_type lvalue
+    {
+        const Tree tree = Tree::make<Leaf>(5);
+        const Tree::reference_type ref = tree.ref();
+        detail::TreeCursor cur{ref};
+        // Because shallow const does not affect a function's signature, and current() returns
+        // Tree::reference_type by value, it can't communicate the const-ness back to the caller.
+        static_assert(std::is_same_v<decltype(cur.current()), Tree::reference_type>);
+        ASSERT_EQ(ref, cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
+
+    // reference_type rvalue
+    {
+        Tree tree = Tree::make<Leaf>(5);
+        detail::TreeCursor cur{tree.ref()};
+        static_assert(std::is_same_v<decltype(cur.current()), Tree::reference_type>);
+        ASSERT_EQ(tree.ref(), cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
+
+    // const reference_type rvalue
+    {
+        const Tree tree = Tree::make<Leaf>(5);
+        detail::TreeCursor cur{tree.ref()};
+        // Note, we get a non-const 'reference_type' here, because 'tree.ref()' returns a non-const
+        // reference type. This is a flaw in the const correctness of reference_type. We could fix
+        // this by either:
+        // - having distinct types for 'reference_type' and 'const_reference_type', analogous to
+        //   std::vector::iterator vs const_iterator.
+        // - turning 'reference_type' into a read-only view, by removing any methods that provide
+        //   write access to the underlying node.
+        static_assert(std::is_same_v<decltype(tree.ref()), Tree::reference_type>);
+        static_assert(std::is_same_v<decltype(cur.current()), Tree::reference_type>);
+        ASSERT_EQ(tree.ref(), cur.current());
+
+        cur.advance();
+        cur.advance();
+        ASSERT(cur.done());
+    }
 }
 
 }  // namespace
