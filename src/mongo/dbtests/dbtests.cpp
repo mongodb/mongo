@@ -203,7 +203,7 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     : _opCtx(opCtx), _nss(NamespaceString::createNamespaceString_forTest(ns)) {
     // Lock the database and collection
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);
-    _collLock.emplace(opCtx, _nss, MODE_IX);
+    _collLock.emplace(opCtx, _nss, MODE_X);
 
     const bool doShardVersionCheck = false;
 
@@ -211,13 +211,6 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     auto db = _autoDb->ensureDbExists(opCtx);
     invariant(db, _nss.toStringForErrorMsg());
     invariant(db == _clientContext->db());
-
-    // If the collection exists, there is no need to lock into stronger mode
-    if (getCollection())
-        return;
-
-    invariant(db == _clientContext->db());
-    _collLock.emplace(opCtx, _nss, MODE_X);
 }
 
 }  // namespace dbtests

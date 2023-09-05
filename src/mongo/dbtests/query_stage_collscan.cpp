@@ -822,10 +822,6 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
 
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
-        Lock::GlobalLock lk{&_opCtx, MODE_IX};  // avoid global lock upgrade during insertion
-        AutoGetCollectionForRead autoColl(&_opCtx, ns);
-        const CollectionPtr& coll = autoColl.getCollection();
-
         Date_t maxDate = Date_t::now();
         Date_t middleDate = maxDate - Milliseconds(1);
         Date_t minDate = middleDate - Milliseconds(1);
@@ -834,6 +830,9 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
         for (const auto& doc : dateDocuments) {
             insertDocument(ns, doc);
         }
+
+        AutoGetCollectionForRead autoColl(&_opCtx, ns);
+        const CollectionPtr& coll = autoColl.getCollection();
 
         CollectionScanParams params;
         params.tailable = false;
