@@ -1269,7 +1269,8 @@ __wt_block_extlist_write(
 
     /* Write the extent list to disk. */
     WT_ERR(__wt_block_write_off(
-      session, block, tmp, &el->objectid, &el->offset, &el->size, &el->checksum, true, true, true));
+      session, block, tmp, &el->offset, &el->size, &el->checksum, true, true, true));
+    el->objectid = block->objectid;
 
     /*
      * Remove the allocated blocks from the system's allocation list, extent blocks never appear on

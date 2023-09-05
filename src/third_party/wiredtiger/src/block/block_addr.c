@@ -297,16 +297,17 @@ __wt_block_ckpt_pack(
      *
      * Passing an object ID of 0 so the pack function doesn't store an object ID.
      */
-    WT_RET(__wt_block_addr_pack(block, pp, 0, ci->root_offset, ci->root_size, ci->root_checksum));
-    WT_RET(
-      __wt_block_addr_pack(block, pp, 0, ci->alloc.offset, ci->alloc.size, ci->alloc.checksum));
-    if (skip_avail)
-        WT_RET(__wt_block_addr_pack(block, pp, 0, 0, 0, 0));
-    else
-        WT_RET(
-          __wt_block_addr_pack(block, pp, 0, ci->avail.offset, ci->avail.size, ci->avail.checksum));
     WT_RET(__wt_block_addr_pack(
-      block, pp, 0, ci->discard.offset, ci->discard.size, ci->discard.checksum));
+      block, pp, WT_TIERED_OBJECTID_NONE, ci->root_offset, ci->root_size, ci->root_checksum));
+    WT_RET(__wt_block_addr_pack(
+      block, pp, WT_TIERED_OBJECTID_NONE, ci->alloc.offset, ci->alloc.size, ci->alloc.checksum));
+    if (skip_avail)
+        WT_RET(__wt_block_addr_pack(block, pp, WT_TIERED_OBJECTID_NONE, 0, 0, 0));
+    else
+        WT_RET(__wt_block_addr_pack(block, pp, WT_TIERED_OBJECTID_NONE, ci->avail.offset,
+          ci->avail.size, ci->avail.checksum));
+    WT_RET(__wt_block_addr_pack(block, pp, WT_TIERED_OBJECTID_NONE, ci->discard.offset,
+      ci->discard.size, ci->discard.checksum));
     a = (uint64_t)ci->file_size;
     WT_RET(__wt_vpack_uint(pp, 0, a));
     a = ci->ckpt_size;
