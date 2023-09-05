@@ -24,11 +24,6 @@
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
-// Skip the following checks since this test leaves a replica set shard partitioned.
-TestData.skipCheckDBHashes = true;
-TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
-TestData.skipCheckShardFilteringMetadata = true;
-
 var testName = "linearizable_read_concern";
 
 var st = new ShardingTest({
@@ -120,10 +115,9 @@ var result = testDB.runReadCommand({
 });
 assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 
-if (TestData.configShard) {
-    // Reconnect so the config server is available for shutdown hooks.
-    secondaries[0].reconnect(primary);
-    secondaries[1].reconnect(primary);
-}
+// Reconnect so the config server is available for shutdown hooks and to allow potential write
+// operations triggered by consistency checks.
+secondaries[0].reconnect(primary);
+secondaries[1].reconnect(primary);
 
 st.stop();
