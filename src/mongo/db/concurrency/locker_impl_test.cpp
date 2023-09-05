@@ -104,8 +104,8 @@ TEST_F(LockerImplTest, ReLockNoConflict) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
 
-    locker.lock(resId, MODE_S);
     locker.lock(resId, MODE_X);
+    locker.lock(resId, MODE_S);
 
     ASSERT(!locker.unlock(resId));
     ASSERT(locker.isLockHeldForMode(resId, MODE_X));

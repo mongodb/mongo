@@ -2144,7 +2144,7 @@ TEST_F(DConcurrencyTestFixture,
     Lock::DBLock dbLock(
         opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "db"), MODE_IX);
     Lock::CollectionLock collLock(
-        opCtx, NamespaceString::createNamespaceString_forTest("db.coll"), MODE_IX);
+        opCtx, NamespaceString::createNamespaceString_forTest("db.coll"), MODE_X);
 
     opCtx->markKilled();
 

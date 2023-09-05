@@ -130,7 +130,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    AutoGetDb db(client2.second.get(), nss.dbName(), MODE_IX);
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.dbName(), MODE_X, Date_t::now()); },
         Milliseconds(0));
@@ -139,7 +138,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    AutoGetDb db(client2.second.get(), nss.dbName(), MODE_IX);
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.dbName(), MODE_X, Date_t{}); },
         Milliseconds(0));
