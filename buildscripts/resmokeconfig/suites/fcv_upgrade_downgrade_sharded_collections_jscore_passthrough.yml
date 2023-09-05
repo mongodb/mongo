@@ -101,11 +101,6 @@ selector:
   - src/mongo/db/modules/*/jstests/fle/fle_use_cases.js
   - src/mongo/db/modules/*/jstests/fle/fle_drivers_integration.js
 
-  # The test uses a resumeToken from previous calls so FCV change will make the token invalid and fail.
-  - jstests/core/resume_query_from_non_existent_record.js
-  - jstests/core/resume_query.js
-  - jstests/core/find_with_resume_after_param.js
-
   # Expected failure due to command count being not precise due to potential retry of index build.
   - jstests/core/operation_latency_histogram.js
 
@@ -172,6 +167,8 @@ selector:
   - uses_transactions
   # Exclude tests with the latest fcv.
   - requires_fcv_71
+  # Exclude tests that are not compatible with upgrade/downgrade.
+  - cannot_run_during_upgrade_downgrade
 
 executor:
   archive:

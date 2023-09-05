@@ -4,6 +4,7 @@
  * @tags: [
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

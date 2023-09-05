@@ -12,6 +12,7 @@
  *   multiversion_incompatible,
  *   requires_non_retryable_writes,
  *   tenant_migration_incompatible,
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

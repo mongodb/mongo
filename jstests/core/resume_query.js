@@ -9,6 +9,7 @@
  *   requires_getmore,
  *   requires_persistence,
  *   no_selinux,
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
