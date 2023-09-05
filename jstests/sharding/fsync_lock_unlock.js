@@ -2,7 +2,6 @@
  * Verifies the fsync with lock+unlock command on mongos.
  * @tags: [
  *   requires_fsync,
- *   requires_fcv_70,
  *   uses_parallel_shell,
  * ]
  */

@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   requires_fsync,
- *   requires_fcv_70
  * ]
  */
 

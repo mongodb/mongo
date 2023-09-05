@@ -4,7 +4,6 @@ runs an fsyncLock which should fail and timeout as the global S lock cannot be t
  * @tags: [
  *   requires_sharding,
  *   requires_fsync,
- *   requires_fcv_70
  * ]
  */
 

@@ -118,8 +118,3 @@ feature_flags:
     cpp_varname: feature_flags::gClusterCardinalityParameter
     default: true
     version: 7.0
-  featureFlagClusterFsyncLock:
-    description: "Feature flag to enable locking of a cluster through mongos"
-    cpp_varname: feature_flags::gClusterFsyncLock
-    default: true
-    version: 7.0
