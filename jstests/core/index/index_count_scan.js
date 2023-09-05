@@ -12,7 +12,7 @@
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]
-import {getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.index_count;
 coll.drop();
@@ -52,7 +52,7 @@ const runTest = function(indexPattern, indexOption = {}) {
     // Verify that this query uses a COUNT_SCAN.
     const runAndVerify = function(expectedCount, pipeline) {
         assert.eq(expectedCount, coll.aggregate(pipeline).next().count);
-        let explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
+        let explain = coll.explain().aggregate(pipeline);
         const [queryPlan, sbePlan] = getQueryPlan(explain);
         let countScan = getPlanStage(queryPlan, "COUNT_SCAN");
         assert.neq(null, countScan, explain);

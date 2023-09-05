@@ -17,9 +17,7 @@ assert.commandWorked(coll.insert(Array.from({length: 10}, (_, i) => ({_id: i - 5
 // Test that with an unsharded collection we don't get any kind of 'splitPipeline', just the
 // normal explain with 'stages'.
 let explain = coll.explain().aggregate([{$project: {a: 1}}]);
-if (explain.hasOwnProperty("splitPipeline")) {
-    assert.eq(explain.splitPipeline, null, explain);
-}
+assert(!explain.hasOwnProperty("splitPipeline"), explain);
 assert(planHasStage(mongosDB, explain, "PROJECTION_SIMPLE"), explain);
 
 // Now shard the collection by _id and move a chunk to each shard.

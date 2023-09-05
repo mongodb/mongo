@@ -137,6 +137,13 @@ void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
     }
 }
 
+bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() const {
+    // If any of the sub-pipelines doesn't allow pass through, then return false.
+    return std::all_of(_pipelines.cbegin(), _pipelines.cend(), [](const auto& subPipeline) {
+        return subPipeline.allowedToPassthroughFromMongos();
+    });
+}
+
 Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
     NamespaceString nss, bool inMultiDocumentTransaction) const {
     for (auto&& pipeline : _pipelines) {

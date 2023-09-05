@@ -109,6 +109,10 @@ public:
             return true;
         }
 
+        bool allowedToPassthroughFromMongos() const final {
+            return false;
+        }
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const {
             return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);

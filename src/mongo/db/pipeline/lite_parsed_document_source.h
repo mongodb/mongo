@@ -197,6 +197,13 @@ public:
     }
 
     /**
+     * Returns true if this stage may be forwarded from mongos unmodified.
+     */
+    virtual bool allowedToPassthroughFromMongos() const {
+        return true;
+    }
+
+    /**
      * Returns Status::OK() if the involved namespace 'nss' is allowed to be sharded. The behavior
      * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
      * sharded by returning a Status with a message explaining why.
@@ -329,6 +336,7 @@ public:
 
     virtual void getForeignExecutionNamespaces(
         stdx::unordered_set<NamespaceString>& nssSet) const override;
+    bool allowedToPassthroughFromMongos() const override;
 
     Status checkShardedForeignCollAllowed(NamespaceString nss,
                                           bool inMultiDocumentTransaction) const override;

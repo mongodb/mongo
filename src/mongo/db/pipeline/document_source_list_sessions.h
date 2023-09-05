@@ -111,6 +111,10 @@ public:
             return true;
         }
 
+        bool allowedToPassthroughFromMongos() const final {
+            return _spec.getAllUsers();
+        }
+
     private:
         const ListSessionsSpec _spec;
         const PrivilegeVector _privileges;

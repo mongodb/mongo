@@ -99,15 +99,11 @@ function runOneTest(conn, t) {
 
     // Some tests requires mongot, however, setting this failpoint will make search queries to
     // return EOF, that way all the hassle of setting it up can be avoided.
-    let disableSearchFailpointShard, disableSearchFailpointRouter;
+    let disableSearchFailpoint;
     if (t.disableSearch) {
-        disableSearchFailpointShard = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
-                                                         'searchReturnEofImmediately');
-        if (conn.s) {
-            disableSearchFailpointRouter = configureFailPoint(conn.s, 'searchReturnEofImmediately');
-        }
+        disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
+                                                    'searchReturnEofImmediately');
     }
-
     for (let i = 0; i < t.testcases.length; i++) {
         const testcase = t.testcases[i];
         if (!("privileges" in testcase)) {
@@ -196,12 +192,8 @@ function runOneTest(conn, t) {
         }
     }
 
-    if (disableSearchFailpointShard) {
-        disableSearchFailpointShard.off();
-    }
-
-    if (disableSearchFailpointRouter) {
-        disableSearchFailpointRouter.off();
+    if (disableSearchFailpoint) {
+        disableSearchFailpoint.off();
     }
 
     return failures;

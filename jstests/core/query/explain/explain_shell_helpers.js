@@ -13,13 +13,7 @@
 
 // Tests for the .explain() shell helper, which provides syntactic sugar for the explain command.
 // Include helpers for analyzing explain output.
-import {
-    getPlanStage,
-    getSingleNodeExplain,
-    getWinningPlan,
-    isIxscan,
-    planHasStage
-} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getWinningPlan, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var t = db.jstests_explain_helpers;
 t.drop();
@@ -227,21 +221,18 @@ assert.commandWorked(results[0]);
 explain = t.explain().aggregate(
     [{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}]);
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 // Legacy varargs format.
 explain = t.explain().aggregate({$_internalInhibitOptimization: {}}, {$group: {_id: null}});
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert.eq(3, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 explain = t.explain().aggregate(
     {$_internalInhibitOptimization: {}}, {$project: {a: 3}}, {$group: {_id: null}});
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
@@ -250,7 +241,6 @@ explain = t.explain().aggregate(
     [{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}],
     {allowDiskUse: true});
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
@@ -261,7 +251,6 @@ assert("queryPlanner" in explain.stages[0].$cursor);
 // Basic count.
 explain = t.explain().count();
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "RECORD_STORE_FAST_COUNT"));
 
 // Tests for applySkipLimit argument to .count. When we don't apply the skip, we
@@ -282,7 +271,6 @@ assert.eq(0, stage.nCounted);
 // Count with hint.
 explain = t.explain().find({a: 3}).hint({a: 1}).count();
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COUNT"));
 assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COUNT_SCAN"));
 
@@ -290,7 +278,6 @@ assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "COUNT_SCAN"));
 assert.commandWorked(t.createIndex({c: 1}, {sparse: true}));
 explain = t.explain().count({c: {$exists: false}}, {hint: "c_1"});
 assert.commandWorked(explain);
-explain = getSingleNodeExplain(explain);
 assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "IXSCAN"));
 assert.eq(getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN").indexName, "c_1");
 assert.commandWorked(t.dropIndex({c: 1}));

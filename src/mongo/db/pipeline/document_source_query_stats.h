@@ -99,6 +99,11 @@ public:
             return _privileges;
         }
 
+        bool allowedToPassthroughFromMongos() const final {
+            // $queryStats must be run locally on a mongod.
+            return false;
+        }
+
         bool isInitialSource() const final {
             return true;
         }

@@ -10,10 +10,8 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-
 const coll = db[jsTestName()];
-assert.commandWorked(coll.insert({}));
+coll.insert({});
 
 // Use .explain() to see what the stage desugars to.
 // The result is formatted as explain-output, which differs from MQL syntax in some cases:
@@ -25,14 +23,12 @@ function desugar(stage) {
         stage,
     ]);
     assert.commandWorked(result);
-    const explain = getSingleNodeExplain(result);
-
-    assert(Array.isArray(explain.stages), explain);
+    assert(Array.isArray(result.stages), result);
     // The first two stages should be the .find() cursor and the inhibit-optimization stage;
     // the rest of the stages are what the user's 'stage' expanded to.
-    assert(explain.stages[0].$cursor, explain);
-    assert(explain.stages[1].$_internalInhibitOptimization, explain);
-    return explain.stages.slice(2);
+    assert(result.stages[0].$cursor, result);
+    assert(result.stages[1].$_internalInhibitOptimization, result);
+    return result.stages.slice(2);
 }
 
 // Often, the desugared stages include a generated temporary name.

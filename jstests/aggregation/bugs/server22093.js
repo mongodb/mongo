@@ -11,12 +11,7 @@
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 // ]
-import {
-    aggPlanHasStage,
-    getAggPlanStage,
-    getQueryPlanner,
-    planHasStage
-} from "jstests/libs/analyze_plan.js";
+import {aggPlanHasStage, getAggPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var coll = db.countscan;
 coll.drop();
@@ -37,8 +32,10 @@ assert.eq(simpleGroup[0]["count"], 15);
 // Retrieve the query plain from explain, whose shape varies depending on the query and the
 // engines used (classic/sbe).
 const getQueryPlan = function(explain) {
-    const queryPlanner = getQueryPlanner(explain);
-    let winningPlan = queryPlanner.winningPlan;
+    if (explain.stages) {
+        explain = explain.stages[0].$cursor;
+    }
+    let winningPlan = explain.queryPlanner.winningPlan;
     return winningPlan.queryPlan ? winningPlan.queryPlan : winningPlan;
 };
 

@@ -69,7 +69,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -661,23 +660,78 @@ ClusterClientCursorGuard buildClusterCursor(OperationContext* opCtx,
 
 AggregationTargeter AggregationTargeter::make(
     OperationContext* opCtx,
+    const NamespaceString& executionNss,
     const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
     boost::optional<CollectionRoutingInfo> cri,
+    stdx::unordered_set<NamespaceString> involvedNamespaces,
     bool hasChangeStream,
     bool startsWithDocuments,
+    bool allowedToPassthrough,
     bool perShardCursor) {
     if (perShardCursor) {
         return {TargetingPolicy::kSpecificShardOnly, nullptr, cri};
     }
 
-    tassert(7972401,
-            "Aggregation did not have a routing table and does not feature either a $changeStream "
-            "or a $documents stage",
-            cri || hasChangeStream || startsWithDocuments);
-    auto pipeline = buildPipelineFn();
-    auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
-                                                    : TargetingPolicy::kAnyShard;
-    return AggregationTargeter{policy, std::move(pipeline), cri};
+    // Check if any of the involved collections are sharded.
+    bool involvesShardedCollections = [&]() {
+        for (const auto& nss : involvedNamespaces) {
+            const auto [resolvedNsCM, _] =
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            if (resolvedNsCM.isSharded()) {
+                return true;
+            }
+        }
+        return false;
+    }();
+
+    // Determine whether this aggregation must be dispatched to all shards in the cluster.
+    const bool mustRunOnAllShards = sharded_agg_helpers::checkIfMustRunOnAllShards(
+        executionNss, hasChangeStream, startsWithDocuments);
+
+    // If we don't have a routing table, then this is either a $changeStream which must run on all
+    // shards or a $documents stage which must not.
+    invariant(cri || (mustRunOnAllShards && hasChangeStream) ||
+              (startsWithDocuments && !mustRunOnAllShards));
+
+    // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
+    // met:
+    //
+    // 1. The namespace of the aggregate and any other involved namespaces are unsharded.
+    // 2. Is allowed to be forwarded to shards. For example, $currentOp with localOps: true should
+    //    run locally on mongos and cannot be forwarded to a shard.
+    // 3. Does not need to run on all shards. For example, a pipeline with a $changeStream or
+    //    $currentOp.
+    // 4. Doesn't need transformation via DocumentSource::serialize(). For example, list sessions
+    //    needs to include information about users that can only be deduced on mongos.
+    if (cri && !cri->cm.isSharded() && !mustRunOnAllShards && allowedToPassthrough &&
+        !involvesShardedCollections) {
+        return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, cri};
+    } else {
+        auto pipeline = buildPipelineFn();
+        auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
+                                                        : TargetingPolicy::kAnyShard;
+        return AggregationTargeter{policy, std::move(pipeline), cri};
+    }
+}
+
+Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const ClusterAggregate::Namespaces& namespaces,
+                                 const ChunkManager& cm,
+                                 boost::optional<ExplainOptions::Verbosity> explain,
+                                 Document serializedCommand,
+                                 const PrivilegeVector& privileges,
+                                 bool eligibleForSampling,
+                                 BSONObjBuilder* out) {
+    return runPipelineOnSpecificShardOnly(expCtx,
+                                          namespaces,
+                                          boost::optional<DatabaseVersion>(cm.dbVersion()),
+                                          explain,
+                                          serializedCommand,
+                                          privileges,
+                                          cm.dbPrimary(),
+                                          false /* forPerShardCursor */,
+                                          eligibleForSampling,
+                                          out);
 }
 
 Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
@@ -728,25 +782,6 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    eligibleForSampling,
                                                    std::move(targeter.pipeline),
                                                    expCtx->explain);
-
-    // Check for valid usage of SEARCH_META. We wait until after we've dispatched pipelines to the
-    // shards in the event that we need to resolve any views.
-    // TODO PM-1966: We can resume doing this at parse time once views are tracked in the catalog.
-    auto svcCtx = opCtx->getServiceContext();
-    if (svcCtx) {
-        if (shardDispatchResults.pipelineForSingleShard) {
-            getSearchHelpers(svcCtx)->assertSearchMetaAccessValid(
-                shardDispatchResults.pipelineForSingleShard->getSources(), expCtx.get());
-        } else {
-            tassert(7972499,
-                    "Must have split pipeline if 'pipelineForSingleShard' not present",
-                    shardDispatchResults.splitPipeline);
-            getSearchHelpers(svcCtx)->assertSearchMetaAccessValid(
-                shardDispatchResults.splitPipeline->shardsPipeline->getSources(),
-                shardDispatchResults.splitPipeline->mergePipeline->getSources(),
-                expCtx.get());
-        }
-    }
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.
@@ -850,20 +885,25 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
 
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
+                                      boost::optional<DatabaseVersion> dbVersion,
                                       boost::optional<ExplainOptions::Verbosity> explain,
                                       Document serializedCommand,
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
+                                      bool forPerShardCursor,
                                       bool eligibleForSampling,
                                       BSONObjBuilder* out) {
     auto opCtx = expCtx->opCtx;
 
-    tassert(6273804,
-            "Per shard cursors are supposed to pass fromMongos: false to shards",
-            !expCtx->inMongos);
-    // By using an initial batchSize of zero all of the events will get returned through
-    // the getMore path and have metadata stripped out.
-    boost::optional<int> overrideBatchSize = 0;
+    boost::optional<int> overrideBatchSize;
+    if (forPerShardCursor) {
+        tassert(6273804,
+                "Per shard cursors are supposed to pass fromMongos: false to shards",
+                !expCtx->inMongos);
+        // By using an initial batchSize of zero all of the events will get returned through
+        // the getMore path and have metadata stripped out.
+        overrideBatchSize = 0;
+    }
 
     // Format the command for the shard. This wraps the command as an explain if necessary, and
     // rewrites the result into a format safe to forward to shards.
@@ -874,6 +914,16 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                                                            BSONObj(),
                                                                            boost::none,
                                                                            overrideBatchSize);
+
+    if (!forPerShardCursor && (!dbVersion || !dbVersion->isFixed())) {
+        // A fixed dbVersion database can't move or be sharded, so we don't attach any version.
+        cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
+    }
+    if (!forPerShardCursor) {
+        // Unless this is a per shard cursor, we need to send shard version info.
+        tassert(6377400, "Missing shard versioning information", dbVersion.has_value());
+        cmdObj = appendDbVersionIfPresent(std::move(cmdObj), *dbVersion);
+    }
 
     if (eligibleForSampling) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
@@ -921,7 +971,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             Grid::get(opCtx)->getCursorManager(),
             privileges,
             expCtx->tailableMode,
-            boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */));
+            forPerShardCursor ? boost::optional<BSONObj>(change_stream_constants::kSortSpec)
+                              : boost::none));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

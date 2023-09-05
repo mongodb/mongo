@@ -10,12 +10,15 @@
  *   requires_pipeline_optimization,
  * ]
  */
-import {getPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function getWinningPlanForPipeline({coll, pipeline}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
-    return getWinningPlan(getQueryPlanner(explain));
+    if ("queryPlanner" in explain) {
+        return getWinningPlan(explain.queryPlanner);
+    }
+    return getWinningPlan(explain.stages[0].$cursor.queryPlanner);
 }
 
 function assertScanFilterEq({coll, pipeline, filter}) {

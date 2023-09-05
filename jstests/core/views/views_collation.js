@@ -12,7 +12,7 @@
 /**
  * Tests the behavior of operations when interacting with a view's default collation.
  */
-import {getAggPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
@@ -489,15 +489,14 @@ let explain, cursorStage;
 // the explain.
 assert.eq(1, viewsDB.case_sensitive_coll.aggregate([{$match: {f: "case"}}]).itcount());
 assert.eq(3, viewsDB.case_insensitive_view.aggregate([{$match: {f: "case"}}]).itcount());
-explain = getSingleNodeExplain(
-    viewsDB.case_insensitive_view.explain().aggregate([{$match: {f: "case"}}]));
+explain = viewsDB.case_insensitive_view.explain().aggregate([{$match: {f: "case"}}]);
 assert.neq(null, explain.queryPlanner, tojson(explain));
 assert.eq(1, explain.queryPlanner.collation.strength, tojson(explain));
 
 // Test that count against a view with a default collation correctly uses the collation.
 assert.eq(1, viewsDB.case_sensitive_coll.count({f: "case"}));
 assert.eq(3, viewsDB.case_insensitive_view.count({f: "case"}));
-explain = getSingleNodeExplain(viewsDB.case_insensitive_view.explain().count({f: "case"}));
+explain = viewsDB.case_insensitive_view.explain().count({f: "case"});
 cursorStage = getAggPlanStage(explain, "$cursor");
 if (featureFlagSbeFull) {
     assert.eq(null, cursorStage, tojson(explain));
@@ -510,7 +509,7 @@ if (featureFlagSbeFull) {
 // Test that distinct against a view with a default collation correctly uses the collation.
 assert.eq(3, viewsDB.case_sensitive_coll.distinct("f").length);
 assert.eq(1, viewsDB.case_insensitive_view.distinct("f").length);
-explain = getSingleNodeExplain(viewsDB.case_insensitive_view.explain().distinct("f"));
+explain = viewsDB.case_insensitive_view.explain().distinct("f");
 cursorStage = getAggPlanStage(explain, "$cursor");
 assert.neq(null, cursorStage, tojson(explain));
 assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
@@ -524,7 +523,6 @@ assert.eq(1, findRes.cursor.firstBatch.length);
 findRes = viewsDB.runCommand({find: "case_insensitive_view", filter: {f: "case"}});
 assert.commandWorked(findRes);
 assert.eq(3, findRes.cursor.firstBatch.length);
-explain = getSingleNodeExplain(
-    viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}}));
+explain = viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}});
 assert.neq(null, explain.queryPlanner, tojson(explain));
 assert.eq(1, explain.queryPlanner.collation.strength, tojson(explain));

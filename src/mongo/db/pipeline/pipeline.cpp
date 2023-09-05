@@ -104,8 +104,7 @@ Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
  */
 void validateTopLevelPipeline(const Pipeline& pipeline) {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
-    auto expCtx = pipeline.getContext();
-    const NamespaceString& nss = expCtx->ns;
+    const NamespaceString& nss = pipeline.getContext()->ns;
 
     const auto& sources = pipeline.getSources();
 
@@ -153,6 +152,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 hasChangeStreamSplitLargeEventStage = true;
             }
         }
+        auto expCtx = pipeline.getContext();
         auto spec = isChangeStream ? expCtx->changeStreamSpec : boost::none;
         auto hasSplitEventResumeToken = spec &&
             change_stream::resolveResumeTokenFromSpec(expCtx, *spec).fragmentNum.has_value();
@@ -162,11 +162,10 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 !(hasSplitEventResumeToken && !hasChangeStreamSplitLargeEventStage));
     }
 
-    // Verify that usage of $searchMeta and $search is legal. Note that on mongos, we defer this
-    // check until after we've established cursors on the shards to resolve any views.
-    if (expCtx->opCtx->getServiceContext() && !expCtx->inMongos) {
-        getSearchHelpers(expCtx->opCtx->getServiceContext())
-            ->assertSearchMetaAccessValid(sources, expCtx.get());
+    // Verify that usage of $searchMeta and $search is legal.
+    if (pipeline.getContext()->opCtx->getServiceContext()) {
+        getSearchHelpers(pipeline.getContext()->opCtx->getServiceContext())
+            ->assertSearchMetaAccessValid(sources, pipeline.getContext().get());
     }
 }
 

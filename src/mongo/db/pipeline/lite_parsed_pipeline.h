@@ -149,6 +149,15 @@ public:
     }
 
     /**
+     * Returns false if the pipeline has any stages which cannot be passed through to the shards.
+     */
+    bool allowedToPassthroughFromMongos() const {
+        return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
+            return spec->allowedToPassthroughFromMongos();
+        });
+    }
+
+    /**
      * Returns an error Status if at least one of the stages does not allow the involved namespace
      * 'nss' to be sharded, otherwise returns Status::OK().
      */

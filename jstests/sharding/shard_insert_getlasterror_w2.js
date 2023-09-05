@@ -8,13 +8,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-// Shard targeting for the routing table consistency check involves issuing a 'listCollections' with
-// primary read preference. As such, this check will fail given that there isn't a config server
-// primary at the end of this test.
-// TODO SERVER-80145: Try to delete this if we no longer need to issue 'listCollections' against a
-// primary to obtain collation and UUID information when performing shard targeting.
-TestData.skipCheckRoutingTableConsistency = true;
-
 var numDocs = 2000;
 var baseName = "shard_insert_getlasterror_w2";
 var testDBName = baseName;

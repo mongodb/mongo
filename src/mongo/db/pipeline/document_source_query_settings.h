@@ -66,6 +66,10 @@ public:
             return _privileges;
         }
 
+        bool allowedToPassthroughFromMongos() const {
+            return true;
+        }
+
         bool isInitialSource() const {
             return true;
         }

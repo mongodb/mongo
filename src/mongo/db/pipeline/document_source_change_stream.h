@@ -95,6 +95,10 @@ public:
             return true;
         }
 
+        bool allowedToPassthroughFromMongos() const final {
+            return false;
+        }
+
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
         }

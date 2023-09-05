@@ -42,13 +42,11 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
-
 ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =
     ServiceContext::declareDecoration<std::unique_ptr<SearchDefaultHelperFunctions>>();
 
-namespace {
-void assertHelper(const Pipeline::SourceContainer& pipeline) {
+void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
+    const Pipeline::SourceContainer& pipeline, ExpressionContext* expCtx) {
     // Any access of $$SEARCH_META is invalid.
     for (const auto& source : pipeline) {
         std::set<Variables::Id> stageRefs;
@@ -58,20 +56,6 @@ void assertHelper(const Pipeline::SourceContainer& pipeline) {
                 !Variables::hasVariableReferenceTo(stageRefs, {Variables::kSearchMetaId}));
     }
 }
-}  // namespace
-void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
-    const Pipeline::SourceContainer& pipeline, ExpressionContext* expCtx) {
-    assertHelper(pipeline);
-}
-
-void SearchDefaultHelperFunctions::assertSearchMetaAccessValid(
-    const Pipeline::SourceContainer& shardsPipeline,
-    const Pipeline::SourceContainer& mergePipeline,
-    ExpressionContext* expCtx) {
-    assertHelper(shardsPipeline);
-    assertHelper(mergePipeline);
-}
-
 
 ServiceContext::ConstructorActionRegisterer searchQueryHelperRegisterer{
     "searchQueryHelperRegisterer", [](ServiceContext* context) {

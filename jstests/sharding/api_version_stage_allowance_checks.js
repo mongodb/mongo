@@ -9,8 +9,6 @@
  * ]
  */
 
-import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
 const dbName = jsTestName();
@@ -50,10 +48,7 @@ assert.commandWorked(result);
         apiVersion: "1",
         apiStrict: true,
     }));
-    const unshardedPlans = [
-        getSingleNodeExplain(coll.find().explain()),
-        getSingleNodeExplain(coll.explain().aggregate([{$match: {}}]))
-    ];
+    const unshardedPlans = [coll.find().explain(), coll.explain().aggregate([{$match: {}}])];
     assert(unshardedPlans.every(
         plan => plan.stages.map(x => Object.keys(x)[0]).includes("$_internalUnpackBucket")));
 
