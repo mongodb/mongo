@@ -140,6 +140,9 @@ void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, l
                   "durationMillis"_attr = timeSpent);
         }
     });
+
+    LOGV2(8025900, "ReplicaSetAwareServiceRegistry::onStepUpComplete stepping up all services");
+
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
         // Additionally, generate a warning if any individual service is taking too long.
         Timer t{};
@@ -155,6 +158,8 @@ void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, l
                       "serviceName"_attr = service->getServiceName());
             }
         });
+        LOGV2_DEBUG(
+            8025901, 1, "Stepping up service", "serviceName"_attr = service->getServiceName());
         service->onStepUpComplete(opCtx, term);
     });
 }
