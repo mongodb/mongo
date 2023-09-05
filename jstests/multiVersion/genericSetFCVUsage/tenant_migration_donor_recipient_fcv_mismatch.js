@@ -12,6 +12,11 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
+if (!buildInfo()["modules"].includes("enterprise")) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
+
 function runTest(downgradeFCV) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 

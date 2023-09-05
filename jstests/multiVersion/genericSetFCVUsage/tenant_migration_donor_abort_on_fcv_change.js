@@ -13,6 +13,11 @@ import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.j
 import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
+if (!buildInfo()["modules"].includes("enterprise")) {
+    jsTestLog("Skipping test as it requires the enterprise module");
+    quit();
+}
+
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const tenantId = ObjectId().str;
