@@ -482,6 +482,7 @@ void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
 void testutil_deduce_build_dir(TEST_OPTS *opts);
+bool testutil_exists(const char *, const char *);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
 void testutil_lazyfs_cleanup(WT_LAZY_FS *);
@@ -503,6 +504,7 @@ void testutil_random_from_random(WT_RAND_STATE *, WT_RAND_STATE *);
 void testutil_random_from_seed(WT_RAND_STATE *, uint64_t);
 void testutil_recreate_dir(const char *);
 void testutil_remove(const char *);
+void testutil_sentinel(const char *, const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif

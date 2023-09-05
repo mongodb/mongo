@@ -89,7 +89,6 @@ usage(void)
 static WT_THREAD_RET
 thread_ckpt_run(void *arg)
 {
-    FILE *fp;
     WT_CONNECTION *conn;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
@@ -120,9 +119,8 @@ thread_ckpt_run(void *arg)
          * finished with the oldest timestamp set so it can start its timer.
          */
         if (first_ckpt && stable > MAX_DATA) {
-            testutil_assert_errno((fp = fopen(ckpt_file, "w")) != NULL);
+            testutil_sentinel(NULL, ckpt_file);
             first_ckpt = false;
-            testutil_assert_errno(fclose(fp) == 0);
         }
     }
     /* NOTREACHED */
@@ -261,7 +259,6 @@ int
 main(int argc, char *argv[])
 {
     struct sigaction sa;
-    struct stat sb;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -271,7 +268,7 @@ main(int argc, char *argv[])
     uint64_t oldest_ts, stable_ts, ts;
     uint32_t timeout;
     int ch, status;
-    char kname[64], statname[1024], tscfg[64];
+    char kname[64], tscfg[64];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     const char *working_dir;
     bool fatal, preserve, rand_time;
@@ -338,8 +335,7 @@ main(int argc, char *argv[])
      * time we notice that the file has been created. That allows the test to run correctly on
      * really slow machines.
      */
-    testutil_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file);
-    while (stat(statname, &sb) != 0)
+    while (!testutil_exists(home, ckpt_file))
         testutil_sleep_wait(1, pid);
     sleep(timeout);
     sa.sa_handler = SIG_DFL;

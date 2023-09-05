@@ -580,7 +580,6 @@ static WT_THREAD_RET
 thread_ckpt_run(void *arg)
 {
     struct timespec now, start;
-    FILE *fp;
     THREAD_DATA *td;
     WT_SESSION *session;
     uint64_t ts;
@@ -663,8 +662,7 @@ thread_ckpt_run(void *arg)
          * can cause a false positive for a timeout.
          */
         if (ready_for_kill && !created_ready) {
-            testutil_assert_errno((fp = fopen(ready_file, "w")) != NULL);
-            testutil_assert_errno(fclose(fp) == 0);
+            testutil_sentinel(NULL, ready_file);
             created_ready = true;
         }
 
@@ -1059,7 +1057,6 @@ int
 main(int argc, char *argv[])
 {
     struct sigaction sa;
-    struct stat sb;
     FILE *fp;
     REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
     WT_CONNECTION *conn;
@@ -1073,7 +1070,7 @@ main(int argc, char *argv[])
     uint32_t i, rand_value, timeout;
     int base, ch, status;
     char *end_number, *stop_arg;
-    char buf[PATH_MAX], fname[64], kname[64], statname[1024];
+    char buf[PATH_MAX], fname[64], kname[64];
     char cwd_start[PATH_MAX]; /* The working directory when we started */
     bool fatal, rand_th, rand_time, verify_only;
 
@@ -1243,8 +1240,7 @@ main(int argc, char *argv[])
          * If we have a stop timestamp, the ready file is created when the child threads have all
          * reached the stop point, so there's no reason to sleep.
          */
-        testutil_snprintf(statname, sizeof(statname), "%s/%s", home, ready_file);
-        while (stat(statname, &sb) != 0)
+        while (!testutil_exists(home, ready_file))
             testutil_sleep_wait(1, pid);
         if (stop_timestamp == 0)
             sleep(timeout);
