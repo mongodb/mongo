@@ -1503,6 +1503,7 @@ config_tiered_storage(void)
 
         /* FIXME-PM-2538: Compact is not yet supported for tiered tables. */
         config_off(NULL, "ops.compaction");
+        config_off(NULL, "background_compact");
     } else
         /* Never try flush to tiered storage unless running with tiered storage. */
         config_single(NULL, "tiered_storage.flush_frequency=0", true);
