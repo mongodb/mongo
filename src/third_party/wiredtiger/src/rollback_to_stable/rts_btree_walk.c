@@ -241,9 +241,9 @@ __wt_rts_btree_walk_btree_apply(
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
       (addr_size == 0 || (rollback_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          WT_RTS_VERB_TAG_FILE_SKIP "skipping rollback to stable on file=%s because %s", uri,
-          addr_size == 0 ? "it has never been checkpointed" :
-                           "it has timestamped updates and the stable timestamp is 0");
+          WT_RTS_VERB_TAG_FILE_SKIP "skipping rollback to stable on file=%s because %s ", uri,
+          addr_size == 0 ? "has never been checkpointed" :
+                           "has timestamped updates and the stable timestamp is 0");
         return (0);
     }
 
@@ -287,7 +287,7 @@ __wt_rts_btree_walk_btree_apply(
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_TREE_SKIP
           "%s: tree skipped with durable_timestamp=%s and stable_timestamp=%s or txnid=%" PRIu64
-          "has_prepared_updates=%s, txnid=%" PRIu64 " > recovery_checkpoint_snap_min=%" PRIu64
+          " has_prepared_updates=%s, txnid=%" PRIu64 " > recovery_checkpoint_snap_min=%" PRIu64
           ": %s",
           uri, __wt_timestamp_to_string(max_durable_ts, ts_string[0]),
           __wt_timestamp_to_string(rollback_timestamp, ts_string[1]), rollback_txnid,
