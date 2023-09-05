@@ -159,7 +159,7 @@ void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<Ten
     }
 }
 
-void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection* coll) {
+void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection& coll) {
     doLoadAllTenantParametersFromCollection(opCtx,
                                             coll,
                                             "initializing"_sd,
@@ -172,9 +172,7 @@ void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const 
 }
 
 void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
-                                                    const Collection* coll) {
-    invariant(coll);
-
+                                                    const Collection& coll) {
     const auto& allParams = ServerParameterSet::getClusterParameterSet()->getMap();
     std::set<std::string> unsetSettings;
     for (const auto& it : allParams) {
@@ -195,7 +193,7 @@ void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
     // For all known settings which were not present in this resync,
     // explicitly clear any value which may be present in-memory.
     for (const auto& setting : unsetSettings) {
-        clearParameter(opCtx, setting, coll->ns().tenantId());
+        clearParameter(opCtx, setting, coll.ns().tenantId());
     }
 }
 

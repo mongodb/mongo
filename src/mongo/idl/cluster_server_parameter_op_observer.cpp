@@ -184,13 +184,17 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
 void ClusterServerParameterOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                              const RollbackObserverInfo& rbInfo) {
     for (const auto& nss : rbInfo.rollbackNamespaces) {
-        if (isConfigNamespace(nss)) {
-            // We can call resynchronize directly because onReplicationRollback is guaranteed to be
-            // called from a state with no active WUOW and no database locks.
-            AutoGetCollectionForRead coll{
-                opCtx, NamespaceString::makeClusterParametersNSS(nss.tenantId())};
+        if (!isConfigNamespace(nss)) {
+            continue;
+        }
+
+        AutoGetCollectionForRead coll{opCtx,
+                                      NamespaceString::makeClusterParametersNSS(nss.tenantId())};
+        if (coll.getCollection()) {
             cluster_parameters::resynchronizeAllTenantParametersFromCollection(
-                opCtx, coll.getCollection().get());
+                opCtx, *coll.getCollection().get());
+        } else {
+            cluster_parameters::clearAllTenantParameters(opCtx, nss.tenantId());
         }
     }
 }

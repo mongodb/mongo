@@ -79,19 +79,20 @@ void clearAllTenantParameters(OperationContext* opCtx, const boost::optional<Ten
  * Used to initialize in-memory cluster parameter state based on the on-disk contents after startup
  * recovery or initial sync is complete.
  */
-void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection* coll);
+void initializeAllTenantParametersFromCollection(OperationContext* opCtx, const Collection& coll);
 
 /**
  * Used on rollback. Updates settings which are present and clears settings which are not.
  */
 void resynchronizeAllTenantParametersFromCollection(OperationContext* opCtx,
-                                                    const Collection* coll);
+                                                    const Collection& coll);
 
 template <typename OnEntry>
 void doLoadAllTenantParametersFromCollection(OperationContext* opCtx,
-                                             const Collection* coll,
+                                             const Collection& coll,
                                              StringData mode,
                                              OnEntry onEntry) try {
+    invariant(coll.ns() == NamespaceString::makeClusterParametersNSS(coll.ns().tenantId()));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
     // abandon the snapshot when exiting the function.
@@ -100,19 +101,14 @@ void doLoadAllTenantParametersFromCollection(OperationContext* opCtx,
         scopeGuard.dismiss();
     }
 
-    if (!coll) {
-        return;
-    }
-    invariant(coll->ns() == NamespaceString::makeClusterParametersNSS(coll->ns().tenantId()));
-
     std::vector<Status> failures;
 
-    auto cursor = coll->getCursor(opCtx);
+    auto cursor = coll.getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         try {
             auto data = doc.get().data.toBson();
-            validateParameter(opCtx, data, coll->ns().tenantId());
-            onEntry(opCtx, data, mode, coll->ns().tenantId());
+            validateParameter(opCtx, data, coll.ns().tenantId());
+            onEntry(opCtx, data, mode, coll.ns().tenantId());
         } catch (const DBException& ex) {
             failures.push_back(ex.toStatus());
         }
