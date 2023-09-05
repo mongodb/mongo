@@ -95,12 +95,6 @@ public:
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& docToDelete,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) final;
-
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,

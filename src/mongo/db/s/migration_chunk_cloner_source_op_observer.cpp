@@ -264,12 +264,6 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
         nss, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime));
 }
 
-void MigrationChunkClonerSourceOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                         const CollectionPtr& coll,
-                                                         const BSONObj& docToDelete,
-                                                         OplogDeleteEntryArgs* args,
-                                                         OpStateAccumulator* opAccumulator) {}
-
 void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
                                                     const CollectionPtr& coll,
                                                     StmtId stmtId,
