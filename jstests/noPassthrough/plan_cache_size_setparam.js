@@ -6,9 +6,9 @@
 "use strict";
 
 const paramName = "planCacheSize";
-const paramStartValue = "711MB";
+const paramDefaultValue = "5%";
 
-let mongod = MongoRunner.runMongod({setParameter: `${paramName}=${paramStartValue}`});
+let mongod = MongoRunner.runMongod();
 let adminDb = mongod.getDB("admin");
 
 function validatePlanCacheSize(paramValue) {
@@ -17,28 +17,24 @@ function validatePlanCacheSize(paramValue) {
     assert.eq(result[paramName], paramValue);
 }
 
-function setPlanCacheSize(paramValue, errorCode) {
-    let result = adminDb.runCommand({setParameter: 1, [paramName]: paramValue});
-    assert.commandWorked(result);
-}
-
 function setPlanCacheSizeThrows(paramValue, errorCode) {
     let result = adminDb.runCommand({setParameter: 1, [paramName]: paramValue});
     assert.commandFailedWithCode(result, errorCode);
 }
 
 // Validates that the parameter is set correctly at startup.
-validatePlanCacheSize(paramStartValue);
+validatePlanCacheSize(paramDefaultValue);
 
-// Validates that the parameter is set correctly in runtime.
-const paramCorrectValue = "10%";
-setPlanCacheSize(paramCorrectValue);
-validatePlanCacheSize(paramCorrectValue);
+// Validates that trying to set planCacheSize throws an error.
+const paramCorrectValue = "100MB";
+const errorCode = 7529500;
+setPlanCacheSizeThrows(paramCorrectValue, errorCode);
+validatePlanCacheSize(paramDefaultValue);
 
-// Validates that an incorrect value is not accepted.
+// Invalid values throw the same error.
 const paramIncorrectValue = "100KB";
-setPlanCacheSizeThrows(paramIncorrectValue, 6007012);
-validatePlanCacheSize(paramCorrectValue);
+setPlanCacheSizeThrows(paramIncorrectValue, errorCode);
+validatePlanCacheSize(paramDefaultValue);
 
 MongoRunner.stopMongod(mongod);
 })();

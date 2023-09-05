@@ -73,7 +73,7 @@ Status onPlanCacheSizeUpdate(const std::string& str) {
 }
 
 Status validatePlanCacheSize(const std::string& str) {
-    return PlanCacheSizeParameter::parse(str).getStatus();
+    uasserted(7529500, "planCacheSize is not a supported parameter in 6.0");
 }
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
