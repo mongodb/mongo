@@ -429,9 +429,9 @@ bool isCompressedBucket(const BSONObj& bucketDoc) {
             versionField && isNumericBSONType(versionField.type()));
     auto version = versionField.Number();
 
-    if (version == 1) {
+    if (version == kTimeseriesControlUncompressedVersion) {
         return false;
-    } else if (version == 2) {
+    } else if (version == kTimeseriesControlCompressedVersion) {
         return true;
     } else {
         uasserted(6540602, "Invalid bucket version");

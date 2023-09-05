@@ -110,7 +110,7 @@ public:
         BSONObjBuilder root;
         {
             BSONObjBuilder builder(root.subobjStart("control"_sd));
-            builder.append("version"_sd, 1);
+            builder.append("version"_sd, timeseries::kTimeseriesControlUncompressedVersion);
         }
         {
             BSONObjBuilder data(root.subobjStart("data"_sd));

@@ -173,8 +173,8 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
 }
 
 // Checks that 'control.count' matches the actual number of measurements in a closed bucket.
-Status _validateTimeseriesCount(const BSONObj& control, int bucketCount, int version) {
-    if (version == 1) {
+Status _validateCompressedTimeseriesCount(const BSONObj& control, int bucketCount, int version) {
+    if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         return Status::OK();
     }
     long long controlCount;
@@ -221,7 +221,8 @@ Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSO
  * Checks the value of the bucket's version.
  */
 Status _validateTimeseriesControlVersion(const BSONObj& recordBson, int bucketVersion) {
-    if (bucketVersion != 1 && bucketVersion != 2) {
+    if (bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
+        bucketVersion != timeseries::kTimeseriesControlCompressedVersion) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
@@ -234,10 +235,12 @@ Status _validateTimeseriesControlVersion(const BSONObj& recordBson, int bucketVe
  * Checks if the bucket's version matches the types of 'data' fields.
  */
 Status _validateTimeseriesDataFieldTypes(const BSONElement& dataField, int bucketVersion) {
-    auto dataType = bucketVersion == 1 ? BSONType::Object : BSONType::BinData;
+    auto dataType = (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion)
+        ? BSONType::Object
+        : BSONType::BinData;
     // Checks that open buckets have 'Object' type and closed buckets have 'BinData Column' type.
     auto isCorrectType = [&](BSONElement el) {
-        if (bucketVersion == 1) {
+        if (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion) {
             return el.type() == BSONType::Object;
         } else {
             return el.type() == BSONType::BinData && el.binDataType() == BinDataType::Column;
@@ -316,7 +319,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                                         int version,
                                         int* bucketCount) {
     timeseries::bucket_catalog::MinMax minmax;
-    if (version == 1) {
+    if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         for (const auto& metric : timeField.Obj()) {
             if (metric.type() != BSONType::Date) {
                 return Status(ErrorCodes::BadValue,
@@ -383,7 +386,7 @@ Status _validateTimeSeriesDataField(const CollectionPtr& coll,
                                     int version,
                                     int bucketCount) {
     timeseries::bucket_catalog::MinMax minmax;
-    if (version == 1) {
+    if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         // Checks that indices are in increasing order and within the correct range.
         int prevIdx = INT_MIN;
         for (const auto& metric : dataField.Obj()) {
@@ -484,7 +487,7 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
         return status;
     }
 
-    if (Status status = _validateTimeseriesCount(control, bucketCount, bucketVersion);
+    if (Status status = _validateCompressedTimeseriesCount(control, bucketCount, bucketVersion);
         !status.isOK()) {
         return status;
     }

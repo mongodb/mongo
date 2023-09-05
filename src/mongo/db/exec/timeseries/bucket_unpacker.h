@@ -131,9 +131,9 @@ public:
         }
 
         auto version = versionField.Number();
-        if (version == 1) {
+        if (version == timeseries::kTimeseriesControlUncompressedVersion) {
             return computeElementCountFromTimestampObjSize(time.objsize());
-        } else if (version == 2) {
+        } else if (version == timeseries::kTimeseriesControlCompressedVersion) {
             auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
             if (countField && isNumericBSONType(countField.type())) {
                 return static_cast<int>(countField.Number());
