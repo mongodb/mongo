@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, sys, wiredtiger, wttest
-from random import randrange
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -62,7 +61,8 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
         if self.chunk_cache_type == 'dram':
             chunk_cache_extra_config = 'type=DRAM'
         else:
-            chunk_cache_extra_config = 'type=FILE,storage_path=/tmp/chunk_cache_{}'.format(randrange(0, 1000000000))
+            current_dir = os.getcwd()
+            chunk_cache_extra_config = 'type=FILE,storage_path=' +  current_dir + '/WiredTigerChunkCache'
 
         return 'tiered_storage=(auth_token=Secret,bucket=bucket1,bucket_prefix=pfx_,name=dir_store),' \
             'chunk_cache=[enabled=true,chunk_size=100MB,capacity=2GB,{}],'.format(chunk_cache_extra_config)
