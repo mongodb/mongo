@@ -593,6 +593,23 @@ A resource pattern is a combination of a [MatchType](action_type.idl) with a `Na
 | `kMatchAnySystemBucketInAnyDBResource` | `{ db: '', system_buckets: 'suffix' }` | Matches the namespace pattern `*.system.buckets.suffix`. |
 | `kMatchExactSystemBucketResource` | `{ db: 'dbname', system_buckets: 'suffix' }` | Matches the exact namespace `dbname.system.buckets.suffix`. |
 
+As `ResourcePattern`s are based on `NamespaceString`, they naturally include an optional `TenantId`,
+which scopes the pattern to a specific tenant in serverless. A user with a given `TenantId` can only
+be granted privileges on resource patterns with that `TenantId`, and non-tenant users can only be
+granted privileges on resource patterns with no `TenantId`. In general, tenant isolation is enforced
+-- for example, the exact namespace pattern `{ db: 'foo', collection: 'bar' }` for tenant A will
+match only tenant A's `<tenantIdA>_foo.bar` collection, and not the no-tenant `foo.bar` collection or
+tenant B's `<tenantIdB>_foo.bar` collection. The same namespace pattern with no `TenantId` will match
+the no-tenant `foo.bar` collection, but not tenant A's `<tenantIdA>_foo.bar` collection.
+
+The exceptions to this rule are the `kMatchClusterResource`, `kMatchAnyResource`, and
+`kMatchAnyNormalResource` resource patterns with no `TenantId` -- these will match across any tenant.
+For example, the any normal resource pattern `{ db: '', collection: '' }` with no `TenantId` will
+match not only the no-tenant `foo.bar` collection, but also tenant A's `<tenantIdA>_foo.bar`
+collection. Note that in order to actually perform operations on tenant data or settings, a
+non-tenant user must be privileged for the `useTenant` action on the `{ cluster : true }` resource
+with no `TenantId`.
+
 ##### Normal Namespace
 
 A "normal" resource is a `namespace` which does not match either of the following patterns:
