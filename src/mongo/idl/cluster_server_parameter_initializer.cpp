@@ -80,6 +80,15 @@ void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext*
 
 void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(OperationContext* opCtx) {
     LOGV2_INFO(6608200, "Initializing cluster server parameters from disk");
+
+    auto initializeTenantParameters = [opCtx](const boost::optional<TenantId>& tenantId) {
+        AutoGetCollectionForRead coll{opCtx, NamespaceString::makeClusterParametersNSS(tenantId)};
+        if (coll.getCollection()) {
+            cluster_parameters::initializeAllTenantParametersFromCollection(
+                opCtx, *coll.getCollection().get());
+        }
+    };
+
     if (gMultitenancySupport) {
         std::set<TenantId> tenantIds;
         auto catalog = CollectionCatalog::get(opCtx);
@@ -89,15 +98,10 @@ void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(Operati
         }
 
         for (const auto& tenantId : tenantIds) {
-            AutoGetCollectionForRead coll{opCtx,
-                                          NamespaceString::makeClusterParametersNSS(tenantId)};
-            cluster_parameters::initializeAllTenantParametersFromCollection(
-                opCtx, coll.getCollection().get());
+            initializeTenantParameters(tenantId);
         }
     }
-    AutoGetCollectionForRead coll{opCtx, NamespaceString::makeClusterParametersNSS(boost::none)};
-    cluster_parameters::initializeAllTenantParametersFromCollection(opCtx,
-                                                                    coll.getCollection().get());
+    initializeTenantParameters(boost::none);
 }
 
 }  // namespace mongo

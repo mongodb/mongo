@@ -93,7 +93,7 @@ public:
             AutoGetCollectionForRead coll{opCtx,
                                           NamespaceString::makeClusterParametersNSS(tenantId)};
             cluster_parameters::resynchronizeAllTenantParametersFromCollection(
-                opCtx, coll.getCollection().get());
+                opCtx, *coll.getCollection().get());
         };
         resynchronize(boost::none);
         resynchronize(kTenantId);
