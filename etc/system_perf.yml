@@ -1749,7 +1749,7 @@ buildvariants:
       <<: *compile-expansions
       compile_variant: -arm64
     run_on:
-      - "amazon2-arm64-large"
+      - "amazon2-arm64-xlarge"
     tasks:
       - name: compile
 
@@ -1926,7 +1926,7 @@ buildvariants:
         --use-diagnostic-latches=off
       compile_variant: -rhel70
     run_on:
-      - rhel70-large
+      - rhel70-xlarge
     tasks:
       - name: compile
 
