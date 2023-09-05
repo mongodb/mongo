@@ -6521,7 +6521,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_sharded_with_config_shard_gen
+  name: concurrency_sharded_with_auto_bootstrap_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
@@ -6552,7 +6552,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_sharded_with_balancer_and_config_shard_gen
+  name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
