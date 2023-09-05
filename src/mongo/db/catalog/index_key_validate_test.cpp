@@ -526,5 +526,10 @@ TEST(IndexKeyValidateTest, GeoIndexSpecs) {
         fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
                  "coarsestIndexedLevel':5}")));
 }
+
+TEST(IndexKeyValidateTest, DuplicatedFieldNames) {
+    ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: true, background: true}")));
+}
 }  // namespace
 }  // namespace mongo
