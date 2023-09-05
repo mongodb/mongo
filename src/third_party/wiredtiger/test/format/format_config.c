@@ -2269,8 +2269,6 @@ config_file_type(u_int type)
 static void
 config_compact(void)
 {
-    char buf[128];
-
     /* Compaction does not work on in-memory databases, disable it. */
     if (GV(RUNS_IN_MEMORY)) {
         if (config_explicit(NULL, "background_compact") && GV(BACKGROUND_COMPACT))
@@ -2281,17 +2279,5 @@ config_compact(void)
               EINVAL, "%s: Foreground compaction cannot be enabled for in-memory runs", progname);
         config_off(NULL, "background_compact");
         config_off(NULL, "ops.compaction");
-    }
-
-    /* Generate values if not explicit set. */
-    if (!config_explicit(NULL, "background_compact.free_space_target")) {
-        testutil_snprintf(buf, sizeof(buf), "background_compact.free_space_target=%" PRIu32,
-          mmrand(&g.extra_rnd, 1, 100));
-        config_single(NULL, buf, false);
-    }
-    if (!config_explicit(NULL, "compact.free_space_target")) {
-        testutil_snprintf(
-          buf, sizeof(buf), "compact.free_space_target=%" PRIu32, mmrand(&g.extra_rnd, 1, 100));
-        config_single(NULL, buf, false);
     }
 }
