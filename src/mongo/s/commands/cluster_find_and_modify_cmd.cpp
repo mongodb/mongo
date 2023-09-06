@@ -519,7 +519,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         const bool isUpsert = cmdObjForShard.getBoolField("upsert");
         const BSONObj collation = getCollation(cmdObjForShard);
         if (write_without_shard_key::useTwoPhaseProtocol(
-                opCtx, nss, false /* isUpdateOrDelete */, isUpsert, query, collation)) {
+                opCtx,
+                nss,
+                false /* isUpdateOrDelete */,
+                isUpsert,
+                false /* isRequestOnTimeseriesViewNamespace */,
+                query,
+                collation)) {
             auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
                 opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
@@ -780,12 +786,14 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         // from the opCtx (which has been set previously in Strategy).
         documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
 
-        if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
-                                                         nss,
-                                                         false /* isUpdateOrDelete */,
-                                                         cmdObj.getBoolField("upsert"),
-                                                         cmdObj.getObjectField("query"),
-                                                         getCollation(cmdObj))) {
+        if (write_without_shard_key::useTwoPhaseProtocol(
+                opCtx,
+                nss,
+                false /* isUpdateOrDelete */,
+                cmdObj.getBoolField("upsert"),
+                false /* isRequestOnTimeseriesViewNamespace */,
+                cmdObj.getObjectField("query"),
+                getCollation(cmdObj))) {
             _runCommandWithoutShardKey(opCtx,
                                        nss,
                                        stripWriteConcern(cmdObj),

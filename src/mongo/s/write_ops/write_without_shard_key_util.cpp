@@ -176,6 +176,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString nss,
                          bool isUpdateOrDelete,
                          bool isUpsert,
+                         bool isRequestOnTimeseriesViewNamespace,
                          const BSONObj& query,
                          const BSONObj& collation) {
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
@@ -200,23 +201,21 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     auto hasDefaultCollation =
         CollatorInterface::collatorsMatch(collator.get(), cm.getDefaultCollator());
 
-    auto tsFields = cm.getTimeseriesFields();
-    bool isTimeseries = tsFields.has_value();
-
     // updateOne and deleteOne do not use the two phase protocol for single writes that specify
     // _id in their queries, unless a document is being upserted. An exact _id match requires
     // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
         isExactIdQuery(opCtx, nss, query, collation, hasDefaultCollation) && !isUpsert &&
-        !isTimeseries) {
+        !isRequestOnTimeseriesViewNamespace) {
         return false;
     }
 
     BSONObj deleteQuery = query;
-    if (isTimeseries) {
+    if (isRequestOnTimeseriesViewNamespace) {
+        invariant(cm.getTimeseriesFields().has_value());
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-        deleteQuery =
-            timeseries::getBucketLevelPredicateForRouting(query, expCtx, tsFields->getMetaField());
+        deleteQuery = timeseries::getBucketLevelPredicateForRouting(
+            query, expCtx, cm.getTimeseriesFields()->getMetaField());
     }
 
     auto shardKey = uassertStatusOK(

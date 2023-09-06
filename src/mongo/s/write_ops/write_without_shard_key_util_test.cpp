@@ -110,16 +110,19 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSi
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("a" << 1 << "b" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 
-    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
-                                                                       kNss,
-                                                                       false /* isUpdateOrDelete */,
-                                                                       false /* isUpsert */,
-                                                                       BSON("a" << 1 << "b" << 1),
-                                                                       {} /* collation */);
+    useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     false /* isUpdateOrDelete */,
+                                                     false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
+                                                     BSON("a" << 1 << "b" << 1),
+                                                     {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -132,16 +135,19 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("a" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
-    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
-                                                                       kNss,
-                                                                       false /* isUpdateOrDelete */,
-                                                                       false /* isUpsert */,
-                                                                       BSON("a" << 1),
-                                                                       {} /* collation */);
+    useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     false /* isUpdateOrDelete */,
+                                                     false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
+                                                     BSON("a" << 1),
+                                                     {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -154,6 +160,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
@@ -168,16 +175,19 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("x" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
-    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
-                                                                       kNss,
-                                                                       false /* isUpdateOrDelete */,
-                                                                       false /* isUpsert */,
-                                                                       BSON("x" << 1),
-                                                                       {} /* collation */);
+    useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     false /* isUpdateOrDelete */,
+                                                     false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
+                                                     BSON("x" << 1),
+                                                     {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -189,6 +199,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhase
                                                      kNss,
                                                      false /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
@@ -202,6 +213,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwo
                                                      kNss,
                                                      false /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("x" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
@@ -215,6 +227,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, QueryWithFeatureFlagDisabledDoesNotUseTwoPh
                                                      kNss,
                                                      false /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("x" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
@@ -248,6 +261,7 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("x" << 1),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
@@ -262,6 +276,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("a"
                                                           << "a"
                                                           << "b"
@@ -280,6 +295,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("a" << 1 << "b" << 1),
                                                      BSON("collation"
                                                           << "lowercase") /* collation */);
@@ -295,6 +311,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id"
                                                           << "hello"),
                                                      BSON("collation"
@@ -311,6 +328,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id" << 1),
                                                      BSON("collation"
                                                           << "lowercase") /* collation */);
@@ -325,6 +343,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUsesTwoPhasePr
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      true /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id" << BSON("$eq" << 1)),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
@@ -339,6 +358,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      true /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("a" << 1 << "_id" << BSON("$eq" << 1)),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
@@ -353,6 +373,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
                                                      kNss,
                                                      true /* isUpdateOrDelete */,
                                                      false /* isUpsert */,
+                                                     false /* isRequestOnTimeseriesViewNamespace */,
                                                      BSON("_id" << BSON("$gt" << 1)),
                                                      {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);

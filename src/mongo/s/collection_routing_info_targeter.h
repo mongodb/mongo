@@ -125,6 +125,8 @@ public:
 
     bool isShardedTimeSeriesBucketsNamespace() const override;
 
+    bool isRequestOnTimeseriesViewNamespace() const override;
+
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
 
     const CollectionRoutingInfo& getRoutingInfo() const;

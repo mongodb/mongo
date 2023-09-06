@@ -51,6 +51,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString ns,
                          bool isUpdateOrDelete,
                          bool isUpsert,
+                         bool isRequestOnTimeseriesViewNamespace,
                          const BSONObj& query,
                          const BSONObj& collation);
 
