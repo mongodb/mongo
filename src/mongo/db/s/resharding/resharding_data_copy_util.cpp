@@ -505,7 +505,9 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
 
     ScopeGuard guard([opCtx, &txnParticipant] {
         try {
-            txnParticipant.abortTransaction(opCtx);
+            if (txnParticipant.transactionIsInProgress()) {
+                txnParticipant.abortTransaction(opCtx);
+            }
         } catch (DBException& e) {
             LOGV2_WARNING(
                 4990200,
