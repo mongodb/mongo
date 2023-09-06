@@ -92,8 +92,10 @@ namespace {
 
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
-
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     uassert(6583201,
             str::stream() << CompactStructuredEncryptionData::kCommandName

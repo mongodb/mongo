@@ -103,8 +103,10 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
-
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            }
 
             auto cleanupCoordinator =
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {

@@ -349,7 +349,10 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
     auto requestAndMsg = [&]() {
         if (request().getEncryptionInformation()) {
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            }
 
             if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                 return processFLEFindAndModifyExplainMongod(opCtx, request());
@@ -458,7 +461,10 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     auto& curOp = *CurOp::get(opCtx);
 
     if (req.getEncryptionInformation().has_value()) {
-        curOp.debug().shouldOmitDiagnosticInformation = true;
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curOp.setShouldOmitDiagnosticInformation_inlock(lk, true);
+        }
         if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
             return processFLEFindAndModify(opCtx, req);
         }

@@ -104,7 +104,7 @@ void updatePlanCache(OperationContext* opCtx,
         plan->indexFilterApplied = solution.indexFilterApplied;
 
         bool shouldOmitDiagnosticInformation =
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
+            CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
         sbe::getPlanCache(opCtx).setPinned(
             std::move(key),
             canonical_query_encoder::computeHash(

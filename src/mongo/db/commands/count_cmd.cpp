@@ -213,8 +213,8 @@ public:
             if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                 processFLECountD(opCtx, nss, &request);
             }
-
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
         if (ctx->getView()) {
@@ -313,8 +313,8 @@ public:
             if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                 processFLECountD(opCtx, nss, &request);
             }
-
-            curOp->debug().shouldOmitDiagnosticInformation = true;
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
         if (request.getMirrored().value_or(false)) {
             const auto& invocation = CommandInvocation::get(opCtx);

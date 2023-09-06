@@ -449,8 +449,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
-
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
         pipeline->optimizePipeline();
