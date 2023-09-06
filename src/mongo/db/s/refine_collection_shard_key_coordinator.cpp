@@ -188,12 +188,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         AutoGetCollection::Options{}
                             .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                             .expectedUUID(_request.getCollectionUUID())};
-
-                    uassert(ErrorCodes::NamespaceNotFound,
-                            str::stream() << "RefineCollectionShardKey: collection "
-                                          << nss().toStringForErrorMsg() << " does not exists",
-                            coll);
-
                     _doc.setUuid(coll->uuid());
 
                     const auto scopedCsr =
