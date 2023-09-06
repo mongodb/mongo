@@ -32,6 +32,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/read_preference_metrics_gen.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -48,8 +49,34 @@ ReadPreferenceMetrics* ReadPreferenceMetrics::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-BSONObj ReadPreferenceMetrics::toBSON() const {
-    return BSONObj();
+void ReadPreferenceMetrics::recordReadPreference(ReadPreferenceSetting readPref,
+                                                 bool isInternal,
+                                                 repl::MemberState state) {}
+
+ReadPrefOps ReadPreferenceMetrics::Counter::toReadPrefOps() const {
+    ReadPrefOps ops;
+    ops.setInternal(internal.load());
+    ops.setExternal(external.load());
+    return ops;
+}
+
+void ReadPreferenceMetrics::Counters::flushCounters(ReadPrefDoc* doc) {
+    doc->setPrimary(primary.toReadPrefOps());
+    doc->setPrimaryPreferred(primaryPreferred.toReadPrefOps());
+    doc->setSecondary(secondary.toReadPrefOps());
+    doc->setSecondaryPreferred(secondaryPreferred.toReadPrefOps());
+    doc->setNearest(nearest.toReadPrefOps());
+    doc->setTagged(tagged.toReadPrefOps());
+}
+
+void ReadPreferenceMetrics::generateMetricsDoc(ReadPreferenceMetricsDoc* doc) {
+    ReadPrefDoc primary;
+    primaryCounters.flushCounters(&primary);
+    doc->setExecutedOnPrimary(primary);
+
+    ReadPrefDoc secondary;
+    secondaryCounters.flushCounters(&secondary);
+    doc->setExecutedOnSecondary(secondary);
 }
 
 namespace {
@@ -65,7 +92,9 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        return ReadPreferenceMetrics::get(opCtx)->toBSON();
+        ReadPreferenceMetricsDoc stats;
+        ReadPreferenceMetrics::get(opCtx)->generateMetricsDoc(&stats);
+        return stats.toBSON();
     }
 
 } ReadPreferenceMetricsSSS;
