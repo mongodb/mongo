@@ -566,7 +566,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         matcher, _ti->makeSessionWorkerFnForStepUp(&sessionKillTokens, &sessionsToReacquireLocks));
     killSessionTokens(opCtx, _ti.get(), std::move(sessionKillTokens));
 
-    {
+    if (sessionsToReacquireLocks.size() > 0) {
+        LOGV2(8083200, "Reacquiring locks for prepared transactions on step-up.");
         // Create a new opCtx because we need an empty locker to refresh the locks.
         auto newClient = opCtx->getServiceContext()->makeClient("restore-prepared-txn");
 
