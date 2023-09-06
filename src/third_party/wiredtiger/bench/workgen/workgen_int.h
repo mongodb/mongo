@@ -286,8 +286,8 @@ struct RTSOperationInternal : OperationInternal {
 struct TableOperationInternal : OperationInternal {
     uint_t _keysize;    // derived from Key._size and Table.options.key_size
     uint_t _valuesize;
-    uint_t _keymax;
-    uint_t _valuemax;
+    uint64_t _keymax;
+    uint64_t _valuemax;
 
     TableOperationInternal() : OperationInternal(), _keysize(0), _valuesize(0),
 			       _keymax(0), _valuemax(0) {}
