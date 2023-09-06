@@ -124,7 +124,6 @@ executor:
         enableTestCommands: 1
         multitenancySupport: true
         featureFlagSecurityToken: true
-        featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2
       noscripting: ''

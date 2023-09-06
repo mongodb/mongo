@@ -107,10 +107,6 @@ executor:
         multitenancySupport: true
         featureFlagSecurityToken: true
         testOnlyValidatedTenancyScopeKey: secret
-        # TODO SERVER-70547: remove featureFlagRequireTenantID from the parameters and have the
-        # inject_security_token override to be able to test both tenant-prefixed request and non-tenant-prefixed request.
-        # Currently, we only test non-tenant-prefixed request and enable the featureFlagRequireTenantID
-        # to have mongod return non-tenant-prefixed response too.
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2
