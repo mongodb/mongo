@@ -837,12 +837,14 @@ public:
 
 class ExpressionLinearFill : public Expression {
 public:
+    static constexpr StringData kName = "$linearFill"_sd;
     ExpressionLinearFill(ExpressionContext* expCtx,
                          std::string accumulatorName,
                          boost::intrusive_ptr<::mongo::Expression> input,
                          WindowBounds bounds)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
                                                   const boost::optional<SortPattern>& sortBy,

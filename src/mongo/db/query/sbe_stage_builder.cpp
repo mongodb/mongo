@@ -3512,7 +3512,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto argY = expr->getChildren()[1].get();
             argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
             argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
-        } else if (accName == "$integral" || accName == "$derivative") {
+        } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
             argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
             argExprs.emplace(AccArgs::kSortBy, makeVariable(getSortBySlot()));
         } else {
@@ -3572,7 +3572,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::vector<std::unique_ptr<sbe::EExpression>> initExprs;
         std::vector<std::unique_ptr<sbe::EExpression>> addExprs;
         std::vector<std::unique_ptr<sbe::EExpression>> removeExprs;
-        auto argExprs = std::move(windowArgExprs[i]);
 
         // Get init expression arg for relevant functions
         auto initExprArg = [&]() {
@@ -3602,28 +3601,33 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 return std::unique_ptr<mongo::sbe::EExpression>(nullptr);
             }
         }();
+
+        auto argExprs = std::move(windowArgExprs[i]);
+        auto cloneExprMap = [](const StringDataMap<std::unique_ptr<sbe::EExpression>>& exprMap) {
+            StringDataMap<std::unique_ptr<sbe::EExpression>> exprMapClone;
+            for (auto& [argName, argExpr] : exprMap) {
+                exprMapClone.emplace(argName, argExpr->clone());
+            }
+            return exprMapClone;
+        };
         if (removable) {
             initExprs = buildWindowInit(_state, outputField, std::move(initExprArg));
             if (argExprs.size() == 1) {
                 addExprs = buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
                 removeExprs =
-                    buildWindowRemove(_state, outputField, std::move(argExprs.begin()->second));
+                    buildWindowRemove(_state, outputField, argExprs.begin()->second->clone());
             } else {
-                StringDataMap<std::unique_ptr<sbe::EExpression>> argExprsClone;
-                for (auto& [argName, argExpr] : argExprs) {
-                    argExprsClone.emplace(argName, argExpr->clone());
-                }
-                addExprs = buildWindowAdd(_state, outputField, std::move(argExprs));
-                removeExprs = buildWindowRemove(_state, outputField, std::move(argExprsClone));
+                addExprs = buildWindowAdd(_state, outputField, cloneExprMap(argExprs));
+                removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
             }
         } else {
             initExprs = buildInitialize(accStmt, std::move(initExprArg), _frameIdGenerator);
             if (argExprs.size() == 1) {
                 addExprs = buildAccumulator(
-                    accStmt, std::move(argExprs.begin()->second), boost::none, _frameIdGenerator);
+                    accStmt, argExprs.begin()->second->clone(), boost::none, _frameIdGenerator);
             } else {
-                addExprs =
-                    buildAccumulator(accStmt, std::move(argExprs), boost::none, _frameIdGenerator);
+                addExprs = buildAccumulator(
+                    accStmt, cloneExprMap(argExprs), boost::none, _frameIdGenerator);
             }
             removeExprs = std::vector<std::unique_ptr<sbe::EExpression>>{addExprs.size()};
         }
@@ -3763,7 +3767,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             stdx::visit(OverloadedVisitor{documentCase, rangeCase}, windowBounds.bounds);
 
+            if (outputField.expr->getOpName() == "$linearFill") {
+                tassert(7971215, "expected a single initExpr", initExprs.size() == 1);
+                window.highBoundExpr =
+                    makeFunction("aggLinearFillCanAdd", makeVariable(window.windowSlot));
+            }
+
             windows.emplace_back(std::move(window));
+        }
+
+        StringDataMap<std::unique_ptr<sbe::EExpression>> finalArgExprs;
+        if (outputField.expr->getOpName() == "$linearFill") {
+            finalArgExprs = std::move(argExprs);
         }
 
         // Build finalize expressions.
@@ -3772,8 +3787,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (removable) {
             finalExpr = buildWindowFinalize(_state, outputField, std::move(componentSlots));
         } else {
-            finalExpr = buildFinalize(
-                _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
+            finalExpr = finalArgExprs.size() > 0
+                ? buildFinalize(_state,
+                                accStmt,
+                                std::move(componentSlots),
+                                std::move(finalArgExprs),
+                                boost::none,
+                                _frameIdGenerator)
+                : buildFinalize(
+                      _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
         }
         auto emptyWindowExpr = [](StringData accExprName) {
             if (accExprName == "$sum") {

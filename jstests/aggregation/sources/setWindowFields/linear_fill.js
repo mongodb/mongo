@@ -4,6 +4,8 @@
  *   requires_fcv_52,
  * ]
  */
+import "jstests/libs/sbe_assert_error_override.js";
+
 const coll = db.linear_fill;
 coll.drop();
 

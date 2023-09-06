@@ -8114,6 +8114,186 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAvgF
     return aggRemovableAvgFinalizeImpl(value::getArrayView(stateVal), countVal);
 }
 
+/**
+ * $linearFill implementation
+ */
+
+std::tuple<value::Array*,
+           std::pair<value::TypeTags, value::Value>,
+           std::pair<value::TypeTags, value::Value>,
+           std::pair<value::TypeTags, value::Value>,
+           std::pair<value::TypeTags, value::Value>,
+           std::pair<value::TypeTags, value::Value>,
+           int64_t>
+linearFillState(value::TypeTags stateTag, value::Value stateVal) {
+    tassert(
+        7971200, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    tassert(7971201,
+            "The accumulator state should have correct number of elements",
+            state->size() == static_cast<size_t>(AggLinearFillElems::kSizeOfArray));
+
+    auto x1 = state->getAt(static_cast<size_t>(AggLinearFillElems::kX1));
+    auto y1 = state->getAt(static_cast<size_t>(AggLinearFillElems::kY1));
+    auto x2 = state->getAt(static_cast<size_t>(AggLinearFillElems::kX2));
+    auto y2 = state->getAt(static_cast<size_t>(AggLinearFillElems::kY2));
+    auto prevX = state->getAt(static_cast<size_t>(AggLinearFillElems::kPrevX));
+    auto [countTag, countVal] = state->getAt(static_cast<size_t>(AggLinearFillElems::kCount));
+    tassert(7971202,
+            "Expected count element to be of int64 type",
+            countTag == value::TypeTags::NumberInt64);
+    auto count = value::bitcastTo<int64_t>(countVal);
+
+    return {state, x1, y1, x2, y2, prevX, count};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillCanAdd(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    auto [state, x1, y1, x2, y2, prevX, count] = linearFillState(stateTag, stateVal);
+
+    // if y2 is non-null it means we have found a valid upper window bound. in that case if count is
+    // positive it means there are still more finalize calls to be made. when count == 0 we have
+    // exhausted this window.
+    if (y2.first != value::TypeTags::Null) {
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(count == 0)};
+    }
+
+    // if y2 is null it means we have not yet found the upper window bound so keep on adding input
+    // values
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillAdd(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [inputTag, inputVal] = moveOwnedFromStack(1);
+    value::ValueGuard inputGuard{inputTag, inputVal};
+
+    auto [sortByTag, sortByVal] = moveOwnedFromStack(2);
+    value::ValueGuard sortByGuard{sortByTag, sortByVal};
+
+    // Validate the types of the values
+    uassert(7971203,
+            "Expected input value type to be numeric or nullish",
+            value::isNumber(inputTag) || value::isNullish(inputTag));
+    uassert(7971204,
+            "Expected sortBy value type to be numeric or date",
+            value::isNumber(sortByTag) || coercibleToDate(sortByTag));
+
+    auto [state, x1, y1, x2, y2, prevX, count] = linearFillState(stateTag, stateVal);
+
+    // Valdiate the current sortBy value with the previous one and update prevX
+    auto [cmpTag, cmpVal] = value::compareValue(sortByTag, sortByVal, prevX.first, prevX.second);
+    uassert(7971205,
+            "There can be no repeated values in the sort field",
+            cmpTag == value::TypeTags::NumberInt32 && cmpVal != 0);
+
+    if (prevX.first != value::TypeTags::Null) {
+        uassert(7971206,
+                "Conflicting sort value types, previous and current types don't match",
+                (coercibleToDate(sortByTag) && coercibleToDate(prevX.first)) ||
+                    (value::isNumber(sortByTag) && value::isNumber(prevX.first)));
+    }
+
+    auto [copyXTag, copyXVal] = value::copyValue(sortByTag, sortByVal);
+    state->setAt(static_cast<size_t>(AggLinearFillElems::kPrevX), copyXTag, copyXVal);
+
+    // Update x2/y2 to the current sortby/input values
+    sortByGuard.reset();
+    auto [oldX2Tag, oldX2Val] =
+        state->swapAt(static_cast<size_t>(AggLinearFillElems::kX2), sortByTag, sortByVal);
+    value::ValueGuard oldX2Guard{oldX2Tag, oldX2Val};
+
+    inputGuard.reset();
+    auto [oldY2Tag, oldY2Val] =
+        state->swapAt(static_cast<size_t>(AggLinearFillElems::kY2), inputTag, inputVal);
+    value::ValueGuard oldY2Guard{oldY2Tag, oldY2Val};
+
+    // If (old) y2 is non-null, it means we need to look for new end-points (x1, y1), (x2, y2)
+    // and the segment spanned be previous endpoints is exhausted. Count should be zero at
+    // this point. Update (x1, y1) to the previous (x2, y2)
+    if (oldY2Tag != value::TypeTags::Null) {
+        tassert(7971207, "count value should be zero", count == 0);
+        oldX2Guard.reset();
+        state->setAt(static_cast<size_t>(AggLinearFillElems::kX1), oldX2Tag, oldX2Val);
+        oldY2Guard.reset();
+        state->setAt(static_cast<size_t>(AggLinearFillElems::kY1), oldY2Tag, oldY2Val);
+    }
+
+    state->setAt(
+        static_cast<size_t>(AggLinearFillElems::kCount), value::TypeTags::NumberInt64, ++count);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+// Given two known points (x1, y1) and (x2, y2) and a value x that lies between those two
+// points, we solve (or fill) for y with the following formula: y = y1 + (x - x1) * ((y2 -
+// y1)/(x2 - x1))
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::linearFillInterpolate(
+    std::pair<value::TypeTags, value::Value> x1,
+    std::pair<value::TypeTags, value::Value> y1,
+    std::pair<value::TypeTags, value::Value> x2,
+    std::pair<value::TypeTags, value::Value> y2,
+    std::pair<value::TypeTags, value::Value> x) {
+    // (y2 - y1)
+    auto [delYOwned, delYTag, delYVal] = genericSub(y2.first, y2.second, y1.first, y1.second);
+    value::ValueGuard delYGuard{delYOwned, delYTag, delYVal};
+
+    // (x2 - x1)
+    auto [delXOwned, delXTag, delXVal] = genericSub(x2.first, x2.second, x1.first, x1.second);
+    value::ValueGuard delXGuard{delXOwned, delXTag, delXVal};
+
+    // (y2 - y1) / (x2 - x1)
+    auto [divOwned, divTag, divVal] = genericDiv(delYTag, delYVal, delXTag, delXVal);
+    value::ValueGuard divGuard{divOwned, divTag, divVal};
+
+    // (x - x1)
+    auto [subOwned, subTag, subVal] = genericSub(x.first, x.second, x1.first, x1.second);
+    value::ValueGuard subGuard{subOwned, subTag, subVal};
+
+    // (x - x1) * ((y2 - y1) / (x2 - x1))
+    auto [mulOwned, mulTag, mulVal] = genericMul(subTag, subVal, divTag, divVal);
+    value::ValueGuard mulGuard{mulOwned, mulTag, mulVal};
+
+    // y1 + (x - x1) * ((y2 - y1) / (x2 - x1))
+    return genericAdd(y1.first, y1.second, mulTag, mulVal);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    auto [xOwned, sortByTag, sortByVal] = getFromStack(1);
+    auto [state, x1, y1, x2, y2, prevX, count] = linearFillState(stateTag, stateVal);
+
+    tassert(7971208, "count should be positive", count > 0);
+    state->setAt(
+        static_cast<size_t>(AggLinearFillElems::kCount), value::TypeTags::NumberInt64, --count);
+
+    // if y2 is null it means the current window is the last window frame in the partition
+    if (y2.first == value::TypeTags::Null) {
+        return {false, value::TypeTags::Null, 0};
+    }
+
+    // If count == 0, we are currently handling the last docoument in the window frame (x2/y2)
+    // so we can return y2 directly. Note that the document represented by y1 was returned as
+    // part of previous window (when it was y2)
+    if (count == 0) {
+        auto [y2Tag, y2Val] = value::copyValue(y2.first, y2.second);
+        return {true, y2Tag, y2Val};
+    }
+
+    // If y1 is null it means the current window is the first window frame in the partition
+    if (y1.first == value::TypeTags::Null) {
+        return {false, value::TypeTags::Null, 0};
+    }
+    return linearFillInterpolate(x1, y1, x2, y2, {sortByTag, sortByVal});
+}
+
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity,
                                                                          const CodeFragment* code) {
@@ -8511,6 +8691,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockLteScalar(arity);
         case Builtin::valueBlockCombine:
             return builtinValueBlockCombine(arity);
+        case Builtin::aggLinearFillCanAdd:
+            return builtinAggLinearFillCanAdd(arity);
+        case Builtin::aggLinearFillAdd:
+            return builtinAggLinearFillAdd(arity);
+        case Builtin::aggLinearFillFinalize:
+            return builtinAggLinearFillFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -8911,6 +9097,12 @@ std::string builtinToString(Builtin b) {
             return "valueBlockLteScalar";
         case Builtin::valueBlockCombine:
             return "valueBlockCombine";
+        case Builtin::aggLinearFillCanAdd:
+            return "aggLinearFillCanAdd";
+        case Builtin::aggLinearFillAdd:
+            return "aggLinearFillAdd";
+        case Builtin::aggLinearFillFinalize:
+            return "aggLinearFillFinalize";
         default:
             MONGO_UNREACHABLE;
     }

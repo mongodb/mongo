@@ -836,6 +836,9 @@ enum class Builtin : uint8_t {
     aggRemovableStdDevSampFinalize,
     aggRemovableStdDevPopFinalize,
     aggRemovableAvgFinalize,
+    aggLinearFillCanAdd,
+    aggLinearFillAdd,
+    aggLinearFillFinalize,
 
     valueBlockExists,
     valueBlockFillEmpty,
@@ -1059,6 +1062,18 @@ enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
  * $stdDevSamp/$stdDevPop expressions.
  */
 enum class AggRemovableStdDevElems { kSum, kM2, kCount, kNonFiniteCount, kSizeOfArray };
+
+/**
+ * This enum defines indices into an `Array` that store state for $linearFill
+ * X, Y refers to sortby field and input field respectively
+ * At any time, (X1, Y1) and (X2, Y2) defines two end-points with non-null input values
+ * with zero or more null input values in between. Count stores the number of values left
+ * till (X2, Y2). Initially it is equal to number of values between (X1, Y1) and (X2, Y2),
+ * exclusive of first and inclusive of latter. It is decremented after each finalize call,
+ * till this segment is exhausted and after which we find next segement(new (X2, Y2)
+ * while (X1, Y1) is set to previous (X2, Y2))
+ */
+enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1956,6 +1971,15 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillCanAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(
+        std::pair<value::TypeTags, value::Value> x1,
+        std::pair<value::TypeTags, value::Value> y1,
+        std::pair<value::TypeTags, value::Value> x2,
+        std::pair<value::TypeTags, value::Value> y2,
+        std::pair<value::TypeTags, value::Value> x);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,

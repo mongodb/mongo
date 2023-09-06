@@ -220,7 +220,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
         _outWindowAccessors.push_back(std::make_unique<value::OwnedValueAccessor>());
         _outAccessorMap.emplace(window.windowSlot, _outWindowAccessors.back().get());
 
-        if (window.lowBoundExpr) {
+        if (window.lowBoundExpr && window.lowBoundTestingSlot) {
             slotIdx =
                 _partitionSlots.size() + _forwardSlots.size() + *_lowBoundSlotIndex[windowIdx];
             _lowBoundTestingAccessors.push_back(
@@ -229,7 +229,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
                                              _lowBoundTestingAccessors.back().get());
         }
 
-        if (window.highBoundExpr) {
+        if (window.highBoundExpr && window.highBoundTestingSlot) {
             slotIdx =
                 _partitionSlots.size() + _forwardSlots.size() + *_highBoundSlotIndex[windowIdx];
             _highBoundTestingAccessors.push_back(

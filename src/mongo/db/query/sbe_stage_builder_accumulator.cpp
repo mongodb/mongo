@@ -1164,6 +1164,66 @@ std::unique_ptr<sbe::EExpression> buildFinalizeDerivative(
     return makeFunction("aggDerivativeFinalize", makeVariable(slots[0]));
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeLinearFill(
+    std::unique_ptr<sbe::EExpression> unitExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("newArray",
+                                makeNullConstant(),
+                                makeNullConstant(),
+                                makeNullConstant(),
+                                makeNullConstant(),
+                                makeNullConstant(),
+                                makeInt64Constant(0)));
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorLinearFill(
+    const AccumulationExpression& expr,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7971210, "Incorrect number of arguments", args.size() == 2);
+
+    auto it = args.find(AccArgs::kInput);
+    tassert(7971211,
+            str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
+            it != args.end());
+    auto input = std::move(it->second);
+
+    it = args.find(AccArgs::kSortBy);
+    tassert(7971212,
+            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
+            it != args.end());
+    auto sortBy = std::move(it->second);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggLinearFillAdd", std::move(input), std::move(sortBy)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildFinalizeLinearFill(
+    StageBuilderState& state,
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7971213,
+            str::stream() << "Expected one input slot for finalization of " << expr.name
+                          << ", got: " << inputSlots.size(),
+            inputSlots.size() == 1);
+    auto inputVar = makeVariable(inputSlots[0]);
+
+    auto it = args.find(AccArgs::kSortBy);
+    tassert(7971214,
+            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
+            it != args.end());
+    auto sortBy = std::move(it->second);
+
+    return makeFunction("aggLinearFillFinalize", std::move(inputVar), std::move(sortBy));
+}
+
+
 template <int N>
 std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
@@ -1238,6 +1298,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
         {AccumulatorCovariancePop::kName, &buildAccumulatorCovariance},
         {AccumulatorIntegral::kName, &buildAccumulatorIntegral},
         {window_function::ExpressionDerivative::kName, &buildAccumulatorDerivative},
+        {window_function::ExpressionLinearFill::kName, &buildAccumulatorLinearFill},
     };
 
     auto accExprName = acc.expr.name;
@@ -1398,6 +1459,7 @@ std::unique_ptr<sbe::EExpression> buildFinalize(
         {AccumulatorTopBottomN<kBottom, true /* single */>::getName(), &buildFinalizeTopBottom},
         {AccumulatorTopBottomN<kTop, false /* single */>::getName(), &buildFinalizeTopBottomN},
         {AccumulatorTopBottomN<kBottom, false /* single */>::getName(), &buildFinalizeTopBottomN},
+        {window_function::ExpressionLinearFill::kName, &buildFinalizeLinearFill},
     };
 
     auto accExprName = acc.expr.name;
@@ -1454,6 +1516,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
         {AccumulatorDenseRank::kName, &emptyInitializer<1>},
         {AccumulatorIntegral::kName, &buildInitializeIntegral},
         {window_function::ExpressionDerivative::kName, &buildInitializeDerivative},
+        {window_function::ExpressionLinearFill::kName, &buildInitializeLinearFill},
     };
 
     auto accExprName = acc.expr.name;

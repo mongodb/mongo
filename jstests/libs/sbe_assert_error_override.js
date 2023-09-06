@@ -22,7 +22,7 @@ const equivalentErrorCodesList = [
     [16006, 4997703, 4997901, 4998202, 7157910, 7157915, 5157904],
     [16007, 5066300, 7158200],
     [16020, 5066300, 7158200],
-    [16554, ErrorCodes.TypeMismatch, 4974201, 4974203, 7157723],
+    [16554, ErrorCodes.TypeMismatch, 4974201, 4974203, 7157723, 7971204, 7971203, 7971206],
     [16555, 5073102, 7157721],
     [16608, 4848401],
     [16609, 5073101, 7157719],
@@ -171,6 +171,7 @@ const equivalentErrorCodesList = [
     [5624901, 7821006],
     [5423901, 7821110],
     [5423902, 7821111],
+    [6050106, 7971205],
 ];
 
 // This map is generated based on the contents of 'equivalentErrorCodesList'. This map should _not_
