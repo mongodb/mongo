@@ -459,6 +459,16 @@ bool PlanExecutorImpl::_shouldWaitForInserts() {
         // In that case, we will return early so that we can inform the client of the new
         // lastCommittedOpTime immediately.
         if (clientsLastKnownCommittedOpTime(_opCtx)) {
+            // When running under lower FCV, we should avoid returning early when the client's
+            // lastCommittedOpTime is null to match 4.2 behavior. This is to prevent returning empty
+            // batches repeatedly close to the end of initial sync where the initial syncing node is
+            // already caught up but isn't able to advance its lastCommittedOpTime until initial
+            // sync is done.
+            if (!serverGlobalParams.featureCompatibility.isVersion(
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44) &&
+                clientsLastKnownCommittedOpTime(_opCtx).value().isNull()) {
+                return true;
+            }
             auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
             return clientsLastKnownCommittedOpTime(_opCtx).value() >=
                 replCoord->getLastCommittedOpTime();
