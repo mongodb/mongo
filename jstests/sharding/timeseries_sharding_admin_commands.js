@@ -288,7 +288,7 @@ function assertRangeMatch(savedRange, paramRange) {
     const newViewNss = `${dbName}.${newCollName}`;
     // Rename collection is not supported through view namespace.
     assert.commandFailedWithCode(mongo.s.adminCommand({renameCollection: viewNss, to: newViewNss}),
-                                 ErrorCodes.NamespaceNotFound);
+                                 ErrorCodes.CommandNotSupportedOnView);
     dropTimeSeriesColl();
 })();
 
