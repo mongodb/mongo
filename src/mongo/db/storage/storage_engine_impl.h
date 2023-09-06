@@ -217,7 +217,7 @@ public:
         class TimestampListener {
         public:
             // Caller must ensure that the lifetime of the variables used in the callback are valid.
-            using Callback = std::function<void(Timestamp timestamp)>;
+            using Callback = std::function<void(OperationContext* opCtx, Timestamp timestamp)>;
 
             /**
              * A TimestampListener saves a 'callback' that will be executed whenever the specified
@@ -231,15 +231,15 @@ public:
              * Executes the appropriate function with the callback of the listener with the new
              * timestamp.
              */
-            void notify(Timestamp newTimestamp) {
+            void notify(OperationContext* opCtx, Timestamp newTimestamp) {
                 if (_type == TimestampType::kCheckpoint)
-                    _onCheckpointTimestampChanged(newTimestamp);
+                    _onCheckpointTimestampChanged(opCtx, newTimestamp);
                 else if (_type == TimestampType::kOldest)
-                    _onOldestTimestampChanged(newTimestamp);
+                    _onOldestTimestampChanged(opCtx, newTimestamp);
                 else if (_type == TimestampType::kStable)
-                    _onStableTimestampChanged(newTimestamp);
+                    _onStableTimestampChanged(opCtx, newTimestamp);
                 else if (_type == TimestampType::kMinOfCheckpointAndOldest)
-                    _onMinOfCheckpointAndOldestTimestampChanged(newTimestamp);
+                    _onMinOfCheckpointAndOldestTimestampChanged(opCtx, newTimestamp);
             }
 
             TimestampType getType() const {
@@ -247,20 +247,21 @@ public:
             }
 
         private:
-            void _onCheckpointTimestampChanged(Timestamp newTimestamp) {
-                _callback(newTimestamp);
+            void _onCheckpointTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
             }
 
-            void _onOldestTimestampChanged(Timestamp newTimestamp) {
-                _callback(newTimestamp);
+            void _onOldestTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
             }
 
-            void _onStableTimestampChanged(Timestamp newTimestamp) {
-                _callback(newTimestamp);
+            void _onStableTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
             }
 
-            void _onMinOfCheckpointAndOldestTimestampChanged(Timestamp newTimestamp) {
-                _callback(newTimestamp);
+            void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
+                                                             Timestamp newTimestamp) {
+                _callback(opCtx, newTimestamp);
             }
 
             // Timestamp type this listener monitors.
@@ -441,7 +442,8 @@ private:
      * Called when the min of checkpoint timestamp (if exists) and oldest timestamp advances in the
      * KVEngine.
      */
-    void _onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp);
+    void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
+                                                     const Timestamp& timestamp);
 
     /**
      * Returns whether the given ident is an internal ident and if it should be dropped or used to
