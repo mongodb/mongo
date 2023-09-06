@@ -2,6 +2,14 @@
  * Tests that storage stats reporting on slow query logging does acquire the RSTL.
  *
  * @tags: [
+ *   # Before we log the slow query, we need to acquire read access to the
+ *   # test collection. This requires lock-free access (no RSTL) because
+ *   # the test is running a concurrent sleep command with exclusive lock
+ *   # on the RSTL resource.
+ *   # Lock-free reads is also dependent on majority read concern support,
+ *   # so this rules out storage engines such as ephemeralForTest.
+ *   incompatible_with_lockfreereads,
+ *   requires_majority_read_concern,
  *   requires_replication,
  * ]
  */
