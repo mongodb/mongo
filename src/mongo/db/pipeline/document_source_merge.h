@@ -112,10 +112,6 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        bool allowedToPassthroughFromMongos() const {
-            return false;
-        }
-
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const final {
             ReadConcernSupportResult result = {

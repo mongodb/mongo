@@ -102,10 +102,6 @@ public:
                           "$out to a sharded collection is not allowed");
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return false;
-        }
-
         PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
             ActionSet actions{ActionType::insert, ActionType::remove};
             if (bypassDocumentValidation) {

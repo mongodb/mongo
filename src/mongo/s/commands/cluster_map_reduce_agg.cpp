@@ -229,13 +229,10 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     auto targeter =
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
-                                                               parsedMr.getNamespace(),
                                                                pipelineBuilder,
                                                                cri,
-                                                               involvedNamespaces,
                                                                false,   // hasChangeStream
                                                                false,   // startsWithDocuments
-                                                               false,   // allowedToPassthrough
                                                                false);  // perShardCursor
     try {
         switch (targeter.policy) {
@@ -244,7 +241,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // Pipelines generated from mapReduce should never be required to run on mongos.
                 MONGO_UNREACHABLE_TASSERT(31291);
             }
-            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough:
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
                 if (verbosity) {
                     explain_common::generateServerInfo(&result);

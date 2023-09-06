@@ -68,10 +68,6 @@ public:
     bool isDocuments() const final {
         return true;
     }
-
-    bool allowedToPassthroughFromMongos() const final {
-        return false;
-    }
 };
 
 static constexpr StringData kStageName = "$documents"_sd;

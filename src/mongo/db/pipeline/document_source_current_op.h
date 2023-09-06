@@ -114,10 +114,6 @@ public:
             return PrivilegeVector();
         }
 
-        bool allowedToPassthroughFromMongos() const final {
-            return _localOps == LocalOpsMode::kRemoteShardOps;
-        }
-
         bool isInitialSource() const final {
             return true;
         }

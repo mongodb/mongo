@@ -12,7 +12,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStage, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.window_functions_on_timeseries_coll;
 
@@ -92,7 +92,7 @@ assert.commandWorked(coll.insert([
  */
 function assertExplainBehaviorAndCorrectResults(pipeline, expectedOpts, expectedResults) {
     const explain = coll.explain().aggregate(pipeline);
-    const winningPlan = getWinningPlanFromExplain(explain);
+    const winningPlan = getWinningPlan(getQueryPlanner(explain));
     assert.neq(null, winningPlan);
     if (expectedOpts.bucketFilter) {
         assert.eq(expectedOpts.bucketFilter, winningPlan.filter);

@@ -9,6 +9,7 @@
  * ]
  */
 import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
 
 let viewsDB = db.getSiblingDB("views_find");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -84,16 +85,19 @@ assert.commandWorked(viewsDB.identityView.find().explain());
 
 // Find with explicit explain modes works on a view.
 let explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("queryPlanner"));
+explainPlan = getSingleNodeExplain(explainPlan);
 assert.eq(explainPlan.queryPlanner.namespace, "views_find.coll");
 assert(!explainPlan.hasOwnProperty("executionStats"));
 
 explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("executionStats"));
+explainPlan = getSingleNodeExplain(explainPlan);
 assert.eq(explainPlan.queryPlanner.namespace, "views_find.coll");
 assert(explainPlan.hasOwnProperty("executionStats"));
 assert.eq(explainPlan.executionStats.nReturned, 5);
 assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
 
 explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("allPlansExecution"));
+explainPlan = getSingleNodeExplain(explainPlan);
 assert.eq(explainPlan.queryPlanner.namespace, "views_find.coll");
 assert(explainPlan.hasOwnProperty("executionStats"));
 assert.eq(explainPlan.executionStats.nReturned, 5);

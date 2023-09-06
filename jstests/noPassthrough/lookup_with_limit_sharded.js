@@ -16,7 +16,8 @@ import {
     flattenQueryPlanTree,
     getAggPlanStages,
     getPlanStage,
-    getWinningPlan
+    getSingleNodeExplain,
+    getWinningPlan,
 } from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
@@ -37,7 +38,7 @@ other.drop();
 // Checks that the order of the query stages and pipeline stages matches the expected optimized
 // ordering for an unsharded collection.
 function checkUnshardedResults(pipeline, expectedPlanStages, expectedPipeline) {
-    const explain = coll.explain().aggregate(pipeline);
+    const explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     if (explain.stages) {
         const queryStages =
             flattenQueryPlanTree(getWinningPlan(explain.stages[0].$cursor.queryPlanner));
@@ -125,7 +126,7 @@ const topKSortPipeline = [
     {$limit: 5}
 ];
 checkUnshardedResults(topKSortPipeline, ["COLLSCAN", "SORT", "EQ_LOOKUP"], []);
-const explain = coll.explain().aggregate(topKSortPipeline);
+const explain = getSingleNodeExplain(coll.explain().aggregate(topKSortPipeline));
 assert.eq(getPlanStage(getWinningPlan(explain.queryPlanner), "SORT").limitAmount, 5, explain);
 
 // Tests on a sharded collection.

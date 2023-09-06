@@ -462,19 +462,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return pipeline;
     };
 
-    // The pipeline is not allowed to passthrough if any stage is not allowed to passthrough or if
-    // the pipeline needs to undergo FLE rewriting first.
-    auto allowedToPassthrough =
-        liteParsedPipeline.allowedToPassthroughFromMongos() && !shouldDoFLERewrite;
     auto targeter = cluster_aggregation_planner::AggregationTargeter::make(
         opCtx,
-        namespaces.executionNss,
         pipelineBuilder,
         cri,
-        involvedNamespaces,
         hasChangeStream,
         startsWithDocuments,
-        allowedToPassthrough,
         request.getPassthroughToShard().has_value());
 
     uassert(
@@ -486,14 +479,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kMongosRequired);
 
     if (!expCtx) {
-        // When the AggregationTargeter chooses a "passthrough" or "specific shard only"
-        // policy, it does not call the 'pipelineBuilder' function, so we've yet to construct an
-        // expression context or register query stats. Because this is a passthrough, we only need a
-        // bare minimum expression context on mongos.
-        invariant(targeter.policy ==
-                      cluster_aggregation_planner::AggregationTargeter::kPassthrough ||
-                  targeter.policy ==
-                      cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
+        // When the AggregationTargeter chooses a "specific shard only" policy, it does not call
+        // the 'pipelineBuilder' function, so we've yet to construct an expression context or
+        // register query stats. Because this is a passthrough, we only need a bare minimum
+        // expression context on mongos.
+        tassert(7972400,
+                "Expected to have a 'kSpecificShardOnly' targetting policy",
+                targeter.policy ==
+                    cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
 
         expCtx = make_intrusive<ExpressionContext>(
             opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
@@ -519,21 +512,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     auto status = [&]() {
         switch (targeter.policy) {
-            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
-                // A pipeline with $changeStream should never be allowed to passthrough.
-                invariant(!hasChangeStream);
-                const bool eligibleForSampling = !request.getExplain();
-                return cluster_aggregation_planner::runPipelineOnPrimaryShard(
-                    expCtx,
-                    namespaces,
-                    targeter.cri->cm,
-                    request.getExplain(),
-                    aggregation_request_helper::serializeToCommandDoc(request),
-                    privileges,
-                    eligibleForSampling,
-                    result);
-            }
-
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                 kMongosRequired: {
                 // If this is an explain write the explain output and return.
@@ -580,14 +558,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         "per shard cursor pipeline must contain $changeStream",
                         hasChangeStream);
 
-                // Make sure the rest of the pipeline can be pushed down.
-                auto pipeline = request.getPipeline();
-                std::vector<BSONObj> nonChangeStreamPart(pipeline.begin() + 1, pipeline.end());
-                LiteParsedPipeline nonChangeStreamLite(request.getNamespace(), nonChangeStreamPart);
-                uassert(6273802,
-                        "$_passthroughToShard specified with a stage that is not allowed to "
-                        "passthrough from mongos",
-                        nonChangeStreamLite.allowedToPassthroughFromMongos());
                 ShardId shardId(std::string(request.getPassthroughToShard()->getShard()));
 
                 // This is an aggregation pipeline started internally, so it is not eligible for
@@ -597,12 +567,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                     expCtx,
                     namespaces,
-                    boost::none,
                     request.getExplain(),
                     aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,
                     shardId,
-                    true /* forPerShardCursor */,
                     eligibleForSampling,
                     result);
             }
