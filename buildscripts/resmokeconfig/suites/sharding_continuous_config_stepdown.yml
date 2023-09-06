@@ -226,6 +226,9 @@ selector:
   # intentionally downed shard primary which prevents the test from making forward progress.
   - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
 
+  # Test will fail if it is unable to lock the config server primary successfully.
+  - jstests/sharding/fsync_lock_unlock.js
+
 executor:
   config:
     shell_options:

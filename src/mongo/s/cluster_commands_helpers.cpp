@@ -386,11 +386,14 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<AsyncRequestsSender::Request> requests;
-    for (auto shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx))
+    std::vector<ShardId> shardIds;
+    shardRegistry->getAllShardIds(opCtx, &shardIds);
+    for (auto shardId : shardIds)
         requests.emplace_back(std::move(shardId), cmdObj);
 
-    auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+    auto configShardId = shardRegistry->getConfigShard()->getId();
     requests.emplace_back(std::move(configShardId), cmdObj);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);

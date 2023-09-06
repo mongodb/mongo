@@ -32,7 +32,6 @@
 #include "mongo/db/pipeline/document_source_current_op.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 namespace mongo {
 

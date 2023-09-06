@@ -206,4 +206,3 @@ suites:
     ticket: SERVER-78793
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
-

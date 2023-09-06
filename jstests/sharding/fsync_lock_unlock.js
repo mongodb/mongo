@@ -6,21 +6,14 @@
  * ]
  */
 
-load('jstests/libs/config_shard_util.js');
-
 (function() {
 "use strict";
 
 const dbName = "test";
 const collName = "collTest";
 const ns = dbName + "." + collName;
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    config: 1,
-    configShard: true,
-    enableBalancer: true
-});
+const st =
+    new ShardingTest({shards: 2, mongos: 1, config: 1, configShard: true, enableBalancer: true});
 const adminDB = st.s.getDB('admin');
 const distributed_txn_insert_count = 10;
 

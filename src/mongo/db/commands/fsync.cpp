@@ -48,6 +48,7 @@
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -140,7 +141,12 @@ public:
         }
 
         const bool lock = cmdObj["lock"].trueValue();
-        LOGV2(20461, "CMD fsync: lock:{lock}", "CMD fsync", "lock"_attr = lock);
+        const bool forBackup = cmdObj["forBackup"].trueValue();
+        LOGV2(20461,
+              "CMD fsync: lock:{lock}",
+              "CMD fsync",
+              "lock"_attr = lock,
+              "forBackup"_attr = forBackup);
 
         // fsync + lock is sometimes used to block writes out of the system and does not care if
         // the `BackupCursorService::fsyncLock` call succeeds.
@@ -174,16 +180,15 @@ public:
                 threadStarted = false;
 
                 Milliseconds deadline = Milliseconds::max();
-                if (forBackup &&
-                    feature_flags::gClusterFsyncLock.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                if (forBackup) {
                     // Set a default deadline of 90s for the fsyncLock to be acquired.
                     deadline = Milliseconds(90000);
                     // Parse the cmdObj and update the deadline if
                     // "fsyncLockAcquisitionTimeoutMillis" exists.
                     for (const auto& elem : cmdObj) {
                         if (elem.fieldNameStringData() == "fsyncLockAcquisitionTimeoutMillis") {
-                            deadline = Milliseconds{uassertStatusOK(parseMaxTimeMS(elem))};
+                            deadline =
+                                Milliseconds{uassertStatusOK(QueryRequest::parseMaxTimeMS(elem))};
                         }
                     }
                 }

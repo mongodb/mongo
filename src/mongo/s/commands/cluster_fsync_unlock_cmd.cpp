@@ -45,10 +45,9 @@
 namespace mongo {
 
 namespace {
-class FsyncUnlockCommand : public TypedCommand<FsyncUnlockCommand> {
+class FsyncUnlockCommand final : public TypedCommand<FsyncUnlockCommand> {
 public:
     using Request = ClusterFsyncUnlock;
-
 
     class Invocation final : public InvocationBase {
     public:
@@ -105,12 +104,10 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             auto authorizationSession = AuthorizationSession::get(opCtx->getClient());
-            uassert(
-                ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authorizationSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(ns()),
-                    ActionType::fsyncUnlock));
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    authorizationSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(ns()), ActionType::fsyncUnlock));
         }
     };
 

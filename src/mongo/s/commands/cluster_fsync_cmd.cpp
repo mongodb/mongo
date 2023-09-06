@@ -39,7 +39,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -86,18 +85,16 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-
-        if (cmdObj["lock"].trueValue() &&
-            !feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
-            errmsg = "can't do lock through mongos";
-            return false;
+        BSONObj fsyncCmdObj = cmdObj;
+        if (cmdObj["lock"].trueValue()) {
+            auto forBackupField = BSON("forBackup" << true);
+            fsyncCmdObj = fsyncCmdObj.addField(forBackupField.firstElement());
         }
-
         auto shardResults = scatterGatherUnversionedTargetConfigServerAndShards(
             opCtx,
             dbname,
             applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(fsyncCmdObj)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
 
@@ -117,7 +114,6 @@ public:
 
         return true;
     }
-
 } clusterFsyncCmd;
 
 }  // namespace
