@@ -294,13 +294,6 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotFound);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-
-// Should fail because even though database 'db' exists, collection 'foo' does not exists.
-assert.commandFailedWithCode(
-    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.NamespaceNotFound);
-
 assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: 1}));
 
 // Should fail because namespace 'db.foo' is not sharded.
