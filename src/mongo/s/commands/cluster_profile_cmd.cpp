@@ -61,7 +61,9 @@ protected:
         OperationContext* opCtx,
         const DatabaseName& dbName,
         const ProfileCmdRequest& request) const final {
-        invariant(!opCtx->lockState()->isW());
+        // Writing to the CollectionCatalog requires holding the Global lock to avoid concurrent
+        // races with BatchedCollectionCatalogWriter.
+        Lock::GlobalLock lk{opCtx, MODE_IX};
 
         const auto profilingLevel = request.getCommandParameter();
 
