@@ -58,7 +58,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/uuid.h"
 
@@ -104,7 +103,7 @@ using ShardPlacementVersionMap =
  */
 class ChunkMap {
 public:
-    // Vector of chunks ordered by max key.
+    // Vector of chunks ordered by max key in ascending order.
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
     using ChunkVectorMap = std::map<std::string, std::shared_ptr<ChunkVector>>;
 
@@ -138,8 +137,8 @@ public:
      *
      * Chunks are yielded in ascending order of shardkey (e.g. minKey to maxKey);
      *
-     * When shardKey is provided only the chunks with minKey greater or equal to shardKey will be
-     * yielded.
+     * When shardKey is provided the function will start yileding from the chunk that contains the
+     * given shard key.
      */
     template <typename Callable>
     void forEach(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
@@ -156,7 +155,7 @@ public:
 
         auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
 
-        const auto mapItBegin = _chunkVectorMap.lower_bound(shardKeyString);
+        const auto mapItBegin = _chunkVectorMap.upper_bound(shardKeyString);
         for (auto mapIt = mapItBegin; mapIt != _chunkVectorMap.end(); mapIt++) {
             const auto& chunkVector = *(mapIt->second);
             auto it = mapIt == mapItBegin ? _findIntersectingChunkIterator(shardKeyString,

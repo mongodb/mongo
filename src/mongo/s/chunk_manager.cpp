@@ -68,7 +68,7 @@ void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
 }
 
 bool overlaps(const ChunkInfo& a, const ChunkInfo& b) {
-    // Microbenchmarks results showed that comparing kestrings
+    // Microbenchmarks results showed that comparing keystrings
     // is more performant than comparing BSONObj
     const auto aMinKeyStr = ShardKeyPattern::toKeyString(a.getMin());
     const auto& aMaxKeyStr = a.getMaxKeyString();
@@ -620,7 +620,7 @@ ChunkMap::_overlappingVectorSlotBounds(const std::string& minShardKeyStr,
                                        const std::string& maxShardKeyStr,
                                        bool isMaxInclusive) const {
 
-    const auto itMin = _chunkVectorMap.lower_bound(minShardKeyStr);
+    const auto itMin = _chunkVectorMap.upper_bound(minShardKeyStr);
     const auto itMax = [&]() {
         auto it = isMaxInclusive ? _chunkVectorMap.upper_bound(maxShardKeyStr)
                                  : _chunkVectorMap.lower_bound(maxShardKeyStr);
@@ -744,7 +744,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         }
     }
 
-    _rt->optRt->forEachOverlappingChunk(min, max, true, [&](auto& chunkInfo) {
+    _rt->optRt->forEachOverlappingChunk(min, max, true, [&](const auto& chunkInfo) {
         shardIds->insert(chunkInfo->getShardIdAt(_clusterTime));
         if (chunkRanges) {
             chunkRanges->insert(chunkInfo->getRange());
@@ -769,7 +769,7 @@ bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& sh
     bool overlapFound = false;
 
     _rt->optRt->forEachOverlappingChunk(
-        range.getMin(), range.getMax(), false, [&](auto& chunkInfo) {
+        range.getMin(), range.getMax(), false, [&](const auto& chunkInfo) {
             if (chunkInfo->getShardIdAt(_clusterTime) == shardId) {
                 overlapFound = true;
                 return false;
@@ -787,7 +787,7 @@ boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey
 
     boost::optional<Chunk> optChunk;
     forEachChunk(
-        [&](const Chunk& chunk) {
+        [&](const auto& chunk) {
             if (chunk.getShardId() == shardId) {
                 optChunk.emplace(chunk);
                 return false;
