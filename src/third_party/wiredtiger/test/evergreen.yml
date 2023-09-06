@@ -1179,6 +1179,22 @@ functions:
       args:
       - "./build_and_push_containers.sh"
 
+  "run workgen test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/bench/workgen/runner"
+      include_expansions_in_env:
+        - task_name
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        # The task name gives us the test name to run (workgen-test-<filename>)
+        FILENAME=`echo ${task_name}| cut -d'-' -f 3-`
+        echo "Running $FILENAME.py"
+        ${python_binary|python3} $FILENAME.py
+
 #######################################
 #               Variables             #
 #######################################
@@ -1348,6 +1364,16 @@ variables:
       - func: "recovery stress test script"
         vars:
           times: 25
+
+  - &workgen-test
+    tags: ["workgen-test"]
+    exec_timeout_secs: 21600
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+      - func: "run workgen test"
 
 #######################################
 #               Tasks                 #
@@ -6015,6 +6041,66 @@ tasks:
         vars:
           test_path: bench/wt2853_perf/wt2853_perf
 
+  - <<: *workgen-test
+    name: "workgen-test-compress_ratio"
+
+  - <<: *workgen-test
+    name: "workgen-test-evict-btree-hs"
+
+  - <<: *workgen-test
+    name: "workgen-test-example_dynamic_tables"
+
+  - <<: *workgen-test
+    name: "workgen-test-example_prepare"
+
+  - <<: *workgen-test
+    name: "workgen-test-example_prepare_evict_reconcile"
+
+  - <<: *workgen-test
+    name: "workgen-test-example_simple"
+
+  - <<: *workgen-test
+    name: "workgen-test-example_txn"
+
+  - <<: *workgen-test
+    name: "workgen-test-insert_stress"
+
+  - <<: *workgen-test
+    name: "workgen-test-insert_test"
+
+  - <<: *workgen-test
+    name: "workgen-test-maintain_low_dirty_cache"
+
+  - <<: *workgen-test
+    name: "workgen-test-many-dhandle-stress"
+
+  - <<: *workgen-test
+    name: "workgen-test-multi_btree_heavy_stress"
+
+  - <<: *workgen-test
+    name: "workgen-test-multiversion"
+
+  - <<: *workgen-test
+    name: "workgen-test-prepare_stress"
+
+  - <<: *workgen-test
+    name: "workgen-test-read_write_storms"
+
+  - <<: *workgen-test
+    name: "workgen-test-read_write_sync_long"
+
+  - <<: *workgen-test
+    name: "workgen-test-read_write_sync_short"
+
+  - <<: *workgen-test
+    name: "workgen-test-skiplist_stress"
+
+  - <<: *workgen-test
+    name: "workgen-test-small_btree"
+
+  - <<: *workgen-test
+    name: "workgen-test-small_btree_reopen"
+
 #######################################
 #     Antithesis Integration          #
 #######################################
@@ -6095,6 +6181,8 @@ buildvariants:
     - name: csuite-timestamp-abort-test-s3
     - name: unit-test-hook-tiered-s3
     - name: chunkcache-test
+    - name: ".workgen-test"
+      batchtime: 1440 # 24 hours
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -6478,6 +6566,8 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: memory-model-test
       batchtime: 40320 # 28 days
+    - name: ".workgen-test"
+      batchtime: 1440 # 24 hours
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
