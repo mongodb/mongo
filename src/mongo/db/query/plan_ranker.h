@@ -65,6 +65,10 @@ void logScoringPlan(std::function<std::string()> solution,
 void logScore(double score);
 void logEOFBonus(double eofBonus);
 void logFailedPlan(std::function<std::string()> planSummary);
+void logTieBreaking(double score,
+                    double docsFetchedBonus,
+                    double indexPrefixBonus,
+                    bool isPlanTied);
 }  // namespace log_detail
 
 // Constant used for tie breakers.
