@@ -113,7 +113,7 @@ inline optimizer::Operations getOptimizerOp(sbe::EPrimBinary::Op op) {
 }  // namespace
 
 std::unique_ptr<sbe::EExpression> SbExprBuilder::extractExpr(SbExpr& e) {
-    return e.extractExpr(_state);
+    return e.extractExpr(_state).expr;
 }
 
 sbe::EExpression::Vector SbExprBuilder::extractExpr(SbExpr::Vector& sbExprs) {

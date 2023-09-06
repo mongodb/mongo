@@ -47,6 +47,6 @@ class PlanStageSlots;
  */
 SbExpr generateExpression(StageBuilderState& state,
                           const Expression* expr,
-                          boost::optional<sbe::value::SlotId> rootSlot,
+                          boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder

@@ -362,10 +362,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     // filter, so ScanStage->getNext() must directly enforce the bounds. min's inclusivity matches
     // getNext()'s default behavior, but max's exclusivity does not and thus is enforced by the
     // excludeScanEndRecordId argument to the ScanStage constructor above.
-    SbExpr filterExpr = generateFilter(state, csn->filter.get(), resultSlot, nullptr);
+    SbExpr filterExpr = generateFilter(
+        state, csn->filter.get(), TypedSlot{resultSlot, TypeSignature::kAnyScalarType}, nullptr);
     if (!filterExpr.isNull()) {
         stage = sbe::makeS<sbe::FilterStage<false>>(
-            std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
+            std::move(stage), filterExpr.extractExpr(state).expr, csn->nodeId());
     }
 
     PlanStageSlots outputs;
@@ -476,10 +477,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
         invariant(!csn->stopApplyingFilterAfterFirstMatch);
 
-        auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, &outputs);
+        auto filterExpr = generateFilter(state,
+                                         csn->filter.get(),
+                                         TypedSlot{resultSlot, TypeSignature::kAnyScalarType},
+                                         &outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state).expr, csn->nodeId());
         }
     }
 

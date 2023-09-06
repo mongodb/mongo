@@ -749,8 +749,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     }
 
     if (ixn->shouldDedup) {
-        stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
+        stage =
+            sbe::makeS<sbe::UniqueStage>(std::move(stage),
+                                         sbe::makeSV(outputs.get(PlanStageSlots::kRecordId).slotId),
+                                         ixn->nodeId());
     }
 
     if (ixn->filter) {
@@ -759,7 +761,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state), ixn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state).expr, ixn->nodeId());
         }
     }
 
@@ -898,7 +900,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                             yieldPolicy,
                                             ixn->nodeId(),
                                             false /* lowPriority */);
-        recordIdSlot = outputs.get(PlanStageSlots::kRecordId);
+        recordIdSlot = outputs.get(PlanStageSlots::kRecordId).slotId;
         tassert(6484702,
                 "lowKey and highKey runtime environment slots must be present",
                 indexScanBoundsSlots);
@@ -949,8 +951,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         auto optimizedOutputs = std::move(optimizedOutSlots);
 
         auto mergeThenElseBranches = [&](const PlanStageSlots::Name name) {
-            genericIndexScanSlots.push_back(genericOutputs.get(name));
-            optimizedIndexScanSlots.push_back(optimizedOutputs.get(name));
+            genericIndexScanSlots.push_back(genericOutputs.get(name).slotId);
+            optimizedIndexScanSlots.push_back(optimizedOutputs.get(name).slotId);
 
             const auto outputSlot = state.slotId();
             outputs.set(name, outputSlot);
@@ -958,7 +960,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         };
 
         mergeThenElseBranches(PlanStageSlots::kRecordId);
-        recordIdSlot = outputs.get(PlanStageSlots::kRecordId);
+        recordIdSlot = outputs.get(PlanStageSlots::kRecordId).slotId;
 
         if (doIndexConsistencyCheck) {
             mergeThenElseBranches(PlanStageSlots::kSnapshotId);
@@ -1005,8 +1007,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     }
 
     if (ixn->shouldDedup) {
-        stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
+        stage =
+            sbe::makeS<sbe::UniqueStage>(std::move(stage),
+                                         sbe::makeSV(outputs.get(PlanStageSlots::kRecordId).slotId),
+                                         ixn->nodeId());
     }
 
     if (ixn->filter) {
@@ -1015,7 +1019,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state), ixn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state).expr, ixn->nodeId());
         }
     }
 

@@ -39,50 +39,16 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/sbe_stage_builder_type_signature.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo::stage_builder {
-
-// The signature of a node is the set of all the types that the Value produced at runtime can assume
-// (including TypeTags::Nothing).
-struct TypeSignature {
-    // Return whether this signature is a strict subset of the other signature.
-    bool isSubset(TypeSignature other) const {
-        return (typesMask & other.typesMask) == typesMask;
-    }
-    // Return whether this signature shares at least one type with the other signature.
-    bool containsAny(TypeSignature other) const {
-        return (typesMask & other.typesMask) != 0;
-    }
-    // Return a new signature containing all the types of this signature plus the ones from the
-    // other signature.
-    TypeSignature include(TypeSignature other) const {
-        return TypeSignature{typesMask | other.typesMask};
-    }
-    // Return a new signature containing all the types of this signature minus the ones from the
-    // other signature.
-    TypeSignature exclude(TypeSignature other) const {
-        return TypeSignature{typesMask & ~other.typesMask};
-    }
-    // Return a new signature containing all the types in common between this signature and the
-    // other signature.
-    TypeSignature intersect(TypeSignature other) const {
-        return TypeSignature{typesMask & other.typesMask};
-    }
-
-    // Simple bitmask using one bit for each enum in the TypeTags definition.
-    int64_t typesMask = 0;
-};
 
 /**
  * Class encapsulating the logic for assigning a type signature to the return value of an ABT node.
  */
 class TypeChecker {
 public:
-    // Predefined constants for common types.
-    static TypeSignature kAnyType, kArrayType, kBooleanType, kDateTimeType, kNothingType,
-        kNumericType, kStringType, kObjectType;
-
     TypeChecker();
     TypeChecker(const TypeChecker& parent);
 
@@ -122,7 +88,7 @@ public:
                              optimizer::ABTOpFixedArity<Arity>& op,
                              bool saveInference) {
         visitChildren(n, op, std::make_index_sequence<Arity>{});
-        return kAnyType;
+        return TypeSignature::kAnyScalarType;
     }
 
     TypeSignature operator()(optimizer::ABT& node, optimizer::Constant& value, bool saveInference);

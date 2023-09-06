@@ -309,7 +309,7 @@ std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
         const auto& fieldRef = shardKeyPaths[i];
 
         auto shardKeyBinding = sbe::makeE<sbe::EVariable>(
-            slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0))));
+            slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0))).slotId);
         if (fieldRef.numParts() > 1) {
             for (size_t level = 1; level < fieldRef.numParts(); ++level) {
                 shardKeyBinding = makeFunction(
@@ -859,7 +859,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
         sbe::SlotExprPairVector projects;
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
-            auto fieldSlot = slots != nullptr ? slots->getIfExists(name) : boost::none;
+            auto fieldSlot = slots->getSlotIfExists(name);
             if (fieldSlot) {
                 outputSlots.emplace_back(*fieldSlot);
             } else {
@@ -905,7 +905,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
             if (auto slot = slots->getIfExists(name); slot) {
                 // We found a kField slot. Assign it to 'node->value' and mark 'node' as "visited",
                 // and add 'node' to 'roots'.
-                node->value = *slot;
+                node->value = slot->slotId;
                 roots.emplace_back(node);
             }
         };
@@ -943,7 +943,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 auto getFieldExpr =
                     makeFunction("getField"_sd,
                                  parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
-                                                         : parent->value.extractExpr(state),
+                                                         : parent->value.extractExpr(state).expr,
                                  makeStrConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {

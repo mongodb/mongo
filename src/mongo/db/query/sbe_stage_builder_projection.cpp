@@ -375,7 +375,7 @@ SbExpr evaluateProjection(StageBuilderState& state,
                           std::vector<std::string> paths,
                           std::vector<ProjectionNode> nodes,
                           SbExpr inputExpr,
-                          boost::optional<sbe::value::SlotId> rootSlot,
+                          boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots) {
     using Node = PathTreeNode<boost::optional<ProjectionNode>>;
 
@@ -476,7 +476,7 @@ SbExpr evaluateSliceOps(StageBuilderState& state,
 SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
-                          boost::optional<sbe::value::SlotId> rootSlot,
+                          boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots) {
     const auto projType = projection->type();
 
@@ -492,7 +492,7 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<std::string> paths,
                           std::vector<ProjectionNode> nodes,
                           SbExpr inputExpr,
-                          boost::optional<sbe::value::SlotId> rootSlot,
+                          boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots) {
     const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
 

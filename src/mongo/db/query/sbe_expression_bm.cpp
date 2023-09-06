@@ -140,14 +140,17 @@ public:
             false /* allowDiskUse */
         };
 
-        auto evalExpr = stage_builder::generateExpression(state, expression.get(), _inputSlotId);
+        auto evalExpr = stage_builder::generateExpression(
+            state,
+            expression.get(),
+            stage_builder::TypedSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType});
 
         LOGV2_DEBUG(6979801,
                     1,
                     "sbe expression benchmark PlanStage",
                     "stage"_attr = debugPrint(stage.get()));
 
-        auto expr = evalExpr.extractExpr(state);
+        auto expr = evalExpr.extractExpr(state).expr;
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",

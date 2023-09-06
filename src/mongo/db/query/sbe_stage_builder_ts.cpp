@@ -141,7 +141,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     auto blockSlots = _slotIdGenerator.generateMultiple(pathReqs.size());
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
-                                                        bucketSlot,
+                                                        bucketSlot.slotId,
                                                         pathReqs,
                                                         blockSlots,
                                                         optMetaSlot,
@@ -181,7 +181,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         outputs.set(std::pair(PlanStageSlots::kField, *metaField), *optMetaSlot);
     }
 
-
     // Add filter stage(s) for the per-event filter.
     if (auto eventFilter = unpackNode->eventFilter.get()) {
         auto [eventFilterByPath, eventFilterResidual] =
@@ -192,7 +191,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                 auto eventFilterSbExpr = generateFilter(
                     _state, filterMatchExpr.get(), /*rootSlot*/ boost::none, &outputs);
 
-                andBranches.push_back(eventFilterSbExpr.extractExpr(_state));
+                andBranches.push_back(eventFilterSbExpr.extractExpr(_state).expr);
             }
 
             auto combinedFilter = buildAndTree(andBranches, 0, andBranches.size());
@@ -209,8 +208,10 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             auto eventFilterSbExpr = generateFilter(
                 _state, eventFilterResidual.get(), /*rootSlot*/ boost::none, &outputs);
             if (!eventFilterSbExpr.isNull()) {
-                stage = sbe::makeS<sbe::FilterStage<false>>(
-                    std::move(stage), eventFilterSbExpr.extractExpr(_state), unpackNode->nodeId());
+                stage =
+                    sbe::makeS<sbe::FilterStage<false>>(std::move(stage),
+                                                        eventFilterSbExpr.extractExpr(_state).expr,
+                                                        unpackNode->nodeId());
                 printPlan(*stage);
             }
         }
@@ -234,7 +235,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             for (auto&& computedMeta : computedMetas) {
                 objFields.push_back(computedMeta);
                 objSlots.push_back(
-                    childOutputs.get(std::pair(PlanStageSlots::kField, computedMeta)));
+                    childOutputs.get(std::pair(PlanStageSlots::kField, computedMeta)).slotId);
             }
         }
         // Includes the user-level meta field in the result object.

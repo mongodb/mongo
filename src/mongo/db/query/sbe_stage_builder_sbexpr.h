@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
+#include "mongo/db/query/sbe_stage_builder_type_signature.h"
 
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/abt/named_slots.h"
@@ -58,7 +59,16 @@ boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariable
 
 optimizer::ABT makeABTVariable(sbe::value::SlotId slot);
 
-std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, StageBuilderState& state);
+/**
+ * Associate an expression with a signature representing all the possible types that the value
+ * evalutated at runtime by the corresponding VM code can assume.
+ */
+struct TypedExpression {
+    std::unique_ptr<sbe::EExpression> expr;
+    TypeSignature typeSignature;
+};
+
+TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state);
 
 /**
  * The SbVar class is used to represent variables in the SBE stage builder. "SbVar" is short for
@@ -280,14 +290,14 @@ public:
         _storage = false;
     }
 
-    EExpr getExpr(StageBuilderState& state) const;
+    TypedExpression getExpr(StageBuilderState& state) const;
 
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
      * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
      * convert variable names into slot ids.
      */
-    EExpr extractExpr(StageBuilderState& state);
+    TypedExpression extractExpr(StageBuilderState& state);
 
     /**
      * Extract the expression on top of the stack as an ABT node. Throws an exception if the

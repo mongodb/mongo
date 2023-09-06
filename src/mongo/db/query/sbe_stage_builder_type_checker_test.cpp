@@ -36,6 +36,7 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 #include "mongo/db/query/sbe_stage_builder_type_checker.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -165,7 +166,7 @@ TEST(TypeCheckerTest, TypeCheckIf) {
 
     TypeSignature sign = TypeChecker{}.typeCheck(tree);
 
-    ASSERT(!TypeChecker::kNothingType.isSubset(sign));
+    ASSERT(!TypeSignature::kNothingType.isSubset(sign));
 }
 
 TEST(TypeCheckerTest, FoldComparisonBetweenBools) {
@@ -208,6 +209,26 @@ TEST(TypeCheckerTest, FoldComparisonBetweenBools) {
     TypeChecker{}.typeCheck(tree4);
 
     ASSERT(tree4.is<UnaryOp>() && tree4.cast<UnaryOp>()->op() == Operations::Not);
+}
+
+TEST(TypeCheckerTest, FoldFillEmptyVariable) {
+    // Run fillEmpty on a test expression based on a slot variable.
+    auto tree1 = make<BinaryOp>(Operations::FillEmpty,
+                                make<If>(make<BinaryOp>(Operations::Eq,
+                                                        make<Variable>(getABTVariableName(1)),
+                                                        Constant::int32(34)),
+                                         Constant::int64(9),
+                                         Constant::int64(18)),
+                                Constant::null());
+    TypeSignature signature = TypeChecker{}.typeCheck(tree1);
+    ASSERT_EQ(
+        signature.typesMask,
+        getTypeSignature(sbe::value::TypeTags::NumberInt64, sbe::value::TypeTags::Null).typesMask);
+    // Inject the information that the slot contains a number that cannot be Nothing.
+    TypeChecker checker;
+    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    signature = checker.typeCheck(tree1);
+    ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::NumberInt64).typesMask);
 }
 
 }  // namespace

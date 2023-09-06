@@ -151,7 +151,7 @@ struct MatchExpressionVisitorContext {
     };
 
     MatchExpressionVisitorContext(StageBuilderState& state,
-                                  boost::optional<sbe::value::SlotId> rootSlot,
+                                  boost::optional<TypedSlot> rootSlot,
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
                                   bool isFilterOverIxscan)
@@ -160,7 +160,7 @@ struct MatchExpressionVisitorContext {
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
         // Set up the top-level MatchFrame.
-        emplaceFrame(state, rootSlot);
+        emplaceFrame(state, rootSlot ? rootSlot->slotId : boost::optional<sbe::value::SlotId>());
     }
 
     SbExpr done() {
@@ -204,7 +204,7 @@ struct MatchExpressionVisitorContext {
 
     // The current context must be initialized either with a slot that contains the root
     // document ('rootSlot') or with the set of kField slots ('slots').
-    boost::optional<sbe::value::SlotId> rootSlot;
+    boost::optional<TypedSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
     bool isFilterOverIxscan = false;
 };
@@ -221,7 +221,7 @@ enum class LeafTraversalMode {
 };
 
 SbExpr generateTraverseF(SbExpr inputExpr,
-                         boost::optional<sbe::value::SlotId> topLevelFieldSlot,
+                         boost::optional<TypedSlot> topLevelFieldSlot,
                          const sbe::MatchPath& fp,
                          FieldIndex level,
                          sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -249,7 +249,7 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
 
     SbExpr fieldExpr = topLevelFieldSlot
-        ? b.makeVariable(*topLevelFieldSlot)
+        ? b.makeVariable(topLevelFieldSlot->slotId)
         : b.makeFunction("getField", inputExpr.clone(), b.makeStrConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
@@ -358,7 +358,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
     const bool isFieldPathOnRootDoc = context->framesCount() == 1;
     auto* slots = context->slots;
 
-    boost::optional<sbe::value::SlotId> topLevelFieldSlot;
+    boost::optional<TypedSlot> topLevelFieldSlot;
     if (isFieldPathOnRootDoc && slots) {
         // If we are generating a filter over an index scan, search for a kField slot that
         // corresponds to the full path 'path'.
@@ -367,7 +367,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             if (auto slot = slots->getIfExists(name); slot) {
                 // We found a kField slot that matches. We don't need to perform any traversal;
                 // we can just evaluate the predicate on the slot directly and return.
-                frame.pushExpr(makePredicate(*slot));
+                frame.pushExpr(makePredicate(slot->slotId));
                 return;
             }
         }
@@ -1191,7 +1191,7 @@ private:
 
 SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
-                      boost::optional<sbe::value::SlotId> rootSlot,
+                      boost::optional<TypedSlot> rootSlot,
                       const PlanStageSlots* slots,
                       const std::vector<std::string>& keyFields,
                       bool isFilterOverIxscan) {

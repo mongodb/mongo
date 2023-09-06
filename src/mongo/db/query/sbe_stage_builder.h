@@ -67,6 +67,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_plan_data.h"
+#include "mongo/db/query/sbe_stage_builder_type_signature.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/storage/key_string.h"
@@ -98,6 +99,15 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
                                     bool preparingFromCache);
+
+/**
+ * Associate a slot with a signature representing all the possible types that the value stored at
+ * runtime in the slot can assume.
+ */
+struct TypedSlot {
+    sbe::value::SlotId slotId;
+    TypeSignature typeSignature;
+};
 
 /**
  * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
@@ -151,24 +161,39 @@ public:
         return _slots.count(str);
     }
 
-    sbe::value::SlotId get(const Name& str) const {
+    TypedSlot get(const Name& str) const {
         auto it = _slots.find(str);
         invariant(it != _slots.end());
         return it->second;
     }
 
-    boost::optional<sbe::value::SlotId> getIfExists(const Name& str) const {
+    boost::optional<TypedSlot> getIfExists(const Name& str) const {
         if (auto it = _slots.find(str); it != _slots.end()) {
             return it->second;
         }
         return boost::none;
     }
 
+    boost::optional<sbe::value::SlotId> getSlotIfExists(const Name& str) const {
+        if (auto it = _slots.find(str); it != _slots.end()) {
+            return it->second.slotId;
+        }
+        return boost::none;
+    }
+
     void set(const Name& str, sbe::value::SlotId slot) {
-        _slots.insert_or_assign(str, slot);
+        set(str, TypedSlot{slot, TypeSignature::kAnyScalarType});
     }
 
     void set(OwnedName str, sbe::value::SlotId slot) {
+        set(std::move(str), TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+
+    void set(const Name& str, TypedSlot slot) {
+        _slots.insert_or_assign(str, slot);
+    }
+
+    void set(OwnedName str, TypedSlot slot) {
         _slots.insert_or_assign(std::move(str), slot);
     }
 
@@ -192,10 +217,11 @@ public:
      * flag in 'reqs' is true.
      */
     inline void forEachSlot(const PlanStageReqs& reqs,
-                            const std::function<void(sbe::value::SlotId)>& fn) const;
+                            const std::function<void(const TypedSlot&)>& fn) const;
 
     inline void forEachSlot(const PlanStageReqs& reqs,
-                            const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
+                            const std::function<void(const TypedSlot&, const Name&)>& fn) const;
+    inline void forEachSlot(const std::function<void(const TypedSlot&)>& fn) const;
     inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
     struct NameHasher {
@@ -215,7 +241,7 @@ public:
     using NameSet = absl::flat_hash_set<OwnedName, NameHasher, NameEq>;
 
 private:
-    NameMap<sbe::value::SlotId> _slots;
+    NameMap<TypedSlot> _slots;
 };
 
 /**
@@ -358,12 +384,12 @@ public:
         }
     }
 
-    friend void PlanStageSlots::forEachSlot(
-        const PlanStageReqs& reqs, const std::function<void(sbe::value::SlotId)>& fn) const;
+    friend void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
+                                            const std::function<void(const TypedSlot&)>& fn) const;
 
     friend void PlanStageSlots::forEachSlot(
         const PlanStageReqs& reqs,
-        const std::function<void(sbe::value::SlotId, const Name&)>& fn) const;
+        const std::function<void(const TypedSlot&, const Name&)>& fn) const;
 
 private:
     PlanStageSlots::NameSet _slots;
@@ -385,7 +411,7 @@ private:
 };
 
 void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
-                                 const std::function<void(sbe::value::SlotId)>& fn) const {
+                                 const std::function<void(const TypedSlot&)>& fn) const {
     for (const auto& name : reqs._slots) {
         auto it = _slots.find(name);
         tassert(7050900,
@@ -398,8 +424,7 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
 }
 
 void PlanStageSlots::forEachSlot(
-    const PlanStageReqs& reqs,
-    const std::function<void(sbe::value::SlotId, const Name&)>& fn) const {
+    const PlanStageReqs& reqs, const std::function<void(const TypedSlot&, const Name&)>& fn) const {
     for (const auto& name : reqs._slots) {
         auto it = _slots.find(name);
         tassert(7050901,
@@ -407,6 +432,12 @@ void PlanStageSlots::forEachSlot(
                               << name.second << "' in the slot map, expected slot to exist",
                 it != _slots.end());
         fn(it->second, name);
+    }
+}
+
+void PlanStageSlots::forEachSlot(const std::function<void(const TypedSlot&)>& fn) const {
+    for (const auto& entry : _slots) {
+        fn(entry.second);
     }
 }
 

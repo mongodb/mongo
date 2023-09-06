@@ -48,7 +48,7 @@ class PlanStageSlots;
 SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* proj,
                           SbExpr inputExpr,
-                          boost::optional<sbe::value::SlotId> rootSlot = boost::none,
+                          boost::optional<TypedSlot> rootSlot = boost::none,
                           const PlanStageSlots* slots = nullptr);
 
 SbExpr generateProjection(StageBuilderState& state,
@@ -56,6 +56,6 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<std::string> paths,
                           std::vector<ProjectionNode> nodes,
                           SbExpr inputExpr,
-                          boost::optional<sbe::value::SlotId> rootSlot = boost::none,
+                          boost::optional<TypedSlot> rootSlot = boost::none,
                           const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder
