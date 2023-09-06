@@ -74,14 +74,13 @@ executor:
           enableMajorityReadConcern: ''
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
-          useDollarTenant: true
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
       eval: >-
         globalThis.testingReplication = true;
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        await import('jstests/libs/override_methods/simulate_atlas_proxy.js');
+        await import('jstests/libs/override_methods/inject_dollar_tenant.js');
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
