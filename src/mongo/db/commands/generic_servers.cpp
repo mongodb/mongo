@@ -176,7 +176,11 @@ void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
                 ActionType::hostInfo));
 }
 template <>
-HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext*) {
+HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
+    // Critical to observability and diagnosability, categorize as immediate priority.
+    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                        AdmissionContext::Priority::kImmediate);
+
     ProcessInfo p;
 
     HostInfoSystemReply system;
@@ -222,7 +226,11 @@ void GetCmdLineOptsCmd::Invocation::doCheckAuthorization(OperationContext* opCtx
                 ActionType::getCmdLineOpts));
 }
 template <>
-GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext*) {
+GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* opCtx) {
+    // Critical to observability and diagnosability, categorize as immediate priority.
+    ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                        AdmissionContext::Priority::kImmediate);
+
     GetCmdLineOptsReply reply;
     reply.setArgv(serverGlobalParams.argvArray);
     reply.setParsed(serverGlobalParams.parsedOpts);
@@ -310,6 +318,10 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
+        // Critical to observability and diagnosability, categorize as immediate priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
+
         if (MONGO_unlikely(hangInGetLog.shouldFail())) {
             LOGV2(5113600, "Hanging in getLog");
             hangInGetLog.pauseWhileSet();

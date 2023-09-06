@@ -399,6 +399,10 @@ public:
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) final {
+        // Critical to monitoring and observability, categorize the command as immediate priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
+
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);

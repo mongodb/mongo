@@ -92,6 +92,11 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     const NamespaceString& nss,
     const DocumentSourceCollStatsSpec& spec,
     const boost::optional<BSONObj>& filterObj) {
+    // The $collStats stage is critical to observability and diagnosability, categorize as immediate
+    // priority.
+    ScopedAdmissionPriorityForLock skipAdmissionControl(expCtx->opCtx->lockState(),
+                                                        AdmissionContext::Priority::kImmediate);
+
     BSONObjBuilder builder;
 
     // We need to use the serialization context from the request when calling

@@ -87,6 +87,10 @@ public:
              const DatabaseName&,
              const mongo::BSONObj& cmdObj,
              mongo::BSONObjBuilder& result) override {
+        // Critical to observability and diagnosability, categorize as immediate priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
+
         executor::ConnectionPoolStats stats{};
 
         // Global connection pool connections.

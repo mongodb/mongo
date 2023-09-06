@@ -81,6 +81,9 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
+        // Critical to observability and diagnosability, annotate as immediate priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
         result.append("id", repl::instanceId);
         return true;
     }

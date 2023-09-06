@@ -484,6 +484,11 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
+            // Critical to monitoring and observability, categorize the command as immediate
+            // priority.
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+
             if (_collStatsSampler.tick())
                 LOGV2_WARNING(7024600,
                               "The collStats command is deprecated. For more information, see "
@@ -656,6 +661,11 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) {
+            // Critical to monitoring and observability, categorize the command as immediate
+            // priority.
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
+
             const auto& cmd = request();
             const auto& dbname = cmd.getDbName();
 
@@ -741,6 +751,10 @@ public:
     BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
 
     Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
+        // Critical to observability and diagnosability, categorize as immediate priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(rec->getOpCtx()->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
+
         auto result = rec->getReplyBuilder()->getBodyBuilder();
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(rec->getOpCtx()->getServiceContext(), &result);
@@ -801,6 +815,10 @@ public:
              const DatabaseName&,
              const BSONObj& jsobj,
              BSONObjBuilder& result) final {
+        // Critical to monitoring and observability, categorize the command as immediate
+        // priority.
+        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
+                                                            AdmissionContext::Priority::kImmediate);
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;
