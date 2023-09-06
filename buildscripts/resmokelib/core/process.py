@@ -98,7 +98,12 @@ class Process(object):
         if env_vars is not None:
             self.env.update(env_vars)
 
-        self.pid = None
+        # If we are running against an External System Under Test & this is a `mongo{d,s}` process, we make this process a NOOP.
+        # `mongo{d,s}` processes are not running locally for an External System Under Test.
+        self.NOOP = _config.EXTERNAL_SUT and os.path.basename(self.args[0]) in ["mongod", "mongos"]
+
+        # The `pid` attribute is assigned after the local process is started. If this process is a NOOP, we assign it a dummy value.
+        self.pid = 1 if self.NOOP else None
 
         self._process = None
         self._recorder = None
@@ -108,6 +113,8 @@ class Process(object):
 
     def start(self):
         """Start the process and the logger pipes for its stdout and stderr."""
+        if self.NOOP:
+            return None
 
         creation_flags = 0
         if sys.platform == "win32" and _JOB_OBJECT is not None:
@@ -175,6 +182,9 @@ class Process(object):
 
     def stop(self, mode=None):
         """Terminate the process."""
+        if self.NOOP:
+            return None
+
         if mode is None:
             mode = fixture_interface.TeardownMode.TERMINATE
 
@@ -244,10 +254,14 @@ class Process(object):
 
     def poll(self):
         """Poll."""
+        if self.NOOP:
+            return None
         return self._process.poll()
 
     def wait(self, timeout=None):
         """Wait until process has terminated and all output has been consumed by the logger pipes."""
+        if self.NOOP:
+            return None
 
         return_code = self._process.wait(timeout)
 
@@ -286,6 +300,8 @@ class Process(object):
 
     def pause(self):
         """Send the SIGSTOP signal to the process and wait for it to be stopped."""
+        if self.NOOP:
+            return None
         while True:
             self._process.send_signal(signal.SIGSTOP)
             mongod_process = psutil.Process(self.pid)
@@ -297,6 +313,8 @@ class Process(object):
 
     def resume(self):
         """Send the SIGCONT signal to the process."""
+        if self.NOOP:
+            return None
         self._process.send_signal(signal.SIGCONT)
 
     def __str__(self):

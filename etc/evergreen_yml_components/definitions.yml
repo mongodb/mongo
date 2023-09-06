@@ -2547,6 +2547,26 @@ functions:
       files:
       - wiki_page_location.json
 
+  ### Helps with debugging docker compose generation failures ###
+  "upload docker compose":
+  - command: archive.targz_pack
+    params:
+      target: "docker_compose.tgz"
+      source_dir: "src"
+      include:
+      - "docker_compose/**"
+  - command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/docker_compose.tgz
+      remote_file: ${project}/${build_variant}/${revision}/docker-compose-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: Docker Compose
+
   "attach local resmoke invocation":
     command: s3.put
     params:
@@ -2596,6 +2616,7 @@ post:
 - func: "attach artifacts"
 - func: "save ec2 task artifacts"
 - func: "attach wiki page"
+- func: "upload docker compose"
 - func: "upload jstestfuzz minimized output"
 - func: "kill processes"
 - func: "save local client logs"
@@ -2771,11 +2792,11 @@ tasks:
       - "./etc/evergreen_yml_components/**"
       - "./etc/repo_config.yaml"
       - "./etc/scons/**"
+      - "docker_compose/**"
       - "buildscripts/**"
       - "jstests/**"
       - "patch_files.txt"
       - "evergreen/**"
-      - "antithesis/**"
       - "src/**.idl"
       - "src/mongo/client/sdam/json_tests/sdam_tests/**"
       - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
@@ -8747,7 +8768,34 @@ tasks:
   - func: "do setup for antithesis"
   - func: "antithesis image build and push"
     vars:
-      suite: antithesis_concurrency_sharded_with_stepdowns_and_balancer
+      suite: concurrency_sharded_with_stepdowns_and_balancer
+
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_multi_stmt_txn_kill_primary
+
+- <<: *antithesis_task_template
+  name: antithesis_replica_sets_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: replica_sets_jscore_passthrough
+
+- <<: *antithesis_task_template
+  name: antithesis_core
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: core
 
 - <<: *task_template
   name: query_golden_classic

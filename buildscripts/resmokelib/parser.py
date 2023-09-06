@@ -7,7 +7,6 @@ from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.discovery import DiscoveryPlugin
 from buildscripts.resmokelib.generate_fcv_constants import \
     GenerateFCVConstantsPlugin
-from buildscripts.resmokelib.generate_docker_compose import GenerateDockerComposePlugin
 from buildscripts.resmokelib.generate_fuzz_config import GenerateFuzzConfigPlugin
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
 from buildscripts.resmokelib.hang_analyzer.core_analyzer import CoreAnalyzerPlugin
@@ -26,7 +25,6 @@ _PLUGINS = [
     DiscoveryPlugin(),
     MultiversionPlugin(),
     GenerateFuzzConfigPlugin(),
-    GenerateDockerComposePlugin(),
 ]
 
 

@@ -12,7 +12,7 @@ from buildscripts.resmokelib.testing.fixtures import external
 from buildscripts.resmokelib.testing.fixtures import _builder
 
 
-class ShardedClusterFixture(interface.Fixture):
+class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a sharded cluster to run against."""
 
     _CONFIGSVR_REPLSET_NAME = "config-rs"
@@ -99,6 +99,13 @@ class ShardedClusterFixture(interface.Fixture):
         # Start up each of the shards
         for shard in self.shards:
             shard.setup()
+
+    def _all_mongo_d_s(self):
+        """Return a list of all `mongo{d,s}` `Process` instances in this fixture."""
+        # When config_shard is None, we have an additional replset for the configsvr.
+        all_nodes = [self.configsvr] if self.config_shard is None else []
+        all_nodes += self.mongos + self.shards
+        return sum([node._all_mongo_d_s() for node in all_nodes], [])
 
     def refresh_logical_session_cache(self, target):
         """Refresh logical session cache with no timeout."""
@@ -516,7 +523,7 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
         return external.ExternalFixture.get_node_info(self)
 
 
-class _MongoSFixture(interface.Fixture):
+class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a mongos to connect to."""
 
     def __init__(self, logger, job_num, fixturelib, dbpath_prefix, mongos_executable=None,
@@ -568,13 +575,9 @@ class _MongoSFixture(interface.Fixture):
 
         self.mongos = mongos
 
-    def get_options(self):
-        """Return the mongos options of this fixture."""
-        launcher = MongosLauncher(self.fixturelib)
-        _, mongos_options = launcher.launch_mongos_program(self.logger, self.job_num,
-                                                           executable=self.mongos_executable,
-                                                           mongos_options=self.mongos_options)
-        return mongos_options
+    def _all_mongo_d_s(self):
+        """Return the standalone `mongos` `Process` instance."""
+        return [self]
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -617,6 +620,12 @@ class _MongoSFixture(interface.Fixture):
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
+        if self.config.EXTERNAL_SUT:
+            self.logger.info(
+                "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."
+            )
+            return
+
         if self.mongos is None:
             self.logger.warning("The mongos fixture has not been set up yet.")
             return  # Teardown is still a success even if nothing is running.
@@ -654,7 +663,7 @@ class _MongoSFixture(interface.Fixture):
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        return "localhost:%d" % self.port
+        return f"{self.logger.external_sut_hostname if self.config.EXTERNAL_SUT else 'localhost'}:{self.port}"
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

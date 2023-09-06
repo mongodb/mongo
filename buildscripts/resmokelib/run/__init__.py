@@ -33,6 +33,7 @@ from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.suitesconfig import get_suite_files
+from buildscripts.resmokelib.testing.docker_cluster_image_builder import build_images
 from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
@@ -515,7 +516,13 @@ class TestRunner(Subcommand):
         try:
             executor = testing.executor.TestSuiteExecutor(
                 self._exec_logger, suite, archive_instance=self._archive, **executor_config)
-            executor.run()
+            # If this is a "docker compose build", we just build the docker compose images for
+            # this resmoke configuration and exit.
+            if config.DOCKER_COMPOSE_BUILD_IMAGES:
+                build_images(suite.get_name(), executor._jobs[0].fixture)
+                suite.return_code = 0
+            else:
+                executor.run()
         except (errors.UserInterrupt, errors.LoggerRuntimeConfigError) as err:
             self._exec_logger.error("Encountered an error when running %ss of suite %s: %s",
                                     suite.test_kind, suite.get_display_name(), err)
@@ -827,6 +834,35 @@ class RunPlugin(PluginInterface):
             help=("Comma separated list of tags. For the jstest portion of the suite(s),"
                   " only tests which have at least one of the specified tags will be"
                   " run."))
+
+        parser.add_argument(
+            "--dockerComposeBuildImages", dest="docker_compose_build_images",
+            metavar="IMAGE1,IMAGE2,IMAGE3", help=
+            ("Comma separated list of base images to build for running resmoke against an External System Under Test:"
+             " (1) `workload`: Your mongo repo with a python development environment setup."
+             " (2) `mongo-binaries`: The `mongo`, `mongod`, `mongos` binaries to run tests with."
+             " (3) `config`: The target suite's `docker-compose.yml` file, startup scripts & configuration."
+             " All three images are needed to successfully setup an External System Under Test."
+             " This will not run any tests. It will just build the images and generate"
+             " the `docker-compose.yml` configuration to set up the External System Under Test for the desired suite."
+             ))
+
+        parser.add_argument(
+            "--dockerComposeBuildEnv", dest="docker_compose_build_env",
+            choices=["local", "evergreen"], default="local", help=
+            ("Set the environment where this `--dockerComposeBuildImages` is happening -- defaults to: `local`."
+             ))
+
+        parser.add_argument(
+            "--dockerComposeTag", dest="docker_compose_tag", metavar="TAG", default="development",
+            help=("The `tag` name to use for images built during a `--dockerComposeBuildImages`."))
+
+        parser.add_argument(
+            "--externalSUT", dest="external_sut", action="store_true", default=False, help=
+            ("This option should only be used when running resmoke against an External System Under Test."
+             " The External System Under Test should be setup via the command generated after"
+             " running: `buildscripts/resmoke.py run --suite [suite_name] ... --dockerComposeBuildImages"
+             " config,workload,mongo-binaries`."))
 
         parser.add_argument(
             "--sanityCheck", action="store_true", dest="sanity_check", help=

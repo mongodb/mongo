@@ -1,4 +1,0 @@
-base_suite: concurrency_sharded_with_stepdowns_and_balancer
-antithesis: true
-overrides:
-  - "antithesis.concurrency_sharded_with_stepdowns_and_balancer"

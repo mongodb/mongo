@@ -152,3 +152,5 @@ class _FixtureConfig(object):
         self.MONGOS_SET_PARAMETERS = config.MONGOS_SET_PARAMETERS
         self.DBPATH_PREFIX = config.DBPATH_PREFIX
         self.DEFAULT_DBPATH_PREFIX = config.DEFAULT_DBPATH_PREFIX
+        self.EXTERNAL_SUT = config.EXTERNAL_SUT
+        self.DOCKER_COMPOSE_BUILD_IMAGES = config.DOCKER_COMPOSE_BUILD_IMAGES

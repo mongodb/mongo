@@ -159,16 +159,18 @@ def new_job_logger(test_kind, job_num) -> logging.Logger:
 class FixtureLogger(logging.Logger):
     """Custom fixture logger."""
 
-    def __init__(self, name, full_name):
+    def __init__(self, name, full_name, external_sut_hostname=None):
         """Initialize fixture logger."""
         self.full_name = full_name
+        self.external_sut_hostname = external_sut_hostname
         super().__init__(name)
 
 
 def new_fixture_logger(fixture_class, job_num):
     """Create a logger for a particular fixture class."""
     full_name = "%s:job%d" % (fixture_class, job_num)
-    logger = FixtureLogger(_shorten(full_name), full_name)
+    external_sut_hostname = full_name.replace(":", "_").lower()
+    logger = FixtureLogger(_shorten(full_name), full_name, external_sut_hostname)
     logger.parent = ROOT_FIXTURE_LOGGER
     _add_build_logger_handler(logger, job_num)
 
@@ -179,7 +181,8 @@ def new_fixture_logger(fixture_class, job_num):
 def new_fixture_node_logger(fixture_class, job_num, node_name):
     """Create a logger for a particular element in a multi-process fixture."""
     full_name = "%s:job%d:%s" % (fixture_class, job_num, node_name)
-    logger = FixtureLogger(_shorten(full_name), full_name)
+    external_sut_hostname = node_name.replace(":", "_")
+    logger = FixtureLogger(_shorten(full_name), full_name, external_sut_hostname)
     logger.parent = _FIXTURE_LOGGER_REGISTRY[job_num]
     return logger
 

@@ -37,7 +37,7 @@ def compare_optime(optime1, optime2):
         return compare_timestamp(optime1["ts"], optime2["ts"])
 
 
-class ReplicaSetFixture(interface.ReplFixture):
+class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a replica set to run against."""
 
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
@@ -249,6 +249,10 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         self._await_secondaries()
         self._await_newly_added_removals()
+
+    def _all_mongo_d_s(self):
+        """Return a list of all `mongo{d,s}` `Process` instances in this fixture."""
+        return sum([node._all_mongo_d_s() for node in self.nodes], [])
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""

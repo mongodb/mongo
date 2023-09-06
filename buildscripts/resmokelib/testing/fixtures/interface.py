@@ -214,6 +214,58 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         return "%r(%r, %r)" % (self.__class__.__name__, self.logger, self.job_num)
 
 
+class DockerComposeException(Exception):
+    """Exception to use when there is a failure in the docker compose interface."""
+
+    pass
+
+
+class _DockerComposeInterface:
+    """
+    Implement the `_all_mongo_d_s_instances` method which returns all `mongo{d,s}` instances.
+
+    Fixtures that use this interface can programmatically generate `docker-compose.yml` configurations
+    by leveraging the `all_processes` method to access the startup args.
+    """
+
+    def _all_mongo_d_s(self) -> List[Fixture]:
+        """
+        Return a list of all mongo{d,s} `Fixture` instances in this fixture.
+
+        :return: A list of `mongo{d,s}` `Fixture` instances.
+        """
+        raise NotImplementedError(
+            "_all_mongo_d_s_instances must be implemented by Fixture subclasses that support `docker-compose.yml` generation."
+        )
+
+    def all_processes(self) -> List['Process']:
+        """
+        Return a list of all `mongo{d,s}` `Process` instances in the fixture.
+
+        :return: A list of mongo{d,s} processes for the current fixture.
+        """
+        if not self.config.DOCKER_COMPOSE_BUILD_IMAGES:
+            raise DockerComposeException(
+                "This method is reserved for `--dockerComposeBuildImages` only.")
+
+        processes = []
+
+        # If `mongo_d_s.EXTERNAL_SUT=True`, `mongo_d_s.setup()` will setup a dummy process
+        # to extract args from instead of a real `mongo{d,s}`.
+        for mongo_d_s in self._all_mongo_d_s():
+            if mongo_d_s.__class__.__name__ == "MongoDFixture":
+                mongo_d_s.setup()
+                processes += [mongo_d_s.mongod]
+            elif mongo_d_s.__class__.__name__ == "_MongoSFixture":
+                mongo_d_s.setup()
+                processes += [mongo_d_s.mongos]
+            else:
+                raise NotImplementedError(
+                    f"Support for this class has not yet been added to docker compose: {mongo_d_s.__class__.__name__}"
+                )
+        return processes
+
+
 class MultiClusterFixture(Fixture):
     """
     Base class for fixtures that may consist of multiple independent participant clusters.

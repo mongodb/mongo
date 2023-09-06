@@ -1,27 +1,55 @@
 import os
+from shlex import quote
 import shutil
 import subprocess
 import sys
 
 import git
+import yaml
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib.errors import RequiresForceRemove
 
-from buildscripts.resmokelib.testing.docker_cluster_config_writer import DockerClusterConfigWriter
+
+def build_images(suite_name, fixture_instance):
+    """Build images needed to run the resmoke suite against docker containers."""
+    image_builder = DockerComposeImageBuilder(suite_name, fixture_instance)
+    if "config" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+        image_builder.build_config_image()
+    if "mongo-binaries" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+        image_builder.build_mongo_binaries_image()
+    if "workload" in config.DOCKER_COMPOSE_BUILD_IMAGES:  # pylint: disable=unsupported-membership-test
+        image_builder.build_workload_image()
+    if config.DOCKER_COMPOSE_BUILD_IMAGES:
+        repro_command = f"""
+        Built image(s): {config.DOCKER_COMPOSE_BUILD_IMAGES}
+
+        SUCCESS - Run this suite against an External System Under Test (SUT) with the following command:
+        `docker compose -f docker_compose/{suite_name}/docker-compose.yml run --rm workload buildscripts/resmoke.py run --suite {suite_name} --externalSUT`
+
+        DISCLAIMER - Make sure you have built all images with the following command first:
+        `buildscripts/resmoke.py run --suite {suite_name} --dockerComposeBuildImages workload,mongo-binaries,config`
+        """
+        print(repro_command)
 
 
 class DockerComposeImageBuilder:
     """Build images needed to run a resmoke suite against a MongoDB Docker Container topology."""
 
-    def __init__(self, tag, in_evergreen):
+    def __init__(self, suite_name, suite_fixture):
         """
         Constructs a `DockerComposeImageBuilder` which can build images locally and in CI.
 
-        :param tag: The tag to use for these images.
-        :param in_evergreen: Whether this is running in Evergreen or not.
+        :param suite_name: The name of the suite we are building images for.
+        :param suite_fixture: The fixture to base the `docker-compose.yml` generation off of.
         """
-        self.tag = tag
-        self.in_evergreen = in_evergreen
+        self.suite_name = suite_name
+        self.suite_fixture = suite_fixture
+        self.tag = config.DOCKER_COMPOSE_TAG
+        self.in_evergreen = config.DOCKER_COMPOSE_BUILD_ENV == "evergreen"
 
         # Build context constants
+        self.DOCKER_COMPOSE_BUILD_CONTEXT = f"docker_compose/{self.suite_name}"
+
         self.WORKLOAD_BUILD_CONTEXT = "buildscripts/antithesis/base_images/workload"
         self.WORKLOAD_DOCKERFILE = f"{self.WORKLOAD_BUILD_CONTEXT}/Dockerfile"
 
@@ -29,7 +57,7 @@ class DockerComposeImageBuilder:
         self.MONGO_BINARIES_DOCKERFILE = f"{self.MONGO_BINARIES_BUILD_CONTEXT}/Dockerfile"
 
         # Artifact constants
-        self.MONGODB_BINARIES_RELATIVE_DIR = "dist-test" if in_evergreen else "antithesis-dist-test"
+        self.MONGODB_BINARIES_RELATIVE_DIR = "dist-test" if self.in_evergreen else "antithesis-dist-test"
         self.MONGO_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongo"
         self.MONGOD_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongod"
         self.MONGOS_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongos"
@@ -37,30 +65,118 @@ class DockerComposeImageBuilder:
         self.LIBVOIDSTAR_PATH = "/usr/lib/libvoidstar.so"
         self.MONGODB_DEBUGSYMBOLS = "mongo-debugsymbols.tgz"
 
-    def build_base_images(self):
-        """
-        Build the base images needed for the docker configuration.
+        # Port suffix ranging from 1-24 is subject to fault injection while ports 130+ are safe.
+        self.next_available_fault_enabled_ip = 2
+        self.next_available_fault_disabled_ip = 130
 
-        :return: None.
+    def _add_docker_compose_configuration_to_build_context(self, build_context) -> None:
         """
-        self._fetch_mongodb_binaries()
-        print("Building base images...")
-        self._build_mongo_binaries_image()
-        self._build_workload_image()
-        print("Done building base images.")
+        Create init scripts for all of the mongo{d,s} processes and a `docker-compose.yml` file.
 
-    def build_config_image(self, antithesis_suite_name):
-        """
-        Build the antithesis config image containing the `docker-compose.yml` file and volumes for the suite.
-
-        :param antithesis_suite_name: The antithesis suite to build a docker compose config image for.
-        :param tag: Tag to use for the docker compose configuration and/or base images.
+        :param build_context: Filepath where the configuration is going to be set up.
         """
 
-        # Build out the directory structure and write the startup scripts for the config image at runtime
-        print(f"Prepping antithesis config image build context for `{antithesis_suite_name}`...")
-        config_image_writer = DockerClusterConfigWriter(antithesis_suite_name, self.tag)
-        config_image_writer.generate_docker_sharded_cluster_config()
+        def create_docker_compose_service(name, fault_injection, depends_on):
+            """
+            Create a service section of a docker-compose.yml for a service with this name.
+
+            :param name: Whether or not this service should be subject to fault injection.
+            :param fault_injection: Whether or not this service should be subject to fault injection.
+            :param depends_on: Any services that this service depends on to successfully run.
+            """
+            if fault_injection:
+                ip_suffix = self.next_available_fault_enabled_ip
+                self.next_available_fault_enabled_ip += 1
+            else:
+                ip_suffix = self.next_available_fault_disabled_ip
+                self.next_available_fault_disabled_ip += 1
+            return {
+                "container_name": name, "hostname": name,
+                "image": f'{"workload" if name == "workload" else "mongo-binaries"}:{self.tag}',
+                "volumes": [
+                    f"./logs/{name}:/var/log/mongodb/",
+                    "./scripts:/scripts/",
+                    f"./data/{name}:/data/db",
+                ], "command": f"/bin/bash /scripts/{name}.sh", "networks": {
+                    "antithesis-net": {"ipv4_address": f"10.20.20.{ip_suffix}"}
+                }, "depends_on": depends_on
+            }
+
+        docker_compose_yml = {
+            "version": "3.0", "services": {
+                "workload":
+                    create_docker_compose_service(
+                        "workload", fault_injection=False, depends_on=[
+                            process.logger.external_sut_hostname
+                            for process in self.suite_fixture.all_processes()
+                        ])
+            }, "networks": {
+                "antithesis-net": {
+                    "driver": "bridge", "ipam": {"config": [{"subnet": "10.20.20.0/24"}]}
+                }
+            }
+        }
+        print("Writing workload init script...")
+        with open(os.path.join(build_context, "scripts", "workload.sh"), "w") as workload_init:
+            workload_init.write("tail -f /dev/null\n")
+
+        print("Writing mongo{d,s} init scripts...")
+        for process in self.suite_fixture.all_processes():
+            # Add the `Process` as a service in the docker-compose.yml
+            service_name = process.logger.external_sut_hostname
+            docker_compose_yml["services"][service_name] = create_docker_compose_service(
+                service_name, fault_injection=True, depends_on=[])
+
+            # Write the `Process` args as an init script
+            with open(os.path.join(build_context, "scripts", f"{service_name}.sh"), "w") as file:
+                file.write(" ".join(map(quote, process.args)) + '\n')
+
+        print("Writing `docker-compose.yml`...")
+        with open(os.path.join(build_context, "docker-compose.yml"), "w") as docker_compose:
+            docker_compose.write(yaml.dump(docker_compose_yml) + '\n')
+
+        print("Writing Dockerfile...")
+        with open(os.path.join(build_context, "Dockerfile"), "w") as dockerfile:
+            dockerfile.write("FROM scratch\n")
+            dockerfile.write("COPY docker-compose.yml /\n")
+            dockerfile.write("ADD scripts /scripts\n")
+            dockerfile.write("ADD logs /logs\n")
+            dockerfile.write("ADD data /data\n")
+            dockerfile.write("ADD debug /debug\n")
+
+    def _initialize_docker_compose_build_context(self, build_context) -> None:
+        """
+        Remove the old docker compose build context and create a new one.
+
+        :param build_context: Filepath where the configuration is going to be set up.
+        """
+        try:
+            shutil.rmtree(build_context)
+        except FileNotFoundError as _:
+            # `shutil.rmtree` throws FileNotFoundError if the path DNE. In that case continue as normal.
+            pass
+        except Exception as exc:
+            exception_text = f"""
+            Could not remove directory due to old artifacts from a previous run.
+
+            Please remove this directory and try again -- you may need to force remove:
+            `{os.path.relpath(build_context)}`
+            """
+            raise RequiresForceRemove(exception_text) from exc
+
+        for volume in ["scripts", "logs", "data", "debug"]:
+            os.makedirs(os.path.join(build_context, volume))
+
+    def build_config_image(self):
+        """
+        Build the config image containing the `docker-compose.yml` file, init scripts and volumes for the suite.
+
+        :return: None
+        """
+        # Build out the directory structure and write the startup scripts for the config image
+        print(f"Preparing antithesis config image build context for `{self.suite_name}`...")
+        self._initialize_docker_compose_build_context(self.DOCKER_COMPOSE_BUILD_CONTEXT)
+        self._add_docker_compose_configuration_to_build_context(self.DOCKER_COMPOSE_BUILD_CONTEXT)
 
         # Our official builds happen in Evergreen. Assert debug symbols are on system.
         # If this is running locally, this is for development purposes only and debug symbols are not required.
@@ -69,19 +185,17 @@ class DockerComposeImageBuilder:
                                   ), f"No debug symbols available at: {self.MONGODB_DEBUGSYMBOLS}"
             print("Running in Evergreen -- copying debug symbols to build context...")
             shutil.copy(self.MONGODB_DEBUGSYMBOLS,
-                        os.path.join(config_image_writer.build_context, "debug"))
+                        os.path.join(self.DOCKER_COMPOSE_BUILD_CONTEXT, "debug"))
 
-        print(
-            f"Done setting up antithesis config image build context for `{antithesis_suite_name}..."
-        )
+        print(f"Done setting up antithesis config image build context for `{self.suite_name}...")
         print("Building antithesis config image...")
         subprocess.run([
-            "docker", "build", "-t", f"{antithesis_suite_name}:{self.tag}", "-f",
-            f"{config_image_writer.build_context}/Dockerfile", config_image_writer.build_context
+            "docker", "build", "-t", f"{self.suite_name}:{self.tag}", "-f",
+            f"{self.DOCKER_COMPOSE_BUILD_CONTEXT}/Dockerfile", self.DOCKER_COMPOSE_BUILD_CONTEXT
         ], stdout=sys.stdout, stderr=sys.stderr, check=True)
         print("Done building antithesis config image.")
 
-    def _build_workload_image(self):
+    def build_workload_image(self):
         """
         Build the workload image.
 
@@ -91,6 +205,7 @@ class DockerComposeImageBuilder:
 
         print("Prepping `workload` image build context...")
         # Set up build context
+        self._fetch_mongodb_binaries()
         self._copy_mongo_binary_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_mongo_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
@@ -103,15 +218,16 @@ class DockerComposeImageBuilder:
         ], stdout=sys.stdout, stderr=sys.stderr, check=True)
         print("Done building workload image.")
 
-    def _build_mongo_binaries_image(self):
+    def build_mongo_binaries_image(self):
         """
         Build the mongo-binaries image.
 
         :return: None.
         """
-
-        print("Prepping `mongo binaries` image build context...")
         # Set up build context
+        print("Prepping `mongo binaries` image build context...")
+
+        self._fetch_mongodb_binaries()
         self._copy_mongodb_binaries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
 
@@ -134,13 +250,10 @@ class DockerComposeImageBuilder:
         """
         mongodb_binaries_destination = os.path.join(self.MONGODB_BINARIES_RELATIVE_DIR, "bin")
 
+        if os.path.exists(mongodb_binaries_destination):
+            print(f"\n\tFound existing MongoDB binaries at: {mongodb_binaries_destination}\n")
         # If local, fetch the binaries.
-        if not self.in_evergreen:
-            # Clean up any old artifacts in the build context.
-            if os.path.exists(mongodb_binaries_destination):
-                print("Removing old MongoDB binaries...")
-                shutil.rmtree(mongodb_binaries_destination)
-
+        elif not self.in_evergreen:
             # Ensure that `db-contrib-tool` is installed locally
             db_contrib_tool_error = """
             Could not find `db-contrib-tool` installation locally.
@@ -164,7 +277,7 @@ class DockerComposeImageBuilder:
         for required_binary in [self.MONGO_BINARY, self.MONGOD_BINARY, self.MONGOS_BINARY]:
             assert os.path.exists(
                 required_binary
-            ), f"Could not find Ubuntu 18.04 MongoDB binary at: {required_binary}"
+            ), f"Could not find Ubuntu 22.04 MongoDB binary at: {required_binary}"
 
             # Our official builds happen in Evergreen.
             # We want to ensure the binaries are linked with `libvoidstar.so` during image build.
@@ -223,7 +336,8 @@ class DockerComposeImageBuilder:
 
         # Copy the mongo repo to the build context.
         # If this fails to clone, the `git` library will raise an exception.
-        git.Repo("./").clone(mongo_repo_destination)
+        active_branch = git.Repo("./").active_branch.name
+        git.Repo.clone_from("./", mongo_repo_destination, branch=active_branch)
         print("Done cloning MongoDB repo to build context.")
 
     def _copy_mongodb_binaries_to_build_context(self, dir_path):

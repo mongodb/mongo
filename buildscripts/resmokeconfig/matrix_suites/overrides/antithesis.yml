@@ -1,8 +1,0 @@
-### Overrides for various antithesis suite external fixture configurations ###
-
-- name: concurrency_sharded_with_stepdowns_and_balancer
-  value:
-    executor:
-      fixture:
-        class: ExternalShardedClusterFixture
-        original_suite_name: concurrency_sharded_with_stepdowns_and_balancer

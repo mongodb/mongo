@@ -14,7 +14,7 @@ import pymongo.errors
 from buildscripts.resmokelib.testing.fixtures import interface
 
 
-class MongoDFixture(interface.Fixture):
+class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
@@ -87,13 +87,9 @@ class MongoDFixture(interface.Fixture):
 
         self.mongod = mongod
 
-    def get_options(self):
-        """Return the mongod options of this fixture."""
-        launcher = MongodLauncher(self.fixturelib)
-        _, mongod_options = launcher.launch_mongod_program(self.logger, self.job_num,
-                                                           executable=self.mongod_executable,
-                                                           mongod_options=self.mongod_options)
-        return mongod_options
+    def _all_mongo_d_s(self):
+        """Return the standalone `mongod` `Process` instance."""
+        return [self]
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -135,6 +131,12 @@ class MongoDFixture(interface.Fixture):
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
+        if self.config.EXTERNAL_SUT:
+            self.logger.info(
+                "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."
+            )
+            return
+
         if self.mongod is None:
             self.logger.warning("The mongod fixture has not been set up yet.")
             return  # Still a success even if nothing is running.
@@ -186,7 +188,7 @@ class MongoDFixture(interface.Fixture):
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        return "localhost:%d" % self.port
+        return f"{self.logger.external_sut_hostname if self.config.EXTERNAL_SUT else 'localhost'}:{self.port}"
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

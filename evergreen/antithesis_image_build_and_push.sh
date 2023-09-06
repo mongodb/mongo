@@ -17,21 +17,28 @@ if [ -n "${antithesis_image_tag:-}" ]; then
   tag=$antithesis_image_tag
 fi
 
-# Build Image
-cd src
-activate_venv
-$python buildscripts/resmoke.py generate-docker-compose --in-evergreen --tag $tag ${suite}
+# Clean up any leftover docker artifacts
+sudo docker logout
+sudo docker rm $(docker ps -a -q) --force || echo "No pre-existing containers"
+sudo docker network prune --force
 
-# Test Image
-cd antithesis/antithesis_config/${suite}
-bash run_suite.sh
-
-# Push Image
-# login, push, and logout
+# Login
 echo "${antithesis_repo_key}" > mongodb.key.json
 cat mongodb.key.json | sudo docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
 rm mongodb.key.json
 
+# Build Image
+cd src
+activate_venv
+$python buildscripts/resmoke.py run --suite ${suite} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen
+
+# Test Image
+docker-compose -f docker_compose/${suite}/docker-compose.yml up -d
+echo "ALL RUNNING CONTAINERS: "
+docker ps
+docker exec workload buildscripts/resmoke.py run --suite ${suite} --sanityCheck --externalSUT
+
+# Push Image
 sudo docker tag "${suite}:$tag" "$antithesis_repo/${suite}:$tag"
 sudo docker push "$antithesis_repo/${suite}:$tag"
 
@@ -41,4 +48,5 @@ sudo docker push "$antithesis_repo/mongo-binaries:$tag"
 sudo docker tag "workload:$tag" "$antithesis_repo/workload:$tag"
 sudo docker push "$antithesis_repo/workload:$tag"
 
+# Logout
 sudo docker logout https://us-central1-docker.pkg.dev

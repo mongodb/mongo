@@ -169,6 +169,18 @@ DEFAULTS = {
     "otel_parent_id": None,
     "otel_collector_endpoint": None,
     "otel_collector_file": None,
+
+    # The images to build for an External System Under Test
+    "docker_compose_build_images": None,
+
+    # Where the `--dockerComposeBuildImages` is happening.
+    "docker_compose_build_env": "local",
+
+    # Tag to use for images built & used for an External System Under Test
+    "docker_compose_tag": "development",
+
+    # Whether or not this resmoke suite is running against an External System Under Test
+    "external_sut": False,
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -629,3 +641,15 @@ SYMBOLIZER_CLIENT_ID = None
 
 # Sanity check
 SANITY_CHECK = False
+
+# The images to build for an External System Under Test
+DOCKER_COMPOSE_BUILD_IMAGES = None
+
+# Where the `--dockerComposeBuildImages` is happening.
+DOCKER_COMPOSE_BUILD_ENV = "local"
+
+# Tag to use for images built & used for an External System Under Test
+DOCKER_COMPOSE_TAG = "development"
+
+# Whether or not this resmoke suite is running against an External System Under Test
+EXTERNAL_SUT = False

@@ -5,7 +5,7 @@ EXPOSE 27018
 EXPOSE 27019
 
 RUN mkdir -p /scripts
-RUN mkdir -p /var/log/resmoke
+RUN mkdir -p /var/log/mongodb
 
 RUN apt-get update
 
@@ -25,11 +25,6 @@ RUN python -m pip install --upgrade pip wheel
 # -------------------
 # Everything above this line should be common image setup
 
-# copy resmoke, make the venv, and pip install
-COPY src /resmoke
-
-RUN bash -c "cd /resmoke && python3 -m venv python3-venv && . python3-venv/bin/activate && python3 -m pip install 'poetry==1.5.1' && python3 -m poetry install --no-root --sync"
-
 # copy the mongo binary -- make sure it is executable
 COPY mongo /usr/bin
 RUN chmod +x /usr/bin/mongo
@@ -37,3 +32,22 @@ RUN chmod +x /usr/bin/mongo
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version
+
+# Initialize the MongoDB repository
+WORKDIR /mongo
+
+# Copy mongodb python deps first
+COPY src/pyproject.toml src/poetry.lock ./
+
+# Install mongodb python deps with poetry
+RUN python -m pip install 'poetry==1.5.1'
+RUN python -m poetry install --no-root --sync
+
+# Add the poetry venv to the $PATH so that it's activated by default
+# (We use a symlink because the path to the poetry venv is unknown & generated at runtime)
+RUN ln -s $(dirname $(dirname $(poetry run which python))) /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# copy mongo
+COPY src /mongo
+WORKDIR /mongo

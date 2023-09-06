@@ -85,6 +85,18 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     args = [executable]
     mongod_options = mongod_options.copy()
 
+    if config.EXTERNAL_SUT:
+        args[0] = os.path.basename(args[0])
+        mongod_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
+        mongod_options["set_parameters"].pop("backtraceLogFile", None)
+        mongod_options.update({
+            "logpath": "/var/log/mongodb/mongodb.log",
+            "dbpath": "/data/db",
+            "bind_ip": "0.0.0.0",
+            "oplogSize": "256",
+            "wiredTigerCacheSizeGB": "1",
+        })
+
     if "port" not in mongod_options:
         mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
 
@@ -117,6 +129,11 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     args = [executable]
 
     mongos_options = mongos_options.copy()
+
+    if config.EXTERNAL_SUT:
+        args[0] = os.path.basename(args[0])
+        mongos_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
+        mongos_options.update({"logpath": "/var/log/mongodb/mongodb.log", "bind_ip": "0.0.0.0"})
 
     if "port" not in mongos_options:
         mongos_options["port"] = network.PortAllocator.next_fixture_port(job_num)

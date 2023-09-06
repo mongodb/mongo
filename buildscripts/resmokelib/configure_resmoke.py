@@ -429,6 +429,14 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
     _config.SANITY_CHECK = config.pop("sanity_check")
+    _config.DOCKER_COMPOSE_BUILD_IMAGES = config.pop("docker_compose_build_images")
+    if _config.DOCKER_COMPOSE_BUILD_IMAGES is not None:
+        _config.DOCKER_COMPOSE_BUILD_IMAGES = _config.DOCKER_COMPOSE_BUILD_IMAGES.split(",")
+    _config.DOCKER_COMPOSE_BUILD_ENV = config.pop("docker_compose_build_env")
+    _config.DOCKER_COMPOSE_TAG = config.pop("docker_compose_tag")
+    # Always set this to True if we are building images for docker compose
+    _config.EXTERNAL_SUT = config.pop(
+        "external_sut") or _config.DOCKER_COMPOSE_BUILD_IMAGES is not None
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")

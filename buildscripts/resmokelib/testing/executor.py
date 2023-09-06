@@ -18,7 +18,7 @@ from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import testcases
-from buildscripts.resmokelib.testing import docker_cluster_config_writer as _docker_cluster_config_writer
+from buildscripts.resmokelib.testing.docker_cluster_image_builder import DockerComposeImageBuilder, build_images
 from buildscripts.resmokelib.testing.fixtures.interface import Fixture
 from buildscripts.resmokelib.testing.hooks.interface import Hook
 from buildscripts.resmokelib.testing.queue_element import QueueElemRepeatTime, queue_elem_factory, QueueElem
