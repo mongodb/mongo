@@ -39,8 +39,7 @@ feature_flags:
         description: "Feature flag for applying improvements on resharding to make it faster and 
         support same-key resharding."
         cpp_varname: gFeatureFlagReshardingImprovements
-        default: true
-        version: 7.1
+        default: false
         shouldBeFCVGated: true
     featureFlagMoveCollection:
         description: "Feature flag for implementing online move collection."

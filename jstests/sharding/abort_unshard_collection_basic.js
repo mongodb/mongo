@@ -2,7 +2,7 @@
  * Tests for basic functionality of the abort unshard collection feature.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  require_fcv_71,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection
  * ]

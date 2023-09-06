@@ -1413,8 +1413,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
-                                                               false);
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
