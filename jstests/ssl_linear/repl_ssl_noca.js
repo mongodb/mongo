@@ -44,7 +44,7 @@ try {
         var argv = ['mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
 
         if (url.endsWith('&ssl=true')) {
-            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/server.pem');
+            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/client.pem');
         }
 
         if (!_isWindows()) {
@@ -56,12 +56,15 @@ try {
         return ret;
     };
 
+    jsTest.log("Testing with no ssl specification...")
     var noMentionSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}`;
     assert.neq(checkShell(noMentionSSLURL), 0, "shell correctly failed to connect without SSL");
 
+    jsTest.log("Testing with ssl specified false...")
     var disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=false`;
     assert.neq(checkShell(disableSSLURL), 0, "shell correctly failed to connect without SSL");
 
+    jsTest.log("Testing with ssl specified true...")
     var useSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=true`;
     assert.eq(checkShell(useSSLURL), 0, "successfully connected with SSL");
 

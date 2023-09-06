@@ -7027,6 +7027,15 @@ tasks:
       suite: ssl_x509
 
 - <<: *gen_task_template
+  name: ssl_linear_gen
+  tags: ["encrypt", "ssl", "patch_build"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: ssl_linear
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   tags: ["jscore"]
   commands:
