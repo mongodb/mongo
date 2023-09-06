@@ -172,7 +172,12 @@ protected:
     const CollectionTruncateMarkers::MarkersCreationMethod kArbitraryMarkerCreationMethod{
         CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
 
-    PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
+    PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {
+        // Advance the clock to generate valid Timestamp objects. Timestamp objects in this test are
+        // generated with the walltime, and Timestamp uses the higher 32 bits of a Date_t as the
+        // secs part. Timestamps which have secs == 0 are considered null.
+        clockSource()->advance(Milliseconds{int64_t(1) << 32});
+    }
 
     ChangeStreamPreImage generatePreImage(
         const UUID& nsUUID,
