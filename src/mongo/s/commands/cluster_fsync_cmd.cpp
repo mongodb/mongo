@@ -107,11 +107,7 @@ public:
                    BSONObjBuilder& result) override {
         const auto dbname = DatabaseNameUtil::serialize(dbName);
         BSONObj fsyncCmdObj = cmdObj;
-        if (cmdObj["lock"].trueValue() &&
-            !feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
-            errmsg = "can't do lock through mongos";
-            return false;
-        }
+
         if (cmdObj["lock"].trueValue()) {
             auto forBackupField = BSON("forBackup" << true);
             fsyncCmdObj = fsyncCmdObj.addFields(forBackupField);

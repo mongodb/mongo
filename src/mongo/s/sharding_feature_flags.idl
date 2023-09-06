@@ -75,13 +75,6 @@ feature_flags:
     cpp_varname: feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
     default: false
     shouldBeFCVGated: true
-  # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
-  featureFlagClusterFsyncLock:
-    description: "Feature flag to enable locking of a cluster through mongos"
-    cpp_varname: feature_flags::gClusterFsyncLock
-    default: true
-    version: 7.1
-    shouldBeFCVGated: true
   featureFlagAuthoritativeShardCollection:
     description: "Feature flag for enabling the authoritative version of the shardCollection DDL operation."
     cpp_varname: feature_flags::gAuthoritativeShardCollection

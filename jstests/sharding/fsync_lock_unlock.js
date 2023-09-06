@@ -3,7 +3,6 @@
  * @tags: [
  *   requires_fsync,
  *   uses_parallel_shell,
- *   requires_fcv_71
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";

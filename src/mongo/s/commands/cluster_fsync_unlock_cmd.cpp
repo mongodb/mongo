@@ -72,12 +72,6 @@ public:
         };
 
         Response typedRun(OperationContext* opCtx) {
-            uassert(781501,
-                    "Cluster Fsync Unlock command requires cluster fsync lock feature flag to "
-                    "be enabled",
-                    feature_flags::gClusterFsyncLock.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             BSONObj fsyncUnlockCmdObj = BSON("fsyncUnlock" << 1);
 
             auto responses = scatterGatherUnversionedTargetConfigServerAndShards(

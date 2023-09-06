@@ -164,9 +164,7 @@ public:
                 threadStatus = Status::OK();
                 threadStarted = false;
                 Milliseconds deadline = Milliseconds::max();
-                if (forBackup &&
-                    feature_flags::gClusterFsyncLock.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                if (forBackup) {
                     // Set a default deadline of 90s for the fsyncLock to be acquired.
                     deadline = Milliseconds(90000);
                     // Parse the cmdObj and update the deadline if
@@ -197,8 +195,10 @@ public:
                 uassertStatusOK(status);
             }
         }
-        if (forBackup &&
-            feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
+        if (forBackup) {
+            // The check must be performed only if the fsync+lock command has been issued for backup
+            // purposes (through monogs). There are valid cases where fsync+lock can be invoked on
+            // the mongod while DDLs are in progress.
             checkForInProgressDDLOperations(opCtx);
         }
 
