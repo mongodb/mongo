@@ -82,8 +82,8 @@ structs:
                 description: "Specifies the collation to use for the delete."
                 type: object
             let:
-                description: "User-defined constant values to be used within $expr. These can be 
-                              specified by the user for each individual element of the 'deletes' 
+                description: "User-defined constant values to be used within $expr. These can be
+                              specified by the user for each individual element of the 'deletes'
                               array."
                 type: object
                 optional: true
@@ -122,3 +122,9 @@ structs:
                 description: "The yielding policy of the plan executor."
                 type: yield_policy
                 default: PlanYieldPolicy::YieldPolicy::NO_YIELD
+            isTimeseriesNamespace:
+                description: "This flag is set to true when the write command was originally sent
+                              to the time-series view, but got rewritten to target time-series
+                              buckets namespace."
+                type: optionalBool
+                stability: internal

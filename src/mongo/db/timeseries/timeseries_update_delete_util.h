@@ -92,51 +92,54 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
     const BSONObj& writeQuery,
     bool fixedBuckets);
 
-// Type requirement 1 for isTimeseries()
 template <typename T>
-concept IsRequestableWithTimeseriesBucketNamespace = requires(const T& t) {
+concept HasGetNamespace = requires(const T& t) {
     t.getNamespace();
-    t.getIsTimeseriesNamespace();
 };
 
-// Type requirement 2 for isTimeseries()
 template <typename T>
-concept IsRequestableOnUserTimeseriesNamespace = requires(const T& t) {
+concept HasGetNsString = requires(const T& t) {
     t.getNsString();
 };
 
-// Disjuction of type requirements for isTimeseries()
+// Type requirement 1 for isTimeseriesViewRequest()
 template <typename T>
-concept IsRequestableOnTimeseries =
-    IsRequestableWithTimeseriesBucketNamespace<T> || IsRequestableOnUserTimeseriesNamespace<T>;
+concept HasNsGetter = HasGetNamespace<T> || HasGetNsString<T>;
+
+// Type requirement 2 for isTimeseriesViewRequest()
+template <typename T>
+concept HasGetIsTimeseriesNamespace = requires(const T& t) {
+    t.getIsTimeseriesNamespace();
+};
+
+// Type requirements for isTimeseriesViewRequest()
+template <typename T>
+concept IsRequestableOnTimeseriesView = HasNsGetter<T> || HasGetIsTimeseriesNamespace<T>;
 
 /**
- * Returns a pair of (whether 'request' is made on a timeseries collection and the timeseries
- * system bucket collection namespace if so).
+ * Returns a pair of (whether 'request' is made on a timeseries view and the timeseries system
+ * bucket collection namespace if so).
  *
- * If the 'request' is not made on a timeseries collection, the second element of the pair is same
- * as the namespace of the 'request'.
+ * If the 'request' is not made on a timeseries view, the second element of the pair is same as the
+ * namespace of the 'request'.
  */
 template <typename T>
-requires IsRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeseries(
+requires IsRequestableOnTimeseriesView<T> std::pair<bool, NamespaceString> isTimeseriesViewRequest(
     OperationContext* opCtx, const T& request) {
-    const auto [nss, bucketNss] = [&] {
-        if constexpr (IsRequestableWithTimeseriesBucketNamespace<T>) {
-            auto nss = request.getNamespace();
-            uassert(5916400,
-                    "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
-                    "system.buckets namespace",
-                    !request.getIsTimeseriesNamespace() || nss.isTimeseriesBucketsCollection());
-            return request.getIsTimeseriesNamespace()
-                ? std::pair{nss, nss}
-                : std::pair{nss, nss.makeTimeseriesBucketsNamespace()};
+    const auto nss = [&] {
+        if constexpr (HasGetNamespace<T>) {
+            return request.getNamespace();
         } else {
-            auto nss = request.getNsString();
-            return std::pair{
-                nss,
-                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace()};
+            return request.getNsString();
         }
     }();
+    uassert(5916400,
+            "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
+            "system.buckets namespace",
+            !request.getIsTimeseriesNamespace() || nss.isTimeseriesBucketsCollection());
+
+    const auto bucketNss =
+        request.getIsTimeseriesNamespace() ? nss : nss.makeTimeseriesBucketsNamespace();
 
     // If the buckets collection exists now, the time-series insert path will check for the
     // existence of the buckets collection later on with a lock.
@@ -147,8 +150,8 @@ requires IsRequestableOnTimeseries<T> std::pair<bool, NamespaceString> isTimeser
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
     auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    bool isTimeseries = (coll && coll->getTimeseriesOptions());
+    bool isTimeseriesViewReq = (coll && coll->getTimeseriesOptions());
 
-    return {isTimeseries, isTimeseries ? bucketNss : nss};
+    return {isTimeseriesViewReq, isTimeseriesViewReq ? bucketNss : nss};
 }
 }  // namespace mongo::timeseries

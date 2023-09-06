@@ -300,6 +300,14 @@ public:
         return _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
     }
 
+    void setIsTimeseriesNamespace(OptionalBool isTimeseriesNamespace) {
+        _isTimeseriesNamespace = isTimeseriesNamespace;
+    }
+
+    const OptionalBool& getIsTimeseriesNamespace() const {
+        return _isTimeseriesNamespace;
+    }
+
     std::string toString() const {
         StringBuilder builder;
         builder << " query: " << getQuery();
@@ -335,6 +343,7 @@ public:
         builder << " isExplain: " << static_cast<bool>(_explain);
         builder << " $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: "
                 << _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+        builder << " isTimeseriesNamespace: " << _isTimeseriesNamespace;
         return builder.str();
     }
 
@@ -365,6 +374,8 @@ private:
     // True if this update is allowed to modify the shard key without the specifying the full shard
     // key.
     OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
+
+    OptionalBool _isTimeseriesNamespace;
 
     // Flags controlling the update.
 

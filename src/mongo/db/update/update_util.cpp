@@ -192,6 +192,7 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setExplain(explain);
 
     requestOut->setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    requestOut->setIsTimeseriesNamespace(request.getIsTimeseriesNamespace());
 }
 
 }  // namespace update

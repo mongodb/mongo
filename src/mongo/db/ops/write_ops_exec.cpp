@@ -762,11 +762,12 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
                            const UpdateRequest& updateRequest) {
-    auto [isTimeseriesUpdate, nsString] = timeseries::isTimeseries(opCtx, updateRequest);
+    auto [isTimeseriesViewUpdate, nsString] =
+        timeseries::isTimeseriesViewRequest(opCtx, updateRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesUpdate || !opCtx->isRetryableWrite());
+            !isTimeseriesViewUpdate || !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,
@@ -824,7 +825,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
             !inTransaction);
     }
 
-    if (isTimeseriesUpdate) {
+    if (isTimeseriesViewUpdate) {
         timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
     }
 
@@ -832,7 +833,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
                               &updateRequest,
                               collection.getCollectionPtr(),
                               false /*forgoOpCounterIncrements*/,
-                              isTimeseriesUpdate);
+                              isTimeseriesViewUpdate);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     const auto exec = uassertStatusOK(
@@ -891,11 +892,13 @@ long long performDelete(OperationContext* opCtx,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
                         boost::optional<BSONObj>& docFound) {
-    auto [isTimeseriesDelete, nsString] = timeseries::isTimeseries(opCtx, deleteRequest);
+    auto [isTimeseriesViewDelete, nsString] =
+        timeseries::isTimeseriesViewRequest(opCtx, deleteRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesDelete || !deleteRequest.getReturnDeleted() || !opCtx->isRetryableWrite());
+            !isTimeseriesViewDelete || !deleteRequest.getReturnDeleted() ||
+                !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchRemove, opCtx, "hangDuringBatchRemove", []() {
@@ -919,11 +922,11 @@ long long performDelete(OperationContext* opCtx,
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
-    if (isTimeseriesDelete) {
+    if (isTimeseriesViewDelete) {
         timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
     }
 
-    ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesDelete);
+    ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesViewDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto dbName = nsString.dbName();

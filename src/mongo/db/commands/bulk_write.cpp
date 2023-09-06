@@ -590,7 +590,7 @@ bool attemptGroupedFLEInserts(OperationContext* opCtx,
     return false;
 }
 
-// A class that meets the type requirements for timeseries::isTimeseries.
+// A class that meets the type requirements for timeseries::isTimeseriesViewRequest.
 class TimeseriesBucketNamespace {
 public:
     TimeseriesBucketNamespace() = delete;
@@ -685,7 +685,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
     // Handle timeseries inserts.
     TimeseriesBucketNamespace tsNs(nsString, nsEntry.getIsTimeseriesNamespace());
-    if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, tsNs); isTimeseries) {
+    if (auto [isTimeseriesViewRequest, _] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+        isTimeseriesViewRequest) {
         try {
             handleGroupedTimeseriesInserts(
                 opCtx, req, firstOpIdx, insertDocs, nsEntry, &curOp, out);
@@ -940,10 +941,11 @@ bool handleUpdateOp(OperationContext* opCtx,
             : kUninitializedStmtId;
 
         TimeseriesBucketNamespace tsNs(nsEntry.getNs(), nsEntry.getIsTimeseriesNamespace());
-        auto [isTimeseries, bucketNs] = timeseries::isTimeseries(opCtx, tsNs);
+        auto [isTimeseriesViewRequest, bucketNs] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
 
         // Handle retryable timeseries updates.
-        if (isTimeseries && opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
+        if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
+            !opCtx->inMultiDocumentTransaction()) {
             write_ops_exec::WriteResult out;
             auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
                 ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(

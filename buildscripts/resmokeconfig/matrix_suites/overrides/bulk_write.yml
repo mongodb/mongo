@@ -9,7 +9,7 @@
 - name: single_op_core_excluded_files
   value:
     exclude_files:
-    # TODO (SERVER-80146): Enable the following test(s).
+    # TODO (SERVER-80190): Enable the following test(s).
     - jstests/core/timeseries/timeseries_bucket_index.js
     - jstests/core/timeseries/timeseries_bucket_manual_removal.js
     # TODO (SERVER-80011): Enable the following test(s).

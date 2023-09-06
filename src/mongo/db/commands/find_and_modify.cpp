@@ -175,6 +175,7 @@ void makeDeleteRequest(OperationContext* opCtx,
     requestOut->setIsExplain(explain);
 
     requestOut->setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    requestOut->setIsTimeseriesNamespace(request.getIsTimeseriesNamespace());
 }
 
 write_ops::FindAndModifyCommandReply buildResponse(
@@ -363,7 +364,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     }();
     auto request = requestAndMsg.first;
 
-    auto [isTimeseries, nss] = timeseries::isTimeseries(opCtx, request);
+    auto [isTimeseriesViewRequest, nss] = timeseries::isTimeseriesViewRequest(opCtx, request);
 
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
     auto const curOp = CurOp::get(opCtx);
@@ -388,7 +389,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
         ParsedDelete parsedDelete(
-            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseries);
+            opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
         uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -422,7 +423,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
-        if (isTimeseries) {
+        if (isTimeseriesViewRequest) {
             timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
         }
 
@@ -430,7 +431,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                   &updateRequest,
                                   collection.getCollectionPtr(),
                                   false /*forgoOpCounterIncrements*/,
-                                  isTimeseries);
+                                  isTimeseriesViewRequest);
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)

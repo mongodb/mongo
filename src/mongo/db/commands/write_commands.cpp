@@ -303,7 +303,9 @@ public:
                 }
             }
 
-            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
+            if (auto [isTimeseriesViewRequest, _] =
+                    timeseries::isTimeseriesViewRequest(opCtx, request());
+                isTimeseriesViewRequest) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
@@ -485,9 +487,10 @@ public:
                 }
             }
 
-            auto [isTimeseries, bucketNs] = timeseries::isTimeseries(opCtx, request());
-            OperationSource source =
-                isTimeseries ? OperationSource::kTimeseriesUpdate : OperationSource::kStandard;
+            auto [isTimeseriesViewRequest, bucketNs] =
+                timeseries::isTimeseriesViewRequest(opCtx, request());
+            OperationSource source = isTimeseriesViewRequest ? OperationSource::kTimeseriesUpdate
+                                                             : OperationSource::kStandard;
 
             long long nModified = 0;
 
@@ -498,7 +501,8 @@ public:
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
-            if (isTimeseries && opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
+            if (isTimeseriesViewRequest && opCtx->isRetryableWrite() &&
+                !opCtx->inMultiDocumentTransaction()) {
                 auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
                     ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
                           opCtx->getServiceContext())
@@ -584,7 +588,8 @@ public:
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
 
-            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
+            auto [isTimeseriesViewRequest, nss] =
+                timeseries::isTimeseriesViewRequest(opCtx, request());
 
             UpdateRequest updateRequest(request().getUpdates()[0]);
             updateRequest.setNamespaceString(nss);
@@ -617,7 +622,7 @@ public:
                                       opCtx, nss, AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
 
-            if (isRequestToTimeseries) {
+            if (isTimeseriesViewRequest) {
                 timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 const auto& requestHint = request().getUpdates()[0].getHint();
@@ -633,7 +638,7 @@ public:
                                       &updateRequest,
                                       collection.getCollectionPtr(),
                                       false /* forgoOpCounterIncrements */,
-                                      isRequestToTimeseries);
+                                      isTimeseriesViewRequest);
             uassertStatusOK(parsedUpdate.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorUpdate(
@@ -740,7 +745,9 @@ public:
                 }
             }
 
-            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
+            if (auto [isTimeseriesViewRequest, _] =
+                    timeseries::isTimeseriesViewRequest(opCtx, request());
+                isTimeseriesViewRequest) {
                 source = OperationSource::kTimeseriesDelete;
             }
 
@@ -776,7 +783,8 @@ public:
                     request().getDeletes().size() == 1);
 
             auto deleteRequest = DeleteRequest{};
-            auto [isRequestToTimeseries, nss] = timeseries::isTimeseries(opCtx, request());
+            auto [isTimeseriesViewRequest, nss] =
+                timeseries::isTimeseriesViewRequest(opCtx, request());
             deleteRequest.setNsString(nss);
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
@@ -810,7 +818,7 @@ public:
                 CollectionAcquisitionRequest::fromOpCtx(
                     opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
-            if (isRequestToTimeseries) {
+            if (isTimeseriesViewRequest) {
                 timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 if (timeseries::isHintIndexKey(firstDelete.getHint())) {
@@ -822,7 +830,7 @@ public:
             }
 
             ParsedDelete parsedDelete(
-                opCtx, &deleteRequest, collection.getCollectionPtr(), isRequestToTimeseries);
+                opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
             uassertStatusOK(parsedDelete.parseRequest());
 
             // Explain the plan tree.
