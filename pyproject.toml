@@ -59,7 +59,7 @@ typing-extensions = ">3.7.4"
 pipx = "1.2.0"
 # TODO: Add in pex as we move forward with this
 # pex = "^2.1.137"
-poetry = "*"
+poetry = "1.5.1"
 
 [tool.poetry.group.evergreen.dependencies]
 click = "^7.1.2"

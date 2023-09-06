@@ -12,6 +12,37 @@ venv_dir="${workdir}/venv"
 if [ -d "$venv_dir" ]; then
   exit 0
 fi
+
+# We create a venv for poetry
+# We cannot install poetry into the same virtual enviorment as the rest of our tools
+# If there is a conflict between poetry and our other deps windows fails to upgrade the package
+# See issue SERVER-80781
+POETRY_VENV="${workdir}/poetry_venv"
+if [ "Windows_NT" = "$OS" ]; then
+  POETRY_VENV_PYTHON="$POETRY_VENV/Scripts/python.exe"
+else
+  POETRY_VENV_PYTHON="$POETRY_VENV/bin/python3"
+fi
+"$python_loc" -m venv "$POETRY_VENV"
+
+# Loop 5 times to retry the poetry install
+# We have seen weird network errors that can sometimes mess up the pip install
+# By retrying we would like to only see errors that happen consistently
+if uname -a | grep -q 's390x\|ppc64le'; then
+  # s390x and ppc64le both require these old versions for some reason
+  # They are pinned deps as well
+  EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
+fi
+for i in {1..5}; do
+  $POETRY_VENV_PYTHON -m pip install "poetry==1.5.1" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
+  echo "Python failed to install poetry, retrying..."
+done
+
+if [ $RET -ne 0 ]; then
+  echo "Pip install error for poetry"
+  exit $RET
+fi
+
 "$python_loc" -m venv "$venv_dir"
 
 # Adding README file for using this venv locally
@@ -76,36 +107,13 @@ if [ $RET -ne 0 ]; then
   exit $RET
 fi
 
-# Loop 5 times to retry the poetry install
-# We have seen weird network errors that can sometimes mess up the pip install
-# By retrying we would like to only see errors that happen consistently
-for i in {1..5}; do
-  if [ "Windows_NT" = "$OS" ]; then
-    # Windows has a bug where reinstalling charset-normalizer fails since it is being used at the same time it is being uninstalled
-    # We need to install the same version that is pinned in poetry
-    python -m pip install "poetry==1.5.1" "charset-normalizer==2.0.12" && RET=0 && break || RET=$? && sleep 1
-  elif uname -a | grep -q 's390x\|ppc64le'; then
-    # s390x and ppc64le both require these old versions for some reason
-    # They are pinned deps as well
-    python -m pip install "poetry==1.5.1" "cryptography==2.3" "pyOpenSSL==19.0.0" && RET=0 && break || RET=$? && sleep 1
-  else
-    python -m pip install "poetry==1.5.1" && RET=0 && break || RET=$? && sleep 1
-  fi
-  echo "Python failed to install poetry, retrying..."
-done
-
-if [ $RET -ne 0 ]; then
-  echo "Pip install error for poetry"
-  exit $RET
-fi
-
 cd src
 
 # Loop 5 times to retry full venv install
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
 for i in {1..5}; do
-  python -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
   echo "Python failed install required deps with poetry, retrying..."
 done
 
