@@ -161,6 +161,10 @@ all:
   ticket: SERVER-78414
 - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
   ticket: SERVER-78813
+- test_file: jstests/sharding/fsync_deadlock.js
+  ticket: SERVER-78793
+- test_file: jstests/sharding/fsync_lock_unlock.js
+  ticket: SERVER-78149
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
@@ -198,3 +202,8 @@ suites:
     ticket: SERVER-63732
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-64142
+  - test_file: jstests/sharding/fsync_deadlock.js
+    ticket: SERVER-78793
+  - test_file: jstests/sharding/fsync_lock_unlock.js
+    ticket: SERVER-78149
+

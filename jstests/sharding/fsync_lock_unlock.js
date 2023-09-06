@@ -2,7 +2,6 @@
  * Verifies the fsync with lock+unlock command on mongos.
  * @tags: [
  *   requires_fsync,
- *   featureFlagClusterFsyncLock,
  *   uses_parallel_shell,
  * ]
  */
@@ -18,7 +17,6 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    mongosOptions: {setParameter: {featureFlagClusterFsyncLock: true}},
     config: 1,
     configShard: true,
     enableBalancer: true
@@ -122,12 +120,6 @@ let ret = assert.commandFailed(st.s.adminCommand({fsyncUnlock: 1}));
 const errmsg = "fsyncUnlock called when not locked";
 assert.eq(ret.errmsg.includes(errmsg), true);
 
-performFsyncLockUnlockWithReadWriteOperations();
-
-// Make sure the lock and unlock commands still work as expected after transitioning to a dedicated
-// config server.
-st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName});
-ConfigShardUtil.transitionToDedicatedConfigServer(st);
 performFsyncLockUnlockWithReadWriteOperations();
 
 st.stop();
