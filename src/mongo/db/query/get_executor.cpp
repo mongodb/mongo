@@ -108,6 +108,7 @@
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -1431,6 +1432,50 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     if (roots.empty()) {
         // We might have execution trees already if we pulled the plan from the cache. If not, we
         // need to generate one for each solution.
+
+        // TODO: SERVER-78565 remove this part after we establish search cursor after prepare().
+        // If roots is empty and we have a search pipeline, we have build the SBE plan here
+        // and return it early to avoid building the plan multiple times. The $search plan
+        // requires establishing a search cursor which we can only do once.
+        const auto& pipeline = cq->cqPipeline();
+        if (!pipeline.empty()) {
+            const auto stage = pipeline.front()->documentSource();
+            auto isSearch =
+                getSearchHelpers(cq->getOpCtx()->getServiceContext())->isSearchStage(stage);
+            auto isSearchMeta =
+                getSearchHelpers(cq->getOpCtx()->getServiceContext())->isSearchMetaStage(stage);
+
+            if (isSearch || isSearchMeta) {
+                invariant(solutions.size() == 1);
+                solutions[0] = QueryPlanner::extendWithAggPipeline(
+                    *cq,
+                    std::move(solutions[0]),
+                    fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
+
+                const auto& sol = solutions[0];
+
+                roots.emplace_back(stage_builder::buildSlotBasedExecutableTree(
+                    opCtx, collections, *cq, *sol, yieldPolicy.get()));
+
+                auto&& [root, data] = roots[0];
+
+                // Prepare the SBE tree for execution.
+                stage_builder::prepareSlotBasedExecutableTree(
+                    opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true);
+
+                return plan_executor_factory::make(opCtx,
+                                                   std::move(cq),
+                                                   std::move(solutions[0]),
+                                                   std::move(roots[0]),
+                                                   {},
+                                                   plannerParams.options,
+                                                   std::move(nss),
+                                                   std::move(yieldPolicy),
+                                                   planningResult->isRecoveredFromPlanCache(),
+                                                   false /* generatedByBonsai */);
+            }
+        }
+
         for (const auto& solution : solutions) {
             roots.emplace_back(stage_builder::buildSlotBasedExecutableTree(
                 opCtx, collections, *cq, *solution, yieldPolicy.get()));

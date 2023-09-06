@@ -152,6 +152,10 @@ public:
     static constexpr Name kIndexIdent = {kMeta, "indexIdent"_sd};
     static constexpr Name kIndexKey = {kMeta, "indexKey"_sd};
     static constexpr Name kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
+    static constexpr Name kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
+    static constexpr Name kMetadataSearchHighlights = {kMeta, "metadataSearchHighlights"_sd};
+    static constexpr Name kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
+    static constexpr Name kMetadataSortValues = {kMeta, "metadataSortValues"_sd};
 
     PlanStageSlots() = default;
 
@@ -470,6 +474,10 @@ public:
     static constexpr auto kIndexIdent = PlanStageSlots::kIndexIdent;
     static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
     static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
+    static constexpr auto kMetadataSearchScore = PlanStageSlots::kMetadataSearchScore;
+    static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
+    static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
+    static constexpr auto kMetadataSortValues = PlanStageSlots::kMetadataSortValues;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,

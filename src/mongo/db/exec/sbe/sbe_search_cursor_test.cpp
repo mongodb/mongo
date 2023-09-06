@@ -51,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 namespace mongo::sbe {
 
