@@ -11,10 +11,10 @@ buildvariants:
   tasks:
   - name: compile_ninja_next_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
   - name: compile_ninja_TG
     distros:
-    - windows-vsCurrent-large
+    - windows-vsCurrent-xlarge
 
 - name: macos-enterprise-ninja
   display_name: "Ninja Build: macOS Enterprise"
