@@ -30,8 +30,11 @@ function setUpCollectionForTest() {
     assert.commandWorked(coll.insert(docs));
 }
 
-function verifySpillingStats(
-    explain, expectedSpills, expectedMemoryLimitBytes, expectedDiskLimitBytes) {
+function verifySpillingStats(explain,
+                             expectedSpills,
+                             expectedSpilledRecords,
+                             expectedMemoryLimitBytes,
+                             expectedDiskLimitBytes) {
     const execStages = getExecutionStages(explain);
     assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
     assert.eq("TS_MODIFY",
@@ -44,19 +47,22 @@ function verifySpillingStats(
     assert.eq(spoolStage.memLimit, expectedMemoryLimitBytes, tojson(explain));
     assert.eq(spoolStage.diskLimit, expectedDiskLimitBytes, tojson(explain));
     assert.eq(spoolStage.spills, expectedSpills, tojson(explain));
+    assert.eq(spoolStage.spilledRecords, expectedSpilledRecords, tojson(explain));
     if (expectedSpills > 0) {
         assert(spoolStage.usedDisk, tojson(explain));
+        assert.gt(spoolStage.spilledUncompressedDataSize, 0, tojson(explain));
         assert.gt(spoolStage.spilledDataStorageSize, 0, tojson(explain));
         assert.gte(
             spoolStage.totalDataSizeSpooled, spoolStage.spilledDataStorageSize, tojson(explain));
     } else {
         assert(!spoolStage.usedDisk, tojson(explain));
         assert.eq(spoolStage.spilledDataStorageSize, 0, tojson(explain));
+        assert.eq(spoolStage.spilledUncompressedDataSize, 0, tojson(explain));
         assert.gt(spoolStage.totalDataSizeSpooled, 0, tojson(explain));
     }
 }
 
-function runTest({memoryLimitBytes, expectedSpills}) {
+function runTest({memoryLimitBytes, expectedSpills, expectedSpilledRecords}) {
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, internalQueryMaxSpoolMemoryUsageBytes: memoryLimitBytes}));
 
@@ -75,7 +81,8 @@ function runTest({memoryLimitBytes, expectedSpills}) {
     // First run an explain and verify the spilling stats.
     const explain =
         assert.commandWorked(db.runCommand({explain: updateCommand, verbosity: "executionStats"}));
-    verifySpillingStats(explain, expectedSpills, memoryLimitBytes, diskLimitBytes);
+    verifySpillingStats(
+        explain, expectedSpills, expectedSpilledRecords, memoryLimitBytes, diskLimitBytes);
 
     // Now run the actual command and verify the results.
     const res = assert.commandWorked(db.runCommand(updateCommand));
@@ -89,19 +96,27 @@ function runTest({memoryLimitBytes, expectedSpills}) {
 }
 
 (function noSpilling() {
-    runTest({memoryLimitBytes: 100 * 1024 * 1024, expectedSpills: 0});
+    runTest({memoryLimitBytes: 100 * 1024 * 1024, expectedSpills: 0, expectedSpilledRecords: 0});
 })();
 
 (function spillEveryRecord() {
     // Spool stage just spills 32-byte record ids in this instance. Set a limit just under that size
     // so that we will need to spill on every record.
-    runTest({memoryLimitBytes: 30, expectedSpills: buckets.length});
+    runTest({
+        memoryLimitBytes: 30,
+        expectedSpills: buckets.length,
+        expectedSpilledRecords: buckets.length
+    });
 })();
 
 (function spillEveryOtherRecord() {
     // Spool stage just spills 32-byte record ids in this instance. Set a limit just over that size
     // so that we will need to spill on every other record.
-    runTest({memoryLimitBytes: 50, expectedSpills: Math.floor(buckets.length / 2)});
+    runTest({
+        memoryLimitBytes: 50,
+        expectedSpills: Math.floor(buckets.length / 2),
+        expectedSpilledRecords: buckets.length - buckets.length % 2
+    });
 })();
 
 (function maxDiskUseExceeded() {

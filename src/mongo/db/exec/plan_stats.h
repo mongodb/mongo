@@ -1254,5 +1254,11 @@ struct SpoolStats : public SpecificStats {
 
     // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
     uint64_t spilledDataStorageSize = 0u;
+
+    // The number of individual records spilled to disk.
+    uint64_t spilledRecords = 0u;
+
+    // The amount of data that has been spilled to the spill file, or 0 if no spilling occurred.
+    uint64_t spilledUncompressedDataSize = 0u;
 };
 }  // namespace mongo

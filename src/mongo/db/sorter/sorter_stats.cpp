@@ -44,6 +44,7 @@ void SorterFileStats::addSpilledDataSize(long long data) {
 }
 
 void SorterFileStats::addSpilledDataSizeUncompressed(long long data) {
+    _bytesSpilledUncompressed.fetchAndAdd(data);
     if (_sorterTracker) {
         _sorterTracker->bytesSpilledUncompressed.fetchAndAdd(data);
     }

@@ -64,10 +64,15 @@ public:
         return _bytesSpilled.load();
     }
 
+    long long bytesSpilledUncompressed() const {
+        return _bytesSpilledUncompressed.load();
+    }
+
 private:
     SorterTracker* _sorterTracker;
 
     AtomicWord<long long> _bytesSpilled;
+    AtomicWord<long long> _bytesSpilledUncompressed;
 };
 
 /**

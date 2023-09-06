@@ -300,6 +300,8 @@ TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
     // Validate the spilling stats. We should have spilled every other record.
     auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
     ASSERT_EQUALS(stats->spills, 2);
+    ASSERT_EQUALS(stats->spilledRecords, 4);
+    ASSERT_GREATER_THAN(stats->spilledUncompressedDataSize, 0);
     ASSERT_GREATER_THAN(stats->spilledDataStorageSize, 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
@@ -326,6 +328,8 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
     // Validate the spilling stats. We should have spilled every other record.
     auto stats = static_cast<const SpoolStats*>(spool.getSpecificStats());
     ASSERT_EQUALS(stats->spills, 2);
+    ASSERT_EQUALS(stats->spilledRecords, 4);
+    ASSERT_GREATER_THAN(stats->spilledUncompressedDataSize, 0);
     ASSERT_GREATER_THAN(stats->spilledDataStorageSize, 0);
     ASSERT_EQUALS(stats->maxMemoryUsageBytes, maxAllowedMemoryUsageBytes);
 }
