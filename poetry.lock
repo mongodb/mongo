@@ -3658,13 +3658,13 @@ sortedcontainers = "*"
 
 [[package]]
 name = "trio-websocket"
-version = "0.10.3"
+version = "0.10.4"
 description = "WebSocket library for Trio"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "trio-websocket-0.10.3.tar.gz", hash = "sha256:1a748604ad906a7dcab9a43c6eb5681e37de4793ba0847ef0bc9486933ed027b"},
-    {file = "trio_websocket-0.10.3-py3-none-any.whl", hash = "sha256:a9937d48e8132ebf833019efde2a52ca82d223a30a7ea3e8d60a7d28f75a4e3a"},
+    {file = "trio-websocket-0.10.4.tar.gz", hash = "sha256:e66b3db3e2453017431dfbd352081006654e1241c2a6800dc2f43d7df54d55c5"},
+    {file = "trio_websocket-0.10.4-py3-none-any.whl", hash = "sha256:c7a620c4013c34b7e4477d89fe76695da1e455e4510a8d7ae13f81c632bdce1d"},
 ]
 
 [package.dependencies]
@@ -4216,4 +4216,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "02e99936cdaa5d7b125fe47792506c93c5b8753149bc37c662b77520eef4a5bd"
+content-hash = "88f85a38c059f416e6918169dd6175efeb3bdc4beb8e9cadf1b3001093eb52f1"

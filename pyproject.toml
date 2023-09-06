@@ -115,7 +115,9 @@ cryptography = [
 mongo-ninja-python = [
     { version = "1.11.1.5", markers = "sys_platform == 'linux'" },
 ]
-ninja = ">=1.10.0"
+ninja = [
+    { version = ">=1.10.0", markers = "sys_platform != 'linux'" },
+]
 
 [tool.poetry.group.testing.dependencies]
 curatorbin = "1.2.3"
