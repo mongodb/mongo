@@ -182,6 +182,41 @@ static void handleIndexScanRemoveOrphanRequirement(const IndexCollationSpec& sha
     builder.make<FilterNode>(groupCE, std::move(functionCallNode), std::move(builder._node));
 }
 
+static bool equalityOnShardKey(const IndexCollationSpec& shardKey, const PSRExpr::Node& psr) {
+    tassert(7985401, "Encountered partial schema requirements not in DNF", PSRExpr::isDNF(psr));
+    if (!PSRExpr::isSingletonDisjunction(psr)) {
+        return false;
+    }
+    // Keep track of paths in the  the components of the shard key that have equality predicates on
+    // them.
+    OrderPreservingABTSet pathsWithEqualityPredicate;
+    PSRExpr::visitDNF(
+        psr,
+        [&pathsWithEqualityPredicate](const PartialSchemaEntry& entry,
+                                      const PSRExpr::VisitorContext&) {
+            // If the interval for this requirement is an equality, add it to the set.
+            auto interval = entry.second.getIntervals();
+            if (IntervalReqExpr::numLeaves(interval) != 1) {
+                return;
+            }
+            IntervalReqExpr::visitAnyShape(
+                interval,
+                [&entry, &pathsWithEqualityPredicate](const IntervalRequirement& req,
+                                                      const IntervalReqExpr::VisitorContext&) {
+                    if (req.isEquality()) {
+                        pathsWithEqualityPredicate.emplace_back(entry.first._path);
+                    }
+                });
+        });
+    // Ensure that all components of the shard key have an equality predicate.
+    for (auto&& shardKeyComponent : shardKey) {
+        if (!pathsWithEqualityPredicate.find(shardKeyComponent._path.ref())) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * Takes a logical node and required physical properties, and creates zero or more physical subtrees
  * that can implement that logical node while satisfying those properties.
@@ -621,7 +656,8 @@ public:
         const PartialSchemaKeyCE& partialSchemaKeyCE = ceProperty.getPartialSchemaKeyCE();
 
         const bool needsShardFilter =
-            getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove();
+            getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove() &&
+            !equalityOnShardKey(scanDef.shardingMetadata().shardKey(), node.getReqMap());
 
         if (indexReqTarget == IndexReqTarget::Index) {
             ProjectionCollationSpec requiredCollation;

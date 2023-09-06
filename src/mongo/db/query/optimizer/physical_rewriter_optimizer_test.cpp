@@ -5786,11 +5786,19 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
 ABT optimizeABTWithShardingMetadataNoIndexes(ABT& rootNode, ShardingMetadata shardingMetadata) {
     auto prefixId = PrefixId::createForTests();
 
+    // Shard keys guarentee non-multikeyness of all their components. In some cases, there might not
+    // be an index backing the shard key. So to make use of the multikeyness data of the shard key,
+    // we populate the multikeyness trie.
+    MultikeynessTrie trie;
+    for (auto&& comp : shardingMetadata.shardKey()) {
+        trie.add(comp._path);
+    }
+
     auto scanDef = createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
                                  UUID::gen(),
                                  ScanDefOptions{},
                                  IndexDefinitions{},
-                                 MultikeynessTrie{},
+                                 std::move(trie),
                                  ConstEval::constFold,
                                  DistributionAndPaths{DistributionType::Centralized},
                                  true /*exists*/,
@@ -6055,7 +6063,6 @@ TEST(PhysRewriter, RemoveOrphansSargableNodeComplete) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n",
@@ -6089,9 +6096,7 @@ TEST(PhysRewriter, RemoveOrphansSargableNodeCompleteDottedShardKey) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse [1]\n"
         "|   PathGet [b]\n"
-        "|   PathTraverse [1]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n",
@@ -6349,6 +6354,255 @@ TEST(PhysRewriter, RemoveOrphanedMultikeyIndex) {
     ASSERT_BSON_PATH("\"shardFilter\"", explainRoot, "child.leftChild.filter.name");
     ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.child.child.nodeType");
     ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.child.child.indexDefName");
+}
+
+TEST(PhysRewriter, RemoveOrphanEqualityOnSimpleShardKey) {
+    // Query: {$match: {a: 1, b: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // No shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_3]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_2, 'b': evalTemp_3}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphanEqualityWithComplexPSR) {
+    // Query: {$match: {a: 1, b: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_composem(_get("a", _traverse1(_cmp("Eq", "1"_cint64))),
+                                            _get("b", _traverse1(_cmp("Eq", "1"_cint64)))),
+                                  "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // No shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_3]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_2, 'b': evalTemp_3}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphanEqualityOnCompoundShardKey) {
+    // Query: {$match: {a: 1, b: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 1, b: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending},
+                         {_get("b", _id())._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // No shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_3]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_2, 'b': evalTemp_3}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphanNoEqualityOnCompoundShardKey) {
+    // Query: {$match: {a: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 1, b: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending},
+                         {_get("b", _id())._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // These is a shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   |   Variable [evalTemp_1]\n"
+        "|   Variable [evalTemp_0]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n",
+        optimized);
+    ;
+}
+
+TEST(PhysRewriter, RemoveOrphanEqualityDottedPathInShardKey) {
+    // Query: {$match: {"a.b": 1, "a.c": 1, "a.d": {$gt: 1}}}
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_get("a", _traverse1(_get("b", _traverse1(_cmp("Eq", "1"_cint64))))),
+                           "root"_var))
+            .filter(_evalf(_get("a", _traverse1(_get("c", _traverse1(_cmp("Eq", "1"_cint64))))),
+                           "root"_var))
+            .filter(_evalf(_get("a", _traverse1(_get("d", _traverse1(_cmp("Gt", "1"_cint64))))),
+                           "root"_var))
+            .finish(_scan("root", "c1"));
+    // Shard key {"a.b": 1, "a.c": 1}
+    ShardingMetadata sm({{_get("a", _get("b", _id()))._n, CollationOp::Ascending},
+                         {_get("a", _get("c", _id()))._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // No shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [d]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [c]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_4}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphanNoEqualityDottedPathInShardKey) {
+    // Query: {$match: {"a.b": 1, "a.c": {$gt: 1}, "a.d": 1}}
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_get("a", _traverse1(_get("b", _traverse1(_cmp("Eq", "1"_cint64))))),
+                           "root"_var))
+            .filter(_evalf(_get("a", _traverse1(_get("c", _traverse1(_cmp("Gt", "1"_cint64))))),
+                           "root"_var))
+            .filter(_evalf(_get("a", _traverse1(_get("d", _traverse1(_cmp("Eq", "1"_cint64))))),
+                           "root"_var))
+            .finish(_scan("root", "c1"));
+    // Shard key {"a.b": 1, "a.c": 1}
+    ShardingMetadata sm({{_get("a", _get("b", _id()))._n, CollationOp::Ascending},
+                         {_get("a", _get("c", _id()))._n, CollationOp::Ascending}},
+                        true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // There is shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   |   Variable [shardKey_3]\n"
+        "|   Variable [shardKey_2]\n"
+        "Evaluation [{shardKey_3}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [c]\n"
+        "|   PathIdentity []\n"
+        "Evaluation [{shardKey_2}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [c]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [d]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_4]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_4}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphanEqualityHashedShardKey) {
+    // Query: {$match: {a: 1, b: 1}}
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                   .finish(_scan("root", "c1"));
+    // Shard key {a: 'hashed'}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Clustered}}, true);
+    const ABT optimized = optimizeABTWithShardingMetadataNoIndexes(root, sm);
+
+    // No shard filter in the plan.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_3]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_2]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_2, 'b': evalTemp_3}, c1]\n",
+        optimized);
 }
 
 // TODO SERVER-78507: Examine the physical alternatives in the memo, rather than the logical nodes,
