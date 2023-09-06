@@ -919,11 +919,8 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
         // collection is sharded.
         if (optMetadata) {
             const auto& metadata = *optMetadata;
-            if (metadata.isSharded()) {
-                auto chunks = metadata.getChunks();
-                if (chunks.empty()) {
-                    return true;
-                }
+            if (metadata.isSharded() && !metadata.currentShardHasAnyChunks()) {
+                return true;
             }
         }
         return false;
