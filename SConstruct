@@ -1471,6 +1471,17 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'GDB_PPTEST_PYONLY',
+    help='''Set the boolean (on/off true/false 1/0) to enable SCons to only emit the .py files
+    needed for testing GDB pretty printers.
+
+    Useful for when the executable files for testing GDB pretty printers are more rapidly built
+    using Ninja and the install-dist-test target (separately from SCons).''',
+    converter=functools.partial(bool_var_converter, var='GDB_PPTEST_PYONLY'),
+    default='False',
+)
+
+env_vars.Add(
     'ENABLE_OOM_RETRY',
     help=
     'Set the boolean (auto, on/off true/false 1/0) to enable retrying a compile or link commands from "out of memory" failures.',

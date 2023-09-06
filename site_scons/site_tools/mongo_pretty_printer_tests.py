@@ -63,7 +63,7 @@ def build_pretty_printer_test(env, target, **kwargs):
         print_warning("Can't find gdb, not building pretty printer tests.")
         return []
 
-    test_component = {"dist-test"}
+    test_component = {"dist-test", "pretty-printer-tests-pyonly"}
 
     if "AIB_COMPONENTS_EXTRA" in kwargs:
         kwargs["AIB_COMPONENTS_EXTRA"] = set(kwargs["AIB_COMPONENTS_EXTRA"]).union(test_component)
@@ -153,10 +153,7 @@ def build_pretty_printer_test(env, target, **kwargs):
         AIB_COMPONENTS_EXTRA=kwargs["AIB_COMPONENTS_EXTRA"])
     env.Depends(
         pretty_printer_test_launcher[0],
-        [
-            test_program,
-            gen_test_script_install,
-        ],
+        ([] if env.get('GDB_PPTEST_PYONLY') else [test_program]) + [gen_test_script_install],
     )
     env.AddPostAction(pretty_printer_test_launcher[0],
                       Chmod(pretty_printer_test_launcher[0], 'ugo+x'))
@@ -196,7 +193,10 @@ def build_pretty_printer_test(env, target, **kwargs):
                            target_scanner=scanner)
     env.Pseudo(run_test)
     env.Alias('+' + os.path.splitext(os.path.basename(gdb_test_script))[0], run_test)
-    env.Depends(pretty_printer_test_launcher_install, [gen_test_script_install, test_program])
+    env.Depends(
+        pretty_printer_test_launcher_install,
+        ([] if env.get('GDB_PPTEST_PYONLY') else [test_program]) + [gen_test_script_install],
+    )
 
     env.RegisterTest('$PRETTY_PRINTER_TEST_LIST', pretty_printer_test_launcher_install[0])
     env.Alias("$PRETTY_PRINTER_TEST_ALIAS", pretty_printer_test_launcher_install[0])
