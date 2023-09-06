@@ -58,15 +58,35 @@ inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
 }
 
 /**
- * Apply docs examined tie breaking heuristic and apply bonuses to the winners.
+ * Holds information about tie breaking heuristic bonuses. It is used to update candidate plan score
+ * and log the bonuses.
+ */
+struct TieBreakingScores {
+    TieBreakingScores(bool isPlanTied, double score)
+        : isPlanTied(isPlanTied), score(score), docsExaminedBonus(0.0), indexPrefixBonus(0.0) {}
+
+    double getTotalBonus() const {
+        return docsExaminedBonus + indexPrefixBonus;
+    }
+
+    const bool isPlanTied;
+    const double score;
+    double docsExaminedBonus;
+    double indexPrefixBonus;
+};
+
+/**
+ * Apply docs examined tie breaking heuristic and return bonuses in 'scores' list. 'candidates' and
+ * 'scores' are synchronized, with the i-th score from 'scores' corresponding to the i-th
+ * 'candidate.'
  */
 template <typename PlanStageType, typename ResultType, typename Data>
-void addBonusToLeastDocsExamined(
-    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+void calcDocsExaminedHeuristicBonus(
+    const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
     size_t numberOfTiedPlans,
     const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
-    const std::vector<size_t>& documentsExamined) {
-
+    const std::vector<size_t>& documentsExamined,
+    std::vector<TieBreakingScores>& scores) {
     // The vector tiedPlans holds the number of documents and the plan's index.
     std::vector<std::pair<double, size_t>> tiedPlans{};
     tiedPlans.reserve(numberOfTiedPlans);
@@ -81,18 +101,21 @@ void addBonusToLeastDocsExamined(
     });
     auto stillTiedPlansEnd = findTopTiedPlans(tiedPlans);
     for (auto topPlan = tiedPlans.begin(); topPlan < stillTiedPlansEnd; ++topPlan) {
-        scoresAndCandidateIndices[topPlan->second].first += kBonusEpsilon;
+        scores[topPlan->second].docsExaminedBonus = kBonusEpsilon;
     }
 }
 
 /**
- * Apply best index prefix tie breaking heuristic and apply bonuses to the winners.
+ * Apply best index prefix tie breaking heuristic and return bonuses in 'scores' list. 'candidates'
+ * and 'scores' are synchronized, with the i-th score from 'scores' corresponding to the i-th
+ * 'candidate.'
  */
 template <typename PlanStageType, typename ResultType, typename Data>
-void addBonusToBestIndexPrefix(
-    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+void calcIndexPrefixHeuristicBonus(
+    const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
     size_t numberOfTiedPlans,
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    std::vector<TieBreakingScores>& scores) {
     std::vector<const QuerySolution*> solutions{};
     solutions.reserve(numberOfTiedPlans);
 
@@ -103,7 +126,47 @@ void addBonusToBestIndexPrefix(
 
     auto winIndices = applyIndexPrefixHeuristic(solutions);
     for (auto winIndex : winIndices) {
-        scoresAndCandidateIndices[winIndex].first += 2 * kBonusEpsilon;
+        const auto candidateIndex = scoresAndCandidateIndices[winIndex].second;
+        scores[candidateIndex].indexPrefixBonus += 2 * kBonusEpsilon;
+    }
+}
+
+/**
+ * Apply tie-breaking hearistics and update candidate plan scores.
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void addTieBreakingHeuristicsBonuses(
+    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::vector<size_t>& documentsExamined) {
+    auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
+    int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+
+    if (numberOfTiedPlans > 1) {
+        // Initialize 'scores' list. 'candidates' and 'scores' are synchronized, with the i-th score
+        // from 'scores' corresponding to the i-th 'candidate.'
+        std::vector<TieBreakingScores> scores{};
+        scores.reserve(candidates.size());
+        for (size_t i = 0; i < scoresAndCandidateIndices.size(); ++i) {
+            scores.emplace_back(/* isPlanTied */ i < static_cast<size_t>(numberOfTiedPlans),
+                                /* score */ scoresAndCandidateIndices[i].first);
+        }
+
+        calcDocsExaminedHeuristicBonus(
+            scoresAndCandidateIndices, numberOfTiedPlans, candidates, documentsExamined, scores);
+
+        calcIndexPrefixHeuristicBonus(
+            scoresAndCandidateIndices, numberOfTiedPlans, candidates, scores);
+
+        // Log tie breaking bonuses.
+        for (const auto& score : scores) {
+            log_detail::logTieBreaking(
+                score.score, score.docsExaminedBonus, score.indexPrefixBonus, score.isPlanTied);
+        }
+
+        for (auto& scoreAndIndex : scoresAndCandidateIndices) {
+            scoreAndIndex.first += scores[scoreAndIndex.second].getTotalBonus();
+        }
     }
 }
 
@@ -208,23 +271,13 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                          return lhs.first > rhs.first;
                      });
 
-    // Tie-breaking by number of documents examined, currently only activated by query knob
-    // responsible for this tie-breaking heuristic.
+    // Apply tie-breaking heuristics.
     if (internalQueryPlanTieBreakingWithIndexHeuristics.load()) {
-        // Find top tied plans, if there are any.
-        auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
-        int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+        addTieBreakingHeuristicsBonuses(scoresAndCandidateIndices, candidates, documentsExamined);
 
-        if (numberOfTiedPlans > 1) {
-            addBonusToLeastDocsExamined(
-                scoresAndCandidateIndices, numberOfTiedPlans, candidates, documentsExamined);
-
-            addBonusToBestIndexPrefix(scoresAndCandidateIndices, numberOfTiedPlans, candidates);
-        }
-
-        // Re-sort top candidates.
+        // Re-sort the candidates.
         std::stable_sort(scoresAndCandidateIndices.begin(),
-                         scoresAndCandidateIndices.begin() + numberOfTiedPlans,
+                         scoresAndCandidateIndices.end(),
                          [](const auto& lhs, const auto& rhs) { return lhs.first > rhs.first; });
     }
 

@@ -107,6 +107,22 @@ void logFailedPlan(std::function<std::string()> planSummary) {
     LOGV2_DEBUG(
         20960, 2, "Not scoring a plan because the plan failed", "planSummary"_attr = planSummary());
 }
+
+void logTieBreaking(double score,
+                    double docsExaminedBonus,
+                    double indexPrefixBonus,
+                    bool isPlanTied) {
+    LOGV2_DEBUG(
+        8027500, 2, "Tie breaking heuristics", "formula"_attr = [&]() {
+            StringBuilder sb;
+            sb << "isPlanTied: " << isPlanTied << ". finalScore("
+               << str::convertDoubleToString(score + docsExaminedBonus + indexPrefixBonus)
+               << ") = score(" << str::convertDoubleToString(score) << ") + docsExaminedBonus("
+               << str::convertDoubleToString(docsExaminedBonus) << ") + indexPrefixBonus("
+               << str::convertDoubleToString(indexPrefixBonus) << ")";
+            return sb.str();
+        }());
+}
 }  // namespace log_detail
 
 namespace {
