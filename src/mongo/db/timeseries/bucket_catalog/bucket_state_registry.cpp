@@ -239,14 +239,14 @@ Status initializeBucketState(BucketStateRegistry& registry,
     return Status::OK();
 }
 
-StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
-                                        const BucketId& bucketId,
-                                        Bucket* bucket) {
+StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
+                                         const BucketId& bucketId,
+                                         Bucket* bucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
     if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
         markIndividualBucketCleared(registry, catalogLock, bucketId);
-        return StateChangeSucessful::kNo;
+        return StateChangeSuccessful::kNo;
     }
 
     auto it = registry.bucketStates.find(bucketId);
@@ -254,24 +254,24 @@ StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
 
     // We cannot update the bucket if it is in a cleared state or has a pending direct write.
     if (conflictsWithInsertions(it->second)) {
-        return StateChangeSucessful::kNo;
+        return StateChangeSuccessful::kNo;
     }
 
     // We cannot prepare an already prepared bucket.
     invariant(!isBucketStatePrepared(it->second));
 
     it->second = BucketState::kPrepared;
-    return StateChangeSucessful::kYes;
+    return StateChangeSuccessful::kYes;
 }
 
-StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
-                                          const BucketId& bucketId,
-                                          Bucket* bucket) {
+StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
+                                           const BucketId& bucketId,
+                                           Bucket* bucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
     if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
         markIndividualBucketCleared(registry, catalogLock, bucketId);
-        return StateChangeSucessful::kNo;
+        return StateChangeSuccessful::kNo;
     }
 
     auto it = registry.bucketStates.find(bucketId);
@@ -284,7 +284,7 @@ StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
     // 'kCleared'.
     it->second = (bucketState == BucketState::kPreparedAndCleared) ? BucketState::kCleared
                                                                    : BucketState::kNormal;
-    return StateChangeSucessful::kYes;
+    return StateChangeSuccessful::kYes;
 }
 
 stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(

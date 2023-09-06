@@ -55,7 +55,7 @@ struct Bucket;
 /**
  * Describes if the state within the BucketStateRegistry was successfully changed.
  */
-enum class StateChangeSucessful { kYes, kNo };
+enum class StateChangeSuccessful { kYes, kNo };
 
 /**
  * Controls whether to stop tracking the bucket after finishing all direct writes.
@@ -216,9 +216,9 @@ Status initializeBucketState(BucketStateRegistry& registry,
  * | PreparedAndCleared |     -
  * | DirectWriteCounter |     -
  */
-StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
-                                        const BucketId& bucketId,
-                                        Bucket* bucket = nullptr);
+StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
+                                         const BucketId& bucketId,
+                                         Bucket* bucket = nullptr);
 
 /**
  * Detransition bucket state from 'kPrepared' to 'kNormal' (or 'kCleared' if the bucket was cleared
@@ -235,9 +235,9 @@ StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
  * | PreparedAndCleared | KCleared
  * | DirectWriteCounter | invariants
  */
-StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
-                                          const BucketId& bucketId,
-                                          Bucket* bucket = nullptr);
+StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
+                                           const BucketId& bucketId,
+                                           Bucket* bucket = nullptr);
 
 /**
  * Tracks the bucket with a counter which is incremented everytime this function is called and must

@@ -221,7 +221,7 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant
 
     // We expect to invariant when attempting to prepare an untracked bucket.
     ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
-                StateChangeSucessful::kNo);
+                StateChangeSuccessful::kNo);
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
@@ -285,7 +285,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
 
     // We expect transition to 'kPrepared' to fail.
     ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
-                StateChangeSucessful::kNo);
+                StateChangeSuccessful::kNo);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect direct writes to succeed on 'kCleared' buckets.
@@ -349,7 +349,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
 
     // We expect transition to 'kPrepared' to fail.
     ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
-                StateChangeSucessful::kNo);
+                StateChangeSuccessful::kNo);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect direct writes to fail and leave the state as 'kPreparedAndCleared'.
@@ -366,7 +366,7 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
     // Reset the state.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
-                StateChangeSucessful::kYes);
+                StateChangeSuccessful::kYes);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 

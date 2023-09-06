@@ -232,10 +232,10 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
                                         BucketPrepareAction prepare) {
     auto it = stripe.openBucketsById.find(bucketId);
     if (it != stripe.openBucketsById.end()) {
-        StateChangeSucessful stateChangeResult = (prepare == BucketPrepareAction::kPrepare)
+        StateChangeSuccessful stateChangeResult = (prepare == BucketPrepareAction::kPrepare)
             ? prepareBucketState(registry, it->second.get()->bucketId, it->second.get())
             : unprepareBucketState(registry, it->second.get()->bucketId, it->second.get());
-        if (stateChangeResult == StateChangeSucessful::kYes) {
+        if (stateChangeResult == StateChangeSuccessful::kYes) {
             return it->second.get();
         }
     }
