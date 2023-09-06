@@ -152,7 +152,9 @@ opentelemetry-api = "*"
 opentelemetry-sdk = "*"
 # TODO: EVG-20576
 # Once the above is merged we can get rid of our dependency on grpc
-opentelemetry-exporter-otlp-proto-grpc = [ { version = "*", markers = "platform_machine != 'darwin'" } ] # TODO: SERVER-80336 this should work on macosx
+# TODO: SERVER-80336 grpc has problems on macosx, ppc, and s390x.
+# For now lets just disable otel metrics on these variants
+opentelemetry-exporter-otlp-proto-grpc = [ { version = "*", markers = "platform_machine != 'darwin' and platform_machine != 's390x' and platform_machine != 'ppc64le'" } ]
 
 [tool.poetry.group.tooling-metrics.dependencies]
 mongo-tooling-metrics = "1.0.8"

@@ -180,13 +180,19 @@ def _set_up_tracing(
     resource = Resource(attributes={SERVICE_NAME: "resmoke"})
 
     provider = TracerProvider(resource=resource)
-    if otel_collector_endpoint and sys.platform != "darwin":
+    if otel_collector_endpoint:
         # TODO: EVG-20576
         # We can remove this and export to a file when EVG-20576 is merged
         # This will remove our dependency on grpc
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-        processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=otel_collector_endpoint))
-        provider.add_span_processor(processor)
+        # TODO: SERVER-80336 grpc has problems on macosx, ppc, and s390x.
+        # Rather than hardcode the environments where grpc fails to install we just try to use it and bail out if it fails
+        try:
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            processor = BatchedBaggageSpanProcessor(
+                OTLPSpanExporter(endpoint=otel_collector_endpoint))
+            provider.add_span_processor(processor)
+        except ModuleNotFoundError:
+            print("Failed to set up a remote grpc otel endpoint. Continuing.")
 
     if otel_collector_file:
         try:
