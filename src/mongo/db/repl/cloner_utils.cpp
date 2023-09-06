@@ -66,23 +66,25 @@ BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
 }
 
 bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
-                                      const boost::optional<TenantId>& prefix,
+                                      const boost::optional<TenantId>& tenant,
                                       MigrationProtocolEnum protocol) {
-    if (!prefix) {
+    if (!tenant) {
         return protocol == MigrationProtocolEnum::kShardMerge;
     }
 
-    if (db.tenantId()) {
-        return *db.tenantId() == *prefix;
-    } else {
-        // No tenant id, check if db has a matched tenant prefix.
-        auto fullDbName = DatabaseNameUtil::serialize(db);
-        auto tenantDelim = fullDbName.find('_');
-        if (tenantDelim != std::string::npos) {
-            return (*prefix).toString() == fullDbName.substr(0, tenantDelim);
-        }
-        return false;
+    if (auto tenantId = db.tenantId()) {
+        return tenantId == *tenant;
     }
+
+    // If we are not running in multitenancy mode, then it's possible that the `dbName` has a prefix
+    // which hasn't been parsed into the DatabaseName type. Serialize `dbName` to a string, and
+    // look for a tenant id manually.
+    auto fullDbName = DatabaseNameUtil::serialize(db);
+    auto tenantDelim = fullDbName.find('_');
+    if (tenantDelim != std::string::npos) {
+        return (*tenant).toString() == fullDbName.substr(0, tenantDelim);
+    }
+    return false;
 }
 
 }  // namespace repl

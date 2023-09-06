@@ -753,18 +753,22 @@ TEST_F(AllDatabaseClonerTest,
     _clock.advance(Minutes(1));
 
     // Allow the cloner to move to the next DB.
-    timesEntered = dbClonerBeforeFailPoint->setMode(
-        FailPoint::alwaysOn,
-        0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << adminWithTenantId.toStringWithTenantId_forTest() << "'}"));
+    timesEntered =
+        dbClonerBeforeFailPoint->setMode(
+            FailPoint::alwaysOn,
+            0,
+            fromjson(str::stream()
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << adminWithTenantId.tenantId()->toString() << "'), database: '"
+                     << adminWithTenantId.toString_forTest() << "'}"));
 
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << adminWithTenantId.toStringWithTenantId_forTest() << "'}"));
-
+        fromjson(str::stream()
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << adminWithTenantId.tenantId()->toString() << "'), database: '"
+                 << adminWithTenantId.toString_forTest() << "'}"));
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
     stats = cloner->getStats();
@@ -784,17 +788,21 @@ TEST_F(AllDatabaseClonerTest,
     _clock.advance(Minutes(1));
 
     // Allow the cloner to move to the tenant admin DB.
-    timesEntered = dbClonerBeforeFailPoint->setMode(
-        FailPoint::alwaysOn,
-        0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aabWithTenantId.toStringWithTenantId_forTest() << "'}"));
+    timesEntered =
+        dbClonerBeforeFailPoint->setMode(
+            FailPoint::alwaysOn,
+            0,
+            fromjson(str::stream()
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << aabWithTenantId.tenantId()->toString() << "'), database: '"
+                     << aabWithTenantId.toString_forTest() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aabWithTenantId.toStringWithTenantId_forTest() << "'}"));
-
+        fromjson(str::stream()
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << aabWithTenantId.tenantId()->toString() << "'), database: '"
+                 << aabWithTenantId.toString_forTest() << "'}"));
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
     stats = cloner->getStats();
@@ -813,16 +821,21 @@ TEST_F(AllDatabaseClonerTest,
 
 
     // Allow the cloner to move to the last DB.
-    timesEntered = dbClonerBeforeFailPoint->setMode(
-        FailPoint::alwaysOn,
-        0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aWithTenantId.toStringWithTenantId_forTest() << "'}"));
+    timesEntered =
+        dbClonerBeforeFailPoint->setMode(
+            FailPoint::alwaysOn,
+            0,
+            fromjson(str::stream()
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << aWithTenantId.tenantId()->toString() << "'), database: '"
+                     << aWithTenantId.toString_forTest() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson(str::stream() << "{cloner: 'DatabaseCloner', stage: 'listCollections', database: '"
-                               << aWithTenantId.toStringWithTenantId_forTest() << "'}"));
+        fromjson(str::stream()
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << aWithTenantId.tenantId()->toString() << "'), database: '"
+                 << aWithTenantId.toString_forTest() << "'}"));
 
     // Wait for the failpoint to be reached.
     dbClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);

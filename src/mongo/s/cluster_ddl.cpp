@@ -117,7 +117,8 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
     auto dbStatus = catalogCache->getDatabase(opCtx, dbName);
 
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
-        ConfigsvrCreateDatabase request(DatabaseNameUtil::serialize(dbName));
+        ConfigsvrCreateDatabase request(
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
         request.setDbName(DatabaseName::kAdmin);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);

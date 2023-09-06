@@ -207,7 +207,9 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
         } else {
             BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
             cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
-            cmdNs.append("db", opts.serializeIdentifier(DatabaseNameUtil::serialize(ns.dbName())));
+            cmdNs.append("db",
+                         opts.serializeIdentifier(DatabaseNameUtil::serialize(
+                             ns.dbName(), findCmd.getSerializationContext())));
             cmdNs.doneFast();
         }
     }

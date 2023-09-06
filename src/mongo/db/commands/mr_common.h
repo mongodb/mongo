@@ -58,7 +58,7 @@ struct OutputOptions {
     OutputType outType;
 };
 
-OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj);
+OutputOptions parseOutputOptions(const DatabaseName& dbname, const BSONObj& cmdObj);
 
 Status checkAuthForMapReduce(const BasicCommand* command,
                              OperationContext* opCtx,

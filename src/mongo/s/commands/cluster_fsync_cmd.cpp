@@ -105,7 +105,6 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const auto dbname = DatabaseNameUtil::serialize(dbName);
         BSONObj fsyncCmdObj = cmdObj;
 
         if (cmdObj["lock"].trueValue()) {

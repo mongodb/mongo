@@ -225,10 +225,11 @@ void warnIfCompressed(OperationContext* opCtx) {
 SaslReply doSaslStart(OperationContext* opCtx,
                       AuthenticationSession* session,
                       const SaslStartCommand& request) {
-    auto mechanism =
-        uassertStatusOK(SASLServerMechanismRegistry::get(opCtx->getServiceContext())
-                            .getServerMechanism(request.getMechanism(),
-                                                DatabaseNameUtil::serialize(request.getDbName())));
+    auto mechanism = uassertStatusOK(
+        SASLServerMechanismRegistry::get(opCtx->getServiceContext())
+            .getServerMechanism(request.getMechanism(),
+                                DatabaseNameUtil::serialize(request.getDbName(),
+                                                            request.getSerializationContext())));
 
     uassert(ErrorCodes::BadValue,
             "Plaintext mechanisms may not be used with speculativeSaslStart",

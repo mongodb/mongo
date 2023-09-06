@@ -100,15 +100,16 @@ namespace {
  * Helper function to verify field of map_reduce_common::OutputOptions.
  */
 template <typename T>
-void _compareOutputOptionField(const std::string& dbname,
+void _compareOutputOptionField(const DatabaseName& dbName,
                                const std::string& cmdObjStr,
                                const std::string& fieldName,
                                const T& actual,
                                const T& expected) {
     if (actual == expected)
         return;
-    FAIL(str::stream() << "parseOutputOptions(\"" << dbname << ", " << cmdObjStr << "): "
-                       << fieldName << ": Expected: " << expected << ". Actual: " << actual);
+    FAIL(str::stream() << "parseOutputOptions(\"" << dbName.toStringForErrorMsg() << ", "
+                       << cmdObjStr << "): " << fieldName << ": Expected: " << expected
+                       << ". Actual: " << actual);
 }
 
 /**
@@ -131,7 +132,7 @@ std::string _getOutTypeString(OutputType outType) {
 /**
  * Test helper function to check expected result of parseOutputOptions.
  */
-void _testConfigParseOutputOptions(const std::string& dbname,
+void _testConfigParseOutputOptions(const DatabaseName& dbName,
                                    const std::string& cmdObjStr,
                                    const std::string& expectedOutDb,
                                    const std::string& expectedCollectionName,
@@ -140,18 +141,18 @@ void _testConfigParseOutputOptions(const std::string& dbname,
                                    OutputType expectedOutType) {
     const BSONObj cmdObj = fromjson(cmdObjStr);
     map_reduce_common::OutputOptions outputOptions =
-        map_reduce_common::parseOutputOptions(dbname, cmdObj);
-    _compareOutputOptionField(dbname, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
+        map_reduce_common::parseOutputOptions(dbName, cmdObj);
+    _compareOutputOptionField(dbName, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
     _compareOutputOptionField(
-        dbname, cmdObjStr, "collectionName", outputOptions.collectionName, expectedCollectionName);
-    _compareOutputOptionField(dbname,
+        dbName, cmdObjStr, "collectionName", outputOptions.collectionName, expectedCollectionName);
+    _compareOutputOptionField(dbName,
                               cmdObjStr,
                               "finalNamespace",
                               outputOptions.finalNamespace.toString_forTest(),
                               expectedFinalNamespace);
     _compareOutputOptionField(
-        dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
-    _compareOutputOptionField(dbname,
+        dbName, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
+    _compareOutputOptionField(dbName,
                               cmdObjStr,
                               "outType",
                               _getOutTypeString(outputOptions.outType),
@@ -162,33 +163,35 @@ void _testConfigParseOutputOptions(const std::string& dbname,
  * Tests for map_reduce_common::parseOutputOptions.
  */
 TEST(ConfigOutputOptionsTest, parseOutputOptions) {
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "mydb");
+    DatabaseName dbName1 = DatabaseName::createDatabaseName_forTest(boost::none, "mydb1");
     // Missing 'out' field.
-    ASSERT_THROWS(map_reduce_common::parseOutputOptions("mydb", fromjson("{}")),
+    ASSERT_THROWS(map_reduce_common::parseOutputOptions(dbName, fromjson("{}")),
                   AssertionException);
     // 'out' must be either string or object.
-    ASSERT_THROWS(map_reduce_common::parseOutputOptions("mydb", fromjson("{out: 99}")),
+    ASSERT_THROWS(map_reduce_common::parseOutputOptions(dbName, fromjson("{out: 99}")),
                   AssertionException);
     // 'out.nonAtomic' false is not supported.
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {normal: 'mycoll', nonAtomic: false}}")),
+                      dbName, fromjson("{out: {normal: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {replace: 'mycoll', nonAtomic: false}}")),
+                      dbName, fromjson("{out: {replace: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {inline: 'mycoll', nonAtomic: false}}")),
+                      dbName, fromjson("{out: {inline: 'mycoll', nonAtomic: false}}")),
                   AssertionException);
 
     // Unknown output specifer.
     ASSERT_THROWS(map_reduce_common::parseOutputOptions(
-                      "mydb", fromjson("{out: {no_such_out_type: 'mycoll'}}")),
+                      dbName, fromjson("{out: {no_such_out_type: 'mycoll'}}")),
                   AssertionException);
 
     // 'out' is string.
     _testConfigParseOutputOptions(
-        "mydb", "{out: 'mycoll'}", "", "mycoll", "mydb.mycoll", true, OutputType::Replace);
+        dbName, "{out: 'mycoll'}", "", "mycoll", "mydb.mycoll", true, OutputType::Replace);
     // 'out' is object.
-    _testConfigParseOutputOptions("mydb",
+    _testConfigParseOutputOptions(dbName,
                                   "{out: {normal: 'mycoll'}}",
                                   "",
                                   "mycoll",
@@ -196,7 +199,7 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   true,
                                   OutputType::Replace);
     // 'out.db' overrides dbname parameter
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {replace: 'mycoll', db: 'mydb2'}}",
                                   "mydb2",
                                   "mycoll",
@@ -204,14 +207,14 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   true,
                                   OutputType::Replace);
     // 'out.nonAtomic' is supported with merge and reduce.
-    _testConfigParseOutputOptions("mydb",
+    _testConfigParseOutputOptions(dbName,
                                   "{out: {merge: 'mycoll', nonAtomic: true}}",
                                   "",
                                   "mycoll",
                                   "mydb.mycoll",
                                   true,
                                   OutputType::Merge);
-    _testConfigParseOutputOptions("mydb",
+    _testConfigParseOutputOptions(dbName,
                                   "{out: {reduce: 'mycoll', nonAtomic: true}}",
                                   "",
                                   "mycoll",
@@ -219,7 +222,7 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   true,
                                   OutputType::Reduce);
     // inline
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {inline: 'mycoll', db: 'mydb2'}}",
                                   "mydb2",
                                   "",
@@ -228,35 +231,35 @@ TEST(ConfigOutputOptionsTest, parseOutputOptions) {
                                   OutputType::InMemory);
 
     // Order should not matter in fields of 'out' object.
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {db: 'mydb2', normal: 'mycoll'}}",
                                   "mydb2",
                                   "mycoll",
                                   "mydb2.mycoll",
                                   true,
                                   OutputType::Replace);
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {db: 'mydb2', replace: 'mycoll'}}",
                                   "mydb2",
                                   "mycoll",
                                   "mydb2.mycoll",
                                   true,
                                   OutputType::Replace);
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {nonAtomic: true, merge: 'mycoll'}}",
                                   "",
                                   "mycoll",
                                   "mydb1.mycoll",
                                   true,
                                   OutputType::Merge);
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {nonAtomic: true, reduce: 'mycoll'}}",
                                   "",
                                   "mycoll",
                                   "mydb1.mycoll",
                                   true,
                                   OutputType::Reduce);
-    _testConfigParseOutputOptions("mydb1",
+    _testConfigParseOutputOptions(dbName1,
                                   "{out: {db: 'mydb2', inline: 'mycoll'}}",
                                   "mydb2",
                                   "",

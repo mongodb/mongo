@@ -1214,7 +1214,6 @@ void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
               "error"_attr = redact(ex));
     }
 
-    const auto db = DatabaseNameUtil::serialize(dbName);
     {
         stdx::lock_guard<Latch> lock(_mutex);
 

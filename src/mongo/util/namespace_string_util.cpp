@@ -270,9 +270,9 @@ NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
                                                         StringData nsFieldName) {
     const auto ns = data.getStringField(nsFieldName);
     const auto tenantField = data.getField("$tenant");
-    const auto tenantId = tenantField.eoo()
-        ? boost::none
-        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    const auto tenantId = tenantField.ok()
+        ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
+        : boost::none;
     return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 

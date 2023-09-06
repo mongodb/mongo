@@ -93,7 +93,8 @@ public:
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
 
-            ConfigsvrCreateDatabase configsvrCreateDatabase{DatabaseNameUtil::serialize(dbName)};
+            ConfigsvrCreateDatabase configsvrCreateDatabase{
+                DatabaseNameUtil::serialize(dbName, request().getSerializationContext())};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 

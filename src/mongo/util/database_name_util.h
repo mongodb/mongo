@@ -109,8 +109,8 @@ public:
         StringData db, const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
-     * To be used within a Failpoint. When used in the `executeIf` we parse a BSONObj which should
-     * contain a field for the database name (such as `db` or `database` etc..).
+     * To be used with Failpoints since they can be database specific. Parses the `data` BSONObj to
+     * find an existing `dbFieldName` and returns a DatabaseName object from it.
      */
     static DatabaseName parseFailPointData(const BSONObj& data, StringData dbFieldName);
 

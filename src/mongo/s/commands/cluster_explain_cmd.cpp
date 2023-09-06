@@ -158,7 +158,9 @@ private:
  * Synthesize a BSONObj for the command to be explained.
  * To do this we must copy generic arguments from the enclosing explain command.
  */
-BSONObj makeExplainedObj(const BSONObj& outerObj, StringData dbName) {
+BSONObj makeExplainedObj(const BSONObj& outerObj,
+                         const DatabaseName& dbName,
+                         const SerializationContext& serializationContext) {
     const auto& first = outerObj.firstElement();
     uassert(
         ErrorCodes::BadValue, "explain command requires a nested object", first.type() == Object);
@@ -166,9 +168,12 @@ BSONObj makeExplainedObj(const BSONObj& outerObj, StringData dbName) {
 
     if (auto innerDb = innerObj["$db"]) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Mismatched $db in explain command. Expected " << dbName
-                              << " but got " << innerDb.checkAndGetStringData(),
-                innerDb.checkAndGetStringData() == dbName);
+                str::stream() << "Mismatched $db in explain command. Expected "
+                              << dbName.toStringForErrorMsg() << " but got "
+                              << innerDb.checkAndGetStringData(),
+                DatabaseNameUtil::deserialize(dbName.tenantId(),
+                                              innerDb.checkAndGetStringData(),
+                                              serializationContext) == dbName);
     }
 
     BSONObjBuilder bob;
@@ -193,12 +198,12 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
         request.body);
-    std::string dbName = DatabaseNameUtil::serialize(cmdObj.getDbName());
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual
     // CommandInvocation::explain() method.
-    const BSONObj explainedObj = makeExplainedObj(request.body, dbName);
+    const BSONObj explainedObj =
+        makeExplainedObj(request.body, cmdObj.getDbName(), cmdObj.getSerializationContext());
 
     // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
     auto commentField = explainedObj["comment"];

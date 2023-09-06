@@ -300,7 +300,7 @@ auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 }  // namespace
 
-OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
+OutputOptions parseOutputOptions(const DatabaseName& dbName, const BSONObj& cmdObj) {
     OutputOptions outputOptions;
 
     outputOptions.outNonAtomic = true;
@@ -354,9 +354,10 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
     }
 
     if (outputOptions.outType != OutputType::InMemory) {
-        const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
-        const auto nss =
-            NamespaceStringUtil::deserialize(boost::none, outDb, outputOptions.collectionName);
+        const auto nss = outputOptions.outDB.empty()
+            ? NamespaceStringUtil::deserialize(dbName, outputOptions.collectionName)
+            : NamespaceStringUtil::deserialize(
+                  boost::none, outputOptions.outDB, outputOptions.collectionName);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid 'out' namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
@@ -372,7 +373,7 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
                              const BSONObj& cmdObj) {
     // Map reduce is not supported in multitenancy environment, we can serialize it without
     // depending on serialization context.
-    OutputOptions outputOptions = parseOutputOptions(DatabaseNameUtil::serialize(dbName), cmdObj);
+    OutputOptions outputOptions = parseOutputOptions(dbName, cmdObj);
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbName, cmdObj));
 

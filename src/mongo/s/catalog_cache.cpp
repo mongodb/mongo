@@ -334,7 +334,6 @@ StatusWith<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCt
         CurOp::get(opCtx)->debug().catalogCacheDatabaseLookupMillis += Milliseconds(t.millis());
     });
 
-    const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
     try {
         auto dbEntryFuture =
             _databaseCache.acquireAsync(dbName, CacheCausalConsistency::kLatestKnown);

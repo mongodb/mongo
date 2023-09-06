@@ -226,9 +226,9 @@ DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
 DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringData dbFieldName) {
     const auto db = data.getStringField(dbFieldName);
     const auto tenantField = data.getField("$tenant");
-    const auto tenantId = tenantField.eoo()
-        ? boost::none
-        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    const auto tenantId = tenantField.ok()
+        ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
+        : boost::none;
     return DatabaseNameUtil::deserialize(tenantId, db);
 }
 

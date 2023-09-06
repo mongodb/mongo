@@ -179,7 +179,7 @@ public:
             uasserted(ErrorCodes::OperationFailed, errmsg);
         }
 
-        output.append("db", DatabaseNameUtil::serialize(dbName));
+        output.append("db", DatabaseNameUtil::serialize(dbName, cmd.getSerializationContext()));
         aggregateResults(cmd, shardResponses, output);
         return true;
     }
