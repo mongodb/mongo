@@ -113,6 +113,7 @@ public:
     using CollectionTypeBase::kTimeseriesFieldsFieldName;
     using CollectionTypeBase::kTimestampFieldName;
     using CollectionTypeBase::kUniqueFieldName;
+    using CollectionTypeBase::kUnsplittableFieldName;
     using CollectionTypeBase::kUpdatedAtFieldName;
     using CollectionTypeBase::kUuidFieldName;
 

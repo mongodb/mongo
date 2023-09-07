@@ -97,12 +97,14 @@ public:
     std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                const DatabaseName& db,
                                                repl::ReadConcernLevel readConcernLevel,
-                                               const BSONObj& sort) override;
+                                               const BSONObj& sort,
+                                               bool excludeUnsplittable) override;
 
-    std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
-                                                               const DatabaseName& dbName,
-                                                               repl::ReadConcernLevel readConcern,
-                                                               const BSONObj& sort) override;
+    std::vector<NamespaceString> getCollectionNamespacesForDb(OperationContext* opCtx,
+                                                              const DatabaseName& dbName,
+                                                              repl::ReadConcernLevel readConcern,
+                                                              const BSONObj& sort,
+                                                              bool excludeUnsplittable) override;
 
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
                                                                const ShardId& shardName) override;

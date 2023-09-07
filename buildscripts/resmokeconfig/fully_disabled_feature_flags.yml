@@ -15,3 +15,4 @@
 - featureFlagAuthoritativeShardCollection
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
+- featureFlagUnsplittableCollectionsOnNonPrimaryShard

@@ -176,7 +176,8 @@ public:
         OperationContext* opCtx,
         const DatabaseName& db,
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
-        const BSONObj& sort = BSONObj()) = 0;
+        const BSONObj& sort = BSONObj(),
+        bool excludeUnsplittable = false) = 0;
 
     /**
      * Returns the set of collections for the specified database, which have been marked as sharded.
@@ -185,11 +186,12 @@ public:
      *
      * Throws exception on errors.
      */
-    virtual std::vector<NamespaceString> getAllShardedCollectionsForDb(
+    virtual std::vector<NamespaceString> getCollectionNamespacesForDb(
         OperationContext* opCtx,
         const DatabaseName& dbName,
         repl::ReadConcernLevel readConcern,
-        const BSONObj& sort = BSONObj()) = 0;
+        const BSONObj& sort = BSONObj(),
+        bool excludeUnsplittable = false) = 0;
 
     /**
      * Retrieves all databases for a shard.

@@ -310,7 +310,7 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
     for (auto& db : allDbs) {
-        for (auto& coll : catalogClient->getAllShardedCollectionsForDb(
+        for (auto& coll : catalogClient->getCollectionNamespacesForDb(
                  opCtx, db.getDbName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
             auto resp = catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, coll);
             if (!resp.isOK()) {

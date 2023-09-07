@@ -114,7 +114,8 @@ public:
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
                                                    repl::ReadConcernLevel readConcernLevel,
-                                                   const BSONObj& sort) override {
+                                                   const BSONObj& sort,
+                                                   bool excludeUnsplittable) override {
             return _colls;
         }
 

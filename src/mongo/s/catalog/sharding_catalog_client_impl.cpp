@@ -599,7 +599,8 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcernLevel,
-    const BSONObj& sort) {
+    const BSONObj& sort,
+    bool excludeUnsplittable) {
     BSONObjBuilder b;
     if (!dbName.isEmpty()) {
         const auto db =
@@ -607,6 +608,9 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
         b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
     }
 
+    if (excludeUnsplittable) {
+        b.appendElements(BSON(CollectionType::kUnsplittableFieldName << BSON("$ne" << true)));
+    }
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                             kConfigReadSelector,
                                                             readConcernLevel,
@@ -623,12 +627,14 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     return collections;
 }
 
-std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollectionsForDb(
+std::vector<NamespaceString> ShardingCatalogClientImpl::getCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcern,
-    const BSONObj& sort) {
-    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, sort);
+    const BSONObj& sort,
+    bool excludeUnsplittable) {
+    auto collectionsOnConfig =
+        getCollections(opCtx, dbName, readConcern, sort, excludeUnsplittable);
 
     std::vector<NamespaceString> collectionsToReturn;
     collectionsToReturn.reserve(collectionsOnConfig.size());

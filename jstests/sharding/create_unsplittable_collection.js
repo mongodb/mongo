@@ -54,27 +54,4 @@ jsTest.log('Check that shardCollection won\'t generate an unsplittable collectio
     assert.eq(shardedColl.unsplittable, undefined);
 }
 
-jsTest.log(
-    'Check that test command createUnsplittableCollection can create a collection in a different shard than the dbPrimary');
-{
-    const kDataColl = 'unsplittable_collection_on_different_shard';
-    const kDataCollNss = kDbName + '.' + kDataColl;
-
-    assert.commandWorked(st.s.getDB(kDbName).runCommand(
-        {createUnsplittableCollection: kDataColl, dataShard: shard1}));
-
-    let res = assert.commandWorked(
-        st.rs1.getPrimary().getDB(kDbName).runCommand({listIndexes: kDataColl}));
-    let indexes = res.cursor.firstBatch;
-    assert(indexes.length === 1);
-
-    let col = st.s.getCollection('config.collections').findOne({_id: kDataCollNss});
-
-    assert.eq(st.s.getCollection('config.chunks').countDocuments({uuid: col.uuid}), 1);
-
-    let chunk = st.s.getCollection('config.chunks').findOne({uuid: col.uuid});
-
-    assert.eq(chunk.shard, shard1);
-}
-
 st.stop();

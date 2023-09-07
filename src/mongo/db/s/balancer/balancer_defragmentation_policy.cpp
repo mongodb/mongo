@@ -1257,7 +1257,10 @@ void BalancerDefragmentationPolicy::startCollectionDefragmentations(OperationCon
     stdx::lock_guard<Latch> lk(_stateMutex);
 
     // Fetch all collections with `defragmentCollection` flag enabled
-    static const auto query = BSON(CollectionType::kDefragmentCollectionFieldName << true);
+    static const auto query =
+        BSON(CollectionType::kDefragmentCollectionFieldName
+             << true << CollectionType::kUnsplittableFieldName << BSON("$ne" << true));
+
     const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
     const auto& collDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
