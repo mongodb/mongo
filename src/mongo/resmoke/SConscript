@@ -19,8 +19,6 @@ resmoke_py_install = env.AutoInstall(
     AIB_COMPONENT='common',
     AIB_ROLE='runtime',
 )
-# TODO SERVER-61013: We shouldn't have to setattr this once AutoInstall is a
-# real builder
 setattr(resmoke_py_install[0].attributes, 'AIB_NO_ARCHIVE', True)
 env.AddPostAction(
     resmoke_py_install,

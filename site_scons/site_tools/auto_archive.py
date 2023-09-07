@@ -142,7 +142,6 @@ def collect_transitive_files(env, entry):
     # Usage:
     # node = env.AutoInstall(...)
     # setattr(node[0].attributes, 'AIB_NO_ARCHIVE', True)
-    # TODO SERVER-61013 Update documentation once AutoInstall is a real builder
     return sorted(f for f in files if not getattr(f.attributes, 'AIB_NO_ARCHIVE', False))
 
 
