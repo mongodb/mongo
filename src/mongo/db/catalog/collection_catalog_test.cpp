@@ -3352,12 +3352,10 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
     // Initialize the oldest timestamp.
-    {
-        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
-        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-            catalog.catalogIdTracker().cleanup(Timestamp(1, 1));
-        });
-    }
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(1, 1));
+    });
+
     // Create and drop the collection. We have a time window where the namespace exists.
     createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
     dropCollection(opCtx.get(), nss, Timestamp(10, 10));
@@ -3366,22 +3364,17 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
     createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
 
     // Perform collection catalog cleanup.
-    {
-        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
-        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-            catalog.catalogIdTracker().cleanup(Timestamp(20, 20));
-        });
-    }
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(20, 20));
+    });
+
     // Drop the re-created collection.
     dropCollection(opCtx.get(), nss, Timestamp(30, 30));
 
     // Cleanup again.
-    {
-        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
-        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-            catalog.catalogIdTracker().cleanup(Timestamp(40, 40));
-        });
-    }
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.catalogIdTracker().cleanup(Timestamp(40, 40));
+    });
 }
 }  // namespace
 }  // namespace mongo
