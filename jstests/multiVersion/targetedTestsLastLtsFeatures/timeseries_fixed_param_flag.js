@@ -28,7 +28,7 @@ assert.eq(output.changed, false);
 
 // Running a setFCV downgrade command should remove the catalog flag.
 assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
-    {setFeatureCompatibilityVersion: '7.0', confirm: true}));
+    {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 output = assert.commandWorked(
     testDB.runCommand({timeseriesCatalogBucketParamsChanged: 'system.buckets.coll'}));
 assert.eq(output.changed, undefined);
@@ -42,7 +42,7 @@ output = assert.commandWorked(
 assert.eq(output.changed, undefined);
 
 assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
-    {setFeatureCompatibilityVersion: '7.1', confirm: true}));
+    {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 // After the FCV is set to latest, the value of the flag of the collection should be undefined.
 output = assert.commandWorked(
@@ -76,7 +76,7 @@ jsTestLog("Turning the failpoint on.");
 assert.commandWorked(
     rst.getPrimary().adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
 assert.commandFailedWithCode(
-    testDB.adminCommand({setFeatureCompatibilityVersion: '7.0', confirm: true}), 549181);
+    testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 549181);
 
 // Confirm feature is still enabled since the FCV downgrade failed.
 output = assert.commandWorked(
@@ -84,7 +84,7 @@ output = assert.commandWorked(
 assert.eq(output.changed, false);
 
 assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
-    {setFeatureCompatibilityVersion: '7.1', confirm: true}));
+    {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 // Confirm the feature remains enabled when the FCV is upgraded. Since the FCV is already at '7.1'
 // the value of the flag should not change.

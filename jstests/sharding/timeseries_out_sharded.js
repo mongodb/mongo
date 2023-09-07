@@ -10,7 +10,9 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_fcv_71,
- *   featureFlagAggOutTimeseries
+ *   featureFlagAggOutTimeseries,
+ *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";

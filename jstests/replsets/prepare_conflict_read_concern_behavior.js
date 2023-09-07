@@ -19,6 +19,8 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   # TODO (SERVER-80568): Re-enable this test in multiversion suites once it has been fixed.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 

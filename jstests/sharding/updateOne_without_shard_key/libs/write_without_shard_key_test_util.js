@@ -265,12 +265,10 @@ export var WriteWithoutShardKeyTestUtil = (function() {
     function isWriteWithoutShardKeyFeatureEnabled(conn) {
         // The feature flag spans 6.2 and current master, while the actual logic only exists
         // on 6.3 and later.
-        return (jsTestOptions().mongosBinVersion !== "last-lts" &&
-                jsTestOptions().mongosBinVersion !== "last-continuous" &&
-                assert
-                    .commandWorked(conn.adminCommand(
-                        {getParameter: 1, featureFlagUpdateOneWithoutShardKey: 1}))
-                    .featureFlagUpdateOneWithoutShardKey.value);
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagUpdateOneWithoutShardKey: 1}))
+            .featureFlagUpdateOneWithoutShardKey.value;
     }
 
     return {

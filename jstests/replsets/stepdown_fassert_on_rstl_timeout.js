@@ -11,7 +11,11 @@
  *    [since deadline is beyond the RSTL fassert timeout].
  * 5. Make sure that primary node is down and that another has stepedUp
  *
- * @tags: [ requires_fcv_53 ]
+ * @tags: [
+ *   requires_fcv_53,
+ *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -5,6 +5,8 @@
  *   # We assume that all nodes in a mixed-mode replica set are using compressed inserts to
  *   # a time-series collection.
  *   requires_fcv_71,
+ *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
