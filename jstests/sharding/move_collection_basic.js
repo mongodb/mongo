@@ -2,7 +2,7 @@
  * Tests for basic functionality of the move collection feature.
  *
  * @tags: [
- *  require_fcv_71,
+ *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
  *  featureFlagMoveCollection
  * ]

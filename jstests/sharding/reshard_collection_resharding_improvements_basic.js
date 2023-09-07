@@ -2,7 +2,7 @@
  * Tests for basic functionality of the resharding improvements feature.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_72,
  *  featureFlagReshardingImprovements
  * ]
  */

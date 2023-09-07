@@ -3,7 +3,7 @@
  * many indexes are built.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_72,
  *  featureFlagReshardingImprovements
  * ]
  */

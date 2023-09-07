@@ -78,6 +78,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -410,6 +411,9 @@ private:
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551105,
               "Running case",
@@ -479,6 +483,9 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
 }
 
 TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     const std::vector<RecipientStateEnum> recipientStates{RecipientStateEnum::kCreatingCollection,
                                                           RecipientStateEnum::kCloning,
                                                           RecipientStateEnum::kApplying,
@@ -572,6 +579,9 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5992701,
               "Running case",
@@ -617,6 +627,9 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
 }
 
 DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire") {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     auto doc = makeStateDocument(false /* isAlsoDonor */);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -632,6 +645,9 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTest, CommitFn, "4457001.*tripwire"
 }
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5551107,
               "Running case",
@@ -695,6 +711,9 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
 }
 
 TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     // The temporary collection is renamed by the donor service when the shard is also a donor. Only
     // on non-donor shards will the recipient service rename the temporary collection.
     bool isAlsoDonor = false;
@@ -732,6 +751,9 @@ TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenD
 }
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
     doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
 
@@ -778,6 +800,9 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 }
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardCollection) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
     doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
 
@@ -823,6 +848,9 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
 }
 
 TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     for (bool isAlsoDonor : {false, true}) {
         LOGV2(5568600,
               "Running case",
@@ -878,6 +906,9 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     auto doc = makeStateDocument(false);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -893,6 +924,9 @@ TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelat
 }
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     const std::vector<RecipientStateEnum> recipientStates{RecipientStateEnum::kCreatingCollection,
                                                           RecipientStateEnum::kCloning,
                                                           RecipientStateEnum::kApplying,
@@ -1029,6 +1063,9 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
 }
 
 TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgressDoc) {
+    // TODO(SERVER-80519): Turn feature flag on and fix test.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               false);
     auto doc = makeStateDocument(false);
     auto instanceId =
         BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());

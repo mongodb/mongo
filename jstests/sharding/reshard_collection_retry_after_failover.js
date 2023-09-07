@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   uses_atclustertime,
+ *   requires_fcv_72,
  *   featureFlagReshardingImprovements,
  * ]
  */

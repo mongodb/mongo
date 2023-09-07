@@ -2,7 +2,7 @@
  * Tests for more complex cases for shardDistribution parameter.
  *
  * @tags: [
- *  requires_fcv_71,
+ *  requires_fcv_72,
  *  featureFlagReshardingImprovements
  * ]
  */
