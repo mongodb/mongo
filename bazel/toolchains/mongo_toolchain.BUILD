@@ -38,14 +38,14 @@ filegroup(
             "--verbose",
             "-std=c++20",
             "-nostdinc++",
-            # These flags are necessary to get system includes properly available for compilation:
+            # These isystems make sure that toolchain includes are used in place of any remote system
             "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include",
             "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
             "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
-            # These flags are necessary for the link step to work remotely:
+            # Make sure that the toolchain binaries are available
             "-Bexternal/mongo_toolchain/v4/bin",
             "-Bexternal/mongo_toolchain/v4/lib",
             "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
@@ -57,8 +57,9 @@ filegroup(
         ],
         host_system_name = "local",
         link_flags = [
-            # These flags are necessary for the link step to work remotely:
+            # Don't use remote system includes, only our toolchain includes
             "-nostdinc++",
+            # Make sure that our toolchain libraries are used for linking
             "-Lexternal/mongo_toolchain/v4/lib",
             "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
             "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
