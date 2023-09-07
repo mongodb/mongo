@@ -214,17 +214,6 @@ DatabaseCloner::Stats DatabaseCloner::getStats() const {
     return stats;
 }
 
-std::string DatabaseCloner::Stats::toString() const {
-    return toBSON().toString();
-}
-
-BSONObj DatabaseCloner::Stats::toBSON() const {
-    BSONObjBuilder bob;
-    bob.append("dbname", DatabaseNameUtil::serialize(dbname));
-    append(&bob);
-    return bob.obj();
-}
-
 void DatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("collections", static_cast<long long>(collections));
     builder->appendNumber("clonedCollections", static_cast<long long>(clonedCollections));

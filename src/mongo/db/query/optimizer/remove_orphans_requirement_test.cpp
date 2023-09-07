@@ -39,6 +39,10 @@ namespace mongo::optimizer {
 namespace {
 
 using namespace unit_test_abt_literals;
+
+const DatabaseName testDBName =
+    DatabaseNameUtil::deserialize(boost::none, "test", SerializationContext::stateDefault());
+
 TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
     // Hypothetical MQL which could generate this ABT:
     //   db.c1.aggregate([{$unionWith: {coll: "c2", pipeline: [{$match: {}}]}}])
@@ -51,7 +55,7 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
     auto prefixId = PrefixId::createForTests();
 
     auto scanDef1 =
-        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+        createScanDef(testDBName,
                       UUID::gen(),
                       ScanDefOptions{},
                       IndexDefinitions{},
@@ -63,18 +67,18 @@ TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
                       boost::none /*ce*/,
                       ShardingMetadata({{_get("a", _id())._n, CollationOp::Ascending}}, true));
 
-    auto scanDef2 =
-        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test2"),
-                      UUID::gen(),
-                      ScanDefOptions{},
-                      IndexDefinitions{},
-                      MultikeynessTrie{},
-                      ConstEval::constFold,
-                      // Sharded on {b: 1}
-                      DistributionAndPaths{DistributionType::Centralized},
-                      true /*exists*/,
-                      boost::none /*ce*/,
-                      ShardingMetadata({{_get("b", _id())._n, CollationOp::Ascending}}, true));
+    auto scanDef2 = createScanDef(
+        DatabaseNameUtil::deserialize(boost::none, "test2", SerializationContext::stateDefault()),
+        UUID::gen(),
+        ScanDefOptions{},
+        IndexDefinitions{},
+        MultikeynessTrie{},
+        ConstEval::constFold,
+        // Sharded on {b: 1}
+        DistributionAndPaths{DistributionType::Centralized},
+        true /*exists*/,
+        boost::none /*ce*/,
+        ShardingMetadata({{_get("b", _id())._n, CollationOp::Ascending}}, true));
 
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -117,7 +121,7 @@ static ABT optimizeABTWithShardingMetadataNoIndexes(ABT& rootNode,
         trie.add(comp._path);
     }
 
-    auto scanDef = createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+    auto scanDef = createScanDef(testDBName,
                                  UUID::gen(),
                                  ScanDefOptions{},
                                  IndexDefinitions{},
@@ -264,7 +268,7 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetBasic) {
 
     ShardingMetadata sm({{_get("b", _id())._n, CollationOp::Ascending}}, true);
 
-    auto scanDef = createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+    auto scanDef = createScanDef(testDBName,
                                  UUID::gen(),
                                  {},
                                  {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
@@ -325,7 +329,7 @@ TEST(PhysRewriter, ScanNodeRemoveOrphansImplementerSeekTargetDottedSharedPrefix)
                          {_get("a", _get("b", _get("d", _id())))._n, CollationOp::Ascending}},
                         true);
     auto shardScanDef =
-        createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+        createScanDef(testDBName,
                       UUID::gen(),
                       ScanDefOptions{},
                       {{"index1", makeIndexDefinition("e", CollationOp::Ascending)}},
@@ -444,7 +448,7 @@ TEST(PhysRewriter, RemoveOrphansSargableNodeIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+           createScanDef(testDBName,
                          UUID::gen(),
                          {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
@@ -489,7 +493,7 @@ TEST(PhysRewriter, RemoveOrphansCovered) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+           createScanDef(testDBName,
                          UUID::gen(),
                          {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
@@ -541,7 +545,7 @@ TEST(PhysRewriter, RemoveOrphansIndexDoesntCoverShardKey) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+           createScanDef(testDBName,
                          UUID::gen(),
                          {},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
@@ -595,7 +599,7 @@ TEST(PhysRewriter, RemoveOrphansDottedPathIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+           createScanDef(testDBName,
                          UUID::gen(),
                          {},
                          {{"index1", {indexSpec, false}}},
@@ -653,7 +657,7 @@ TEST(PhysRewriter, RemoveOrphanedMultikeyIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1",
-           createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+           createScanDef(testDBName,
                          UUID::gen(),
                          {},
                          {{"index1", {indexSpec, false}}},
@@ -959,7 +963,7 @@ TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
              OptPhase::MemoImplementationPhase},
             prefixId,
             {{{"c1",
-               createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
+               createScanDef(testDBName,
                              UUID::gen(),
                              {},
                              {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},

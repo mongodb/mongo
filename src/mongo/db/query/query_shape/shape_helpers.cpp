@@ -89,7 +89,8 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }
 
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
+NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt,
+                                          const SerializationContext& serializationContext) {
     tassert(7632900, "cmdNs must be an object.", cmdNsElt.type() == BSONType::Object);
     // cmdNs is internally built from structured requests and can be deserialized as storage.
     auto cmdNs = query_shape::CommandNamespace::parse(
@@ -107,7 +108,8 @@ NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
                 "Exactly one of 'uuid' and 'coll' can be defined.",
                 !cmdNs.getColl().has_value());
         UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
-        return NamespaceStringOrUUID(DatabaseNameUtil::deserialize(tenantId, cmdNs.getDb()), uuid);
+        return NamespaceStringOrUUID(
+            DatabaseNameUtil::deserialize(tenantId, cmdNs.getDb(), serializationContext), uuid);
     }
 }
 

@@ -192,7 +192,8 @@ public:
             std::vector<ListDatabasesReplyItem> items;
             const auto& tenantId = cmd.getDbName().tenantId();
             for (const auto& sizeEntry : sizes) {
-                const auto dbname = DatabaseNameUtil::deserialize(tenantId, sizeEntry.first);
+                const auto dbname = DatabaseNameUtil::deserialize(
+                    tenantId, sizeEntry.first, cmd.getSerializationContext());
                 const long long size = sizeEntry.second;
 
                 // Skip the local database, since all shards have their own independent local

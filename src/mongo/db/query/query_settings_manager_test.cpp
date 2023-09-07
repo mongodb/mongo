@@ -80,7 +80,7 @@ QueryShapeConfiguration makeQueryShapeConfiguration(
     ASSERT_OK(parsedFindCommandResult);
     return QueryShapeConfiguration(
         std::make_unique<query_shape::FindCmdShape>(*parsedFindCommandResult.getValue(), expCtx)
-            ->sha256Hash(expCtx->opCtx),
+            ->sha256Hash(expCtx->opCtx, SerializationContext::stateDefault()),
         settings,
         query);
 }

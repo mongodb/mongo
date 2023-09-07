@@ -78,9 +78,11 @@ Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
     : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {}
 
 
-BSONObj Shape::toBson(OperationContext* opCtx, const SerializationOptions& opts) const {
+BSONObj Shape::toBson(OperationContext* opCtx,
+                      const SerializationOptions& opts,
+                      const SerializationContext& serializationContext) const {
     BSONObjBuilder bob;
-    appendCmdNsOrUUID(bob, opts);
+    appendCmdNsOrUUID(bob, opts, serializationContext);
     if (!collation.isEmpty()) {
         // Collation is never shapified. We use find command's collation name definition, but it
         // should be the same for all requests.
@@ -94,22 +96,27 @@ int64_t Shape::size() const {
     return sizeof(this) + shape_helpers::optionalObjSize(collation) + specificComponents().size();
 }
 
-QueryShapeHash Shape::sha256Hash(OperationContext* opCtx) const {
+QueryShapeHash Shape::sha256Hash(OperationContext* opCtx,
+                                 const SerializationContext& serializationContext) const {
     // The Query Shape Hash should use the representative query shape.
-    auto serialized =
-        toBson(opCtx, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    auto serialized = toBson(opCtx,
+                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                             serializationContext);
     return SHA256Block::computeHash((const uint8_t*)serialized.sharedBuffer().get(),
                                     serialized.objsize());
 }
 
-void Shape::appendCmdNsOrUUID(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void Shape::appendCmdNsOrUUID(BSONObjBuilder& bob,
+                              const SerializationOptions& opts,
+                              const SerializationContext& serializationContext) const {
     if (nssOrUUID.isNamespaceString()) {
         appendCmdNs(bob, nssOrUUID.nss(), opts);
     } else {
         BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
         cmdNs.append("uuid", opts.serializeIdentifier(nssOrUUID.uuid().toString()));
         cmdNs.append("db",
-                     opts.serializeIdentifier(DatabaseNameUtil::serialize(nssOrUUID.dbName())));
+                     opts.serializeIdentifier(
+                         DatabaseNameUtil::serialize(nssOrUUID.dbName(), serializationContext)));
         cmdNs.doneFast();
     }
 }

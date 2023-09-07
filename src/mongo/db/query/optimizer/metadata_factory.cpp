@@ -69,14 +69,15 @@ MultikeynessTrie createTrie(const IndexDefinitions& indexDefs) {
 ScanDefinition createScanDef(ScanDefOptions options, IndexDefinitions indexDefs) {
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
-    return createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
-                         UUID::gen(),
-                         std::move(options),
-                         std::move(indexDefs),
-                         std::move(multikeynessTrie),
-                         ConstEval::constFold,
-                         {DistributionType::Centralized},
-                         true);
+    return createScanDef(
+        DatabaseNameUtil::deserialize(boost::none, "test", SerializationContext::stateDefault()),
+        UUID::gen(),
+        std::move(options),
+        std::move(indexDefs),
+        std::move(multikeynessTrie),
+        ConstEval::constFold,
+        {DistributionType::Centralized},
+        true);
 }
 
 ScanDefinition createScanDef(ScanDefOptions options,
@@ -89,17 +90,18 @@ ScanDefinition createScanDef(ScanDefOptions options,
 
     MultikeynessTrie multikeynessTrie = createTrie(indexDefs);
 
-    return createScanDef(DatabaseNameUtil::deserialize(boost::none, "test"),
-                         UUID::gen(),
-                         std::move(options),
-                         std::move(indexDefs),
-                         std::move(multikeynessTrie),
-                         constFold,
-                         std::move(distributionAndPaths),
-                         exists,
-                         std::move(ce),
-                         {} /*shardingMetadata*/,
-                         pathToInterval);
+    return createScanDef(
+        DatabaseNameUtil::deserialize(boost::none, "test", SerializationContext::stateDefault()),
+        UUID::gen(),
+        std::move(options),
+        std::move(indexDefs),
+        std::move(multikeynessTrie),
+        constFold,
+        std::move(distributionAndPaths),
+        exists,
+        std::move(ce),
+        {} /*shardingMetadata*/,
+        pathToInterval);
 }
 
 ScanDefinition createScanDef(DatabaseName dbName,

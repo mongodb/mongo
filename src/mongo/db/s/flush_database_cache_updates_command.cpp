@@ -224,7 +224,8 @@ public:
     private:
         DatabaseName _dbName() const {
             return DatabaseNameUtil::deserialize(boost::none,
-                                                 Base::request().getCommandParameter());
+                                                 Base::request().getCommandParameter(),
+                                                 Base::request().getSerializationContext());
         }
     };
 };

@@ -77,7 +77,8 @@ public:
 
     struct DSSAndLock {
         DSSAndLock(const DatabaseName& dbName)
-            : dssMutex("DSSMutex::" + DatabaseNameUtil::serialize(dbName)),
+            : dssMutex("DSSMutex::" +
+                       DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault())),
               dss(std::make_unique<DatabaseShardingState>(dbName)) {}
 
         const Lock::ResourceMutex dssMutex;

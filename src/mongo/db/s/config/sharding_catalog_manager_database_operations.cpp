@@ -109,7 +109,8 @@ using namespace fmt::literals;
 DatabaseType ShardingCatalogManager::createDatabase(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    const boost::optional<ShardId>& optPrimaryShard) {
+    const boost::optional<ShardId>& optPrimaryShard,
+    const SerializationContext& serializationContext) {
 
     if (dbName.isConfigDB()) {
         return DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
@@ -148,8 +149,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         ? uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))
         : nullptr;
 
-    const auto dbNameStr =
-        DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+    const auto dbNameStr = DatabaseNameUtil::serialize(dbName, serializationContext);
     const auto dbMatchFilter = [&] {
         BSONObjBuilder filterBuilder;
         filterBuilder.append(DatabaseType::kDbNameFieldName, dbNameStr);
@@ -178,9 +178,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
         // concurrent create database operations
         dbLock.emplace(opCtx,
                        opCtx->lockState(),
-                       DatabaseNameUtil::deserialize(boost::none,
-                                                     str::toLower(dbNameStr),
-                                                     SerializationContext::stateCommandRequest()),
+                       DatabaseNameUtil::deserialize(
+                           boost::none, str::toLower(dbNameStr), serializationContext),
                        "createDatabase" /* reason */,
                        MODE_X,
                        true /*waitForRecovery*/);
@@ -341,7 +340,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
         BSON("_flushDatabaseCacheUpdates"
-             << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())),
+             << DatabaseNameUtil::serialize(dbName, serializationContext)),
         Shard::RetryPolicy::kIdempotent));
     uassertStatusOK(cmdResponse.commandStatus);
 
@@ -351,7 +350,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
 void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const DatabaseVersion& expectedDbVersion,
-                                               const ShardId& toShardId) {
+                                               const ShardId& toShardId,
+                                               const SerializationContext& serializationContext) {
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
@@ -369,14 +369,14 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             "Requested primary shard {} is draining"_format(toShardId.toString()),
             !toShardEntry.getDraining());
 
-    const auto transactionChain = [dbName, expectedDbVersion, toShardId](
+    const auto transactionChain = [dbName, expectedDbVersion, toShardId, serializationContext](
                                       const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
         const auto updateDatabaseEntryOp = [&] {
             const auto query = [&] {
                 BSONObjBuilder bsonBuilder;
                 bsonBuilder.append(DatabaseType::kDbNameFieldName,
-                                   DatabaseNameUtil::serialize(dbName));
+                                   DatabaseNameUtil::serialize(dbName, serializationContext));
                 // Include the version in the update filter to be resilient to potential network
                 // retries and delayed messages.
                 for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {

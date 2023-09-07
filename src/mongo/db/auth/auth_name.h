@@ -123,7 +123,7 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseNameUtil::deserialize(_tenant, _db);
+        return DatabaseNameUtil::deserialize(_tenant, _db, SerializationContext::stateDefault());
     }
 
     /**

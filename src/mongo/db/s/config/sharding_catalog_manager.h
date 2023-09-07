@@ -460,7 +460,8 @@ public:
      */
     DatabaseType createDatabase(OperationContext* opCtx,
                                 const DatabaseName& dbName,
-                                const boost::optional<ShardId>& optPrimaryShard);
+                                const boost::optional<ShardId>& optPrimaryShard,
+                                const SerializationContext& serializationContext);
 
     /**
      * Updates the metadata in config.databases collection with the new primary shard for the given
@@ -469,7 +470,8 @@ public:
     void commitMovePrimary(OperationContext* opCtx,
                            const DatabaseName& dbName,
                            const DatabaseVersion& expectedDbVersion,
-                           const ShardId& toShardId);
+                           const ShardId& toShardId,
+                           const SerializationContext& serializationContext);
 
     //
     // Collection Operations

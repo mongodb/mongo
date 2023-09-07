@@ -209,9 +209,9 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx,
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigDatabasesNamespace};
-        findRequest.setFilter(BSON(
-            ShardDatabaseType::kDbNameFieldName
-            << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())));
+        findRequest.setFilter(
+            BSON(ShardDatabaseType::kDbNameFieldName
+                 << DatabaseNameUtil::serialize(dbName, findRequest.getSerializationContext())));
         findRequest.setLimit(1);
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
@@ -516,7 +516,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName)
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
                 entry.setQ(BSON(ShardDatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(
-                                    dbName, SerializationContext::stateCommandRequest())));
+                                    dbName, SerializationContext::stateDefault())));
                 entry.setMulti(false);
                 return entry;
             }()});

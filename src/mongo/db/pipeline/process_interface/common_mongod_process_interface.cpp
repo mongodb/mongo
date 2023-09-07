@@ -191,7 +191,8 @@ void listDurableCatalog(OperationContext* opCtx,
         }
 
         BSONObjBuilder builder;
-        builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
+        builder.append(
+            "db", DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
         builder.append("name", ns.coll());
         builder.append("type", "collection");
         if (!shardName.empty()) {
@@ -325,7 +326,9 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
                     NamespaceStringUtil::deserialize(ns.dbName(), obj.getStringField("viewOn")));
 
                 BSONObjBuilder builder;
-                builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
+                builder.append(
+                    "db",
+                    DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
                 builder.append("name", ns.coll());
                 if (viewOnNs.isTimeseriesBucketsCollection()) {
                     builder.append("type", "timeseries");
@@ -363,7 +366,8 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
         }
 
         BSONObjBuilder builder;
-        builder.append("db", DatabaseNameUtil::serialize(ns.dbName()));
+        builder.append(
+            "db", DatabaseNameUtil::serialize(ns.dbName(), SerializationContext::stateDefault()));
         builder.append("name", ns.coll());
         builder.append("type", "collection");
         if (auto shardName = getShardName(opCtx); !shardName.empty()) {

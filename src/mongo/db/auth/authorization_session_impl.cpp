@@ -106,7 +106,6 @@ std::unique_ptr<AuthorizationSession> authorizationSessionCreateImpl(
 auto authorizationSessionCreateRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
 
-constexpr StringData ADMIN_DBNAME = "admin"_sd;
 constexpr StringData SYSTEM_BUCKETS_PREFIX = "system.buckets."_sd;
 
 bool checkContracts() {
@@ -462,13 +461,13 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     // a system and add the first user.
     if (_externalState->shouldAllowLocalhost()) {
 
-        const DatabaseName kAdminDB = DatabaseNameUtil::deserialize(boost::none, ADMIN_DBNAME);
-        const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(kAdminDB);
+        const ResourcePattern adminDBResource =
+            ResourcePattern::forDatabaseName(DatabaseName::kAdmin);
         const ActionSet setupAdminUserActionSet{ActionType::createUser, ActionType::grantRole};
         Privilege setupAdminUserPrivilege(adminDBResource, setupAdminUserActionSet);
 
-        const DatabaseName kExternalDB = DatabaseNameUtil::deserialize(boost::none, "$external"_sd);
-        const ResourcePattern externalDBResource = ResourcePattern::forDatabaseName(kExternalDB);
+        const ResourcePattern externalDBResource =
+            ResourcePattern::forDatabaseName(DatabaseName::kExternal);
         Privilege setupExternalUserPrivilege(externalDBResource, ActionType::createUser);
 
         ActionSet setupServerConfigActionSet;

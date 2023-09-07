@@ -247,7 +247,8 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
         commandBuilder.append(conversationId);
 
     // Asynchronously continue the conversation
-    const auto dbName = DatabaseNameUtil::deserialize(boost::none, targetDatabase);
+    const auto dbName = DatabaseNameUtil::deserialize(
+        boost::none, targetDatabase, SerializationContext::stateDefault());
     return runCommand(OpMsgRequest::fromDBAndBody(dbName, commandBuilder.obj()))
         .then([runCommand, session, targetDatabase, saslLogLevel](
                   BSONObj serverResponse) -> Future<void> {

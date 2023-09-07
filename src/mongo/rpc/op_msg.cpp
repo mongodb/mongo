@@ -288,7 +288,7 @@ boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
 
 DatabaseName OpMsgRequest::getDbName() const {
     if (!gMultitenancySupport) {
-        return DatabaseNameUtil::deserialize(boost::none, getDatabase());
+        return DatabaseNameUtil::deserialize(boost::none, getDatabase(), getSerializationContext());
     }
     auto tenantId = getValidatedTenantId() ? getValidatedTenantId() : parseDollarTenant(body);
 

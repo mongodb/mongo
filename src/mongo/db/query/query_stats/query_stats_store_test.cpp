@@ -111,7 +111,7 @@ public:
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;
         }
-        return findKeyGenerator.generate(expCtx->opCtx, opts);
+        return findKeyGenerator.generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 
     BSONObj makeTelemetryKeyAggregateRequest(
@@ -132,7 +132,7 @@ public:
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;
         }
-        return aggKeyGenerator->generate(expCtx->opCtx, opts);
+        return aggKeyGenerator->generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 };
 

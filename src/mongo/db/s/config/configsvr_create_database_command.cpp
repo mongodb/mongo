@@ -98,7 +98,8 @@ public:
                 opCtx,
                 DatabaseNameUtil::deserialize(
                     boost::none, dbname, request().getSerializationContext()),
-                request().getPrimaryShardId());
+                request().getPrimaryShardId(),
+                request().getSerializationContext());
 
             return {dbt.getVersion()};
         }

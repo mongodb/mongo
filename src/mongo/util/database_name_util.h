@@ -61,9 +61,7 @@ public:
      * If multitenancySupport is disabled, the tenantID is not set in the DatabaseName Object.
      * eg. serialize(DatabaseName(boost::none, "foo")) -> "foo"
      */
-    static std::string serialize(
-        const DatabaseName& dbName,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serialize(const DatabaseName& dbName, const SerializationContext& context);
 
     /**
      * To be used only for durable catalog. We always include the tenantId as prefixed in a
@@ -97,10 +95,9 @@ public:
      * and DatabaseName is constructed without the tenantID.
      * eg. deserialize(boost::none, "foo") -> DatabaseName(boost::none, "foo")
      */
-    static DatabaseName deserialize(
-        boost::optional<TenantId> tenantId,
-        StringData db,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static DatabaseName deserialize(boost::optional<TenantId> tenantId,
+                                    StringData db,
+                                    const SerializationContext& context);
 
     /**
      * To be used only by the storage catalog.

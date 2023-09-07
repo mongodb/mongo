@@ -116,7 +116,8 @@ public:
         DatabaseName _targetDb() const {
             const auto& cmd = request();
             return DatabaseNameUtil::deserialize(cmd.getDbName().tenantId(),
-                                                 cmd.getCommandParameter());
+                                                 cmd.getCommandParameter(),
+                                                 cmd.getSerializationContext());
         }
     };
 

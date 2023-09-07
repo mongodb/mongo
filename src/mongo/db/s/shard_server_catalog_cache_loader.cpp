@@ -197,7 +197,8 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
     // Update the databases collection entry for 'dbName' in case there are any new updates.
     Status status = updateShardDatabasesEntry(
         opCtx,
-        BSON(ShardDatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(dbt.getDbName())),
+        BSON(ShardDatabaseType::kDbNameFieldName
+             << DatabaseNameUtil::serialize(dbt.getDbName(), SerializationContext::stateDefault())),
         dbt.toBSON(),
         BSONObj(),
         true /*upsert*/);
@@ -369,7 +370,7 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
         BSON("_flushDatabaseCacheUpdates"
-             << DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest())),
+             << DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault())),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 

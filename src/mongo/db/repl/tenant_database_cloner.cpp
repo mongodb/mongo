@@ -115,9 +115,9 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
     // This will be set after a successful listCollections command.
     _operationTime = Timestamp();
 
-    auto collectionInfos =
-        getClient()->getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, _dbName),
-                                        ListCollectionsFilter::makeTypeCollectionFilter());
+    auto collectionInfos = getClient()->getCollectionInfos(
+        DatabaseNameUtil::deserialize(boost::none, _dbName, SerializationContext::stateDefault()),
+        ListCollectionsFilter::makeTypeCollectionFilter());
 
     // Do a majority read on the sync source to make sure the collections listed exist on a majority
     // of nodes in the set. We do not check the rollbackId - rollback would lead to the sync source
@@ -227,9 +227,9 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
     long long approxTotalDBSizeOnDisk = 0;
 
     std::vector<UUID> clonedCollectionUUIDs;
-    auto collectionInfos =
-        client.getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, _dbName),
-                                  ListCollectionsFilter::makeTypeCollectionFilter());
+    auto collectionInfos = client.getCollectionInfos(
+        DatabaseNameUtil::deserialize(boost::none, _dbName, SerializationContext::stateDefault()),
+        ListCollectionsFilter::makeTypeCollectionFilter());
     for (auto&& info : collectionInfos) {
         ListCollectionResult result;
         try {
@@ -256,7 +256,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
         clonedCollectionUUIDs.emplace_back(result.getInfo().getUuid());
 
         BSONObj res;
-        client.runCommand(DatabaseNameUtil::deserialize(boost::none, _dbName),
+        client.runCommand(DatabaseNameUtil::deserialize(
+                              boost::none, _dbName, SerializationContext::stateDefault()),
                           BSON("collStats" << result.getName()),
                           res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {

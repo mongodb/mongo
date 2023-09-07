@@ -59,7 +59,6 @@ public:
         long long dataSize{0};
         std::vector<DatabaseCloner::Stats> databaseStats;
 
-        std::string toString() const;
         BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };

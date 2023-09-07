@@ -272,8 +272,8 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      bool waitForRecovery)
     : ScopedBaseDDLLock(opCtx,
                         locker,
-                        DatabaseNameUtil::serialize(db),
-                        ResourceId{RESOURCE_DDL_DATABASE, DatabaseNameUtil::serialize(db)},
+                        DatabaseNameUtil::serialize(db, SerializationContext::stateDefault()),
+                        ResourceId{RESOURCE_DDL_DATABASE, db},
                         reason,
                         mode,
                         waitForRecovery) {}

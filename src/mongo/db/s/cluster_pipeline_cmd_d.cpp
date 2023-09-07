@@ -102,12 +102,7 @@ struct ClusterPipelineCommandD {
         auto modifiedRequestBody =
             opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
         return aggregation_request_helper::parseFromBSON(
-            opCtx,
-            DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
-                                          opMsgRequest.getDatabase()),
-            modifiedRequestBody,
-            explainVerbosity,
-            apiStrict);
+            opCtx, opMsgRequest.getDbName(), modifiedRequestBody, explainVerbosity, apiStrict);
     }
 };
 MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>);

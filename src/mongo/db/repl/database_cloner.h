@@ -64,8 +64,6 @@ public:
         size_t clonedCollections{0};
         std::vector<CollectionCloner::Stats> collectionStats;
 
-        std::string toString() const;
-        BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };
 

@@ -111,12 +111,15 @@ KeyGenerator::KeyGenerator(OperationContext* opCtx,
               : boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON()),
           collectionType) {}
 
-BSONObj KeyGenerator::generate(OperationContext* opCtx, const SerializationOptions& opts) const {
+BSONObj KeyGenerator::generate(OperationContext* opCtx,
+                               const SerializationOptions& opts,
+                               const SerializationContext& serializationContext) const {
     BSONObjBuilder bob;
 
     // We'll take care of appending this one outside of the appendTo() call below since it needs
     // an OperationContext in some re-parsing cases. The rest is simpler.
-    bob.append("queryShape", _universalComponents._queryShape->toBson(opCtx, opts));
+    bob.append("queryShape",
+               _universalComponents._queryShape->toBson(opCtx, opts, serializationContext));
 
     _universalComponents.appendTo(bob, opts);
     appendCommandSpecificComponents(bob, opts);

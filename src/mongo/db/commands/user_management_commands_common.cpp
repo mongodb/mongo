@@ -75,8 +75,8 @@ Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
                                         << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
-                   ResourcePattern::forDatabaseName(
-                       DatabaseNameUtil::deserialize(targetDb.tenantId(), "admin"_sd)),
+                   ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
+                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
                    ActionType::grantRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To grant privileges affecting multiple databases or the cluster,"
@@ -151,8 +151,8 @@ Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
                                         << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
-                   ResourcePattern::forDatabaseName(
-                       DatabaseNameUtil::deserialize(targetDb.tenantId(), "admin"_sd)),
+                   ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(
+                       targetDb.tenantId(), "admin"_sd, SerializationContext::stateDefault())),
                    ActionType::revokeRole)) {
         return Status(ErrorCodes::Unauthorized,
                       "To revoke privileges affecting multiple databases or the cluster,"

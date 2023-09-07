@@ -223,14 +223,17 @@ public:
      * use the absl::HashOf() API to look them up. Instead, this may be useful to display the key
      * (as it is used for $queryStats) or perhaps one day persist it to storage.
      */
-    BSONObj generate(OperationContext* opCtx, const SerializationOptions& opts) const;
+    BSONObj generate(OperationContext* opCtx,
+                     const SerializationOptions& opts,
+                     const SerializationContext& serializationContext) const;
 
     /**
      * Convenience function.
      */
-    query_shape::QueryShapeHash getQueryShapeHash(OperationContext* opCtx) const {
+    query_shape::QueryShapeHash getQueryShapeHash(
+        OperationContext* opCtx, const SerializationContext& serializationContext) const {
         // TODO (future ticket?) should we cache this somewhere else?
-        return _universalComponents._queryShape->sha256Hash(opCtx);
+        return _universalComponents._queryShape->sha256Hash(opCtx, serializationContext);
     }
 
     int64_t size() const {

@@ -62,8 +62,10 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
             nssOrUuid.isNamespaceString());
     stdx::unordered_set<NamespaceString> involvedNamespaces{nssOrUuid.nss()};
 
-    auto queryShapeHash = std::make_unique<query_shape::FindCmdShape>(*parsedFindCommand, expCtx)
-                              ->sha256Hash(expCtx->opCtx);
+    auto queryShapeHash =
+        std::make_unique<query_shape::FindCmdShape>(*parsedFindCommand, expCtx)
+            ->sha256Hash(expCtx->opCtx,
+                         parsedFindCommand->findCommandRequest->getSerializationContext());
 
     return RepresentativeQueryInfo{std::move(queryShapeHash),
                                    std::move(involvedNamespaces),
@@ -105,11 +107,11 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
 
     auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
     const auto& ns = aggregateCommandRequest.getNamespace();
-
+    const auto sc = aggregateCommandRequest.getSerializationContext();
     auto queryShapeHash =
         std::make_unique<query_shape::AggCmdShape>(
             std::move(aggregateCommandRequest), ns, involvedNamespaces, *pipeline, expCtx)
-            ->sha256Hash(expCtx->opCtx);
+            ->sha256Hash(expCtx->opCtx, sc);
 
     // For aggregate queries, the check for IDHACK should not be taken into account due to the
     // complexity of determining if a pipeline is eligible or not for IDHACK.

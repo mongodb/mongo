@@ -122,13 +122,16 @@ public:
     /**
      * Note this may involve re-parsing command BSON and so is not necessarily cheap.
      */
-    BSONObj toBson(OperationContext*, const SerializationOptions&) const;
+    BSONObj toBson(OperationContext*,
+                   const SerializationOptions&,
+                   const SerializationContext& serializationContext) const;
 
     /**
      * The Query Shape Hash is defined to be the SHA256 Hash of the representatice query shape. This
      * helper computes that.
      */
-    QueryShapeHash sha256Hash(OperationContext*) const;
+    QueryShapeHash sha256Hash(OperationContext*,
+                              const SerializationContext& serializationContext) const;
 
     /**
      * The size of a query shape is important, since we store these in space-constrained
@@ -165,7 +168,9 @@ protected:
                                                   const SerializationOptions& opts) const = 0;
 
 private:
-    void appendCmdNsOrUUID(BSONObjBuilder&, const SerializationOptions&) const;
+    void appendCmdNsOrUUID(BSONObjBuilder&,
+                           const SerializationOptions&,
+                           const SerializationContext& serializationContext) const;
     void appendCmdNs(BSONObjBuilder&, const NamespaceString&, const SerializationOptions&) const;
 };
 

@@ -651,7 +651,7 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
 
     for (const auto& dbEntry : cmdResult["databases"].Obj()) {
         const auto& dbName = DatabaseNameUtil::deserialize(
-            boost::none, dbEntry["name"].String(), SerializationContext::stateCommandRequest());
+            boost::none, dbEntry["name"].String(), SerializationContext::stateDefault());
 
         if (!(dbName.isAdminDB() || dbName.isLocalDB() || dbName.isConfigDB())) {
             dbNames.push_back(dbName);
@@ -1142,7 +1142,8 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
         BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
         for (const auto& dbName : databases) {
             if (!dbName.isLocalDB()) {
-                dbs.append(DatabaseNameUtil::serialize(dbName));
+                dbs.append(
+                    DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
             }
         }
         dbs.doneFast();
@@ -1395,8 +1396,8 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
         SetClusterParameter setClusterParameterRequest(
             BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
                      BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
-        setClusterParameterRequest.setDbName(
-            DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db()));
+        setClusterParameterRequest.setDbName(DatabaseNameUtil::deserialize(
+            tenantId, DatabaseName::kAdmin.db(), SerializationContext::stateDefault()));
         std::unique_ptr<ServerParameterService> parameterService =
             std::make_unique<ClusterParameterService>();
         SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
@@ -1494,7 +1495,8 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
     LOGV2(6360600, "Pushing cluster parameters into new shard");
 
     for (const auto& [tenantId, clusterParameters] : allClusterParameters) {
-        const auto& dbName = DatabaseNameUtil::deserialize(tenantId, DatabaseName::kAdmin.db());
+        const auto& dbName = DatabaseNameUtil::deserialize(
+            tenantId, DatabaseName::kAdmin.db(), SerializationContext::stateDefault());
         // Push cluster parameters into the newly added shard.
         for (auto& parameter : clusterParameters) {
             ShardsvrSetClusterParameter setClusterParamsCmd(

@@ -184,7 +184,8 @@ protected:
         MultikeynessTrie trie;
         bool exists = true;
         CEType ce{false};
-        return ScanDefinition(DatabaseNameUtil::deserialize(boost::none, "test"),
+        return ScanDefinition(DatabaseNameUtil::deserialize(
+                                  boost::none, "test", SerializationContext::stateDefault()),
                               UUID::gen(),
                               opts,
                               indexDefs,

@@ -113,10 +113,7 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const ClusterFindCmdBase* definition, const OpMsgRequest& request)
-            : CommandInvocation(definition),
-              _request(request),
-              _dbName(DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
-                                                    request.getDatabase())) {}
+            : CommandInvocation(definition), _request(request), _dbName(request.getDbName()) {}
 
     private:
         bool supportsWriteConcern() const override {

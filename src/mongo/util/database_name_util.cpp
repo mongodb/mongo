@@ -275,7 +275,7 @@ DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringDat
     const auto tenantId = tenantField.ok()
         ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
         : boost::none;
-    return DatabaseNameUtil::deserialize(tenantId, db);
+    return DatabaseNameUtil::deserialize(tenantId, db, SerializationContext::stateDefault());
 }
 
 DatabaseName DatabaseNameUtil::deserializeForErrorMsg(StringData dbInErrMsg) {

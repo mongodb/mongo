@@ -124,7 +124,8 @@ std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& par
 }  // namespace
 
 BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
-    std::shared_ptr<const KeyGenerator> keyGenerator) const {
+    std::shared_ptr<const KeyGenerator> keyGenerator,
+    const SerializationContext& serializationContext) const {
     static const auto sha256HmacStringDataHasher = [](std::string key, const StringData& sd) {
         auto hashed = SHA256Block::computeHmac(
             (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
@@ -139,7 +140,7 @@ BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
             return sha256HmacStringDataHasher(_hmacKey, sd);
         };
     }
-    return keyGenerator->generate(pExpCtx->opCtx, opts);
+    return keyGenerator->generate(pExpCtx->opCtx, opts, serializationContext);
 }
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
@@ -256,7 +257,8 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
             const auto& keyGenerator = metrics.keyGenerator;
             const auto& hash = absl::HashOf(keyGenerator);
             try {
-                auto queryStatsKey = computeQueryStatsKey(keyGenerator);
+                auto queryStatsKey =
+                    computeQueryStatsKey(keyGenerator, SerializationContext::stateDefault());
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics.toBSON()},
                                                   {"asOf", partitionReadTime}});
@@ -264,7 +266,8 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                 queryStatsHmacApplicationErrors.increment();
                 const auto queryShape = keyGenerator->universalComponents()._queryShape->toBson(
                     pExpCtx->opCtx,
-                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                    SerializationContext::stateDefault());
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "

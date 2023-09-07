@@ -122,10 +122,11 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
     SerializationContext sc = SerializationContext::stateCommandRequest();
     sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
-    AggregateCommandRequest request(NamespaceString::makeCollectionlessAggregateNSS(
-                                        DatabaseNameUtil::deserialize(dbName.tenantId(), "admin")),
-                                    std::move(pipeline),
-                                    sc);
+    AggregateCommandRequest request(
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseNameUtil::deserialize(
+            dbName.tenantId(), "admin", SerializationContext::stateDefault())),
+        std::move(pipeline),
+        sc);
 
     // Run the pipeline and obtain a CursorResponse.
     auto aggResults = uassertStatusOK(runAggregation(opCtx, request));

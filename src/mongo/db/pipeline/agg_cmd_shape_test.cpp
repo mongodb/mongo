@@ -113,7 +113,8 @@ TEST_F(AggCmdShapeTest, BasicPipelineShape) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions));
+                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
 }
 
 TEST_F(AggCmdShapeTest, IncludesLet) {
@@ -144,7 +145,8 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions));
+                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -175,7 +177,8 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
 }
 }  // namespace
 

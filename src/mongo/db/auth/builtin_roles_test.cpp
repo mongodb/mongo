@@ -52,7 +52,7 @@
 namespace mongo {
 namespace {
 
-const auto kAdminDB = DatabaseNameUtil::deserialize(boost::none, "admin"_sd);
+const auto kAdminDB = DatabaseName::kAdmin;
 const auto kAdminRsrc = ResourcePattern::forDatabaseName(kAdminDB);
 const auto kAdminSystemJSNSS =
     NamespaceString::createNamespaceString_forTest(kAdminDB, "system.js"_sd);

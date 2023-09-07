@@ -79,7 +79,7 @@ bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
     // If we are not running in multitenancy mode, then it's possible that the `dbName` has a prefix
     // which hasn't been parsed into the DatabaseName type. Serialize `dbName` to a string, and
     // look for a tenant id manually.
-    auto fullDbName = DatabaseNameUtil::serialize(db);
+    auto fullDbName = DatabaseNameUtil::serialize(db, SerializationContext::stateDefault());
     auto tenantDelim = fullDbName.find('_');
     if (tenantDelim != std::string::npos) {
         return (*tenant).toString() == fullDbName.substr(0, tenantDelim);

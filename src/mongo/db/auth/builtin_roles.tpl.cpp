@@ -60,7 +60,8 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
 //#if $db is None
 //#echo 'dbName'
 //#else
-//#echo 'DatabaseNameUtil::deserialize(dbName.tenantId(), "' + $db + '"_sd)'
+//#echo 'DatabaseNameUtil::deserialize(dbName.tenantId(), "' + $db + '"_sd,'
+//#echo 'SerializationContext::stateDefault())'
 //#end if
 //#end def
 
@@ -165,7 +166,7 @@ const std::map<StringData, BuiltinRoleAttributes> kBuiltinRoleMap = {
 
 const stdx::unordered_set<RoleName> kAdminBuiltinRolesNoTenant = {
     //#for $role in $roles
-    RoleName("$role.name"_sd, DatabaseNameUtil::deserialize(boost::none, kAdminDB)),
+    RoleName("$role.name"_sd, DatabaseName::kAdmin.db()),
     //#end for
 };
 
@@ -209,7 +210,9 @@ stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(const DatabaseName&
 
 void auth::generateUniversalPrivileges(PrivilegeVector* privileges,
                                        const boost::optional<TenantId>& tenantId) {
-    addPrivileges___system(privileges, DatabaseNameUtil::deserialize(tenantId, kAdminDB));
+    addPrivileges___system(
+        privileges,
+        DatabaseNameUtil::deserialize(tenantId, kAdminDB, SerializationContext::stateDefault()));
 }
 
 bool auth::addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges) {

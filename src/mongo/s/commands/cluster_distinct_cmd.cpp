@@ -159,10 +159,7 @@ public:
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
         const BSONObj& cmdObj = opMsgRequest.body;
-        const NamespaceString nss(
-            parseNs(DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
-                                                  opMsgRequest.getDatabase()),
-                    cmdObj));
+        const NamespaceString nss(parseNs(opMsgRequest.getDbName(), cmdObj));
 
         auto parsedDistinctCmd =
             ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), true);

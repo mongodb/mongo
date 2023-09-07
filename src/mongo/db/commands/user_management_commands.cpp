@@ -801,7 +801,8 @@ public:
           _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()},
           // Subclient used by transaction operations.
           _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
-          _dbName{DatabaseNameUtil::deserialize(tenant, kAdminDB)},
+          _dbName{DatabaseNameUtil::deserialize(
+              tenant, kAdminDB, SerializationContext::stateDefault())},
           _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
         // Note: We allow the client to be killable. We only make an operation context on this
         // client during runCommand, and that operation context is short-lived. If we get

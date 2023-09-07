@@ -70,7 +70,7 @@ public:
      * Checks if the database belongs to the given tenant.
      */
     static bool isDatabaseForTenant(const DatabaseName& db,
-                                    const boost::optional<TenantId>& prefix,
+                                    const boost::optional<TenantId>& tenant,
                                     MigrationProtocolEnum protocol);
 };
 

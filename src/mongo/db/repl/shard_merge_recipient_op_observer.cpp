@@ -181,8 +181,10 @@ void deleteTenantDataWhenMergeAborts(const ShardMergeRecipientDocument& doc) {
                                  [tenant = tenantId.toString() + "_"](const DatabaseName& db) {
                                      // In non multitenacy environment, check if the db has a
                                      // matched tenant prefix.
-                                     return StringData{DatabaseNameUtil::serialize(db)}.startsWith(
-                                         tenant);
+                                     return StringData{
+                                         DatabaseNameUtil::serialize(
+                                             db, SerializationContext::stateDefault())}
+                                         .startsWith(tenant);
                                  });
                 }
 

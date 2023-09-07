@@ -213,11 +213,12 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
         if (opDebug.queryStatsKeyGenerator) {
-            return opDebug.queryStatsKeyGenerator->getQueryShapeHash(opCtx);
+            return opDebug.queryStatsKeyGenerator->getQueryShapeHash(
+                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
         }
 
         return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
-            ->sha256Hash(opCtx);
+            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
     };
 
     // Return the found query settings or an empty one.

@@ -76,7 +76,7 @@ public:
         SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
         opts.transformIdentifiers = true;
         opts.transformIdentifiersCallback = applyHmacForTest;
-        auto shapeBson = shape->toBson(_expCtx->opCtx, opts);
+        auto shapeBson = shape->toBson(_expCtx->opCtx, opts, SerializationContext::stateDefault());
         if (auto sortElem = shapeBson["sort"]; !sortElem.eoo()) {
             return sortElem.Obj().getOwned();
         }

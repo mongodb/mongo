@@ -85,7 +85,8 @@ public:
                 opCtx,
                 request().getCommandParameter(),
                 request().getExpectedDatabaseVersion(),
-                request().getTo());
+                request().getTo(),
+                request().getSerializationContext());
         }
 
     private:

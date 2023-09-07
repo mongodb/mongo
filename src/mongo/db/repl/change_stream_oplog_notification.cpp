@@ -138,7 +138,8 @@ void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
 
     for (const auto& dbName : databasesAddedNotification.getNames()) {
         repl::MutableOplogEntry oplogEntry;
-        const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
+        const auto dbNameStr =
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setNss(NamespaceString(dbName));
@@ -164,7 +165,8 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
                                       const ShardId& oldPrimary,
                                       const ShardId& newPrimary) {
     repl::MutableOplogEntry oplogEntry;
-    const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
+    const auto dbNameStr =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault());
 
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(NamespaceString(dbName));

@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+const auto stateDefault = SerializationContext::stateDefault();
+
 // TenantID is not included in serialization when multitenancySupport and
 // featureFlagRequireTenantID are enabled.
 TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
@@ -50,7 +52,7 @@ TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenan
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
-    ASSERT_EQ(DatabaseNameUtil::serialize(dbName), "foo");
+    ASSERT_EQ(DatabaseNameUtil::serialize(dbName, stateDefault), "foo");
 }
 
 // TenantID is included in serialization when multitenancySupport is enabled and
@@ -61,14 +63,14 @@ TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenan
     TenantId tenantId(OID::gen());
     std::string tenantDbStr = str::stream() << tenantId.toString() << "_foo";
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
-    ASSERT_EQ(DatabaseNameUtil::serialize(dbName), tenantDbStr);
+    ASSERT_EQ(DatabaseNameUtil::serialize(dbName, stateDefault), tenantDbStr);
 }
 
 // Serialize correctly when multitenancySupport is disabled.
 TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "foo");
-    ASSERT_EQ(DatabaseNameUtil::serialize(dbName), "foo");
+    ASSERT_EQ(DatabaseNameUtil::serialize(dbName, stateDefault), "foo");
 }
 
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.
@@ -88,7 +90,8 @@ TEST(DatabaseNameUtilTest,
      DeserializeInternalDbTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, "local");
+    DatabaseName dbName =
+        DatabaseNameUtil::deserialize(boost::none, "local", SerializationContext::stateDefault());
     ASSERT_EQ(dbName, DatabaseName::kLocal);
 }
 
@@ -100,7 +103,8 @@ TEST(DatabaseNameUtilTest,
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
-    DatabaseName dbName = DatabaseNameUtil::deserialize(tenantId, "foo");
+    DatabaseName dbName =
+        DatabaseNameUtil::deserialize(tenantId, "foo", SerializationContext::stateDefault());
     ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(tenantId, "foo"));
@@ -113,8 +117,10 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequireTen
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     TenantId tenantId(OID::gen());
     std::string tenantDbStr = str::stream() << tenantId.toString() << "_foo";
-    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, tenantDbStr);
-    DatabaseName dbName1 = DatabaseNameUtil::deserialize(tenantId, tenantDbStr);
+    DatabaseName dbName = DatabaseNameUtil::deserialize(
+        boost::none, tenantDbStr, SerializationContext::stateDefault());
+    DatabaseName dbName1 =
+        DatabaseNameUtil::deserialize(tenantId, tenantDbStr, SerializationContext::stateDefault());
     ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(tenantId, "foo"));
@@ -125,7 +131,10 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequireTen
 TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
-    ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(tenantId, "foo"), AssertionException, 7005302);
+    ASSERT_THROWS_CODE(
+        DatabaseNameUtil::deserialize(tenantId, "foo", SerializationContext::stateDefault()),
+        AssertionException,
+        7005302);
 }
 
 // Deserialize DatabaseName with prefixed tenantId when multitenancySupport and
@@ -135,7 +144,8 @@ TEST(DatabaseNameUtilTest,
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
     std::string dbNameStr = str::stream() << tenantId.toString() << "_foo";
-    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, dbNameStr);
+    DatabaseName dbName =
+        DatabaseNameUtil::deserialize(boost::none, dbNameStr, SerializationContext::stateDefault());
     ASSERT_EQ(dbName.tenantId(), boost::none);
     ASSERT_EQ(dbName.toString_forTest(), dbNameStr);
 }
@@ -144,7 +154,8 @@ TEST(DatabaseNameUtilTest,
 TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequireTenantIDOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
-    DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, "foo");
+    DatabaseName dbName =
+        DatabaseNameUtil::deserialize(boost::none, "foo", SerializationContext::stateDefault());
     ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(!dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(boost::none, "foo"));

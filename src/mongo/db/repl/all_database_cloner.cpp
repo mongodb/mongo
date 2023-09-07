@@ -195,7 +195,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
         boost::optional<TenantId> tenantId = dbBSON.hasField("tenantId")
             ? boost::make_optional<TenantId>(TenantId::parseFromBSON(dbBSON["tenantId"]))
             : boost::none;
-        DatabaseName dbName = DatabaseNameUtil::deserialize(tenantId, dbBSON["name"].str());
+        const DatabaseName dbName = DatabaseNameUtil::deserialize(
+            tenantId, dbBSON["name"].str(), SerializationContext::stateDefault());
 
         if (dbName.isLocalDB()) {
             LOGV2_DEBUG(21056,
@@ -387,10 +388,6 @@ std::string AllDatabaseCloner::toString() const {
                          << " db cloners completed:" << _stats.databasesCloned;
 }
 
-std::string AllDatabaseCloner::Stats::toString() const {
-    return toBSON().toString();
-}
-
 BSONObj AllDatabaseCloner::Stats::toBSON() const {
     BSONObjBuilder bob;
     append(&bob);
@@ -401,7 +398,8 @@ void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("databasesToClone", static_cast<long long>(databasesToClone));
     builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
     for (auto&& db : databaseStats) {
-        BSONObjBuilder dbBuilder(builder->subobjStart(DatabaseNameUtil::serialize(db.dbname)));
+        BSONObjBuilder dbBuilder(builder->subobjStart(
+            DatabaseNameUtil::serialize(db.dbname, SerializationContext::stateDefault())));
         db.append(&dbBuilder);
         dbBuilder.doneFast();
     }

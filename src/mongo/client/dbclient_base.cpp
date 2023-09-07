@@ -443,7 +443,10 @@ void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringD
 }
 
 void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    runCommand(DatabaseNameUtil::deserialize(boost::none, dbname), BSON("logout" << 1), info);
+    runCommand(
+        DatabaseNameUtil::deserialize(boost::none, dbname, SerializationContext::stateDefault()),
+        BSON("logout" << 1),
+        info);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {

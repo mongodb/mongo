@@ -83,7 +83,8 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeQueryingRecipients);
 
 BSONObj makeCommandObj(const NamespaceString& ns) {
     auto command = _shardsvrReshardingOperationTime(ns);
-    command.setDbName(DatabaseNameUtil::deserialize(ns.tenantId(), DatabaseName::kAdmin.db()));
+    command.setDbName(DatabaseNameUtil::deserialize(
+        ns.tenantId(), DatabaseName::kAdmin.db(), SerializationContext::stateDefault()));
     return command.toBSON({});
 }
 

@@ -144,10 +144,13 @@ public:
 
             // If there is no database name present in the input, run validation against all the
             // databases.
+            // validateDBMetadata accepts a command parameter `db` which is different than `$db`.
+            // If we have `getDb` which returns the `db` parameter, we should use it.
             auto dbNames = validateCmdRequest.getDb()
                 ? std::vector<DatabaseName>{DatabaseNameUtil::deserialize(
                       validateCmdRequest.getDbName().tenantId(),
-                      validateCmdRequest.getDb()->toString())}
+                      validateCmdRequest.getDb()->toString(),
+                      validateCmdRequest.getSerializationContext())}
                 : collectionCatalog->getAllDbNames();
 
             for (const auto& dbName : dbNames) {

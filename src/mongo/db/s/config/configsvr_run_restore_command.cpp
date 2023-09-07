@@ -241,8 +241,7 @@ public:
         if (TestingProctor::instance().isEnabled()) {
             // All collections in the config server must be defined in kConfigCollections.
             // Collections to restore should be defined in kCollectionEntries.
-            auto collInfos =
-                client.getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, "config"));
+            auto collInfos = client.getCollectionInfos(DatabaseName::kConfig);
             for (auto&& info : collInfos) {
                 StringData collName = info.getStringField("name");
                 // Ignore cache collections as they will be dropped later in the restore procedure.

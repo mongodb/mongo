@@ -179,10 +179,11 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
     write_ops::UpdateCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
     sampledCmd.setLet(originalCmd.getLet());
 
-    return {
-        sampleId,
-        sampledCmd.getNamespace(),
-        sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db_forSharding().toString()))};
+    return {sampleId,
+            sampledCmd.getNamespace(),
+            sampledCmd.toBSON(
+                BSON("$db" << DatabaseNameUtil::serialize(sampledCmd.getNamespace().dbName(),
+                                                          sampledCmd.getSerializationContext())))};
 }
 
 /*

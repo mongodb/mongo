@@ -744,7 +744,8 @@ boost::optional<TenantId> parseTenantIdFromDatabaseName(const DatabaseName& dbNa
         return dbName.tenantId();
     }
 
-    const auto tenantStr = getTenantPrefix(DatabaseNameUtil::serialize(dbName));
+    const auto tenantStr =
+        getTenantPrefix(DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
     if (tenantStr.empty()) {
         // Not a tenant database.
         return boost::none;
@@ -766,7 +767,8 @@ boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& d
         }
     }
 
-    const auto tenantStr = getTenantPrefix(DatabaseNameUtil::serialize(dbName));
+    const auto tenantStr =
+        getTenantPrefix(DatabaseNameUtil::serialize(dbName, SerializationContext::stateDefault()));
     if (tenantStr.empty()) {
         // Not a tenant database.
         return boost::none;

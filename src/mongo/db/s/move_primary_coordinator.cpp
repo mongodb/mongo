@@ -100,7 +100,8 @@ MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* se
       _csReason([&] {
           BSONObjBuilder builder;
           builder.append("command", "movePrimary");
-          builder.append("db", DatabaseNameUtil::serialize(_dbName));
+          builder.append(
+              "db", DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
           builder.append("to", _doc.getToShardId());
           return builder.obj();
       }()) {}
@@ -511,7 +512,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
 
     const auto cloneCommand = [&] {
         BSONObjBuilder commandBuilder;
-        commandBuilder.append("_shardsvrCloneCatalogData", DatabaseNameUtil::serialize(_dbName));
+        commandBuilder.append(
+            "_shardsvrCloneCatalogData",
+            DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
         commandBuilder.append("from", fromShard->getConnString().toString());
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
     }();
@@ -587,7 +590,8 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
             NamespaceString::kConfigDatabasesNamespace,
-            BSON(DatabaseType::kDbNameFieldName << DatabaseNameUtil::serialize(_dbName)),
+            BSON(DatabaseType::kDbNameFieldName
+                 << DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault())),
             BSONObj(),
             1));
 

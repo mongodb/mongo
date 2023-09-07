@@ -119,7 +119,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             // renameCollection commands must be run on the 'admin' database. Its arguments are
             // fully qualified namespaces. Catalog internals don't know the op produced by running
             // renameCollection was originally run on 'admin', so we must restore this.
-            dbNameForAuthCheck = DatabaseNameUtil::deserialize(nss.tenantId(), "admin");
+            dbNameForAuthCheck = DatabaseNameUtil::deserialize(
+                nss.tenantId(), "admin", SerializationContext::stateDefault());
         }
 
         // TODO reuse the parse result for when we run() later. Note that when running,

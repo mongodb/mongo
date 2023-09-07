@@ -158,7 +158,8 @@ private:
           _algorithm(algorithm),
           _hmacKey(hmacKey) {}
 
-    BSONObj computeQueryStatsKey(std::shared_ptr<const KeyGenerator> keyGenerator) const;
+    BSONObj computeQueryStatsKey(std::shared_ptr<const KeyGenerator> keyGenerator,
+                                 const SerializationContext& serializationContext) const;
 
     GetNextResult doGetNext() final;
 
