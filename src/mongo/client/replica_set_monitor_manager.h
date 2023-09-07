@@ -48,7 +48,7 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor_stats.h"
-#include "mongo/executor/egress_tag_closer.h"
+#include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
@@ -85,7 +85,7 @@ public:
                        executor::RemoteCommandResponse&& response) override;
 };
 
-class ReplicaSetMonitorConnectionManager : public executor::EgressTagCloser {
+class ReplicaSetMonitorConnectionManager : public executor::EgressConnectionCloser {
     ReplicaSetMonitorConnectionManager() = delete;
 
 public:
@@ -95,15 +95,13 @@ public:
     void dropConnections(const HostAndPort& hostAndPort) override;
 
     // Not supported.
-    void dropConnections(transport::Session::TagMask tags) override {
+    void dropConnections() override {
         MONGO_UNREACHABLE;
     };
     // Not supported.
-    void mutateTags(const HostAndPort& hostAndPort,
-                    const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
-                        mutateFunc) override {
+    void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override {
         MONGO_UNREACHABLE;
-    };
+    }
 
 private:
     std::shared_ptr<executor::NetworkInterface> _network;
@@ -195,9 +193,9 @@ public:
 
 private:
     /**
-     * Returns an EgressTagCloser controlling the executor's network interface.
+     * Returns an EgressConnectionCloser controlling the executor's network interface.
      */
-    std::shared_ptr<executor::EgressTagCloser> _getConnectionManager();
+    std::shared_ptr<executor::EgressConnectionCloser> _getConnectionManager();
 
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 

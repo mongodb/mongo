@@ -121,7 +121,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        'egress_tag_closer_manager',
+        'egress_connection_closer_manager',
     ],
 )
 
@@ -149,9 +149,9 @@ env.Library(
 )
 
 env.Library(
-    target='egress_tag_closer_manager',
+    target='egress_connection_closer_manager',
     source=[
-        'egress_tag_closer_manager.cpp',
+        'egress_connection_closer_manager.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -213,7 +213,7 @@ env.Library(
     ], LIBDEPS=[
         'connection_pool_executor',
     ], LIBDEPS_PRIVATE=[
-        'egress_tag_closer_manager',
+        'egress_connection_closer_manager',
         'network_interface',
         'network_interface_tl',
     ])
@@ -425,7 +425,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'async_rpc',
         'connection_pool_executor',
-        'egress_tag_closer_manager',
+        'egress_connection_closer_manager',
         'hedge_options_util',
         'hedging_metrics',
         'inline_executor',

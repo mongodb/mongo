@@ -33,7 +33,7 @@
 
 #include <absl/container/node_hash_set.h>
 
-#include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -43,48 +43,46 @@
 namespace mongo {
 namespace executor {
 
-const auto egressTagCloserManagerDecoration =
-    ServiceContext::declareDecoration<EgressTagCloserManager>();
+const auto egressConnectionCloserManagerDecoration =
+    ServiceContext::declareDecoration<EgressConnectionCloserManager>();
 
-EgressTagCloserManager& EgressTagCloserManager::get(ServiceContext* svc) {
-    return egressTagCloserManagerDecoration(svc);
+EgressConnectionCloserManager& EgressConnectionCloserManager::get(ServiceContext* svc) {
+    return egressConnectionCloserManagerDecoration(svc);
 }
 
-void EgressTagCloserManager::add(EgressTagCloser* etc) {
+void EgressConnectionCloserManager::add(EgressConnectionCloser* ecc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    _egressTagClosers.insert(etc);
+    _egressConnectionClosers.insert(ecc);
 }
 
-void EgressTagCloserManager::remove(EgressTagCloser* etc) {
+void EgressConnectionCloserManager::remove(EgressConnectionCloser* ecc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    _egressTagClosers.erase(etc);
+    _egressConnectionClosers.erase(ecc);
 }
 
-void EgressTagCloserManager::dropConnections(transport::Session::TagMask tags) {
+void EgressConnectionCloserManager::dropConnections() {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    for (auto etc : _egressTagClosers) {
-        etc->dropConnections(tags);
+    for (auto ecc : _egressConnectionClosers) {
+        ecc->dropConnections();
     }
 }
 
-void EgressTagCloserManager::dropConnections(const HostAndPort& hostAndPort) {
+void EgressConnectionCloserManager::dropConnections(const HostAndPort& hostAndPort) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    for (auto etc : _egressTagClosers) {
-        etc->dropConnections(hostAndPort);
+    for (auto ecc : _egressConnectionClosers) {
+        ecc->dropConnections(hostAndPort);
     }
 }
 
-void EgressTagCloserManager::mutateTags(
-    const HostAndPort& hostAndPort,
-    const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
+void EgressConnectionCloserManager::setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    for (auto etc : _egressTagClosers) {
-        etc->mutateTags(hostAndPort, mutateFunc);
+    for (auto ecc : _egressConnectionClosers) {
+        ecc->setKeepOpen(hostAndPort, keepOpen);
     }
 }
 

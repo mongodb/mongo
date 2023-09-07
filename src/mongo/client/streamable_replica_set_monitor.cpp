@@ -77,7 +77,7 @@ using std::vector;
 
 namespace {
 // Pull nested types to top-level scope
-using executor::EgressTagCloser;
+using executor::EgressConnectionCloser;
 using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
@@ -186,7 +186,7 @@ bool hasMembershipChange(sdam::TopologyDescriptionPtr oldDescription,
 StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
-    std::shared_ptr<executor::EgressTagCloser> connectionManager,
+    std::shared_ptr<executor::EgressConnectionCloser> connectionManager,
     std::function<void()> cleanupCallback,
     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats)
     : ReplicaSetMonitor(cleanupCallback),
@@ -227,7 +227,7 @@ StreamableReplicaSetMonitor::~StreamableReplicaSetMonitor() {
 ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
-    std::shared_ptr<executor::EgressTagCloser> connectionManager,
+    std::shared_ptr<executor::EgressConnectionCloser> connectionManager,
     std::function<void()> cleanupCallback,
     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats) {
     auto result = std::make_shared<StreamableReplicaSetMonitor>(

@@ -47,8 +47,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/executor/egress_tag_closer.h"
-#include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/executor/egress_connection_closer.h"
+#include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -81,7 +81,8 @@ struct ConnectionPoolStats;
  * The overall workflow here is to manage separate pools for each unique
  * HostAndPort. See comments on the various Options for how the pool operates.
  */
-class ConnectionPool : public EgressTagCloser, public std::enable_shared_from_this<ConnectionPool> {
+class ConnectionPool : public EgressConnectionCloser,
+                       public std::enable_shared_from_this<ConnectionPool> {
     class LimitController;
 
 public:
@@ -162,7 +163,7 @@ public:
          *
          * The manager will hold this pool for the lifetime of the pool.
          */
-        EgressTagCloserManager* egressTagCloserManager = nullptr;
+        EgressConnectionCloserManager* egressConnectionCloserManager = nullptr;
 
         /**
          * Connections created through this connection pool will not attempt to authenticate.
@@ -264,11 +265,17 @@ public:
 
     void dropConnections(const HostAndPort& hostAndPort) override;
 
-    void dropConnections(transport::Session::TagMask tags) override;
+    /**
+     * Drops all connections, but if a certain SpecificPool (and therefore HostAndPort) is
+     * marked as keep open, that connection will not be dropped.
+     */
+    void dropConnections() override;
 
-    void mutateTags(const HostAndPort& hostAndPort,
-                    const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
-                        mutateFunc) override;
+    /**
+     * Marks SpecificPool to be kept open for dropConnections(), must acquire connection pool
+     * mutex.
+     */
+    void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override;
 
     inline SemiFuture<ConnectionHandle> get(
         const HostAndPort& hostAndPort,
@@ -336,7 +343,7 @@ private:
     PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
 
-    EgressTagCloserManager* _manager;
+    EgressConnectionCloserManager* _manager;
 
     mutable ClockSource* _fastClockSource{nullptr};
     mutable std::once_flag _fastClkSrcInitFlag;

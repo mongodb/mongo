@@ -1851,22 +1851,19 @@ void ConnectionPoolTest::dropConnectionsTest(std::shared_ptr<ConnectionPool> con
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap3));
 
-    t->dropConnections(transport::Session::kPending);
+    t->dropConnections();
 
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap1));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap3));
 
-    t->mutateTags(hap1,
-                  [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
+    t->setKeepOpen(hap1, true);
 
-    t->mutateTags(hap2,
-                  [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
+    t->setKeepOpen(hap2, true);
 
-    t->mutateTags(
-        hap3, [](transport::Session::TagMask tags) { return transport::Session::kEmptyTagMask; });
+    t->setKeepOpen(hap3, false);
 
-    t->dropConnections(transport::Session::kKeepOpen);
+    t->dropConnections();
 
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap1));
     ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap2));
@@ -1897,10 +1894,10 @@ TEST_F(ConnectionPoolTest, DropConnections) {
 }
 
 TEST_F(ConnectionPoolTest, DropConnectionsInMultipleViaManager) {
-    EgressTagCloserManager manager;
+    EgressConnectionCloserManager manager;
     ConnectionPool::Options options;
     options.minConnections = 0;
-    options.egressTagCloserManager = &manager;
+    options.egressConnectionCloserManager = &manager;
     auto pool = makePool(options);
 
     dropConnectionsTest(pool, &manager);

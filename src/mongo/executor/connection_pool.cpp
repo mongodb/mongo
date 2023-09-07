@@ -402,18 +402,14 @@ public:
     }
 
     /**
-     * Return true if the tags on the specific pool match the passed in tags
+     * Return true if the specific pool should be kept open.
      */
-    bool matchesTags(transport::Session::TagMask tags) const {
-        return !!(_tags & tags);
+    bool isKeepOpen(WithLock) const {
+        return _keepOpen;
     }
 
-    /**
-     * Atomically manipulate the tags in the pool
-     */
-    void mutateTags(
-        const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
-        _tags = mutateFunc(_tags);
+    void setKeepOpen(WithLock, bool keepOpen) {
+        _keepOpen = keepOpen;
     }
 
     void fassertSSLModeIs(transport::ConnectSSLMode desired) const {
@@ -543,7 +539,8 @@ private:
 
     ConnectionWaitTimeHistogram _connAcquisitionWaitTimeStats{};
 
-    transport::Session::TagMask _tags = transport::Session::kPending;
+    // Indicates connections associated with this HostAndPort should be kept open.
+    bool _keepOpen = true;
 
     HostHealth _health;
 };
@@ -574,7 +571,7 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _factory(std::move(impl)),
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
-      _manager(_options.egressTagCloserManager) {
+      _manager(_options.egressConnectionCloserManager) {
     if (_manager) {
         _manager->add(this);
     }
@@ -622,7 +619,7 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
         Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
 }
 
-void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
+void ConnectionPool::dropConnections() {
     stdx::lock_guard lk(_mutex);
 
     // SpecificPool::triggerShutdown can cause iterator invalidation (e.g. `pool` removing itself
@@ -632,7 +629,7 @@ void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
         auto& pool = it->second;
         ++it;
 
-        if (pool->matchesTags(tags))
+        if (pool->isKeepOpen(lk))
             continue;
 
         pool->triggerShutdown(
@@ -640,9 +637,7 @@ void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
     }
 }
 
-void ConnectionPool::mutateTags(
-    const HostAndPort& hostAndPort,
-    const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
+void ConnectionPool::setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) {
     stdx::lock_guard lk(_mutex);
 
     auto iter = _pools.find(hostAndPort);
@@ -651,7 +646,7 @@ void ConnectionPool::mutateTags(
         return;
 
     auto pool = iter->second;
-    pool->mutateTags(mutateFunc);
+    pool->setKeepOpen(lk, keepOpen);
 }
 
 void ConnectionPool::retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb) {

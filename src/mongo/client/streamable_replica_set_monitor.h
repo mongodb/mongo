@@ -59,7 +59,7 @@
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
-#include "mongo/executor/egress_tag_closer.h"
+#include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
@@ -104,7 +104,7 @@ public:
 
     StreamableReplicaSetMonitor(const MongoURI& uri,
                                 std::shared_ptr<executor::TaskExecutor> executor,
-                                std::shared_ptr<executor::EgressTagCloser> connectionManager,
+                                std::shared_ptr<executor::EgressConnectionCloser> connectionManager,
                                 std::function<void()> cleanupCallback,
                                 std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
@@ -116,11 +116,12 @@ public:
 
     void drop() override;
 
-    static ReplicaSetMonitorPtr make(const MongoURI& uri,
-                                     std::shared_ptr<executor::TaskExecutor> executor,
-                                     std::shared_ptr<executor::EgressTagCloser> connectionCloser,
-                                     std::function<void()> cleanupCallback,
-                                     std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
+    static ReplicaSetMonitorPtr make(
+        const MongoURI& uri,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::EgressConnectionCloser> egressConnectionCloser,
+        std::function<void()> cleanupCallback,
+        std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const std::vector<HostAndPort>& excludedHosts,
@@ -334,7 +335,7 @@ private:
     StreamableReplicaSetMonitorDiscoveryTimeProcessorPtr _primaryDiscoveryTimeProcessor;
     const MongoURI _uri;
 
-    std::shared_ptr<executor::EgressTagCloser> _connectionManager;
+    std::shared_ptr<executor::EgressConnectionCloser> _connectionManager;
     std::shared_ptr<executor::TaskExecutor> _executor;
 
     AtomicWord<bool> _isDropped{true};

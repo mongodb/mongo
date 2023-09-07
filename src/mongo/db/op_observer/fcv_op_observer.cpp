@@ -55,7 +55,7 @@
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -104,8 +104,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         // Close all outgoing connections to servers with binary versions lower than ours.
         pauseBeforeCloseCxns.pauseWhileSet();
 
-        executor::EgressTagCloserManager::get(opCtx->getServiceContext())
-            .dropConnections(transport::Session::kKeepOpen | transport::Session::kPending);
+        executor::EgressConnectionCloserManager::get(opCtx->getServiceContext()).dropConnections();
 
         if (MONGO_unlikely(finishedDropConnections.shouldFail())) {
             LOGV2(575210, "Hit finishedDropConnections failpoint");

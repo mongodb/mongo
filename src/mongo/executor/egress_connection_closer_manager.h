@@ -34,7 +34,7 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/db/service_context.h"
-#include "mongo/executor/egress_tag_closer.h"
+#include "mongo/executor/egress_connection_closer.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
@@ -45,32 +45,35 @@ namespace mongo {
 namespace executor {
 
 /**
- * Manager for some number of EgressTagClosers, controlling dispatching to the managed resources.
+ * Manager for some number of EgressConnectionClosers, controlling dispatching to the managed
+ * resources.
  *
- * The idea is that you own some semi-global EgressTagCloserManager which owns a bunch of TagClosers
- * (which register themselves with it) and then interact exclusively with the manager.
+ * The idea is that you own some semi-global EgressConnectionCloserManager which owns a bunch of
+ * EgressConnectionClosers (which register themselves with it) and then interact exclusively with
+ * the manager.
  */
-class EgressTagCloserManager {
+class EgressConnectionCloserManager {
 public:
-    EgressTagCloserManager() = default;
+    EgressConnectionCloserManager() = default;
 
-    static EgressTagCloserManager& get(ServiceContext* svc);
+    static EgressConnectionCloserManager& get(ServiceContext* svc);
 
-    void add(EgressTagCloser* etc);
-    void remove(EgressTagCloser* etc);
+    void add(EgressConnectionCloser* etc);
+    void remove(EgressConnectionCloser* etc);
 
-    void dropConnections(transport::Session::TagMask tags);
+    // Drops all closers' connections, deferring to their dropConnections().
+    void dropConnections();
 
+    // Drops all connections associated with the HostAndPort on any closer.
     void dropConnections(const HostAndPort& hostAndPort);
 
-    void mutateTags(
-        const HostAndPort& hostAndPort,
-        const std::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc);
+    // Mark keep open on all connections associated with a HostAndPort on all closers.
+    void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen);
 
 private:
     Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "EgressTagCloserManager::_mutex");
-    stdx::unordered_set<EgressTagCloser*> _egressTagClosers;
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "EgressConnectionCloserManager::_mutex");
+    stdx::unordered_set<EgressConnectionCloser*> _egressConnectionClosers;
 };
 
 }  // namespace executor

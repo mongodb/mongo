@@ -38,25 +38,29 @@ namespace mongo {
 namespace executor {
 
 /**
- * Thin interface for types that can mutateTags called on them and then later be dropped or not
- * based on those tags.  Largely to support upgrade/downgrade scenarios with hosts we should now no
- * longer talk to.
+ * Thin interface for types that can drop connections, or drop connections considering only those
+ * associated with a HostAndPort. Connections associated with a HostAndPort can also be marked as
+ * to be kept open, though it is up to implementations to decide on the interactions between
+ * dropping and keeping open.
+ *
+ * Largely to support egress connections on upgrade/downgrade scenarios with hosts we should now
+ * no longer talk to.
  */
-class EgressTagCloser {
+class EgressConnectionCloser {
 public:
-    virtual ~EgressTagCloser() {}
+    virtual ~EgressConnectionCloser() {}
 
-    virtual void dropConnections(transport::Session::TagMask tags) = 0;
+    // Drop connections.
+    virtual void dropConnections() = 0;
 
+    // Drop connections, considering only those associated with a specific HostAndPort.
     virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
 
-    virtual void mutateTags(
-        const HostAndPort& hostAndPort,
-        const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
-            mutateFunc) = 0;
+    // Mark connections associated with a certain HostAndPort as to be kept open.
+    virtual void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) = 0;
 
 protected:
-    EgressTagCloser() {}
+    EgressConnectionCloser() {}
 };
 
 }  // namespace executor

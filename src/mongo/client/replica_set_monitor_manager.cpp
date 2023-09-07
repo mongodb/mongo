@@ -365,7 +365,8 @@ std::shared_ptr<executor::TaskExecutor> ReplicaSetMonitorManager::getExecutor() 
     return _taskExecutor;
 }
 
-std::shared_ptr<executor::EgressTagCloser> ReplicaSetMonitorManager::_getConnectionManager() {
+std::shared_ptr<executor::EgressConnectionCloser>
+ReplicaSetMonitorManager::_getConnectionManager() {
     invariant(_connectionManager);
     return _connectionManager;
 }
