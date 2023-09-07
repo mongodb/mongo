@@ -1282,6 +1282,14 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         }
     }
 
+    if (source == OperationSource::kTimeseriesInsert) {
+        // Disable auto yielding in the plan executor in order to prevent retrying on
+        // WriteConflictExceptions internally. A WriteConflictException can be thrown in order to
+        // abort a WriteBatch in an attempt to retry the operation, so we need it to escape the plan
+        // executor layer.
+        updateRequest->setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    }
+
     if (const auto& coll = collection.getCollectionPtr()) {
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));

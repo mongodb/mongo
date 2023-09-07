@@ -64,32 +64,40 @@ const awaitUpdate = startParallelShell(
     }, dbName, coll.getName(), modified), conn.port);
 fpUpdate.wait();
 
-fpUpdate.off();
+// A direct update holds open a storage transaction with the modification performed before checking
+// if the bucket it's modifying is in the prepared state. This causes this insert to throw a
+// WriteConflictException, aborting the WriteBatch before retrying the operation and opening a new
+// bucket for the measurement.
 fpInsert.off();
-awaitUpdate();
 awaitInsert();
 
-// The expected ordering is that the insert finished, then the update overwrote the bucket document,
-// so there should be one document, and a closed flag.
+// After throwing the WriteConflictException due to the bucket being prepared, the operation is
+// retried and overwrites the bucket document.
+fpUpdate.off();
+awaitUpdate();
 
-assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
-
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
-assert.eq(buckets.length, 1);
-assert.eq(buckets[0].control.min[timeFieldName], times[0]);
-assert.eq(buckets[0].control.max[timeFieldName], times[0]);
-assert(buckets[0].control.closed);
-
-// Now another insert should generate a new bucket.
-
-assert.commandWorked(coll.insert(docs[2]));
-assert.docEq([docs[0], docs[2]], coll.find().sort({_id: 1}).toArray());
+// The expectation is that the first document is overwritten, and the second document holds the
+// measurement that was retried.
+assert.docEq(docs.slice(0, 2), coll.find().sort({_id: 1}).toArray());
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 2);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
-assert.eq(buckets[1].control.min[timeFieldName], times[2]);
+assert(buckets[0].control.closed);
+
+assert.eq(buckets[1].control.min[timeFieldName], times[1]);
+assert.eq(buckets[1].control.max[timeFieldName], times[1]);
+
+// Now another insert should land in the second bucket.
+assert.commandWorked(coll.insert(docs[2]));
+assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
+
+buckets = bucketsColl.find().sort({_id: 1}).toArray();
+assert.eq(buckets.length, 2);
+assert.eq(buckets[0].control.min[timeFieldName], times[0]);
+assert.eq(buckets[0].control.max[timeFieldName], times[0]);
+assert.eq(buckets[1].control.min[timeFieldName], times[1]);
 assert.eq(buckets[1].control.max[timeFieldName], times[2]);
 
 MongoRunner.stopMongod(conn);
