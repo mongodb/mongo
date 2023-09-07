@@ -5,8 +5,8 @@
 (function() {
 "use strict";
 
-const collNamePrefix = jsTestName() + "_collection";
-const viewNamePrefix = jsTestName() + "_view";
+const collNamePrefix = "rename_collection_view_collection";
+const viewNamePrefix = "rename_collection_view_view";
 let collCounter = 0;
 let viewCounter = 0;
 
