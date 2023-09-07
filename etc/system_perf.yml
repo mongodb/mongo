@@ -767,6 +767,13 @@ tasks:
         vars:
           test_control: "tsbs_query_manual_bucketing"
 
+  - name: tsbs_query_fixed_bucketing
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_fixed_bucketing"
+
   - name: tpcc
     priority: 5
     commands:
@@ -2561,6 +2568,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
       - name: tpcc
       - name: tpcc_majority
       - name: tpch_1_normalized
@@ -3218,6 +3226,7 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
       - name: big_update_10k
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
@@ -3361,6 +3370,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
 
   - name: linux-3-node-replSet-last-lts-fcv.2022-11
     display_name: Linux 3-Node ReplSet (Last LTS FCV) 2022-11
@@ -3418,6 +3428,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
 
   - name: linux-3-node-replSet-all-feature-flags.2022-11
     display_name: Linux 3-Node ReplSet (all feature flags) 2022-11
@@ -3477,6 +3488,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
       - name: dbcheck
 
   - name: linux-3-node-replSet-notls.2022-11
