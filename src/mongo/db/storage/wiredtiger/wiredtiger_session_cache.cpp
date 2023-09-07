@@ -299,9 +299,14 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
     if (current != start) {
         // Someone else synced already since we read lastSyncTime, so we're done!
+
+        // Unconditionally unlock mutex here to run operations that do not require synchronization.
+        // The JournalListener is the only operation that meets this criteria currently.
+        lk.unlock();
         if (token) {
             journalListener->onDurable(token.value());
         }
+
         return;
     }
     _lastSyncTime.store(current + 1);
@@ -333,6 +338,9 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
         _timeSinceLastDurabilitySessionReset.reset();
     }
 
+    // Unconditionally unlock mutex here to run operations that do not require synchronization.
+    // The JournalListener is the only operation that meets this criteria currently.
+    lk.unlock();
     if (token) {
         journalListener->onDurable(token.value());
     }
