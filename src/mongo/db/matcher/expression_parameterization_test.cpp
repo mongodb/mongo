@@ -526,6 +526,63 @@ TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsThreeParamWith
 }
 
 TEST(MatchExpressionParameterizationVisitor,
+     MapIsUsedForParamIdLookupsAfterContextSizeExceedsThreshold) {
+    MatchExpressionParameterizationVisitorContext context{};
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+
+    auto expectedSize = context.kUseMapThreshold;
+
+    auto addExpressions = [&]() {
+        for (size_t i = 0; i < expectedSize; i++) {
+            BSONObj gt = BSON("$gt" << static_cast<int>(i));
+            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
+        }
+    };
+
+    // Add the same set of 50 expressions twice. For duplicate expressions, param ids will be reused
+    // by doing a lookup on the map.
+    addExpressions();
+    addExpressions();
+
+    OrMatchExpression expr{std::move(expressions)};
+    walkExpression(&context, &expr);
+
+    // Ensure param ids were reused for duplicate expressions.
+    ASSERT_EQ(expectedSize, context.inputParamIdToExpressionMap.size());
+    // The tasserts in MatchExpressionParameterizationVisitorContext::nextReusableInputParamId
+    // ensure the map is actually used for lookups once the amount of input param ids exceeds
+    // kUseMapThreshold.
+    ASSERT_TRUE(context.inputParamIdToExpressionMap.usingMap());
+}
+
+TEST(MatchExpressionParameterizationVisitor,
+     MapIsNotUsedForParamIdLookupsUntilContextSizeExceedsThreshold) {
+    MatchExpressionParameterizationVisitorContext context{};
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+
+    auto expectedSize = context.kUseMapThreshold - 1;
+
+    auto addExpressions = [&]() {
+        for (size_t i = 0; i < expectedSize; i++) {
+            BSONObj gt = BSON("$gt" << static_cast<int>(i));
+            expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, gt["$gt"]));
+        }
+    };
+
+    // Add the same set of 49 expressions twice. For duplicate expressions, param ids will be reused
+    // by doing a lookup on the vector.
+    addExpressions();
+    addExpressions();
+
+    OrMatchExpression expr{std::move(expressions)};
+    walkExpression(&context, &expr);
+
+    // Ensure param ids were reused for duplicate expressions.
+    ASSERT_EQ(expectedSize, context.inputParamIdToExpressionMap.size());
+    ASSERT_FALSE(context.inputParamIdToExpressionMap.usingMap());
+}
+
+TEST(MatchExpressionParameterizationVisitor,
      AutoParametrizationWalkerSetsCorrectNumberOfParamsIds) {
     BSONObj equalityExpr = BSON("x" << 1);
     BSONObj gtExpr = BSON("y" << BSON("$gt" << 2));

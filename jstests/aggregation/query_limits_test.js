@@ -85,60 +85,58 @@ function testLargeAndOrPredicates() {
     }
     jsTestLog("Testing large $and/$or predicates");
 
-    // TODO: SERVER-79092 uncomment this test. This is an issue with match expression
-    // auto-parameterization. This affects both classic and SBE.
     // Large $match of the form {$match: {a0: 1, a1: 1, ...}}
-    // const largeMatch = {};
-    // range(1200000).forEach(function(i) {
-    //     largeMatch["a" + i] = NumberInt(1);
-    // });
-    // runAgg([{$match: largeMatch}]);
+    const largeMatch = {};
+    range(1200000).forEach(function(i) {
+        largeMatch["a" + i] = NumberInt(1);
+    });
+    runAgg([{$match: largeMatch}]);
 
-    // function intStream(n) {
-    //     return range(n).map(i => NumberInt(i));
-    // }
+    function intStream(n) {
+        return range(n).map(i => NumberInt(i));
+    }
 
-    // const andOrFilters = [
-    //     // Plain a=i filter.
-    //     intStream(800000).map(function(i) {
-    //         return {a: i};
-    //     }),
-    //     // a_i = i filter. Different field for each value.
-    //     intStream(600000).map(function(i) {
-    //         const field = "a" + i;
-    //         return {[field]: i};
-    //     }),
-    //     // Mix of lt and gt with the same field.
-    //     intStream(500000).map(function(i) {
-    //         const predicate = i % 2 ? {$lt: i} : {$gt: i};
-    //         return {a: predicate};
-    //     }),
-    //     // Mix of lt and gt with different fields.
-    //     intStream(400000).map(function(i) {
-    //         const field = "a" + i;
-    //         const predicate = i % 2 ? {$lt: i} : {$gt: i};
-    //         return {[field]: predicate};
-    //     }),
-    //     // Mix of lt and gt wrapped in not with different fields.
-    //     intStream(300000).map(function(i) {
-    //         const field = "a" + i;
-    //         const predicate = i % 2 ? {$lt: i} : {$gt: i};
-    //         return {[field]: {$not: predicate}};
-    //     }),
-    //     // $exists on different fields.
-    //     intStream(400000).map(function(i) {
-    //         const field = "a" + i;
-    //         return {[field]: {$exists: true}};
-    //     }),
-    //     intStream(400000).map(function(i) {
-    //         const field = "a" + i;
-    //         return {[field]: {$exists: false}};
-    //     })
-    // ];
-    // for (const m of andOrFilters) {
-    //     runAgg([{$match: {$and: m}}]);
-    //     runAgg([{$match: {$or: m}}]);
-    // }
+    const andOrFilters = [
+        // Plain a=i filter.
+        intStream(800000).map(function(i) {
+            return {a: i};
+        }),
+        // a_i = i filter. Different field for each value.
+        intStream(600000).map(function(i) {
+            const field = "a" + i;
+            return {[field]: i};
+        }),
+        // Mix of lt and gt with the same field.
+        intStream(500000).map(function(i) {
+            const predicate = i % 2 ? {$lt: i} : {$gt: i};
+            return {a: predicate};
+        }),
+        // Mix of lt and gt with different fields.
+        intStream(400000).map(function(i) {
+            const field = "a" + i;
+            const predicate = i % 2 ? {$lt: i} : {$gt: i};
+            return {[field]: predicate};
+        }),
+        // Mix of lt and gt wrapped in not with different fields.
+        intStream(300000).map(function(i) {
+            const field = "a" + i;
+            const predicate = i % 2 ? {$lt: i} : {$gt: i};
+            return {[field]: {$not: predicate}};
+        }),
+        // $exists on different fields.
+        intStream(400000).map(function(i) {
+            const field = "a" + i;
+            return {[field]: {$exists: true}};
+        }),
+        intStream(400000).map(function(i) {
+            const field = "a" + i;
+            return {[field]: {$exists: false}};
+        })
+    ];
+    for (const m of andOrFilters) {
+        runAgg([{$match: {$and: m}}]);
+        runAgg([{$match: {$or: m}}]);
+    }
 }
 
 // Test deeply nested queries.
@@ -212,18 +210,17 @@ function generateNestedAndOr(type, branchingFactor, maxDepth) {
 }
 
 function testNestedAndOr() {
-    // TODO: SERVER-79092 uncomment this test. This is an issue with match expression
-    // auto-parameterization. jsTestLog("Testing nested $and/$or"); for (const topLevelType of
-    // ['$and', '$or']) {
-    //     // Test different types of nested queries
-    //     let [branchingFactor, maxDepth] = [3, 10];
-    //     const deepNarrowQuery = generateNestedAndOr(topLevelType, branchingFactor, maxDepth);
-    //     runAgg([{$match: deepNarrowQuery}]);
+    jsTestLog("Testing nested $and/$or");
+    for (const topLevelType of ['$and', '$or']) {
+        // Test different types of nested queries
+        let [branchingFactor, maxDepth] = [3, 10];
+        const deepNarrowQuery = generateNestedAndOr(topLevelType, branchingFactor, maxDepth);
+        runAgg([{$match: deepNarrowQuery}]);
 
-    //     [branchingFactor, maxDepth] = [10, 5];
-    //     const shallowWideQuery = generateNestedAndOr(topLevelType, branchingFactor, maxDepth);
-    //     runAgg([{$match: shallowWideQuery}]);
-    // }
+        [branchingFactor, maxDepth] = [10, 5];
+        const shallowWideQuery = generateNestedAndOr(topLevelType, branchingFactor, maxDepth);
+        runAgg([{$match: shallowWideQuery}]);
+    }
 }
 
 const tests = [
