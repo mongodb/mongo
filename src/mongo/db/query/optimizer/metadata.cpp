@@ -40,6 +40,7 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/util/assert_util.h"
 
 
@@ -255,7 +256,13 @@ ShardingMetadata::ShardingMetadata() : ShardingMetadata({}, false) {}
 ShardingMetadata::ShardingMetadata(IndexCollationSpec shardKey, bool mayContainOrphans)
     : _shardKey(shardKey),
       _mayContainOrphans(mayContainOrphans),
-      _topLevelShardKeyFieldNames(computeTopLevelShardKeyFields(shardKey)) {}
+      _topLevelShardKeyFieldNames(computeTopLevelShardKeyFields(shardKey)) {
+    for (auto&& entry : _shardKey) {
+        tassert(8054101,
+                "Encountered unexpected PathTraverse in definition of shard key",
+                !checkPathContainsTraverse(entry._path));
+    }
+}
 
 const ShardingMetadata& ScanDefinition::shardingMetadata() const {
     return _shardingMetadata;
