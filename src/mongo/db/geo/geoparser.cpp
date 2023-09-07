@@ -353,7 +353,7 @@ static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimpl
 static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphere = false) {
     *crs = SPHERE;
 
-    BSONElement crsElt = obj["crs"];
+    BSONElement crsElt = obj[kCrsField];
     // "crs" field doesn't exist, return the default SPHERE
     if (crsElt.eoo()) {
         return Status::OK();
@@ -366,22 +366,22 @@ static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphe
     BSONObj crsObj = crsElt.embeddedObject();
 
     // "type": "name"
-    if (String != crsObj["type"].type() || "name" != crsObj["type"].String())
+    if (String != crsObj[kCrsTypeField].type() || kCrsNameField != crsObj[kCrsTypeField].String())
         return BAD_VALUE("GeoJSON CRS must have field \"type\": \"name\"");
 
     // "properties"
-    BSONElement propertiesElt = crsObj["properties"];
+    BSONElement propertiesElt = crsObj[kCrsPropertiesField];
     if (!propertiesElt.isABSONObj()) {
         return BAD_VALUE("CRS must have field \"properties\" which is an object, instead got type "
                          << typeName(propertiesElt.type()));
     }
     BSONObj propertiesObj = propertiesElt.embeddedObject();
-    if (String != propertiesObj["name"].type()) {
+    if (String != propertiesObj[kPropertiesNameField].type()) {
         return BAD_VALUE("In CRS, \"properties.name\" must be a string, instead got type "
-                         << typeName(propertiesObj["name"].type()));
+                         << typeName(propertiesObj[kPropertiesNameField].type()));
     }
 
-    const string& name = propertiesObj["name"].String();
+    const string& name = propertiesObj[kPropertiesNameField].String();
     if (CRS_CRS84 == name || CRS_EPSG_4326 == name) {
         *crs = SPHERE;
     } else if (CRS_STRICT_WINDING == name) {
@@ -803,15 +803,15 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
         return GeoParser::UNKNOWN;
     }
     StringData fieldName = type.fieldNameStringData();
-    if (fieldName == "$box") {
+    if (fieldName == kBoxField) {
         return GeoParser::BOX;
-    } else if (fieldName == "$center") {
+    } else if (fieldName == kCenterField) {
         return GeoParser::CENTER;
-    } else if (fieldName == "$polygon") {
+    } else if (fieldName == kPolygonField) {
         return GeoParser::POLYGON;
-    } else if (fieldName == "$centerSphere") {
+    } else if (fieldName == kCenterSphereField) {
         return GeoParser::CENTER_SPHERE;
-    } else if (fieldName == "$geometry") {
+    } else if (fieldName == kGeometryField) {
         return GeoParser::GEOMETRY;
     }
     return GeoParser::UNKNOWN;

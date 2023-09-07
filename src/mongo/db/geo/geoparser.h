@@ -41,26 +41,54 @@
 namespace mongo {
 
 // This field must be present, and...
-static const string GEOJSON_TYPE = "type";
+static constexpr StringData GEOJSON_TYPE = "type"_sd;
 // Have one of these values:
-static const string GEOJSON_TYPE_POINT = "Point";
-static const string GEOJSON_TYPE_LINESTRING = "LineString";
-static const string GEOJSON_TYPE_POLYGON = "Polygon";
-static const string GEOJSON_TYPE_MULTI_POINT = "MultiPoint";
-static const string GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString";
-static const string GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon";
-static const string GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection";
+static constexpr StringData GEOJSON_TYPE_POINT = "Point"_sd;
+static constexpr StringData GEOJSON_TYPE_LINESTRING = "LineString"_sd;
+static constexpr StringData GEOJSON_TYPE_POLYGON = "Polygon"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_POINT = "MultiPoint"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_LINESTRING = "MultiLineString"_sd;
+static constexpr StringData GEOJSON_TYPE_MULTI_POLYGON = "MultiPolygon"_sd;
+static constexpr StringData GEOJSON_TYPE_GEOMETRY_COLLECTION = "GeometryCollection"_sd;
 // This field must also be present.  The value depends on the type.
-static const string GEOJSON_COORDINATES = "coordinates";
-static const string GEOJSON_GEOMETRIES = "geometries";
+static constexpr StringData GEOJSON_COORDINATES = "coordinates"_sd;
+static constexpr StringData GEOJSON_GEOMETRIES = "geometries"_sd;
 
 // Coordinate System Reference
 // see http://portal.opengeospatial.org/files/?artifact_id=24045
 // and http://spatialreference.org/ref/epsg/4326/
 // and http://www.geojson.org/geojson-spec.html#named-crs
-static const string CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84";
-static const string CRS_EPSG_4326 = "EPSG:4326";
-static const string CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326";
+static constexpr StringData CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84"_sd;
+static constexpr StringData CRS_EPSG_4326 = "EPSG:4326"_sd;
+static constexpr StringData CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326"_sd;
+
+// String constants for field names.
+static constexpr StringData kBoxField = "$box"_sd;
+static constexpr StringData kCenterField = "$center"_sd;
+static constexpr StringData kPolygonField = "$polygon"_sd;
+static constexpr StringData kCenterSphereField = "$centerSphere"_sd;
+static constexpr StringData kGeometryField = "$geometry"_sd;
+static constexpr StringData kGeoWithinField = "$geoWithin"_sd;
+static constexpr StringData kUniqueDocsField = "$uniqueDocs"_sd;
+static constexpr StringData kNearField = "$near"_sd;
+static constexpr StringData kGeoNearField = "$geoNear"_sd;
+static constexpr StringData kNearSphereField = "$nearSphere"_sd;
+static constexpr StringData kMaxDistanceField = "$maxDistance"_sd;
+static constexpr StringData kMinDistanceField = "$minDistance"_sd;
+// "crs": {
+//   "type": "name",
+//   "properties": {
+//     "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+//    }
+// }
+static constexpr StringData kCrsField = "crs"_sd;
+static constexpr StringData kCrsTypeField = "type"_sd;
+static constexpr StringData kCrsNameField = "name"_sd;
+static constexpr StringData kCrsPropertiesField = "properties"_sd;
+static constexpr StringData kPropertiesNameField = "name"_sd;
+// { "type": "Point", "coordinates": [100.0, 0.0] }
+static constexpr StringData kGeometryTypeField = "type"_sd;
+static constexpr StringData kGeometryCoordinatesField = "coordinates"_sd;
 
 // This class parses geographic data.
 // It parses a subset of GeoJSON and creates S2 shapes from it.

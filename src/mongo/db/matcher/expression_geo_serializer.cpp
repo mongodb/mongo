@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -53,19 +54,19 @@ void appendLegacyGeoLiteral(BSONObjBuilder* bob,
     }
 
     StringData fieldName = e.fieldNameStringData();
-    if (fieldName == "$nearSphere"_sd || fieldName == "$near") {
+    if (fieldName == kNearSphereField || fieldName == kNearField) {
         // Legacy $nearSphere and $near requires at minimum 2 coordinates to be
         // re-parseable, so the representative value is [1, 1].
         bob->appendArray(fieldName, BSON_ARRAY(1 << 1));
-    } else if (fieldName == "$center"_sd || fieldName == "$centerSphere"_sd) {
+    } else if (fieldName == kCenterField || fieldName == kCenterSphereField) {
         // $center and $centerSphere requires a pair of coordinates and a radius to be
         // re-parseable, so the representative value is [[1, 1],1].
         bob->appendArray(fieldName, BSON_ARRAY(BSON_ARRAY(1 << 1) << 1));
-    } else if (fieldName == "$box"_sd) {
+    } else if (fieldName == kBoxField) {
         // $box requires two pairs of coordinates to be re-parseable, so the
         // representative value is [[1, 1],[1,1]].
         bob->appendArray(fieldName, BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(1 << 1)));
-    } else if (fieldName == "$polygon"_sd) {
+    } else if (fieldName == kPolygonField) {
         // $polygon requires three pairs of coordinates to be re-parseable, so the representative
         // value is [[0,0],[0,1],[1,1]].
         bob->appendArray(
@@ -126,32 +127,32 @@ void appendCRSObject(BSONObjBuilder* bob,
     // with a single 'name' field.
     tassert(7559701,
             str::stream() << "Expected 'crs' to contain a string 'type' field, got " << crsObj,
-            crsObj["type"] && crsObj["type"].type() == BSONType::String);
+            crsObj[kCrsTypeField] && crsObj[kCrsTypeField].type() == BSONType::String);
     tassert(7559702,
             str::stream() << "Expected 'crs' to contain a 'properties' object, got , " << crsObj,
-            crsObj["properties"] && crsObj["properties"].type() == BSONType::Object);
+            crsObj[kCrsPropertiesField] && crsObj[kCrsPropertiesField].type() == BSONType::Object);
     tassert(7559703,
             str::stream() << "Expected 'crs.properties' to contain a 'name' "
                              "string field, got "
-                          << crsObj["properties"],
-            crsObj["properties"].Obj()["name"] &&
-                crsObj["properties"].Obj()["name"].type() == BSONType::String);
+                          << crsObj[kCrsPropertiesField],
+            crsObj[kCrsPropertiesField].Obj()[kCrsNameField] &&
+                crsObj[kCrsPropertiesField].Obj()[kCrsNameField].type() == BSONType::String);
 
     // The CRS "type" and "properties.name" fields must be preserved for
     // kToRepresentativeParseableValue serialization policy so the query
     // shape can be re-parsed (and will be preserved for kUnchanged policy
     // as well).
-    BSONObjBuilder crsObjBuilder(bob->subobjStart("crs"));
+    BSONObjBuilder crsObjBuilder(bob->subobjStart(kCrsField));
     if (opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
-        opts.appendLiteral(&crsObjBuilder, crsObj["type"]);
+        opts.appendLiteral(&crsObjBuilder, crsObj[kCrsTypeField]);
     } else {
-        crsObjBuilder.append(crsObj["type"]);
+        crsObjBuilder.append(crsObj[kCrsTypeField]);
     }
-    BSONObjBuilder crsPropBuilder(crsObjBuilder.subobjStart("properties"));
+    BSONObjBuilder crsPropBuilder(crsObjBuilder.subobjStart(kCrsPropertiesField));
     if (opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
-        opts.appendLiteral(&crsPropBuilder, crsObj["properties"].Obj()["name"]);
+        opts.appendLiteral(&crsPropBuilder, crsObj[kCrsPropertiesField].Obj()[kCrsNameField]);
     } else {
-        crsPropBuilder.append(crsObj["properties"].Obj()["name"]);
+        crsPropBuilder.append(crsObj[kCrsPropertiesField].Obj()[kCrsNameField]);
     }
     crsPropBuilder.doneFast();
     crsObjBuilder.doneFast();
@@ -160,17 +161,17 @@ void appendCRSObject(BSONObjBuilder* bob,
 void appendGeometrySubObject(BSONObjBuilder* bob,
                              const BSONObj& geometryObj,
                              const SerializationOptions& opts) {
-    auto typeElem = geometryObj["type"];
+    auto typeElem = geometryObj[kGeometryTypeField];
     if (typeElem) {
         bob->append(typeElem);
     }
-    if (auto coordinatesElem = geometryObj["coordinates"]) {
+    if (auto coordinatesElem = geometryObj[kGeometryCoordinatesField]) {
         appendGeoJSONCoordinatesLiteral(bob, coordinatesElem, typeElem.valueStringData(), opts);
     }
 
     // 'crs' can be present if users want to use STRICT_SPHERE coordinate
     // system.
-    if (auto crsElt = geometryObj["crs"]) {
+    if (auto crsElt = geometryObj[kCrsField]) {
         appendCRSObject(bob, crsElt, opts);
     }
 }
@@ -218,7 +219,7 @@ void geoCustomSerialization(BSONObjBuilder* bob,
             while (embedded_it.more()) {
                 BSONElement argElem = embedded_it.next();
                 fieldName = argElem.fieldNameStringData();
-                if (fieldName == "$geometry"_sd) {
+                if (fieldName == kGeometryField) {
                     if (argElem.type() == BSONType::Array) {
                         // This would be like {$geometry: [0, 0]} which must be a point.
                         auto asArray = argElem.Array();
@@ -229,11 +230,11 @@ void geoCustomSerialization(BSONObjBuilder* bob,
                                            BSON_ARRAY(opts.serializeLiteral(asArray[0])
                                                       << opts.serializeLiteral(asArray[1])));
                     } else {
-                        BSONObjBuilder nestedSubObj = bob->subobjStart("$geometry");
+                        BSONObjBuilder nestedSubObj = bob->subobjStart(kGeometryField);
                         appendGeometrySubObject(&nestedSubObj, argElem.Obj(), opts);
                         nestedSubObj.doneFast();
                     }
-                } else if (fieldName == "type"_sd) {
+                } else if (fieldName == kGeometryTypeField) {
                     // This handles an edge-case where syntax allows geoJSON coordinates without
                     // specifying $geometry; e.g., {$nearSphere: {type: 'Point', coordinates:
                     // [1,2]}}.

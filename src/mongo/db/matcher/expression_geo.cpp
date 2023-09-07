@@ -94,12 +94,12 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
     while (geoIt.more()) {
         BSONElement elt = geoIt.next();
         // $geoWithin doesn't accept multiple shapes.
-        if (geoContainer && queryElt.fieldNameStringData() == "$geoWithin"_sd) {
+        if (geoContainer && queryElt.fieldNameStringData() == kGeoWithinField) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "$geoWithin doesn't accept multiple shapes "
                                         << queryElt.toString());
         }
-        if (elt.fieldNameStringData() == "$uniqueDocs") {
+        if (elt.fieldNameStringData() == kUniqueDocsField) {
             // Deprecated "$uniqueDocs" field
             LOGV2_WARNING(23847, "Deprecated $uniqueDocs option", "query"_attr = redact(obj));
         } else {
@@ -195,7 +195,8 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
     while (it.more()) {
         BSONElement e = it.next();
         StringData fieldName = e.fieldNameStringData();
-        if ((fieldName == "$near") || (fieldName == "$geoNear") || (fieldName == "$nearSphere")) {
+        if ((fieldName == kNearField) || (fieldName == kGeoNearField) ||
+            (fieldName == kNearSphereField)) {
             if (!e.isABSONObj()) {
                 return false;
             }
@@ -205,17 +206,17 @@ bool GeoNearExpression::parseLegacyQuery(const BSONObj& obj) {
                 GeoParser::parsePointWithMaxDistance(embeddedObj, centroid.get(), &maxDistance)) {
                 uassert(18522, "max distance must be non-negative", maxDistance >= 0.0);
                 hasGeometry = true;
-                isNearSphere = (e.fieldNameStringData() == "$nearSphere");
+                isNearSphere = (e.fieldNameStringData() == kNearSphereField);
             }
-        } else if (fieldName == "$minDistance") {
+        } else if (fieldName == kMinDistanceField) {
             uassert(16893, "$minDistance must be a number", e.isNumber());
             minDistance = e.Number();
             uassert(16894, "$minDistance must be non-negative", minDistance >= 0.0);
-        } else if (fieldName == "$maxDistance") {
+        } else if (fieldName == kMaxDistanceField) {
             uassert(16895, "$maxDistance must be a number", e.isNumber());
             maxDistance = e.Number();
             uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
-        } else if (fieldName == "$uniqueDocs") {
+        } else if (fieldName == kUniqueDocsField) {
             LOGV2_WARNING(23848, "Ignoring deprecated option $uniqueDocs");
         } else {
             // In a query document, $near queries can have no non-geo sibling parameters.
@@ -265,7 +266,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
     while (it.more()) {
         BSONElement e = it.next();
         StringData fieldName = e.fieldNameStringData();
-        if (fieldName == "$geometry") {
+        if (fieldName == kGeometryField) {
             if (e.isABSONObj()) {
                 BSONObj embeddedObj = e.embeddedObject();
                 Status status = GeoParser::parseQueryPoint(e, centroid.get());
@@ -282,7 +283,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                 }
                 hasGeometry = true;
             }
-        } else if (fieldName == "$minDistance") {
+        } else if (fieldName == kMinDistanceField) {
             if (!e.isNumber()) {
                 return Status(ErrorCodes::BadValue, "$minDistance must be a number");
             }
@@ -290,7 +291,7 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
             if (!isValidNumericValue(minDistance)) {
                 return Status(ErrorCodes::BadValue, "$minDistance must be non-negative");
             }
-        } else if (fieldName == "$maxDistance") {
+        } else if (fieldName == kMaxDistanceField) {
             if (!e.isNumber()) {
                 return Status(ErrorCodes::BadValue, "$maxDistance must be a number");
             }
