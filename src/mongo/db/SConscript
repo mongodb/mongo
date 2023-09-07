@@ -1181,7 +1181,6 @@ env.Library(
         'shared_request_handling',
         'stats/api_version_metrics',
         'stats/counters',
-        'stats/read_preference_metrics',
         'stats/resource_consumption_metrics',
         'stats/server_read_concern_write_concern_metrics',
         'stats/top',
