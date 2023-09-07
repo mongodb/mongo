@@ -408,6 +408,14 @@ void broadcastDropCollection(OperationContext* opCtx,
         opCtx, nss, participants, executor, osi, true /* fromMigrate */);
 }
 
+CreateCollectionRequest patchedRequestForChangeStream(
+    const CreateCollectionRequest& originalRequest,
+    const mongo::TranslatedRequestParams& translatedRequestParams) {
+    auto req = originalRequest;
+    req.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
+    return req;
+}
+
 }  // namespace
 
 void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
@@ -516,7 +524,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                 opCtx,
                                 nss(),
                                 *createCollectionResponseOpt->getCollectionUUID(),
-                                _request.toBSON(),
+                                patchedRequestForChangeStream(_request,
+                                                              *_doc.getTranslatedRequestParams())
+                                    .toBSON(),
                                 CommitPhase::kSuccessful);
 
                             // The critical section might have been taken by a migration, we force
@@ -566,7 +576,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         opCtx,
                         nss(),
                         *createCollectionResponseOpt->getCollectionUUID(),
-                        _request.toBSON(),
+                        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams())
+                            .toBSON(),
                         CommitPhase::kSuccessful);
 
                     // Return any previously acquired resource.
@@ -1239,11 +1250,13 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     }
 
     const auto& osi = getNewSession(opCtx);
+    const auto patchedRequestBSONObj =
+        patchedRequestForChangeStream(_request, *_doc.getTranslatedRequestParams()).toBSON();
     try {
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss(),
                                              *_collectionUUID,
-                                             _request.toBSON(),
+                                             patchedRequestBSONObj,
                                              CommitPhase::kPrepare,
                                              *shardsHoldingData);
 
@@ -1251,7 +1264,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
             opCtx, executor, coll, placementVersion, shardsHoldingData, osi);
 
         notifyChangeStreamsOnShardCollection(
-            opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);
+            opCtx, nss(), *_collectionUUID, patchedRequestBSONObj, CommitPhase::kSuccessful);
 
         LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss()));
 
@@ -1274,7 +1287,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         }
 
         notifyChangeStreamsOnShardCollection(
-            opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kAborted);
+            opCtx, nss(), *_collectionUUID, patchedRequestBSONObj, CommitPhase::kAborted);
 
         throw;
     }
