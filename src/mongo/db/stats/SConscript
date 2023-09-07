@@ -73,6 +73,19 @@ env.Library(
 )
 
 env.Library(
+    target='read_preference_metrics',
+    source=[
+        'read_preference_metrics.cpp',
+        'read_preference_metrics.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='resource_consumption_metrics',
     source=[
         'resource_consumption_metrics.cpp',

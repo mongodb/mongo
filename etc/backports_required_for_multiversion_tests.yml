@@ -405,6 +405,8 @@ last-continuous:
     ticket: SERVER-80947
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-80947
+  - test_file: jstests/noPassthrough/read_preference_metrics.js
+    ticket: SERVER-66018
   suites: null
 last-lts:
   all:
@@ -858,4 +860,6 @@ last-lts:
     ticket: SERVER-80947
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-80947
+  - test_file: jstests/noPassthrough/read_preference_metrics.js
+    ticket: SERVER-66018
   suites: null
