@@ -249,6 +249,9 @@ selector:
   # Test runs command on a config shard and does not shutdown safely upon transitioning to a dedicated config server.
   - jstests/sharding/fsync_lock_unlock.js
 
+  # Expect the configureQueryAnalyzer command to execute without config server stepdown.
+  - jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
+
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
