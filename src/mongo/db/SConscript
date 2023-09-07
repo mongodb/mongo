@@ -1171,6 +1171,7 @@ env.Library(
         'repl/replica_set_messages',
         'shared_request_handling',
         'transaction',
+        'stats/read_preference_metrics',
     ],
 )
 
