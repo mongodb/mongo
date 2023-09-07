@@ -54,8 +54,14 @@ const StringData kTopBottomNValue = "value"_sd;
 const StringData kCovarianceX = "x"_sd;
 const StringData kCovarianceY = "y"_sd;
 
+const StringData kUnit = "unit"_sd;
 const StringData kInput = "input"_sd;
 const StringData kSortBy = "sortBy"_sd;
+
+const StringData kDerivativeInputFirst = "inputFirst"_sd;
+const StringData kDerivativeInputLast = "inputLast"_sd;
+const StringData kDerivativeSortByFirst = "sortByFirst"_sd;
+const StringData kDerivativeSortByLast = "sortByLast"_sd;
 }  // namespace AccArgs
 
 /**

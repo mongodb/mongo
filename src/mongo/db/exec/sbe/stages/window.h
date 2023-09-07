@@ -38,48 +38,51 @@ namespace mongo::sbe {
 
 /**
  * Performs a partitioned sliding window aggregation. The input is assumed to be partitioned into
- * consecutive groups, where the values to separate partitions are saved in the 'partitionSlots'.
- * The stage can also forward a list of slots saved in 'forwardSlots'.
+ * consecutive groups. For each document the stage takes a fixed number of slots in `currSlots`,
+ * where the first `partitionSlotCount` slots are used to separate partitions.
  *
  * The list of sliding window aggregator definitions are in the 'windows' vector. Each aggregator
  * has a slot 'windowSlot' to keep the accumulator state, a expression triplet 'initExpr', 'addExpr'
- * and 'removeExpr' to update the accumulator state, where 'initExpr' and 'removeExpr' are optional.
+ * and 'removeExpr' to update the accumulator state, all expressions are optional.
  *
  * The sliding window bound is determined by two boolean valued expressions 'lowBoundExpr' and
  * 'highBoundExpr', where both can be optional to indicated unbounded window. If any document is
  * evaluated to true for the current document, then that document is included in the window frame
- * of the current document. The 'lowBoundSlot', 'highBoundSlot' are used to save the current
- * document value for the lower and higher bound checking, while the 'boundTestingSlot' is for a
- * different document. The 'lowBoundSlot' and 'highBoundSlot' may be the same for different windows.
+ * of the current document. This test is performed against a different document, whose slots are
+ * saved in `boundTestingSlots`, which is of the same number as `currSlots`.
+ *
+ * In addition, the caller may provide a list of `frameFirstSlots` and `frameLastSlots` for each
+ * window, each slot vector of the same size as the `currSlots`, to represent slots for the first
+ * and last documents in the current window frame. Empty slot vector means the value is not
+ * required.
  *
  * Debug string representation:
  *
- *  window  [<partition slots>] [<forward slots>] [<window slot 1> = lowBound{<expr>},
- *                                                                   highBound{<expr>},
- *                                                                   init{<expr>},
- *                                                                   add{<expr>},
- *                                                                   remove{<expr>},
- *                                                ...]
+ *  window  [<current slots>]  [<window slot 1> = lowBound{<expr>},
+ *                                                highBound{<expr>},
+ *                                                init{<expr>},
+ *                                                add{<expr>},
+ *                                                remove{<expr>},
+ *                              ...]
  *  childStage
  */
 class WindowStage final : public PlanStage {
 public:
     struct Window {
         value::SlotId windowSlot;
+        value::SlotVector frameFirstSlots;
+        value::SlotVector frameLastSlots;
         std::unique_ptr<EExpression> initExpr;
         std::unique_ptr<EExpression> addExpr;
         std::unique_ptr<EExpression> removeExpr;
-        boost::optional<value::SlotId> lowBoundSlot;
-        boost::optional<value::SlotId> lowBoundTestingSlot;
         std::unique_ptr<EExpression> lowBoundExpr;
-        boost::optional<value::SlotId> highBoundSlot;
-        boost::optional<value::SlotId> highBoundTestingSlot;
         std::unique_ptr<EExpression> highBoundExpr;
     };
 
     WindowStage(std::unique_ptr<PlanStage> input,
-                value::SlotVector partitionSlots,
-                value::SlotVector forwardSlots,
+                value::SlotVector currSlots,
+                value::SlotVector boundTestingSlots,
+                size_t partitionSlotCount,
                 std::vector<Window> windows,
                 PlanNodeId nodeId,
                 bool participateInTrialRunTracking = true);
@@ -102,33 +105,48 @@ private:
     bool fetchNextRow();
     void freeUntilRow(size_t id);
     void freeRows();
-    void setOutAccessors(size_t id);
-    void setBoundTestingAccessor(size_t id);
-    void resetWindowRange(int start);
+    void setCurrAccessors(size_t id);
+    void setBoundTestingAccessors(size_t id);
+    void setFrameFirstAccessors(size_t windowIdx, size_t firstId);
+    void clearFrameFirstAccessors(size_t windowIdx);
+    void setFrameLastAccessors(size_t windowIdx, size_t lastId);
+    void clearFrameLastAccessors(size_t windowIdx);
+    void resetPartition(int start);
 
-    const value::SlotVector _partitionSlots;
-    const value::SlotVector _forwardSlots;
+    const value::SlotVector _currSlots;
+    const value::SlotVector _boundTestingSlots;
+    const size_t _partitionSlotCount;
     const std::vector<Window> _windows;
-    // List of bound slots for different windows after deduplication.
-    value::SlotVector _boundSlots;
-    // The index of bound slot for each window within the above vector.
-    std::vector<boost::optional<size_t>> _lowBoundSlotIndex;
-    std::vector<boost::optional<size_t>> _highBoundSlotIndex;
 
     using BufferedRowAccessor = value::MaterializedRowAccessor<std::deque<value::MaterializedRow>>;
-    std::vector<value::SlotAccessor*> _inPartitionAccessors;
-    std::vector<value::SlotAccessor*> _inForwardAccessors;
-    std::vector<value::SlotAccessor*> _inBoundAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _outPartitionAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _outForwardAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _outBoundAccessors;
-    size_t _outRowIdx;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _lowBoundTestingAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _highBoundTestingAccessors;
+    // The in/out accessors for the current document slots, and the index pointing to that
+    // document in the window buffer.
+    std::vector<value::SlotAccessor*> _inCurrAccessors;
+    std::vector<std::unique_ptr<BufferedRowAccessor>> _outCurrAccessors;
+    size_t _currRowIdx;
+    // The accessors for document slots under bound testing, and the index pointing to that
+    // document in the window buffer.
+    std::vector<std::unique_ptr<BufferedRowAccessor>> _boundTestingAccessors;
     size_t _boundTestingRowIdx;
+    // The accessors for the document slots of the first document in range, and the index pointing
+    // to that document in the window buffer. The accessors are switched with _emptyAccessor to
+    // allow empty window frame.
+    std::vector<std::vector<std::unique_ptr<value::SwitchAccessor>>> _outFrameFirstAccessors;
+    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameFirstRowAccessors;
+    std::vector<size_t> _frameFirstRowIdxes;
+    // The accessors for the document slots of the last document in range, and the index pointing
+    // to that document in the window buffer. The accessors are switched with _emptyAccessor to
+    // allow empty window frame.
+    std::vector<std::vector<std::unique_ptr<value::SwitchAccessor>>> _outFrameLastAccessors;
+    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameLastRowAccessors;
+    std::vector<size_t> _frameLastRowIdxes;
+    // An always empty accessor holding Nothing.
+    std::unique_ptr<value::OwnedValueAccessor> _emptyAccessor;
+    // The out accessors for the window states.
     std::vector<std::unique_ptr<value::OwnedValueAccessor>> _outWindowAccessors;
-    value::SlotMap<value::SlotAccessor*> _outAccessorMap;
+
     value::SlotMap<value::SlotAccessor*> _boundTestingAccessorMap;
+    value::SlotMap<value::SlotAccessor*> _outAccessorMap;
 
     bool _compiled{false};
     vm::ByteCode _bytecode;
@@ -149,6 +167,8 @@ private:
     std::deque<value::MaterializedRow> _rows;
     // The first id in the buffered rows.
     size_t _firstRowId{1};
+    // The id of the start of the current partition.
+    size_t _currPartitionId{1};
     // The id of the next partition that we have fetched into the buffer.
     boost::optional<size_t> _nextPartitionId{boost::none};
     // Whether the child stage has reached EOF.

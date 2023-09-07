@@ -48,16 +48,37 @@ public:
         using namespace stage_builder;
         value::SlotVector windowSlots;
         std::vector<WindowStage::Window> windows;
+
+        sbe::value::SlotVector currSlots;
+        sbe::value::SlotVector boundTestingSlots;
+        auto addSlotForDocument = [&](value::SlotId slot) {
+            for (size_t i = 0; i < currSlots.size(); i++) {
+                if (slot == currSlots[i]) {
+                    return i;
+                }
+            }
+            currSlots.push_back(slot);
+            boundTestingSlots.push_back(generateSlotId());
+            return currSlots.size() - 1;
+        };
+        for (auto slot : partitionSlots) {
+            addSlotForDocument(slot);
+        }
+        for (auto slot : forwardSlots) {
+            addSlotForDocument(slot);
+        }
+        addSlotForDocument(valueSlot);
+
         for (auto [lowBoundSlot, highBoundSlot, lowerOffset, higherOffset] : windowOffsets) {
             auto windowSlot = generateSlotId();
-            auto lowBoundTestingSlot = generateSlotId();
-            auto highBoundTestingSlot = generateSlotId();
+            auto lowBoundSlotIdx = addSlotForDocument(lowBoundSlot);
+            auto lowBoundTestingSlot = boundTestingSlots[lowBoundSlotIdx];
+            auto highBoundSlotIdx = addSlotForDocument(highBoundSlot);
+            auto highBoundTestingSlot = boundTestingSlots[highBoundSlotIdx];
             windowSlots.push_back(windowSlot);
 
             WindowStage::Window window;
             window.windowSlot = windowSlot;
-            window.lowBoundSlot = lowBoundSlot;
-            window.lowBoundTestingSlot = lowBoundTestingSlot;
             window.lowBoundExpr = nullptr;
             if (lowerOffset) {
                 window.lowBoundExpr = makeBinaryOp(EPrimBinary::greaterEq,
@@ -66,8 +87,6 @@ public:
                                                                 makeVariable(lowBoundSlot),
                                                                 makeInt32Constant(*lowerOffset)));
             }
-            window.highBoundSlot = highBoundSlot;
-            window.highBoundTestingSlot = highBoundTestingSlot;
             window.highBoundExpr = nullptr;
             if (higherOffset) {
                 window.highBoundExpr = makeBinaryOp(EPrimBinary::lessEq,
@@ -84,8 +103,9 @@ public:
             windows.emplace_back(std::move(window));
         }
         stage = makeS<WindowStage>(std::move(stage),
-                                   std::move(partitionSlots),
-                                   std::move(forwardSlots),
+                                   std::move(currSlots),
+                                   std::move(boundTestingSlots),
+                                   partitionSlots.size(),
                                    std::move(windows),
                                    kEmptyPlanNodeId);
 

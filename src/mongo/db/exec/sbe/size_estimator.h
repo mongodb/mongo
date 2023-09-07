@@ -123,7 +123,9 @@ inline size_t estimate(const WindowStage::Window& window) {
     if (window.initExpr) {
         size += size_estimator::estimate(window.initExpr);
     }
-    size += size_estimator::estimate(window.addExpr);
+    if (window.addExpr) {
+        size += size_estimator::estimate(window.addExpr);
+    }
     if (window.removeExpr) {
         size += size_estimator::estimate(window.removeExpr);
     }

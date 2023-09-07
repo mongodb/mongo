@@ -40,38 +40,36 @@
 namespace mongo::sbe {
 
 WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
-                         value::SlotVector partitionSlots,
-                         value::SlotVector forwardSlots,
+                         value::SlotVector currSlots,
+                         value::SlotVector boundTestingSlots,
+                         size_t partitionSlotCount,
                          std::vector<Window> windows,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
     : PlanStage("window"_sd, planNodeId, participateInTrialRunTracking),
-      _partitionSlots(std::move(partitionSlots)),
-      _forwardSlots(std::move(forwardSlots)),
+      _currSlots(std::move(currSlots)),
+      _boundTestingSlots(std::move(boundTestingSlots)),
+      _partitionSlotCount(partitionSlotCount),
       _windows(std::move(windows)) {
     _children.emplace_back(std::move(input));
-
-    // Dedupe the list of window bound slots and remember the index for each window.
-    for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
-        auto dedupeBoundSlot = [&](value::SlotId boundSlot) {
-            for (size_t boundIdx = 0; boundIdx < _boundSlots.size(); boundIdx++) {
-                if (boundSlot == _boundSlots[boundIdx]) {
-                    return boundIdx;
-                }
-            }
-            // If we didn't find this bound slot previously.
-            _boundSlots.push_back(boundSlot);
-            return _boundSlots.size() - 1;
-        };
-        _lowBoundSlotIndex.push_back(boost::none);
-        if (_windows[windowIdx].lowBoundSlot) {
-            _lowBoundSlotIndex[windowIdx] = dedupeBoundSlot(*_windows[windowIdx].lowBoundSlot);
+    tassert(7993411,
+            "The number of boundTestingSlots doesn't match the number of currSlots",
+            _boundTestingSlots.size() == _currSlots.size());
+    for (auto& window : _windows) {
+        if (window.frameFirstSlots.size()) {
+            tassert(7993412,
+                    "The number of frameFirstSlots doesn't match the number of currSlots",
+                    window.frameFirstSlots.size() == _currSlots.size());
         }
-        _highBoundSlotIndex.push_back(boost::none);
-        if (_windows[windowIdx].highBoundSlot) {
-            _highBoundSlotIndex[windowIdx] = dedupeBoundSlot(*_windows[windowIdx].highBoundSlot);
+        if (window.frameLastSlots.size()) {
+            tassert(7993413,
+                    "The number of frameLastSlots doesn't match the number of currSlots",
+                    window.frameLastSlots.size() == _currSlots.size());
         }
     }
+    tassert(7993414,
+            "The partition slot count should be less or equal to the total number of slots",
+            partitionSlotCount <= _currSlots.size());
 }
 
 std::unique_ptr<PlanStage> WindowStage::clone() const {
@@ -79,23 +77,22 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
     newWindows.resize(_windows.size());
     for (size_t idx = 0; idx < _windows.size(); idx++) {
         newWindows[idx].windowSlot = _windows[idx].windowSlot;
-        newWindows[idx].lowBoundSlot = _windows[idx].lowBoundSlot;
-        newWindows[idx].highBoundSlot = _windows[idx].highBoundSlot;
-        newWindows[idx].lowBoundTestingSlot = _windows[idx].lowBoundTestingSlot;
-        newWindows[idx].highBoundTestingSlot = _windows[idx].highBoundTestingSlot;
+        newWindows[idx].frameFirstSlots = _windows[idx].frameFirstSlots;
+        newWindows[idx].frameLastSlots = _windows[idx].frameLastSlots;
         newWindows[idx].lowBoundExpr =
             _windows[idx].lowBoundExpr ? _windows[idx].lowBoundExpr->clone() : nullptr;
         newWindows[idx].highBoundExpr =
             _windows[idx].highBoundExpr ? _windows[idx].highBoundExpr->clone() : nullptr;
         newWindows[idx].initExpr =
             _windows[idx].initExpr ? _windows[idx].initExpr->clone() : nullptr;
-        newWindows[idx].addExpr = _windows[idx].addExpr->clone();
+        newWindows[idx].addExpr = _windows[idx].addExpr ? _windows[idx].addExpr->clone() : nullptr;
         newWindows[idx].removeExpr =
             _windows[idx].removeExpr ? _windows[idx].removeExpr->clone() : nullptr;
     }
     return std::make_unique<WindowStage>(_children[0]->clone(),
-                                         _partitionSlots,
-                                         _forwardSlots,
+                                         _currSlots,
+                                         _boundTestingSlots,
+                                         _partitionSlotCount,
                                          std::move(newWindows),
                                          _commonStats.nodeId,
                                          _participateInTrialRunTracking);
@@ -111,20 +108,11 @@ bool WindowStage::fetchNextRow() {
     }
     auto state = _children[0]->getNext();
     if (state == PlanState::ADVANCED) {
-        auto rowSize =
-            _inPartitionAccessors.size() + _inForwardAccessors.size() + _inBoundAccessors.size();
+        auto rowSize = _inCurrAccessors.size();
         value::MaterializedRow row(rowSize);
         size_t idx = 0;
-        for (auto partitionAccessor : _inPartitionAccessors) {
-            auto [tag, val] = partitionAccessor->copyOrMoveValue();
-            row.reset(idx++, true, tag, val);
-        }
-        for (auto forwardAccessor : _inForwardAccessors) {
-            auto [tag, val] = forwardAccessor->copyOrMoveValue();
-            row.reset(idx++, true, tag, val);
-        }
-        for (auto boundAccessor : _inBoundAccessors) {
-            auto [tag, val] = boundAccessor->copyOrMoveValue();
+        for (auto accessor : _inCurrAccessors) {
+            auto [tag, val] = accessor->copyOrMoveValue();
             row.reset(idx++, true, tag, val);
         }
         _rows.push_back(std::move(row));
@@ -133,7 +121,7 @@ bool WindowStage::fetchNextRow() {
         if (_rows.size() >= 2) {
             auto& row = _rows[_rows.size() - 1];
             auto& prevRow = _rows[_rows.size() - 2];
-            for (idx = 0; idx < _partitionSlots.size(); idx++) {
+            for (idx = 0; idx < _partitionSlotCount; idx++) {
                 auto [tag, val] = row.getViewOfValue(idx);
                 auto [prevTag, prevVal] = prevRow.getViewOfValue(idx);
                 auto [cmpTag, cmpVal] = value::compareValue(tag, val, prevTag, prevVal);
@@ -168,12 +156,40 @@ void WindowStage::freeRows() {
     _isEOF = false;
 }
 
-void WindowStage::setOutAccessors(size_t id) {
+void WindowStage::setCurrAccessors(size_t id) {
     invariant(id >= _firstRowId && id < _firstRowId + _rows.size());
-    _outRowIdx = id - _firstRowId;
+    _currRowIdx = id - _firstRowId;
 }
 
-void WindowStage::setBoundTestingAccessor(size_t id) {
+void WindowStage::setFrameFirstAccessors(size_t windowIdx, size_t firstId) {
+    invariant(firstId >= _firstRowId && firstId < _firstRowId + _rows.size());
+    for (auto&& switchAccessor : _outFrameFirstAccessors[windowIdx]) {
+        switchAccessor->setIndex(0);
+    }
+    _frameFirstRowIdxes[windowIdx] = firstId - _firstRowId;
+}
+
+void WindowStage::clearFrameFirstAccessors(size_t windowIdx) {
+    for (auto&& switchAccessor : _outFrameFirstAccessors[windowIdx]) {
+        switchAccessor->setIndex(1);
+    }
+}
+
+void WindowStage::setFrameLastAccessors(size_t windowIdx, size_t lastId) {
+    invariant(lastId >= _firstRowId && lastId < _firstRowId + _rows.size());
+    for (auto&& switchAccessor : _outFrameLastAccessors[windowIdx]) {
+        switchAccessor->setIndex(0);
+    }
+    _frameLastRowIdxes[windowIdx] = lastId - _firstRowId;
+}
+
+void WindowStage::clearFrameLastAccessors(size_t windowIdx) {
+    for (auto&& switchAccessor : _outFrameLastAccessors[windowIdx]) {
+        switchAccessor->setIndex(1);
+    }
+}
+
+void WindowStage::setBoundTestingAccessors(size_t id) {
     invariant(id >= _firstRowId && id < _firstRowId + _rows.size());
     _boundTestingRowIdx = id - _firstRowId;
 }
@@ -181,34 +197,31 @@ void WindowStage::setBoundTestingAccessor(size_t id) {
 void WindowStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
 
-    _inPartitionAccessors.reserve(_partitionSlots.size());
-    _outPartitionAccessors.reserve(_partitionSlots.size());
     size_t slotIdx = 0;
-    for (auto slot : _partitionSlots) {
-        _inPartitionAccessors.push_back(_children[0]->getAccessor(ctx, slot));
-        _outPartitionAccessors.push_back(
-            std::make_unique<BufferedRowAccessor>(_rows, _outRowIdx, slotIdx++));
-        _outAccessorMap.emplace(slot, _outPartitionAccessors.back().get());
+    _inCurrAccessors.reserve(_currSlots.size());
+    _outCurrAccessors.reserve(_currSlots.size());
+    for (auto slot : _currSlots) {
+        _inCurrAccessors.push_back(_children[0]->getAccessor(ctx, slot));
+        _outCurrAccessors.push_back(
+            std::make_unique<BufferedRowAccessor>(_rows, _currRowIdx, slotIdx++));
+        _outAccessorMap.emplace(slot, _outCurrAccessors.back().get());
     }
 
-    _inForwardAccessors.reserve(_forwardSlots.size());
-    _outForwardAccessors.reserve(_forwardSlots.size());
-    for (auto slot : _forwardSlots) {
-        _inForwardAccessors.push_back(_children[0]->getAccessor(ctx, slot));
-        _outForwardAccessors.push_back(
-            std::make_unique<BufferedRowAccessor>(_rows, _outRowIdx, slotIdx++));
-        _outAccessorMap.emplace(slot, _outForwardAccessors.back().get());
+    slotIdx = 0;
+    _boundTestingAccessors.reserve(_boundTestingSlots.size());
+    for (auto slot : _boundTestingSlots) {
+        _boundTestingAccessors.push_back(
+            std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx++));
+        _boundTestingAccessorMap.emplace(slot, _boundTestingAccessors.back().get());
     }
 
-    _inBoundAccessors.reserve(_boundSlots.size());
-    _outBoundAccessors.reserve(_boundSlots.size());
-    for (auto slot : _boundSlots) {
-        _inBoundAccessors.push_back(_children[0]->getAccessor(ctx, slot));
-        _outBoundAccessors.push_back(
-            std::make_unique<BufferedRowAccessor>(_rows, _outRowIdx, slotIdx++));
-        _outAccessorMap.emplace(slot, _outBoundAccessors.back().get());
-    }
-
+    _emptyAccessor = std::unique_ptr<value::OwnedValueAccessor>();
+    _outFrameFirstAccessors.reserve(_windows.size());
+    _outFrameFirstRowAccessors.reserve(_windows.size());
+    _frameFirstRowIdxes.reserve(_windows.size());
+    _outFrameLastAccessors.reserve(_windows.size());
+    _outFrameLastRowAccessors.reserve(_windows.size());
+    _frameLastRowIdxes.reserve(_windows.size());
     _outWindowAccessors.reserve(_windows.size());
     _windowLowBoundCodes.reserve(_windows.size());
     _windowHighBoundCodes.reserve(_windows.size());
@@ -217,26 +230,37 @@ void WindowStage::prepare(CompileCtx& ctx) {
     _windowRemoveCodes.reserve(_windows.size());
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& window = _windows[windowIdx];
+
+        _outFrameFirstRowAccessors.push_back(std::vector<std::unique_ptr<BufferedRowAccessor>>());
+        _outFrameFirstAccessors.push_back(std::vector<std::unique_ptr<value::SwitchAccessor>>());
+        _frameFirstRowIdxes.push_back(-1);
+        slotIdx = 0;
+        for (auto slot : window.frameFirstSlots) {
+            _outFrameFirstRowAccessors[windowIdx].push_back(std::make_unique<BufferedRowAccessor>(
+                _rows, _frameFirstRowIdxes[windowIdx], slotIdx++));
+            std::vector<value::SlotAccessor*> switchAccessors{
+                _outFrameFirstRowAccessors[windowIdx].back().get(), _emptyAccessor.get()};
+            _outFrameFirstAccessors[windowIdx].push_back(
+                std::make_unique<value::SwitchAccessor>(std::move(switchAccessors)));
+            _outAccessorMap.emplace(slot, _outFrameFirstAccessors[windowIdx].back().get());
+        }
+
+        _outFrameLastRowAccessors.push_back(std::vector<std::unique_ptr<BufferedRowAccessor>>());
+        _outFrameLastAccessors.push_back(std::vector<std::unique_ptr<value::SwitchAccessor>>());
+        _frameLastRowIdxes.push_back(-1);
+        slotIdx = 0;
+        for (auto slot : window.frameLastSlots) {
+            _outFrameLastRowAccessors[windowIdx].push_back(std::make_unique<BufferedRowAccessor>(
+                _rows, _frameLastRowIdxes[windowIdx], slotIdx++));
+            std::vector<value::SlotAccessor*> switchAccessors{
+                _outFrameLastRowAccessors[windowIdx].back().get(), _emptyAccessor.get()};
+            _outFrameLastAccessors[windowIdx].push_back(
+                std::make_unique<value::SwitchAccessor>(std::move(switchAccessors)));
+            _outAccessorMap.emplace(slot, _outFrameLastAccessors[windowIdx].back().get());
+        }
+
         _outWindowAccessors.push_back(std::make_unique<value::OwnedValueAccessor>());
         _outAccessorMap.emplace(window.windowSlot, _outWindowAccessors.back().get());
-
-        if (window.lowBoundExpr && window.lowBoundTestingSlot) {
-            slotIdx =
-                _partitionSlots.size() + _forwardSlots.size() + *_lowBoundSlotIndex[windowIdx];
-            _lowBoundTestingAccessors.push_back(
-                std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx));
-            _boundTestingAccessorMap.emplace(*window.lowBoundTestingSlot,
-                                             _lowBoundTestingAccessors.back().get());
-        }
-
-        if (window.highBoundExpr && window.highBoundTestingSlot) {
-            slotIdx =
-                _partitionSlots.size() + _forwardSlots.size() + *_highBoundSlotIndex[windowIdx];
-            _highBoundTestingAccessors.push_back(
-                std::make_unique<BufferedRowAccessor>(_rows, _boundTestingRowIdx, slotIdx));
-            _boundTestingAccessorMap.emplace(*window.highBoundTestingSlot,
-                                             _highBoundTestingAccessors.back().get());
-        }
 
         ctx.root = this;
         _windowLowBoundCodes.push_back(window.lowBoundExpr ? window.lowBoundExpr->compile(ctx)
@@ -246,7 +270,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
         _windowInitCodes.push_back(window.initExpr ? window.initExpr->compile(ctx) : nullptr);
         ctx.aggExpression = true;
         ctx.accumulator = _outWindowAccessors.back().get();
-        _windowAddCodes.push_back(window.addExpr->compile(ctx));
+        _windowAddCodes.push_back(window.addExpr ? window.addExpr->compile(ctx) : nullptr);
         _windowRemoveCodes.push_back(window.removeExpr ? window.removeExpr->compile(ctx) : nullptr);
         ctx.aggExpression = false;
     }
@@ -265,7 +289,8 @@ value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slo
     return ctx.getAccessor(slot);
 }
 
-void WindowStage::resetWindowRange(int startId) {
+void WindowStage::resetPartition(int startId) {
+    _currPartitionId = startId;
     _windowIdRanges.clear();
     _windowIdRanges.resize(_windows.size(), std::make_pair(startId, startId - 1));
     for (size_t idx = 0; idx < _windows.size(); idx++) {
@@ -284,9 +309,9 @@ void WindowStage::open(bool reOpen) {
 
     _children[0]->open(reOpen);
 
-    freeRows();
     _currId = 0;
-    resetWindowRange(1);
+    resetPartition(1);
+    freeRows();
 }
 
 PlanState WindowStage::getNext() {
@@ -306,7 +331,7 @@ PlanState WindowStage::getNext() {
     // Partition boundary check.
     if (_currId == _nextPartitionId) {
         freeUntilRow(_currId - 1);
-        resetWindowRange(_currId);
+        resetPartition(_currId);
     }
 
     // Add documents into window.
@@ -333,16 +358,18 @@ PlanState WindowStage::getNext() {
             // check.
             bool inBound = true;
             if (window.highBoundExpr) {
-                setOutAccessors(_currId);
-                setBoundTestingAccessor(id);
+                setCurrAccessors(_currId);
+                setBoundTestingAccessors(id);
                 inBound = _bytecode.runPredicate(_windowHighBoundCodes[windowIdx].get());
             }
 
             // Run aggregation if this document is inside the desired range.
             if (inBound) {
-                setOutAccessors(id);
-                auto [owned, tag, val] = _bytecode.run(_windowAddCodes[windowIdx].get());
-                windowAccessor->reset(owned, tag, val);
+                if (_windowAddCodes[windowIdx]) {
+                    setCurrAccessors(id);
+                    auto [owned, tag, val] = _bytecode.run(_windowAddCodes[windowIdx].get());
+                    windowAccessor->reset(owned, tag, val);
+                }
                 idRange.second = id;
             } else {
                 break;
@@ -360,15 +387,17 @@ PlanState WindowStage::getNext() {
             for (size_t id = idRange.first; idRange.first <= idRange.second; id++) {
                 // Set accessors for the current document and the testing document to perform bound
                 // check.
-                setOutAccessors(_currId);
-                setBoundTestingAccessor(id);
+                setCurrAccessors(_currId);
+                setBoundTestingAccessors(id);
                 bool inBound = _bytecode.runPredicate(_windowLowBoundCodes[windowIdx].get());
 
                 // Undo the aggregation if this document is being removed from the updated range.
                 if (!inBound) {
-                    setOutAccessors(id);
-                    auto [owned, tag, val] = _bytecode.run(_windowRemoveCodes[windowIdx].get());
-                    windowAccessor->reset(owned, tag, val);
+                    if (_windowRemoveCodes[windowIdx]) {
+                        setCurrAccessors(id);
+                        auto [owned, tag, val] = _bytecode.run(_windowRemoveCodes[windowIdx].get());
+                        windowAccessor->reset(owned, tag, val);
+                    }
                     idRange.first = id + 1;
                 } else {
                     break;
@@ -379,19 +408,44 @@ PlanState WindowStage::getNext() {
 
     // Free documents from cache if not needed.
     size_t requiredIdLow = _currId;
-    for (size_t windowIndex = 0; windowIndex < _windows.size(); windowIndex++) {
+    for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         // We can't free past what hasn't been added to idRange.
         // Additionally, if lower bound is not unbounded, we can't free anything that has been added
         // to the range, since its needed to be removed later.
-        requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].second + 1);
-        if (_windows[windowIndex].lowBoundExpr) {
-            requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIndex].first);
+        requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIdx].second + 1);
+        if (_windows[windowIdx].lowBoundExpr) {
+            requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIdx].first);
+        } else {
+            if (_windows[windowIdx].frameLastSlots.size()) {
+                requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIdx].second);
+            }
+            if (_windows[windowIdx].frameFirstSlots.size()) {
+                requiredIdLow = std::min(requiredIdLow, _windowIdRanges[windowIdx].first);
+            }
         }
     }
     freeUntilRow(requiredIdLow - 1);
 
-    // Set out accessors for the current document.
-    setOutAccessors(_currId);
+    // Set current and frame first/last accessors for the document.
+    setCurrAccessors(_currId);
+    for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
+        auto& idRange = _windowIdRanges[windowIdx];
+        if (idRange.first <= idRange.second) {
+            if (_windows[windowIdx].frameFirstSlots.size()) {
+                setFrameFirstAccessors(windowIdx, idRange.first);
+            } else {
+                clearFrameFirstAccessors(windowIdx);
+            }
+            if (_windows[windowIdx].frameLastSlots.size()) {
+                setFrameLastAccessors(windowIdx, idRange.second);
+            } else {
+                clearFrameLastAccessors(windowIdx);
+            }
+        } else {
+            clearFrameFirstAccessors(windowIdx);
+            clearFrameLastAccessors(windowIdx);
+        }
+    }
 
     return trackPlanState(PlanState::ADVANCED);
 }
@@ -408,20 +462,11 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _partitionSlots.size(); ++idx) {
+    for (size_t idx = 0; idx < _currSlots.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
-        DebugPrinter::addIdentifier(ret, _partitionSlots[idx]);
-    }
-    ret.emplace_back(DebugPrinter::Block("`]"));
-
-    ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _forwardSlots.size(); ++idx) {
-        if (idx) {
-            ret.emplace_back(DebugPrinter::Block("`,"));
-        }
-        DebugPrinter::addIdentifier(ret, _forwardSlots[idx]);
+        DebugPrinter::addIdentifier(ret, _currSlots[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
@@ -434,6 +479,24 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
         }
         DebugPrinter::addIdentifier(ret, window.windowSlot);
         ret.emplace_back("=");
+
+        ret.emplace_back("frameFirst[`");
+        for (size_t slotIdx = 0; slotIdx < window.frameFirstSlots.size(); slotIdx++) {
+            if (slotIdx) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+            DebugPrinter::addIdentifier(ret, window.frameFirstSlots[slotIdx]);
+        }
+        ret.emplace_back("`],");
+
+        ret.emplace_back("frameLast[`");
+        for (size_t slotIdx = 0; slotIdx < window.frameLastSlots.size(); slotIdx++) {
+            if (slotIdx) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+            DebugPrinter::addIdentifier(ret, window.frameLastSlots[slotIdx]);
+        }
+        ret.emplace_back("`],");
 
         ret.emplace_back("lowBound{`");
         if (window.lowBoundExpr) {
@@ -451,7 +514,9 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
         }
         ret.emplace_back("`},");
         ret.emplace_back("add{`");
-        DebugPrinter::addBlocks(ret, window.addExpr->debugPrint());
+        if (window.addExpr) {
+            DebugPrinter::addBlocks(ret, window.addExpr->debugPrint());
+        }
         ret.emplace_back("`},");
         ret.emplace_back("remove{`");
         if (window.removeExpr) {
@@ -481,8 +546,8 @@ const SpecificStats* WindowStage::getSpecificStats() const {
 size_t WindowStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
-    size += size_estimator::estimate(_partitionSlots);
-    size += size_estimator::estimate(_forwardSlots);
+    size += size_estimator::estimate(_currSlots);
+    size += size_estimator::estimate(_boundTestingSlots);
     size += size_estimator::estimate(_windows);
     return size;
 }

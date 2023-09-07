@@ -84,6 +84,15 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
                                                       sbe::value::SlotVector values);
 
 /**
+ * Similar to above but takes multiple arguments.
+ */
+std::unique_ptr<sbe::EExpression> buildWindowFinalize(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector values,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args);
+
+/**
  * Create a fake AccumulationStatement from the WindowFunctionStatement in order to invoke
  * accumulator stage builder.
  */

@@ -224,31 +224,23 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveDerivative(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
     StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
-    tassert(7996817, "Incorrect number of arguments", args.size() == 2);
-
-    auto it = args.find(AccArgs::kInput);
-    tassert(7996818,
-            str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
-            it != args.end());
-    auto input = std::move(it->second);
-
-    it = args.find(AccArgs::kSortBy);
-    tassert(7996819,
-            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
-            it != args.end());
-    auto sortBy = std::move(it->second);
-
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggDerivativeRemove", std::move(input), std::move(sortBy)));
+    exprs.push_back(nullptr);
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(StageBuilderState& state,
-                                                                const WindowFunctionStatement& stmt,
-                                                                sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(
-        state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildFinalize(state,
+                         accStmt,
+                         std::move(slots),
+                         std::move(args),
+                         {} /* collatorSlot */,
+                         *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddStdDev(
@@ -479,7 +471,6 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
         {"$covariancePop", &buildWindowFinalizeCovariancePop},
         {"$push", &buildWindowFinalizePush},
         {"$integral", &buildWindowFinalizeIntegral},
-        {"$derivative", &buildWindowFinalizeDerivative},
         {"$stdDevSamp", &buildWindowFinalizeStdDevSamp},
         {"$stdDevPop", &buildWindowFinalizeStdDevPop},
         {AccumulatorAvg::kName, &buildWindowFinalizeAvg},
@@ -492,4 +483,29 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
 
     return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(values));
 }
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalize(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector values,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    using BuildFinalizeFn = std::function<std::unique_ptr<sbe::EExpression>(
+        StageBuilderState&,
+        const WindowFunctionStatement&,
+        sbe::value::SlotVector,
+        StringDataMap<std::unique_ptr<sbe::EExpression>>)>;
+
+    static const StringDataMap<BuildFinalizeFn> kWindowFunctionBuilders = {
+        {"$derivative", &buildWindowFinalizeDerivative},
+    };
+
+    auto opName = stmt.expr->getOpName();
+    uassert(7993415,
+            str::stream() << "Unsupported window function in SBE stage builder: " << opName,
+            kWindowFunctionBuilders.find(opName) != kWindowFunctionBuilders.end());
+
+    return std::invoke(
+        kWindowFunctionBuilders.at(opName), state, stmt, std::move(values), std::move(args));
+}
+
 }  // namespace mongo::stage_builder

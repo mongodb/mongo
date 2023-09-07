@@ -49,91 +49,60 @@ enum class DerivativeOp { kAdd, kRemove };
 
 class SBEDerivativeTest : public EExpressionTestFixture {
 public:
-    std::pair<value::TypeTags, value::Value> initQueue() {
-        auto [queueTag, queueVal] = value::makeNewArray();
-        auto queue = value::getArrayView(queueVal);
-        auto [queueInternalArrTag, queueInternalArrVal] = value::makeNewArray();
-        auto arr = value::getArrayView(queueInternalArrVal);
-        arr->push_back(value::TypeTags::Null, 0);
-        queue->push_back(queueInternalArrTag, queueInternalArrVal);
-        queue->push_back(value::TypeTags::NumberInt64, 0);
-        queue->push_back(value::TypeTags::NumberInt64, 0);
-        return {queueTag, queueVal};
-    }
-
-    std::pair<value::TypeTags, value::Value> initState(boost::optional<int64_t> unitMillis) {
-        auto [stateTag, stateVal] = value::makeNewArray();
-        auto state = value::getArrayView(stateVal);
-
-        // input queue
-        auto [inputQueueTag, inputQueueVal] = initQueue();
-        state->push_back(inputQueueTag, inputQueueVal);
-
-        // sortBy queue
-        auto [sortByQueueTag, sortByQueueVal] = initQueue();
-        state->push_back(sortByQueueTag, sortByQueueVal);
-
-        // unitMillis
-        if (unitMillis) {
-            state->push_back(value::TypeTags::NumberInt64,
-                             value::bitcastFrom<int64_t>(*unitMillis));
-        } else {
-            state->push_back(value::TypeTags::Null, 0);
-        }
-
-        return {stateTag, stateVal};
-    }
-
     void runAndAssertExpression(boost::optional<int64_t> unitMillis,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                 std::vector<DerivativeOp>& operations,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
-        value::ViewOfValueAccessor inputAccessor;
-        auto inputSlot = bindAccessor(&inputAccessor);
+        value::ViewOfValueAccessor inputAccessorFirst;
+        auto inputFirstSlot = bindAccessor(&inputAccessorFirst);
 
-        value::ViewOfValueAccessor sortByAccessor;
-        auto sortBySlot = bindAccessor(&sortByAccessor);
+        value::ViewOfValueAccessor sortByAccessorFirst;
+        auto sortByFirstSlot = bindAccessor(&sortByAccessorFirst);
 
-        value::OwnedValueAccessor aggAccessor;
-        auto aggSlot = bindAccessor(&aggAccessor);
+        value::ViewOfValueAccessor inputAccessorLast;
+        auto inputLastSlot = bindAccessor(&inputAccessorLast);
 
-        auto aggDerivativeAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeAdd",
-            sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
-        auto compiledDerivativeAdd = compileAggExpression(*aggDerivativeAddExpr, &aggAccessor);
+        value::ViewOfValueAccessor sortByAccessorLast;
+        auto sortByLastSlot = bindAccessor(&sortByAccessorLast);
 
-        auto aggDerivativeRemoveExpr = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeRemove",
-            sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
-        auto compiledDerivativeRemove =
-            compileAggExpression(*aggDerivativeRemoveExpr, &aggAccessor);
+        auto unitMillisConst = unitMillis
+            ? sbe::makeE<sbe::EConstant>(value::TypeTags::NumberInt64,
+                                         value::bitcastFrom<int64_t>(*unitMillis))
+            : sbe::makeE<sbe::EConstant>(value::TypeTags::Null, 0);
 
-        auto aggDerivativeFinalize = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+        auto aggDerivativeFinalize =
+            sbe::makeE<sbe::EFunction>("aggDerivativeFinalize",
+                                       sbe::makeEs(std::move(unitMillisConst),
+                                                   makeE<EVariable>(inputFirstSlot),
+                                                   makeE<EVariable>(sortByFirstSlot),
+                                                   makeE<EVariable>(inputLastSlot),
+                                                   makeE<EVariable>(sortByLastSlot)));
         auto compiledDerivativeFinalize = compileExpression(*aggDerivativeFinalize);
-
-        auto [stateTag, stateVal] = initState(unitMillis);
-        aggAccessor.reset(stateTag, stateVal);
 
         // call DerivativeOp (derivativeAdd/Remove) on the inputs and call finalize() method after
         // each DerivativeOp
-        size_t addIdx = 0, removeIdx = 0;
+        size_t firstIdx = 0;
+        size_t lastIdx = -1;
         for (size_t i = 0; i < operations.size(); ++i) {
-            vm::CodeFragment* compiledExpr;
-            size_t idx;
             if (operations[i] == DerivativeOp::kAdd) {
-                compiledExpr = compiledDerivativeAdd.get();
-                idx = addIdx++;
+                lastIdx++;
             } else {
-                compiledExpr = compiledDerivativeRemove.get();
-                idx = removeIdx++;
+                firstIdx++;
             }
-            inputAccessor.reset(inputValues[idx].first, inputValues[idx].second);
-            sortByAccessor.reset(sortByValues[idx].first, sortByValues[idx].second);
-            auto [runTag, runVal] = runCompiledExpression(compiledExpr);
+            if (firstIdx <= lastIdx) {
+                inputAccessorFirst.reset(inputValues[firstIdx].first, inputValues[firstIdx].second);
+                sortByAccessorFirst.reset(sortByValues[firstIdx].first,
+                                          sortByValues[firstIdx].second);
+                inputAccessorLast.reset(inputValues[lastIdx].first, inputValues[lastIdx].second);
+                sortByAccessorLast.reset(sortByValues[lastIdx].first, sortByValues[lastIdx].second);
+            } else {
+                inputAccessorFirst.reset();
+                sortByAccessorFirst.reset();
+                inputAccessorLast.reset();
+                sortByAccessorLast.reset();
+            }
 
-            aggAccessor.reset(runTag, runVal);
             auto out = runCompiledExpression(compiledDerivativeFinalize.get());
 
             ASSERT_EQ(out.first, expValues[i].first);
@@ -153,50 +122,57 @@ public:
                                std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                std::vector<DerivativeOp>& operations,
                                int expErrCode) {
-        value::ViewOfValueAccessor inputAccessor;
-        auto inputSlot = bindAccessor(&inputAccessor);
+        value::ViewOfValueAccessor inputAccessorFirst;
+        auto inputFirstSlot = bindAccessor(&inputAccessorFirst);
 
-        value::ViewOfValueAccessor sortByAccessor;
-        auto sortBySlot = bindAccessor(&sortByAccessor);
+        value::ViewOfValueAccessor sortByAccessorFirst;
+        auto sortByFirstSlot = bindAccessor(&sortByAccessorFirst);
 
-        value::OwnedValueAccessor aggAccessor;
-        auto aggSlot = bindAccessor(&aggAccessor);
+        value::ViewOfValueAccessor inputAccessorLast;
+        auto inputLastSlot = bindAccessor(&inputAccessorLast);
 
-        auto aggDerivativeAddExpr = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeAdd",
-            sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
-        auto compiledDerivativeAdd = compileAggExpression(*aggDerivativeAddExpr, &aggAccessor);
+        value::ViewOfValueAccessor sortByAccessorLast;
+        auto sortByLastSlot = bindAccessor(&sortByAccessorLast);
 
-        auto aggDerivativeRemoveExpr = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeRemove",
-            sbe::makeEs(makeE<EVariable>(inputSlot), makeE<EVariable>(sortBySlot)));
-        auto compiledDerivativeRemove =
-            compileAggExpression(*aggDerivativeRemoveExpr, &aggAccessor);
+        auto unitMillisConst = unitMillis
+            ? sbe::makeE<sbe::EConstant>(value::TypeTags::NumberInt64,
+                                         value::bitcastFrom<int64_t>(*unitMillis))
+            : sbe::makeE<sbe::EConstant>(value::TypeTags::Null, 0);
 
-        auto aggDerivativeFinalize = sbe::makeE<sbe::EFunction>(
-            "aggDerivativeFinalize", sbe::makeEs(makeE<EVariable>(aggSlot)));
+        auto aggDerivativeFinalize =
+            sbe::makeE<sbe::EFunction>("aggDerivativeFinalize",
+                                       sbe::makeEs(std::move(unitMillisConst),
+                                                   makeE<EVariable>(inputFirstSlot),
+                                                   makeE<EVariable>(sortByFirstSlot),
+                                                   makeE<EVariable>(inputLastSlot),
+                                                   makeE<EVariable>(sortByLastSlot)));
         auto compiledDerivativeFinalize = compileExpression(*aggDerivativeFinalize);
-
-        auto [stateTag, stateVal] = initState(unitMillis);
-        aggAccessor.reset(stateTag, stateVal);
 
         Status status = [&]() {
             try {
-                size_t addIdx = 0, removeIdx = 0;
+                size_t firstIdx = 0;
+                size_t lastIdx = -1;
                 for (size_t i = 0; i < operations.size(); ++i) {
-                    vm::CodeFragment* compiledExpr;
-                    size_t idx;
                     if (operations[i] == DerivativeOp::kAdd) {
-                        compiledExpr = compiledDerivativeAdd.get();
-                        idx = addIdx++;
+                        lastIdx++;
                     } else {
-                        compiledExpr = compiledDerivativeRemove.get();
-                        idx = removeIdx++;
+                        firstIdx++;
                     }
-                    inputAccessor.reset(inputValues[idx].first, inputValues[idx].second);
-                    sortByAccessor.reset(sortByValues[idx].first, sortByValues[idx].second);
-                    auto [runTag, runVal] = runCompiledExpression(compiledExpr);
-                    aggAccessor.reset(runTag, runVal);
+                    if (firstIdx <= lastIdx) {
+                        inputAccessorFirst.reset(inputValues[firstIdx].first,
+                                                 inputValues[firstIdx].second);
+                        sortByAccessorFirst.reset(sortByValues[firstIdx].first,
+                                                  sortByValues[firstIdx].second);
+                        inputAccessorLast.reset(inputValues[lastIdx].first,
+                                                inputValues[lastIdx].second);
+                        sortByAccessorLast.reset(sortByValues[lastIdx].first,
+                                                 sortByValues[lastIdx].second);
+                    } else {
+                        inputAccessorFirst.reset();
+                        sortByAccessorFirst.reset();
+                        inputAccessorLast.reset();
+                        sortByAccessorLast.reset();
+                    }
 
                     auto out = runCompiledExpression(compiledDerivativeFinalize.get());
                     value::releaseValue(out.first, out.second);
@@ -409,7 +385,7 @@ TEST_F(SBEDerivativeTest, DerivativeWithSortByDatesAndNoUnit) {
     std::vector<DerivativeOp> derivativeOps = {
         DerivativeOp::kAdd, DerivativeOp::kAdd, DerivativeOp::kRemove, DerivativeOp::kRemove};
 
-    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821006);
+    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7993410);
 }
 
 TEST_F(SBEDerivativeTest, DerivativeWithSortByNumbersAndDateUnit) {
@@ -427,7 +403,7 @@ TEST_F(SBEDerivativeTest, DerivativeWithSortByNumbersAndDateUnit) {
         DerivativeOp::kAdd, DerivativeOp::kAdd, DerivativeOp::kRemove, DerivativeOp::kRemove};
 
     boost::optional<int64_t> unitMillis = 60LL * 60LL * 1000LL;
-    runAndAssertErrorCode(unitMillis, inputValues, sortByValues, derivativeOps, 7821005);
+    runAndAssertErrorCode(unitMillis, inputValues, sortByValues, derivativeOps, 7993409);
 }
 
 TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes1) {
@@ -441,7 +417,7 @@ TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes1) {
 
     std::vector<DerivativeOp> derivativeOps = {DerivativeOp::kAdd};
 
-    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821007);
+    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821012);
 }
 
 TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes2) {
@@ -455,7 +431,7 @@ TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes2) {
 
     std::vector<DerivativeOp> derivativeOps = {DerivativeOp::kAdd};
 
-    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821006);
+    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7993410);
 }
 
 TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes3) {
@@ -469,6 +445,6 @@ TEST_F(SBEDerivativeTest, DerivativeWithIncorrectTypes3) {
 
     std::vector<DerivativeOp> derivativeOps = {DerivativeOp::kAdd};
 
-    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821007);
+    runAndAssertErrorCode(boost::none, inputValues, sortByValues, derivativeOps, 7821012);
 }
 }  // namespace mongo::sbe

@@ -820,9 +820,6 @@ enum class Builtin : uint8_t {
     aggIntegralAdd,
     aggIntegralRemove,
     aggIntegralFinalize,
-    aggDerivativeInit,
-    aggDerivativeAdd,
-    aggDerivativeRemove,
     aggDerivativeFinalize,
     aggCovarianceAdd,
     aggCovarianceRemove,
@@ -1929,9 +1926,6 @@ private:
         std::pair<value::TypeTags, value::Value> prevSortByVal,
         std::pair<value::TypeTags, value::Value> newInput,
         std::pair<value::TypeTags, value::Value> newSortByVal);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeInit(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeRemove(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDerivativeFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> aggRemovableAvgFinalizeImpl(
         value::Array* sumState, int64_t count);

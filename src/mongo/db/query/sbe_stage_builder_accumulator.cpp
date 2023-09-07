@@ -1123,34 +1123,13 @@ std::unique_ptr<sbe::EExpression> buildFinalizeIntegral(
     return makeFunction("aggIntegralFinalize", makeVariable(slots[0]));
 }
 
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeDerivative(
-    std::unique_ptr<sbe::EExpression> unitExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
-    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction("aggDerivativeInit", std::move(unitExpr)));
-    return aggs;
-}
-
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorDerivative(
     const AccumulationExpression& expr,
     StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator& frameIdGenerator) {
-    tassert(7996810, "Incorrect number of arguments", args.size() == 2);
-
-    auto it = args.find(AccArgs::kInput);
-    tassert(7996811,
-            str::stream() << "Window function expects '" << AccArgs::kInput << "' argument",
-            it != args.end());
-    auto input = std::move(it->second);
-
-    it = args.find(AccArgs::kSortBy);
-    tassert(7996812,
-            str::stream() << "Window function expects '" << AccArgs::kSortBy << "' argument",
-            it != args.end());
-    auto sortBy = std::move(it->second);
-
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggDerivativeAdd", std::move(input), std::move(sortBy)));
+    exprs.push_back(nullptr);
     return exprs;
 }
 
@@ -1158,10 +1137,49 @@ std::unique_ptr<sbe::EExpression> buildFinalizeDerivative(
     StageBuilderState& state,
     const AccumulationExpression& expr,
     const sbe::value::SlotVector& slots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator& frameIdGenerator) {
-    tassert(7996813, "Incorrect number of arguments", slots.size() == 1);
-    return makeFunction("aggDerivativeFinalize", makeVariable(slots[0]));
+    auto it = args.find(AccArgs::kUnit);
+    tassert(7993403,
+            str::stream() << "Window function expects '" << AccArgs::kUnit << "' argument",
+            it != args.end());
+    auto unit = std::move(it->second);
+
+    it = args.find(AccArgs::kDerivativeInputFirst);
+    tassert(7993404,
+            str::stream() << "Window function expects '" << AccArgs::kDerivativeInputFirst
+                          << "' argument",
+            it != args.end());
+    auto inputFirst = std::move(it->second);
+
+    it = args.find(AccArgs::kDerivativeSortByFirst);
+    tassert(7993405,
+            str::stream() << "Window function expects '" << AccArgs::kDerivativeSortByFirst
+                          << "' argument",
+            it != args.end());
+    auto sortByFirst = std::move(it->second);
+
+    it = args.find(AccArgs::kDerivativeInputLast);
+    tassert(7993406,
+            str::stream() << "Window function expects '" << AccArgs::kDerivativeInputLast
+                          << "' argument",
+            it != args.end());
+    auto inputLast = std::move(it->second);
+
+    it = args.find(AccArgs::kDerivativeSortByLast);
+    tassert(7993407,
+            str::stream() << "Window function expects '" << AccArgs::kDerivativeSortByLast
+                          << "' argument",
+            it != args.end());
+    auto sortByLast = std::move(it->second);
+
+    return makeFunction("aggDerivativeFinalize",
+                        std::move(unit),
+                        std::move(inputFirst),
+                        std::move(sortByFirst),
+                        std::move(inputLast),
+                        std::move(sortByLast));
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeLinearFill(
@@ -1421,7 +1439,6 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         {AccumulatorRank::kName, &buildFinalizeRank},
         {AccumulatorDenseRank::kName, &buildFinalizeRank},  // same as $rank
         {AccumulatorIntegral::kName, &buildFinalizeIntegral},
-        {window_function::ExpressionDerivative::kName, &buildFinalizeDerivative},
         {AccumulatorLocf::kName, nullptr},
         {AccumulatorDocumentNumber::kName, nullptr},
     };
@@ -1459,6 +1476,7 @@ std::unique_ptr<sbe::EExpression> buildFinalize(
         {AccumulatorTopBottomN<kBottom, true /* single */>::getName(), &buildFinalizeTopBottom},
         {AccumulatorTopBottomN<kTop, false /* single */>::getName(), &buildFinalizeTopBottomN},
         {AccumulatorTopBottomN<kBottom, false /* single */>::getName(), &buildFinalizeTopBottomN},
+        {window_function::ExpressionDerivative::kName, &buildFinalizeDerivative},
         {window_function::ExpressionLinearFill::kName, &buildFinalizeLinearFill},
     };
 
@@ -1515,7 +1533,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
         {AccumulatorRank::kName, &emptyInitializer<1>},
         {AccumulatorDenseRank::kName, &emptyInitializer<1>},
         {AccumulatorIntegral::kName, &buildInitializeIntegral},
-        {window_function::ExpressionDerivative::kName, &buildInitializeDerivative},
+        {window_function::ExpressionDerivative::kName, &emptyInitializer<1>},
         {window_function::ExpressionLinearFill::kName, &buildInitializeLinearFill},
     };
 
