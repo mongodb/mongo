@@ -84,7 +84,8 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     if (nss.tenantId()) {
         bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
     }
-    bob.append("db", opts.serializeIdentifier(nss.db_deprecated()));
+    // We do not want to include the tenantId as prefix of 'db' because the tenantid is added above.
+    bob.append("db", opts.serializeIdentifier(nss.dbName().serializeWithoutTenantPrefix_UNSAFE()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }
 

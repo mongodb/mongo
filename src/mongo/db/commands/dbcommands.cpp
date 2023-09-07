@@ -564,7 +564,8 @@ public:
                                                       AuthorizationSession::get(opCtx->getClient()),
                                                       request().getNamespace(),
                                                       unparsedRequest().body,
-                                                      false));
+                                                      false,
+                                                      request().getSerializationContext()));
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {

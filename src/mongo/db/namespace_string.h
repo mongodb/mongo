@@ -401,18 +401,6 @@ public:
     }
 
     /**
-     * This method is deprecated and will be removed as part of SERVER-65456. We strongly
-     * encourage to make the use of `dbName`, which returns a DatabaseName object instead.
-     * In case you would need to a StringData object instead we strongly recommend taking a look
-     * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
-     */
-    StringData db_deprecated() const {
-        // TODO SERVER-65456 Remove this function.
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return StringData{_data.data() + offset, _dbNameOffsetEnd()};
-    }
-
-    /**
      * This function must only be used in sharding code (src/mongo/s and src/mongo/db/s).
      */
     StringData db_forSharding() const {
@@ -940,6 +928,17 @@ private:
     StringData ns() const {
         auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
         return StringData{_data.data() + offset, _data.size() - offset};
+    }
+
+    /**
+     * This method is deprecated and will be removed as part of SERVER-65456. We strongly
+     * encourage to make the use of `dbName`, which returns a DatabaseName object instead.
+     * In case you would need to a StringData object instead we strongly recommend taking a look
+     * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
+     */
+    StringData db_deprecated() const {
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return StringData{_data.data() + offset, _dbNameOffsetEnd()};
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

@@ -658,6 +658,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/storage_control',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'repl_server_parameters',
         'replication_auth',
     ],

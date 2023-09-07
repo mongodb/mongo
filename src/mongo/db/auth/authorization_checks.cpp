@@ -66,7 +66,8 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
                                       const NamespaceString& viewNs,
                                       const NamespaceString& viewOnNs,
                                       const BSONArray& viewPipeline,
-                                      bool isMongos) {
+                                      bool isMongos,
+                                      const SerializationContext& serializationContext) {
     // It's safe to allow a user to create or modify a view if they can't read it anyway.
     if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
         return Status::OK();
@@ -76,9 +77,11 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
         opCtx,
         viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
-                         << "$db" << viewOnNs.db_deprecated()),
+                         << "$db"
+                         << DatabaseNameUtil::serialize(viewOnNs.dbName(), serializationContext)),
         boost::none,
-        false);
+        false,
+        serializationContext);
 
     auto statusWithPrivs = getPrivilegesForAggregate(authzSession, viewOnNs, request, isMongos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
@@ -255,8 +258,13 @@ Status checkAuthForCreate(OperationContext* opCtx,
         for (const auto& stage : pipeline) {
             pipelineArray.append(stage);
         }
-        return checkAuthForCreateOrModifyView(
-            opCtx, authSession, ns, viewOnNs, pipelineArray.arr(), isMongos);
+        return checkAuthForCreateOrModifyView(opCtx,
+                                              authSession,
+                                              ns,
+                                              viewOnNs,
+                                              pipelineArray.arr(),
+                                              isMongos,
+                                              cmd.getSerializationContext());
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -273,7 +281,8 @@ Status checkAuthForCollMod(OperationContext* opCtx,
                            AuthorizationSession* authSession,
                            const NamespaceString& ns,
                            const BSONObj& cmdObj,
-                           bool isMongos) {
+                           bool isMongos,
+                           const SerializationContext& serializationContext) {
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
@@ -294,7 +303,7 @@ Status checkAuthForCollMod(OperationContext* opCtx,
             ns.dbName(), cmdObj["viewOn"].checkAndGetStringData()));
         auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
         return checkAuthForCreateOrModifyView(
-            opCtx, authSession, ns, viewOnNs, viewPipeline, isMongos);
+            opCtx, authSession, ns, viewOnNs, viewPipeline, isMongos, serializationContext);
     }
 
     return Status::OK();

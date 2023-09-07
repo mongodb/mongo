@@ -108,6 +108,7 @@ Status checkAuthForCollMod(OperationContext* opCtx,
                            AuthorizationSession* authSession,
                            const NamespaceString& ns,
                            const BSONObj& cmdObj,
-                           bool isMongos);
+                           bool isMongos,
+                           const SerializationContext& serializationContext);
 
 }  // namespace mongo::auth

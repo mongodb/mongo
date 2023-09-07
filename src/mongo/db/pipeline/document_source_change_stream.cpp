@@ -162,12 +162,21 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
-            return "^" + regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(nss)) + "$";
+            return "^" +
+                // Change streams will only be enabled in serverless when multitenancy and
+                // featureFlag are on, therefore we don't have a tenantid prefix.
+                regexEscapeNsForChangeStream(
+                       NamespaceStringUtil::serialize(nss, expCtx->serializationCtxt)) +
+                "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
-            return "^" + regexEscapeNsForChangeStream(nss.db_deprecated().toString()) + "\\." +
-                resolveAllCollectionsRegex(expCtx);
+            return "^" +
+                // Change streams will only be enabled in serverless when multitenancy and
+                // featureFlag are on, therefore we don't have a tenantid prefix.
+                regexEscapeNsForChangeStream(
+                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
+                "\\." + resolveAllCollectionsRegex(expCtx);
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT '$' or 'system.' unless 'showSystemEvents' is set.
@@ -184,7 +193,9 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
-            return "^" + regexEscapeNsForChangeStream(nss.db_deprecated().toString()) +
+            return "^" +
+                regexEscapeNsForChangeStream(
+                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
                 "\\.system.views$";
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.

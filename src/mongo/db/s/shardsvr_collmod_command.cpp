@@ -92,8 +92,12 @@ public:
                                  const BSONObj& cmdObj) const override {
         auto* client = opCtx->getClient();
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        return auth::checkAuthForCollMod(
-            client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, false);
+        return auth::checkAuthForCollMod(client->getOperationContext(),
+                                         AuthorizationSession::get(client),
+                                         nss,
+                                         cmdObj,
+                                         false,
+                                         SerializationContext::stateCommandRequest());
     }
 
     bool skipApiVersionCheck() const override {

@@ -121,7 +121,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     auto cmdObjBob = BSONObjBuilder{BSON(AggregateCommandRequest::kCommandName << nss.coll())};
     if (!cmdObj.hasField(AggregateCommandRequest::kCommandName) ||
         !cmdObj.hasField(AggregateCommandRequest::kDbNameFieldName)) {
-        cmdObjBob.append("$db", nss.db_deprecated());
+        cmdObjBob.append("$db", DatabaseNameUtil::serialize(nss.dbName(), serializationContext));
         cmdObjBob.appendElementsUnique(cmdObj);
         cmdObjChanged = true;
     }

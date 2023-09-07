@@ -431,11 +431,13 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
-    const auto outNss = NamespaceStringUtil::deserialize(
-        parsedMr.getDollarTenant(),
-        (parsedMr.getOutOptions().getDatabaseName() ? *parsedMr.getOutOptions().getDatabaseName()
-                                                    : parsedMr.getNamespace().db_deprecated()),
-        parsedMr.getOutOptions().getCollectionName());
+    const auto outNss = parsedMr.getOutOptions().getDatabaseName()
+        ? (NamespaceStringUtil::deserialize(parsedMr.getDollarTenant(),
+                                            *parsedMr.getOutOptions().getDatabaseName(),
+                                            parsedMr.getOutOptions().getCollectionName()))
+        : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
+                                           parsedMr.getOutOptions().getCollectionName());
+
 
     std::set<FieldPath> shardKey;
     boost::optional<ChunkVersion> targetCollectionPlacementVersion;

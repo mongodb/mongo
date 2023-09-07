@@ -891,7 +891,7 @@ void createCollectionObject(JSContext* cx,
     JS::RootedValueArray<2> databaseArgs(cx);
 
     databaseArgs[0].setObject(client.toObject());
-    mozjs::ValueReader(cx, databaseArgs[1]).fromStringData(ns.db_deprecated());
+    mozjs::ValueReader(cx, databaseArgs[1]).fromStringData(ns.dbName().toString_forTest());
     scope->getProto<mozjs::DBInfo>().newInstance(databaseArgs, &databaseRV);
 
     invariant(databaseRV.isObject());

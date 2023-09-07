@@ -223,6 +223,15 @@ DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
     return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(db);
 }
 
+DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringData dbFieldName) {
+    const auto db = data.getStringField(dbFieldName);
+    const auto tenantField = data.getField("$tenant");
+    const auto tenantId = tenantField.eoo()
+        ? boost::none
+        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    return DatabaseNameUtil::deserialize(tenantId, db);
+}
+
 DatabaseName DatabaseNameUtil::deserializeForErrorMsg(StringData dbInErrMsg) {
     // TenantId always prefix in the error message. This method returns either (tenantId,
     // nonPrefixedDb) or (none, prefixedDb) depending on gMultitenancySupport flag.

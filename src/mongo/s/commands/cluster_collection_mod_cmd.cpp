@@ -109,8 +109,12 @@ public:
                                  const BSONObj& cmdObj) const override {
         auto* client = opCtx->getClient();
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        return auth::checkAuthForCollMod(
-            client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, true);
+        return auth::checkAuthForCollMod(client->getOperationContext(),
+                                         AuthorizationSession::get(client),
+                                         nss,
+                                         cmdObj,
+                                         true,
+                                         SerializationContext::stateCommandRequest());
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
