@@ -30,8 +30,6 @@
 
 #pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 #include "asio/detail/config.hpp"
 
 #include "asio/detail/push_options.hpp"
@@ -46,6 +44,8 @@
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace asio {
 namespace ssl {

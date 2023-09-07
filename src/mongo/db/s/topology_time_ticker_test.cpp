@@ -39,12 +39,14 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 
 namespace mongo {
 namespace {

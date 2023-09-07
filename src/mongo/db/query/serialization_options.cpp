@@ -28,7 +28,6 @@
  */
 
 #include "serialization_options.h"
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/query/serialization_options.h"
 
@@ -52,6 +51,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
 
