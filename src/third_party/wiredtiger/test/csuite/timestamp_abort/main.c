@@ -1870,6 +1870,7 @@ main(int argc, char *argv[])
              */
             tmp ^= __wt_random(&opts->data_rnd);
             tmp ^= __wt_random(&opts->extra_rnd);
+            WT_UNUSED(tmp);
 
             /*
              * Fork a child to insert as many items. We will then randomly kill the child, run
