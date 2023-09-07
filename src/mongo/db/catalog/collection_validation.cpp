@@ -303,6 +303,19 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
         const auto& oplogCollection = oplogRead.getCollection();
 
+        if (!oplogCollection) {
+            for (auto it = results->recordTimestamps.rbegin();
+                 it != results->recordTimestamps.rend();
+                 it++) {
+                const auto& timestamp = *it;
+                LOGV2(8080900,
+                      "    Validation failed: Oplog entry timestamp for corrupted collection and "
+                      "index entry",
+                      "timestamp"_attr = timestamp);
+            }
+            return;
+        }
+
         // Log oplog entries in reverse from most recent timestamp to oldest.
         // Due to oplog truncation, if we fail to find any oplog entry for a particular timestamp,
         // we can stop searching for oplog entries with earlier timestamps.
