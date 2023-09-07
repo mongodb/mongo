@@ -2262,11 +2262,6 @@ buildvariants:
     tasks: &bonsai_standalone_tasks
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: ycsb_60GB.long
-      - name: bestbuy_agg
-      - name: bestbuy_query
 
   - name: linux-intel-standalone-sampling-bonsai
     display_name: Linux Intel Standalone (Bonsai with Sampling CE)
