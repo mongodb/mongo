@@ -548,6 +548,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 PlanNodeId planNodeId,
                                 bool lowPriority) {
     auto slotIdGenerator = state.slotIdGenerator;
+    auto recordIdSlot = slotIdGenerator->generate();
     tassert(6584701,
             "Either both lowKey and highKey are specified or none of them are",
             (lowKey && highKey) || (!lowKey && !highKey));
@@ -568,60 +569,6 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
         ? makeVariable(*highKeySlot)
         : makeConstant(sbe::value::TypeTags::ksValue,
                        sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
-
-    auto [stage, outputs] = generateSingleIntervalIndexScan(state,
-                                                            collection,
-                                                            indexName,
-                                                            keyPattern,
-                                                            lowKeyExpr->clone(),
-                                                            highKeyExpr->clone(),
-                                                            std::move(indexKeysToInclude),
-                                                            std::move(indexKeySlots),
-                                                            reqs,
-                                                            yieldPolicy,
-                                                            planNodeId,
-                                                            forward,
-                                                            lowPriority);
-
-    // If low and high keys are provided in the runtime environment, then we need to create
-    // a cfilter stage on top of project in order to be sure that the single interval
-    // exists (the interval may be empty), in which case the index scan plan should simply
-    // return EOF.
-    if (shouldRegisterLowHighKeyInRuntimeEnv) {
-        stage = sbe::makeS<sbe::FilterStage<true /*IsConst*/, false /*IsEof*/>>(
-            std::move(stage),
-            makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                         makeFunction("exists", lowKeyExpr->clone()),
-                         makeFunction("exists", highKeyExpr->clone())),
-            planNodeId);
-    }
-
-    return {std::move(stage),
-            std::move(outputs),
-            shouldRegisterLowHighKeyInRuntimeEnv
-                ? boost::make_optional(std::pair(*lowKeySlot, *highKeySlot))
-                : boost::none};
-}
-
-std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleIntervalIndexScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const std::string& indexName,
-    const BSONObj& keyPattern,
-    std::unique_ptr<sbe::EExpression> lowKeyExpr,
-    std::unique_ptr<sbe::EExpression> highKeyExpr,
-    sbe::IndexKeysInclusionSet indexKeysToInclude,
-    sbe::value::SlotVector indexKeySlots,
-    const PlanStageReqs& reqs,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId,
-    bool forward,
-    bool lowPriority) {
-    auto slotIdGenerator = state.slotIdGenerator;
-    auto recordIdSlot = slotIdGenerator->generate();
-    tassert(7856101,
-            "lowKeyExpr must be present if highKeyExpr is specified.",
-            lowKeyExpr || (!lowKeyExpr && !highKeyExpr));
 
     auto snapshotIdSlot = reqs.has(PlanStageSlots::kSnapshotId)
         ? boost::make_optional(slotIdGenerator->generate())
@@ -645,8 +592,8 @@ std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleInterv
                                                        indexIdentSlot,
                                                        indexKeysToInclude,
                                                        std::move(indexKeySlots),
-                                                       std::move(lowKeyExpr),
-                                                       std::move(highKeyExpr),
+                                                       lowKeyExpr->clone(),
+                                                       highKeyExpr->clone(),
                                                        yieldPolicy,
                                                        planNodeId,
                                                        lowPriority);
@@ -660,7 +607,24 @@ std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleInterv
                                        indexIdentSlot,
                                        indexKeySlot);
 
-    return {std::move(stage), std::move(outputs)};
+    // If low and high keys are provided in the runtime environment, then we need to create
+    // a cfilter stage on top of project in order to be sure that the single interval
+    // exists (the interval may be empty), in which case the index scan plan should simply
+    // return EOF.
+    if (shouldRegisterLowHighKeyInRuntimeEnv) {
+        stage = sbe::makeS<sbe::FilterStage<true /*IsConst*/, false /*IsEof*/>>(
+            std::move(stage),
+            makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                         makeFunction("exists", lowKeyExpr->clone()),
+                         makeFunction("exists", highKeyExpr->clone())),
+            planNodeId);
+    }
+
+    return {std::move(stage),
+            std::move(outputs),
+            shouldRegisterLowHighKeyInRuntimeEnv
+                ? boost::make_optional(std::pair(*lowKeySlot, *highKeySlot))
+                : boost::none};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(

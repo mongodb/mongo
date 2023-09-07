@@ -56,8 +56,6 @@ namespace mongo::stage_builder {
 class PlanStageReqs;
 class PlanStageSlots;
 
-constexpr StringData kIdIndexName = "_id_"_sd;
-
 /**
  * A list of low and high key values representing ranges over a particular index.
  */
@@ -83,9 +81,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds.
  *
- * In case when the 'lowKey'/'lowKeySlot' and 'highKey' are not specified, slots will be registered
- * for them in the runtime environment and their slot ids returned as a pair in the third element of
- * the tuple.
+ * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
+ * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
  *
  * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
  * in the index.
@@ -106,21 +103,6 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 PlanYieldPolicy* yieldPolicy,
                                 PlanNodeId planNodeId,
                                 bool lowPriority);
-
-std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleIntervalIndexScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const std::string& indexName,
-    const BSONObj& keyPattern,
-    std::unique_ptr<sbe::EExpression> lowKeyExpr,
-    std::unique_ptr<sbe::EExpression> highKeyExpr,
-    sbe::IndexKeysInclusionSet indexKeysToInclude,
-    sbe::value::SlotVector indexKeySlots,
-    const PlanStageReqs& reqs,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId,
-    bool forward,
-    bool lowPriority);
 
 /**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as

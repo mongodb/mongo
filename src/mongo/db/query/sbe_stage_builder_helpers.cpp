@@ -686,14 +686,14 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                 indexIdentSlot,
                                                 indexKeySlot,
                                                 indexKeyPatternSlot,
-                                                boost::none /* oplogTsSlot */,
+                                                boost::none,
                                                 std::move(fields),
                                                 std::move(fieldSlots),
                                                 seekRecordIdSlot,
                                                 boost::none /* minRecordIdSlot */,
                                                 boost::none /* maxRecordIdSlot */,
                                                 true /* forward */,
-                                                nullptr /* yieldPolicy */,
+                                                nullptr,
                                                 planNodeId,
                                                 std::move(callbacks));
 
@@ -705,7 +705,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
         std::move(slotsToForward),
         sbe::makeSV(
             seekRecordIdSlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
-        nullptr /* predicate */,
+        nullptr,
         planNodeId);
 }
 

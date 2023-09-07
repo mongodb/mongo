@@ -73,13 +73,10 @@
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
-#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
@@ -112,7 +109,6 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
@@ -139,7 +135,6 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/id_generator.h"
@@ -285,8 +280,6 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     if (preparingFromCache && data->staticData->doSbeClusteredCollectionScan) {
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
-
-    // TODO: SERVER-78565 set cursor and other info of $search here.
 }  // prepareSlotBasedExecutableTree
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
@@ -467,7 +460,6 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     invariant(outputs.has(kResult));
     invariant(reqs.has(kRecordId) == outputs.has(kRecordId));
 
-    // TODO: SERVER-78566 add search metadata and SEARCH_META slot to '_data'.
     _data->resultSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kResult);
     _data->recordIdSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kRecordId);
 
@@ -3359,6 +3351,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(outputs)};
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    return generateEofPlan(root->nodeId(), reqs, _state);
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildWindow(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto windowNode = static_cast<const WindowNode*>(root);
@@ -3862,173 +3859,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     outputs.clearNonRequiredSlots(reqs);
 
-    return {std::move(stage), std::move(outputs)};
-}
-
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    auto sn = static_cast<const SearchNode*>(root);
-    const auto& collection = getCurrentCollection(reqs);
-    auto expCtx = _cq.getExpCtxRaw();
-
-    // get the first batch and cursor id information
-    // TODO: SERVER-78565 move this to the place after 'prepare()'.
-    auto [cursor, _] = getSearchHelpers(_cq.getOpCtx()->getServiceContext())
-                           ->establishSearchQueryCursors(expCtx, sn);
-    auto firstBatch = cursor.getBatch();
-    auto cursorId = cursor.getCursorId();
-
-    // cursorId and first batch slots adding values
-    auto cursorIdSlot = _env->registerSlot("cursorId"_sd,
-                                           sbe::value::TypeTags::NumberInt64,
-                                           cursorId,
-                                           true /* owned */,
-                                           &_slotIdGenerator);
-
-    BSONArrayBuilder firstBatchBuilder;
-    for (const auto& obj : firstBatch) {
-        firstBatchBuilder.append(obj);
-    }
-    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
-    auto firstBatchSlot = _env->registerSlot(
-        "firstBatch"_sd, firstBatchTag, firstBatchVal, true /* owned */, &_slotIdGenerator);
-
-    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
-    auto searchQuerySlot = _env->registerSlot(
-        "searchQuery"_sd, searchQueryTag, searchQueryVal, true /* owned */, &_slotIdGenerator);
-
-    // QSN slots
-    auto limitSlot = _env->registerSlot(
-        "limit"_sd, sbe::value::TypeTags::Nothing, 0, false /* owned */, &_slotIdGenerator);
-    if (sn->limit) {
-        _env->resetSlot(limitSlot, sbe::value::TypeTags::NumberInt64, *sn->limit, true /* owned */);
-    }
-
-    auto protocolVersionSlot = _env->registerSlot(
-        "protocolVersion"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
-    if (sn->intermediateResultsProtocolVersion) {
-        _env->resetSlot(protocolVersionSlot,
-                        sbe::value::TypeTags::NumberInt32,
-                        *sn->intermediateResultsProtocolVersion,
-                        true /* owned */);
-    }
-
-    PlanStageSlots outputs;
-    // Search cursor stage output slots
-    auto searchResultSlot = _slotIdGenerator.generate();
-    auto searchMetaSlot = _slotIdGenerator.generate();
-
-    std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
-                                              Document::metaFieldSearchHighlights.toString(),
-                                              Document::metaFieldSearchScoreDetails.toString(),
-                                              Document::metaFieldSearchSortValues.toString()};
-    auto metadataSlots = _slotIdGenerator.generateMultiple(metadataNames.size());
-    outputs.set(kMetadataSearchScore, metadataSlots[0]);
-    outputs.set(kMetadataSearchHighlights, metadataSlots[1]);
-    outputs.set(kMetadataSearchDetails, metadataSlots[2]);
-    outputs.set(kMetadataSortValues, metadataSlots[3]);
-
-    std::vector<std::string> fieldNames = {"_id"};
-    auto fieldSlots = _slotIdGenerator.generateMultiple(fieldNames.size());
-
-    auto searchCursorStage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
-                                                                expCtx->uuid,
-                                                                searchResultSlot,
-                                                                metadataNames,
-                                                                metadataSlots,
-                                                                fieldNames,
-                                                                fieldSlots,
-                                                                searchMetaSlot,
-                                                                cursorIdSlot,
-                                                                firstBatchSlot,
-                                                                searchQuerySlot,
-                                                                boost::none /* sortSpecSlot */,
-                                                                limitSlot,
-                                                                protocolVersionSlot,
-                                                                expCtx->explain,
-                                                                _yieldPolicy,
-                                                                sn->nodeId());
-    auto searchCursorStagePtr = dynamic_cast<sbe::SearchCursorStage*>(searchCursorStage.get());
-
-    // Make a project stage to convert '_id' field value into keystring.
-    auto catalog = collection->getIndexCatalog();
-    auto indexDescriptor = catalog->findIndexByName(_state.opCtx, kIdIndexName);
-    auto indexAccessMethod = catalog->getEntry(indexDescriptor)->accessMethod()->asSortedData();
-    auto sortedData = indexAccessMethod->getSortedDataInterface();
-    auto version = sortedData->getKeyStringVersion();
-    auto ordering = sortedData->getOrdering();
-
-    auto collatorSlot = _state.getCollatorSlot();
-    auto makeNewKeyFunc = [&](key_string::Discriminator discriminator) {
-        StringData functionName = collatorSlot ? "collKs" : "ks";
-        sbe::EExpression::Vector args;
-        args.emplace_back(makeInt64Constant(static_cast<int64_t>(version)));
-        args.emplace_back(makeInt32Constant(ordering.getBits()));
-        args.emplace_back(makeVariable(fieldSlots[0]));
-        args.emplace_back(makeInt64Constant(static_cast<int64_t>(discriminator)));
-        if (collatorSlot) {
-            args.emplace_back(makeVariable(*collatorSlot));
-        }
-        return makeE<sbe::EFunction>(functionName, std::move(args));
-    };
-
-    auto childReqs = reqs.copy()
-                         .set(kRecordId)
-                         .set(kSnapshotId)
-                         .set(kIndexIdent)
-                         .set(kIndexKey)
-                         .set(kIndexKeyPattern);
-    auto [idxScanStage, idxOutputs] =
-        generateSingleIntervalIndexScan(_state,
-                                        collection,
-                                        kIdIndexName.toString(),
-                                        indexDescriptor->keyPattern(),
-                                        makeNewKeyFunc(key_string::Discriminator::kExclusiveBefore),
-                                        makeNewKeyFunc(key_string::Discriminator::kExclusiveAfter),
-                                        {} /* indexKeysToInclude */,
-                                        {} /* indexKeySlots */,
-                                        childReqs,
-                                        _yieldPolicy,
-                                        sn->nodeId(),
-                                        true /* forward */,
-                                        false /* lowPriority */);
-
-    // Slot stores the resulting document.
-    auto outputDocSlot = _slotIdGenerator.generate();
-    outputs.set(kResult, outputDocSlot);
-    // Slot stores rid if it it found, in our case same as seekRecordIdSlot.
-    auto ridSlot = _slotIdGenerator.generate();
-
-    // Join the idx scan stage with fetch stage.
-    auto fetchStage = makeLoopJoinForFetch(std::move(idxScanStage),
-                                           outputDocSlot,
-                                           ridSlot,
-                                           std::vector<std::string>() /* fields */,
-                                           sbe::makeSV() /* fieldSlots */,
-                                           idxOutputs.get(kRecordId).slotId,
-                                           idxOutputs.get(kSnapshotId).slotId,
-                                           idxOutputs.get(kIndexIdent).slotId,
-                                           idxOutputs.get(kIndexKey).slotId,
-                                           idxOutputs.get(kIndexKeyPattern).slotId,
-                                           collection,
-                                           sn->nodeId(),
-                                           sbe::makeSV() /* slotsToForward */);
-
-    // Join the search_cursor+project stage with idx_scan+fetch stage.
-    auto stage = sbe::makeS<sbe::LoopJoinStage>(
-        std::move(searchCursorStage),
-        sbe::makeS<sbe::LimitSkipStage>(
-            std::move(fetchStage), 1, boost::none /* skip */, sn->nodeId()),
-        metadataSlots,
-        sbe::makeSV(fieldSlots[0]),
-        nullptr /* predicate */,
-        sn->nodeId());
-
-    // Use the most outer nlj stage stats to track how many documents is returned.
-    // TODO: SERVER-80648 for a better solution.
-    searchCursorStagePtr->setDocsReturnedStats(stage->getCommonStats());
-
-    outputs.clearNonRequiredSlots(reqs);
     return {std::move(stage), std::move(outputs)};
 }
 
