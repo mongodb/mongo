@@ -137,6 +137,7 @@ env.CppUnitTest(
         "physical_rewriter_optimizer_test.cpp",
         "physical_rewriter_parallelism_test.cpp",
         "reference_tracker_test.cpp",
+        "remove_orphans_requirement_test.cpp",
         "rewrites/const_eval_test.cpp",
         "rewrites/path_optimizer_test.cpp",
         "unit_test_infra_test.cpp",
