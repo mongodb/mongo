@@ -425,6 +425,8 @@ last-continuous:
     ticket: SERVER-80301
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
     ticket: SERVER-21185
+  - test_file: jstests/noPassthrough/read_preference_metrics.js
+    ticket: SERVER-66018
   suites: null
 last-lts:
   all:
@@ -916,4 +918,6 @@ last-lts:
     ticket: SERVER-79912
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
     ticket: SERVER-21185
+  - test_file: jstests/noPassthrough/read_preference_metrics.js
+    ticket: SERVER-66018
   suites: null
