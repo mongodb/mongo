@@ -6891,6 +6891,13 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *task_template
+  name: serverless_MTM
+  tags: ["serverless"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *gen_task_template
   name: sharding_gen
   tags: ["sharding", "common"]
