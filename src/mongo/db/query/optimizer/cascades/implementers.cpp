@@ -906,7 +906,6 @@ public:
                 fieldProjectionMap._rootProjection = scanProjectionName;
             }
 
-            // TODO SERVER-79854: Omit shard filtering if there equality on the shard key.
             if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
                 // Add top level fields of the shard key to the fieldProjectionMap used to create
                 // the PhysicalScan.
