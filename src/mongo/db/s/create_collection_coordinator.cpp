@@ -1017,6 +1017,15 @@ boost::optional<UUID> createCollectionAndIndexes(
     return *sharding_ddl_util::getCollectionUUID(opCtx, nss);
 }
 
+
+CreateCollectionRequest patchedRequestForChangeStream(
+    const CreateCollectionRequest& originalRequest,
+    const mongo::TranslatedRequestParams& translatedRequestParams) {
+    auto req = originalRequest;
+    req.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
+    return req;
+}
+
 /**
  * Does the following writes:
  * 1. Updates the config.collections entry for the new sharded collection
@@ -1080,11 +1089,14 @@ boost::optional<CreateCollectionResponse> commit(
         coll->setUnique(*request.getUnique());
     }
 
+    const auto patchedRequestBSONObj =
+        patchedRequestForChangeStream(request, *translatedRequestParams).toBSON();
+
     try {
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss,
                                              *collectionUUID,
-                                             request.toBSON(),
+                                             patchedRequestBSONObj,
                                              CommitPhase::kPrepare,
                                              *shardsHoldingData);
 
@@ -1092,7 +1104,7 @@ boost::optional<CreateCollectionResponse> commit(
             opCtx, executor, coll, placementVersion, shardsHoldingData, newSessionBuilder(opCtx));
 
         notifyChangeStreamsOnShardCollection(
-            opCtx, nss, *collectionUUID, request.toBSON(), CommitPhase::kSuccessful);
+            opCtx, nss, *collectionUUID, patchedRequestBSONObj, CommitPhase::kSuccessful);
 
         LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss));
 
@@ -1115,7 +1127,7 @@ boost::optional<CreateCollectionResponse> commit(
         }
 
         notifyChangeStreamsOnShardCollection(
-            opCtx, nss, *collectionUUID, request.toBSON(), CommitPhase::kAborted);
+            opCtx, nss, *collectionUUID, patchedRequestBSONObj, CommitPhase::kAborted);
 
         throw;
     }
@@ -1255,7 +1267,9 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                 opCtx,
                                 nss(),
                                 *createCollectionResponseOpt->getCollectionUUID(),
-                                _request.toBSON(),
+                                patchedRequestForChangeStream(_request,
+                                                              *_doc.getTranslatedRequestParams())
+                                    .toBSON(),
                                 CommitPhase::kSuccessful);
 
                             // The critical section might have been taken by a migration, we force
