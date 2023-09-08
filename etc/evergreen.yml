@@ -695,7 +695,6 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_windows_tls
-      --excludeWithAnyTags=incompatible_with_shard_merge
     external_auth_jobs_max: 1
     # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
     # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
@@ -1190,7 +1189,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_shard_merge
     # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
     # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
     # run too long and hit execution timeouts.
@@ -1457,7 +1455,6 @@ buildvariants:
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     test_flags: >-
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_shard_merge
       --excludeWithAnyTags=cqf_incompatible
       --mongosSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
       --mongodSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
@@ -1654,7 +1651,6 @@ buildvariants:
     # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
       --runNoFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_shard_merge,
 
 # This variant exists becuase this is the only way to test future multiversion tags
 # version_expansions_gen will pretend we are upgrading to "bv_future_git_tag"
@@ -1922,7 +1918,7 @@ buildvariants:
     exec_timeout_factor: 1.5
     test_flags: >-
       --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
@@ -2054,7 +2050,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
-      --excludeWithAnyTags=incompatible_with_shard_merge
       --runAllFeatureFlagTests
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -2156,7 +2151,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling
-      --excludeWithAnyTags=incompatible_with_shard_merge
       --runAllFeatureFlagTests
   tasks:
   - name: jsCore
@@ -2174,7 +2168,6 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --excludeWithAnyTags=requires_ocsp_stapling
-      --excludeWithAnyTags=incompatible_with_shard_merge
       --runAllFeatureFlagTests
   tasks:
   - name: audit
@@ -2876,7 +2869,7 @@ buildvariants:
     <<: *linux_arm64_generic_expansions
     test_flags: >-
       --mongodSetParameters="{storageEngineConcurrencyAdjustmentAlgorithm: fixedConcurrentTransactions}"
-      --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
+      --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
     scons_cache_scope: shared
     scons_cache_mode: all
     commit_queue_alternate_cache: amazon-linux2-arm64-compile
@@ -3003,7 +2996,6 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=resource_intensive
-      --excludeWithAnyTags=incompatible_with_shard_merge
 
 ### Security Patch-Specific Build Variants ###
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
