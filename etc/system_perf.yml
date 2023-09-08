@@ -837,6 +837,13 @@ tasks:
         vars:
           test_control: "ycsb_rolling_restarts"
 
+  - name: locust_bulk_insert
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "locust_bulk_insert"
+
   - name: industry_benchmarks_non_retryable_writes_stepdowns
     priority: 5
     commands:
@@ -2064,6 +2071,34 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
+
+  - name: atlas-M60-shard-real-aws-multi-client.2023-09
+    display_name: M60-Shard Atlas AWS Multiple Workload Clients 2023-09
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-shard
+      canaries: none
+      atlas_setup: M60-shard
+      use_custom_build: true
+      infrastructure_provisioning: workload_client_multiple.arm.2023-09
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks:
+      - name: locust_bulk_insert
 
   - name: atlas-M60-real-azure
     display_name: M60-Atlas ReplSet Azure
