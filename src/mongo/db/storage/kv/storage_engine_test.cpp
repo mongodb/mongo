@@ -199,8 +199,9 @@ public:
         using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
         using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
         auto pf = makePromiseFuture<void>();
-        auto listener =
-            TimestampListener(TimestampType::kOldest, [promise = &pf.promise](Timestamp t) mutable {
+        auto listener = TimestampListener(
+            TimestampType::kOldest,
+            [promise = &pf.promise](OperationContext* opCtx, Timestamp t) mutable {
                 promise->emplaceValue();
             });
         timestampMonitor->addListener(&listener);
@@ -598,9 +599,9 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorRunning) {
 }
 
 TEST_F(TimestampKVEngineTest, TimestampListeners) {
-    TimestampListener first(stable, [](Timestamp timestamp) {});
-    TimestampListener second(oldest, [](Timestamp timestamp) {});
-    TimestampListener third(stable, [](Timestamp timestamp) {});
+    TimestampListener first(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
+    TimestampListener second(oldest, [](OperationContext* opCtx, Timestamp timestamp) {});
+    TimestampListener third(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
 
     // Can only register the listener once.
     _storageEngine->getTimestampMonitor()->addListener(&first);
@@ -621,7 +622,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
     bool changes[4] = {false, false, false, false};
 
-    TimestampListener first(checkpoint, [&](Timestamp timestamp) {
+    TimestampListener first(checkpoint, [&](OperationContext* opCtx, Timestamp timestamp) {
         stdx::lock_guard<Latch> lock(mutex);
         if (!changes[0]) {
             changes[0] = true;
@@ -629,7 +630,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
         }
     });
 
-    TimestampListener second(oldest, [&](Timestamp timestamp) {
+    TimestampListener second(oldest, [&](OperationContext* opCtx, Timestamp timestamp) {
         stdx::lock_guard<Latch> lock(mutex);
         if (!changes[1]) {
             changes[1] = true;
@@ -637,7 +638,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
         }
     });
 
-    TimestampListener third(stable, [&](Timestamp timestamp) {
+    TimestampListener third(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
         stdx::lock_guard<Latch> lock(mutex);
         if (!changes[2]) {
             changes[2] = true;
@@ -645,7 +646,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
         }
     });
 
-    TimestampListener fourth(stable, [&](Timestamp timestamp) {
+    TimestampListener fourth(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
         stdx::lock_guard<Latch> lock(mutex);
         if (!changes[3]) {
             changes[3] = true;
@@ -676,7 +677,7 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     Timestamp previous = Timestamp();
     AtomicWord<int> timesNotified{0};
 
-    TimestampListener listener(stable, [&](Timestamp timestamp) {
+    TimestampListener listener(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
         ASSERT_TRUE(previous < timestamp);
         previous = timestamp;
         timesNotified.fetchAndAdd(1);

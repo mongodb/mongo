@@ -2175,9 +2175,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCreate) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
     // Initialize the oldest timestamp to (1, 1)
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+        });
+    }
 
     // Create collection and extract the catalogId
     UUID uuid = createCollection(opCtx.get(), nss, Timestamp(1, 2));
@@ -2204,9 +2207,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingDrop) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
     // Initialize the oldest timestamp to (1, 1)
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+        });
+    }
 
     // Create and drop collection. We have a time window where the namespace exists
     UUID uuid = createCollection(opCtx.get(), nss, Timestamp(1, 5));
@@ -2242,9 +2248,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
     NamespaceString to = NamespaceString::createNamespaceString_forTest("a.c");
 
     // Initialize the oldest timestamp to (1, 1)
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+        });
+    }
 
     // Create and rename collection. We have two windows where the collection exists but for
     // different namespaces
@@ -2298,10 +2307,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRenameDropTarget) {
     NamespaceString to = NamespaceString::createNamespaceString_forTest("a.c");
 
     // Initialize the oldest timestamp to (1, 1)
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
-    });
-
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+        });
+    }
     // Create collections. The 'to' namespace will exist for one collection from Timestamp(1, 6)
     // until it is dropped by the rename at Timestamp(1, 10), after which the 'to' namespace will
     // correspond to the renamed collection.
@@ -2421,9 +2432,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupEqDrop) {
               CollectionCatalog::CatalogIdLookup::Existence::kNotExists);
 
     // Cleanup at drop timestamp
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 10));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 10));
+        });
+    }
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
     ASSERT_FALSE(catalog()->needsCleanupForOldestTimestamp(Timestamp(1, 10)));
@@ -2468,9 +2482,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtDrop) {
               CollectionCatalog::CatalogIdLookup::Existence::kNotExists);
 
     // Cleanup after the drop timestamp
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 12));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 12));
+        });
+    }
 
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
@@ -2516,9 +2533,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupGtRecreate) {
               CollectionCatalog::CatalogIdLookup::Existence::kNotExists);
 
     // Cleanup after the recreate timestamp
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 20));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 20));
+        });
+    }
 
     // After cleanup, we cannot find the old catalogId anymore. Also verify that we don't need
     // anymore cleanup
@@ -2560,9 +2580,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
               CollectionCatalog::CatalogIdLookup::Existence::kExists);
 
     // Cleanup oldest
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 10));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 10));
+        });
+    }
 
     // Lookup can find the three remaining collections
     ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 5)).result,
@@ -2575,9 +2598,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
               CollectionCatalog::CatalogIdLookup::Existence::kExists);
 
     // Cleanup
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 21));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 21));
+        });
+    }
 
     // Lookup can find the two remaining collections
     ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 5)).result,
@@ -2590,9 +2616,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
               CollectionCatalog::CatalogIdLookup::Existence::kExists);
 
     // Cleanup
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 32));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 32));
+        });
+    }
 
     // Lookup can find the last remaining collections
     ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 5)).result,
@@ -2605,9 +2634,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultiple) {
               CollectionCatalog::CatalogIdLookup::Existence::kExists);
 
     // Cleanup
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
+        });
+    }
 
     // Lookup now result in unknown as the oldest timestamp has advanced where mapping has been
     // removed
@@ -2648,9 +2680,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingCleanupMultipleSingleCall
               CollectionCatalog::CatalogIdLookup::Existence::kExists);
 
     // Cleanup all
-    CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
-        c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& c) {
+            c.cleanupForOldestTimestampAdvanced(Timestamp(1, 50));
+        });
+    }
 
     // Lookup now result in unknown as the oldest timestamp has advanced where mapping has been
     // removed
@@ -2685,8 +2720,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRollback) {
     dropCollection(opCtx.get(), b, Timestamp(1, 10));
 
     // Rollback to Timestamp(1, 8)
-    CollectionCatalog::write(
-        opCtx.get(), [&](CollectionCatalog& c) { c.cleanupForCatalogReopen(Timestamp(1, 8)); });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(
+            opCtx.get(), [&](CollectionCatalog& c) { c.cleanupForCatalogReopen(Timestamp(1, 8)); });
+    }
 
     ASSERT_EQ(lookupCatalogId(e, firstUUID, boost::none).result,
               CollectionCatalog::CatalogIdLookup::Existence::kNotExists);
@@ -2718,9 +2756,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
 
     // Simulate startup where we have a range [oldest, stable] by creating and dropping collections
     // and then advancing the oldest timestamp and then reading behind it.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
+        });
+    }
 
     // Confirm that the mappings have been cleaned up
     ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 15)).result,
@@ -2879,9 +2920,12 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
 
 
     // Clean up, check so we are back to the original state
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 41));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 41));
+        });
+    }
 
     ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 15)).result,
               CollectionCatalog::CatalogIdLookup::Existence::kUnknown);
@@ -2897,17 +2941,23 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsertUnknown) {
 
     // Simulate startup where we have a range [oldest, stable] by advancing the oldest timestamp and
     // then reading behind it.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 40));
+        });
+    }
 
     // Reading before the oldest is unknown
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
               CollectionCatalog::CatalogIdLookup::Existence::kUnknown);
 
     // Try to instantiate a non existing collection at this timestamp.
-    CollectionCatalog::get(opCtx.get())
-        ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 15));
+    {
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 15));
+    }
 
     // Lookup should now be not existing
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss, Timestamp(1, 15)).result,
@@ -4296,9 +4346,12 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("system.profile");
 
     // Initialize the oldest timestamp.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+        });
+    }
 
     // Create and drop the collection. We have a time window where the namespace exists.
     createCollection(opCtx.get(), nss, Timestamp::min());
@@ -4308,17 +4361,23 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
     createCollection(opCtx.get(), nss, Timestamp::min());
 
     // Perform collection catalog cleanup.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(20, 20));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(20, 20));
+        });
+    }
 
     // Drop the re-created collection.
     dropCollection(opCtx.get(), nss, Timestamp(30, 30));
 
     // Cleanup again.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.cleanupForOldestTimestampAdvanced(Timestamp(25, 25));
-    });
+    {
+        Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+        CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+            catalog.cleanupForOldestTimestampAdvanced(Timestamp(25, 25));
+        });
+    }
 }
 
 TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
