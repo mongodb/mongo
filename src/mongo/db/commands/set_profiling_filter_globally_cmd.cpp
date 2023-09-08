@@ -96,10 +96,6 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
     // explicitly stored for new databases.
     ProfileFilter::setDefault(newDefault);
 
-    // Writing to the CollectionCatalog requires holding the Global lock to avoid concurrent races
-    // with BatchedCollectionCatalogWriter.
-    Lock::GlobalLock lk{opCtx, MODE_IX};
-
     // Update all existing database settings.
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog.setAllDatabaseProfileFilters(newDefault);
