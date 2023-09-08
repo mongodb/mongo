@@ -330,6 +330,9 @@ variables:
   - func: "antithesis image build and push"
     vars:
       suite: suite_name
+      resmoke_args: >-
+        --arg=val
+        --flag
 
 # TODO: split this up into the user files.
 # List of all variants that make mongocryptd
@@ -8799,6 +8802,19 @@ tasks:
       binary: bash
       args:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_with_stepdowns_and_balancer
+      resmoke_args: >-
+        --configShard=0
+        --numShards=2
+        --excludeWithAnyTags=config_shard_incompatible
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer

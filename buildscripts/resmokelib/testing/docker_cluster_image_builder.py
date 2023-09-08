@@ -24,7 +24,7 @@ def build_images(suite_name, fixture_instance):
         Built image(s): {config.DOCKER_COMPOSE_BUILD_IMAGES}
 
         SUCCESS - Run this suite against an External System Under Test (SUT) with the following command:
-        `docker compose -f docker_compose/{suite_name}/docker-compose.yml run --rm workload buildscripts/resmoke.py run --suite {suite_name} --externalSUT`
+        `docker compose -f docker_compose/{suite_name}/docker-compose.yml run --rm workload {image_builder.get_resmoke_run_command()}`
 
         DISCLAIMER - Make sure you have built all images with the following command first:
         `buildscripts/resmoke.py run --suite {suite_name} --dockerComposeBuildImages workload,mongo-binaries,config`
@@ -68,6 +68,16 @@ class DockerComposeImageBuilder:
         # Port suffix ranging from 1-24 is subject to fault injection while ports 130+ are safe.
         self.next_available_fault_enabled_ip = 2
         self.next_available_fault_disabled_ip = 130
+
+    @staticmethod
+    def get_resmoke_run_command() -> str:
+        """Construct the supported resmoke `run` command to test against an external system under test."""
+        # The supported `run` command should keep all of the same args except:
+        # (1) it should remove the `--dockerComposeBuildImages` option and value
+        # (2) it should add the `--externalSUT` flag
+        command = sys.argv
+        rm_index = command.index("--dockerComposeBuildImages")
+        return ' '.join(command[0:rm_index] + command[rm_index + 2:] + ["--externalSUT"])
 
     def _add_docker_compose_configuration_to_build_context(self, build_context) -> None:
         """
@@ -119,6 +129,10 @@ class DockerComposeImageBuilder:
         print("Writing workload init script...")
         with open(os.path.join(build_context, "scripts", "workload.sh"), "w") as workload_init:
             workload_init.write("tail -f /dev/null\n")
+
+        print("Writing resmoke run script for convenience...")
+        with open(os.path.join(build_context, "scripts", "run_resmoke.sh"), "w") as run_resmoke:
+            run_resmoke.write(f'{self.get_resmoke_run_command()} "$@"\n')
 
         print("Writing mongo{d,s} init scripts...")
         for process in self.suite_fixture.all_processes():

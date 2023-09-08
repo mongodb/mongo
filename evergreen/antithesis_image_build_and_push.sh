@@ -30,17 +30,17 @@ rm mongodb.key.json
 # Build Image
 cd src
 activate_venv
-$python buildscripts/resmoke.py run --suite ${suite} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen
+$python buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen
 
 # Test Image
 docker-compose -f docker_compose/${suite}/docker-compose.yml up -d
 echo "ALL RUNNING CONTAINERS: "
 docker ps
-docker exec workload buildscripts/resmoke.py run --suite ${suite} --sanityCheck --externalSUT
+docker exec workload buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --sanityCheck --externalSUT
 
 # Push Image
-sudo docker tag "${suite}:$tag" "$antithesis_repo/${suite}:$tag"
-sudo docker push "$antithesis_repo/${suite}:$tag"
+sudo docker tag "${suite}:$tag" "$antithesis_repo/${task_name}:$tag"
+sudo docker push "$antithesis_repo/${task_name}:$tag"
 
 sudo docker tag "mongo-binaries:$tag" "$antithesis_repo/mongo-binaries:$tag"
 sudo docker push "$antithesis_repo/mongo-binaries:$tag"
