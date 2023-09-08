@@ -42,10 +42,10 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostname_canonicalization.h"
@@ -70,10 +70,10 @@ public:
                             const BSONElement& configElement) const override {
         BSONObjBuilder bb;
 
-        auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
-        invariant(serviceEntryPoint);
+        auto sessionManager = opCtx->getServiceContext()->getSessionManager();
+        invariant(sessionManager);
+        sessionManager->appendStats(&bb);
 
-        serviceEntryPoint->appendStats(&bb);
         return bb.obj();
     }
 

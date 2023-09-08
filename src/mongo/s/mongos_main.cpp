@@ -129,6 +129,7 @@
 #include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/session_manager_mongos.h"
 #include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
@@ -473,12 +474,12 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
-        // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
-        if (auto sep = serviceContext->getServiceEntryPoint()) {
-            if (!sep->shutdown(Seconds(10))) {
+        // Shutdown the Session Mnager and its sessions and give it a grace period to complete.
+        if (auto mgr = serviceContext->getSessionManager()) {
+            if (!mgr->shutdown(Seconds(10))) {
                 LOGV2_OPTIONS(22844,
                               {LogComponent::kNetwork},
-                              "Service entry point did not shutdown within the time limit");
+                              "SessionManager did not shutdown within the time limit");
             }
         }
 
@@ -647,7 +648,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>(serviceContext));
+    serviceContext->setSessionManager(std::make_unique<SessionManagerMongos>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
     const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
     if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {
@@ -779,12 +781,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                                                   std::make_unique<SessionsCollectionSharded>(),
                                                   RouterSessionCatalog::reapSessionsOlderThan));
 
-    status = serviceContext->getServiceEntryPoint()->start();
+    status = serviceContext->getSessionManager()->start();
     if (!status.isOK()) {
-        LOGV2_ERROR(22860,
-                    "Error starting service entry point: {error}",
-                    "Error starting service entry point",
-                    "error"_attr = redact(status));
+        LOGV2_ERROR(22860, "Error starting session manager", "error"_attr = redact(status));
         return ExitCode::netError;
     }
 

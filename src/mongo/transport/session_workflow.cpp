@@ -289,7 +289,7 @@ private:
 // TODO(SERVER-63883): Remove when re-introducing real metrics.
 class NoopSessionWorkflowMetrics {
 public:
-    explicit NoopSessionWorkflowMetrics(ServiceEntryPoint*) {}
+    explicit NoopSessionWorkflowMetrics() {}
     void start() {}
     void yieldedBeforeReceive() {}
     void received() {}
@@ -391,10 +391,11 @@ public:
         : _workflow{workflow},
           _serviceContext{client->getServiceContext()},
           _sep{_serviceContext->getServiceEntryPoint()},
+          _sessionManager{_serviceContext->getSessionManager()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
 
     ~Impl() {
-        _sep->onEndSession(session());
+        _sessionManager->onEndSession(session());
     }
 
     Client* client() const {
@@ -459,7 +460,7 @@ private:
     };
 
     struct IterationFrame {
-        explicit IterationFrame(const Impl& impl) : metrics{impl._sep} {
+        explicit IterationFrame(const Impl& impl) : metrics{} {
             metrics.start();
         }
         ~IterationFrame() {
@@ -550,6 +551,7 @@ private:
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
+    SessionManager* _sessionManager;
     RunnerAndSource _taskRunner;
 
     AtomicWord<bool> _isTerminated{false};
@@ -875,7 +877,7 @@ void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     }
     _cleanupExhaustResources();
     _taskRunner = {};
-    _sep->onClientDisconnect(client());
+    _sessionManager->onClientDisconnect(client());
 }
 
 SessionWorkflow::SessionWorkflow(PassKeyTag, ServiceContext::UniqueClient client)

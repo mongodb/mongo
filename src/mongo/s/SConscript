@@ -427,6 +427,7 @@ env.Library(
     target='startup_initialization',
     source=[
         'service_entry_point_mongos.cpp',
+        'session_manager_mongos.cpp',
         'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -435,13 +436,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/transport/session_manager',
         'commands/cluster_commands_common',
         'load_balancer_support',
         'sharding_router_api',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
     ],
 )
 
@@ -478,7 +479,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/hedging_metrics',
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/clock_sources',
         '$BUILD_DIR/mongo/util/fail_point',
@@ -542,7 +543,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_refresher',
         '$BUILD_DIR/mongo/transport/ingress_handshake_metrics',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/latch_analyzer'
         if get_option('use-diagnostic-latches') == 'on' else [],

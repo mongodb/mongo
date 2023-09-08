@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,23 +29,26 @@
 
 #pragma once
 
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_manager.h"
 
 namespace mongo {
 
-class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
-    ServiceEntryPointEmbedded(const ServiceEntryPointEmbedded&) = delete;
-    ServiceEntryPointEmbedded& operator=(const ServiceEntryPointEmbedded&) = delete;
-
+class SessionManagerEmbedded final : public transport::SessionManager {
 public:
-    ServiceEntryPointEmbedded() = default;
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override;
+    SessionManagerEmbedded() = default;
 
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() override;
-
-private:
-    class Hooks;
+    void startSession(std::shared_ptr<transport::Session> session) override {}
+    void endAllSessions(transport::Session::TagMask tags) override {}
+    Status start() override {
+        return Status::OK();
+    }
+    bool shutdown(Milliseconds timeout) override {
+        return true;
+    }
+    void appendStats(BSONObjBuilder* bob) const override {}
+    std::size_t numOpenSessions() const override {
+        return 0;
+    }
 };
 
 }  // namespace mongo

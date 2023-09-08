@@ -210,6 +210,10 @@ ServiceEntryPoint* ServiceContext::getServiceEntryPoint() const {
     return _serviceEntryPoint.get();
 }
 
+transport::SessionManager* ServiceContext::getSessionManager() const {
+    return _sessionManager.get();
+}
+
 void ServiceContext::setStorageEngine(std::unique_ptr<StorageEngine> engine) {
     invariant(engine);
     invariant(!_storageEngine);
@@ -230,6 +234,10 @@ void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) 
 
 void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSource) {
     _preciseClockSource = std::move(newSource);
+}
+
+void ServiceContext::setSessionManager(std::unique_ptr<transport::SessionManager> sm) {
+    _sessionManager = std::move(sm);
 }
 
 void ServiceContext::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {

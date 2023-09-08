@@ -27,75 +27,41 @@
  *    it in the license file.
  */
 
+#include "mongo/transport/session_manager_common.h"
 
-#include "mongo/transport/service_entry_point_impl.h"
+#include <boost/optional.hpp>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_id.h"
+#include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/net/cidr.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/sockaddr.h"
-#include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
-
-#if !defined(_WIN32)
-#include <sys/resource.h>
-#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-namespace mongo {
-
-using namespace fmt::literals;
-
+namespace mongo::transport {
 namespace {
-bool quiet() {
-    return serverGlobalParams.quiet.load();
-}
 
 /** Some diagnostic data that we will want to log about a Client after its death. */
 struct ClientSummary {
     explicit ClientSummary(const Client* c)
-        : uuid{c->getUUID()}, remote{c->session()->remote()}, id{c->session()->id()} {}
+        : uuid(c->getUUID()), remote(c->session()->remote()), id(c->session()->id()) {}
 
     friend auto logAttrs(const ClientSummary& m) {
         return logv2::multipleAttrs(
@@ -104,57 +70,27 @@ struct ClientSummary {
 
     UUID uuid;
     HostAndPort remote;
-    transport::SessionId id;
+    SessionId id;
 };
-}  // namespace
 
-bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
-                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
-    if (exemptions.empty())
-        return false;
-
-    boost::optional<CIDR> remoteCIDR;
-    if (const auto& ra = session->remoteAddr(); ra.isValid() && ra.isIP())
-        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
-
-#ifndef _WIN32
-    boost::optional<std::string> localPath;
-    if (const auto& la = session->localAddr(); la.isValid())
-        localPath = la.getAddr();
-#endif
-
-    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
-        return stdx::visit(
-            [&](auto&& ex) {
-                using Alt = std::decay_t<decltype(ex)>;
-                if constexpr (std::is_same_v<Alt, CIDR>)
-                    return remoteCIDR && ex.contains(*remoteCIDR);
-#ifndef _WIN32
-                // Otherwise the exemption is a UNIX path and we should check the local path
-                // (the remoteAddr == "anonymous unix socket") against the exemption string.
-                // On Windows we don't check this at all and only CIDR ranges are supported.
-                if constexpr (std::is_same_v<Alt, std::string>)
-                    return localPath && *localPath == ex;
-#endif
-                return false;
-            },
-            exemption);
-    });
+bool quiet() {
+    return serverGlobalParams.quiet.load();
 }
 
-size_t getSupportedMax() {
-    const auto supportedMax = [] {
+// Limit maximum sessions to `net.maxIncomingConnections`/`--maxConns`
+// On non-windows, this is automatically capped to 80% of the current system rlimit.
+std::size_t getSupportedMax() {
+    const auto supportedMax = ([] {
 #ifdef _WIN32
         return serverGlobalParams.maxConns;
 #else
         struct rlimit limit;
         MONGO_verify(getrlimit(RLIMIT_NOFILE, &limit) == 0);
 
-        size_t max = (size_t)(limit.rlim_cur * .8);
+        const auto max = static_cast<std::size_t>(limit.rlim_cur * .8);
 
         LOGV2_DEBUG(22940,
                     1,
-                    "fd limit hard:{hard} soft:{soft} max conn: {conn}",
                     "file descriptor and connection resource limits",
                     "hard"_attr = limit.rlim_max,
                     "soft"_attr = limit.rlim_cur,
@@ -162,26 +98,76 @@ size_t getSupportedMax() {
 
         return std::min(max, serverGlobalParams.maxConns);
 #endif
-    }();
+    })();
 
     // If we asked for more connections than supported, inform the user.
     if (supportedMax < serverGlobalParams.maxConns &&
         serverGlobalParams.maxConns != DEFAULT_MAX_CONN) {
-        LOGV2(22941,
-              " --maxConns too high, can only handle {limit}",
-              " --maxConns too high",
-              "limit"_attr = supportedMax);
+        LOGV2(22941, " --maxConns too high", "limit"_attr = supportedMax);
     }
 
     return supportedMax;
 }
 
-class ServiceEntryPointImpl::Sessions {
+void _setupRestrictionEnvironment(std::shared_ptr<Session>& session) {
+    const auto& remoteAddr = session->remoteAddr();
+    const auto& localAddr = session->localAddr();
+    invariant(remoteAddr.isValid() && localAddr.isValid());
+    auto restrictionEnvironment = std::make_unique<RestrictionEnvironment>(remoteAddr, localAddr);
+    RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
+}
+
+}  // namespace
+
+bool shouldOverrideMaxConns(const std::shared_ptr<transport::Session>& session,
+                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
+    if (exemptions.empty()) {
+        return false;
+    }
+
+    boost::optional<CIDR> remoteCIDR;
+    if (const auto& ra = session->remoteAddr(); ra.isValid() && ra.isIP()) {
+        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
+    }
+
+#ifndef _WIN32
+    boost::optional<std::string> localPath;
+    if (const auto& la = session->localAddr(); la.isValid() && !la.isIP()) {
+        localPath = la.getAddr();
+    }
+#endif
+
+    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
+        return stdx::visit(
+            [&](auto&& ex) {
+                using Alt = std::decay_t<decltype(ex)>;
+                if constexpr (std::is_same_v<Alt, CIDR>) {
+                    return remoteCIDR && ex.contains(*remoteCIDR);
+                }
+#ifndef _WIN32
+                // Otherwise the exemption is a UNIX path and we should check the local path
+                // (the remoteAddr == "anonymous unix socket") against the exemption string.
+                // On Windows we don't check this at all and only CIDR ranges are supported.
+                if constexpr (std::is_same_v<Alt, std::string>) {
+                    return localPath && *localPath == ex;
+                }
+#endif
+                return false;
+            },
+            exemption);
+    });
+}
+
+/**
+ * Container implementation for currently active sessions.
+ * Structurally this behaves like an STL map<Client*, SessionWorkflow*>
+ * with additional machinery to manage concurrency.
+ */
+class SessionManagerCommon::Sessions {
 public:
     struct Entry {
-        explicit Entry(std::shared_ptr<transport::SessionWorkflow> workflow)
-            : workflow{std::move(workflow)} {}
-        std::shared_ptr<transport::SessionWorkflow> workflow;
+        explicit Entry(std::shared_ptr<SessionWorkflow> workflow) : workflow{std::move(workflow)} {}
+        std::shared_ptr<SessionWorkflow> workflow;
         ClientSummary summary{workflow->client()};
     };
     using ByClientMap = stdx::unordered_map<Client*, Entry>;
@@ -195,8 +181,9 @@ public:
         /** Run `f(workflow)` for each `SessionWorkflow& workflow`, in an unspecified order. */
         template <typename F>
         void forEach(F&& f) {
-            for (auto& e : _src->_byClient)
+            for (auto& e : _src->_byClient) {
                 f(*e.second.workflow);
+            }
         }
 
         /**
@@ -223,13 +210,13 @@ public:
             _onSizeChange();
         }
 
-        iterator find(Client* client) {
+        iterator find(Client* client) const {
             auto iter = _src->_byClient.find(client);
             invariant(iter != _src->_byClient.end());
             return iter;
         }
 
-        size_t size() const {
+        std::size_t size() const {
             return _src->_byClient.size();
         }
 
@@ -248,82 +235,57 @@ public:
         return SyncToken(this);
     }
 
-    size_t size() const {
+    std::size_t size() const {
         return _size.load();
     }
 
-    size_t created() const {
+    std::size_t created() const {
         return _created.load();
     }
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceEntryPointImpl::Sessions::_mutex");
-    stdx::condition_variable _cv;    ///< notified on `_byClient` changes.
-    AtomicWord<size_t> _size{0};     ///< Kept in sync with `_byClient.size()`
-    AtomicWord<size_t> _created{0};  ///< Increases with each `insert` call.
-    ByClientMap _byClient;           ///< guarded by `_mutex`
+    stdx::condition_variable _cv;         ///< notified on `_byClient` changes.
+    AtomicWord<std::size_t> _size{0};     ///< Kept in sync with `_byClient.size()`
+    AtomicWord<std::size_t> _created{0};  ///< Increases with each `insert` call.
+    ByClientMap _byClient;                ///< guarded by `_mutex`
 };
 
-ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx)
+SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx)
     : _svcCtx(svcCtx),
-      _maxSessions(getSupportedMax()),
-      _rejectedSessions(0),
-      _sessions{std::make_unique<Sessions>()} {}
+      _maxOpenSessions(getSupportedMax()),
+      _sessions(std::make_unique<Sessions>()) {}
 
-ServiceEntryPointImpl::~ServiceEntryPointImpl() = default;
+SessionManagerCommon::~SessionManagerCommon() = default;
 
-Status ServiceEntryPointImpl::start() {
-    if (auto status = transport::ServiceExecutorSynchronous::get(_svcCtx)->start();
-        !status.isOK()) {
-        return status;
-    }
-
-    if (auto exec = transport::ServiceExecutorReserved::get(_svcCtx)) {
-        if (auto status = exec->start(); !status.isOK()) {
-            return status;
-        }
-    }
-
-    if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
-void ServiceEntryPointImpl::configureServiceExecutorContext(ServiceContext::UniqueClient& client,
-                                                            bool isPrivilegedSession) {
-    auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-    seCtx->setUseDedicatedThread(transport::gInitialUseDedicatedThread);
+void SessionManagerCommon::configureServiceExecutorContext(Client* client,
+                                                           bool isPrivilegedSession) const {
+    auto seCtx = std::make_unique<ServiceExecutorContext>();
+    seCtx->setUseDedicatedThread(gInitialUseDedicatedThread);
     seCtx->setCanUseReserved(isPrivilegedSession);
     stdx::lock_guard lk(*client);
-    transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
+    ServiceExecutorContext::set(client, std::move(seCtx));
 }
 
-void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> session) {
+void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
+    IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
+    _setupRestrictionEnvironment(session);
 
-    transport::IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
+    const bool isPrivilegedSession =
+        shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
+    const bool verbose = !quiet();
 
-    // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
-    const auto& remoteAddr = session->remoteAddr();
-    const auto& localAddr = session->localAddr();
-    invariant(remoteAddr.isValid() && localAddr.isValid());
-    auto restrictionEnvironment = std::make_unique<RestrictionEnvironment>(remoteAddr, localAddr);
-    RestrictionEnvironment::set(session, std::move(restrictionEnvironment));
-
-    bool isPrivilegedSession = shouldOverrideMaxConns(session, serverGlobalParams.maxConnsOverride);
-
-    auto client = _svcCtx->makeClient("conn{}"_format(session->id()), session);
-    auto clientPtr = client.get();
+    auto uniqueClient = _svcCtx->makeClient("conn{}"_format(session->id()), session);
+    auto client = uniqueClient.get();
 
     std::shared_ptr<transport::SessionWorkflow> workflow;
     {
         auto sync = _sessions->sync();
-        if (sync.size() >= _maxSessions && !isPrivilegedSession) {
+        if (sync.size() >= _maxOpenSessions && !isPrivilegedSession) {
             // Since startSession() is guaranteed to be accessed only by a single listener thread,
             // an atomic increment is not necessary here.
             _rejectedSessions++;
-            if (!quiet()) {
+            if (verbose) {
                 LOGV2(22942,
                       "Connection refused because there are too many open connections",
                       "remote"_attr = session->remote(),
@@ -334,9 +296,9 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
 
         configureServiceExecutorContext(client, isPrivilegedSession);
 
-        workflow = transport::SessionWorkflow::make(std::move(client));
+        workflow = SessionWorkflow::make(std::move(uniqueClient));
         auto iter = sync.insert(workflow);
-        if (!quiet()) {
+        if (verbose) {
             LOGV2(22943,
                   "Connection accepted",
                   logAttrs(iter->second.summary),
@@ -344,32 +306,39 @@ void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> ses
         }
     }
 
-    onClientConnect(clientPtr);
+    onClientConnect(client);
     // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
     // instance of `ServiceEntryPoint`.
     workflow->start();
 }
 
-void ServiceEntryPointImpl::onClientDisconnect(Client* client) {
-    derivedOnClientDisconnect(client);
-    {
-        stdx::lock_guard lk(*client);
-        transport::ServiceExecutorContext::reset(client);
-    }
-    auto sync = _sessions->sync();
-    auto iter = sync.find(client);
-    auto summary = iter->second.summary;
-    sync.erase(iter);
-    if (!quiet()) {
-        LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());
-    }
-}
-
-void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
+void SessionManagerCommon::endAllSessions(Session::TagMask tags) {
     _sessions->sync().forEach([&](auto&& workflow) { workflow.terminateIfTagsDontMatch(tags); });
 }
 
-bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
+void SessionManagerCommon::endAllSessionsNoTagMask() {
+    _sessions->sync().forEach([&](auto&& workflow) { workflow.terminate(); });
+}
+
+Status SessionManagerCommon::start() {
+    if (auto status = ServiceExecutorSynchronous::get(_svcCtx)->start(); !status.isOK()) {
+        return status;
+    }
+
+    if (auto exec = ServiceExecutorReserved::get(_svcCtx)) {
+        if (auto status = exec->start(); !status.isOK()) {
+            return status;
+        }
+    }
+
+    if (auto status = ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+bool SessionManagerCommon::shutdown(Milliseconds timeout) {
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     static constexpr bool kSanitizerBuild = true;
 #else
@@ -381,29 +350,16 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     // harder to dry up the server from active connections before going on to really shut down.
     // In non-sanitizer builds, a feature flag can enable a true shutdown anyway. We use the
     // flag to identify these shutdown problems in testing.
-    if (kSanitizerBuild || transport::gJoinIngressSessionsOnShutdown) {
+    if (kSanitizerBuild || gJoinIngressSessionsOnShutdown) {
         const auto result = shutdownAndWait(timeout);
-        if (transport::gJoinIngressSessionsOnShutdown)
-            invariant(result, "Shutdown did not complete within {}ms"_format(timeout.count()));
+        invariant(result || !gJoinIngressSessionsOnShutdown,
+                  "Shutdown did not complete within {}ms"_format(timeout.count()));
         return result;
     }
 
     return true;
 }
-
-size_t ServiceEntryPointImpl::numOpenSessions() const {
-    return _sessions->size();
-}
-
-size_t ServiceEntryPointImpl::maxOpenSessions() const {
-    return _maxSessions;
-}
-
-logv2::LogSeverity ServiceEntryPointImpl::slowSessionWorkflowLogSeverity() {
-    return _slowSessionWorkflowLogSuppressor();
-}
-
-bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
+bool SessionManagerCommon::shutdownAndWait(Milliseconds timeout) {
     auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
 
     // Issue a terminate to all sessions, then wait for them to drain.
@@ -429,47 +385,62 @@ bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
     return drainedAll;
 }
 
-void ServiceEntryPointImpl::endAllSessionsNoTagMask() {
-    _sessions->sync().forEach([&](auto&& workflow) { workflow.terminate(); });
-}
-
-bool ServiceEntryPointImpl::waitForNoSessions(Milliseconds timeout) {
+bool SessionManagerCommon::waitForNoSessions(Milliseconds timeout) {
     auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
     LOGV2(5342100, "Waiting for all sessions to conclude", "deadline"_attr = deadline);
 
     return _sessions->sync().waitForEmpty(deadline);
 }
 
-void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
-    size_t sessionCount = _sessions->size();
-    size_t sessionsCreated = _sessions->created();
+void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
+    const auto sessionCount = _sessions->size();
+    const auto sessionsCreated = _sessions->created();
 
-    auto appendInt = [&](StringData n, auto v) {
+    const auto appendInt = [&](StringData n, auto v) {
         bob->append(n, static_cast<int>(v));
     };
 
     appendInt("current", sessionCount);
-    appendInt("available", _maxSessions - sessionCount);
+    appendInt("available", _maxOpenSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
     appendInt("rejected", _rejectedSessions);
 
     invariant(_svcCtx);
     appendInt("active", _svcCtx->getActiveClientOperations());
 
-    const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
+    const auto seStats = ServiceExecutorStats::get(_svcCtx);
     appendInt("threaded", seStats.usesDedicated);
-    if (!serverGlobalParams.maxConnsOverride.empty())
+    if (!serverGlobalParams.maxConnsOverride.empty()) {
         appendInt("limitExempt", seStats.limitExempt);
+    }
 
     auto&& hm = HelloMetrics::get(_svcCtx);
     appendInt("exhaustIsMaster", hm->getNumExhaustIsMaster());
     appendInt("exhaustHello", hm->getNumExhaustHello());
     appendInt("awaitingTopologyChanges", hm->getNumAwaitingTopologyChanges());
 
-    if (auto adminExec = transport::ServiceExecutorReserved::get(_svcCtx)) {
+    if (auto adminExec = ServiceExecutorReserved::get(_svcCtx)) {
         BSONObjBuilder section(bob->subobjStart("adminConnections"));
         adminExec->appendStats(&section);
     }
 }
 
-}  // namespace mongo
+std::size_t SessionManagerCommon::numOpenSessions() const {
+    return _sessions->size();
+}
+
+void SessionManagerCommon::onClientDisconnect(Client* client) {
+    {
+        stdx::lock_guard lk(*client);
+        ServiceExecutorContext::reset(client);
+    }
+    auto sync = _sessions->sync();
+    auto iter = sync.find(client);
+    auto summary = iter->second.summary;
+    sync.erase(iter);
+    if (!quiet()) {
+        LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());
+    }
+}
+
+}  // namespace mongo::transport
