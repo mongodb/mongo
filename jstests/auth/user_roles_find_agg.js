@@ -43,7 +43,7 @@ function runAgg(db) {
     assert.commandWorked(coll.insertMany([engDoc, salesDoc]));
 
     // This will match the documents where the intersection between the allowedRoles field and the
-    // user"s roles is not empty, i.e. the user"s role allows them to see the document in the
+    // user's roles is not empty, i.e. the user's role allows them to see the document in the
     // results. In this case, only the engDoc has the the "read" role that was assigned to the user,
     // so only the engDoc will appear in the results.
     let pipeline = [{
@@ -52,6 +52,31 @@ function runAgg(db) {
     }];
     let res = coll.aggregate(pipeline).toArray();
     assert.eq([engDoc], res);
+
+    // Insert a document that has the currently authenticated user's roles in the allowedRoles
+    // field, and thus will match the following subpipeline.
+    let readDoc = {_id: 2, allowedRoles: ["readWriteAnyDatabase", "read"]};
+    assert.commandWorked(coll.insert(readDoc));
+    const subpipeline = [{$match: {$expr: {$eq: ["$allowedRoles", "$$USER_ROLES.role"]}}}];
+
+    // Ensure that $$USER_ROLES can be present in a $lookup subpipeline.
+    let findColl = db.getCollection(findCollName);
+    const lookupPipeline = [
+        {$lookup: {from: aggCollName, pipeline: subpipeline, as: "docThatMatchesRoles"}},
+        {$project: {_id: 0, docThatMatchesRoles: 1}}
+    ];
+    const lookupRes = findColl.aggregate(lookupPipeline).toArray();
+    assert.eq(
+        [{"docThatMatchesRoles": [{"_id": 2, "allowedRoles": ["readWriteAnyDatabase", "read"]}]}],
+        lookupRes);
+
+    // Ensure that $$USER_ROLES can be present in a $unionWith subpipeline. The result set should
+    // include the one document from findColl and the document from the unioned collection inserted
+    // above where the allowedRoles field has the currently authenticated user's roles.
+    const unionWithPipeline =
+        [{$unionWith: {coll: aggCollName, pipeline: subpipeline}}, {$project: {_id: 0}}];
+    const unionWithRes = findColl.aggregate(unionWithPipeline).toArray();
+    assert.eq([{a: 1}, {allowedRoles: ["readWriteAnyDatabase", "read"]}], unionWithRes);
 }
 
 function runTest(conn, shardingTest = null) {
