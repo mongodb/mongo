@@ -70,8 +70,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 
@@ -468,8 +468,7 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
             // Return error on first unrecognized field.
             return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                                            str::stream() << '\'' << elem.fieldNameStringData()
-                                                         << '\''
-                                                         << " is not a supported option.");
+                                                         << '\'' << " is not a supported option.");
         }
     }
     return StatusWith<std::string>(ss.str());
@@ -1497,10 +1496,10 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
             warning() << msg;
             results->warnings.push_back(msg);
         } else if (err) {
-            std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err)
-                                            << ". "
-                                            << "This indicates structural damage. "
-                                            << "Not examining individual documents.";
+            std::string msg = str::stream()
+                << "verify() returned " << wiredtiger_strerror(err) << ". "
+                << "This indicates structural damage. "
+                << "Not examining individual documents.";
             error() << msg;
             results->errors.push_back(msg);
             results->valid = false;
@@ -2061,7 +2060,9 @@ RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
 
 bool WiredTigerRecordStoreStandardCursor::hasWrongPrefix(WT_CURSOR* cursor,
                                                          RecordId* recordId) const {
-    invariantWTOK(cursor->get_key(cursor, recordId));
+    std::int64_t val;
+    invariantWTOK(cursor->get_key(cursor, &val));
+    recordId->setValue(val);
     return false;
 }
 
@@ -2131,7 +2132,9 @@ RecordId WiredTigerRecordStorePrefixedCursor::getKey(WT_CURSOR* cursor) const {
 bool WiredTigerRecordStorePrefixedCursor::hasWrongPrefix(WT_CURSOR* cursor,
                                                          RecordId* recordId) const {
     std::int64_t prefix;
-    invariantWTOK(cursor->get_key(cursor, &prefix, recordId));
+    std::int64_t val;
+    invariantWTOK(cursor->get_key(cursor, &prefix, &val));
+    recordId->setValue(val);
 
     return prefix != _prefix.repr();
 }

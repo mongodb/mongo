@@ -81,7 +81,7 @@ public:
     /**
      * Constructs a Null RecordId.
      */
-    RecordId() : RecordId(kNullRepr) {}
+    RecordId() = default;
 
     explicit RecordId(int64_t repr) {
         _format = Format::kLong;
@@ -95,8 +95,8 @@ public:
             _format = Format::kSmallStr;
             // Must fit into the buffer minus 1 byte for size.
             _buffer[0] = static_cast<char>(size);
-            memcpy(_buffer.data() + 1, data, size);
-            // std::copy(data, data + size, _buffer.data()+1);
+            // memcpy(_buffer.data() + 1, data, size);
+            std::copy(data, data + size, &_buffer[1]);
 
         } else if (size <= kBigStrMaxSize) {
             _format = Format::kBigStr;
@@ -113,6 +113,31 @@ public:
      * TODO consider removing.
      */
     RecordId(int high, int low) : RecordId((uint64_t(high) << 32) | uint32_t(low)) {}
+
+    void setValue(int64_t val) {
+        _format = Format::kLong;
+        const char* valPtr = reinterpret_cast<const char*>(&val);
+        std::copy(valPtr, valPtr + sizeof(val), _buffer.begin());
+    }
+
+    void setValue(const char* data, size_t size) {
+        invariant(size > 0, "key size must be greater than 0");
+        if (size <= kSmallStrMaxSize) {
+            _format = Format::kSmallStr;
+            // Must fit into the buffer minus 1 byte for size.
+            _buffer[0] = static_cast<char>(size);
+            // memcpy(_buffer.data() + 1, data, size);
+            std::copy(data, data + size, &_buffer[1]);
+
+        } else if (size <= kBigStrMaxSize) {
+            _format = Format::kBigStr;
+            auto sharedBuf = SharedBuffer::allocate(size);
+            std::copy(data, data + size, sharedBuf.get());
+            _sharedBuffer = std::move(sharedBuf);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
 
     /**
      * A RecordId that compares less than all ids that represent documents in a collection.
@@ -223,8 +248,6 @@ public:
         } else {
             return true;
         }
-        // int64_t val = _getLongNoCheck();
-        // return _repr > 0 && _repr < kMaxRepr;
     }
 
     int compare(RecordId rhs) const {
@@ -250,8 +273,6 @@ public:
                 return _getBigStrNoCheck().compare(rhs.getStr());
         }
         MONGO_UNREACHABLE;
-
-        // return _repr == rhs._repr ? 0 : _repr < rhs._repr ? -1 : 1;
     }
 
     /**
@@ -286,8 +307,6 @@ public:
 
 private:
     int64_t _getLongNoCheck() const {
-        // int64_t* val = reinterpret_cast<int64_t*>(const_cast<char*>(_buffer.data()));
-        // return *val;
         int64_t val;
         std::copy(
             _buffer.begin(), _buffer.begin() + sizeof(int64_t), reinterpret_cast<char*>(&val));
@@ -316,22 +335,28 @@ private:
 };
 
 inline bool operator==(RecordId lhs, RecordId rhs) {
-    return lhs.repr() == rhs.repr();
+    return lhs.compare(rhs) == 0;
+    // return lhs.repr() == rhs.repr();
 }
 inline bool operator!=(RecordId lhs, RecordId rhs) {
-    return lhs.repr() != rhs.repr();
+    return lhs.compare(rhs);
+    // return lhs.repr() != rhs.repr();
 }
 inline bool operator<(RecordId lhs, RecordId rhs) {
-    return lhs.repr() < rhs.repr();
+    return lhs.compare(rhs) < 0;
+    // return lhs.repr() < rhs.repr();
 }
 inline bool operator<=(RecordId lhs, RecordId rhs) {
-    return lhs.repr() <= rhs.repr();
+    return lhs.compare(rhs) <= 0;
+    // return lhs.repr() <= rhs.repr();
 }
 inline bool operator>(RecordId lhs, RecordId rhs) {
-    return lhs.repr() > rhs.repr();
+    return lhs.compare(rhs) > 0;
+    // return lhs.repr() > rhs.repr();
 }
 inline bool operator>=(RecordId lhs, RecordId rhs) {
-    return lhs.repr() >= rhs.repr();
+    return lhs.compare(rhs) >= 0;
+    // return lhs.repr() >= rhs.repr();
 }
 
 inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
