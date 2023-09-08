@@ -701,10 +701,15 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        removeCoordinatorDocAndReshardingFields(opCtx, _metrics.get(), coordinatorDoc);
+        auto updatedCoordinatorDoc =
+            removeCoordinatorDocAndReshardingFields(opCtx, _metrics.get(), coordinatorDoc);
 
+        ASSERT_EQ(updatedCoordinatorDoc.getState(), CoordinatorStateEnum::kDone);
+
+        // Check that the on disk document is same as the in memory document returned above.
         auto expectedCoordinatorDoc = coordinatorDoc;
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+        ASSERT_BSONOBJ_EQ(updatedCoordinatorDoc.toBSON(), expectedCoordinatorDoc.toBSON());
 
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
@@ -715,12 +720,12 @@ protected:
         // Check that the resharding fields are removed from the config.collections entry and
         // allowMigrations is set back to true.
         auto expectedOriginalCollType = makeOriginalCollectionCatalogEntry(
-            expectedCoordinatorDoc,
+            updatedCoordinatorDoc,
             boost::none,
             _finalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         assertOriginalCollectionCatalogEntryMatchesExpected(
-            opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
+            opCtx, expectedOriginalCollType, updatedCoordinatorDoc);
     }
 
     void transitionToErrorExpectSuccess(ErrorCodes::Error errorCode) {
