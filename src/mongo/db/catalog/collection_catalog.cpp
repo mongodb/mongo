@@ -695,6 +695,13 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 
 void CollectionCatalog::write(OperationContext* opCtx,
                               std::function<void(CollectionCatalog&)> job) {
+    // Calling the writer must be done with the GlobalLock held. Otherwise we risk having the
+    // BatchedCollectionCatalogWriter and this caller concurrently modifying the catalog. This is
+    // because normal operations calling this will all be serialized, but
+    // BatchedCollectionCatalogWriter skips this mechanism as it knows it is the sole user of the
+    // server by holding a Global MODE_X lock.
+    invariant(opCtx->lockState()->isLocked());
+
     // If global MODE_X lock are held we can re-use a cloned CollectionCatalog instance when
     // 'ongoingBatchedWrite' and 'batchedCatalogWriteInstance' are set. Make sure we are the one
     // holding the write lock.

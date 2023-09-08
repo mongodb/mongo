@@ -87,6 +87,8 @@ void BM_CollectionCatalogWrite(benchmark::State& state) {
 
     createCollections(opCtx.get(), state.range(0));
 
+    Lock::GlobalLock lk{opCtx.get(), MODE_IX};
+
     for (auto _ : state) {
         benchmark::ClobberMemory();
         CollectionCatalog::write(opCtx.get(), [&](CollectionCatalog& catalog) {});
