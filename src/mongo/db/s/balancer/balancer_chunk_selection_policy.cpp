@@ -337,11 +337,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::selectChunksToSplit(
 
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-    auto collections = catalogClient->getCollections(opCtx,
-                                                     DatabaseName::kEmpty,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     {},
-                                                     true /*excludeUnsplittable*/);
+    auto collections = catalogClient->getShardedCollections(
+        opCtx, DatabaseName::kEmpty, repl::ReadConcernLevel::kMajorityReadConcern, {});
     if (collections.empty()) {
         return SplitInfoVector{};
     }
@@ -404,11 +401,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
     Timer chunksSelectionTimer;
 
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto collections = catalogClient->getCollections(opCtx,
-                                                     DatabaseName::kEmpty,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     BSON(CollectionType::kNssFieldName << 1),
-                                                     true /*excludeUnsplittable*/);
+    auto collections =
+        catalogClient->getShardedCollections(opCtx,
+                                             DatabaseName::kEmpty,
+                                             repl::ReadConcernLevel::kMajorityReadConcern,
+                                             BSON(CollectionType::kNssFieldName << 1));
     if (collections.empty()) {
         return MigrateInfoVector{};
     }

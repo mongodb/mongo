@@ -525,7 +525,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     bool isUnsplittableOnlyOnPrimary =
         feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility) &&
-        !feature_flags::gUnsplittableCollectionsOnNonPrimaryShards.isEnabled(
+        !feature_flags::gUnsplittableCollectionsOnNonPrimaryShard.isEnabled(
             serverGlobalParams.featureCompatibility);
     const bool isPlacementVersionIgnored = [&]() {
         if (isUnsplittableOnlyOnPrimary && receivedShardVersion == ShardVersion::UNSHARDED() &&

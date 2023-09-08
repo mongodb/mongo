@@ -87,7 +87,7 @@ public:
                     serverGlobalParams.featureCompatibility);
 
             bool isUnsplittableOnNonPrimary = isTrackUnshardedEnabled &&
-                feature_flags::gUnsplittableCollectionsOnNonPrimaryShards.isEnabled(
+                feature_flags::gUnsplittableCollectionsOnNonPrimaryShard.isEnabled(
                     serverGlobalParams.featureCompatibility);
 
             uassert(ErrorCodes::IllegalOperation,

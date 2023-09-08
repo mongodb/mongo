@@ -594,13 +594,11 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
 
     return CollectionType(collDoc[0]);
 }
-
-std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
+std::vector<CollectionType> ShardingCatalogClientImpl::getShardedCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcernLevel,
-    const BSONObj& sort,
-    bool excludeUnsplittable) {
+    const BSONObj& sort) {
     BSONObjBuilder b;
     if (!dbName.isEmpty()) {
         const auto db =
@@ -608,9 +606,8 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
         b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
     }
 
-    if (excludeUnsplittable) {
-        b.appendElements(BSON(CollectionType::kUnsplittableFieldName << BSON("$ne" << true)));
-    }
+    b.append(CollectionType::kUnsplittableFieldName, BSON("$ne" << true));
+
     auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
                                                             kConfigReadSelector,
                                                             readConcernLevel,
@@ -627,14 +624,70 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
     return collections;
 }
 
+std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcernLevel,
+    const BSONObj& sort) {
+    BSONObjBuilder b;
+    if (!dbName.isEmpty()) {
+        const auto db =
+            DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+        b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    }
+
+    auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                            kConfigReadSelector,
+                                                            readConcernLevel,
+                                                            CollectionType::ConfigNS,
+                                                            b.obj(),
+                                                            sort,
+                                                            boost::none))
+                        .value;
+    std::vector<CollectionType> collections;
+    collections.reserve(collDocs.size());
+    for (const BSONObj& obj : collDocs)
+        collections.emplace_back(obj);
+
+    return collections;
+}
+
+std::vector<NamespaceString> ShardingCatalogClientImpl::getShardedCollectionNamespacesForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
+    BSONObjBuilder b;
+    const auto db =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+    b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    b.append(CollectionTypeBase::kUnsplittableFieldName, BSON("$ne" << true));
+
+    auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                            kConfigReadSelector,
+                                                            readConcern,
+                                                            CollectionType::ConfigNS,
+                                                            b.obj(),
+                                                            sort,
+                                                            boost::none))
+                        .value;
+
+    std::vector<NamespaceString> collections;
+    collections.reserve(collDocs.size());
+    for (const BSONObj& obj : collDocs) {
+        auto coll = CollectionTypeBase::parse(IDLParserContext("getShardedCollectionsForDb"), obj);
+        collections.emplace_back(coll.getNss());
+    }
+
+    return collections;
+}
+
 std::vector<NamespaceString> ShardingCatalogClientImpl::getCollectionNamespacesForDb(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcern,
-    const BSONObj& sort,
-    bool excludeUnsplittable) {
-    auto collectionsOnConfig =
-        getCollections(opCtx, dbName, readConcern, sort, excludeUnsplittable);
+    const BSONObj& sort) {
+    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, sort);
 
     std::vector<NamespaceString> collectionsToReturn;
     collectionsToReturn.reserve(collectionsOnConfig.size());
@@ -643,6 +696,37 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getCollectionNamespacesF
     }
 
     return collectionsToReturn;
+}
+
+std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectionNamespacesForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
+    BSONObjBuilder b;
+    const auto db =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+    b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
+    b.append(CollectionTypeBase::kUnsplittableFieldName, true);
+
+    auto collDocs = uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
+                                                            kConfigReadSelector,
+                                                            readConcern,
+                                                            CollectionType::ConfigNS,
+                                                            b.obj(),
+                                                            sort,
+                                                            boost::none))
+                        .value;
+
+    std::vector<NamespaceString> collections;
+    collections.reserve(collDocs.size());
+    for (const BSONObj& obj : collDocs) {
+        auto coll =
+            CollectionTypeBase::parse(IDLParserContext("getAllUnsplittableCollectionsForDb"), obj);
+        collections.emplace_back(coll.getNss());
+    }
+
+    return collections;
 }
 
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,

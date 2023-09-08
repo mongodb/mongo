@@ -342,11 +342,17 @@ public:
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
 
+        std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
+                                                          const DatabaseName& dbName,
+                                                          repl::ReadConcernLevel readConcernLevel,
+                                                          const BSONObj& sort) override {
+            return {};
+        }
+
         std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
                                                    repl::ReadConcernLevel readConcernLevel,
-                                                   const BSONObj& sort,
-                                                   bool excludeUnsplittable) override {
+                                                   const BSONObj& sort) override {
             return _colls;
         }
 

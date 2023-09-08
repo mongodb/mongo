@@ -94,17 +94,32 @@ public:
                                  const UUID& uuid,
                                  repl::ReadConcernLevel readConcernLevel) override;
 
+    std::vector<CollectionType> getShardedCollections(OperationContext* opCtx,
+                                                      const DatabaseName& db,
+                                                      repl::ReadConcernLevel readConcernLevel,
+                                                      const BSONObj& sort) override;
+
     std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                const DatabaseName& db,
                                                repl::ReadConcernLevel readConcernLevel,
-                                               const BSONObj& sort,
-                                               bool excludeUnsplittable) override;
+                                               const BSONObj& sort) override;
 
     std::vector<NamespaceString> getCollectionNamespacesForDb(OperationContext* opCtx,
                                                               const DatabaseName& dbName,
                                                               repl::ReadConcernLevel readConcern,
-                                                              const BSONObj& sort,
-                                                              bool excludeUnsplittable) override;
+                                                              const BSONObj& sort) override;
+
+    std::vector<NamespaceString> getShardedCollectionNamespacesForDb(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        repl::ReadConcernLevel readConcern,
+        const BSONObj& sort = BSONObj()) override;
+
+    std::vector<NamespaceString> getUnsplittableCollectionNamespacesForDb(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        repl::ReadConcernLevel readConcern,
+        const BSONObj& sort = BSONObj()) override;
 
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
                                                                const ShardId& shardName) override;

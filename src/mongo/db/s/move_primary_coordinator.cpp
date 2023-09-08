@@ -441,11 +441,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
     const auto shardedCollections = [&] {
         auto colls = Grid::get(opCtx)->catalogClient()->getCollectionNamespacesForDb(
-            opCtx,
-            _dbName,
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            {},
-            true /*excludeUnsplittable*/);
+            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
 
         std::sort(colls.begin(), colls.end());
         return colls;

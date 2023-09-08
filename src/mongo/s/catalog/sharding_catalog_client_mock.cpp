@@ -79,12 +79,19 @@ CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
+std::vector<CollectionType> ShardingCatalogClientMock::getShardedCollections(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcernLevel,
+    const BSONObj& sort) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
+
 std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcernLevel,
-    const BSONObj& sort,
-    bool excludeUnsplittable) {
+    const BSONObj& sort) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
@@ -92,8 +99,23 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getCollectionNamespacesF
     OperationContext* opCtx,
     const DatabaseName& dbName,
     repl::ReadConcernLevel readConcern,
-    const BSONObj& sort,
-    bool excludeUnsplittable) {
+    const BSONObj& sort) {
+    return {};
+}
+
+std::vector<NamespaceString> ShardingCatalogClientMock::getShardedCollectionNamespacesForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
+    return {};
+}
+
+std::vector<NamespaceString> ShardingCatalogClientMock::getUnsplittableCollectionNamespacesForDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
     return {};
 }
 
