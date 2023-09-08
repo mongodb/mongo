@@ -163,14 +163,14 @@ Date_t getCurrentTime() {
     return svcCtx->getFastClockSource()->now();
 }
 
-void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
-                                          const BSONObj& response,
-                                          int expected) {
-    auto numDocsModified = response.getIntField("n");
+void assertNumDocsMatchedEqualsExpected(const BatchedCommandRequest& request,
+                                        const BSONObj& response,
+                                        int expected) {
+    auto numDocsMatched = response.getIntField("n");
     uassert(5030401,
             str::stream() << "Expected to match " << expected << " docs, but only matched "
-                          << numDocsModified << " for write request " << request.toString(),
-            expected == numDocsModified);
+                          << numDocsMatched << " for write request " << request.toString(),
+            expected == numDocsMatched);
 }
 
 void appendShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -341,15 +341,15 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         }
     }());
 
-    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
         ? boost::none
         : boost::make_optional(1);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigReshardingOperationsNamespace, request, txnNumber);
 
-    if (expectedNumModified) {
-        assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
+    if (expectedNumMatched) {
+        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
     }
 
     // When moving from quiescing to done, we don't have metrics available.
@@ -524,7 +524,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, request, txnNumber);
 
-    assertNumDocsModifiedMatchesExpected(request, res, 1 /* expected */);
+    assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
 }
 
 void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
@@ -616,15 +616,15 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
         }
     }());
 
-    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
         ? boost::none
         : boost::make_optional(1);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, request, txnNumber);
 
-    if (expectedNumModified) {
-        assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
+    if (expectedNumMatched) {
+        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
     }
 }
 
@@ -709,7 +709,7 @@ void writeToConfigPlacementHistoryForOriginalNss(
     auto response = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, request, txnNumber);
 
-    assertNumDocsModifiedMatchesExpected(request, response, 1);
+    assertNumDocsMatchedEqualsExpected(request, response, 1);
 }
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
@@ -1014,8 +1014,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
             ShardingCatalogClient::kLocalWriteConcern);
 }
 
-boost::optional<ReshardingCoordinatorDocument>
-removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -1024,8 +1023,12 @@ removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
     const bool wasDecisionPersisted =
-        coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting;
+        coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitting;
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
+
+    if (coordinatorDoc.getState() > CoordinatorStateEnum::kQuiesced) {
+        return coordinatorDoc;
+    }
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     // If a user resharding ID was provided, move the coordinator doc to "quiesced" rather than
@@ -1073,9 +1076,7 @@ removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
         ShardingCatalogClient::kLocalWriteConcern);
 
     metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
-    return boost::optional<ReshardingCoordinatorDocument>{updatedCoordinatorDoc.getState() ==
-                                                              CoordinatorStateEnum::kQuiesced,
-                                                          std::move(updatedCoordinatorDoc)};
+    return updatedCoordinatorDoc;
 }
 }  // namespace resharding
 
@@ -2582,13 +2583,11 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx, boost::optional<Status> abortReason) {
-    auto optionalDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+    auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
         opCtx, _metrics.get(), _coordinatorDoc, abortReason);
 
-    // Update in-memory coordinator doc if it wasn't deleted.
-    if (optionalDoc) {
-        installCoordinatorDoc(opCtx, *optionalDoc);
-    }
+    // Update in-memory coordinator doc.
+    installCoordinatorDoc(opCtx, updatedCoordinatorDoc);
 }
 
 template <typename CommandType>
