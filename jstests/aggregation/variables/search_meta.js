@@ -37,7 +37,8 @@ const response = db.runCommand({
     cursor: {}
 });
 if (!response.ok) {
-    assert.commandFailedWithCode(response, [31082, 6047401] /* mongos or community */);
+    assert.commandFailedWithCode(response,
+                                 [ErrorCodes.SearchNotEnabled, 6047401] /* mongos or community */);
 } else {
     assert.eq(response.cursor.firstBatch, []);
 }
