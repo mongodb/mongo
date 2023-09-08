@@ -110,8 +110,7 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc);
 
-boost::optional<ReshardingCoordinatorDocument>
-removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc,
