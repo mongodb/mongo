@@ -3610,18 +3610,6 @@ tasks:
       resmoke_jobs_max: 1
   - func: "send benchmark results"
 
-- <<: *benchmark_template
-  name: benchmarks_streams
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suites: benchmarks_streams
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
   tags: ["jepsen"]
@@ -8041,13 +8029,6 @@ tasks:
 
 - <<: *task_template
   name: cqf_parallel
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: streams
   tags: []
   commands:
   - func: "do setup"

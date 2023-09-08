@@ -1188,7 +1188,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
-  - name: streams
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1323,7 +1322,6 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
-  - name: streams
   - name: telemetry_passthrough
   - name: vector_search
   - name: vector_search_auth
@@ -2221,7 +2219,6 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
-  - name: streams
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
@@ -2458,7 +2455,6 @@ buildvariants:
   - name: .serverless
     distros:
     - rhel80-xlarge
-  - name: streams
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit

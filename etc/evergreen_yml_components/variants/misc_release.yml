@@ -483,7 +483,6 @@ buildvariants:
   - name: .sharding .common
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: streams
   - name: .updatefuzzer
   - name: vector_search
   - name: vector_search_auth
