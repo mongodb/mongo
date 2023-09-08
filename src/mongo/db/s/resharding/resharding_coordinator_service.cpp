@@ -111,14 +111,14 @@ Date_t getCurrentTime() {
     return svcCtx->getFastClockSource()->now();
 }
 
-void assertNumDocsModifiedMatchesExpected(const BatchedCommandRequest& request,
-                                          const BSONObj& response,
-                                          int expected) {
-    auto numDocsModified = response.getIntField("n");
+void assertNumDocsMatchedEqualsExpected(const BatchedCommandRequest& request,
+                                        const BSONObj& response,
+                                        int expected) {
+    auto numDocsMatched = response.getIntField("n");
     uassert(5030401,
             str::stream() << "Expected to match " << expected << " docs, but only matched "
-                          << numDocsModified << " for write request " << request.toString(),
-            expected == numDocsModified);
+                          << numDocsMatched << " for write request " << request.toString(),
+            expected == numDocsMatched);
 }
 
 void appendShardEntriesToSetBuilder(const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -217,15 +217,15 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         }
     }());
 
-    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
         ? boost::none
         : boost::make_optional(1);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigReshardingOperationsNamespace, request, txnNumber);
 
-    if (expectedNumModified) {
-        assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
+    if (expectedNumMatched) {
+        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
     }
 }
 
@@ -387,7 +387,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, request, txnNumber);
 
-    assertNumDocsModifiedMatchesExpected(request, res, 1 /* expected */);
+    assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
 }
 
 void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
@@ -478,15 +478,15 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
         }
     }());
 
-    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+    auto expectedNumMatched = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
         ? boost::none
         : boost::make_optional(1);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, CollectionType::ConfigNS, request, txnNumber);
 
-    if (expectedNumModified) {
-        assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
+    if (expectedNumMatched) {
+        assertNumDocsMatchedEqualsExpected(request, res, *expectedNumMatched);
     }
 }
 
@@ -754,15 +754,20 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
         ShardingCatalogClient::kLocalWriteConcern);
 }
 
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc,
-                                             boost::optional<Status> abortReason) {
+ReshardingCoordinatorDocument removeCoordinatorDocAndReshardingFields(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<Status> abortReason) {
     // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
     const bool wasDecisionPersisted =
-        coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting;
+        coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitting;
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
+
+    if (coordinatorDoc.getState() > CoordinatorStateEnum::kCommitting) {
+        return coordinatorDoc;
+    }
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -797,6 +802,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         },
         ShardingCatalogClient::kLocalWriteConcern);
+    return updatedCoordinatorDoc;
 }
 }  // namespace resharding
 
