@@ -89,24 +89,21 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
       _dropPendingIdentReaper(_engine.get()),
       _minOfCheckpointAndOldestTimestampListener(
           TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
-          [this](OperationContext* opCtx, Timestamp timestamp) {
-              _onMinOfCheckpointAndOldestTimestampChanged(opCtx, timestamp);
-          }),
+          [this](Timestamp timestamp) { _onMinOfCheckpointAndOldestTimestampChanged(timestamp); }),
       _historicalIdentTimestampListener(
           TimestampMonitor::TimestampType::kCheckpoint,
-          [serviceContext = opCtx->getServiceContext()](OperationContext* opCtx,
-                                                        Timestamp timestamp) {
-              HistoricalIdentTracker::get(opCtx).removeEntriesOlderThan(timestamp);
+          [serviceContext = opCtx->getServiceContext()](Timestamp timestamp) {
+              HistoricalIdentTracker::get(serviceContext).removeEntriesOlderThan(timestamp);
           }),
       _collectionCatalogCleanupTimestampListener(
           TimestampMonitor::TimestampType::kOldest,
-          [serviceContext = opCtx->getServiceContext()](OperationContext* opCtx,
-                                                        Timestamp timestamp) {
-              // We take the global lock so there can be no concurrent
-              // BatchedCollectionCatalogWriter and we are thus safe to perform writes.
-              Lock::GlobalLock lk{opCtx, MODE_IX};
-              if (CollectionCatalog::latest(opCtx)->needsCleanupForOldestTimestamp(timestamp)) {
-                  CollectionCatalog::write(opCtx, [timestamp](CollectionCatalog& catalog) {
+          [serviceContext = opCtx->getServiceContext()](Timestamp timestamp) {
+              // The global lock is held by the timestamp monitor while callbacks are executed, so
+              // there can be no batched CollectionCatalog writer and we are thus safe to write
+              // using the service context.
+              if (CollectionCatalog::latest(serviceContext)
+                      ->needsCleanupForOldestTimestamp(timestamp)) {
+                  CollectionCatalog::write(serviceContext, [timestamp](CollectionCatalog& catalog) {
                       catalog.cleanupForOldestTimestampAdvanced(timestamp);
                   });
               }
@@ -1222,8 +1219,7 @@ void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
     _engine->checkpoint(opCtx);
 }
 
-void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
-                                                                    const Timestamp& timestamp) {
+void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
 
@@ -1245,6 +1241,8 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(OperationCon
             LOGV2(22260,
                   "Removing drop-pending idents with drop timestamps before timestamp",
                   "timestamp"_attr = timestamp);
+            auto opCtx = cc().getOperationContext();
+            invariant(opCtx);
 
             _dropPendingIdentReaper.dropIdentsOlderThan(opCtx, timestamp);
         }
@@ -1315,19 +1313,19 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                     stdx::lock_guard<Latch> lock(_monitorMutex);
                     for (const auto& listener : _listeners) {
                         if (listener->getType() == TimestampType::kCheckpoint) {
-                            listener->notify(opCtx, checkpoint);
+                            listener->notify(checkpoint);
                         } else if (listener->getType() == TimestampType::kOldest) {
-                            listener->notify(opCtx, oldest);
+                            listener->notify(oldest);
                         } else if (listener->getType() == TimestampType::kStable) {
-                            listener->notify(opCtx, stable);
+                            listener->notify(stable);
                         } else if (listener->getType() ==
                                    TimestampType::kMinOfCheckpointAndOldest) {
-                            listener->notify(opCtx, minOfCheckpointAndOldest);
+                            listener->notify(minOfCheckpointAndOldest);
                         } else if (stable == Timestamp::min()) {
                             // Special case notification of all listeners when writes do not have
                             // timestamps. This handles standalone mode and storage engines that
                             // don't support timestamps.
-                            listener->notify(opCtx, Timestamp::min());
+                            listener->notify(Timestamp::min());
                         }
                     }
                 }

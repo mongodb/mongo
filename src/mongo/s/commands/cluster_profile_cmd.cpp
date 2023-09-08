@@ -54,6 +54,7 @@ protected:
         OperationContext* opCtx,
         const DatabaseName& dbName,
         const ProfileCmdRequest& request) const final {
+        invariant(!opCtx->lockState()->isW());
 
         const auto profilingLevel = request.getCommandParameter();
 
@@ -75,11 +76,7 @@ protected:
             } else {
                 newSettings.filter = nullptr;
             }
-            // We use the ServiceContext overload since the OperationContext would crash the server
-            // due to not holding a Global Lock. As this is mongoS we know that there can't be a
-            // concurrent BatchedCollectionCatalogWriter since those are used only in mongoD. The
-            // Global lock is necessary to avoid conflicts with that class.
-            CollectionCatalog::write(opCtx->getServiceContext(), [&](CollectionCatalog& catalog) {
+            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
                 catalog.setDatabaseProfileSettings(dbName, newSettings);
             });
         }

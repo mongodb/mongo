@@ -33,7 +33,6 @@
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/is_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -79,28 +78,10 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
     // explicitly stored for new databases.
     ProfileFilter::setDefault(newDefault);
 
-
-    if (!isMongos()) {
-        // Writing to the CollectionCatalog requires holding the Global lock to avoid concurrent
-        // races with BatchedCollectionCatalogWriter.
-        Lock::GlobalLock lk{opCtx, MODE_IX};
-
-        // Update all existing database settings.
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.setAllDatabaseProfileFilters(newDefault);
-        });
-    } else {
-        // Update all existing database settings.
-        //
-        // We use the ServiceContext overload since the OperationContext would crash the server
-        // due to not holding a Global Lock. As this is mongoS we know that there can't be a
-        // concurrent BatchedCollectionCatalogWriter since those are used only in mongoD. The
-        // Global lock is necessary to avoid conflicts with that class.
-        CollectionCatalog::write(opCtx->getServiceContext(), [&](CollectionCatalog& catalog) {
-            catalog.setAllDatabaseProfileFilters(newDefault);
-        });
-    }
-
+    // Update all existing database settings.
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog.setAllDatabaseProfileFilters(newDefault);
+    });
 
     // Capture the old setting in the result object.
     if (oldDefault) {
