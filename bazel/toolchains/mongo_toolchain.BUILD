@@ -55,6 +55,13 @@ filegroup(
         cxx_builtin_include_directories = [
             "/usr/include",
         ],
+        unfiltered_compile_flags = [
+            # Replace compile timestamp-related macros for reproducible binaries with consistent hashes.
+            "-Wno-builtin-macro-redefined",
+            "-D__DATE__=\"OMITTED_FOR_HASH_CONSISTENCY\"",
+            "-D__TIMESTAMP__=\"OMITTED_FOR_HASH_CONSISTENCY\"",
+            "-D__TIME__=\"OMITTED_FOR_HASH_CONSISTENCY\"",
+        ],
         host_system_name = "local",
         link_flags = [
             # Don't use remote system includes, only our toolchain includes
