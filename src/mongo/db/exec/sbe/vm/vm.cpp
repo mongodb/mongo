@@ -8062,8 +8062,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillAdd
 
     // Validate the types of the values
     uassert(7971203,
-            "Expected input value type to be numeric or nullish",
-            value::isNumber(inputTag) || value::isNullish(inputTag));
+            "Expected input value type to be numeric or null",
+            value::isNumber(inputTag) || inputTag == value::TypeTags::Null);
     uassert(7971204,
             "Expected sortBy value type to be numeric or date",
             value::isNumber(sortByTag) || coercibleToDate(sortByTag));

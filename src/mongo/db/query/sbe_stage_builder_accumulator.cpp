@@ -1215,7 +1215,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorLinearFill(
     auto sortBy = std::move(it->second);
 
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggLinearFillAdd", std::move(input), std::move(sortBy)));
+    exprs.push_back(
+        makeFunction("aggLinearFillAdd", makeFillEmptyNull(std::move(input)), std::move(sortBy)));
     return exprs;
 }
 
