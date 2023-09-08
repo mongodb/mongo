@@ -1388,6 +1388,15 @@ functions:
       args:
       - "src/evergreen/get_bazelisk.sh"
 
+  "verify build output present":
+  # Args:
+  #   $output (string) - relpath to the file-to-be-checked
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        test -f ${output}
+
   "bazel compile (gcc)":
   - *get_version_expansions
   - *apply_version_expansions
@@ -2684,6 +2693,9 @@ tasks:
         --link-model=static
         -j 200
         --modules=
+  - func: "verify build output present"
+    vars:
+      output: build/fast/mongo/db/commands/libfsync_locked.a
   - func: "bazel compile (gcc)"
     vars:
       targets: src/mongo/db/commands:fsync_locked
