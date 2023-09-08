@@ -29,14 +29,12 @@
 
 #include <memory>
 
-#include "mongo/db/dbmessage.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/test_fixtures.h"
-#include "mongo/transport/session_manager.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -60,22 +58,20 @@ public:
 
     void setUp() override {
         ServiceContextTest::setUp();
-        auto* svcCtx = getServiceContext();
 
-        svcCtx->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
+        getServiceContext()->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
 
         sslGlobalParams.sslCAFile = grpc::CommandServiceTestFixtures::kCAFile;
         sslGlobalParams.sslPEMKeyFile = grpc::CommandServiceTestFixtures::kServerCertificateKeyFile;
 
-        svcCtx->setServiceEntryPoint(std::make_unique<test::ServiceEntryPointUnimplemented>());
-        svcCtx->setSessionManager(
-            std::make_unique<test::MockSessionManager>([this](test::SessionThread& sessionThread) {
+        std::vector<std::unique_ptr<TransportLayer>> layers;
+        getServiceContext()->setServiceEntryPoint(
+            std::make_unique<test::MockSEP>([this](test::SessionThread& sessionThread) {
                 if (_serverCb) {
                     _serverCb(sessionThread.session());
                 }
             }));
 
-        std::vector<std::unique_ptr<TransportLayer>> layers;
         auto asioTl = _makeAsioTransportLayer();
         _asioTL = asioTl.get();
         layers.push_back(std::move(asioTl));
@@ -90,7 +86,7 @@ public:
     }
 
     void tearDown() override {
-        getServiceContext()->getSessionManager()->endAllSessions({});
+        getServiceContext()->getServiceEntryPoint()->endAllSessions({});
         _tlManager->shutdown();
         _tlManager.reset();
         ServiceContextTest::tearDown();
@@ -114,7 +110,7 @@ public:
 private:
     std::unique_ptr<AsioTransportLayer> _makeAsioTransportLayer() {
         return std::make_unique<AsioTransportLayer>(AsioTransportLayer::Options{},
-                                                    getServiceContext()->getSessionManager());
+                                                    getServiceContext()->getServiceEntryPoint());
     }
 
     std::unique_ptr<grpc::GRPCTransportLayer> _makeGRPCTransportLayer() {

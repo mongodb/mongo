@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/base/counter.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -37,6 +45,9 @@ namespace mongo {
  * The entry point from the TransportLayer into Mongos.
  */
 class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
+    ServiceEntryPointMongos(const ServiceEntryPointMongos&) = delete;
+    ServiceEntryPointMongos& operator=(const ServiceEntryPointMongos&) = delete;
+
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;
 
@@ -44,7 +55,15 @@ public:
                                                 const Message& request) noexcept;
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept final;
+                                     const Message& request) noexcept override;
+
+    void appendStats(BSONObjBuilder* bob) const override;
+
+    void onClientConnect(Client* client) override;
+    void derivedOnClientDisconnect(Client* client) override;
+
+private:
+    Counter64 _loadBalancedConnections;
 };
 
 }  // namespace mongo

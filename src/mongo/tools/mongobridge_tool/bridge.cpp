@@ -72,7 +72,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -288,13 +287,11 @@ ProxiedConnection& ProxiedConnection::get(const std::shared_ptr<transport::Sessi
 
 class ServiceEntryPointBridge final : public ServiceEntryPointImpl {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    explicit ServiceEntryPointBridge(ServiceContext* svcCtx) : ServiceEntryPointImpl(svcCtx) {}
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
 };
-
-using SessionManagerBridge = transport::SessionManagerCommon;
 
 Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCtx,
                                                           const Message& request) noexcept try {
@@ -515,9 +512,9 @@ int bridgeMain(int argc, char** argv) {
             if (sc->getTransportLayer())
                 sc->getTransportLayer()->shutdown();
 
-            if (auto mgr = sc->getSessionManager()) {
-                mgr->endAllSessions(transport::Session::kEmptyTagMask);
-                mgr->shutdown(Seconds{10});
+            if (sc->getServiceEntryPoint()) {
+                sc->getServiceEntryPoint()->endAllSessions(transport::Session::kEmptyTagMask);
+                sc->getServiceEntryPoint()->shutdown(Seconds{10});
             }
         }
     });
@@ -530,8 +527,7 @@ int bridgeMain(int argc, char** argv) {
     setGlobalServiceContext(std::move(serviceContextHolder));
     auto serviceContext = getGlobalServiceContext();
 
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>());
-    serviceContext->setSessionManager(std::make_unique<SessionManagerBridge>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
 
     {
         transport::AsioTransportLayer::Options opts;
@@ -539,11 +535,11 @@ int bridgeMain(int argc, char** argv) {
         opts.port = mongoBridgeGlobalParams.port;
 
         auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(
-            opts, serviceContext->getSessionManager());
+            opts, serviceContext->getServiceEntryPoint());
         serviceContext->setTransportLayer(std::move(tl));
     }
 
-    if (auto status = serviceContext->getSessionManager()->start(); !status.isOK()) {
+    if (auto status = serviceContext->getServiceEntryPoint()->start(); !status.isOK()) {
         LOGV2(4907203, "Error starting service entry point", "error"_attr = status);
     }
 

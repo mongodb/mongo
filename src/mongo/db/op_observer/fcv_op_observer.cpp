@@ -61,8 +61,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -98,7 +98,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         // minWireVersion == maxWireVersion on kLatest FCV or upgrading/downgrading FCV.
         // Close all incoming connections from internal clients with binary versions lower than
         // ours.
-        opCtx->getServiceContext()->getSessionManager()->endAllSessions(
+        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
             transport::Session::kLatestVersionInternalClientKeepOpen |
             transport::Session::kExternalClientKeepOpen);
         // Close all outgoing connections to servers with binary versions lower than ours.

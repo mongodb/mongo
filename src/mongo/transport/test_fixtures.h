@@ -115,18 +115,25 @@ private:
     JoinThread _thread;  // Appears after the members _run uses.
 };
 
-class MockSessionManager : public SessionManager {
+class MockSEP : public ServiceEntryPoint {
 public:
-    MockSessionManager() = default;
-    explicit MockSessionManager(std::function<void(SessionThread&)> onStartSession)
+    MockSEP() = default;
+    explicit MockSEP(std::function<void(SessionThread&)> onStartSession)
         : _onStartSession(std::move(onStartSession)) {}
 
-    ~MockSessionManager() override {
+    ~MockSEP() override {
         _join();
     }
 
     Status start() override {
         return Status::OK();
+    }
+
+    void appendStats(BSONObjBuilder*) const override {}
+
+    Future<DbResponse> handleRequest(OperationContext* opCtx,
+                                     const Message& request) noexcept override {
+        MONGO_UNREACHABLE;
     }
 
     void startSession(std::shared_ptr<transport::Session> session) override {
@@ -141,8 +148,6 @@ public:
         LOGV2(6109511, "started session");
     }
 
-    void appendStats(BSONObjBuilder*) const override {}
-
     void endAllSessions(transport::Session::TagMask tags) override {
         _join();
     }
@@ -152,8 +157,12 @@ public:
         return true;
     }
 
-    std::size_t numOpenSessions() const override {
+    size_t numOpenSessions() const override {
         return _sessions->size();
+    }
+
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() override {
+        MONGO_UNIMPLEMENTED;
     }
 
     void setOnStartSession(std::function<void(SessionThread&)> cb) {
@@ -169,21 +178,6 @@ private:
     std::function<void(SessionThread&)> _onStartSession;
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
-
-class ServiceEntryPointUnimplemented : public ServiceEntryPoint {
-public:
-    ServiceEntryPointUnimplemented() = default;
-
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override {
-        MONGO_UNREACHABLE;
-    }
-
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() override {
-        MONGO_UNIMPLEMENTED;
-    }
-};
-
 }  // namespace mongo::transport::test
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

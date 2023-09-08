@@ -224,4 +224,58 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     return handleRequestImpl(opCtx, message);
 }
 
+void ServiceEntryPointMongos::onClientConnect(Client* client) {
+    if (load_balancer_support::isFromLoadBalancer(client)) {
+        _loadBalancedConnections.increment();
+    }
+}
+
+void ServiceEntryPointMongos::derivedOnClientDisconnect(Client* client) {
+    if (load_balancer_support::isFromLoadBalancer(client)) {
+        _loadBalancedConnections.decrement();
+
+        auto killerOperationContext = client->makeOperationContext();
+
+        // Kill any cursors opened by the given Client.
+        auto ccm = Grid::get(client->getServiceContext())->getCursorManager();
+        ccm->killCursorsSatisfying(killerOperationContext.get(),
+                                   [&](CursorId, const ClusterCursorManager::CursorEntry& entry) {
+                                       return entry.originatingClientUuid() == client->getUUID();
+                                   });
+
+        // Kill any in-progress transactions over this Client connection.
+        auto lsid = load_balancer_support::getMruSession(client);
+
+        auto killToken = [&]() -> boost::optional<SessionCatalog::KillToken> {
+            try {
+                return SessionCatalog::get(killerOperationContext.get())->killSession(lsid);
+            } catch (const ExceptionFor<ErrorCodes::NoSuchSession>&) {
+                return boost::none;
+            }
+        }();
+        if (!killToken) {
+            // There was no entry in the SessionCatalog for the session most recently used by the
+            // disconnecting client, so we have no transaction state to clean up.
+            return;
+        }
+        OperationContextSession sessionCtx(killerOperationContext.get(), std::move(*killToken));
+        invariant(lsid ==
+                  OperationContextSession::get(killerOperationContext.get())->getSessionId());
+
+        auto txnRouter = TransactionRouter::get(killerOperationContext.get());
+        if (txnRouter && txnRouter.isInitialized() && !txnRouter.isTrackingOver()) {
+            txnRouter.implicitlyAbortTransaction(
+                killerOperationContext.get(),
+                {ErrorCodes::Interrupted,
+                 "aborting in-progress transaction because load-balanced client disconnected"});
+        }
+    }
+}
+
+void ServiceEntryPointMongos::appendStats(BSONObjBuilder* bob) const {
+    ServiceEntryPointImpl::appendStats(bob);
+    if (load_balancer_support::isEnabled()) {
+        bob->append("loadBalanced", _loadBalancedConnections);
+    }
+}
 }  // namespace mongo

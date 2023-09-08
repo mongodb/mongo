@@ -182,7 +182,7 @@ public:
     };
 
     AsioTransportLayer(const Options& opts,
-                       SessionManager* sessionManager,
+                       ServiceEntryPoint* sep,
                        const WireSpec& wireSpec = WireSpec::instance());
 
     ~AsioTransportLayer() override;
@@ -317,7 +317,7 @@ private:
     };
     Listener _listener;
 
-    SessionManager* const _sessionManager = nullptr;
+    ServiceEntryPoint* const _sep = nullptr;
 
     Options _listenerOptions;
     // The real incoming port in case of _listenerOptions.port==0 (ephemeral).

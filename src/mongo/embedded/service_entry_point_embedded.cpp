@@ -181,6 +181,28 @@ Future<DbResponse> ServiceEntryPointEmbedded::handleRequest(OperationContext* op
     return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
 }
 
+void ServiceEntryPointEmbedded::startSession(std::shared_ptr<transport::Session> session) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ServiceEntryPointEmbedded::endAllSessions(transport::Session::TagMask tags) {}
+
+Status ServiceEntryPointEmbedded::start() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+bool ServiceEntryPointEmbedded::shutdown(Milliseconds timeout) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ServiceEntryPointEmbedded::appendStats(BSONObjBuilder*) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+size_t ServiceEntryPointEmbedded::numOpenSessions() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 logv2::LogSeverity ServiceEntryPointEmbedded::slowSessionWorkflowLogSeverity() {
     UASSERT_NOT_IMPLEMENTED;
 }

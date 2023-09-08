@@ -34,8 +34,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/transport/mock_session.h"
+#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager_common.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/net/cidr.h"

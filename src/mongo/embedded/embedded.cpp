@@ -97,7 +97,6 @@
 #include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
-#include "mongo/embedded/session_manager_embedded.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -255,7 +254,6 @@ ServiceContext* initialize(const char* yaml_config) {
 
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());
-    serviceContext->setSessionManager(std::make_unique<SessionManagerEmbedded>());
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(

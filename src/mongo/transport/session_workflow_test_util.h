@@ -34,7 +34,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 
@@ -109,44 +108,33 @@ public:
 
 class MockServiceEntryPoint : public ServiceEntryPointImpl {
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    explicit MockServiceEntryPoint(ServiceContext* svcCtx) : ServiceEntryPointImpl(svcCtx) {}
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override {
         return handleRequestCb(opCtx, request);
     }
 
-    std::function<Future<DbResponse>(OperationContext*, const Message&)> handleRequestCb;
-};
-
-class MockSessionManager : public SessionManagerCommon {
-public:
-    using SessionManagerCommon::SessionManagerCommon;
-
-    void onEndSession(const std::shared_ptr<Session>& session) override {
-        if (onEndSessionCb) {
-            onEndSessionCb(session);
-        }
+    void onEndSession(const std::shared_ptr<Session>& handle) override {
+        onEndSessionCb(handle);
     }
 
-    void onClientDisconnect(Client* client) override {
-        if (derivedOnClientDisconnectCb) {
-            derivedOnClientDisconnectCb(client);
-        }
-        SessionManagerCommon::onClientDisconnect(client);
+    void derivedOnClientDisconnect(Client* client) override {
+        derivedOnClientDisconnectCb(client);
     }
 
-    void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override {
-        if (configureServiceExecutorContextCb) {
+    void configureServiceExecutorContext(ServiceContext::UniqueClient& client,
+                                         bool isPrivilegedSession) override {
+        if (configureServiceExecutorContextCb)
             configureServiceExecutorContextCb(client, isPrivilegedSession);
-        } else {
-            SessionManagerCommon::configureServiceExecutorContext(client, isPrivilegedSession);
-        }
+        else
+            ServiceEntryPointImpl::configureServiceExecutorContext(client, isPrivilegedSession);
     }
 
+    std::function<Future<DbResponse>(OperationContext*, const Message&)> handleRequestCb;
     std::function<void(const std::shared_ptr<Session>)> onEndSessionCb;
     std::function<void(Client*)> derivedOnClientDisconnectCb;
-    std::function<void(Client*, bool)> configureServiceExecutorContextCb;
+    std::function<void(ServiceContext::UniqueClient&, bool)> configureServiceExecutorContextCb;
 };
 
 }  // namespace transport

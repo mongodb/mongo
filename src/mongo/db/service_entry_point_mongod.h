@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point_impl.h"
@@ -37,13 +38,16 @@
 namespace mongo {
 
 /**
- * Mongod specific service entry point.
+ * The entry point into mongod. Just a wrapper around assembleResponse.
  */
 class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
+    ServiceEntryPointMongod(const ServiceEntryPointMongod&) = delete;
+    ServiceEntryPointMongod& operator=(const ServiceEntryPointMongod&) = delete;
+
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;
     Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept final;
+                                     const Message& request) noexcept override;
 
 private:
     class Hooks;

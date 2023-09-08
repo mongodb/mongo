@@ -211,7 +211,11 @@ public:
 
     class Sep : public MockServiceEntryPoint {
     public:
-        explicit Sep(MockCoordinator* mc) : MockServiceEntryPoint(), _mc{mc} {}
+        explicit Sep(MockCoordinator* mc) : MockServiceEntryPoint{mc->_sc}, _mc{mc} {}
+
+        void derivedOnClientDisconnect(Client*) override {}
+
+        void onEndSession(const std::shared_ptr<transport::Session>& session) override {}
 
         Future<DbResponse> handleRequest(OperationContext* opCtx,
                                          const Message& request) noexcept override {
@@ -240,13 +244,20 @@ public:
         return std::make_shared<Session>(this);
     }
 
-    MockSessionManager* sessionManager() {
-        return checked_cast<MockSessionManager*>(_sc->getSessionManager());
+    std::unique_ptr<Sep> makeServiceEntryPoint() {
+        auto p = std::make_unique<Sep>(this);
+        _sep = &*p;
+        return p;
+    }
+
+    Sep* serviceEntryPoint() {
+        return _sep;
     }
 
 private:
     ServiceContext* _sc;
     int _rounds = 0;
+    Sep* _sep = nullptr;
 };
 
 class SessionWorkflowBm : public benchmark::Fixture {
@@ -282,11 +293,10 @@ public:
         setGlobalServiceContext(ServiceContext::make());
         auto sc = getGlobalServiceContext();
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
-        sc->setServiceEntryPoint(std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
-        sc->setSessionManager(std::make_unique<MockSessionManager>(sc));
+        sc->setServiceEntryPoint(_coordinator->makeServiceEntryPoint());
         sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
         LOGV2_DEBUG(7015136, 3, "About to start sep");
-        invariant(_coordinator->sessionManager()->start());
+        invariant(_coordinator->serviceEntryPoint()->start());
     }
 
     void TearDown(benchmark::State& state) override {
@@ -296,7 +306,7 @@ public:
             return;
         LOGV2_DEBUG(7015138, 3, "TearDown (last)");
 
-        invariant(_coordinator->sessionManager()->shutdownAndWait(Seconds{10}));
+        invariant(_coordinator->serviceEntryPoint()->shutdownAndWait(Seconds{10}));
         setGlobalServiceContext({});
         _savedDefaultReserved.reset();
         _savedUseDedicated.reset();
@@ -305,14 +315,16 @@ public:
     void run(benchmark::State& state) {
         for (auto _ : state) {
             LOGV2_DEBUG(7015139, 3, "run: iteration start");
+            auto sep = _coordinator->serviceEntryPoint();
+            invariant(sep);
             auto session = _coordinator->makeSession();
             invariant(session);
             Future<void> ended = session->observeEnd();
-            _coordinator->sessionManager()->startSession(std::move(session));
+            sep->startSession(std::move(session));
             ended.get();
         }
         LOGV2_DEBUG(7015140, 3, "run: all iterations finished");
-        invariant(_coordinator->sessionManager()->waitForNoSessions(Seconds{1}));
+        invariant(_coordinator->serviceEntryPoint()->waitForNoSessions(Seconds{1}));
     }
 
 private:

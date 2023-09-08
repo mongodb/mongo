@@ -362,13 +362,13 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
 }
 
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
-                                       SessionManager* sessionManager,
+                                       ServiceEntryPoint* sep,
                                        const WireSpec& wireSpec)
     : TransportLayer(wireSpec),
       _ingressReactor(std::make_shared<AsioReactor>()),
       _egressReactor(std::make_shared<AsioReactor>()),
       _acceptorReactor(std::make_shared<AsioReactor>()),
-      _sessionManager(sessionManager),
+      _sep(sep),
       _listenerOptions(opts),
       _timerService(std::make_unique<TimerService>()) {}
 
@@ -1333,11 +1333,11 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session)](Status s) {
                         if (s.isOK()) {
-                            _sessionManager->startSession(std::move(session));
+                            _sep->startSession(std::move(session));
                         }
                     });
             } else {
-                _sessionManager->startSession(std::move(session));
+                _sep->startSession(std::move(session));
             }
         } catch (const asio::system_error& e) {
             // Swallow connection reset errors.

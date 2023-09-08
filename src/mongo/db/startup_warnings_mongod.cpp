@@ -53,7 +53,7 @@
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/session_manager.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 
@@ -289,7 +289,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     // Check if vm.max_map_count is high enough, as per SERVER-51233
     {
-        size_t maxConns = svcCtx->getSessionManager()->maxOpenSessions();
+        size_t maxConns = svcCtx->getServiceEntryPoint()->maxOpenSessions();
         size_t requiredMapCount = 2 * maxConns;
 
         std::fstream f("/proc/sys/vm/max_map_count", ios_base::in);

@@ -85,7 +85,7 @@ void ServiceExecutorContext::set(Client* client,
     invariant(!serviceExecutorContext);
 
     seCtx._client = client;
-    seCtx._sessionManager = client->getServiceContext()->getSessionManager();
+    seCtx._sep = client->getServiceContext()->getServiceEntryPoint();
 
     {
         auto&& syncStats = *getServiceExecutorStats(client->getServiceContext());
@@ -158,11 +158,11 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() noexcept {
 
     auto shouldUseReserved = [&] {
         // This is at best a naive solution. There could be a world where numOpenSessions() changes
-        // very quickly. We are not taking locks on the SessionManager, so we may chose to
+        // very quickly. We are not taking locks on the ServiceEntryPoint, so we may chose to
         // schedule onto the ServiceExecutorReserved when it is no longer necessary. The upside is
         // that we will automatically shift to the ServiceExecutorSynchronous after the first
         // command loop.
-        return _sessionManager->numOpenSessions() > _sessionManager->maxOpenSessions();
+        return _sep->numOpenSessions() > _sep->maxOpenSessions();
     };
 
     if (_canUseReserved && !_hasUsedSynchronous && shouldUseReserved()) {

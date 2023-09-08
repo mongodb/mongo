@@ -231,10 +231,9 @@ public:
     void setUp() override {
         ServiceContextTest::setUp();
         auto sc = getServiceContext();
-        sc->setServiceEntryPoint(_makeServiceEntryPoint());
-        sc->setSessionManager(_makeSessionManager(sc));
+        sc->setServiceEntryPoint(_makeServiceEntryPoint(sc));
         initializeNewSession();
-        invariant(sessionManager()->start());
+        invariant(sep()->start());
         _threadPool->startup();
     }
 
@@ -243,7 +242,7 @@ public:
             ServiceContextTest::tearDown();
         };
         // Normal shutdown is a noop outside of ASAN.
-        invariant(sessionManager()->shutdownAndWait(Seconds{10}));
+        invariant(sep()->shutdownAndWait(Seconds{10}));
         _threadPool->shutdown();
         _threadPool->join();
     }
@@ -254,21 +253,17 @@ public:
 
     /** Waits for the current Session and SessionWorkflow to end. */
     void joinSessions() {
-        ASSERT(sessionManager()->waitForNoSessions(Seconds{1}));
+        ASSERT(sep()->waitForNoSessions(Seconds{1}));
     }
 
     /** Launches a SessionWorkflow for the current session. */
     void startSession() {
         LOGV2(6742613, "Starting session");
-        sessionManager()->startSession(_session);
+        sep()->startSession(_session);
     }
 
     MockServiceEntryPoint* sep() {
         return checked_cast<MockServiceEntryPoint*>(getServiceContext()->getServiceEntryPoint());
-    }
-
-    MockSessionManager* sessionManager() {
-        return checked_cast<MockSessionManager*>(getServiceContext()->getSessionManager());
     }
 
     /**
@@ -357,9 +352,9 @@ private:
         return std::make_shared<ThreadPool>(std::move(options));
     }
 
-    std::unique_ptr<MockServiceEntryPoint> _makeServiceEntryPoint() {
-        auto sep = std::make_unique<MockServiceEntryPoint>();
-        sep->handleRequestCb = [this](OperationContext* opCtx, const Message& msg) {
+    std::unique_ptr<MockServiceEntryPoint> _makeServiceEntryPoint(ServiceContext* sc) {
+        auto sep = std::make_unique<MockServiceEntryPoint>(sc);
+        sep->handleRequestCb = [=, this](OperationContext* opCtx, const Message& msg) {
             if (!gInitialUseDedicatedThread) {
                 // Simulates an async command implemented under the borrowed
                 // thread model. The returned future will be fulfilled while
@@ -382,15 +377,12 @@ private:
             }
             return _onMockEvent<Event::sepHandleRequest>(std::tie(opCtx, msg));
         };
-        return sep;
-    }
-
-    std::unique_ptr<MockSessionManager> _makeSessionManager(ServiceContext* svcCtx) {
-        auto manager = std::make_unique<MockSessionManager>(svcCtx);
-        manager->onEndSessionCb = [this](const std::shared_ptr<Session>& session) {
+        sep->onEndSessionCb = [=, this](const std::shared_ptr<Session>& session) {
             _onMockEvent<Event::sepEndSession>(std::tie(session));
         };
-        return manager;
+        sep->derivedOnClientDisconnectCb = [&](Client*) {
+        };
+        return sep;
     }
 
     /**
@@ -428,7 +420,7 @@ TEST_F(SessionWorkflowTest, OneNormalCommand) {
 
 TEST_F(SessionWorkflowTest, OnClientDisconnectCalledOnCleanup) {
     int disconnects = 0;
-    sessionManager()->derivedOnClientDisconnectCb = [&](Client*) {
+    sep()->derivedOnClientDisconnectCb = [&](Client*) {
         ++disconnects;
     };
     startSession();
@@ -662,7 +654,7 @@ public:
                     // before responding with a shutdown error.
                     auto pf = std::make_shared<PromiseAndFuture<void>>();
                     _fixture->injectMockResponse<event>([this, pf](auto&&...) {
-                        _fixture->sessionManager()->endAllSessionsNoTagMask();
+                        _fixture->sep()->endAllSessionsNoTagMask();
                         pf->promise.emplaceValue();
                         if constexpr (std::is_void_v<EventResultT<event>>) {
                             return;

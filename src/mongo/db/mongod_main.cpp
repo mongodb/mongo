@@ -202,7 +202,6 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
@@ -259,7 +258,7 @@
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/session_manager_common.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -524,8 +523,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     initializeCommandHooks(serviceContext);
 
-    serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
     // Set up the periodic runner for background job execution. This is required to be running
     // before both the storage engine or the transport layer are initialized.
@@ -1011,9 +1009,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = serviceContext->getSessionManager()->start();
+    auto start = serviceContext->getServiceEntryPoint()->start();
     if (!start.isOK()) {
-        LOGV2_ERROR(20571, "Error starting transport session manager", "error"_attr = start);
+        LOGV2_ERROR(20571,
+                    "Error starting service entry point: {error}",
+                    "Error starting service entry point",
+                    "error"_attr = start);
         return ExitCode::netError;
     }
 
@@ -1679,14 +1680,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-    // Shutdown the Session Manager and its sessions and give it a grace period to complete.
-    if (auto mgr = serviceContext->getSessionManager()) {
-        LOGV2_OPTIONS(
-            4784923, {LogComponent::kCommand}, "Shutting down the transport SessionManager");
-        if (!mgr->shutdown(Seconds(10))) {
+    // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
+    if (auto sep = serviceContext->getServiceEntryPoint()) {
+        LOGV2_OPTIONS(4784923, {LogComponent::kCommand}, "Shutting down the ServiceEntryPoint");
+        if (!sep->shutdown(Seconds(10))) {
             LOGV2_OPTIONS(20563,
                           {LogComponent::kNetwork},
-                          "SessionManager did not shutdown within the time limit");
+                          "Service entry point did not shutdown within the time limit");
         }
     }
 
@@ -1828,8 +1828,7 @@ int mongod_main(int argc, char* argv[]) {
     setUpReplication(service);
     setUpObservers(service);
     setUpMultitenancyCheck(service, gMultitenancySupport);
-    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
-    service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

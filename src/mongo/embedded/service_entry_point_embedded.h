@@ -29,10 +29,24 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
+/**
+ * The entry point into mongod. Just a wrapper around assembleResponse.
+ */
 class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
     ServiceEntryPointEmbedded(const ServiceEntryPointEmbedded&) = delete;
     ServiceEntryPointEmbedded& operator=(const ServiceEntryPointEmbedded&) = delete;
@@ -42,6 +56,12 @@ public:
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept override;
 
+    void startSession(std::shared_ptr<transport::Session> session) override;
+    void endAllSessions(transport::Session::TagMask tags) override;
+    Status start() override;
+    bool shutdown(Milliseconds timeout) override;
+    void appendStats(BSONObjBuilder* bob) const override;
+    size_t numOpenSessions() const override;
     logv2::LogSeverity slowSessionWorkflowLogSeverity() override;
 
 private:
