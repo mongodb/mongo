@@ -69,6 +69,22 @@ public:
         boost::optional<UUID> uuid) {
         return nullptr;
     }
+
+    /**
+     * Check if this is a $search pipeline, specifically that the front of the pipeline is
+     * a $search stage.
+     */
+    virtual bool isSearchPipeline(const Pipeline* pipeline) {
+        return false;
+    }
+
+    /**
+     * Check if this is a $searchMeta pipeline, specifically that the front of the pipeline is
+     * a $searchMeta stage.
+     */
+    virtual bool isSearchMetaPipeline(const Pipeline* pipeline) {
+        return false;
+    }
 };
 
 /**
