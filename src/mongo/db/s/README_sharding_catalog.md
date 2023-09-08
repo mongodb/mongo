@@ -59,10 +59,4 @@ When a piece of code is running in a router loop, it is also said that it is exe
 * [Stale Shard Version Helpers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_shard_version_helpers.h#L71-L72)
 
 ### Shard role
-For a piece of code to be executing in the shard role, it must be holding some kind of synchronisation which guarantees the stability of the catalog for that scope. There are two ways to ensure that stability - (1) by taking a lock on a database or collection or (2) by taking a consistent snapshot of the DSS/CSS and the local catalog (aka CollectionCatalog). In either of these two cases, the catalog is guaranteed to not change and therefore the shard can perform a check for whether the router is up-to-date.
-
-Currently, the code for the shard role is scattered across at least the following utilities:
-* [ShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/sharding_state.h#L51)
-* [CollectionShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/collection_sharding_state.h#L59)
-* [DatabaseShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/database_sharding_state.h#L45)
-* [Service Entry Point Retry Loops](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/service_entry_point_common.h#L86-L94)
+For a piece of code to be executing in the shard role, it must be holding some kind of synchronisation which guarantees the stability of the catalog for that scope. See [here](https://github.com/mongodb/mongo/blob/master/src/mongo/db/README_shard_role_api.md) for details about the Shard Role API.

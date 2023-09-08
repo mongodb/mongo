@@ -90,7 +90,10 @@ collection.getShardingDescription().isSharded();
 collection.getShardingFilter();
 ```
 
-`CollectionAcquisition`/`CollectionOrViewAcquisition` are reference-counted views to a `TransactionResources` object which holds the catalog snapshots. Copying a `CollectionAcquisition`/`CollectionOrViewAcquisition` object increases its associated `TransactionResources` reference counter. When it reaches zero, the resources are released.
+## TransactionResources
+`CollectionAcquisition`/`CollectionOrViewAcquisition` are reference-counted views to a `TransactionResources` object. `TransactionResources` is the holder of the acquisition's resources, which include the global/db/collection locks (in case of a locked acquisition), the local catalog snapshot (collectionPtr), the sharding catalog snapshot (collectionDescription) and ownershipFilter.
+
+Copying a `CollectionAcquisition`/`CollectionOrViewAcquisition` object increases its associated `TransactionResources` reference counter. When it reaches zero, the resources are released.
 
 ## Acquisitions and query plans
 Query plans are to use `CollectionAcquisitions` as the sole entry point to access the different catalogs (e.g. to access a CollectionPtr, to get the sharding description or the orphan filter). Plans should never store references to the catalogs because they can become invalid after a yield. Upon restore, they will find the `CollectionAcquisition` in a valid state.
