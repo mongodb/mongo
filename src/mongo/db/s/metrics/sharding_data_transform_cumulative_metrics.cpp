@@ -52,7 +52,11 @@ constexpr auto kEstimateNotAvailable = -1;
 
 struct Metrics {
     ReshardingCumulativeMetrics _resharding;
+    ReshardingCumulativeMetrics _moveCollection;
+    ReshardingCumulativeMetrics _unshardCollection;
     global_index::GlobalIndexCumulativeMetrics _globalIndexes;
+
+    Metrics() : _moveCollection{"moveCollection"}, _unshardCollection{"unshardCollection"} {};
 };
 using MetricsPtr = std::unique_ptr<Metrics>;
 const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
@@ -67,6 +71,18 @@ ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::
     ServiceContext* context) {
     auto& metrics = getMetrics(context);
     return &metrics->_resharding;
+}
+
+ShardingDataTransformCumulativeMetrics*
+ShardingDataTransformCumulativeMetrics::getForMoveCollection(ServiceContext* context) {
+    auto& metrics = getMetrics(context);
+    return &metrics->_moveCollection;
+}
+
+ShardingDataTransformCumulativeMetrics*
+ShardingDataTransformCumulativeMetrics::getForUnshardCollection(ServiceContext* context) {
+    auto& metrics = getMetrics(context);
+    return &metrics->_unshardCollection;
 }
 
 ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForGlobalIndexes(

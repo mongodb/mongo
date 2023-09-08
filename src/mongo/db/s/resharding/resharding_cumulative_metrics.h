@@ -73,6 +73,7 @@ using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics
 class ReshardingCumulativeMetrics : public resharding_cumulative_metrics::Base {
 public:
     ReshardingCumulativeMetrics();
+    ReshardingCumulativeMetrics(const std::string& rootName);
 
     static boost::optional<StringData> fieldNameFor(AnyState state);
 

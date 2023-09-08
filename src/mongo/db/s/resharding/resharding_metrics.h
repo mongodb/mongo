@@ -131,7 +131,8 @@ public:
                       Date_t startTime,
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
-                      State state);
+                      State state,
+                      ProvenanceEnum provenance = ProvenanceEnum::kReshardCollection);
 
     ~ReshardingMetrics();
 
@@ -159,10 +160,23 @@ public:
 
     template <typename T>
     static auto initializeFrom(const T& document, ServiceContext* serviceContext) {
-        return initializeFrom(
-            document,
-            serviceContext->getFastClockSource(),
-            ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext));
+        auto cumulativeMetrics = [&] {
+            auto provenance = document.getCommonReshardingMetadata().getProvenance().value_or(
+                ProvenanceEnum::kReshardCollection);
+            switch (provenance) {
+                case ProvenanceEnum::kMoveCollection:
+                    return ShardingDataTransformCumulativeMetrics::getForMoveCollection(
+                        serviceContext);
+                case ProvenanceEnum::kUnshardCollection:
+                    return ShardingDataTransformCumulativeMetrics::getForUnshardCollection(
+                        serviceContext);
+                case ProvenanceEnum::kReshardCollection:
+                    return ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext);
+            }
+            MONGO_UNREACHABLE;
+        }();
+
+        return initializeFrom(document, serviceContext->getFastClockSource(), cumulativeMetrics);
     }
 
     template <typename StateOrStateVariant>
@@ -262,6 +276,7 @@ private:
 
     ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
+    const ProvenanceEnum _provenance;
 };
 
 }  // namespace mongo

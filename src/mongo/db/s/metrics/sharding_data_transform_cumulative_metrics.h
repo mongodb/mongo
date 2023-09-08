@@ -95,6 +95,8 @@ public:
     friend ScopedObserver;
 
     static ShardingDataTransformCumulativeMetrics* getForResharding(ServiceContext* context);
+    static ShardingDataTransformCumulativeMetrics* getForMoveCollection(ServiceContext* context);
+    static ShardingDataTransformCumulativeMetrics* getForUnshardCollection(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForMovePrimary(ServiceContext* context);
 

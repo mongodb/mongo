@@ -102,6 +102,14 @@ Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fall
     }
 }
 
+ProvenanceEnum readProvenance(const CommonReshardingMetadata& metadata) {
+    if (const auto& provenance = metadata.getProvenance()) {
+        return provenance.get();
+    }
+
+    return ProvenanceEnum::kReshardCollection;
+}
+
 }  // namespace
 
 void ReshardingMetrics::ExternallyTrackedRecipientFields::accumulateFrom(
@@ -138,7 +146,8 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      Date_t startTime,
                                      ClockSource* clockSource,
                                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
-                                     State state)
+                                     State state,
+                                     ProvenanceEnum provenance)
     : Base{std::move(instanceId),
            createOriginalCommand(nss, std::move(shardKey)),
            nss,
@@ -149,7 +158,8 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
            std::make_unique<ReshardingMetricsFieldNameProvider>()},
       _ableToEstimateRemainingRecipientTime{!mustRestoreExternallyTrackedRecipientFields(state)},
       _scopedObserver(registerInstanceMetrics()),
-      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())} {
+      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())},
+      _provenance{provenance} {
     setState(state);
 }
 
@@ -165,7 +175,8 @@ ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                         readStartTime(metadata, clockSource),
                         clockSource,
                         cumulativeMetrics,
-                        state} {}
+                        state,
+                        readProvenance(metadata)} {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
@@ -178,7 +189,8 @@ ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                         readStartTime(metadata, clockSource),
                         clockSource,
                         cumulativeMetrics,
-                        getDefaultState(role)} {}
+                        getDefaultState(role),
+                        readProvenance(metadata)} {}
 
 ReshardingMetrics::~ReshardingMetrics() {
     // Deregister the observer first to ensure that the observer will no longer be able to reach
@@ -256,6 +268,7 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
         reportOplogApplicationCountMetrics(_reshardingFieldNames, &builder);
     }
     builder.appendElementsUnique(Base::reportForCurrentOp());
+    builder.appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
     return builder.obj();
 }
 
@@ -331,6 +344,7 @@ void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
                                              builder,
                                              Seconds{0});
     }
+    builder->appendElements(BSON("provenance" << Provenance_serializer(_provenance)));
 }
 
 void ReshardingMetrics::fillDonorCtxOnCompletion(DonorShardContext& donorCtx) {

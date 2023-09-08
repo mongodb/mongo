@@ -316,6 +316,7 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  reshardingFields.getDonorFields()->getTempReshardingNss(),
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
+    commonMetadata.setProvenance(reshardingFields.getProvenance());
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return donorDoc;
@@ -347,6 +348,7 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    nss,
                                                    metadata.getShardKeyPattern().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
+    commonMetadata.setProvenance(reshardingFields.getProvenance());
 
     ReshardingRecipientMetrics metrics;
     metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());

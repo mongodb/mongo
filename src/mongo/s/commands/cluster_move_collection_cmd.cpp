@@ -64,7 +64,7 @@ public:
 
             ReshardCollectionRequest reshardCollectionRequest;
             reshardCollectionRequest.setKey(BSON("_id" << 1));
-            reshardCollectionRequest.setProvenance(StringData("moveCollection"));
+            reshardCollectionRequest.setProvenance(ProvenanceEnum::kMoveCollection);
 
             std::vector<mongo::ShardKeyRange> destinationShard = {request().getToShard()};
             reshardCollectionRequest.setShardDistribution(destinationShard);

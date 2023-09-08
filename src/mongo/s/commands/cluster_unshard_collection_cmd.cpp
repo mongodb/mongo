@@ -72,7 +72,7 @@ public:
 
             ReshardCollectionRequest reshardCollectionRequest;
             reshardCollectionRequest.setKey(BSON("_id" << 1));
-            reshardCollectionRequest.setProvenance(StringData("unshardCollection"));
+            reshardCollectionRequest.setProvenance(ProvenanceEnum::kUnshardCollection);
 
             ShardId toShard;
             if (request().getToShard().has_value()) {

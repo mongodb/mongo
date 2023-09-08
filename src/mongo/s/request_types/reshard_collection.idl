@@ -137,7 +137,7 @@ commands:
             retryability purposes."
         optional: true
       provenance:
-        type: string
+        type: Provenance
         description: "The source operation that called this resharding operation."
         optional: true
 

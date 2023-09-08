@@ -225,6 +225,10 @@ selector:
   # TODO SERVER-51495: Re-enable these tests after reshardCollection is resilient to config server
   # primary failovers.
   - jstests/sharding/*reshard*.js
+  - jstests/sharding/move_collection_basic.js
+  - jstests/sharding/abort_move_collection_basic.js
+  - jstests/sharding/unshard_collection_basic.js
+  - jstests/sharding/abort_unshard_collection_basic.js
 
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js

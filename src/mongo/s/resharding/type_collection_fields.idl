@@ -111,3 +111,7 @@ structs:
                 type: date
                 description: "Start time of the operation."
                 optional: true
+            provenance:
+                type: Provenance
+                description: "The source operation that called this resharding operation."
+                optional: true

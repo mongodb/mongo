@@ -83,8 +83,11 @@ boost::optional<StringData> ReshardingCumulativeMetrics::fieldNameFor(AnyState s
 }
 
 ReshardingCumulativeMetrics::ReshardingCumulativeMetrics()
+    : ReshardingCumulativeMetrics(kResharding) {}
+
+ReshardingCumulativeMetrics::ReshardingCumulativeMetrics(const std::string& rootName)
     : resharding_cumulative_metrics::Base(
-          kResharding, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
+          rootName, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
       _fieldNames(
           static_cast<const ReshardingCumulativeMetricsFieldNameProvider*>(getFieldNames())) {}
 

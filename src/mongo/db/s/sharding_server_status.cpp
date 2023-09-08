@@ -171,6 +171,8 @@ public:
         auto sCtx = opCtx->getServiceContext();
         using Metrics = ShardingDataTransformCumulativeMetrics;
         Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
+        Metrics::getForMoveCollection(sCtx)->reportForServerStatus(bob);
+        Metrics::getForUnshardCollection(sCtx)->reportForServerStatus(bob);
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
         // checking whether the global index feature is enabled here.
