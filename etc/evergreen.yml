@@ -1167,8 +1167,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
-  - name: streams
-  - name: streams_auth
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1313,8 +1311,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
-  - name: streams
-  - name: streams_auth
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1562,8 +1558,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
-  - name: streams
-  - name: streams_auth
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
@@ -2013,8 +2007,6 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: streams
-  - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
   - name: vector_search_auth
@@ -2222,8 +2214,6 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
-  - name: streams
-  - name: streams_auth
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
@@ -2379,8 +2369,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
-  - name: streams
-  - name: streams_auth
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -2970,8 +2958,6 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: streams
-  - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
   - name: vector_search_auth
