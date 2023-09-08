@@ -7,6 +7,7 @@
  * ]
  */
 
+import {getExecutionStages, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
@@ -24,20 +25,6 @@ const docsToInsert = [
     {_id: 2, x: 1, y: 1, a: [1, 2, 3]},
     {_id: 3, x: 2, y: 1, a: [1, 2, 3]}
 ];
-
-const multiplannerTieBreakingKnobOn = assert.commandWorked(
-    dbConn.adminCommand({getParameter: 1, "internalQueryPlanTieBreakingWithIndexHeuristics": 1}));
-if (multiplannerTieBreakingKnobOn) {
-    // TODO SERVER-80388: Re-enable this test for all query knobs.
-    // New tie breaking behaviour changes plan chosen and breaks the following three tests:
-    // - findAndModify remove with positional projection with sort
-    // - findAndModify update with positional projection with sort
-    // - findAndModify update with positional update with sort
-    // When this heuristic is applied, the plan with "CLUSTERED_IXSCAN" is chosen over "FETCH".
-    jsTestLog("Skipping the test as multi-planner tie breaking is on.");
-    st.stop();
-    quit();
-}
 
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
@@ -284,6 +271,15 @@ function runTestCase(testCase) {
     });
 }
 
+function constainsExecutionStage(executionStages, stageName) {
+    return executionStages.findIndex(stage => stage.name === stageName) != -1;
+}
+
+/**
+ * This function verifies whether the 'res' argument, which contains the explain output, includes
+ * the expected plan stages. It does not perform an exact plan shape check since the plan's shape
+ * can vary.
+ */
 function validateResponse(res, testCase, verbosity) {
     assert.eq(res.queryPlanner.winningPlan.stage, "SHARD_WRITE");
 
@@ -293,62 +289,20 @@ function validateResponse(res, testCase, verbosity) {
         assert.eq(res.queryPlanner.winningPlan.inputStage.winningPlan.stage, "SHARD_MERGE");
     }
 
+    const clusteredIndexScanStages = getPlanStages(res, "CLUSTERED_IXSCAN");
+
+    if (clusteredIndexScanStages.length != 0) {
+        assert.eq(true,
+                  usingClusteredIndex,
+                  "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+    }
+
     if (testCase.isPositionalProjection) {
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, "PROJECTION_DEFAULT");
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
                   testCase.opType);
-        if (testCase.hasSort) {
-            assert.eq(res.queryPlanner.winningPlan.shards[0]
-                          .winningPlan.inputStage.inputStage.inputStage.stage,
-                      "FETCH");
-            assert.eq(res.queryPlanner.winningPlan.shards[0]
-                          .winningPlan.inputStage.inputStage.inputStage.inputStage.stage,
-                      "IXSCAN");
-        } else {
-            if (usingClusteredIndex) {
-                assert.eq(
-                    res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.inputStage.stage,
-                    "CLUSTERED_IXSCAN");
-            } else {
-                assert.eq(
-                    res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.inputStage.stage,
-                    "FETCH",
-                    res);
-                assert.eq(res.queryPlanner.winningPlan.shards[0]
-                              .winningPlan.inputStage.inputStage.inputStage.stage,
-                          "IXSCAN");
-            }
-        }
-    } else if (testCase.isPositionalUpdate) {
-        assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, testCase.opType);
-        if (testCase.hasSort) {
-            assert.eq(
-                res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.inputStage.stage,
-                "FETCH");
-            assert.eq(res.queryPlanner.winningPlan.shards[0]
-                          .winningPlan.inputStage.inputStage.inputStage.stage,
-                      "IXSCAN");
-        } else {
-            if (usingClusteredIndex) {
-                assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
-                          "CLUSTERED_IXSCAN");
-            } else {
-                assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
-                          "FETCH");
-                assert.eq(
-                    res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.inputStage.stage,
-                    "IXSCAN");
-            }
-        }
     } else {
-        if (usingClusteredIndex) {
-            assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
-                      "CLUSTERED_IXSCAN");
-        } else {
-            assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, testCase.opType);
-            assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
-                      "IDHACK");
-        }
+        assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, testCase.opType);
     }
 
     assert.eq(res.queryPlanner.winningPlan.shards.length,
@@ -360,70 +314,27 @@ function validateResponse(res, testCase, verbosity) {
         assert.eq(res.executionStats, null);
     } else {
         assert.eq(res.executionStats.executionStages.stage, "SHARD_WRITE");
+
+        const executionStages = getExecutionStages(res);
+        const containsClusteredIndexScanStages =
+            constainsExecutionStage(executionStages, "CLUSTERED_IXSCAN");
+
+        if (containsClusteredIndexScanStages) {
+            assert.eq(true,
+                      usingClusteredIndex,
+                      "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+        }
+
         if (testCase.isPositionalProjection) {
             assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage,
                       "PROJECTION_DEFAULT");
             assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
                       testCase.opType);
-            if (testCase.hasSort) {
-                assert.eq(res.executionStats.executionStages.shards[0]
-                              .executionStages.inputStage.inputStage.inputStage.stage,
-                          "FETCH");
-                assert.eq(res.executionStats.executionStages.shards[0]
-                              .executionStages.inputStage.inputStage.inputStage.inputStage.stage,
-                          "IXSCAN");
-            } else {
-                if (usingClusteredIndex) {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.inputStage.stage,
-                              "CLUSTERED_IXSCAN");
-                } else {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.inputStage.stage,
-                              "FETCH");
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.inputStage.inputStage.stage,
-                              "IXSCAN");
-                }
-            }
-        } else if (testCase.isPositionalUpdate) {
+        } else {
             assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage,
                       testCase.opType);
-            if (testCase.hasSort) {
-                assert.eq(res.executionStats.executionStages.shards[0]
-                              .executionStages.inputStage.inputStage.stage,
-                          "FETCH");
-                assert.eq(res.executionStats.executionStages.shards[0]
-                              .executionStages.inputStage.inputStage.inputStage.stage,
-                          "IXSCAN");
-            } else {
-                if (usingClusteredIndex) {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.stage,
-                              "CLUSTERED_IXSCAN");
-                } else {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.stage,
-                              "FETCH");
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.inputStage.stage,
-                              "IXSCAN");
-                }
-            }
-        } else {
-            if (usingClusteredIndex) {
-                assert.eq(
-                    res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
-                    "CLUSTERED_IXSCAN");
-
-            } else {
-                assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage,
-                          testCase.opType);
-                assert.eq(
-                    res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
-                    "IDHACK");
-            }
         }
+
         assert.eq(res.executionStats.executionStages.shards.length,
                   1);  // Only 1 shard targeted by the write.
         assert.eq(res.executionStats.inputStage.executionStages.shards.length,
