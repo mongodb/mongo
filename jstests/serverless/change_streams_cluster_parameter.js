@@ -5,7 +5,7 @@
 //  requires_sharding,
 //  featureFlagServerlessChangeStreams,
 //  requires_fcv_63,
-//  # TODO SERVER-74811: Re-enable this test.
+//  # TODO SERVER-73337: Re-enable this test.
 //   __TEMPORARILY_DISABLED__,
 // ]
 import {
