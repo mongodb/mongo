@@ -53,6 +53,9 @@ assert.neq(initialCollectionMetadata.lastmodEpoch, finalCollectionMetadata.lastm
 assert.commandWorked(runConfigsvrCommitRefineCollectionShardKey(
     st, ns, initialCollectionMetadata.timestamp, finalCollectionMetadata.timestamp, newShardKey));
 
+// Ensure causality by making sure all nodes have the commit replicated.
+st.configRS.awaitLastOpCommitted(1 * 60 * 1000);
+
 const noopCollectionMetadata = st.s.getCollection('config.collections').findOne({_id: ns});
 
 assert.eq(noopCollectionMetadata.key, finalCollectionMetadata.key);
