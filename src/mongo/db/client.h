@@ -228,9 +228,31 @@ public:
     }
 
     /**
-     * Used to mark system operations that are not allowed to be killed by the stepdown process.
-     * This should only be called once per Client and only from system connections. The Client
-     * should be locked by the caller.
+     * Used to mark system operations that are not allowed to be killed by the stepdown
+     * thread. This should only be called once per Client and only from system connections. The
+     * Client should be locked by the caller. We should minimize the usage of this function because
+     * improper usage could lead to a deadlock. More context comes as follows.
+     *
+     * How does this kill operation process work?
+     * To be more clear, the kill operation is actually an interruption. In order to get the RSTL
+     * lock during stepUp/stepDown, the replication coordinator will start a RstlKillOpThread to
+     * interrupt all threads that may block it for the RSTL lock. The RstlKillOpThread will loop
+     * through all threads and find out the threads that have ever taken a global lock in S/X/IX
+     * mode. It will interrupt these threads by interrupting their opCtx, which will cause an
+     * InterruptedDueToReplStateChange error to be thrown when the thread checks interruption on the
+     * opCtx. In addition to those threads hold global locks, a thread could also be interrupted if
+     * it is explicitly marked as alwaysInterruptAtStepDownOrUp or waiting on prepare conflicts.
+     *
+     * What should I consider if I introduced a new thread?
+     * - Whether the new thread ever takes any global lock in S/IX/X mode? If not, the stepdown
+     *   thread won't interrupt the new thread so we should leave it as killable. Even if the thread
+     *   takes global lock, the best practice should be making the new thread killable and handle
+     *   the interruption properly.
+     * - It's always better to write the code in a way that can catch the
+     *   InterruptedDueToReplStateChange error and recover from there. This helps make the thread
+     *   killable in a safer way and can prevent deadlock from unkillable thread.
+     * - If the thread has to be unkillable, it would be helpful to leave the reason in a comment so
+     *   if it becomes an issue, it will be easier to find the cause.
      */
     void setSystemOperationUnkillableByStepdown(WithLock) {
         // This can only be changed once for system operations.
@@ -240,7 +262,7 @@ public:
     }
 
     /**
-     * Used to determine whether a system operation is allowed to be killed by the stepdown process.
+     * Used to determine whether a system operation is allowed to be killed by the stepdown thread.
      * The Client should be locked by the caller.
      */
     bool canKillSystemOperationInStepdown(WithLock) const {
