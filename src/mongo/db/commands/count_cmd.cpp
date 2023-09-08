@@ -217,6 +217,7 @@ public:
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
+        SerializationContext serializationCtx = request.getSerializationContext();
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
@@ -230,7 +231,7 @@ public:
                                   nss.dbName(),
                                   opMsgRequest.validatedTenancyScope,
                                   viewAggregation.getValue(),
-                                  request.getSerializationContext())
+                                  serializationCtx)
                                   .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
@@ -238,7 +239,7 @@ public:
                 viewAggCmd,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                request.getSerializationContext());
+                serializationCtx);
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
@@ -275,15 +276,14 @@ public:
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(
-            exec.get(),
-            collection,
-            verbosity,
-            BSONObj(),
-            SerializationContext::stateCommandReply(request.getSerializationContext()),
-            cmdObj,
-            query_settings::QuerySettings(),
-            &bodyBuilder);
+        Explain::explainStages(exec.get(),
+                               collection,
+                               verbosity,
+                               BSONObj(),
+                               SerializationContext::stateCommandReply(serializationCtx),
+                               cmdObj,
+                               query_settings::QuerySettings(),
+                               &bodyBuilder);
         return Status::OK();
     }
 

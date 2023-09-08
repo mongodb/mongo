@@ -50,24 +50,6 @@ selector:
   # `rolesInfo` is returning unprefixed database names
   - jstests/core/administrative/builtin_roles_external.js
 
-  # TODO(SERVER-80397): Remove these test exclusions when we support explain for `distinct`
-  - jstests/core/query/explain/explain_includes_command.js
-  - jstests/core/query/distinct/distinct_compound_index.js
-  - jstests/core/query/distinct/distinct_hint.js
-  - jstests/core/query/distinct/distinct_index1.js
-  - jstests/core/query/explain/explain_multikey.js
-  - jstests/core/query/distinct/distinct_multikey_dotted_path.js
-  - jstests/core/query/regex/regex_distinct.js
-  - jstests/core/views/views_distinct.js
-  - jstests/core/views/views_distinct_with_arrays.js
-  - jstests/core/query/distinct/distinct_with_hashed_index.js
-  - jstests/core/query/explain/explain_multi_plan.js
-  - jstests/core/index/wildcard/wildcard_index_distinct_scan.js
-  - jstests/core/query/explain/explain_upsert.js
-  - jstests/core/query/explain/explain_shell_helpers.js
-  - jstests/core/query/explain/explain_distinct.js
-  - jstests/core/query/distinct/distinct_multikey.js
-
   # TODO(SERVER-80407): Remove these test exclusions when we support explain for `count`
   - jstests/core/query/agg_hint.js
   - jstests/core/views/views_count.js

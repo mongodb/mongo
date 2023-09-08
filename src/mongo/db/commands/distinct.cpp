@@ -223,7 +223,7 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
-        SerializationContext sc = request.getSerializationContext();
+        SerializationContext serializationCtx = request.getSerializationContext();
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -235,8 +235,10 @@ public:
             }
 
             auto viewAggCmd =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), request.validatedTenancyScope, viewAggregation.getValue())
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(nss.dbName(),
+                                                                     request.validatedTenancyScope,
+                                                                     viewAggregation.getValue(),
+                                                                     serializationCtx)
                     .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
@@ -244,7 +246,7 @@ public:
                 viewAggCmd,
                 verbosity,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
-                sc);
+                serializationCtx);
 
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
@@ -262,7 +264,7 @@ public:
                                collection,
                                verbosity,
                                BSONObj(),
-                               SerializationContext::stateCommandReply(sc),
+                               SerializationContext::stateCommandReply(serializationCtx),
                                cmdObj,
                                // TODO: SERVER-79230 Apply QuerySettings for distinct commands.
                                query_settings::QuerySettings(),

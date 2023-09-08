@@ -50,7 +50,12 @@ function checkCountCommandPasses(request, targetDb, expectedCount) {
     assert.eq(countRes.n, expectedCount, tojson(countRes));
 }
 
-function checkExplainCountCommandPasses(request, targetDb, tenantId) {
+function checkDistinctCommandPasses(request, targetDb, expectedValues) {
+    let distinctRes = assert.commandWorked(targetDb.runCommand(request));
+    assert.eq(distinctRes.values, expectedValues, tojson(distinctRes));
+}
+
+function checkExplainCommandPasses(request, targetDb, tenantId) {
     let response = assert.commandWorked(targetDb.runCommand(request));
     let nss = "";
     if (response.hasOwnProperty("stages")) {
@@ -62,8 +67,11 @@ function checkExplainCountCommandPasses(request, targetDb, tenantId) {
 }
 
 function createTenantCommand(request, options) {
-    const {injectDollarTenant = false} = options;
-    request = Object.assign(request, {'expectPrefix': true});
+    const {injectDollarTenant = false, expectPrefix = false} = options;
+
+    if (expectPrefix) {
+        request = Object.assign(request, {'expectPrefix': true});
+    }
     if (injectDollarTenant) {
         request = Object.assign(request, {'$tenant': kTenant});
     }
@@ -80,7 +88,20 @@ function testCountCommand(targetDb, options) {
     // explain count command on view.
     let explainRequest =
         createTenantCommand({"explain": {"count": kViewName, "query": {}}}, options);
-    checkExplainCountCommandPasses(explainRequest, targetDb, kTenant);
+    checkExplainCommandPasses(explainRequest, targetDb, kTenant);
+}
+
+function testDistictCommand(targetDb, options) {
+    let expectedValues = [1];
+    let request = createTenantCommand({distinct: kCollName, key: "a", query: {}}, options);
+    checkDistinctCommandPasses(request, targetDb, expectedValues);
+
+    let viewRequest = createTenantCommand({distinct: kViewName, key: "a", query: {}}, options);
+    checkDistinctCommandPasses(viewRequest, targetDb, expectedValues);
+
+    let explainRequest =
+        createTenantCommand({explain: {distinct: kViewName, key: "a", query: {}}}, options);
+    checkExplainCommandPasses(explainRequest, targetDb, kTenant);
 }
 
 function runTestWithSecurityTokenFlag() {
@@ -182,7 +203,9 @@ function runTestWithSecurityTokenFlag() {
     }
 
     // count prefix DB with security token.
-    testCountCommand(prefixedTokenDb, {injectDollarTenant: false});
+    testCountCommand(prefixedTokenDb, {expectPrefix: true});
+
+    testDistictCommand(prefixedTokenDb, {expectPrefix: true});
 
     rst.stopSet();
 }
@@ -265,7 +288,9 @@ function runTestWithDollarTenant() {
     }
 
     // count with $tenant and prefixed DB using expectPrefix.
-    testCountCommand(prefixedDb, {injectDollarTenant: true});
+    testCountCommand(prefixedDb, {injectDollarTenant: true, expectPrefix: true});
+
+    testDistictCommand(prefixedDb, {injectDollarTenant: true, expectPrefix: true});
 
     rst.stopSet();
 }
@@ -311,7 +336,9 @@ function runTestTenantPrefixAlone() {
     }
 
     // count prefixed DB only.
-    testCountCommand(prefixedDb, {injectDollarTenant: false});
+    testCountCommand(prefixedDb, {});
+
+    testDistictCommand(prefixedDb, {});
 
     rst.stopSet();
 }
