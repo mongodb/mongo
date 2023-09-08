@@ -809,30 +809,21 @@ void recoverChangeStreamCollections(OperationContext* opCtx,
         return;
     }
 
-    if (isStandalone) {
+    if (isStandalone && !oplogExists(opCtx)) {
         // If the node is started up as a standalone, it could have either (1) previously been a
         // standalone (the oplog doesn't exist), or (2) previously been a replica set node (the
         // oplog collection exists and the cached pointer to the oplog is initialized, or the oplog
         // collection exists but the cached pointer to the oplog hasn't been initialized yet).
-        if (!oplogExists(opCtx)) {
-            // Try to initialize the cached pointer to the oplog collection, provided the collection
-            // exists.
-            LOGV2_DEBUG(
-                7803705,
-                4,
-                "Attempting to initialize a cached pointer to the oplog on startup recovery");
-            repl::acquireOplogCollectionForLogging(opCtx);
-            if (!oplogExists(opCtx)) {
-                // There is no underlying oplog collection. Nothing to do since change stream
-                // collections implicitly replicate from the oplog, and can't exist without it.
-                LOGV2_DEBUG(7803704,
-                            3,
-                            "Skipping truncation of pre-images collection on startup recovery "
-                            "because there is no oplog");
+        // If the oplog exists, the pointer has already been cached, even in standalone mode.
 
-                return;
-            }
-        }
+        // There is no underlying oplog collection. Nothing to do since change stream collections
+        // implicitly replicate from the oplog, and can't exist without it.
+        LOGV2_DEBUG(7803704,
+                    3,
+                    "Skipping truncation of pre-images collection on startup recovery "
+                    "because there is no oplog");
+
+        return;
     }
 
     if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
