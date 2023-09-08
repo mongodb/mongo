@@ -98,9 +98,8 @@ buildvariants:
     - name: many-dhandle-stress
     - name: ".wt2853-perf"
     - name: cppsuite-bounded-cursor-perf-stress
-    # FIXME-WT-11599 Disable until python changes are implemented.
-    # - name: many-collection-test
-      # distros: ubuntu2004-wt-large
+    - name: many-collection-test
+      distros: ubuntu2004-wt-large
 
 - name: documentation-update
   display_name: "~ Documentation update"
