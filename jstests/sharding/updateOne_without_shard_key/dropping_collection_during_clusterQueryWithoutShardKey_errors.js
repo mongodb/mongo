@@ -68,7 +68,7 @@ assert.commandWorked(testColl.insert(docsToInsert));
 findAndModifyThread.start();
 updateOneThread.start();
 deleteOneThread.start();
-hangQueryFp.wait(3);
+hangQueryFp.wait({timesEntered: 3});
 
 // Drop sharded collection.
 assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collName}));
