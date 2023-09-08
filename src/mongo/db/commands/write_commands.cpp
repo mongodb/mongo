@@ -614,45 +614,13 @@ public:
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 
-            // Explains of write commands are read-only, but we take write locks so that timing
-            // info is more accurate.
-            const auto collection =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest::fromOpCtx(
-                                      opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                  MODE_IX);
-
-            if (isTimeseriesViewRequest) {
-                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-                const auto& requestHint = request().getUpdates()[0].getHint();
-                if (timeseries::isHintIndexKey(requestHint)) {
-                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                    updateRequest.setHint(
-                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                            *timeseriesOptions, requestHint)));
-                }
-            }
-
-            ParsedUpdate parsedUpdate(opCtx,
-                                      &updateRequest,
-                                      collection.getCollectionPtr(),
-                                      false /* forgoOpCounterIncrements */,
-                                      isTimeseriesViewRequest);
-            uassertStatusOK(parsedUpdate.parseRequest());
-
-            auto exec = uassertStatusOK(getExecutorUpdate(
-                &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
-            auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(
-                exec.get(),
-                collection.getCollectionPtr(),
-                verbosity,
-                BSONObj(),
-                SerializationContext::stateCommandReply(request().getSerializationContext()),
-                _commandObj,
-                query_settings::QuerySettings(),
-                &bodyBuilder);
+            write_ops_exec::explainUpdate(opCtx,
+                                          updateRequest,
+                                          isTimeseriesViewRequest,
+                                          request().getSerializationContext(),
+                                          _commandObj,
+                                          verbosity,
+                                          result);
         }
 
         BSONObj _commandObj;
@@ -782,9 +750,10 @@ public:
                     "explained write batches must be of size 1",
                     request().getDeletes().size() == 1);
 
-            auto deleteRequest = DeleteRequest{};
             auto [isTimeseriesViewRequest, nss] =
                 timeseries::isTimeseriesViewRequest(opCtx, request());
+
+            auto deleteRequest = DeleteRequest{};
             deleteRequest.setNsString(nss);
             deleteRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
@@ -811,41 +780,13 @@ public:
             deleteRequest.setHint(firstDelete.getHint());
             deleteRequest.setIsExplain(true);
 
-            // Explains of write commands are read-only, but we take write locks so that timing
-            // info is more accurate.
-            const auto collection = acquireCollection(
-                opCtx,
-                CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
-                MODE_IX);
-            if (isTimeseriesViewRequest) {
-                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-                if (timeseries::isHintIndexKey(firstDelete.getHint())) {
-                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                    deleteRequest.setHint(
-                        uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                            *timeseriesOptions, firstDelete.getHint())));
-                }
-            }
-
-            ParsedDelete parsedDelete(
-                opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
-            uassertStatusOK(parsedDelete.parseRequest());
-
-            // Explain the plan tree.
-            auto exec = uassertStatusOK(getExecutorDelete(
-                &CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
-            auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(
-                exec.get(),
-                collection.getCollectionPtr(),
-                verbosity,
-                BSONObj(),
-                SerializationContext::stateCommandReply(request().getSerializationContext()),
-                _commandObj,
-                query_settings::QuerySettings(),
-                &bodyBuilder);
+            write_ops_exec::explainDelete(opCtx,
+                                          deleteRequest,
+                                          isTimeseriesViewRequest,
+                                          request().getSerializationContext(),
+                                          _commandObj,
+                                          verbosity,
+                                          result);
         }
 
         const BSONObj& _commandObj;

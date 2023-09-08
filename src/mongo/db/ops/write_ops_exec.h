@@ -50,6 +50,7 @@
 #include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -230,6 +231,25 @@ write_ops::InsertCommandReply performTimeseriesWrites(
 
 write_ops::InsertCommandReply performTimeseriesWrites(
     OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp);
+
+/*
+ * Populates 'result' with the explain information for the write requests.
+ */
+void explainUpdate(OperationContext* opCtx,
+                   UpdateRequest& updateRequest,
+                   bool isTimeseriesViewRequest,
+                   const SerializationContext& serializationContext,
+                   const BSONObj& command,
+                   ExplainOptions::Verbosity verbosity,
+                   rpc::ReplyBuilderInterface* result);
+
+void explainDelete(OperationContext* opCtx,
+                   DeleteRequest& deleteRequest,
+                   bool isTimeseriesViewRequest,
+                   const SerializationContext& serializationContext,
+                   const BSONObj& command,
+                   ExplainOptions::Verbosity verbosity,
+                   rpc::ReplyBuilderInterface* result);
 
 }  // namespace write_ops_exec
 }  // namespace mongo

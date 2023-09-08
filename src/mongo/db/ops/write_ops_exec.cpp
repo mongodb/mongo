@@ -2961,4 +2961,98 @@ write_ops::InsertCommandReply performTimeseriesWrites(
     return insertReply;
 }
 
+void explainUpdate(OperationContext* opCtx,
+                   UpdateRequest& updateRequest,
+                   bool isTimeseriesViewRequest,
+                   const SerializationContext& serializationContext,
+                   const BSONObj& command,
+                   ExplainOptions::Verbosity verbosity,
+                   rpc::ReplyBuilderInterface* result) {
+
+    // Explains of write commands are read-only, but we take write locks so that timing
+    // info is more accurate.
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, updateRequest.getNamespaceString(), AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    if (isTimeseriesViewRequest) {
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+
+        const auto& requestHint = updateRequest.getHint();
+        if (timeseries::isHintIndexKey(requestHint)) {
+            auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
+            updateRequest.setHint(
+                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                    *timeseriesOptions, requestHint)));
+        }
+    }
+
+    ParsedUpdate parsedUpdate(opCtx,
+                              &updateRequest,
+                              collection.getCollectionPtr(),
+                              false /* forgoOpCounterIncrements */,
+                              isTimeseriesViewRequest);
+    uassertStatusOK(parsedUpdate.parseRequest());
+
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
+    auto bodyBuilder = result->getBodyBuilder();
+
+    Explain::explainStages(exec.get(),
+                           collection.getCollectionPtr(),
+                           verbosity,
+                           BSONObj(),
+                           SerializationContext::stateCommandReply(serializationContext),
+                           command,
+                           query_settings::QuerySettings(),
+                           &bodyBuilder);
+}
+
+void explainDelete(OperationContext* opCtx,
+                   DeleteRequest& deleteRequest,
+                   bool isTimeseriesViewRequest,
+                   const SerializationContext& serializationContext,
+                   const BSONObj& command,
+                   ExplainOptions::Verbosity verbosity,
+                   rpc::ReplyBuilderInterface* result) {
+    // Explains of write commands are read-only, but we take write locks so that timing
+    // info is more accurate.
+    const auto collection =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
+                          MODE_IX);
+
+    if (isTimeseriesViewRequest) {
+        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+
+        if (timeseries::isHintIndexKey(deleteRequest.getHint())) {
+            auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
+            deleteRequest.setHint(
+                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+                    *timeseriesOptions, deleteRequest.getHint())));
+        }
+    }
+
+    ParsedDelete parsedDelete(
+        opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
+    uassertStatusOK(parsedDelete.parseRequest());
+
+    // Explain the plan tree.
+    auto exec = uassertStatusOK(
+        getExecutorDelete(&CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
+    auto bodyBuilder = result->getBodyBuilder();
+
+    Explain::explainStages(exec.get(),
+                           collection.getCollectionPtr(),
+                           verbosity,
+                           BSONObj(),
+                           SerializationContext::stateCommandReply(serializationContext),
+                           command,
+                           query_settings::QuerySettings(),
+                           &bodyBuilder);
+}
+
 }  // namespace mongo::write_ops_exec
