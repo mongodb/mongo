@@ -28,6 +28,11 @@
 
 #pragma once
 
+#include "boost/optional/optional.hpp"
+#include <boost/context/continuation_fcontext.hpp>
+#include <boost/context/stack_context.hpp>
+#include <boost/context/continuation.hpp>
+
 #include <atomic>
 
 #include "mongo/base/status.h"
@@ -44,6 +49,9 @@
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 
 namespace mongo {
 
@@ -68,12 +76,17 @@ public:
      */
     static std::shared_ptr<ServiceStateMachine> create(ServiceContext* svcContext,
                                                        transport::SessionHandle session,
-                                                       transport::Mode transportMode);
+                                                       transport::Mode transportMode,
+                                                       uint16_t group_id = UINT16_MAX);
 
     ServiceStateMachine(ServiceContext* svcContext,
                         transport::SessionHandle session,
-                        transport::Mode transportMode);
-
+                        transport::Mode transportMode,
+                         uint16_t group_id = UINT16_MAX);
+    void Reset(ServiceContext* svcContext,
+               transport::SessionHandle session,
+               transport::Mode transportMode,
+               uint16_t group_id = UINT16_MAX);
     /*
      * Any state may transition to EndSession in case of an error, otherwise the valid state
      * transitions are:
@@ -219,6 +232,7 @@ private:
     transport::Mode _transportMode;
 
     ServiceContext* const _serviceContext;
+    transport::ServiceExecutor* _serviceExecutor;
 
     transport::SessionHandle _sessionHandle;
     const std::string _threadName;
@@ -235,6 +249,41 @@ private:
     AtomicWord<stdx::thread::id> _owningThread;
 #endif
     std::string _oldThreadName;
+
+    class NoopAllocator{
+        public:
+        NoopAllocator()=default;
+    
+        boost::context::stack_context allocate(){
+            boost::context::stack_context sc;
+            return sc;
+        }
+
+        void deallocate(boost::context::stack_context & sc){
+            // 
+        }
+    };
+
+    static constexpr size_t kCoroStackSize=32*1024;
+    boost::context::stack_context coroStackContext(){
+        boost::context::stack_context sc;
+        sc.size =kCoroStackSize;
+        sc.sp = _coroStack +kCoroStackSize;
+        return sc;
+    }
+
+    boost::context::continuation _source;
+    char _coroStack[kCoroStackSize];
+
+    enum class CoroStatus{
+        Empty=0,
+        OnGoing,
+        Finished
+    };
+    CoroStatus _coroStatus{CoroStatus::Empty};
+    std::function<void()> _coroYield;
+    std::function<void()> _coroResume;
+    uint16_t _thdGroupId{UINT16_MAX};
 };
 
 template <typename T>

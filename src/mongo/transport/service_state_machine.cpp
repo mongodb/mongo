@@ -26,6 +26,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
+#include "mongo/db/operation_context.h"
+#include <boost/context/continuation_fcontext.hpp>
+#include <boost/context/preallocated.hpp>
+#include <boost/context/stack_context.hpp>
+#include <memory>
+#include <utility>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
@@ -213,23 +220,56 @@ private:
     bool _haveTakenOwnership = false;
 };
 
+static moodycamel::ConcurrentQueue<std::unique_ptr<ServiceStateMachine>> ssmPool{};
+
 std::shared_ptr<ServiceStateMachine> ServiceStateMachine::create(ServiceContext* svcContext,
                                                                  transport::SessionHandle session,
-                                                                 transport::Mode transportMode) {
+                                                                 transport::Mode transportMode,
+                                                                 uint16_t group_id) {
     return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode);
+    ServiceStateMachine* ssm{nullptr};
+    std::unique_ptr<ServiceStateMachine> ssmUptr{nullptr};
+    bool success = ssmPool.try_dequeue(ssmUptr);
+    if (success) {
+        ssm = ssmUptr.release();
+        ssm->Reset(svcContext, std::move(session), transportMode);
+    } else {
+        ssm = new ServiceStateMachine(svcContext, std::move(session), transportMode, group_id);
+    }
+    return std::shared_ptr<ServiceStateMachine>(ssm, [](ServiceStateMachine* ptr) {
+        ssmPool.enqueue(std::unique_ptr<ServiceStateMachine>(ptr));
+    });
 }
 
 ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
                                          transport::SessionHandle session,
-                                         transport::Mode transportMode)
+                                         transport::Mode transportMode,
+                                         uint16_t group_id)
     : _state{State::Created},
       _sep{svcContext->getServiceEntryPoint()},
       _transportMode(transportMode),
       _serviceContext(svcContext),
+      _serviceExecutor(_serviceContext->getServiceExecutor()),
       _sessionHandle(session),
       _threadName{str::stream() << "conn" << _session()->id()},
       _dbClient{svcContext->makeClient(_threadName, std::move(session))},
-      _dbClientPtr{_dbClient.get()} {}
+      _dbClientPtr{_dbClient.get()},
+      _thdGroupId(group_id) {}
+
+void ServiceStateMachine::Reset(ServiceContext* svcContext,
+                                transport::SessionHandle session,
+                                transport::Mode transportMode,
+                                uint16_t group_id) {
+    _state.store(State::Created);
+    _sep = svcContext->getServiceEntryPoint();
+    _transportMode = transportMode;
+    // _serviceContext = svcContext;
+    _serviceExecutor = _serviceContext->getServiceExecutor();
+    _sessionHandle = session;
+    // _threadName = str::stream() << "conn" << _session()->id();
+    _dbClient = svcContext->makeClient(_threadName, std::move(session));
+    _dbClientPtr = _dbClient.get();
+}
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {
     return _sessionHandle;
@@ -372,6 +412,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     // Pass sourced Message to handler to generate response.
     auto opCtx = Client::getCurrent()->makeOperationContext();
+    opCtx->setCoroutineFunctors(&_coroYield, &_coroResume);
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
@@ -435,9 +476,34 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
             case State::Source:
                 _sourceMessage(std::move(guard));
                 break;
-            case State::Process:
-                _processMessage(std::move(guard));
-                break;
+            case State::Process: {
+                if (_coroStatus == CoroStatus::Empty) {
+                    _coroStatus = CoroStatus::OnGoing;
+                    // auto func = [ssm = shared_from_this(), ownershipModel] {
+                    //     ThreadGuard guard(ssm.get());
+                    //     if (ownershipModel == Ownership::kStatic)
+                    //         guard.markStaticOwnership();
+                    //     ssm->_runNextInGuard(std::move(guard));
+                    // };
+                    // _coroResume = _serviceExecutor->CoroutineResumeFunctor(_thdGroupId, func);
+
+                    boost::context::stack_context sc = coroStackContext();
+                    boost::context::preallocated prealloc(sc.sp, sc.size, sc);
+                    _source =
+                        boost::context::callcc(std::allocator_arg,
+                                               prealloc,
+                                               NoopAllocator(),
+                                               [this, &guard](boost::context::continuation&& sink) {
+                                                   _coroYield = [&sink]() { sink = sink.resume(); };
+                                                   _processMessage(std::move(guard));
+                                                   return std::move(sink);
+                                               });
+
+                } else if (_coroStatus == CoroStatus::OnGoing) {
+                    _source = _source.resume();
+                }
+
+            } break;
             case State::EndSession:
                 _cleanupSession(std::move(guard));
                 break;
@@ -472,7 +538,7 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
                                                  transport::ServiceExecutor::ScheduleFlags flags,
                                                  transport::ServiceExecutorTaskName taskName,
                                                  Ownership ownershipModel) {
-    auto func = [ ssm = shared_from_this(), ownershipModel ] {
+    auto func = [ssm = shared_from_this(), ownershipModel] {
         ThreadGuard guard(ssm.get());
         if (ownershipModel == Ownership::kStatic)
             guard.markStaticOwnership();

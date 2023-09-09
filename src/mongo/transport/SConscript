@@ -114,6 +114,7 @@ tlEnv.Library(
     source=[
         'service_executor_adaptive.cpp',
         'service_executor_synchronous.cpp',
+        'service_executor_reserved.cpp',
         'thread_idle_callback.cpp',
     ],
     LIBDEPS=[
@@ -123,6 +124,9 @@ tlEnv.Library(
         "$BUILD_DIR/mongo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
         'transport_layer_common',
+    ],
+    SYSLIBDEPS=[
+        'boost_context'
     ],
 )
 

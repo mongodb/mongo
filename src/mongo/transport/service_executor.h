@@ -80,6 +80,12 @@ public:
      * thread is available.
      */
     virtual Status schedule(Task task, ScheduleFlags flags, ServiceExecutorTaskName taskName) = 0;
+    virtual Status schedule(Task task,
+                            ScheduleFlags flags,
+                            ServiceExecutorTaskName taskName,
+                            uint16_t thd_group_id) {
+        return Status::OK();
+    }
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
@@ -98,6 +104,10 @@ public:
      * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
      */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
+
+    virtual std::function<void()> CoroutineResumeFunctor(uint16_t thd_group_id, Task task)  {
+        return {};
+    }
 };
 
 }  // namespace transport

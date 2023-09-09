@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
@@ -425,6 +426,12 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
+    void setCoroutineFunctors(const std::function<void()>* yield,
+                              const std::function<void()>* resume) {
+        _coroYield = yield;
+        _coroResume = resume;
+    }
+
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -514,6 +521,9 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+
+    const std::function<void()>* _coroYield;
+    const std::function<void()>* _coroResume;
 };
 
 namespace repl {
