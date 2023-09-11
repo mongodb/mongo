@@ -52,11 +52,6 @@ filegroup(
             "-Bexternal/mongo_toolchain/v4/lib",
             "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
         ],
-        unfiltered_compile_flags = [
-            # Do not resolve our symlinked resource prefixes to real paths. This is required to
-            # make includes resolve correctly.
-            "-no-canonical-prefixes",
-        ],
         compiler = compiler_name,
         cpu = "arm64",
         cxx_builtin_include_directories = [
@@ -68,6 +63,9 @@ filegroup(
             "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed)%",
         ],
         unfiltered_compile_flags = [
+            # Do not resolve our symlinked resource prefixes to real paths. This is required to
+            # make includes resolve correctly.
+            "-no-canonical-prefixes",
             # Replace compile timestamp-related macros for reproducible binaries with consistent hashes.
             "-Wno-builtin-macro-redefined",
             "-D__DATE__=\"OMITTED_FOR_HASH_CONSISTENCY\"",
