@@ -2356,7 +2356,7 @@ Operation::kv_gen(
     TableOperationInternal *internal = static_cast<TableOperationInternal *>(_internal);
 
     uint_t size = iskey ? internal->_keysize : internal->_valuesize;
-    uint_t max = iskey ? internal->_keymax : internal->_valuemax;
+    uint64_t max = iskey ? internal->_keymax : internal->_valuemax;
     if (n > max)
         THROW((iskey ? "Key" : "Value") << " (" << n << ") too large for size (" << size << ")");
 
