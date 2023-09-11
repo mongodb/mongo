@@ -3412,6 +3412,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return windowFrameLastSlots.size() - 1;
     };
 
+    auto collatorSlot = _state.getCollatorSlot();
+
     // Get stages for partition by.
     size_t partitionSlotCount = 0;
     if (windowNode->partitionBy) {
@@ -3670,10 +3672,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             initExprs = buildInitialize(accStmt, std::move(initExprArg), _frameIdGenerator);
             if (argExprs.size() == 1) {
                 addExprs = buildAccumulator(
-                    accStmt, argExprs.begin()->second->clone(), boost::none, _frameIdGenerator);
+                    accStmt, argExprs.begin()->second->clone(), collatorSlot, _frameIdGenerator);
             } else {
                 addExprs = buildAccumulator(
-                    accStmt, cloneExprMap(argExprs), boost::none, _frameIdGenerator);
+                    accStmt, cloneExprMap(argExprs), collatorSlot, _frameIdGenerator);
             }
             removeExprs = std::vector<std::unique_ptr<sbe::EExpression>>{addExprs.size()};
         }
@@ -3930,6 +3932,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                          std::move(boundTestingSlots),
                                          partitionSlotCount,
                                          std::move(windows),
+                                         collatorSlot,
                                          windowNode->nodeId());
 
     // Get final window outputs.

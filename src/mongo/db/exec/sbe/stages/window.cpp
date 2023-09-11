@@ -44,13 +44,15 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector boundTestingSlots,
                          size_t partitionSlotCount,
                          std::vector<Window> windows,
+                         boost::optional<value::SlotId> collatorSlot,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
     : PlanStage("window"_sd, planNodeId, participateInTrialRunTracking),
       _currSlots(std::move(currSlots)),
       _boundTestingSlots(std::move(boundTestingSlots)),
       _partitionSlotCount(partitionSlotCount),
-      _windows(std::move(windows)) {
+      _windows(std::move(windows)),
+      _collatorSlot(collatorSlot) {
     _children.emplace_back(std::move(input));
     tassert(7993411,
             "The number of boundTestingSlots doesn't match the number of currSlots",
@@ -94,6 +96,7 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
                                          _boundTestingSlots,
                                          _partitionSlotCount,
                                          std::move(newWindows),
+                                         _collatorSlot,
                                          _commonStats.nodeId,
                                          _participateInTrialRunTracking);
 }
@@ -124,7 +127,8 @@ bool WindowStage::fetchNextRow() {
             for (idx = 0; idx < _partitionSlotCount; idx++) {
                 auto [tag, val] = row.getViewOfValue(idx);
                 auto [prevTag, prevVal] = prevRow.getViewOfValue(idx);
-                auto [cmpTag, cmpVal] = value::compareValue(tag, val, prevTag, prevVal);
+                auto [cmpTag, cmpVal] =
+                    value::compareValue(tag, val, prevTag, prevVal, _collatorView);
                 if (cmpTag != value::TypeTags::NumberInt32 || cmpVal != 0) {
                     _nextPartitionId = _firstRowId + _rows.size() - 1;
                     break;
@@ -275,6 +279,13 @@ void WindowStage::prepare(CompileCtx& ctx) {
         ctx.aggExpression = false;
     }
     _compiled = true;
+
+    if (_collatorSlot) {
+        _collatorAccessor = getAccessor(ctx, *_collatorSlot);
+        tassert(7870800,
+                "collator accessor should exist if collator slot provided to WindowStage",
+                _collatorAccessor != nullptr);
+    }
 }
 
 value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -305,6 +316,13 @@ void WindowStage::resetPartition(int startId) {
 
 void WindowStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
+
+    if (_collatorAccessor) {
+        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
+        uassert(7870801, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
+        _collatorView = value::getCollatorView(collatorVal);
+    }
+
     _commonStats.opens++;
 
     _children[0]->open(reOpen);

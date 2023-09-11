@@ -84,6 +84,7 @@ public:
                 value::SlotVector boundTestingSlots,
                 size_t partitionSlotCount,
                 std::vector<Window> windows,
+                boost::optional<value::SlotId> collatorSlot,
                 PlanNodeId nodeId,
                 bool participateInTrialRunTracking = true);
 
@@ -118,6 +119,8 @@ private:
     const size_t _partitionSlotCount;
     const std::vector<Window> _windows;
 
+    const boost::optional<value::SlotId> _collatorSlot;
+
     using BufferedRowAccessor = value::MaterializedRowAccessor<std::deque<value::MaterializedRow>>;
     // The in/out accessors for the current document slots, and the index pointing to that
     // document in the window buffer.
@@ -147,6 +150,10 @@ private:
 
     value::SlotMap<value::SlotAccessor*> _boundTestingAccessorMap;
     value::SlotMap<value::SlotAccessor*> _outAccessorMap;
+
+    // Accessor for collator. Only set if collatorSlot provided during construction.
+    value::SlotAccessor* _collatorAccessor = nullptr;
+    CollatorInterface* _collatorView = nullptr;
 
     bool _compiled{false};
     vm::ByteCode _bytecode;

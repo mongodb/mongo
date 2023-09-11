@@ -29,6 +29,8 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -44,7 +46,8 @@ public:
         value::SlotVector partitionSlots,
         value::SlotVector forwardSlots,
         value::SlotId valueSlot,
-        std::vector<WindowOffset> windowOffsets) {
+        std::vector<WindowOffset> windowOffsets,
+        boost::optional<value::SlotId> collatorSlot) {
         using namespace stage_builder;
         value::SlotVector windowSlots;
         std::vector<WindowStage::Window> windows;
@@ -107,6 +110,7 @@ public:
                                    std::move(boundTestingSlots),
                                    partitionSlots.size(),
                                    std::move(windows),
+                                   collatorSlot,
                                    kEmptyPlanNodeId);
 
         value::SlotVector resultSlots;
@@ -125,7 +129,7 @@ public:
     }
 };
 
-TEST_F(WindowStageTest, WindowTest) {
+TEST_F(WindowStageTest, IntWindowTest) {
     auto ctx = makeCompileCtx();
     // Create a test case of two partitions with [partitionSlot, boundSlot1, boundSlot2, valueSlot]
     auto [dataTag, dataVal] = stage_builder::makeValue(BSON_ARRAY(
@@ -160,7 +164,8 @@ TEST_F(WindowStageTest, WindowTest) {
                                                               std::move(partitionSlots),
                                                               std::move(forwardSlots),
                                                               valueSlot,
-                                                              std::move(windowOffsets));
+                                                              std::move(windowOffsets),
+                                                              boost::optional<value::SlotId>());
 
     prepareTree(ctx.get(), resultStage.get());
     std::vector<value::SlotAccessor*> resultAccessors;
@@ -180,6 +185,154 @@ TEST_F(WindowStageTest, WindowTest) {
         {900, 1200, 900, 500, 0, 900, 1200, 900, 500, 0},
         {0, 0, 100, 300, 600, 0, 0, 100, 300, 600},
     };
+    for (size_t i = 0; i < expected[0].size(); i++) {
+        auto planState = resultStage->getNext();
+        ASSERT_EQ(PlanState::ADVANCED, planState);
+
+        for (size_t j = 0; j < resultSlots.size(); j++) {
+            auto [tag, val] = resultAccessors[j]->getViewOfValue();
+            ASSERT_EQ(value::TypeTags::NumberInt32, tag);
+            ASSERT_EQ(expected[j][i], val);
+        }
+    }
+    auto planState = resultStage->getNext();
+    ASSERT_EQ(PlanState::IS_EOF, planState);
+}
+
+TEST_F(WindowStageTest, StringWindowTest) {
+    auto ctx = makeCompileCtx();
+    // Create a test case of two partitions with [partitionSlot, boundSlot1, boundSlot2, valueSlot]
+    auto [dataTag, dataVal] = stage_builder::makeValue(BSON_ARRAY(
+        // First partition
+        BSON_ARRAY("1" << 1 << 2 << 100)
+        << BSON_ARRAY("1" << 3 << 4 << 200) << BSON_ARRAY("1" << 5 << 6 << 300)
+        << BSON_ARRAY("1" << 7 << 8 << 400) << BSON_ARRAY("1" << 9 << 10 << 500) <<
+        // Second partition
+        BSON_ARRAY("2" << 11 << 12 << 100) << BSON_ARRAY("2" << 13 << 14 << 200)
+        << BSON_ARRAY("2" << 15 << 16 << 300) << BSON_ARRAY("2" << 17 << 18 << 400)
+        << BSON_ARRAY("2" << 19 << 20 << 500)));
+    auto [slots, inputStage] = generateVirtualScanMulti(4, dataTag, dataVal);
+    value::SlotVector partitionSlots{slots[0]};
+    auto boundSlot1 = slots[1];
+    auto boundSlot2 = slots[2];
+    auto valueSlot = slots[3];
+    value::SlotVector forwardSlots{valueSlot};
+    std::vector<WindowOffset> windowOffsets{
+        // Both boundSlot1 and boundSlot2 are evenly spaced 2 units apart, we expect a range of [-2,
+        // +2] to cover
+        // 1 document on either side of the current document, similarly for other ranges.
+        {boundSlot1, boundSlot1, -2, 2},
+        {boundSlot1, boundSlot2, -2, 2},
+        {boundSlot2, boundSlot2, -2, 2},
+        {boundSlot1, boundSlot1, boost::none, 0},
+        {boundSlot1, boundSlot1, 0, boost::none},
+        {boundSlot1, boundSlot1, -6, -2},
+        {boundSlot1, boundSlot1, 2, 6},
+        {boundSlot1, boundSlot1, boost::none, -3},
+    };
+    auto [resultStage, resultSlots] = createSimpleWindowStage(std::move(inputStage),
+                                                              std::move(partitionSlots),
+                                                              std::move(forwardSlots),
+                                                              valueSlot,
+                                                              std::move(windowOffsets),
+                                                              boost::optional<value::SlotId>());
+
+    prepareTree(ctx.get(), resultStage.get());
+    std::vector<value::SlotAccessor*> resultAccessors;
+    for (auto resultSlot : resultSlots) {
+        resultAccessors.push_back(resultStage->getAccessor(*ctx, resultSlot));
+    }
+    resultStage->open(false);
+
+    // The same results repeated twice for two partitions.
+    std::vector<std::vector<int32_t>> expected{
+        {300, 600, 900, 1200, 900, 300, 600, 900, 1200, 900},
+        {300, 600, 900, 1200, 900, 300, 600, 900, 1200, 900},
+        {300, 600, 900, 1200, 900, 300, 600, 900, 1200, 900},
+        {100, 300, 600, 1000, 1500, 100, 300, 600, 1000, 1500},
+        {1500, 1400, 1200, 900, 500, 1500, 1400, 1200, 900, 500},
+        {0, 100, 300, 600, 900, 0, 100, 300, 600, 900},
+        {900, 1200, 900, 500, 0, 900, 1200, 900, 500, 0},
+        {0, 0, 100, 300, 600, 0, 0, 100, 300, 600},
+    };
+    for (size_t i = 0; i < expected[0].size(); i++) {
+        auto planState = resultStage->getNext();
+        ASSERT_EQ(PlanState::ADVANCED, planState);
+
+        for (size_t j = 0; j < resultSlots.size(); j++) {
+            auto [tag, val] = resultAccessors[j]->getViewOfValue();
+            ASSERT_EQ(value::TypeTags::NumberInt32, tag);
+            ASSERT_EQ(expected[j][i], val);
+        }
+    }
+    auto planState = resultStage->getNext();
+    ASSERT_EQ(PlanState::IS_EOF, planState);
+}
+
+TEST_F(WindowStageTest, CollatorWindowTest) {
+    auto ctx = makeCompileCtx();
+    // Create a test case of two partitions with [partitionSlot, boundSlot1, boundSlot2, valueSlot]
+    auto [dataTag, dataVal] = stage_builder::makeValue(BSON_ARRAY(
+        // First partition
+        BSON_ARRAY("1" << 1 << 2 << 100)
+        << BSON_ARRAY("1" << 3 << 4 << 200) << BSON_ARRAY("1" << 5 << 6 << 300)
+        << BSON_ARRAY("1" << 7 << 8 << 400) << BSON_ARRAY("1" << 9 << 10 << 500) <<
+        // Second partition
+        BSON_ARRAY("2" << 11 << 12 << 100) << BSON_ARRAY("2" << 13 << 14 << 200)
+        << BSON_ARRAY("2" << 15 << 16 << 300) << BSON_ARRAY("2" << 17 << 18 << 400)
+        << BSON_ARRAY("2" << 19 << 20 << 500)));
+    auto [slots, inputStage] = generateVirtualScanMulti(4, dataTag, dataVal);
+    value::SlotVector partitionSlots{slots[0]};
+    auto boundSlot1 = slots[1];
+    auto boundSlot2 = slots[2];
+    auto valueSlot = slots[3];
+    value::SlotVector forwardSlots{valueSlot};
+    std::vector<WindowOffset> windowOffsets{
+        // Both boundSlot1 and boundSlot2 are evenly spaced 2 units apart, we expect a range of [-2,
+        // +2] to cover
+        // 1 document on either side of the current document, similarly for other ranges.
+        {boundSlot1, boundSlot1, -2, 2},
+        {boundSlot1, boundSlot2, -2, 2},
+        {boundSlot2, boundSlot2, -2, 2},
+        {boundSlot1, boundSlot1, boost::none, 0},
+        {boundSlot1, boundSlot1, 0, boost::none},
+        {boundSlot1, boundSlot1, -6, -2},
+        {boundSlot1, boundSlot1, 2, 6},
+        {boundSlot1, boundSlot1, boost::none, -3},
+    };
+
+    auto collatorSlot = generateSlotId();
+    // Setup collator and insert it into the ctx.
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    value::OwnedValueAccessor collatorAccessor;
+    ctx->pushCorrelated(collatorSlot, &collatorAccessor);
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(collator.release()));
+
+    auto [resultStage, resultSlots] = createSimpleWindowStage(std::move(inputStage),
+                                                              std::move(partitionSlots),
+                                                              std::move(forwardSlots),
+                                                              valueSlot,
+                                                              std::move(windowOffsets),
+                                                              collatorSlot);
+
+    prepareTree(ctx.get(), resultStage.get());
+    std::vector<value::SlotAccessor*> resultAccessors;
+    for (auto resultSlot : resultSlots) {
+        resultAccessors.push_back(resultStage->getAccessor(*ctx, resultSlot));
+    }
+    resultStage->open(false);
+    std::vector<std::vector<int32_t>> expected{
+        {300, 600, 900, 1200, 1000, 800, 600, 900, 1200, 900},
+        {300, 600, 900, 1200, 1000, 800, 600, 900, 1200, 900},
+        {300, 600, 900, 1200, 1000, 800, 600, 900, 1200, 900},
+        {100, 300, 600, 1000, 1500, 1600, 1800, 2100, 2500, 3000},
+        {3000, 2900, 2700, 2400, 2000, 1500, 1400, 1200, 900, 500},
+        {0, 100, 300, 600, 900, 1200, 1000, 800, 600, 900},
+        {900, 1200, 1000, 800, 600, 900, 1200, 900, 500, 0},
+        {0, 0, 100, 300, 600, 1000, 1500, 1600, 1800, 2100}};
+
     for (size_t i = 0; i < expected[0].size(); i++) {
         auto planState = resultStage->getNext();
         ASSERT_EQ(PlanState::ADVANCED, planState);
