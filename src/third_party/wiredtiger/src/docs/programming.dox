@@ -48,6 +48,7 @@ each of which is ordered by one or more columns.
 
 <h2>Advanced topics</h2>
 - @subpage backup
+- @subpage chunkcache
 - @subpage compact
 - @subpage in_memory
 - @subpage eviction
