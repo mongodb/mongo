@@ -504,3 +504,4 @@ if not test_config:
     config_h = ModifyFile('../src/include/config.h')
     with config_h.replace_fragment('configuration section') as tfile:
             tfile.write(config_defines)
+    config_h.done()
