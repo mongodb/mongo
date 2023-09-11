@@ -117,6 +117,9 @@ selector:
   - jstests/core/roles_info.js
   - jstests/core/views/views_all_commands.js
 
+  # The following test timesout due to fcv downgrade interfering with index build (see BF-29538)
+  - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+
   # Sharding specific failed:
   #
   # $unionWith explain output does not check whether the collection is sharded in a sharded
