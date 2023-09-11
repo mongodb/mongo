@@ -2138,17 +2138,19 @@ err:
  *     Discard a cursor range from the tree.
  */
 int
-__wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, WT_ITEM *orig_start_key,
-  WT_ITEM *orig_stop_key, bool local_start)
+__wt_btcur_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_BTREE *btree;
+    WT_CURSOR_BTREE *start, *stop;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     bool logging;
 
-    btree = CUR2BT(start);
-    session = CUR2S(start);
+    session = trunc_info->session;
+    btree = CUR2BT(trunc_info->start);
     logging = __wt_log_op(session);
+    start = (WT_CURSOR_BTREE *)trunc_info->start;
+    stop = (WT_CURSOR_BTREE *)trunc_info->stop;
 
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
@@ -2175,7 +2177,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop, WT_ITEM
      * disabling writing of the in-memory remove records to disk.
      */
     if (logging)
-        WT_RET(__wt_txn_truncate_log(session, orig_start_key, orig_stop_key, local_start));
+        WT_RET(__wt_txn_truncate_log(trunc_info));
 
     switch (btree->type) {
     case BTREE_COL_FIX:

@@ -1181,20 +1181,21 @@ err:
  *     Discard a cursor range from the history store tree.
  */
 static int
-__curhs_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
+__curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_CURSOR *start_file_cursor, *stop_file_cursor;
     WT_SESSION_IMPL *session;
 
-    session = CUR2S(start);
-    start_file_cursor = ((WT_CURSOR_HS *)start)->file_cursor;
-    stop_file_cursor = stop != NULL ? ((WT_CURSOR_HS *)stop)->file_cursor : NULL;
+    session = trunc_info->session;
+    start_file_cursor = ((WT_CURSOR_HS *)trunc_info->start)->file_cursor;
+    stop_file_cursor = NULL;
 
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
     WT_ASSERT(session, F_ISSET(start_file_cursor, WT_CURSTD_KEY_INT));
     WT_RET(__wt_cursor_localkey(start_file_cursor));
-    if (stop != NULL) {
+    if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP)) {
+        stop_file_cursor = ((WT_CURSOR_HS *)trunc_info->stop)->file_cursor;
         WT_ASSERT(session, F_ISSET(stop_file_cursor, WT_CURSTD_KEY_INT));
         WT_RET(__wt_cursor_localkey(stop_file_cursor));
     }
@@ -1210,15 +1211,15 @@ __curhs_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
  *     Discard a cursor range from the history store tree.
  */
 int
-__wt_curhs_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
+__wt_curhs_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_CURSOR *start_file_cursor;
     WT_DECL_RET;
 
-    start_file_cursor = ((WT_CURSOR_HS *)start)->file_cursor;
+    start_file_cursor = ((WT_CURSOR_HS *)trunc_info->start)->file_cursor;
 
     WT_WITH_BTREE(
-      CUR2S(start), CUR2BT(start_file_cursor), ret = __curhs_range_truncate(start, stop));
+      trunc_info->session, CUR2BT(start_file_cursor), ret = __curhs_range_truncate(trunc_info));
 
     return (ret);
 }

@@ -748,10 +748,10 @@ err:
  *     Truncate of a cursor range, table implementation.
  */
 int
-__wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
+__wt_table_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 {
     WT_CURSOR *wt_start, *wt_stop;
-    WT_CURSOR_TABLE *ctable;
+    WT_CURSOR_TABLE *ctable, *start, *stop;
     WT_DECL_ITEM(key);
     WT_DECL_RET;
     WT_ITEM raw;
@@ -759,6 +759,8 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
     u_int i;
     int cmp;
 
+    start = (WT_CURSOR_TABLE *)trunc_info->start;
+    stop = (WT_CURSOR_TABLE *)trunc_info->stop;
     ctable = (start != NULL) ? start : stop;
     session = CUR2S(ctable);
     wt_start = start == NULL ? NULL : &start->iface;
