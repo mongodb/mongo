@@ -54,6 +54,20 @@ functions:
               export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_TOPDIR/TCMALLOC_LIB/lib"
               export LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
             fi
+
+            # Create the common sanitizer options and export the specific sanitizer environment
+            # variables.
+            COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
+            if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
+              export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+              export TESTUTIL_BYPASS_ASAN=1
+            elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
+              export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
+              export TESTUTIL_MSAN=1
+            elif [[ "${CMAKE_BUILD_TYPE|}" =~ UBSan ]]; then
+              export UBSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_stacktrace=1"
+            fi
+
             ${additional_env_vars}
         # The expansion is used for any task that requires the mongodbtoolchain binaries.
         - key: PREPARE_PATH
@@ -1308,9 +1322,6 @@ variables:
           # Always disable mmap for PPC due to issues on variant setup.
           # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
           format_test_script_args: -t 360 -- -C "mmap=false,mmap_all=false"
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - &format-stress-sanitizer-test
     exec_timeout_secs: 25200
@@ -1322,9 +1333,6 @@ variables:
       - func: "format test script"
         vars:
           format_test_script_args: -t 360
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - &race-condition-stress-sanitizer-test
     exec_timeout_secs: 25200
@@ -1336,9 +1344,6 @@ variables:
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - &recovery-stress-test
     exec_timeout_secs: 25200
@@ -4097,15 +4102,9 @@ tasks:
           <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
       - func: "format test script"
         vars:
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           format_test_script_args: -S
       - func: "format test"
         vars:
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-wtperf-test
@@ -4435,9 +4434,6 @@ tasks:
           <<: *configure_flags_address_sanitizer_mongodb_stable_clang_with_builtins
       - func: "format test script"
         vars:
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           # Run for 30 mins, and explicitly set data_source to LSM with a large cache
           format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
 
@@ -4694,9 +4690,6 @@ tasks:
       - func: "format test script"
         vars:
           format_test_script_args: -t 360
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - name: race-condition-stress-sanitizer-test-no-barrier
     tags: ["stress-test-sanitizer"]
@@ -4710,9 +4703,6 @@ tasks:
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
-          additional_env_vars: |
-            export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - name: recovery-stress-test-no-barrier
     tags: ["stress-test-no-barrier"]
@@ -6194,10 +6184,7 @@ buildvariants:
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     additional_env_vars: |
-      export ASAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:unmap_shadow_on_exit=1"
-      export LSAN_OPTIONS="abort_on_error=1:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-      export ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
-      export TESTUTIL_BYPASS_ASAN=1
+      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest"
@@ -6233,10 +6220,7 @@ buildvariants:
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     additional_env_vars: |
-      export MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:verbosity=3"
-      export MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
-      export TESTUTIL_MSAN=1
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the 
     # make-check-test task and are covered by the csuite-long-running task.
@@ -6268,7 +6252,6 @@ buildvariants:
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     additional_env_vars: |
-      export UBSAN_OPTIONS="abort_on_error=1:detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer:print_stacktrace=1"
       export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
   tasks:
     - name: clang-analyzer
