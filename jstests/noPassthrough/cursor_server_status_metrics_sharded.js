@@ -5,7 +5,10 @@
  *   requires_sharding,
  * ]
  */
-const st = new ShardingTest({shards: 2});
+const st = new ShardingTest({
+    shards: 2,
+    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
+});
 st.stopBalancer();
 
 const db = st.s.getDB("test");
