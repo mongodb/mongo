@@ -191,7 +191,7 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
-        renameIndexCatalogReq, executor, token, args);
+        executor, token, renameIndexCatalogReq, args);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 }
 
@@ -859,7 +859,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
-                    renameCollParticipantRequest, **executor, token, args);
+                    **executor, token, renameCollParticipantRequest, args);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {primaryShardId});
             }))
@@ -943,7 +943,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionUnblockParticipant>>(
-                    unblockParticipantRequest, **executor, token, args);
+                    **executor, token, unblockParticipantRequest, args);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.

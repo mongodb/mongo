@@ -81,7 +81,7 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtil) {
     for (size_t i = 0; i < total_targets; ++i) {
         std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
         auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-            findCmd, getExecutorPtr(), source.token());
+            getExecutorPtr(), source.token(), findCmd);
         futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
             options, opCtxHolder.get(), std::move(targeter)));
     }
@@ -131,7 +131,7 @@ TEST_F(AsyncRPCTestFixture, GetAllResponsesUtilCancellationFinishesResolvingPend
 
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), source.token());
+        getExecutorPtr(), source.token(), findCmd);
     futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
         options, opCtxHolder.get(), std::move(targeter)));
 
@@ -200,7 +200,7 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdownErrorProcessed) {
     // Try and send a find command and store the result future.
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, rejectingExecutor, source.token());
+        rejectingExecutor, source.token(), findCmd);
     responseFutureContainer.push_back(sendCommand(options, opCtxHolder.get(), std::move(targeter)));
 
     auto response = getAllResponsesOrFirstErrorWithCancellation<size_t, Reply>(

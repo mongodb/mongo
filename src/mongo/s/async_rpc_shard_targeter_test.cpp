@@ -125,7 +125,7 @@ private:
  */
 TEST_F(AsyncRPCShardingTestFixture, ShardTargeter) {
     ReadPreferenceSetting readPref;
-    auto targeter = ShardIdTargeter(kTestShardIds[0], operationContext(), readPref, executor());
+    auto targeter = ShardIdTargeter(executor(), operationContext(), kTestShardIds[0], readPref);
 
     auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
 
@@ -138,7 +138,7 @@ TEST_F(AsyncRPCShardingTestFixture, ShardTargeter) {
 TEST_F(AsyncRPCShardingTestFixture, ShardDoesNotExist) {
     ReadPreferenceSetting readPref;
     auto targeter =
-        ShardIdTargeter(ShardId("MissingShard"), operationContext(), readPref, executor());
+        ShardIdTargeter(executor(), operationContext(), ShardId("MissingShard"), readPref);
 
     auto resolveFuture = targeter.resolve(CancellationToken::uncancelable());
 
@@ -167,7 +167,7 @@ TEST_F(AsyncRPCShardingTestFixture, ShardDoesNotExist) {
 TEST_F(AsyncRPCShardingTestFixture, ShardNotInCache) {
     ReadPreferenceSetting readPref;
     auto targeter =
-        ShardIdTargeter(ShardId("MissingShard"), operationContext(), readPref, executor());
+        ShardIdTargeter(executor(), operationContext(), ShardId("MissingShard"), readPref);
 
     auto getShardFuture = targeter.getShard();
 
@@ -196,7 +196,7 @@ TEST_F(AsyncRPCShardingTestFixture, ShardNotInCache) {
  */
 TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopology) {
     ReadPreferenceSetting readPref;
-    ShardIdTargeter targeter{kTestShardIds[0], operationContext(), readPref, executor()};
+    ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     // We must call resolve before calling onRemoteCommandError
     auto initialResolve = targeter.resolve(CancellationToken::uncancelable()).get();
@@ -221,7 +221,7 @@ TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopology) {
  */
 TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopologyAndResolver) {
     ReadPreferenceSetting readPref;
-    ShardIdTargeter targeter{kTestShardIds[0], operationContext(), readPref, executor()};
+    ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     // We must call resolve before calling onRemoteCommandError
     auto initialResolve = targeter.resolve(CancellationToken::uncancelable()).get();
@@ -254,7 +254,7 @@ TEST_F(AsyncRPCShardingTestFixture, OnRemoteErrorUpdatesTopologyAndResolver) {
  */
 TEST_F(AsyncRPCShardingTestFixture, TestingIfShardRemoved) {
     ReadPreferenceSetting readPref;
-    ShardIdTargeter targeter{kTestShardIds[0], operationContext(), readPref, executor()};
+    ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     // Pretend we are inside the sendCommand() function.
 
@@ -305,7 +305,7 @@ TEST_F(AsyncRPCShardingTestFixture, TestingIfShardRemoved) {
  */
 DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, "invariant") {
     ReadPreferenceSetting readPref;
-    ShardIdTargeter targeter{kTestShardIds[0], operationContext(), readPref, executor()};
+    ShardIdTargeter targeter{executor(), operationContext(), kTestShardIds[0], readPref};
 
     Status e = Status(ErrorCodes::NetworkTimeout, "mock");
     auto commandErrorResult = targeter.onRemoteCommandError(kTestShardHosts[0], e);
@@ -323,7 +323,7 @@ TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
                             .toBSON(CursorResponse::ResponseType::InitialResponse);
 
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, executor(), CancellationToken::uncancelable());
+        executor(), CancellationToken::uncancelable(), findCmd);
     auto fut = sendCommand(options, operationContext(), ShardId(kTestShardIds[0]));
 
     onCommand([&](const auto& request) {

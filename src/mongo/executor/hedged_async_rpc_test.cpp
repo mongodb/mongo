@@ -151,11 +151,11 @@ public:
         std::unique_ptr<Targeter> targeter =
             std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
 
-        return sendHedgedCommand(cmd,
-                                 _opCtx.get(),
-                                 std::move(targeter),
-                                 getExecutorPtr(),
+        return sendHedgedCommand(getExecutorPtr(),
                                  CancellationToken::uncancelable(),
+                                 _opCtx.get(),
+                                 cmd,
+                                 std::move(targeter),
                                  retryPolicy,
                                  readPref,
                                  genericArgs,
@@ -394,11 +394,11 @@ TEST_F(HedgedAsyncRPCTest, FailedTargeting) {
     auto targeterFailStatus = Status{ErrorCodes::InternalError, "Fake targeter failure"};
     auto targeter = std::make_unique<FailingTargeter>(targeterFailStatus);
 
-    auto resultFuture = sendHedgedCommand(helloCmd,
+    auto resultFuture = sendHedgedCommand(getExecutorPtr(),
+                                          CancellationToken::uncancelable(),
                                           getOpCtx(),
-                                          std::move(targeter),
-                                          getExecutorPtr(),
-                                          CancellationToken::uncancelable());
+                                          helloCmd,
+                                          std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
@@ -1062,7 +1062,7 @@ TEST_F(HedgedAsyncRPCTest, NoAttemptedTargetIfTargetingFails) {
 
 
     auto resultFuture = sendHedgedCommand(
-        helloCmd, getOpCtx(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, getOpCtx(), helloCmd, std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);

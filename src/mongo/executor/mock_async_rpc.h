@@ -134,12 +134,12 @@ public:
      * notifies waiters that a new request has been scheduled.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        const DatabaseName& dbName,
-        BSONObj cmdBSON,
-        Targeter* targeter,
-        OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token,
+        OperationContext* opCtx,
+        Targeter* targeter,
+        const DatabaseName& dbName,
+        BSONObj cmdBSON,
         BatonHandle,
         boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
@@ -246,12 +246,12 @@ public:
      * functions to inspect that state.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        const DatabaseName& dbName,
-        BSONObj cmdBSON,
-        Targeter* targeter,
-        OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token,
+        OperationContext* opCtx,
+        Targeter* targeter,
+        const DatabaseName& dbName,
+        BSONObj cmdBSON,
         BatonHandle,
         boost::optional<UUID> clientOperationKey) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
@@ -403,12 +403,12 @@ public:
      * notifies waiters that a new request has been scheduled.
      */
     ExecutorFuture<detail::AsyncRPCInternalResponse> _sendCommand(
-        const DatabaseName& dbName,
-        BSONObj cmdBSON,
-        Targeter* targeter,
-        OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token,
+        OperationContext* opCtx,
+        Targeter* targeter,
+        const DatabaseName& dbName,
+        BSONObj cmdBSON,
         BatonHandle,
         boost::optional<UUID>) final {
 

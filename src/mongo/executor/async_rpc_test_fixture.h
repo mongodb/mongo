@@ -200,12 +200,12 @@ public:
 
 class ShardIdTargeterForTest : public ShardIdTargeter {
 public:
-    ShardIdTargeterForTest(ShardId shardId,
+    ShardIdTargeterForTest(ExecutorPtr executor,
                            OperationContext* opCtx,
+                           ShardId shardId,
                            ReadPreferenceSetting readPref,
-                           ExecutorPtr executor,
                            std::vector<HostAndPort> resolvedHosts)
-        : ShardIdTargeter(shardId, opCtx, readPref, executor) {
+        : ShardIdTargeter(executor, opCtx, shardId, readPref) {
         _resolvedHosts = resolvedHosts;
     };
 

@@ -83,7 +83,7 @@ public:
         HelloCommand hello;
         initializeCommand(hello);
         auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-            hello, getExecutorPtr(), _cancellationToken, retryPolicy);
+            getExecutorPtr(), _cancellationToken, hello, retryPolicy);
         return sendCommand(options, _opCtx.get(), std::make_unique<FixedTargeter>(target));
     }
 

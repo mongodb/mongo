@@ -110,7 +110,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHello) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -138,7 +138,7 @@ TEST_F(AsyncRPCTestFixture, URIOverload) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), uri);
 
@@ -168,7 +168,7 @@ TEST_F(AsyncRPCTestFixture, ConnectionStringOverload) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), cstr);
 
@@ -218,9 +218,9 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd,
         getExecutorPtr(),
         _cancellationToken,
+        helloCmd,
         std::make_shared<NeverRetryPolicy>(),
         GenericArgs(genericArgsApiV1, genericArgsUnstable));
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
@@ -272,7 +272,7 @@ TEST_F(AsyncRPCTestFixture, RetryOnSuccessfulHelloAdditionalAttempts) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
+        getExecutorPtr(), _cancellationToken, helloCmd, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -314,7 +314,7 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
+        getExecutorPtr(), _cancellationToken, helloCmd, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -354,7 +354,7 @@ TEST_F(AsyncRPCTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
+        getExecutorPtr(), _cancellationToken, helloCmd, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -381,7 +381,7 @@ TEST_F(AsyncRPCTestFixture, LocalError) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -413,7 +413,7 @@ TEST_F(AsyncRPCTestFixture, RemoteError) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -447,7 +447,7 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     GenericReplyFieldsWithTypesV1 stableFields;
@@ -495,7 +495,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -531,7 +531,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -572,7 +572,7 @@ TEST_F(AsyncRPCTestFixture, WriteError) {
     BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
         sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -609,7 +609,7 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdown) {
     initializeCommand(helloCmd);
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     getExecutorPtr()->shutdown();
     auto error = resultFuture.getNoThrow().getStatus();
@@ -633,7 +633,7 @@ TEST_F(AsyncRPCTestFixture, BatonTest) {
     auto opCtxHolder = makeOperationContext();
     auto baton = opCtxHolder->getBaton();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     options->baton = baton;
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -703,7 +703,7 @@ TEST_F(AsyncRPCTestFixture, ParseAndSeralizeNoop) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -742,7 +742,7 @@ TEST_F(AsyncRPCTestFixture, FailedTargeting) {
     initializeCommand(helloCmd);
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
@@ -770,7 +770,7 @@ TEST_F(AsyncRPCTestFixture, BatonShutdownExecutorAlive) {
     auto opCtxHolder = makeOperationContext();
     auto subBaton = opCtxHolder->getBaton()->makeSubBaton();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     options->baton = *subBaton;
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
@@ -800,13 +800,13 @@ TEST_F(AsyncRPCTestFixture, SendTxnCommandWithoutTxnRouterAppendsNoTxnFields) {
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto opCtxHolder = makeOperationContext();
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, opCtxHolder.get(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), opCtxHolder.get(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto resultFuture = sendTxnCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -833,7 +833,7 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -846,7 +846,7 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -870,9 +870,9 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
     // // Issue a follow-up find command in the same transaction.
     FindCommandRequest secondFindCmd(nss);
     auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        secondFindCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, secondFindCmd);
     auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     auto secondResultFuture =
         sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
 
@@ -899,7 +899,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnSuccess)
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -912,7 +912,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnSuccess)
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
 
     // There should be no recovery shard to start with.
     ASSERT(!txnRouter.getRecoveryShardId());
@@ -934,9 +934,9 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnSuccess)
     // // Issue a follow-up find command in the same transaction.
     FindCommandRequest secondFindCmd(nss);
     auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        secondFindCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, secondFindCmd);
     auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     auto secondResultFuture =
         sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
 
@@ -962,7 +962,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteEr
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -975,7 +975,7 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteEr
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
 
     // There should be no recovery shard to start with.
     ASSERT(!txnRouter.getRecoveryShardId());
@@ -994,9 +994,9 @@ TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteEr
     // // Issue a follow-up find command in the same transaction.
     FindCommandRequest secondFindCmd(nss);
     auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        secondFindCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, secondFindCmd);
     auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     auto secondResultFuture =
         sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
 
@@ -1024,7 +1024,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -1050,9 +1050,9 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     genericArgsUnstable.setShardVersion(expectedShardVersion);
 
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd,
         getExecutorPtr(),
         _cancellationToken,
+        findCmd,
         std::make_shared<NeverRetryPolicy>(),
         GenericArgs(genericArgsApiV1, genericArgsUnstable));
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
@@ -1090,7 +1090,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsRemoteError) {
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -1103,7 +1103,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsRemoteError) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
@@ -1127,7 +1127,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsLocalError) {
     std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
     // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
     auto targeter = std::make_unique<ShardIdTargeterForTest>(
-        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+        getExecutorPtr(), getOpCtx(), shardId, readPref, testHost);
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
@@ -1140,7 +1140,7 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsLocalError) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
@@ -1166,7 +1166,7 @@ TEST_F(AsyncRPCTestFixture, AttemptedTargetCorrectlyPropogatedWithLocalError) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -1194,7 +1194,7 @@ TEST_F(AsyncRPCTestFixture, NoAttemptedTargetIfTargetingFails) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
@@ -1215,7 +1215,7 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-        helloCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, helloCmd);
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -1254,7 +1254,7 @@ TEST_F(AsyncRPCTestFixture, OperationKeyIsSetByDefault) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     ASSERT_DOES_NOT_THROW([&] {
         onCommand([&](const auto& request) {
@@ -1281,7 +1281,7 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), _cancellationToken);
+        getExecutorPtr(), _cancellationToken, findCmd);
     // Set OperationKey via AsyncRPCOptions.
     options->genericArgs.stable.setClientOperationKey(opKey);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
@@ -1310,7 +1310,7 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     CancellationToken token = source.token();
     FindCommandRequest findCmd(nss);
     auto options =
-        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(findCmd, getExecutorPtr(), token);
+        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(getExecutorPtr(), token, findCmd);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     // Will pause processing response after network interface.
@@ -1356,7 +1356,7 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
 
     FindCommandRequest findCmd(nss);
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), CancellationToken::uncancelable());
+        getExecutorPtr(), CancellationToken::uncancelable(), findCmd);
     auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
@@ -1373,7 +1373,7 @@ TEST_F(AsyncRPCTestFixture, TargeterOnRemoteCommandError) {
     // not update with the testHost.
     targeter = std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
     options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        findCmd, getExecutorPtr(), CancellationToken::uncancelable());
+        getExecutorPtr(), CancellationToken::uncancelable(), findCmd);
     future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     getExecutorPtr()->shutdown();
     future.wait();

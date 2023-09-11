@@ -121,16 +121,16 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
         std::unique_ptr<async_rpc::Targeter> targeter =
             std::make_unique<async_rpc::ShardIdTargeter>(
-                shardIds[i], opCtx, readPref, originalOpts->exec);
+                originalOpts->exec, opCtx, shardIds[i], readPref);
         bool startTransaction = originalOpts->genericArgs.stable.getStartTransaction()
             ? *originalOpts->genericArgs.stable.getStartTransaction()
             : false;
         auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
             Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
         auto opts =
-            std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->cmd,
-                                                                      originalOpts->exec,
+            std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->exec,
                                                                       cancelSource.token(),
+                                                                      originalOpts->cmd,
                                                                       originalOpts->genericArgs,
                                                                       retryPolicy);
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));

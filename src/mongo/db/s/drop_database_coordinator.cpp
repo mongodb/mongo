@@ -225,7 +225,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            blockCRUDOperationsRequest, **executor, token, args);
+            **executor, token, blockCRUDOperationsRequest, args);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
@@ -270,7 +270,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            unblockCRUDOperationsRequest, **executor, token, args);
+            **executor, token, unblockCRUDOperationsRequest, args);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
             opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
@@ -434,7 +434,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // idempotency.
                     auto opts = std::make_shared<
                         async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
-                        dropDatabaseParticipantCmd, **executor, token, args);
+                        **executor, token, dropDatabaseParticipantCmd, args);
                     try {
                         sharding_ddl_util::sendAuthenticatedCommandToShards(
                             opCtx, opts, participants);
@@ -489,7 +489,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
                 auto opts = std::make_shared<
                     async_rpc::AsyncRPCOptions<FlushDatabaseCacheUpdatesWithWriteConcern>>(
-                    flushDbCacheUpdatesCmd, **executor, token, args);
+                    **executor, token, flushDbCacheUpdatesCmd, args);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
             }
 

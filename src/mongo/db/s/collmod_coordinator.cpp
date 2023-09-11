@@ -259,9 +259,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     auto opts =
                         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            blockCRUDOperationsRequest,
                             **executor,
                             token,
+                            blockCRUDOperationsRequest,
                             async_rpc::GenericArgs());
                     sendAuthenticatedCommandWithOsiToShards(
                         opCtx, opts, _shardingInfo->shardsOwningChunks, getNewSession(opCtx));
@@ -347,7 +347,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
                             auto optsDryRun = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                                dryRunRequest, **executor, token, args);
+                                **executor, token, dryRunRequest, args);
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
                                 opCtx, optsDryRun, shardsOwningChunks);
                         }
@@ -358,7 +358,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             request.setPerformViewChange(true);
                             auto opts = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                                request, **executor, token, async_rpc::GenericArgs());
+                                **executor, token, request, async_rpc::GenericArgs());
                             const auto& primaryResponse = sendAuthenticatedCommandWithOsiToShards(
                                 opCtx, opts, {_shardingInfo->primaryShard}, getNewSession(opCtx));
 
@@ -370,7 +370,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         request.setPerformViewChange(false);
                         auto opts = std::make_shared<
                             async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                            request, **executor, token, async_rpc::GenericArgs());
+                            **executor, token, request, async_rpc::GenericArgs());
                         const auto& secondaryResponses = sendAuthenticatedCommandWithOsiToShards(
                             opCtx, opts, shardsOwningChunks, getNewSession(opCtx));
 

@@ -117,9 +117,9 @@ void killOperations(ServiceContext* svcCtx,
                     UUID opKey) {
     KillOperationsRequest cmd({opKey});
     auto options = std::make_shared<AsyncRPCOptions<KillOperationsRequest>>(
-        std::move(cmd),
         std::move(exec),
         CancellationToken::uncancelable(),
+        std::move(cmd),
         std::make_shared<NeverRetryPolicy>(),
         GenericArgs());
     for (const auto& target : targets) {
@@ -150,11 +150,11 @@ void killOperations(ServiceContext* svcCtx,
  */
 template <typename CommandType>
 SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
-    CommandType cmd,
-    OperationContext* opCtx,
-    std::unique_ptr<Targeter> targeter,
     std::shared_ptr<executor::TaskExecutor> exec,
     CancellationToken token,
+    OperationContext* opCtx,
+    CommandType cmd,
+    std::unique_ptr<Targeter> targeter,
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
     GenericArgs genericArgs = GenericArgs(),
@@ -167,7 +167,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
     auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
-    auto proxyExec = std::make_shared<detail::ProxyingExecutor>(baton, exec);
+    auto proxyExec = std::make_shared<detail::ProxyingExecutor>(exec, baton);
     auto tryBody = [=, targeter = std::move(targeter)]() mutable {
         HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
         auto operationKey =
@@ -212,9 +212,9 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                     // is implemented at the hedged command runner level and not at the
                     // 'sendCommand' level.
                     auto options = std::make_shared<AsyncRPCOptions<CommandType>>(
-                        cmd,
                         exec,
                         hedgeCancellationToken.token(),
+                        cmd,
                         std::make_shared<NeverRetryPolicy>(),
                         genericArgs);
 

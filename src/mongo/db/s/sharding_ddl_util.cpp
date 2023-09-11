@@ -339,7 +339,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
     command.setFilter(filterObj);
     command.setDbName(nss.dbName());
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
-        command, **executor, CancellationToken::uncancelable());
+        **executor, CancellationToken::uncancelable(), command);
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     struct MismatchedShard {
@@ -391,7 +391,7 @@ void checkTargetCollectionDoesNotExistInCluster(
     command.setFilter(filterObj);
     command.setDbName(toNss.dbName());
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
-        command, **executor, CancellationToken::uncancelable());
+        **executor, CancellationToken::uncancelable(), command);
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     std::vector<std::string> shardsContainingTargetCollection;
@@ -673,7 +673,7 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
-        updateOp, executor, CancellationToken::uncancelable(), args);
+        executor, CancellationToken::uncancelable(), updateOp, args);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
@@ -708,7 +708,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
-        dropCollectionParticipant, executor, CancellationToken::uncancelable(), args);
+        executor, CancellationToken::uncancelable(), dropCollectionParticipant, args);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 

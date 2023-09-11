@@ -827,7 +827,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     auto retryPolicy =
         std::make_shared<RecipientSyncDataRetryPolicy>(getProtocol(), kExponentialBackoff);
     auto options =
-        std::make_shared<RecipientSyncDataRPCOptions>(request, **exec, token, retryPolicy);
+        std::make_shared<RecipientSyncDataRPCOptions>(**exec, token, request, retryPolicy);
     auto cmdRes = async_rpc::sendCommand(options, _serviceContext, std::move(asyncTargeter));
     return std::move(cmdRes).ignoreValue().onError([](Status status) {
         return async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status).addContext(
@@ -869,7 +869,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
         kPrimaryOnlyReadPreference, recipientTargeterRS);
     auto retryPolicy = std::make_shared<RecipientForgetMigrationRetryPolicy>(kExponentialBackoff);
     auto options =
-        std::make_shared<RecipientForgetMigrationRPCOptions>(request, **exec, token, retryPolicy);
+        std::make_shared<RecipientForgetMigrationRPCOptions>(**exec, token, request, retryPolicy);
     auto cmdRes = async_rpc::sendCommand(options, _serviceContext, std::move(asyncTargeter));
     return std::move(cmdRes).ignoreValue().onError([](Status status) {
         return async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status).addContext(
