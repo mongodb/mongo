@@ -43,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -161,17 +160,8 @@ enum class ValidateExpireAfterSecondsMode {
 Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
                                   ValidateExpireAfterSecondsMode mode);
 
-StatusWith<TTLCollectionCache::Info::ExpireAfterSecondsType> validateExpireAfterSeconds(
-    BSONElement expireAfterSeconds, ValidateExpireAfterSecondsMode mode);
-
-/**
- * Convenience method to extract the 'ExpireAfterSecondsType' from the
- * `StatusWith<ExpireAfterSecondsType>` result of a 'validateExpireAfterSeconds' call, converting a
- * non-OK status to `kInvalid`.
- */
-TTLCollectionCache::Info::ExpireAfterSecondsType extractExpireAfterSecondsType(
-    const StatusWith<TTLCollectionCache::Info::ExpireAfterSecondsType>& swType);
-
+Status validateExpireAfterSeconds(BSONElement expireAfterSeconds,
+                                  ValidateExpireAfterSecondsMode mode);
 /**
  * Returns true if 'indexSpec' refers to a TTL index.
  */

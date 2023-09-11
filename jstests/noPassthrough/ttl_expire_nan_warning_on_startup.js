@@ -21,7 +21,8 @@ const coll = db.t;
 // 'expireAfterSeconds'. The current createIndexes behavior will overwrite NaN with int32::max
 // unless we use a fail point.
 const fp = configureFailPoint(primary, 'skipTTLIndexValidationOnCreateIndex');
-const fp2 = configureFailPoint(primary, 'skipTTLIndexExpireAfterSecondsValidation');
+const fp2 =
+    configureFailPoint(primary, 'skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex');
 try {
     assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: NaN}));
 } finally {

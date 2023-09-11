@@ -99,9 +99,8 @@ void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {
                        TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
 }
 
-void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
-                                                           const IndexName& indexName,
-                                                           Info::ExpireAfterSecondsType type) {
+void TTLCollectionCache::unsetTTLIndexExpireAfterSecondsInvalid(UUID uuid,
+                                                                const IndexName& indexName) {
     stdx::lock_guard<Latch> lock(_ttlInfosLock);
     auto infoIt = _ttlInfos.find(uuid);
     if (infoIt == _ttlInfos.end()) {
@@ -111,7 +110,7 @@ void TTLCollectionCache::setTTLIndexExpireAfterSecondsType(UUID uuid,
     auto&& infoVec = infoIt->second;
     for (auto&& info : infoVec) {
         if (!info.isClustered() && info.getIndexName() == indexName) {
-            info.setExpireAfterSecondsType(type);
+            info.unsetExpireAfterSecondsInvalid();
             break;
         }
     }
