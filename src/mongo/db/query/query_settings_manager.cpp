@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
@@ -56,6 +57,34 @@ namespace mongo::query_settings {
 namespace {
 const auto getQuerySettingsManager =
     ServiceContext::declareDecoration<boost::optional<QuerySettingsManager>>();
+
+class QuerySettingsServerStatusSection final : public ServerStatusSection {
+public:
+    QuerySettingsServerStatusSection() : ServerStatusSection("querySettings") {}
+
+    bool includeByDefault() const override {
+        // Only include if Query Settings are enabled.
+        return feature_flags::gFeatureFlagQuerySettings.isEnabled(
+            serverGlobalParams.featureCompatibility);
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return BSON("count" << _count << "size" << _size);
+    }
+
+    void record(int count, int size) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _count = count;
+        _size = size;
+    }
+
+private:
+    int _count = 0;
+    int _size = 0;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
+} querySettingsServerStatusSection;
 }  // namespace
 
 QuerySettingsManager& QuerySettingsManager::get(ServiceContext* service) {
@@ -206,6 +235,9 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         IDLParserContext("querySettingsParameterValue"), newValueElement.Obj());
+    querySettingsServerStatusSection.record(
+        /* count */ static_cast<int>(newSettings.getSettingsArray().size()),
+        /* size */ static_cast<int>(newValueElement.valuesize()));
     querySettingsManager.setQueryShapeConfigurations(Client::getCurrent()->getOperationContext(),
                                                      std::move(newSettings.getSettingsArray()),
                                                      newSettings.getClusterParameterTime(),

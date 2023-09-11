@@ -42,6 +42,13 @@ export class QuerySettingsUtils {
     }
 
     /**
+     * Return the query settings section of the server status.
+     */
+    getQuerySettingsServerStatus() {
+        return this.db.runCommand({serverStatus: 1}).querySettings;
+    }
+
+    /**
      * Helper function to assert equality of QueryShapeConfigurations. In order to ease the
      * assertion logic, 'queryShapeHash' field is removed from the QueryShapeConfiguration prior to
      * assertion.

@@ -194,6 +194,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha256_block',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
