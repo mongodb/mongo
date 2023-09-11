@@ -30,6 +30,7 @@ rm mongodb.key.json
 # Build Image
 cd src
 activate_venv
+setup_db_contrib_tool
 $python buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --dockerComposeTag $tag --dockerComposeBuildImages workload,config,mongo-binaries --dockerComposeBuildEnv evergreen
 
 # Test Image

@@ -954,6 +954,7 @@ functions:
   - command: git.get_project
     params:
       directory: src/buildscripts/antithesis/base_images/workload/src
+  - *configure_evergreen_api_credentials
 
   "do non-compile setup":
   - command: manifest.load
@@ -8802,6 +8803,15 @@ tasks:
       binary: bash
       args:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
+- <<: *antithesis_task_template
+  name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard

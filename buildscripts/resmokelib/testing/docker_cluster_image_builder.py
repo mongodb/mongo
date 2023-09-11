@@ -255,17 +255,19 @@ class DockerComposeImageBuilder:
 
     def _fetch_mongodb_binaries(self):
         """
-        Get MongoDB binaries -- if running locally -- and verify existence/validity.
+        Get MongoDB binaries and verify existence/validity.
 
-        In CI the binaries should already exist. In that case, we want to verify binary existence and
-        that they are linked with `libvoidstar`.
+        In CI the binaries from the `master` branch should already exist from the compile task.
+        In that case, we just want to fetch the `last-continuous` and `last-lts` binaries.
 
         :return: None.
         """
         mongodb_binaries_destination = os.path.join(self.MONGODB_BINARIES_RELATIVE_DIR, "bin")
 
-        if os.path.exists(mongodb_binaries_destination):
-            print(f"\n\tFound existing MongoDB binaries at: {mongodb_binaries_destination}\n")
+        if not self.in_evergreen and os.path.exists(mongodb_binaries_destination):
+            print(
+                f"\n\tRunning Locally - Found existing MongoDB binaries at: {mongodb_binaries_destination}\n"
+            )
         # If local, fetch the binaries.
         elif not self.in_evergreen:
             # Ensure that `db-contrib-tool` is installed locally
@@ -281,10 +283,33 @@ class DockerComposeImageBuilder:
                                    "db-contrib-tool"]).returncode == 0, db_contrib_tool_error
 
             # Use `db-contrib-tool` to get MongoDB binaries for this image
-            print("Fetching MongoDB binaries for image build...")
+            print("Running Locally - Fetching All MongoDB binaries for image build...")
             subprocess.run([
-                "db-contrib-tool", "setup-repro-env", "--variant", "ubuntu2204", "--linkDir",
-                mongodb_binaries_destination, "master"
+                "db-contrib-tool",
+                "setup-repro-env",
+                "--variant",
+                "ubuntu2204",
+                "--linkDir",
+                mongodb_binaries_destination,
+                "--installLastContinuous",
+                "--installLastLTS",
+                "master",
+            ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+        elif self.in_evergreen:
+            print(
+                "Running in Evergreen - Fetching `last-continuous` and `last-lts` MongoDB binaries for image build..."
+            )
+            subprocess.run([
+                "db-contrib-tool",
+                "setup-repro-env",
+                "--variant",
+                "ubuntu2204",
+                "--linkDir",
+                mongodb_binaries_destination,
+                "--installLastContinuous",
+                "--installLastLTS",
+                "--evergreenConfig",
+                "./.evergreen.yml",
             ], stdout=sys.stdout, stderr=sys.stderr, check=True)
 
         # Verify the binaries were downloaded successfully
