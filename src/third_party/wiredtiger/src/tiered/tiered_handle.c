@@ -689,6 +689,12 @@ __wt_tiered_name(
         WT_ASSERT(session, !LF_ISSET(WT_TIERED_NAME_SHARED));
         WT_PREFIX_SKIP_REQUIRED(session, name, "tier:");
     }
+
+    if (LF_ISSET(WT_TIERED_NAME_SKIP_PREFIX)) {
+        *retp = name;
+        return (0);
+    }
+
     return (__wt_tiered_name_str(session, name, id, flags, retp));
 }
 
