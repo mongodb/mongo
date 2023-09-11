@@ -3375,8 +3375,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Create a tuple of slots for each new slot added.
     sbe::value::SlotVector currSlots;
     sbe::value::SlotVector boundTestingSlots;
-    std::vector<sbe::value::SlotVector*> windowFrameFirstSlots;
-    std::vector<sbe::value::SlotVector*> windowFrameLastSlots;
+    std::vector<sbe::value::SlotVector> windowFrameFirstSlots;
+    std::vector<sbe::value::SlotVector> windowFrameLastSlots;
     auto ensureSlotInBuffer = [&](sbe::value::SlotId slot) {
         for (size_t i = 0; i < currSlots.size(); i++) {
             if (slot == currSlots[i]) {
@@ -3385,24 +3385,31 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
         currSlots.push_back(slot);
         boundTestingSlots.push_back(_slotIdGenerator.generate());
-        for (auto frameFirstSlots : windowFrameFirstSlots) {
-            frameFirstSlots->push_back(_slotIdGenerator.generate());
+        for (auto& frameFirstSlots : windowFrameFirstSlots) {
+            frameFirstSlots.push_back(_slotIdGenerator.generate());
         }
-        for (auto frameLastSlots : windowFrameLastSlots) {
-            frameLastSlots->push_back(_slotIdGenerator.generate());
+        for (auto& frameLastSlots : windowFrameLastSlots) {
+            frameLastSlots.push_back(_slotIdGenerator.generate());
         }
         return currSlots.size() - 1;
     };
-    auto registerFrameFirstLastSlots = [&](sbe::value::SlotVector* frameFirstSlots,
-                                           sbe::value::SlotVector* frameLastSlots) {
-        windowFrameFirstSlots.push_back(frameFirstSlots);
-        windowFrameLastSlots.push_back(frameLastSlots);
-        frameFirstSlots->clear();
-        frameLastSlots->clear();
+    auto registerFrameFirstSlots = [&]() {
+        windowFrameFirstSlots.push_back(sbe::value::SlotVector());
+        auto& frameFirstSlots = windowFrameFirstSlots.back();
+        frameFirstSlots.clear();
         for (size_t i = 0; i < currSlots.size(); i++) {
-            frameFirstSlots->push_back(_slotIdGenerator.generate());
-            frameLastSlots->push_back(_slotIdGenerator.generate());
+            frameFirstSlots.push_back(_slotIdGenerator.generate());
         }
+        return windowFrameFirstSlots.size() - 1;
+    };
+    auto registerFrameLastSlots = [&]() {
+        windowFrameLastSlots.push_back(sbe::value::SlotVector());
+        auto& frameLastSlots = windowFrameLastSlots.back();
+        frameLastSlots.clear();
+        for (size_t i = 0; i < currSlots.size(); i++) {
+            frameLastSlots.push_back(_slotIdGenerator.generate());
+        }
+        return windowFrameLastSlots.size() - 1;
     };
 
     // Get stages for partition by.
@@ -3569,6 +3576,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<std::string> windowFields;
     sbe::value::SlotVector windowFinalSlots;
     sbe::SlotExprPairVector windowFinalProjects;
+    std::vector<boost::optional<size_t>> windowFrameFirstSlotIdx;
+    std::vector<boost::optional<size_t>> windowFrameLastSlotIdx;
     for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
         auto& outputField = windowNode->outputFields[i];
         windowFields.push_back(outputField.fieldName);
@@ -3683,7 +3692,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             // Create frame first and last slots if the window requires.
             if (frameFirstLastAccumulators.count(outputField.expr->getOpName())) {
-                registerFrameFirstLastSlots(&window.frameFirstSlots, &window.frameLastSlots);
+                windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
+                windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
+            } else {
+                windowFrameFirstSlotIdx.push_back(boost::none);
+                windowFrameLastSlotIdx.push_back(boost::none);
             }
 
             window.initExpr = std::move(initExprs[i]);
@@ -3808,7 +3821,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         // Build extra arguments for finalize expressions.
         auto getModifiedExpr = [&](std::unique_ptr<sbe::EExpression> argExpr,
-                                   sbe::value::SlotVector newSlots) {
+                                   sbe::value::SlotVector& newSlots) {
             if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
                 auto idx = ensureSlotInBuffer(varExpr->getSlotId());
                 return makeVariable(newSlots[idx]);
@@ -3833,14 +3846,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                   << "' argument",
                     it != argExprs.end());
             auto sortByExpr = it->second->clone();
-            auto frameFirstInput =
-                getModifiedExpr(inputExpr->clone(), windows.back().frameFirstSlots);
-            auto frameLastInput =
-                getModifiedExpr(inputExpr->clone(), windows.back().frameLastSlots);
-            auto frameFirstSortBy =
-                getModifiedExpr(sortByExpr->clone(), windows.back().frameFirstSlots);
-            auto frameLastSortBy =
-                getModifiedExpr(sortByExpr->clone(), windows.back().frameLastSlots);
+
+            auto& frameFirstSlots =
+                windowFrameFirstSlots[*windowFrameFirstSlotIdx[windows.size() - 1]];
+            auto& frameLastSlots =
+                windowFrameLastSlots[*windowFrameLastSlotIdx[windows.size() - 1]];
+            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
+            auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
+            auto frameFirstSortBy = getModifiedExpr(sortByExpr->clone(), frameFirstSlots);
+            auto frameLastSortBy = getModifiedExpr(sortByExpr->clone(), frameLastSlots);
             finalArgExprs.emplace(AccArgs::kUnit, std::move(unit));
             finalArgExprs.emplace(AccArgs::kDerivativeInputFirst, std::move(frameFirstInput));
             finalArgExprs.emplace(AccArgs::kDerivativeInputLast, std::move(frameLastInput));
@@ -3896,6 +3910,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto finalSlot = _slotIdGenerator.generate();
         windowFinalProjects.emplace_back(finalSlot, std::move(finalExpr));
         windowFinalSlots.push_back(finalSlot);
+    }
+
+    // Assign frame first/last slots to window definitions.
+    for (size_t windowIdx = 0; windowIdx < windows.size(); ++windowIdx) {
+        if (windowFrameFirstSlotIdx[windowIdx]) {
+            windows[windowIdx].frameFirstSlots =
+                std::move(windowFrameFirstSlots[*windowFrameFirstSlotIdx[windowIdx]]);
+        }
+        if (windowFrameLastSlotIdx[windowIdx]) {
+            windows[windowIdx].frameLastSlots =
+                std::move(windowFrameLastSlots[*windowFrameLastSlotIdx[windowIdx]]);
+        }
     }
 
     // Calculate sliding window.
