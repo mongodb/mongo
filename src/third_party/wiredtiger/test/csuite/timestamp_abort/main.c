@@ -1677,7 +1677,7 @@ main(int argc, char *argv[])
     struct sigaction sa;
     WT_LAZY_FS lazyfs;
     pid_t pid;
-    uint32_t iteration, num_iterations, rand_value, timeout;
+    uint32_t iteration, num_iterations, rand_value, timeout, tmp;
     int ch, status, ret;
     char buf[PATH_MAX], bucket[512];
     char cwd_start[PATH_MAX]; /* The working directory when we started */
@@ -1707,6 +1707,7 @@ main(int argc, char *argv[])
     rand_th = rand_time = true;
     ret = 0;
     timeout = MIN_TIME;
+    tmp = 0;
     use_backups = false;
     use_lazyfs = lazyfs_is_implicitly_enabled();
     use_ts = true;
@@ -1861,6 +1862,14 @@ main(int argc, char *argv[])
 
             if (num_iterations > 1)
                 printf("\n=== Iteration %" PRIu32 "/%" PRIu32 "\n", iteration, num_iterations);
+
+            /*
+             * Advance the random number generators, so that child process created in the loop would
+             * not all start with the same random state. Note that we cannot simply use (void) to
+             * ignore the return value, because that generates compiler warnings.
+             */
+            tmp ^= __wt_random(&opts->data_rnd);
+            tmp ^= __wt_random(&opts->extra_rnd);
 
             /*
              * Fork a child to insert as many items. We will then randomly kill the child, run
