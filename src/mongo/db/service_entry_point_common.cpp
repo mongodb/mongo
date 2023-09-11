@@ -2498,9 +2498,10 @@ void logHandleRequestFailure(const Status& status) {
     LOGV2_INFO(4879802, "Failed to handle request", "error"_attr = redact(status));
 }
 
-void onHandleRequestException(const HandleRequest& hr, const Status& status) {
+void onHandleRequestException(const std::shared_ptr<HandleRequest::ExecutionContext>& context,
+                              const Status& status) {
     auto isMirrorOp = [&] {
-        const auto& obj = hr.executionContext->getRequest().body;
+        const auto& obj = context->getRequest().body;
         if (auto e = obj.getField("mirrored"); MONGO_unlikely(e.ok() && e.boolean()))
             return true;
         return false;
@@ -2523,8 +2524,9 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
     auto opRunner = hr.makeOpRunner();
     invariant(opRunner);
 
+    auto execContext = hr.executionContext;
     return opRunner->run()
-        .then([&hr](DbResponse response) mutable {
+        .then([hr = std::move(hr)](DbResponse response) mutable {
             hr.completeOperation(response);
 
             auto opCtx = hr.executionContext->getOpCtx();
@@ -2539,7 +2541,9 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
 
             return response;
         })
-        .tapError([hr = std::move(hr)](Status status) { onHandleRequestException(hr, status); });
+        .tapError([execContext = std::move(execContext)](Status status) {
+            onHandleRequestException(execContext, status);
+        });
 } catch (const DBException& ex) {
     auto status = ex.toStatus();
     logHandleRequestFailure(status);
