@@ -30,17 +30,38 @@ import os, queue, random, shutil, threading, time, wiredtiger, wttest
 from helper import compare_tables
 
 class checkpoint_thread(threading.Thread):
-    def __init__(self, conn, done):
+    def __init__(self, conn, done, **kwargs):
+        """
+        Keyword Args:
+            checkpoint_count_max (int): Maximum number of checkpoints to initiate. Must be greater
+                than zero. Thread will exit if done is signalled, or maximum number of checkpoints
+                is reached.
+        """
         self.conn = conn
         self.done = done
+        self.checkpoint_count = 0
+        
+        if "checkpoint_count_max" in kwargs:
+            count_max = int(kwargs["checkpoint_count_max"])
+            if count_max <= 0:
+                raise ValueError("checkpoint_count_max must be a positive integer")
+            self._max_count = count_max
+        else:
+            # Infinite checkpoints: run until signalled.
+            self._max_count = 0
+
         threading.Thread.__init__(self)
+
+    def reached_max_count(self):
+        return self._max_count > 0 and self.checkpoint_count >= self._max_count
 
     def run(self):
         sess = self.conn.open_session()
-        while not self.done.is_set():
+        while not self.done.is_set() and not self.reached_max_count():
             # Sleep for 10 milliseconds.
             time.sleep(0.001)
             sess.checkpoint()
+            self.checkpoint_count += 1
         sess.close()
 
 class named_checkpoint_thread(threading.Thread):
