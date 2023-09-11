@@ -75,6 +75,8 @@ void FeatureFlagTest::setUp() {
     _featureFlagSpoon = getServerParameter("featureFlagSpoon");
     ASSERT_OK(_featureFlagSpoon->setFromString("true", boost::none));
 
+    _featureFlagFork = getServerParameter("featureFlagFork");
+
     ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == true);
     ASSERT(feature_flags::gFeatureFlagSpoon.isEnabledAndIgnoreFCVUnsafe() == true);
 
@@ -122,12 +124,12 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
         _featureFlagBlender->append(nullptr, &builder, "blender", boost::none);
 
-        ASSERT_BSONOBJ_EQ(
-            builder.obj(),
-            // (Generic FCV reference): feature flag test.
-            BSON("blender" << BSON("value"
-                                   << true << "version"
-                                   << multiversion::toString(multiversion::GenericFCV::kLatest))));
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          // (Generic FCV reference): feature flag test.
+                          BSON("blender" << BSON("value" << true << "version"
+                                                         << multiversion::toString(
+                                                                multiversion::GenericFCV::kLatest)
+                                                         << "shouldBeFCVGated" << true)));
     }
 
     {
@@ -138,7 +140,36 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
         _featureFlagBlender->append(nullptr, &builder, "blender", boost::none);
 
-        ASSERT_BSONOBJ_EQ(builder.obj(), BSON("blender" << BSON("value" << false)));
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          BSON("blender" << BSON("value" << false << "shouldBeFCVGated" << true)));
+    }
+
+    {
+        ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
+        ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == true);
+
+        BSONObjBuilder builder;
+
+        _featureFlagFork->append(nullptr, &builder, "fork", boost::none);
+
+        // (Generic FCV reference): feature flag test
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            BSON("fork" << BSON("value" << true << "version"
+                                        << multiversion::toString(multiversion::GenericFCV::kLatest)
+                                        << "shouldBeFCVGated" << false)));
+    }
+
+    {
+        ASSERT_OK(_featureFlagFork->setFromString("false", boost::none));
+        ASSERT(feature_flags::gFeatureFlagFork.isEnabledAndIgnoreFCVUnsafe() == false);
+
+        BSONObjBuilder builder;
+
+        _featureFlagFork->append(nullptr, &builder, "fork", boost::none);
+
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          BSON("fork" << BSON("value" << false << "shouldBeFCVGated" << false)));
     }
 }
 
@@ -217,6 +248,8 @@ TEST_F(FeatureFlagTest, ShouldBeFCVGatedFalse) {
     // Test that feature flag that is enabled and not FCV gated will return true for isEnabled.
     // Test newest version
     // (Generic FCV reference): feature flag test
+    ASSERT_OK(_featureFlagFork->setFromString("true", boost::none));
+
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
 
     ASSERT_TRUE(feature_flags::gFeatureFlagFork.isEnabled(serverGlobalParams.featureCompatibility));

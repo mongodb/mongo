@@ -36,12 +36,7 @@ export var TimeseriesTest = class {
      * TODO SERVER-70605 remove this helper.
      */
     static timeseriesAlwaysUseCompressedBucketsEnabled(conn) {
-        // TODO SERVER-79460: Clean this up so the ignoreFCV option does not need to be explicitly
-        // specified.
-        return FeatureFlagUtil.isPresentAndEnabled(conn,
-                                                   "TimeseriesAlwaysUseCompressedBuckets",
-                                                   /*user=*/ undefined,
-                                                   /*ignoreFCV=*/ true);
+        return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesAlwaysUseCompressedBuckets");
     }
 
     // TODO SERVER-68058 remove this helper.

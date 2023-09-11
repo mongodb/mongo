@@ -63,6 +63,8 @@ public:
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version.
+     * If the functionality of this function changes, make sure that the
+     * isEnabled/isPresentAndEnabled functions in feature_flag_util.js also incorporate the change.
      */
     bool isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const;
 

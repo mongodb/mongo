@@ -66,6 +66,8 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFC
     }
 }
 
+// If the functionality of this function changes, make sure that the isEnabled/isPresentAndEnabled
+// functions in feature_flag_util.js also incorporate the change.
 bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const {
     // If the feature flag is not FCV gated, return whether it is enabled.
     if (!_shouldBeFCVGated) {
@@ -167,6 +169,8 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
                        FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
                            _storage.getVersion()));
         }
+
+        sub.append("shouldBeFCVGated", _storage._shouldBeFCVGated);
     }
 }
 

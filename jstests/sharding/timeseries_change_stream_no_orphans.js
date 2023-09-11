@@ -147,10 +147,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 
     // If we are always using compressed buckets for time-series writes, we must de-compress the
     // bucket to inspect its contents.
-    if (FeatureFlagUtil.isPresentAndEnabled(db,
-                                            "TimeseriesAlwaysUseCompressedBuckets",
-                                            /*user=*/ undefined,
-                                            /*ignoreFCV=*/ true)) {  // TODO SERVER-79460
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
         TimeseriesTest.decompressBucket(actualBucket);
     }
 
@@ -193,10 +190,7 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 
     // If we are always using compressed buckets for time-series writes, we must de-compress the
     // bucket to inspect its contents.
-    if (FeatureFlagUtil.isPresentAndEnabled(db,
-                                            "TimeseriesAlwaysUseCompressedBuckets",
-                                            /*user=*/ undefined,
-                                            /*ignoreFCV=*/ true)) {  // TODO SERVER-79460
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
         TimeseriesTest.decompressBucket(shard0Bucket);
     }
 
