@@ -29,6 +29,7 @@
 
 #include <boost/none.hpp>
 #include <cstdint>
+#include <fmt/format.h>
 #include <functional>
 #include <initializer_list>
 
@@ -59,10 +60,8 @@
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
@@ -71,10 +70,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
+
+using service_context_test::RoleOverride;
+using service_context_test::ServerRoleIndex;
 
 TEST(Commands, appendCommandStatusOK) {
     BSONObjBuilder actualResult;
@@ -413,7 +415,7 @@ MONGO_REGISTER_COMMAND(UnauthorizedCommand);
 
 class TypedCommandTest : public ServiceContextMongoDTest {
 public:
-    void setUp() {
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         // Set up the auth subsystem to authorize the command.
@@ -432,6 +434,7 @@ public:
 
         _session = _transportLayer.createSession();
         _client = getServiceContext()->makeClient("testClient", _session);
+        _registry = getCommandRegistry(_client->getService());
         RestrictionEnvironment::set(
             _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _authzSession = AuthorizationSession::get(_client.get());
@@ -462,7 +465,7 @@ public:
 
     template <typename ConcreteCommand>
     auto& fetchCommandAs(StringData name) {
-        return *dynamic_cast<ConcreteCommand*>(globalCommandRegistry()->findCommand(name));
+        return *dynamic_cast<ConcreteCommand*>(_registry->findCommand(name));
     }
 
     auto& throwsStatusCommand() {
@@ -533,6 +536,7 @@ protected:
     std::shared_ptr<transport::Session> _session;
     ServiceContext::UniqueClient _client;
     AuthorizationSession* _authzSession;
+    CommandRegistry* _registry;
 };
 
 const UserName kVarunTest("varun", "test");
@@ -659,56 +663,196 @@ TEST_F(TypedCommandTest, runThrowAuthzSessionExpired) {
     });
 }
 
-class CommandConstructionPlanTest : public unittest::Test {
+/** Support the tests' need to make "throwaway" command registrations. */
+template <int n>
+class TrivialNopCommand : public BasicCommand {
+    static int nextSerial() {
+        static int serial = 0;
+        return ++serial;
+    }
+
+    static std::string makeName() {
+        return "trivialNopCommand_{}_{}"_format(n, nextSerial());
+    }
+
 public:
-    template <int n>
-    class TrivialNopCommand : public BasicCommand {
-    public:
-        TrivialNopCommand() : BasicCommand{std::to_string(n)} {}
-        bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
-            return true;
-        }
-        AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-            return AllowedOnSecondary::kAlways;
-        }
-        bool supportsWriteConcern(const BSONObj&) const override {
-            return true;
-        }
-        Status checkAuthForOperation(OperationContext*,
-                                     const DatabaseName&,
-                                     const BSONObj&) const override {
-            return Status::OK();
-        }
-    };
+    TrivialNopCommand() : BasicCommand{makeName()} {}
+    bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) override {
+        return true;
+    }
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    bool supportsWriteConcern(const BSONObj&) const override {
+        return true;
+    }
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
 };
 
-TEST_F(CommandConstructionPlanTest, EntriesShowUp) {
-    CommandConstructionPlan plan;
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<100>>().setPlan(&plan);
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<101>>().setPlan(&plan);
-    std::set<const std::type_info*> actual;
+using TypeInfoSet = std::set<const std::type_info*>;
+
+TypeInfoSet getPlanEntryTypes(CommandConstructionPlan& plan) {
+    TypeInfoSet res;
     for (const auto& e : plan.entries())
-        ASSERT_TRUE(actual.insert(e->typeInfo).second);
-    ASSERT_EQ(actual,
-              (std::set{
-                  &typeid(TrivialNopCommand<100>),
-                  &typeid(TrivialNopCommand<101>),
-              }));
+        ASSERT_TRUE(res.insert(e->typeInfo).second);
+    return res;
 }
 
-TEST_F(CommandConstructionPlanTest, ExecutePlan) {
+TypeInfoSet getCommandTypes(const CommandRegistry& reg) {
+    TypeInfoSet res;
+    reg.forEachCommand([&](Command* cmd) { ASSERT_TRUE(res.insert(&typeid(*cmd)).second); });
+    return res;
+}
+
+class CommandConstructionPlanTest : public unittest::Test {
+public:
+    /**
+     * Populates `plan` with `count` registrations of generated Command types.
+     * Returns a set of the typeids of the Commands that were registered, which
+     * tests can use to make expectations.
+     */
+    template <size_t count>
+    TypeInfoSet registerSomeUniqueNops(CommandConstructionPlan& plan) {
+        TypeInfoSet typesAdded;
+        auto populateOneCommand = [&]<typename Cmd>(std::type_identity<Cmd>) {
+            *CommandConstructionPlan::EntryBuilder::make<Cmd>().setPlan(&plan);
+            typesAdded.insert(&typeid(Cmd));
+        };
+        [&]<int... i>(std::integer_sequence<int, i...>) {
+            (populateOneCommand(std::type_identity<TrivialNopCommand<i>>{}), ...);
+        }
+        (std::make_integer_sequence<int, count>{});
+        return typesAdded;
+    }
+};
+
+TEST_F(CommandConstructionPlanTest, BuildPlan) {
     CommandConstructionPlan plan;
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<200>>().setPlan(&plan);
-    *CommandConstructionPlan::EntryBuilder::make<TrivialNopCommand<201>>().setPlan(&plan);
+    auto fullSet = registerSomeUniqueNops<2>(plan);
+    ASSERT_EQ(getPlanEntryTypes(plan), fullSet);
+}
+
+TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateTrue) {
+    CommandConstructionPlan plan;
+    auto fullSet = registerSomeUniqueNops<2>(plan);
     CommandRegistry reg;
-    { plan.execute(&reg); }
-    std::set<const std::type_info*> actual;
-    reg.forEachCommand([&](Command* cmd) { ASSERT_TRUE(actual.insert(&typeid(*cmd)).second); });
-    ASSERT_EQ(actual,
-              (std::set{
-                  &typeid(TrivialNopCommand<200>),
-                  &typeid(TrivialNopCommand<201>),
-              }));
+    plan.execute(&reg, [](auto&&) { return true; });
+    ASSERT_EQ(getCommandTypes(reg), fullSet);
+}
+
+TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateFalse) {
+    CommandConstructionPlan plan;
+    auto fullSet = registerSomeUniqueNops<2>(plan);
+    CommandRegistry reg;
+    plan.execute(&reg, [](auto&&) { return false; });
+    ASSERT_EQ(getCommandTypes(reg), TypeInfoSet{});
+}
+
+/** Create a ServiceContext for each supported ClusterRole mask. */
+class BasicCommandRegistryTest : public ServiceContextMongoDTest {
+public:
+    struct ExecutePlanForServiceResult {
+        TypeInfoSet fullSet;
+        TypeInfoSet commandTypes;
+    };
+
+    virtual ClusterRole serverRole() const = 0;
+
+    TypeInfoSet initPlan(CommandConstructionPlan& plan) {
+        TypeInfoSet typesAdded;
+        // Populate plan with a few commands, each configured for `serverRole()`.
+        auto populateOneCommand = [&]<typename Cmd>(std::type_identity<Cmd>) {
+            *CommandConstructionPlan::EntryBuilder::make<Cmd>().roles(serverRole()).setPlan(&plan);
+            typesAdded.insert(&typeid(Cmd));
+        };
+        [&]<int... i>(std::integer_sequence<int, i...>) {
+            (populateOneCommand(std::type_identity<TrivialNopCommand<i>>{}), ...);
+        }
+        (std::make_integer_sequence<int, 3>{});
+        return typesAdded;
+    }
+
+    TypeInfoSet getCommandsForRole(const CommandConstructionPlan& plan, ClusterRole role) {
+        Service* service = getServiceContext()->getService(role);
+        if (!service)
+            return {};
+        invariant(service->role().hasExclusively(role));
+        CommandRegistry reg;
+        plan.execute(&reg, service);
+        return getCommandTypes(reg);
+    }
+
+    ExecutePlanForServiceResult testExecutePlanForService(ClusterRole sourceServiceRole) {
+        ExecutePlanForServiceResult result;
+        CommandConstructionPlan plan;
+        result.fullSet = initPlan(plan);
+        result.commandTypes = getCommandsForRole(plan, sourceServiceRole);
+        return result;
+    }
+};
+
+/**
+ * Because ServiceContextTestSetup is a virtual base, its constructor happens
+ * before an ordinary generated test class constructor can intervene.
+ * To get ahead of it, we virtually inherit a `RoleOverride` to run first.
+ */
+template <ServerRoleIndex roleIndex>
+class CommandRegistryTest : public virtual RoleOverride<roleIndex>,
+                            public BasicCommandRegistryTest {
+public:
+    ClusterRole serverRole() const override {
+        return getClusterRole(roleIndex);
+    }
+};
+
+using ShardCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;
+
+TEST_F(ShardCommandRegistryTest, ServicesInit) {
+    auto sc = getGlobalServiceContext();
+    ASSERT(sc->getService(ClusterRole::ShardServer));
+    ASSERT(!sc->getService(ClusterRole::RouterServer));
+}
+
+TEST_F(ShardCommandRegistryTest, ExecutePlanForService) {
+    auto result = testExecutePlanForService(ClusterRole::ShardServer);
+    ASSERT_EQ(result.commandTypes, result.fullSet);
+}
+
+using RouterCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::router>;
+
+TEST_F(RouterCommandRegistryTest, ServicesInit) {
+    auto sc = getGlobalServiceContext();
+    ASSERT(!sc->getService(ClusterRole::ShardServer));
+    ASSERT(sc->getService(ClusterRole::RouterServer));
+}
+
+TEST_F(RouterCommandRegistryTest, ExecutePlanForService) {
+    auto result = testExecutePlanForService(ClusterRole::RouterServer);
+    ASSERT_EQ(result.commandTypes, result.fullSet);
+}
+
+using ShardRouterCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shardRouter>;
+
+TEST_F(ShardRouterCommandRegistryTest, ServicesInit) {
+    auto sc = getGlobalServiceContext();
+    ASSERT(sc->getService(ClusterRole::ShardServer));
+    ASSERT(sc->getService(ClusterRole::RouterServer));
+}
+
+TEST_F(ShardRouterCommandRegistryTest, ShardExecutePlanForService) {
+    // The shard side of the shard+router ServiceContext.
+    auto result = testExecutePlanForService(ClusterRole::ShardServer);
+    ASSERT_EQ(result.commandTypes, result.fullSet);
+}
+
+TEST_F(ShardRouterCommandRegistryTest, RouterExecutePlanForService) {
+    // The router side of the shard+router ServiceContext.
+    auto result = testExecutePlanForService(ClusterRole::RouterServer);
+    ASSERT_EQ(result.commandTypes, result.fullSet);
 }
 
 }  // namespace

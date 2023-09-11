@@ -658,10 +658,18 @@ public:
 
     LockedClient getLockedClient(OperationId id);
 
-    /** Transitional. There's only one service for now. */
-    Service* getService() const {
-        return _service.get();
-    }
+    /** The `role` must be ShardServer or RouterServer exactly. */
+    Service* getService(ClusterRole role) const;
+
+    /**
+     * Returns the shard service if it exists.
+     * Otherwise, returns the router service.
+     *
+     * Gets the "main service" of this ServiceContext. Used when a caller needs
+     * some Service (e.g. to call `makeClient`), but it doesn't matter which
+     * Service they get.
+     */
+    Service* getService() const;
 
 private:
     /**
@@ -732,6 +740,8 @@ private:
     private:
         std::unique_ptr<ClientObserver> _observer;
     };
+
+    struct ServiceSet;
 
     /**
      * Removes the operation from its client and the `_clientByOperationId` of its service context.
@@ -820,8 +830,7 @@ private:
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;
 
-    // There's only one for now!
-    std::unique_ptr<Service> _service;
+    std::unique_ptr<ServiceSet> _serviceSet;
 };
 
 /**
@@ -838,11 +847,15 @@ private:
  */
 class Service : public Decorable<Service> {
 public:
-    explicit Service(ServiceContext* sc) : _sc{sc} {}
+    Service(ServiceContext* sc, ClusterRole role) : _sc{sc}, _role{role} {}
 
     ServiceContext::UniqueClient makeClient(std::string desc,
                                             std::shared_ptr<transport::Session> session = nullptr) {
         return _sc->makeClientForService(std::move(desc), std::move(session), this);
+    }
+
+    ClusterRole role() const {
+        return _role;
     }
 
     ServiceContext* getServiceContext() const {
@@ -851,6 +864,7 @@ public:
 
 private:
     ServiceContext* _sc;
+    ClusterRole _role;
 };
 
 /**

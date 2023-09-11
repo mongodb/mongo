@@ -32,10 +32,44 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace service_context_test {
+
+/**
+ * "Literal" and "structural" type to stand-in for a `ClusterRole` value.
+ * Necessary until `ClusterRole` can be used as a NTTP.
+ */
+enum class ServerRoleIndex { shard, router, shardRouter };
+
+inline ClusterRole getClusterRole(ServerRoleIndex i) {
+    switch (i) {
+        case ServerRoleIndex::shard:
+            return ClusterRole::ShardServer;
+        case ServerRoleIndex::router:
+            return ClusterRole::RouterServer;
+        case ServerRoleIndex::shardRouter:
+            return {ClusterRole::ShardServer, ClusterRole::RouterServer};
+    }
+    MONGO_UNREACHABLE;
+}
+
+/**
+ * Virtual base for tests that need to set SC role before the
+ * ServiceContextTest constructor. Necessary since ServiceContextTest
+ * is often a virtual base and those run before all non-virtual bases.
+ */
+template <ServerRoleIndex roleIndex>
+class RoleOverride {
+public:
+    ~RoleOverride() {
+        serverGlobalParams.clusterRole = _saved;
+    }
+
+private:
+    ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, getClusterRole(roleIndex))};
+};
 
 class ScopedGlobalServiceContextForTest {
 public:
@@ -44,6 +78,8 @@ public:
      * Must not be called before setUp or after tearDown.
      */
     ServiceContext* getServiceContext();
+
+    Service* getService();
 
 protected:
     ScopedGlobalServiceContextForTest();
@@ -66,10 +102,14 @@ public:
 
 protected:
     ServiceContextTest();
-    virtual ~ServiceContextTest();
+    ~ServiceContextTest() override;
 
 private:
     ThreadClient _threadClient;
 };
+}  // namespace service_context_test
+
+using service_context_test::ScopedGlobalServiceContextForTest;
+using service_context_test::ServiceContextTest;
 
 }  // namespace mongo

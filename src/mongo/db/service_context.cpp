@@ -44,6 +44,7 @@
 #include "mongo/db/default_baton.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -105,12 +106,43 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
     globalServiceContext = serviceContext.release();
 }
 
+/**
+ * The global clusterRole determines which services are initialized.
+ * If no role is set, then ShardServer is assumed, so there's always
+ * at least one Service created.
+ */
+struct ServiceContext::ServiceSet {
+public:
+    explicit ServiceSet(ServiceContext* sc) {
+        auto role = serverGlobalParams.clusterRole;
+        if (!role.has(ClusterRole::RouterServer))
+            role += ClusterRole::ShardServer;
+        if (role.has(ClusterRole::RouterServer))
+            _router = std::make_unique<Service>(sc, ClusterRole::RouterServer);
+        if (role.has(ClusterRole::ShardServer))
+            _shard = std::make_unique<Service>(sc, ClusterRole::ShardServer);
+    }
+
+    /** The `role` here must be ShardServer or RouterServer exactly. */
+    Service* getService(ClusterRole role) {
+        if (role.hasExclusively(ClusterRole::ShardServer))
+            return _shard.get();
+        if (role.hasExclusively(ClusterRole::RouterServer))
+            return _router.get();
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    std::unique_ptr<Service> _shard;
+    std::unique_ptr<Service> _router;
+};
+
 ServiceContext::ServiceContext()
     : _opIdRegistry(UniqueOperationIdRegistry::create()),
       _tickSource(makeSystemTickSource()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
       _preciseClockSource(std::make_unique<SystemClockSource>()),
-      _service(std::make_unique<Service>(this)) {}
+      _serviceSet(std::make_unique<ServiceSet>(this)) {}
 
 
 ServiceContext::~ServiceContext() {
@@ -123,6 +155,17 @@ ServiceContext::~ServiceContext() {
                     "serviceContext"_attr = reinterpret_cast<uint64_t>(this));
     }
     invariant(_clients.empty());
+}
+
+Service* ServiceContext::getService(ClusterRole role) const {
+    return _serviceSet->getService(role);
+}
+
+Service* ServiceContext::getService() const {
+    for (auto role : {ClusterRole::ShardServer, ClusterRole::RouterServer})
+        if (auto p = getService(role))
+            return p;
+    MONGO_UNREACHABLE;
 }
 
 namespace {

@@ -29,8 +29,14 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <initializer_list>
+#include <ostream>
+#include <sstream>
+#include <string>
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
@@ -83,5 +89,30 @@ public:
 private:
     uint8_t _roleMask;
 };
+
+inline std::ostream& operator<<(std::ostream& os, ClusterRole r) {
+    static const std::array<std::pair<ClusterRole, StringData>, 3> bitNames{{
+        {ClusterRole::ShardServer, "shard"_sd},
+        {ClusterRole::ConfigServer, "config"_sd},
+        {ClusterRole::RouterServer, "router"_sd},
+    }};
+
+    StringData sep;
+    os << "ClusterRole{";
+    for (auto&& [key, name] : bitNames) {
+        if (r.has(key)) {
+            os << sep << name;
+            sep = "|";
+        }
+    }
+    os << "}";
+    return os;
+}
+
+inline std::string toString(ClusterRole r) {
+    std::ostringstream os;
+    os << r;
+    return os.str();
+}
 
 }  // namespace mongo

@@ -50,6 +50,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/error_labels.h"
@@ -1074,6 +1075,33 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 
 //////////////////////////////////////////////////////////////
 // CommandRegistry
+namespace {
+CommandRegistry initRegistryForRole(ClusterRole role) {
+    CommandRegistry reg;
+    globalCommandConstructionPlan().execute(&reg, [&](const CommandConstructionPlan::Entry& e) {
+        // Transitional: all commands are in both registries unless otherwise
+        // qualified. After assigning a role to every Command, we can
+        // remove this complication.
+        ClusterRole roleMaskFallback{ClusterRole::ShardServer, ClusterRole::RouterServer};
+        ClusterRole roleMask = e.roles.value_or(roleMaskFallback);
+        return roleMask.has(role);
+    });
+    return reg;
+}
+}  // namespace
+
+CommandRegistry* getCommandRegistry(Service* service) {
+    auto role = service->role();
+    if (role.hasExclusively(ClusterRole::ShardServer)) {
+        static StaticImmortal obj = initRegistryForRole(role);
+        return &*obj;
+    }
+    if (role.hasExclusively(ClusterRole::RouterServer)) {
+        static StaticImmortal obj = initRegistryForRole(role);
+        return &*obj;
+    }
+    MONGO_UNREACHABLE;  // Service role has to be exclusively Shard or Router.
+}
 
 void CommandRegistry::registerCommand(Command* command) {
     StringData name = command->getName();
@@ -1105,48 +1133,42 @@ void CommandRegistry::incrementUnknownCommands() {
     unknowns.increment();
 }
 
-CommandRegistry* globalCommandRegistry() {
-    static StaticImmortal<CommandRegistry> obj{};
-    return &*obj;
-}
-
 CommandConstructionPlan& globalCommandConstructionPlan() {
     static StaticImmortal<CommandConstructionPlan> obj{};
     return *obj;
 }
 
-void CommandConstructionPlan::execute(CommandRegistry* registry) const {
-    LOGV2_DEBUG(7897601, 3, "Constructing Command objects from specs");
+void CommandConstructionPlan::execute(CommandRegistry* registry,
+                                      const std::function<bool(const Entry&)>& pred) const {
+    LOGV2_DEBUG(8043400, 3, "Constructing Command objects from specs");
     for (auto&& entry : entries()) {
         auto type = demangleName(*entry->typeInfo);
         if (entry->testOnly && !getTestCommandsEnabled()) {
-            LOGV2_DEBUG(7897603, 3, "Skipping test-only command", "type"_attr = type);
+            LOGV2_DEBUG(8043401, 3, "Skipping test-only command", "type"_attr = type);
             continue;
         }
         if (entry->featureFlag && !entry->featureFlag->isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            LOGV2_DEBUG(7897604, 3, "Skipping FeatureFlag gated command", "type"_attr = type);
+            LOGV2_DEBUG(8043402, 3, "Skipping FeatureFlag gated command", "type"_attr = type);
+            continue;
+        }
+        if (!pred(*entry)) {
+            LOGV2_DEBUG(8043403, 3, "Skipping command for failed predicate", "type"_attr = type);
             continue;
         }
         auto c = entry->construct();
-        LOGV2_DEBUG(7897602, 3, "Created", "command"_attr = c->getName(), "type"_attr = type);
+        LOGV2_DEBUG(8043404, 3, "Created", "command"_attr = c->getName(), "type"_attr = type);
         registry->registerCommand(&*c);
 
         // In the future, we should get to the point where the registry owns the
         // command object. But we aren't there yet and they have to be leaked,
         // So we at least do it as an explicit choice here.
-        // After selfRegister is removed, a CommandRegistry can own its commands.
         static StaticImmortal leakedCommands = std::vector<std::unique_ptr<Command>>{};
         leakedCommands->push_back(std::move(c));
     }
 }
 
-/**
- * Activates the command construction plan, constructing Commands as
- * appropriate.  In the near future, this will be part of the setup of each
- * CommandRegistry object instead of a MONGO_INITIALIZER.
- */
-MONGO_INITIALIZER(CreateAllSpecifiedCommands)(InitializerContext*) {
-    globalCommandConstructionPlan().execute(globalCommandRegistry());
+void CommandConstructionPlan::execute(CommandRegistry* registry, Service* service) const {
+    execute(registry, [r = service->role()](const auto& e) { return !e.roles || e.roles->has(r); });
 }
 
 }  // namespace mongo

@@ -60,8 +60,17 @@ ServiceContext* ScopedGlobalServiceContextForTest::getServiceContext() {
     return getGlobalServiceContext();
 }
 
+Service* ScopedGlobalServiceContextForTest::getService() {
+    auto sc = getServiceContext();
+    // Just pick any service. Giving priority to Shard.
+    if (auto srv = sc->getService(ClusterRole::ShardServer))
+        return srv;
+    if (auto srv = sc->getService(ClusterRole::RouterServer))
+        return srv;
+    MONGO_UNREACHABLE;
+}
 
-ServiceContextTest::ServiceContextTest() : _threadClient(getServiceContext()) {}
+ServiceContextTest::ServiceContextTest() : _threadClient{getService()} {}
 
 ServiceContextTest::~ServiceContextTest() = default;
 
