@@ -46,6 +46,7 @@ struct Transaction;
 struct OptionsList {
     OptionsList() = default;
     OptionsList(const OptionsList &other);
+    ~OptionsList() = default;
 
     void add_int(const std::string& name, int default_value, const std::string& desc);
     void add_bool(const std::string& name, bool default_value, const std::string& desc);

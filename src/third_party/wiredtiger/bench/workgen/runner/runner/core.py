@@ -290,8 +290,8 @@ def op_multi_table(ops_arg, tables, range_partition = False):
         ops = op_append(ops, op)
     return ops
 
-# should be 8 bytes format 'Q'
-_logkey = Key(Key.KEYGEN_APPEND, 8)
+# should be 8 bytes format 'Q', but for 'S' it needs to be larger for workgen tests
+_logkey = Key(Key.KEYGEN_APPEND, 12)
 def _op_log_op(op, log_table):
     keysize = op._key._size
     if keysize == 0:

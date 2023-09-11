@@ -78,8 +78,7 @@ from workgen import *
 import time
 
 context = Context()
-#FIXME - WT-10494 Update the cache_size to 1GB after fixing this ticket.
-conn_config =   "cache_size=2G,checkpoint=(wait=60,log_size=2GB),\
+conn_config =   "cache_size=1G,checkpoint=(wait=60,log_size=2GB),\
                 eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=800,\
                 debug_mode=(table_logging=true),\
                 eviction_target=60,statistics=(fast),statistics_log=(wait=1,json)"# explicitly added
@@ -98,8 +97,7 @@ for i in range(0, table_count):
     table = Table(tname)
     s.create(tname, wtperf_table_config +\
              compress_table_config + table_config + ",log=(enabled=false)")
-    #FIXME - WT-10494 Update the key_size to 200 after fixing this ticket.
-    table.options.key_size = 2000
+    table.options.key_size = 200
     table.options.value_size = 5000
     tables.append(table)
 
@@ -189,13 +187,12 @@ logging_thread.options.session_config="isolation=snapshot"
 workload = Workload(context, 50 * thread0 + 50 * thread1 +\
                     10 * thread2 + 100 * thread3 + logging_thread)
 workload.options.report_interval=5
-#FIXME - WT-10494 Update the run_time to 500 after fixing this ticket.
 workload.options.run_time=400
 workload.options.max_latency=50000
 # oldest_timestamp_lag - Number of seconds lag to the oldest_timestamp from current time.
-workload.options.oldest_timestamp_lag=30
+workload.options.oldest_timestamp_lag=40
 # stable_timestamp_lag - Number of seconds lag to the stable_timestamp from current time.
-workload.options.stable_timestamp_lag=10
+workload.options.stable_timestamp_lag=20
 # timestamp_advance is the number of seconds to wait before moving oldest and stable timestamp.
 workload.options.timestamp_advance=1
 ret = workload.run(conn)

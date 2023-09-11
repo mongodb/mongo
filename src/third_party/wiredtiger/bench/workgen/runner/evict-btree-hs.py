@@ -157,7 +157,8 @@ logging_thread = Thread(ops)
 workload = Workload(context, 400 * thread0 + 100 * thread1 +\
                     10 * thread2 + 100 * thread3 + logging_thread)
 workload.options.report_interval=5
-workload.options.run_time=500
+# Run for 400 seconds due to the disk space requirements
+workload.options.run_time=400
 workload.options.max_latency=50000
 ret = workload.run(conn)
 assert ret == 0, ret
