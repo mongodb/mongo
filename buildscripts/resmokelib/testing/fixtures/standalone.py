@@ -334,7 +334,6 @@ class MongodLauncher(object):
         shortcut_opts = {
             "enableMajorityReadConcern": self.config.MAJORITY_READ_CONCERN,
             "storageEngine": self.config.STORAGE_ENGINE,
-            "transportLayer": self.config.TRANSPORT_LAYER,
             "wiredTigerCollectionConfigString": self.config.WT_COLL_CONFIG,
             "wiredTigerEngineConfigString": self.config.WT_ENGINE_CONFIG,
             "wiredTigerIndexConfigString": self.config.WT_INDEX_CONFIG,

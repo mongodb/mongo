@@ -1141,10 +1141,6 @@ class RunPlugin(PluginInterface):
             "--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
             help="Sets the WiredTiger index configuration setting for all mongod's.")
 
-        mongodb_server_options.add_argument("--transportLayer", dest="transport_layer",
-                                            metavar="TRANSPORT",
-                                            help="The transport layer used by jstests")
-
         mongodb_server_options.add_argument(
             "--fuzzMongodConfigs", dest="fuzz_mongod_configs",
             help="Randomly chooses mongod parameters that were not specified. Use 'stress' to fuzz "

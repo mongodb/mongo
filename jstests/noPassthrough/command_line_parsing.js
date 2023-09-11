@@ -27,7 +27,6 @@ var m2result = m2.getDB("admin").runCommand("getCmdLineOpts");
 MongoRunner.stopMongod(m2);
 
 // remove variables that depend on the way the test is started.
-delete m2result.parsed.net.transportLayer;
 delete m2result.parsed.setParameter;
 delete m2result.parsed.storage.engine;
 delete m2result.parsed.storage.inMemory;
@@ -53,7 +52,6 @@ var m3result = m3.getDB("admin").runCommand("getCmdLineOpts");
 MongoRunner.stopMongod(m3);
 
 // remove variables that depend on the way the test is started.
-delete m3result.parsed.net.transportLayer;
 delete m3result.parsed.setParameter;
 delete m3result.parsed.storage.engine;
 delete m3result.parsed.storage.inMemory;

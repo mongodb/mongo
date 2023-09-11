@@ -111,7 +111,6 @@ DEFAULTS = {
     "suite_files": "with_server",
     "tag_files": [],
     "test_files": [],
-    "transport_layer": None,
     "user_friendly_output": None,
     "mixed_bin_versions": None,
     "old_bin_version": None,
@@ -546,9 +545,6 @@ TAG_FILES = None
 
 # The test files to execute.
 TEST_FILES = None
-
-# If set, then mongod/mongos's started by resmoke.py will use the specified transport layer.
-TRANSPORT_LAYER = None
 
 # Metrics for open telemetry
 OTEL_TRACE_ID = None

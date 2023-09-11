@@ -100,12 +100,6 @@ configs:
         arg_vartype: Int
         source: yaml
         hidden: true
-    'net.transportLayer':
-        description: 'Sets the ingress transport layer implementation'
-        short_name: transportLayer
-        arg_vartype: String
-        default: asio
-        hidden: true
     'processManagement.pidFilePath':
         description: 'Full path to pidfile (if not set, no pidfile is created)'
         short_name: pidfilepath

@@ -1338,12 +1338,6 @@ function appendSetParameterArgs(argArray) {
 
         // New options in 3.5.x
         if (programMajorMinorVersion >= 350) {
-            if (jsTest.options().transportLayer) {
-                if (!argArrayContains("--transportLayer")) {
-                    argArray.push(...["--transportLayer", jsTest.options().transportLayer]);
-                }
-            }
-
             // Disable background cache refreshing to avoid races in tests
             if (!argArrayContainsSetParameterValue('disableLogicalSessionCacheRefresh=')) {
                 argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);

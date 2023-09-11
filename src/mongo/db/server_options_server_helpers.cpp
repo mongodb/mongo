@@ -346,13 +346,6 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.listenBacklog = params["net.listenBacklog"].as<int>();
     }
 
-    if (params.count("net.transportLayer")) {
-        serverGlobalParams.transportLayer = params["net.transportLayer"].as<std::string>();
-        if (serverGlobalParams.transportLayer != "asio") {
-            return {ErrorCodes::BadValue, "Unsupported value for transportLayer. Must be \"asio\""};
-        }
-    }
-
     if (params.count("security.transitionToAuth")) {
         serverGlobalParams.transitionToAuth = params["security.transitionToAuth"].as<bool>();
     }
