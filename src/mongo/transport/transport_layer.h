@@ -42,7 +42,6 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
@@ -94,8 +93,7 @@ public:
 
     friend class Session;
 
-    explicit TransportLayer(const WireSpec& wireSpec) : _wireSpec(wireSpec) {}
-
+    TransportLayer() = default;
     virtual ~TransportLayer() = default;
 
     virtual StatusWith<std::shared_ptr<Session>> connect(
@@ -146,10 +144,6 @@ public:
         return opCtx->getServiceContext()->makeBaton(opCtx);
     }
 
-    std::shared_ptr<const WireSpec::Specification> getWireSpec() const {
-        return _wireSpec.get();
-    }
-
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
@@ -164,9 +158,6 @@ public:
     virtual StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
     createTransientSSLContext(const TransientSSLParams& transientSSLParams) = 0;
 #endif
-
-private:
-    const WireSpec& _wireSpec;
 };
 
 class ReactorTimer {

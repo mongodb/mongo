@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
@@ -44,6 +45,7 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
     }
 
     auto serviceContext = ServiceContext::make();
+    WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
     setGlobalServiceContext(std::move(serviceContext));
 }
 

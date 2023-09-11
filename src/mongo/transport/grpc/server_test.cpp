@@ -54,7 +54,7 @@
 
 namespace mongo::transport::grpc {
 
-class ServerTest : public unittest::Test {
+class ServerTest : public CommandServiceTestFixtures {
 public:
     void runCertificateValidationTest(Server::Options options,
                                       ::grpc::StatusCode validCertResult,

@@ -68,10 +68,6 @@ namespace {
 
 ConnectionString fixtureConnectionString{};
 
-MONGO_INITIALIZER(WireSpec)(InitializerContext*) {
-    WireSpec::instance().initialize(WireSpec::Specification{});
-}
-
 }  // namespace
 
 namespace mongo {
@@ -84,12 +80,17 @@ ConnectionString getFixtureConnectionString() {
 }  // namespace unittest
 }  // namespace mongo
 
+void initializeWireSpec(ServiceContext* serviceContext) {
+    WireSpec::getWireSpec(serviceContext).initialize(WireSpec::Specification{});
+}
+
 int main(int argc, char** argv) {
     setupSynchronousSignalHandlers();
     TestingProctor::instance().setEnabled(true);
     runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setTestCommandsEnabled(true);
     auto serviceContextHolder = ServiceContext::make();
+    initializeWireSpec(serviceContextHolder.get());
     setGlobalServiceContext(std::move(serviceContextHolder));
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", "", 1));
 }

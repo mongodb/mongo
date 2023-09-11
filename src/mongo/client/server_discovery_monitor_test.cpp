@@ -47,6 +47,7 @@
 #include "mongo/client/sdam/topology_listener_mock.h"
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -85,6 +86,7 @@ protected:
      */
     void setUp() override {
         auto serviceContext = ServiceContext::make();
+        WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
         setGlobalServiceContext(std::move(serviceContext));
         ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kSdam);
         ReplicaSetMonitor::cleanup();

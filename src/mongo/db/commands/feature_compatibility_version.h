@@ -118,7 +118,7 @@ public:
      * Sets the server's outgoing and incomingInternalClient minWireVersions according to the
      * current featureCompatibilityVersion value.
      */
-    static void updateMinWireVersion();
+    static void updateMinWireVersion(OperationContext* opCtx);
 
     /**
      * Returns a scoped object, which holds the 'fcvLock' in exclusive mode for the given scope. It

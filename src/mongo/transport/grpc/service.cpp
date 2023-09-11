@@ -43,6 +43,7 @@
 #include <grpcpp/support/status_code_enum.h>
 #include <grpcpp/support/sync_stream.h>
 
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -97,8 +98,9 @@ inline Status makeShutdownTerminationStatus() {
             fmt::format("Provided wire version ({}) exceeds cluster's max wire version ({})",
                         clientWireVersion,
                         clusterMaxWireVersion));
-    } else if (auto serverMinWireVersion =
-                   WireSpec::instance().get()->incomingExternalClient.minWireVersion;
+    } else if (auto serverMinWireVersion = WireSpec::getWireSpec(getGlobalServiceContext())
+                                               .get()
+                                               ->incomingExternalClient.minWireVersion;
                clientWireVersion < serverMinWireVersion) {
         return ::grpc::Status(::grpc::StatusCode::FAILED_PRECONDITION,
                               fmt::format("Provided wire version ({}) is less than this server's "

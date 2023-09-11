@@ -53,10 +53,8 @@ GRPCTransportLayer::Options::Options(const ServerGlobalParams& params) {
     maxServerThreads = params.grpcServerMaxThreads;
 }
 
-GRPCTransportLayer::GRPCTransportLayer(ServiceContext* svcCtx,
-                                       const WireSpec& wireSpec,
-                                       Options options)
-    : TransportLayer(wireSpec), _svcCtx(svcCtx), _options(std::move(options)) {}
+GRPCTransportLayer::GRPCTransportLayer(ServiceContext* svcCtx, Options options)
+    : _svcCtx(svcCtx), _options(std::move(options)) {}
 
 Status GRPCTransportLayer::registerService(std::unique_ptr<Service> svc) try {
     stdx::lock_guard lk(_mutex);

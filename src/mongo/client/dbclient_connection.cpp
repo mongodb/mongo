@@ -214,8 +214,9 @@ executor::RemoteCommandResponse initWireVersion(
 
     conn->getCompressorManager().clientBegin(&bob);
 
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
+    if (auto& wireSpec = WireSpec::getWireSpec(getGlobalServiceContext());
+        wireSpec.get()->isInternalClient) {
+        wireSpec.appendInternalClientWireVersion(wireSpec.get()->outgoing, &bob);
     }
 
     Date_t start{Date_t::now()};
@@ -342,7 +343,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
         }
     }
 
-    auto wireSpec = WireSpec::instance().get();
+    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
     auto validateStatus =
         wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion.getValue());
     if (!validateStatus.isOK()) {

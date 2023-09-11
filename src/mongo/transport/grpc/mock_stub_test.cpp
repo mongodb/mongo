@@ -78,8 +78,9 @@ public:
                     MockClientContext ctx;
                     ctx.addMetadataEntry(
                         util::constants::kWireVersionKey.toString(),
-                        std::to_string(
-                            WireSpec::instance().get()->incomingExternalClient.maxWireVersion));
+                        std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
+                                           .get()
+                                           ->incomingExternalClient.maxWireVersion));
                     ctx.addMetadataEntry(util::constants::kAuthenticationTokenKey.toString(),
                                          "my-token");
                     auto stream = makeStream(ctx);

@@ -62,6 +62,7 @@
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
@@ -458,8 +459,9 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
     bob.append("hello", 1);
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
+    ServiceContext* sc = haveClient() ? cc().getServiceContext() : getGlobalServiceContext();
+    if (auto wireSpec = WireSpec::getWireSpec(sc); wireSpec.get()->isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(wireSpec.get()->outgoing, &bob);
     }
 
     BSONObj o;

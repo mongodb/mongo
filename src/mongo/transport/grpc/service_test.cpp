@@ -63,7 +63,7 @@
 namespace mongo::transport::grpc {
 namespace {
 
-class CommandServiceTest : public unittest::Test {
+class CommandServiceTest : public CommandServiceTestFixtures {
 public:
     using ClientContextType = ::grpc::ClientContext;
     using StubType = CommandServiceTestFixtures::Stub;

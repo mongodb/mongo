@@ -123,8 +123,8 @@ private:
         grpcOpts.maxServerThreads = grpc::CommandServiceTestFixtures::kMaxThreads;
         grpcOpts.enableEgress = true;
         grpcOpts.clientMetadata = grpc::makeClientMetadataDocument();
-        auto grpcLayer = std::make_unique<grpc::GRPCTransportLayer>(
-            getServiceContext(), WireSpec::instance(), std::move(grpcOpts));
+        auto grpcLayer =
+            std::make_unique<grpc::GRPCTransportLayer>(getServiceContext(), std::move(grpcOpts));
         uassertStatusOK(grpcLayer->registerService(std::make_unique<grpc::CommandService>(
             grpcLayer.get(),
             [&](auto session) { _serverCb(*session); },

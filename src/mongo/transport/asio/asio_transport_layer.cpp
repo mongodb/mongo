@@ -362,10 +362,8 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
 }
 
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
-                                       SessionManager* sessionManager,
-                                       const WireSpec& wireSpec)
-    : TransportLayer(wireSpec),
-      _ingressReactor(std::make_shared<AsioReactor>()),
+                                       SessionManager* sessionManager)
+    : _ingressReactor(std::make_shared<AsioReactor>()),
       _egressReactor(std::make_shared<AsioReactor>()),
       _acceptorReactor(std::make_shared<AsioReactor>()),
       _sessionManager(sessionManager),

@@ -112,12 +112,16 @@ std::string DBDirectClient::getServerAddress() const {
 
 // Returned version should match the incoming connections restrictions.
 int DBDirectClient::getMinWireVersion() {
-    return WireSpec::instance().get()->incomingExternalClient.minWireVersion;
+    return WireSpec::getWireSpec(_opCtx->getServiceContext())
+        .get()
+        ->incomingExternalClient.minWireVersion;
 }
 
 // Returned version should match the incoming connections restrictions.
 int DBDirectClient::getMaxWireVersion() {
-    return WireSpec::instance().get()->incomingExternalClient.maxWireVersion;
+    return WireSpec::getWireSpec(_opCtx->getServiceContext())
+        .get()
+        ->incomingExternalClient.maxWireVersion;
 }
 
 bool DBDirectClient::isReplicaSetMember() const {

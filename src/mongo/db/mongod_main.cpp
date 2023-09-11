@@ -379,19 +379,6 @@ void logStartup(OperationContext* opCtx) {
     wunit.commit();
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
-    // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
-    // in-memory version is unset.
-    WireSpec::Specification spec;
-    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.isInternalClient = true;
-
-    WireSpec::instance().initialize(std::move(spec));
-}
-
 void initializeCommandHooks(ServiceContext* serviceContext) {
     class MongodCommandInvocationHooks final : public CommandInvocationHooks {
     public:
@@ -1403,6 +1390,19 @@ void setUpObservers(ServiceContext* serviceContext) {
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 }
 
+void initializeWireSpec(ServiceContext* serviceContext) {
+    // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
+    // in-memory version is unset.
+    WireSpec::Specification spec;
+    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+    spec.isInternalClient = true;
+
+    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
+}
+
 #ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 (InitializerContext* context) {
@@ -1823,6 +1823,7 @@ int mongod_main(int argc, char* argv[]) {
         quickExit(ExitCode::auditRotateError);
     }
 
+    initializeWireSpec(service);
     setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);

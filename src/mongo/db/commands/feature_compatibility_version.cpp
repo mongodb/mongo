@@ -520,8 +520,8 @@ bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* o
     return true;
 }
 
-void FeatureCompatibilityVersion::updateMinWireVersion() {
-    WireSpec& wireSpec = WireSpec::instance();
+void FeatureCompatibilityVersion::updateMinWireVersion(OperationContext* opCtx) {
+    WireSpec& wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext());
     const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
     // The reason we set the minWireVersion to LATEST_WIRE_VERSION when downgrading from latest as
     // well as on upgrading to latest is because we shouldn’t decrease the minWireVersion until we
@@ -584,7 +584,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
 
     auto version = swVersion.getValue();
     serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
-    FeatureCompatibilityVersion::updateMinWireVersion();
+    FeatureCompatibilityVersion::updateMinWireVersion(opCtx);
 
     serverGlobalParams.featureCompatibility.logFCVWithContext("startup"_sd);
 

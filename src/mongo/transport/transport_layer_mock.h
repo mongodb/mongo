@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
@@ -62,8 +61,7 @@ class TransportLayerMock : public TransportLayer {
     TransportLayerMock& operator=(const TransportLayerMock&) = delete;
 
 public:
-    explicit TransportLayerMock(const WireSpec& wireSpec = WireSpec::instance())
-        : TransportLayer(wireSpec), _shutdown(false) {}
+    TransportLayerMock() = default;
     ~TransportLayerMock();
 
     std::shared_ptr<Session> createSession();
@@ -113,7 +111,7 @@ private:
         SSLPeerInfo peerInfo;
     };
     stdx::unordered_map<Session::Id, Connection> _sessions;
-    bool _shutdown;
+    bool _shutdown = false;
 };
 
 }  // namespace transport

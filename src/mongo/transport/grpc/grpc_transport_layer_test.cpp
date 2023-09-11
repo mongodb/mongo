@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/db/server_options.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
@@ -87,8 +86,7 @@ public:
     std::unique_ptr<GRPCTransportLayer> makeTL(
         CommandService::RPCHandler serverCb = makeNoopRPCHandler(),
         GRPCTransportLayer::Options options = makeTLOptions()) {
-        auto tl = std::make_unique<GRPCTransportLayer>(
-            getServiceContext(), WireSpec::instance(), std::move(options));
+        auto tl = std::make_unique<GRPCTransportLayer>(getServiceContext(), std::move(options));
         uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
             tl.get(), std::move(serverCb), std::make_unique<WireVersionProvider>())));
         return tl;
@@ -196,8 +194,7 @@ public:
 
     void setUp() override {
         GRPCTransportLayerTest::setUp();
-        _tl = std::make_unique<GRPCTransportLayer>(
-            getServiceContext(), WireSpec::instance(), makeTLOptions());
+        _tl = std::make_unique<GRPCTransportLayer>(getServiceContext(), makeTLOptions());
         uassertStatusOK(_tl->setup());
     }
 

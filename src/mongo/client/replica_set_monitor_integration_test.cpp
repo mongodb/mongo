@@ -50,6 +50,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -97,9 +98,9 @@ public:
     constexpr static Milliseconds kTimeout{5000};
 
     void resetIsInternalClient(bool isInternalClient) {
-        WireSpec::Specification newSpec = *WireSpec::instance().get();
+        WireSpec::Specification newSpec = *WireSpec::getWireSpec(getGlobalServiceContext()).get();
         newSpec.isInternalClient = isInternalClient;
-        WireSpec::instance().reset(std::move(newSpec));
+        WireSpec::getWireSpec(getGlobalServiceContext()).reset(std::move(newSpec));
     }
 
     void setUp() override {

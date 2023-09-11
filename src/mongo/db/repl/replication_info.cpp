@@ -444,7 +444,9 @@ public:
             // All incoming connections from mongod/mongos of earlier versions should be
             // closed if the featureCompatibilityVersion is bumped to 3.6.
             if (internalClient->getMaxWireVersion() >=
-                WireSpec::instance().get()->incomingInternalClient.maxWireVersion) {
+                WireSpec::getWireSpec(opCtx->getServiceContext())
+                    .get()
+                    ->incomingExternalClient.maxWireVersion) {
                 sessionTagsToSet |= transport::Session::kLatestVersionInternalClientKeepOpen;
             } else {
                 sessionTagsToUnset |= transport::Session::kLatestVersionInternalClientKeepOpen;
@@ -542,7 +544,8 @@ public:
                             opCtx->getClient()->getConnectionId());
 
 
-        if (auto wireSpec = WireSpec::instance().get(); cmd.getInternalClient()) {
+        if (auto wireSpec = WireSpec::getWireSpec(opCtx->getServiceContext()).get();
+            cmd.getInternalClient()) {
             result.append(HelloCommandReply::kMinWireVersionFieldName,
                           wireSpec->incomingInternalClient.minWireVersion);
             result.append(HelloCommandReply::kMaxWireVersionFieldName,

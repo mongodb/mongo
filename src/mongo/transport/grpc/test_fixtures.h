@@ -40,6 +40,7 @@
 #include <grpcpp/support/sync_stream.h>
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -160,7 +161,7 @@ private:
     std::shared_ptr<ClockSourceMock> _clkSource;
 };
 
-class CommandServiceTestFixtures {
+class CommandServiceTestFixtures : public ServiceContextTest {
 public:
     static constexpr auto kBindAddress = "localhost";
     static constexpr auto kBindPort = 1234;
@@ -392,9 +393,10 @@ public:
      * a superset of the required metadata for any individual RPC.
      */
     static void addRequiredClientMetadata(::grpc::ClientContext& ctx) {
-        ctx.AddMetadata(
-            util::constants::kWireVersionKey.toString(),
-            std::to_string(WireSpec::instance().get()->incomingExternalClient.maxWireVersion));
+        ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
+                        std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
+                                           .get()
+                                           ->incomingExternalClient.maxWireVersion));
         ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
     }
 

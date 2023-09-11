@@ -66,7 +66,7 @@ public:
         boost::optional<BSONObj> clientMetadata;
     };
 
-    GRPCTransportLayer(ServiceContext* svcCtx, const WireSpec& wireSpec, Options options);
+    GRPCTransportLayer(ServiceContext* svcCtx, Options options);
 
     /**
      * Add the service to the list that will be served once this transport layer has been started.

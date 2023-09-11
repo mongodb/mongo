@@ -45,8 +45,6 @@ class TransportLayerManagerTest : public unittest::Test {
 public:
     class TransportLayerMockWithConnect : public TransportLayerMock {
     public:
-        TransportLayerMockWithConnect() : TransportLayerMock(WireSpec::instance()) {}
-
         StatusWith<std::shared_ptr<Session>> connect(
             HostAndPort peer,
             ConnectSSLMode sslMode,

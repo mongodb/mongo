@@ -63,9 +63,8 @@ void TransportLayerManager::_foreach(Callable&& cb) const {
 }
 
 TransportLayerManager::TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
-                                             TransportLayer* egressLayer,
-                                             const WireSpec& wireSpec)
-    : TransportLayer(wireSpec), _tls(std::move(tls)), _egressLayer(egressLayer) {
+                                             TransportLayer* egressLayer)
+    : _tls(std::move(tls)), _egressLayer(egressLayer) {
     invariant(_egressLayer);
     invariant(find_if(_tls.begin(), _tls.end(), [&](auto& tl) {
                   return tl.get() == _egressLayer;

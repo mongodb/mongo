@@ -181,9 +181,7 @@ public:
         stdx::thread _thread;
     };
 
-    AsioTransportLayer(const Options& opts,
-                       SessionManager* sessionManager,
-                       const WireSpec& wireSpec = WireSpec::instance());
+    AsioTransportLayer(const Options& opts, SessionManager* sessionManager);
 
     ~AsioTransportLayer() override;
 

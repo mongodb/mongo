@@ -130,7 +130,7 @@ BSONObj AsyncDBClient::_buildHelloRequest(const std::string& appName,
 
     _compressorManager.clientBegin(&bob);
 
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+    if (auto wireSpec = WireSpec::getWireSpec(_svcCtx).get(); wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 
@@ -146,7 +146,7 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
     uassert(50786,
             "Expected OP_MSG response to 'hello'",
             response->getProtocol() == rpc::Protocol::kOpMsg);
-    auto wireSpec = WireSpec::instance().get();
+    auto wireSpec = WireSpec::getWireSpec(_svcCtx).get();
     auto responseBody = response->getCommandReply();
     uassertStatusOK(getStatusFromCommandResult(responseBody));
 

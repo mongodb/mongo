@@ -69,6 +69,10 @@ protected:
     SdamConfiguration makeSdamConfig(std::vector<HostAndPort> servers,
                                      TopologyType topologyType,
                                      boost::optional<std::string> setName) {
+        auto serviceContext = ServiceContext::make();
+        WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
+        setGlobalServiceContext(std::move(serviceContext));
+
         return SdamConfiguration(
             servers, topologyType, kNotUsedMs, kNotUsedMs, kNotUsedMs, setName);
     }
@@ -207,7 +211,8 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowChangingTheHeartbeatFrequen
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMinWireVersionIsGreater) {
-    const auto outgoingMaxWireVersion = WireSpec::instance().get()->outgoing.maxWireVersion;
+    const auto outgoingMaxWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).get()->outgoing.maxWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMinVersion = ServerDescriptionBuilder()
@@ -224,7 +229,8 @@ TEST_F(TopologyDescriptionTestFixture,
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMaxWireVersionIsLess) {
-    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
+    const auto outgoingMinWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).get()->outgoing.minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion = ServerDescriptionBuilder()
@@ -240,7 +246,8 @@ TEST_F(TopologyDescriptionTestFixture,
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotSetWireCompatibilityErrorWhenServerTypeIsUnknown) {
-    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
+    const auto outgoingMinWireVersion =
+        WireSpec::getWireSpec(getGlobalServiceContext()).get()->outgoing.minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion =

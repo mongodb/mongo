@@ -47,7 +47,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
@@ -84,9 +83,8 @@ public:
      * for egress networking. This pointer must be associated with one of the layers in the provided
      * list.
      */
-    explicit TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
-                                   TransportLayer* egressLayer,
-                                   const WireSpec& wireSpec = WireSpec::instance());
+    TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
+                          TransportLayer* egressLayer);
 
     StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,

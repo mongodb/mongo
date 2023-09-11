@@ -42,6 +42,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
@@ -115,9 +116,9 @@ PseudoRandom* NetworkInterfaceIntegrationFixture::getRandomNumberGenerator() {
 }
 
 void NetworkInterfaceIntegrationFixture::resetIsInternalClient(bool isInternalClient) {
-    WireSpec::Specification newSpec = *WireSpec::instance().get();
+    WireSpec::Specification newSpec = *WireSpec::getWireSpec(getGlobalServiceContext()).get();
     newSpec.isInternalClient = isInternalClient;
-    WireSpec::instance().reset(std::move(newSpec));
+    WireSpec::getWireSpec(getGlobalServiceContext()).reset(std::move(newSpec));
 }
 
 void NetworkInterfaceIntegrationFixture::startCommand(const TaskExecutor::CallbackHandle& cbHandle,

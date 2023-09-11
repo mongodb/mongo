@@ -1019,7 +1019,7 @@ TEST_F(NetworkInterfaceInternalClientTest,
     auto helloHandshake = waitForHello();
 
     // Verify that the "hello" reply has the expected internalClient data.
-    auto wireSpec = WireSpec::instance().get();
+    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
     auto internalClientElem = helloHandshake.request["internalClient"];
     ASSERT_EQ(internalClientElem.type(), BSONType::Object);
     auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];

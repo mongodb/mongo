@@ -54,6 +54,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedge_options_util.h"
@@ -907,6 +908,9 @@ void NetworkInterfaceTL::RequestManager::trySend(
             return;
         }
 
+        ServiceContext* sc =
+            getCurrentServiceContext() ? getCurrentServiceContext() : getGlobalServiceContext();
+
         auto currentSentIdx = sentIdx++;
 
         requestState = std::make_shared<RequestState>(this, cmdState->shared_from_this());
@@ -922,7 +926,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
         request = &requestState->request.value();
         if (requestState->isHedge) {
             invariant(request->options.hedgeOptions.isHedgeEnabled);
-            invariant(WireSpec::instance().get()->isInternalClient);
+            invariant(WireSpec::getWireSpec(sc).get()->isInternalClient);
 
             hedgingMaxTimeMS = Milliseconds(request->options.hedgeOptions.maxTimeMSForHedgedReads);
             if (request->timeout == RemoteCommandRequest::kNoTimeout ||
@@ -933,7 +937,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
         }
 
         if (request->timeout != RemoteCommandRequest::kNoTimeout &&
-            WireSpec::instance().get()->isInternalClient) {
+            WireSpec::getWireSpec(sc).get()->isInternalClient) {
             logSetMaxTimeMS = true;
             BSONObjBuilder updatedCmdBuilder;
             updatedCmdBuilder.appendElements(request->cmdObj);

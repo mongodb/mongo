@@ -268,7 +268,8 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+    if (auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
+        wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 
@@ -325,7 +326,9 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
 StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_scheduleSingleHello() {
     BSONObjBuilder bob;
     bob.append("hello", 1);
-    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+
+    if (auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
+        wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 

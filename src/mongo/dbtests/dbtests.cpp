@@ -91,7 +91,7 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
+void initializeWireSpec(ServiceContext* serviceContext) {
     WireSpec::Specification spec;
 
     // Accept from any version external client.
@@ -107,7 +107,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
     spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
-    WireSpec::instance().initialize(std::move(spec));
+    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
@@ -231,6 +231,7 @@ int dbtestsMain(int argc, char** argv) {
     setGlobalServiceContext(ServiceContext::make());
 
     const auto service = getGlobalServiceContext();
+    mongo::dbtests::initializeWireSpec(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
     service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 
