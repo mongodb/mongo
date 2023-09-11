@@ -372,7 +372,7 @@ class MongodLauncher(object):
 
         # Override the storage engine specified on the command line with "wiredTiger" if running a
         # config server replica set.
-        if "replSet" in mongod_options and "configsvr" in mongod_options:
+        if "configsvr" in mongod_options:
             mongod_options["storageEngine"] = "wiredTiger"
 
         return self.fixturelib.mongod_program(logger, job_num, executable, process_kwargs,
