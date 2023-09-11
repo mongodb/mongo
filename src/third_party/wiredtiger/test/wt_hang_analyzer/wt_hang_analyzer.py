@@ -536,7 +536,7 @@ def main():
         root_logger.warning("Cannot determine Unix Current Login, not supported on Windows")
 
     contain_processes = ["ex_", "intpack-test", "python", "test_"]
-    exact_processes = ["cursor_order", "packing-test", "t"]
+    exact_processes = ["cursor_order", "packing-test", "run", "t"]
     process_ids = []
 
     parser = OptionParser(description=__doc__)
