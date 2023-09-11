@@ -49,7 +49,7 @@ static const char table_config_col[] =
 static char data_str[1024] = "";
 static const char working_dir_row[] = "WT_TEST.data-correctness-row";
 static const char working_dir_col[] = "WT_TEST.data-correctness-col";
-static const char compact_file_fmt[] = "%s/compact_started";
+static const char compact_file[] = "compact_started";
 static char value_a[] = "AA";
 static char value_b[] = "BB";
 static char value_c[] = "CC";
@@ -126,12 +126,11 @@ static int
 run_test(bool column_store, const char *uri, bool preserve)
 {
     struct sigaction sa;
-    struct stat sb;
     WT_CONNECTION *conn;
     WT_SESSION *session;
     pid_t pid;
     int status;
-    char compact_file[2048], home[1024];
+    char home[1024];
 
     testutil_work_dir_from_path(
       home, sizeof(home), column_store ? working_dir_col : working_dir_row);
@@ -163,8 +162,7 @@ run_test(bool column_store, const char *uri, bool preserve)
      * killing the child. Start the timeout from the time we notice that child process has started
      * compact. That allows the test to run correctly on really slow machines.
      */
-    testutil_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home);
-    while (stat(compact_file, &sb) != 0)
+    while (!testutil_exists(home, compact_file))
         testutil_sleep_wait(1, pid);
 
     /* Sleep for a while. Let the child process do some operations on the tables. */
@@ -218,10 +216,9 @@ run_test(bool column_store, const char *uri, bool preserve)
 static void
 workload_compact(const char *home, const char *table_config, const char *uri)
 {
-    FILE *fp;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    char compact_file[2048], tscfg[64];
+    char tscfg[64];
 
     testutil_check(wiredtiger_open(home, NULL, conn_config, &conn));
 
@@ -270,9 +267,7 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     /*
      * Create the compact_started file so that the parent process can start its timer.
      */
-    testutil_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home);
-    testutil_assert_errno((fp = fopen(compact_file, "w")) != NULL);
-    testutil_assert_errno(fclose(fp) == 0);
+    testutil_sentinel(home, compact_file);
 
     run_compact(session, uri);
 }

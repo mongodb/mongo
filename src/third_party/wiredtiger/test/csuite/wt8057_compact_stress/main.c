@@ -56,7 +56,7 @@ static const char table_config_col[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=r,value_format=" WT_UNCHECKED_STRING(QS);
 static char data_str[1024] = "";
 
-static const char ckpt_file_fmt[] = "%s/checkpoint_done";
+static const char ckpt_file[] = "checkpoint_done";
 static const char working_dir_row[] = "WT_TEST.compact-stress-row";
 static const char working_dir_col[] = "WT_TEST.compact-stress-col";
 static const char uri1[] = "table:compact1";
@@ -174,11 +174,10 @@ run_test(bool column_store, bool preserve)
     WT_CONNECTION *conn;
     WT_SESSION *session;
 
-    char ckpt_file[2048], home[1024];
+    char home[1024];
     int status;
     pid_t pid;
     struct sigaction sa;
-    struct stat sb;
 
     testutil_work_dir_from_path(
       home, sizeof(home), column_store ? working_dir_col : working_dir_row);
@@ -210,8 +209,7 @@ run_test(bool column_store, bool preserve)
      * time we notice that child process has written a checkpoint. That allows the test to run
      * correctly on really slow machines.
      */
-    testutil_snprintf(ckpt_file, sizeof(ckpt_file), ckpt_file_fmt, home);
-    while (stat(ckpt_file, &sb) != 0)
+    while (!testutil_exists(home, ckpt_file))
         testutil_sleep_wait(1, pid);
 
     /* Sleep for a while. Let the child process do some operations on the tables. */
@@ -247,14 +245,12 @@ run_test(bool column_store, bool preserve)
 static void
 workload_compact(const char *home, const char *table_config)
 {
-    FILE *fp;
     WT_CONNECTION *conn;
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     int ret;
 
     bool first_ckpt;
-    char ckpt_file[2048];
     uint32_t i;
     uint64_t key_range_start;
 
@@ -287,9 +283,7 @@ workload_compact(const char *home, const char *table_config)
          * finished and can start its timer.
          */
         if (!first_ckpt) {
-            testutil_snprintf(ckpt_file, sizeof(ckpt_file), ckpt_file_fmt, home);
-            testutil_assert_errno((fp = fopen(ckpt_file, "w")) != NULL);
-            testutil_assert_errno(fclose(fp) == 0);
+            testutil_sentinel(home, ckpt_file);
             first_ckpt = true;
         }
 

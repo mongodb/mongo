@@ -614,3 +614,49 @@ testutil_remove(const char *path)
 
     globfree(&g);
 }
+
+/*
+ * testutil_exists --
+ *     Check whether a file exists. The function takes both a directory and a file argument, because
+ *     it is often used to check whether a file exists in a different directory. This saves the
+ *     caller an unnecessary snprintf.
+ */
+bool
+testutil_exists(const char *dir, const char *file)
+{
+    struct stat sb;
+    char path[PATH_MAX];
+
+    if (dir == NULL)
+        testutil_snprintf(path, sizeof(path), "%s", file);
+    else
+        testutil_snprintf(path, sizeof(path), "%s" DIR_DELIM_STR "%s", dir, file);
+
+    if (stat(path, &sb) == 0)
+        return (true);
+    else {
+        /* If stat failed, make sure that it is because the file does not exist. */
+        testutil_assert(errno == ENOENT);
+        return (false);
+    }
+}
+
+/*
+ * testutil_sentinel --
+ *     Create an empty "sentinel" file to indicate that something has happened. For example, this
+ *     can be used to indicate that a checkpoint or a backup completed.
+ */
+void
+testutil_sentinel(const char *dir, const char *file)
+{
+    FILE *fp;
+    char path[PATH_MAX];
+
+    if (dir == NULL)
+        testutil_snprintf(path, sizeof(path), "%s", file);
+    else
+        testutil_snprintf(path, sizeof(path), "%s" DIR_DELIM_STR "%s", dir, file);
+
+    testutil_assert_errno((fp = fopen(path, "w")) != NULL);
+    testutil_assert_errno(fclose(fp) == 0);
+}
