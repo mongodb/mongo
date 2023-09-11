@@ -185,7 +185,7 @@ run_test(bool column_store, bool preserve)
 
     printf("\n");
     printf("Work directory: %s\n", home);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     /* Fork a child to create tables and perform operations on them. */
     memset(&sa, 0, sizeof(sa));
@@ -237,7 +237,7 @@ run_test(bool column_store, bool preserve)
     conn = NULL;
 
     if (!preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
 }
 
 /*

@@ -104,7 +104,7 @@ main(int argc, char *argv[])
         testutil_die(ENOTSUP, "Fixed-length column store not supported");
     sharedopts->usecolumns = (opts->table_type == TABLE_COL);
 
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
     testutil_progress(opts, "start");
 
     testutil_check(wiredtiger_open(opts->home, NULL,

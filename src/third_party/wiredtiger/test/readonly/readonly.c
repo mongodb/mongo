@@ -171,12 +171,13 @@ main(int argc, char *argv[])
 {
     WT_CONNECTION *conn, *conn2, *conn3, *conn4;
     WT_CURSOR *cursor;
+    WT_FILE_COPY_OPTS copy_opts;
     WT_ITEM data;
     WT_SESSION *session;
     uint64_t i;
     uint8_t buf[MAX_VAL];
     int ch, op, ret, status;
-    char cmd[512];
+    char cmd[512], home_all[512], lock_file[512];
     const char *working_dir;
     bool child;
 
@@ -218,10 +219,10 @@ main(int argc, char *argv[])
     testutil_check(__wt_snprintf(home_rd, sizeof(home_rd), "%s%s", home, HOME_RD_SUFFIX));
     testutil_check(__wt_snprintf(home_rd2, sizeof(home_rd2), "%s%s", home, HOME_RD2_SUFFIX));
     if (!child) {
-        testutil_make_work_dir(home);
-        testutil_make_work_dir(home_wr);
-        testutil_make_work_dir(home_rd);
-        testutil_make_work_dir(home_rd2);
+        testutil_recreate_dir(home);
+        testutil_recreate_dir(home_wr);
+        testutil_recreate_dir(home_rd);
+        testutil_recreate_dir(home_rd2);
     } else
         /*
          * We are a child process, we just want to call the open_dbs with the directories we have.
@@ -262,21 +263,23 @@ main(int argc, char *argv[])
      * Copy the database. Remove any lock file from one copy and chmod the copies to be read-only
      * permissions.
      */
-    testutil_check(__wt_snprintf(
-      cmd, sizeof(cmd), "cp -rp %s/* %s; rm -f %s/WiredTiger.lock", home, home_wr, home_wr));
-    if ((status = system(cmd)) < 0)
-        testutil_die(status, "system: %s", cmd);
+    testutil_snprintf(home_all, sizeof(home_all), "%s/*", home);
+    memset(&copy_opts, 0, sizeof(copy_opts));
+    copy_opts.preserve = true;
 
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-      "cp -rp %s/* %s; chmod 0555 %s; chmod -R 0444 %s/*", home, home_rd, home_rd, home_rd));
-    if ((status = system(cmd)) < 0)
-        testutil_die(status, "system: %s", cmd);
+    testutil_copy_ext(home_all, home_wr, &copy_opts);
+    testutil_snprintf(lock_file, sizeof(lock_file), "%s/WiredTiger.lock", home_wr);
+    testutil_remove(lock_file);
 
-    testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-      "cp -rp %s/* %s; rm -f %s/WiredTiger.lock; chmod 0555 %s; chmod -R 0444 %s/*", home, home_rd2,
-      home_rd2, home_rd2, home_rd2));
-    if ((status = system(cmd)) < 0)
-        testutil_die(status, "system: %s", cmd);
+    testutil_copy_ext(home_all, home_rd, &copy_opts);
+    testutil_system("chmod 0555 %s", home_rd);
+    testutil_system("chmod -R 0444 %s/*", home_rd);
+
+    testutil_copy_ext(home_all, home_rd2, &copy_opts);
+    testutil_snprintf(lock_file, sizeof(lock_file), "%s/WiredTiger.lock", home_rd2);
+    testutil_remove(lock_file);
+    testutil_system("chmod 0555 %s", home_rd2);
+    testutil_system("chmod -R 0444 %s/*", home_rd2);
 
     /*
      * Run four scenarios.  Sometimes expect errors, sometimes success.

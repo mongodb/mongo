@@ -778,6 +778,7 @@ gettimeofday
 getv
 ggg
 github
+globfree
 gobare
 goesc
 gostring
@@ -892,7 +893,6 @@ linux
 llll
 llu
 llvm
-ln
 loadtext
 loc
 localTime
@@ -1135,7 +1135,6 @@ rmw
 rng
 rotN
 rotn
-rp
 rpc
 rts
 ru

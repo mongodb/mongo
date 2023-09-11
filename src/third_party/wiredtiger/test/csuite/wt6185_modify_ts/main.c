@@ -361,7 +361,7 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(path, sizeof(path), home);
-    testutil_make_work_dir(path);
+    testutil_recreate_dir(path);
 
     testutil_check(__wt_snprintf(
       table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S"));
@@ -427,6 +427,6 @@ main(int argc, char *argv[])
     cleanup();
 
     if (!preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     return (EXIT_SUCCESS);
 }

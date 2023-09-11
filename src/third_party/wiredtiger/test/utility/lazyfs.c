@@ -308,7 +308,7 @@ testutil_lazyfs_setup(WT_LAZY_FS *lazyfs, const char *home)
     /* Create the base directory on the underlying file system. */
     testutil_check(
       __wt_snprintf(lazyfs->base, sizeof(lazyfs->base), "%s/%s", home_canonical, LAZYFS_BASE_DIR));
-    testutil_make_work_dir(lazyfs->base);
+    testutil_recreate_dir(lazyfs->base);
 
     /* Set up the relevant LazyFS files. */
     testutil_check(__wt_snprintf(
@@ -351,6 +351,6 @@ testutil_lazyfs_cleanup(WT_LAZY_FS *lazyfs)
     lazyfs_unmount(lazyfs->mountpoint, lazyfs->pid);
     lazyfs->pid = 0;
 
-    testutil_clean_work_dir(lazyfs->mountpoint);
+    testutil_remove(lazyfs->mountpoint);
 #endif
 }

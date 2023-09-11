@@ -110,7 +110,7 @@ main(int argc, char *argv[])
     opts->n_append_threads = N_APPEND_THREADS;
     opts->nrecords = N_RECORDS;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
       "create,cache_size=%s,eviction=(threads_max=5),statistics=(all),"

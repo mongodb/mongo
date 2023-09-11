@@ -33,17 +33,13 @@
 #ifdef _WIN32
 #define DIR_DELIM '\\'
 #define DIR_DELIM_STR "\\"
-#define DIR_EXISTS_COMMAND "IF EXIST "
-#define RM_COMMAND "rd /s /q "
 #else
 #define DIR_DELIM '/'
 #define DIR_DELIM_STR "/"
-#define RM_COMMAND "rm -rf "
 #endif
 
 #define DEFAULT_DIR "WT_TEST"
 #define DEFAULT_TABLE_SCHEMA "key_format=i,value_format=S"
-#define MKDIR_COMMAND "mkdir "
 
 /* Subdirectory names, if we need to split the test directory into multiple subdirectories. */
 #define RECORDS_DIR "records"
@@ -172,6 +168,23 @@ typedef struct {
 } WT_LAZY_FS;
 
 /*
+ * Options for copying files.
+ */
+typedef struct {
+    bool link;                  /* Create a hard link instead of copying a file (if supported) */
+    const char *link_if_prefix; /* Create hard links only for files/directories with this prefix */
+    bool preserve;              /* Preserve timestamps and selected other metadata */
+} WT_FILE_COPY_OPTS;
+
+/*
+ * Options for creating directories.
+ */
+typedef struct {
+    bool can_exist; /* Do not fail the test if the directory already exists */
+    bool parents;   /* Create any parents that don't exist */
+} WT_MKDIR_OPTS;
+
+/*
  * testutil_assert --
  *     Complain and quit if something isn't true, with no error value.
  */
@@ -234,6 +247,12 @@ typedef struct {
             testutil_die(                                                                 \
               __r, "%s/%d: %s: " fmt, __PRETTY_FUNCTION__, __LINE__, #call, __VA_ARGS__); \
     } while (0)
+
+/*
+ * testutil_snprintf --
+ *     Do snprintf; fail on error.
+ */
+#define testutil_snprintf(out, size, ...) testutil_check(__wt_snprintf(out, size, __VA_ARGS__))
 
 /*
  * WT_OP_CHECKPOINT_WAIT --
@@ -440,10 +459,11 @@ bool testutil_is_flag_set(const char *);
 bool testutil_is_dir_store(TEST_OPTS *);
 void testutil_build_dir(TEST_OPTS *, char *, int);
 void testutil_clean_test_artifacts(const char *);
-void testutil_clean_work_dir(const char *);
 void testutil_cleanup(TEST_OPTS *);
+void testutil_copy(const char *, const char *);
 void testutil_copy_data(const char *);
 void testutil_copy_data_opt(const char *, const char *);
+void testutil_copy_ext(const char *, const char *, const WT_FILE_COPY_OPTS *opts);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
@@ -453,7 +473,8 @@ int testutil_general_event_handler(
 void testutil_lazyfs_cleanup(WT_LAZY_FS *);
 void testutil_lazyfs_clear_cache(WT_LAZY_FS *);
 void testutil_lazyfs_setup(WT_LAZY_FS *, const char *);
-void testutil_make_work_dir(const char *);
+void testutil_mkdir(const char *);
+void testutil_mkdir_ext(const char *, const WT_MKDIR_OPTS *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
 uint64_t testutil_pareto(uint64_t, uint64_t, u_int);
 void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);
@@ -466,6 +487,8 @@ uint32_t testutil_random(WT_RAND_STATE *);
 void testutil_random_init(WT_RAND_STATE *, uint64_t *, uint32_t);
 void testutil_random_from_random(WT_RAND_STATE *, WT_RAND_STATE *);
 void testutil_random_from_seed(WT_RAND_STATE *, uint64_t);
+void testutil_recreate_dir(const char *);
+void testutil_remove(const char *);
 #ifndef _WIN32
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif

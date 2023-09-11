@@ -172,7 +172,7 @@ run(int r)
 
     printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-    testutil_make_work_dir(HOME);
+    testutil_recreate_dir(HOME);
 
     testutil_assert_errno((res_fp = fopen(RSLT, "w")) != NULL);
 
@@ -487,7 +487,7 @@ run(int r)
         exit(EXIT_FAILURE);
     }
 
-    testutil_clean_work_dir(HOME);
+    testutil_remove(HOME);
 }
 
 /*

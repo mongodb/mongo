@@ -550,10 +550,7 @@ create_object(TABLE *table, void *arg)
 void
 wts_create_home(void)
 {
-    char buf[MAX_FORMAT_PATH * 2];
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s && mkdir %s", g.home, g.home));
-    testutil_checkfmt(system(buf), "database home creation (\"%s\") failed", buf);
+    testutil_recreate_dir(g.home);
 }
 
 /*

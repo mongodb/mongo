@@ -94,7 +94,7 @@ hs_workload(TEST_OPTS *opts, const char *hs_file_max)
      * We're going to run this workload for different configurations of file_max. So clean out the
      * work directory each time.
      */
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(__wt_snprintf(open_config, sizeof(open_config),
       "create,cache_size=50MB,history_store=(file_max=%s),statistics=(all),statistics_log=(json,on_"

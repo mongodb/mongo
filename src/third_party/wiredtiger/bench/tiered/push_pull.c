@@ -176,8 +176,8 @@ run_test_clean(const char *suffix, uint32_t num_records)
 
     /* Cleanup */
     if (!opts->preserve) {
-        testutil_check(__wt_snprintf(home_full, HOME_BUF_SIZE, "%s_%s*", opts->home, suffix));
-        testutil_clean_work_dir(home_full);
+        testutil_snprintf(home_full, HOME_BUF_SIZE, "%s_%s*", opts->home, suffix);
+        testutil_remove(home_full);
     }
 
     /* Compute the average */
@@ -227,8 +227,8 @@ remove_local_cached_files(const char *home)
     DIR *dir;
 
     char *tablename;
-    char delete_file[512], file_prefix[1024], rm_cmd[512];
-    int highest, index, nmatches, objnum, status;
+    char buf[512], file_prefix[1024];
+    int highest, index, nmatches, objnum;
 
     highest = nmatches = objnum = 0;
     tablename = opts->uri;
@@ -261,19 +261,13 @@ remove_local_cached_files(const char *home)
     testutil_check(__wt_snprintf(file_prefix, sizeof(file_prefix), "%s-000", tablename));
     if (highest > 1 && nmatches > 1) {
         for (index = 1; index < highest; index++) {
-            testutil_check(__wt_snprintf(
-              delete_file, sizeof(delete_file), "rm -f %s/%s*0%d.wtobj", home, file_prefix, index));
-            status = system(delete_file);
-
-            if (status != 0)
-                testutil_die(status, "system: %s", delete_file);
+            testutil_snprintf(buf, sizeof(buf), "%s/%s*0%d.wtobj", home, file_prefix, index);
+            testutil_remove(buf);
         }
     }
 
-    testutil_check(__wt_snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf %s/cache-*", home));
-    status = system(rm_cmd);
-    if (status < 0)
-        testutil_die(status, "system: %s", rm_cmd);
+    testutil_snprintf(buf, sizeof(buf), "%s/cache-*", home);
+    testutil_remove(buf);
 }
 #endif
 
@@ -366,10 +360,10 @@ run_test(const char *home, uint32_t num_records, uint32_t counter)
     WT_CONNECTION *conn;
     WT_SESSION *session;
 
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     if (opts->tiered_storage && testutil_is_dir_store(opts)) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, DIR_STORE_BUCKET_NAME));
-        testutil_make_work_dir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, DIR_STORE_BUCKET_NAME);
+        testutil_mkdir(buf);
     }
 
     testutil_wiredtiger_open(opts, home, conn_config, NULL, &conn, false, true);

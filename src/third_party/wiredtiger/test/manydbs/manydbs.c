@@ -199,12 +199,12 @@ main(int argc, char *argv[])
      * Set up all the directory names.
      */
     testutil_work_dir_from_path(home, HOME_SIZE, working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     __wt_random_init(&rnd);
     for (i = 0; i < dbs; ++i) {
         testutil_check(
           __wt_snprintf(hometmp, HOME_SIZE, "%s%c%s.%d", home, DIR_DELIM, HOME_BASE, i));
-        testutil_make_work_dir(hometmp);
+        testutil_recreate_dir(hometmp);
         /*
          * Open each database. Rotate different configurations among them. Open a session and
          * statistics cursor. If writing data, create the table and open a data cursor.

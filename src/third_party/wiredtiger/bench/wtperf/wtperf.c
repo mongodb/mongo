@@ -40,7 +40,6 @@ static int find_table_count(WTPERF *);
 static WT_THREAD_RET monitor(void *);
 static WT_THREAD_RET populate_thread(void *);
 static void randomize_value(WTPERF_THREAD *, char *, int64_t);
-static void recreate_dir(const char *);
 static WT_THREAD_RET scan_worker(void *);
 static int start_all_runs(WTPERF *);
 static int start_run(WTPERF *);
@@ -2219,14 +2218,14 @@ start_all_runs(WTPERF *wtperf)
         next_wtperf->home = dmalloc(len);
         testutil_check(__wt_snprintf(next_wtperf->home, len, "%s/D%02d", wtperf->home, (int)i));
         if (opts->create != 0)
-            recreate_dir(next_wtperf->home);
+            testutil_recreate_dir(next_wtperf->home);
 
         len = strlen(wtperf->monitor_dir) + 5;
         next_wtperf->monitor_dir = dmalloc(len);
         testutil_check(
           __wt_snprintf(next_wtperf->monitor_dir, len, "%s/D%02d", wtperf->monitor_dir, (int)i));
         if (opts->create != 0 && strcmp(next_wtperf->home, next_wtperf->monitor_dir) != 0)
-            recreate_dir(next_wtperf->monitor_dir);
+            testutil_recreate_dir(next_wtperf->monitor_dir);
 
         testutil_check(__wt_thread_create(NULL, &threads[i], thread_run_wtperf, next_wtperf));
     }
@@ -2667,7 +2666,7 @@ main(int argc, char *argv[])
 
     /* If creating, remove and re-create the home directory. */
     if (opts->create != 0)
-        recreate_dir(wtperf->home);
+        testutil_recreate_dir(wtperf->home);
 
     /* Write a copy of the config. */
     req_len = strlen(wtperf->home) + strlen("/CONFIG.wtperf") + 1;
@@ -2775,15 +2774,6 @@ stop_threads(u_int num, WTPERF_THREAD *threads)
      * stop the threads; the thread structure is still being read by the monitor thread (among
      * others). As a standalone program, leaking memory isn't a concern, and it's simpler that way.
      */
-}
-
-static void
-recreate_dir(const char *name)
-{
-    /* Clean the directory if it already exists. */
-    testutil_clean_work_dir(name);
-    /* Recreate the directory. */
-    testutil_make_work_dir(name);
 }
 
 static int

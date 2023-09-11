@@ -408,8 +408,8 @@ backup_create_full(WT_CONNECTION *conn, bool consolidate, uint32_t index)
     WT_CURSOR *cursor;
     WT_SESSION *session;
     int nfiles, ret;
-    char backup_home[PATH_MAX];
-    char buf[4096];
+    char backup_home[PATH_MAX], copy_from[PATH_MAX], copy_to[PATH_MAX];
+    char buf[PATH_MAX];
     char *filename;
     const char *cons;
 
@@ -419,8 +419,9 @@ backup_create_full(WT_CONNECTION *conn, bool consolidate, uint32_t index)
       index, consolidate, backup_granularity_kb);
 
     /* Prepare the directory. */
-    testutil_check(__wt_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index));
-    testutil_system("rm -rf %s && mkdir %s", backup_home, backup_home);
+    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
+    testutil_remove(backup_home);
+    testutil_mkdir(backup_home);
 
     /* Open the session. */
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -430,16 +431,19 @@ backup_create_full(WT_CONNECTION *conn, bool consolidate, uint32_t index)
         cons = ",consolidate=true";
     else
         cons = ",consolidate=false";
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
+    testutil_snprintf(buf, sizeof(buf),
       "incremental=(granularity=%" PRIu32 "K,enabled=true,%s,this_id=ID%" PRIu32 ")",
-      backup_granularity_kb, cons, index));
+      backup_granularity_kb, cons, index);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 
     /* Copy the files. */
     while ((ret = cursor->next(cursor)) == 0) {
         nfiles++;
         testutil_check(cursor->get_key(cursor, &filename));
-        testutil_system("cp %s/%s %s/%s", WT_HOME_DIR, filename, backup_home, filename);
+        testutil_snprintf(
+          copy_from, sizeof(copy_from), "%s" DIR_DELIM_STR "%s", WT_HOME_DIR, filename);
+        testutil_snprintf(copy_to, sizeof(copy_to), "%s" DIR_DELIM_STR "%s", backup_home, filename);
+        testutil_copy(copy_from, copy_to);
     }
     testutil_assert(ret == WT_NOTFOUND);
 
@@ -448,7 +452,7 @@ backup_create_full(WT_CONNECTION *conn, bool consolidate, uint32_t index)
     testutil_check(session->close(session, NULL));
 
     /* Remember that the backup finished successfully. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", backup_home));
+    testutil_snprintf(buf, sizeof(buf), "%s/done", backup_home);
     testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
     testutil_assert_errno(fclose(fp) == 0);
 
@@ -468,7 +472,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     ssize_t rdsize;
     uint64_t offset, size, type;
     int rfd, ret, wfd, nfiles, nranges, nunmodified;
-    char backup_home[PATH_MAX], src_backup_home[PATH_MAX];
+    char backup_home[PATH_MAX], copy_from[PATH_MAX], copy_to[PATH_MAX], src_backup_home[PATH_MAX];
     char buf[4096];
     char *filename;
     bool first_range;
@@ -478,21 +482,21 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     nranges = 0;
     nunmodified = 0;
 
-    testutil_check(
-      __wt_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%" PRIu32, src_index));
+    testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%" PRIu32, src_index);
 
     printf("Create incremental backup %" PRIu32 " - start: source=%" PRIu32 "\n", index, src_index);
 
     /* Prepare the directory. */
-    testutil_check(__wt_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index));
-    testutil_system("rm -rf %s && mkdir %s", backup_home, backup_home);
+    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
+    testutil_remove(backup_home);
+    testutil_mkdir(backup_home);
 
     /* Open the session. */
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Open the backup cursor to get the list of files to copy. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "incremental=(src_id=ID%" PRIu32 ",this_id=ID%" PRIu32 ")", src_index, index));
+    testutil_snprintf(buf, sizeof(buf), "incremental=(src_id=ID%" PRIu32 ",this_id=ID%" PRIu32 ")",
+      src_index, index);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 
     /* Process the files. */
@@ -517,17 +521,17 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
                  */
                 if (first_range) {
                     first_range = false;
-                    testutil_system(
-                      "cp %s/%s %s/%s", src_backup_home, filename, backup_home, filename);
-                    printf(
-                      "INCR: cp %s/%s %s/%s\n", src_backup_home, filename, backup_home, filename);
+                    testutil_snprintf(copy_from, sizeof(copy_from), "%s" DIR_DELIM_STR "%s",
+                      src_backup_home, filename);
+                    testutil_snprintf(
+                      copy_to, sizeof(copy_to), "%s" DIR_DELIM_STR "%s", backup_home, filename);
+                    testutil_copy(copy_from, copy_to);
+                    printf("INCR: cp %s %s\n", copy_from, copy_to);
                     fflush(stdout);
 
                     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", WT_HOME_DIR, filename));
                     testutil_assert((rfd = open(buf, O_RDONLY, 0666)) >= 0);
-
-                    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", backup_home, filename));
-                    testutil_assert((wfd = open(buf, O_WRONLY | O_CREAT, 0666)) >= 0);
+                    testutil_assert((wfd = open(copy_to, O_WRONLY | O_CREAT, 0666)) >= 0);
                 }
 
                 /* Copy the range. */
@@ -542,7 +546,11 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
                 /* We are supposed to do the full file copy. */
                 testutil_assert(first_range);
                 first_range = false;
-                testutil_system("cp %s/%s %s/%s", WT_HOME_DIR, filename, backup_home, filename);
+                testutil_snprintf(
+                  copy_from, sizeof(copy_from), "%s" DIR_DELIM_STR "%s", WT_HOME_DIR, filename);
+                testutil_snprintf(
+                  copy_to, sizeof(copy_to), "%s" DIR_DELIM_STR "%s", backup_home, filename);
+                testutil_copy(copy_from, copy_to);
             }
         }
 
@@ -558,7 +566,15 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
              * "copy" the file from the source backup (actually, just create a hard link as an
              * optimization).
              */
-            testutil_system("ln %s/%s %s/%s", src_backup_home, filename, backup_home, filename);
+            testutil_snprintf(
+              copy_from, sizeof(copy_from), "%s" DIR_DELIM_STR "%s", src_backup_home, filename);
+            testutil_snprintf(
+              copy_to, sizeof(copy_to), "%s" DIR_DELIM_STR "%s", backup_home, filename);
+#ifndef _WIN32
+            testutil_assert_errno(link(copy_from, copy_to) == 0);
+#else
+            testutil_copy(copy_from, copy_to);
+#endif
             nunmodified++;
         }
 
@@ -572,7 +588,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     testutil_check(session->close(session, NULL));
 
     /* Remember that the backup finished successfully. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", backup_home));
+    testutil_snprintf(buf, sizeof(buf), "%s/done", backup_home);
     testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
     testutil_assert_errno(fclose(fp) == 0);
 
@@ -584,7 +600,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     if (backup_verify_immediately) {
         PRINT_BACKUP_VERIFY(index);
         if (backup_verify_quick) {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "ID%" PRIu32, index));
+            testutil_snprintf(buf, sizeof(buf), "ID%" PRIu32, index);
             testutil_verify_src_backup(conn, backup_home, WT_HOME_DIR, buf);
         } else
             testutil_check(recover_and_verify(index, 0));
@@ -624,7 +640,7 @@ backup_delete_old_backups(int retain, int last_full)
                 /* If the backup failed to finish, delete it right away. */
                 testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
                 if (stat(buf, &sb) != 0 && errno == ENOENT) {
-                    testutil_system("%s %s", RM_COMMAND, dir->d_name);
+                    testutil_remove(dir->d_name);
                     ndeleted++;
                 }
 
@@ -641,7 +657,8 @@ backup_delete_old_backups(int retain, int last_full)
 
         __wt_qsort(indexes, (size_t)count, sizeof(*indexes), __int_comparator);
         for (i = 0; i < count - retain; i++) {
-            testutil_system("%s " BACKUP_BASE "%d", RM_COMMAND, indexes[i]);
+            testutil_check(__wt_snprintf(buf, sizeof(buf), BACKUP_BASE "%d", indexes[i]));
+            testutil_remove(buf);
             ndeleted++;
         }
     } while (!done);
@@ -1314,7 +1331,7 @@ backup_verify(WT_CONNECTION *conn, uint32_t workload_iteration)
     testutil_check(closedir(d));
 
     /* Delete any check directories that we might have created for backup verification. */
-    testutil_system("%s " CHECK_BASE "*", RM_COMMAND);
+    testutil_remove(CHECK_BASE "*");
 }
 
 /*
@@ -1335,7 +1352,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     uint64_t commit_fp, durable_fp, stable_val;
     uint32_t i;
     int ret;
-    char buf[PATH_MAX], fname[64], kname[64];
+    char backup_dir[PATH_MAX], buf[PATH_MAX], fname[64], kname[64];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal;
 
@@ -1353,7 +1370,7 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         /* Compare against the copy of the home directory just before recovery. */
         if (use_backups) {
             printf("--- Verify saved dir against the backup source\n");
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.SAVE/%s", home, WT_HOME_DIR));
+            testutil_snprintf(buf, sizeof(buf), "%s.SAVE/%s", home, WT_HOME_DIR);
             testutil_verify_src_backup(conn, buf, WT_HOME_DIR, NULL);
             printf("--- DONE: Verify saved dir against the backup source\n");
         }
@@ -1364,9 +1381,11 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
         if (use_backups)
             backup_verify(conn, workload_iteration);
     } else {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), CHECK_BASE "%" PRIu32, backup_index));
-        testutil_system(
-          "rm -rf " CHECK_BASE "* ; cp -rf " BACKUP_BASE "%" PRIu32 " %s", backup_index, buf);
+        testutil_snprintf(backup_dir, sizeof(backup_dir), BACKUP_BASE "%" PRIu32, backup_index);
+        testutil_snprintf(buf, sizeof(buf), CHECK_BASE "%" PRIu32, backup_index);
+        testutil_remove(CHECK_BASE "*");
+        testutil_copy(backup_dir, buf);
+
         /*
          * Open the database connection to the backup. But don't pass our event handlers, so that we
          * don't create another statistics thread. Not only we don't need it here, but trying to
@@ -1383,13 +1402,13 @@ recover_and_verify(uint32_t backup_index, uint32_t workload_iteration)
     /*
      * Open a cursor on all the tables.
      */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_collection));
+    testutil_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_collection);
     testutil_check(session->open_cursor(session, buf, NULL, NULL, &cur_coll));
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_shadow));
+    testutil_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_shadow);
     testutil_check(session->open_cursor(session, buf, NULL, NULL, &cur_shadow));
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_local));
+    testutil_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_local);
     testutil_check(session->open_cursor(session, buf, NULL, NULL, &cur_local));
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_oplog));
+    testutil_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_oplog);
     testutil_check(session->open_cursor(session, buf, NULL, NULL, &cur_oplog));
 
     /*
@@ -1732,22 +1751,21 @@ main(int argc, char *argv[])
     /* Set up the test. */
     if (!verify_only) {
         /* Create the test's home directory. */
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
 
         /* Set up the test subdirectories. */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
-        testutil_make_work_dir(buf);
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
-        testutil_make_work_dir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR);
+        testutil_mkdir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR);
+        testutil_mkdir(buf);
 
         /* Set up LazyFS. */
         if (use_lazyfs)
             testutil_lazyfs_setup(&lazyfs, home);
 
         if (opts->tiered_storage) {
-            testutil_check(
-              __wt_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR));
-            testutil_make_work_dir(bucket);
+            testutil_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR);
+            testutil_mkdir(bucket);
         }
 
         if (rand_time) {
@@ -1921,7 +1939,7 @@ main(int argc, char *argv[])
 
     /* Delete the work directory. */
     if (ret == EXIT_SUCCESS && !opts->preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
 
     testutil_cleanup(opts);
     return (ret);

@@ -320,27 +320,31 @@ verify_metadata(WT_CONNECTION *conn, TABLE_INFO *tables)
 static void
 copy_database(const char *sfx)
 {
-    WT_DECL_RET;
-    char buf[1024];
+    WT_FILE_COPY_OPTS copy_opts;
+    char buf[1024], copy_from[1024], copy_to[1024];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ./%s.%s; mkdir ./%s.%s; cp -p %s/* ./%s.%s", home, sfx, home, sfx, home, home, sfx));
-    printf("copy: %s\n", buf);
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
+    memset(&copy_opts, 0, sizeof(copy_opts));
+    copy_opts.preserve = true;
+
+    testutil_snprintf(buf, sizeof(buf), "%s.%s", home, sfx);
+    testutil_recreate_dir(buf);
+
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s/*", home);
+    testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", home, sfx);
+    printf("copy: %s %s\n", copy_from, copy_to);
+    testutil_copy_ext(copy_from, copy_to, &copy_opts);
 
     /*
      * Now, in the copied directory make a save copy of the metadata and turtle files to move around
      * and restore as needed during testing.
      */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "cp -p %s.%s/%s %s.%s/%s.%s", home, sfx,
-      WT_METADATA_TURTLE, home, sfx, WT_METADATA_TURTLE, SAVE));
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "cp -p %s.%s/%s %s.%s/%s.%s", home, sfx,
-      WT_METAFILE, home, sfx, WT_METAFILE, SAVE));
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s.%s/%s", home, sfx, WT_METADATA_TURTLE);
+    testutil_snprintf(copy_to, sizeof(copy_to), "%s.%s/%s.%s", home, sfx, WT_METADATA_TURTLE, SAVE);
+    testutil_copy_ext(copy_from, copy_to, &copy_opts);
+
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s.%s/%s", home, sfx, WT_METAFILE);
+    testutil_snprintf(copy_to, sizeof(copy_to), "%s.%s/%s.%s", home, sfx, WT_METAFILE, SAVE);
+    testutil_copy_ext(copy_from, copy_to, &copy_opts);
 }
 
 /*
@@ -472,8 +476,8 @@ main(int argc, char *argv[])
       {CORRUPT, "key_format=S,value_format=S", false}, {NULL, NULL, false}};
     TABLE_INFO *t;
     TEST_OPTS *opts, _opts;
-    WT_DECL_RET;
-    char buf[1024];
+    WT_FILE_COPY_OPTS copy_opts;
+    char copy_from[1024], save_path[1024];
 
     /* Bypass this test for ASAN builds */
     if (testutil_is_flag_set("TESTUTIL_BYPASS_ASAN"))
@@ -486,7 +490,7 @@ main(int argc, char *argv[])
      * Set a global. We use this everywhere.
      */
     home = opts->home;
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     testutil_check(wiredtiger_open(home, &event_handler,
       "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
@@ -505,16 +509,19 @@ main(int argc, char *argv[])
      * Make copy of original directory.
      */
     copy_database(SAVE);
+
     /*
      * Damage/corrupt WiredTiger.wt.
      */
     printf("corrupt metadata\n");
     corrupt_file(WT_METAFILE, CORRUPT);
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cp -p %s/WiredTiger.wt ./%s.%s/WiredTiger.wt.CORRUPT", home, home, SAVE));
-    printf("copy: %s\n", buf);
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
+    memset(&copy_opts, 0, sizeof(copy_opts));
+    copy_opts.preserve = true;
+
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s/WiredTiger.wt", home);
+    testutil_snprintf(save_path, sizeof(save_path), "%s.%s/WiredTiger.wt.CORRUPT", home, SAVE);
+    printf("copy: %s %s\n", copy_from, save_path);
+    testutil_copy_ext(copy_from, save_path, &copy_opts);
     run_all_verification(NULL, &table_data[0]);
 
     /*
@@ -522,18 +529,17 @@ main(int argc, char *argv[])
      */
     printf("corrupt turtle\n");
     corrupt_file(WT_METADATA_TURTLE, WT_METAFILE_URI);
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "cp -p %s/WiredTiger.turtle ./%s.%s/WiredTiger.turtle.CORRUPT", home, home, SAVE));
-    printf("copy: %s\n", buf);
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
+
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s/WiredTiger.turtle", home);
+    testutil_snprintf(save_path, sizeof(save_path), "%s.%s/WiredTiger.turtle.CORRUPT", home, SAVE);
+    printf("copy: %s %s\n", copy_from, save_path);
+    testutil_copy_ext(copy_from, save_path, &copy_opts);
     run_all_verification(NULL, &table_data[0]);
 
     /* Remove saved copy of the original database directory. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s.%s", home, SAVE));
-    printf("cleanup and remove: %s\n", buf);
-    if ((ret = system(buf)) < 0)
-        testutil_die(ret, "system: %s", buf);
+    testutil_snprintf(save_path, sizeof(save_path), "%s.%s", home, SAVE);
+    printf("cleanup and remove: %s\n", save_path);
+    testutil_remove(save_path);
 
     /*
      * Cleanup from test. This will delete the database directory along with the core files left

@@ -104,7 +104,7 @@ main(int argc, char *argv[])
     /* 0 isn't a valid table_type; use rows by default */
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     switch (opts->table_type) {
     case TABLE_COL:

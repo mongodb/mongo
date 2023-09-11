@@ -37,7 +37,6 @@ static void verify_import(WT_SESSION *);
  * Import directory initialize command, remove and create import directory, to place new database
  * connection.
  */
-#define HOME_IMPORT_INIT_CMD "rm -rf %s/" IMPORT_DIR "&& mkdir %s/" IMPORT_DIR
 #define IMPORT_DIR "IMPORT"
 /*
  * The number of entries in the import table, primary use for validating contents after import.
@@ -57,10 +56,9 @@ import(void *arg)
 {
     WT_CONNECTION *conn, *import_conn;
     WT_SESSION *import_session, *session;
-    size_t cmd_len;
     uint32_t import_value;
     u_int period;
-    char buf[2048], *cmd;
+    char buf[2048];
     const char *file_config, *table_config;
 
     WT_UNUSED(arg);
@@ -71,18 +69,11 @@ import(void *arg)
     /*
      * Create a new database, primarily used for testing import.
      */
-    cmd_len = strlen(g.home) * 2 + strlen(HOME_IMPORT_INIT_CMD) + 1;
-    cmd = dmalloc(cmd_len);
-    testutil_check(__wt_snprintf(cmd, cmd_len, HOME_IMPORT_INIT_CMD, g.home, g.home));
-    testutil_checkfmt(system(cmd), "%s", "import directory creation failed");
-    free(cmd);
+    testutil_snprintf(buf, sizeof(buf), "%s/" IMPORT_DIR, g.home);
+    testutil_recreate_dir(buf);
 
-    cmd_len = strlen(g.home) + strlen(IMPORT_DIR) + 10;
-    cmd = dmalloc(cmd_len);
-    testutil_check(__wt_snprintf(cmd, cmd_len, "%s/%s", g.home, IMPORT_DIR));
     /* Open a connection to the database, creating it if necessary. */
-    create_database(cmd, &import_conn);
-    free(cmd);
+    create_database(buf, &import_conn);
 
     /*
      * Open two sessions, one for test/format database and one for the import database.

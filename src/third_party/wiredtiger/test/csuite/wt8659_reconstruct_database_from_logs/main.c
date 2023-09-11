@@ -81,11 +81,15 @@ dump_table(const char *home, const char *table, const char *out_file)
 static void
 reset_dir(const char *dir)
 {
+    WT_MKDIR_OPTS opts;
     char buf[1024];
 
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "rm -rf %s/%s && mkdir -p %s/%s", test_root, dir, test_root, dir));
-    testutil_check(system(buf));
+    memset(&opts, 0, sizeof(opts));
+    opts.parents = true;
+
+    testutil_snprintf(buf, sizeof(buf), "%s/%s", test_root, dir);
+    testutil_remove(buf);
+    testutil_mkdir_ext(buf, &opts);
 }
 
 /*
@@ -97,8 +101,8 @@ remove_dir(const char *dir)
 {
     char buf[1024];
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s/%s", test_root, dir));
-    testutil_check(system(buf));
+    testutil_snprintf(buf, sizeof(buf), "%s/%s", test_root, dir);
+    testutil_remove(buf);
 }
 
 /*
@@ -109,15 +113,15 @@ static int
 compare_backups(void)
 {
     int ret;
-    char buf[1024];
+    char buf[1024], copy_from[1024], copy_to[1024];
 
     /*
      * We have to copy incremental backup to keep the original database intact. Otherwise we'll get
      * "Incremental backup after running recovery is not allowed".
      */
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cp %s/%s/* %s/%s", test_root, home_incr, test_root, home_incr_copy));
-    testutil_check(system(buf));
+    testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s/*", test_root, home_incr);
+    testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", test_root, home_incr_copy);
+    testutil_copy(copy_from, copy_to);
 
     /* Dump both backups. */
     dump_table(home_full, uri, full_out);
@@ -135,9 +139,10 @@ compare_backups(void)
         exit(1);
     } else {
         /* If they compare successfully, clean up. */
-        testutil_check(__wt_snprintf(
-          buf, sizeof(buf), "rm %s/%s %s/%s", test_root, full_out, test_root, incr_out));
-        testutil_check(system(buf));
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", test_root, full_out);
+        testutil_remove(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", test_root, incr_out);
+        testutil_remove(buf);
         printf("\t Table \"%s\": OK\n", uri);
     }
 
@@ -177,16 +182,16 @@ take_full_backup(const char *home, const char *backup_home)
 {
     WT_CURSOR *cursor;
     int ret;
-    char buf[1024];
+    char copy_from[1024], copy_to[1024];
     const char *filename;
 
     testutil_check(session->open_cursor(session, "backup:", NULL, NULL, &cursor));
 
     while ((ret = cursor->next(cursor)) == 0) {
         testutil_check(cursor->get_key(cursor, &filename));
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", test_root, home,
-          filename, test_root, backup_home, filename));
-        testutil_check(system(buf));
+        testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s/%s", test_root, home, filename);
+        testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s/%s", test_root, backup_home, filename);
+        testutil_copy(copy_from, copy_to);
     }
 
     testutil_assert(ret == WT_NOTFOUND);
@@ -202,17 +207,16 @@ take_incr_backup(const char *backup_home, bool truncate_logs)
 {
     WT_CURSOR *cursor;
     int ret;
-    char buf[1024];
+    char copy_from[1024], copy_to[1024];
     const char *filename;
 
     testutil_check(session->open_cursor(session, "backup:", NULL, "target=(\"log:\")", &cursor));
 
     while ((ret = cursor->next(cursor)) == 0) {
         testutil_check(cursor->get_key(cursor, &filename));
-
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "cp %s/%s/%s %s/%s/%s", test_root, home_live,
-          filename, test_root, backup_home, filename));
-        testutil_check(system(buf));
+        testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s/%s", test_root, home_live, filename);
+        testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s/%s", test_root, backup_home, filename);
+        testutil_copy(copy_from, copy_to);
     }
     testutil_assert(ret == WT_NOTFOUND);
 

@@ -319,7 +319,7 @@ wt_connect(const char *config_open)
      */
     if (g.opts.tiered_storage) {
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", g.home));
-        testutil_make_work_dir(buf);
+        testutil_recreate_dir(buf);
     }
 
     printf("WT open config: %s\n", config);
@@ -368,7 +368,7 @@ cleanup(bool remove_dir)
     g.ntables_created = 0;
 
     if (remove_dir)
-        testutil_make_work_dir(g.home);
+        testutil_recreate_dir(g.home);
 }
 
 /*
