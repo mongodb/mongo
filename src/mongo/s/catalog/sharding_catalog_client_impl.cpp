@@ -1039,6 +1039,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 
     // Parse the result
     std::vector<NamespaceString> nssList;
+    nssList.reserve(aggResult.size());
     for (const auto& doc : aggResult) {
         nssList.push_back(
             NamespaceStringUtil::deserialize(boost::none, doc.getField("_id").String()));

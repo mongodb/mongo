@@ -525,6 +525,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
     // Convert remote cursors into a vector of "owned" cursors.
     std::vector<OwnedRemoteCursor> ownedCursors;
+    ownedCursors.reserve(cursors.size());
     for (auto&& cursor : cursors) {
         ownedCursors.emplace_back(OwnedRemoteCursor(opCtx, std::move(cursor), executionNss));
     }

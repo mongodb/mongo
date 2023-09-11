@@ -313,6 +313,7 @@ ShardId getLocalShardId(ServiceContext* service) {
 
 Future<void> whenAll(std::vector<Future<void>>& futures) {
     std::vector<Future<int>> dummyFutures;
+    dummyFutures.reserve(futures.size());
     for (auto&& f : futures) {
         dummyFutures.push_back(std::move(f).then([]() { return 0; }));
     }

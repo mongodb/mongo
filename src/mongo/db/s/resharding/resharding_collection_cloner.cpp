@@ -655,6 +655,7 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
                     const HostAndPort& donorHost) {
                  auto cursorBatch = cursorResponse.getBatch();
                  std::vector<InsertStatement> batch;
+                 batch.reserve(cursorBatch.size());
                  for (auto&& obj : cursorBatch) {
                      batch.emplace_back(obj);
                  }

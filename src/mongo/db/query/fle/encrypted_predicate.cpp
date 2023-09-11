@@ -105,6 +105,7 @@ BSONArray toBSONArray(std::vector<PrfBlock>&& vec) {
 
 std::vector<Value> toValues(std::vector<PrfBlock>&& vec) {
     std::vector<Value> output;
+    output.reserve(vec.size());
     for (auto& elt : vec) {
         output.push_back(Value(BSONBinData(elt.data(), elt.size(), BinDataType::BinDataGeneral)));
     }

@@ -373,6 +373,7 @@ public:
                 createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
 
             std::vector<AsyncRequestsSender::Request> requests;
+            requests.reserve(allShardsContainingChunksForNs.size());
             for (const auto& shardId : allShardsContainingChunksForNs) {
                 requests.emplace_back(shardId,
                                       appendShardVersion(cmdObj, cri.getShardVersion(shardId)));
@@ -509,6 +510,7 @@ public:
             const auto aggExplainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
             std::vector<AsyncRequestsSender::Request> requests;
+            requests.reserve(allShardsContainingChunksForNs.size());
             for (const auto& shardId : allShardsContainingChunksForNs) {
                 requests.emplace_back(
                     shardId, appendShardVersion(aggExplainCmdObj, cri.getShardVersion(shardId)));

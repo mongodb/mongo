@@ -1438,6 +1438,7 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&allParameters, i](const std::vector<BSONObj>& docs) -> bool {
                 std::vector<BSONObj> parameters;
+                parameters.reserve(docs.size());
                 for (const BSONObj& doc : docs) {
                     parameters.push_back(doc.getOwned());
                 }

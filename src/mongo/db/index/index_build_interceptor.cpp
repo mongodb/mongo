@@ -463,6 +463,7 @@ Status IndexBuildInterceptor::_finishSideWrite(OperationContext* opCtx,
         });
 
     std::vector<Record> records;
+    records.reserve(toInsert.size());
     for (auto& doc : toInsert) {
         records.emplace_back(Record{RecordId(),  // The storage engine will assign its own RecordId
                                                  // when we pass one that is null.

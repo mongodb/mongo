@@ -476,6 +476,7 @@ std::unique_ptr<LineWithCRS> LineWithCRS::clone() const {
     cloned->crs = crs;
 
     std::vector<S2Point> vertices;
+    vertices.reserve(line.num_vertices());
     for (int i = 0; i < line.num_vertices(); ++i) {
         vertices.emplace_back(line.vertex(i));
     }

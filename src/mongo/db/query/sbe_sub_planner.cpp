@@ -72,6 +72,7 @@ CandidatePlans SubPlanner::plan(
         _yieldPolicy->clearRegisteredPlans();
 
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
+        roots.reserve(solutions.size());
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
                 _opCtx, _collections, *cq, *solution, _yieldPolicy));
@@ -162,6 +163,7 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     // Many solutions. Build a plan stage tree for each solution and create a multi planner to pick
     // the best, update the cache, and so on.
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
+    roots.reserve(solutions.size());
     for (auto&& solution : solutions) {
         roots.push_back(stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collections, _cq, *solution, _yieldPolicy));

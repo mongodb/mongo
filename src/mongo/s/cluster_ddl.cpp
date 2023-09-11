@@ -73,6 +73,7 @@ std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     appendShardVersion(cmdToSend, ShardVersion::UNSHARDED());
 
     std::vector<AsyncRequestsSender::Request> requests;
+    requests.reserve(shardIds.size());
     for (auto&& shardId : shardIds)
         requests.emplace_back(std::move(shardId), cmdToSend);
 

@@ -524,6 +524,7 @@ void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
         _equalities->getFirstOfEachType(opts.inMatchExprSortAndDedupElements);
 
     std::vector<Value> firstOfEachType;
+    firstOfEachType.reserve(firstElementOfEachType.size());
     for (auto&& elem : firstElementOfEachType) {
         firstOfEachType.emplace_back(elem);
     }
