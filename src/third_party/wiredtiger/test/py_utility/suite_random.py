@@ -28,7 +28,7 @@
 
 # suite_random.py
 #    A quick and predictable pseudo random number generator.
-import wttest
+import abstract_test_case
 
 class suite_random:
     """
@@ -39,7 +39,7 @@ class suite_random:
     """
     def __init__(self, *args):
         arglen = len(args)
-        seedw, seedz = wttest.getseed()
+        seedw, seedz = abstract_test_case.getseed()
         if arglen == 1:
             self.seedw = int(args[0]) & 0xffffffff
             self.seedz = int(args[0]) & 0xffffffff
@@ -57,7 +57,7 @@ class suite_random:
         w = self.seedw
         z = self.seedz
         if w == 0 or z == 0:
-            seedw, seedz = wttest.getRandomSeed()
+            seedw, seedz = abstract_test_case.getseed()
             self.seedw = int(seedw) & 0xffffffff
             self.seedz = int(seedz) & 0xffffffff
 

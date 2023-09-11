@@ -26,14 +26,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import compatibility_test, os, shutil, sys
+import compatibility_test, os, shutil, sys, wiredtiger
 
 class test_wt10533(compatibility_test.CompatibilityTestCase):
     '''
     Test handling checkpoints during database downgrade.
     '''
 
-    cmake_args = '-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DWT_STANDALONE_BUILD=0 -DENABLE_PYTHON=1'
     conn_config = 'compatibility=(release="3.3"),' + \
         'statistics=(fast),statistics_log=(json,on_close,wait=5)'
     create_config = 'key_format=i,value_format=S'
@@ -52,29 +51,18 @@ class test_wt10533(compatibility_test.CompatibilityTestCase):
         Test downgrading after creating a large number of checkpoints, which forces the
         monotonic checkpoint time to race far ahead the wallclock time.
         '''
+        self.run_method_on_branch(self.newer_branch, 'on_newer_branch_test_checkpoint_downgrade')
+        self.run_method_on_branch(self.older_branch, 'on_older_branch_test_checkpoint_downgrade')
 
-        # Checkout the relevant branches
-        branch = 'mongodb-6.0'
-        self.prepare_wt_branch(branch, self.cmake_args)
-        self.prepare_wt_branch('develop', self.cmake_args)
-
-        # Now run the first part of the test on the develop branch.
-        self.run_method_on_branch('develop', 'on_develop_test_checkpoint_downgrade')
-
-        # Now run the second part of the test on the other branch.
-        self.run_method_on_branch(branch, 'on_branch_test_checkpoint_downgrade')
-
-    def on_develop_test_checkpoint_downgrade(self):
+    def on_newer_branch_test_checkpoint_downgrade(self):
         '''
-        The first part of the test, which runs on the latest branch.
+        The first part of the test, which runs on the newer branch.
         '''
-
-        import wiredtiger
 
         conn = wiredtiger.wiredtiger_open('.', 'create,' + self.conn_config)
         session = conn.open_session()
-        
-        print(f'Running on {wiredtiger.wiredtiger_version()[0]}')
+
+        self.pr(f'Running on {wiredtiger.wiredtiger_version()[0]}')
 
         # Create and populate a table.
         session.create(self.uri, self.create_config)
@@ -98,14 +86,12 @@ class test_wt10533(compatibility_test.CompatibilityTestCase):
         session.close()
         conn.close()
 
-    def on_branch_test_checkpoint_downgrade(self):
+    def on_older_branch_test_checkpoint_downgrade(self):
         '''
-        The second part of the test, which runs on a different branch.
+        The second part of the test, which runs on the older branch.
         '''
-        
-        import wiredtiger
-        
-        print(f'Running on {wiredtiger.wiredtiger_version()[0]}')
+
+        self.pr(f'Running on {wiredtiger.wiredtiger_version()[0]}')
 
         conn = wiredtiger.wiredtiger_open('.', self.conn_config)
         session = conn.open_session()
