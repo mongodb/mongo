@@ -1,0 +1,15 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name="visibility_test_libcommon",
+    hdrs=[
+        "visibility_test_libcommon.h",
+        "visibility.h",
+        "basic.h",
+    ],
+    srcs=[
+        "visibility_test_libcommon.cpp",
+    ],
+    # Since Mongo's c++ files' #include directives are `src`-relative, we need to include `src` in the include path.
+    copts = ["-Isrc"],
+)

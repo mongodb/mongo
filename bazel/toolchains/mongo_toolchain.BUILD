@@ -42,6 +42,8 @@ filegroup(
             "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include",
             "-isystem",
+            "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed",
+            "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
             "-isystem",
             "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
@@ -50,10 +52,20 @@ filegroup(
             "-Bexternal/mongo_toolchain/v4/lib",
             "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
         ],
+        unfiltered_compile_flags = [
+            # Do not resolve our symlinked resource prefixes to real paths. This is required to
+            # make includes resolve correctly.
+            "-no-canonical-prefixes",
+        ],
         compiler = compiler_name,
         cpu = "arm64",
         cxx_builtin_include_directories = [
             "/usr/include",
+            # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
+            "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include)%",
+            "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0)%",
+            "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux)%",
+            "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed)%",
         ],
         unfiltered_compile_flags = [
             # Replace compile timestamp-related macros for reproducible binaries with consistent hashes.
