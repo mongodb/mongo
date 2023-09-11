@@ -117,7 +117,8 @@ AwsManager AwsManager::aws_instance;
 static int S3GetDirectory(
   const S3Storage &, const std::string &, const std::string &, bool, std::string &);
 static bool S3CacheExists(WT_FILE_SYSTEM *, const std::string &);
-static std::string S3Path(const std::string &, const std::string &);
+static std::string S3CachePath(const std::string &, const std::string &);
+static std::string S3SourcePath(const std::string &, const std::string &);
 static int S3FileExists(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int S3CustomizeFileSystem(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
@@ -143,9 +144,23 @@ static int S3FileSize(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 static int S3FileLock(WT_FILE_HANDLE *, WT_SESSION *, bool);
 static int S3ObjectSize(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
 
-// Construct a pathname from the directory and the object name.
+// Construct a pathname from the cache directory and the object name. This takes care of translating
+// illegal characters in the object name (e.g., '/') into legal characters.
 static std::string
-S3Path(const std::string &dir, const std::string &name)
+S3CachePath(const std::string &dir, const std::string &name)
+{
+    int i;
+    std::string cacheFileName = name;
+    for (i = 0; i < cacheFileName.length(); i++)
+        if (cacheFileName[i] == '/')
+            cacheFileName[i] = '-';
+
+    return (dir + "/" + cacheFileName);
+}
+
+// Construct a pathname from the source directory and the base file name.
+static std::string
+S3SourcePath(const std::string &dir, const std::string &name)
 {
     // Skip over "./" and variations (".//", ".///./././//") at the beginning of the name.
     int i = 0;
@@ -190,7 +205,7 @@ S3FileExists(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, 
 static bool
 S3CacheExists(WT_FILE_SYSTEM *fileSystem, const std::string &name)
 {
-    const std::string path = S3Path(((S3FileSystem *)fileSystem)->cacheDir, name);
+    const std::string path = S3CachePath(((S3FileSystem *)fileSystem)->cacheDir, name);
     return (LocalFileExists(path));
 }
 
@@ -307,7 +322,7 @@ S3FileOpen(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
     }
 
     // Make a copy from S3 if the file is not in the cache.
-    const std::string cachePath = S3Path(fs->cacheDir, name);
+    const std::string cachePath = S3CachePath(fs->cacheDir, name);
     if (!LocalFileExists(cachePath)) {
         s3->statistics.getObjectCount++;
         if ((ret = fs->connection->GetObject(name, cachePath)) != 0) {
@@ -783,7 +798,7 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
     FS2S3(fileSystem)->statistics.putObjectCount++;
 
     // Confirm that the file exists on the native filesystem.
-    std::string srcPath = S3Path(fs->homeDir, source);
+    std::string srcPath = S3SourcePath(fs->homeDir, source);
     bool nativeExist = false;
     int ret = wtFileSystem->fs_exist(wtFileSystem, session, srcPath.c_str(), &nativeExist);
     if (ret != 0) {
@@ -816,10 +831,11 @@ S3FlushFinish(WT_STORAGE_SOURCE *storage, WT_SESSION *session, WT_FILE_SYSTEM *f
     S3Storage *s3 = (S3Storage *)storage;
     S3FileSystem *fs = (S3FileSystem *)fileSystem;
     // Constructing the pathname for source and cache from file system and local.
-    std::string srcPath = S3Path(fs->homeDir, source);
-    std::string destPath = S3Path(fs->cacheDir, object);
+    std::string srcPath = S3SourcePath(fs->homeDir, source);
+    std::string destPath = S3CachePath(fs->cacheDir, object);
 
-    // Converting S3 object name to cache directory strcture to link the cache file with local file.
+    // Converting S3 object name to cache directory structure to link the cache file with local
+    // file.
     std::filesystem::create_directories(std::filesystem::path(destPath).parent_path());
 
     // Linking file with the local file.

@@ -292,7 +292,7 @@ configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, 
     opts.absolute_bucket_dir = true;
 
     testutil_tiered_storage_configuration(
-      &opts, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
+      &opts, home, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
     CONFIG_APPEND(*p, ",%s", tiered_cfg);
 }
 
