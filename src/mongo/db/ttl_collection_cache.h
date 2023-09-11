@@ -59,14 +59,11 @@ public:
     // Specifies how a collection should expire data with TTL.
     class Info {
     public:
-        enum class ExpireAfterSecondsType { kInvalid, kNonInt, kInt };
-
-        explicit Info(ClusteredId)
-            : _isClustered(true), _expireAfterSecondsType(ExpireAfterSecondsType::kInt) {}
-        Info(IndexName indexName, ExpireAfterSecondsType type)
+        explicit Info(ClusteredId) : _isClustered(true), _isExpireAfterSecondsInvalid(false) {}
+        Info(IndexName indexName, bool isExpireAfterSecondsInvalid)
             : _isClustered(false),
               _indexName(std::move(indexName)),
-              _expireAfterSecondsType(type) {}
+              _isExpireAfterSecondsInvalid(isExpireAfterSecondsInvalid) {}
         bool isClustered() const {
             return _isClustered;
         }
@@ -74,19 +71,16 @@ public:
             return _indexName;
         }
         bool isExpireAfterSecondsInvalid() const {
-            return _expireAfterSecondsType == ExpireAfterSecondsType::kInvalid;
+            return _isExpireAfterSecondsInvalid;
         }
-        bool isExpireAfterSecondsNonInt() const {
-            return _expireAfterSecondsType == ExpireAfterSecondsType::kNonInt;
-        }
-        void setExpireAfterSecondsType(ExpireAfterSecondsType type) {
-            _expireAfterSecondsType = type;
+        void unsetExpireAfterSecondsInvalid() {
+            _isExpireAfterSecondsInvalid = false;
         }
 
     private:
         bool _isClustered;
         IndexName _indexName;
-        ExpireAfterSecondsType _expireAfterSecondsType;
+        bool _isExpireAfterSecondsInvalid;
     };
 
     // Caller is responsible for ensuring no duplicates are registered.
@@ -98,9 +92,7 @@ public:
      * Resets expireAfterSeconds flag on TTL index.
      * For idempotency, this has no effect if index is not found.
      */
-    void setTTLIndexExpireAfterSecondsType(UUID uuid,
-                                           const IndexName& indexName,
-                                           Info::ExpireAfterSecondsType type);
+    void unsetTTLIndexExpireAfterSecondsInvalid(UUID uuid, const IndexName& indexName);
 
     using InfoMap = stdx::unordered_map<UUID, std::vector<Info>, UUID::Hash>;
     InfoMap getTTLInfos();
