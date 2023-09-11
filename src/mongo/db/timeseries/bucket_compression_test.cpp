@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
@@ -80,6 +81,50 @@ const BSONObj sampleBucket = mongo::fromjson(R"({
         }
 })");
 
+const BSONObj bucketWithDuplicateIndexFieldNames = mongo::fromjson(R"({
+        "_id" : {"$oid": "630ea4802093f9983fc394dc"},
+        "control" : {
+                "version" : 1,
+                "min" : {
+                        "_id" : {"$oid": "630fabf7c388456f8aea4f2d"},
+                        "t" : {"$date": "2022-08-31T00:00:00Z"},
+                        "a" : 0
+                },
+                "max" : {
+                        "_id" : {"$oid": "630fabf7c388456f8aea4f33"},
+                        "t" : {"$date": "2022-08-31T00:00:03Z"},
+                        "a" : 3
+                }
+        },
+        "data" : {
+                "_id" : {
+                        "0" : {"$oid": "630fabf7c388456f8aea4f2d"},
+                        "1" : {"$oid": "630fabf7c388456f8aea4f2f"},
+                        "1" : {"$oid": "630fabf7c388456f8aea4f31"},
+                        "2" : {"$oid": "630fabf7c388456f8aea4f33"}
+                },
+                "a" : {
+                        "0" : 0,
+                        "1" : 1,
+                        "1" : 2,
+                        "2" : 3
+                },
+                "t" : {
+                        "0" : {"$date": "2022-08-31T00:00:00Z"},
+                        "1" : {"$date": "2022-08-31T00:00:01Z"},
+                        "1" : {"$date": "2022-08-31T00:00:02Z"},
+                        "2" : {"$date": "2022-08-31T00:00:03Z"}
+                }
+        }
+}})");
+
+void assertNoDuplicateIndexFieldNames(const BSONObj& column) {
+    size_t curIdx = 0;
+    for (const auto elemIt : column) {
+        ASSERT_EQ(std::to_string(curIdx++), elemIt.fieldName());
+    }
+}
+
 TEST(TimeseriesBucketCompression, BasicRoundtrip) {
     auto compressed = timeseries::compressBucket(
         sampleBucket, "t"_sd, NamespaceString::createNamespaceString_forTest("test.foo"), false);
@@ -90,6 +135,34 @@ TEST(TimeseriesBucketCompression, BasicRoundtrip) {
     // Compression will re-order data fields, moving the timeField to the front.
     UnorderedFieldsBSONObjComparator comparator;
     ASSERT_EQ(0, comparator.compare(decompressed.value(), sampleBucket));
+}
+
+TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
+    const StringData timeFieldName("t");
+    auto compressed =
+        timeseries::compressBucket(bucketWithDuplicateIndexFieldNames,
+                                   timeFieldName,
+                                   NamespaceString::createNamespaceString_forTest("test.foo"),
+                                   false);
+    ASSERT_TRUE(compressed.compressedBucket.has_value());
+    auto decompressed = timeseries::decompressBucket(compressed.compressedBucket.value());
+    ASSERT_TRUE(decompressed.has_value());
+
+    // Compression will re-order data fields, moving the timeField to the front.
+    UnorderedFieldsBSONObjComparator comparator;
+
+    // Decompression rewrites index field names, so the objects will not match.
+    ASSERT_NE(0, comparator.compare(decompressed.value(), bucketWithDuplicateIndexFieldNames));
+
+    // Check that we have 4 measurements in the decompressed bucket.
+    ASSERT_EQ(4,
+              decompressed->getObjectField(timeseries::kBucketDataFieldName)
+                  .getObjectField(timeFieldName)
+                  .nFields());
+
+    for (const auto columnIt : decompressed->getObjectField(timeseries::kBucketDataFieldName)) {
+        assertNoDuplicateIndexFieldNames(columnIt.Obj());
+    }
 }
 
 TEST(TimeseriesBucketCompression, CannotDecompressUncompressedBucket) {
