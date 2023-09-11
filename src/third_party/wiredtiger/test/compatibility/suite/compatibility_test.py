@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import inspect, os, pickle, shutil, subprocess, sys, tempfile, unittest
+import argparse, inspect, os, pickle, shutil, subprocess, sys, tempfile, unittest
 
 # Import the common compatibility test functionality
 sys.path.insert(1, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
@@ -222,7 +222,7 @@ def add_branch_pair_scenarios(suite):
         else:
             setattr(test, 'scenarios', wtscenario.make_scenarios(branch_scenarios, scenarios))
 
-def global_setup():
+def global_setup(verbose = 1):
     '''
     Perform the global setup.
     '''
@@ -232,7 +232,7 @@ def global_setup():
 
     # Global setup.
     CompatibilityTestCase.setupTestDir()
-    CompatibilityTestCase.setupIO()
+    CompatibilityTestCase.setupIO(verbose=verbose)
     CompatibilityTestCase.setupRandom()
 
     # At this point, we can finally set up WiredTiger paths. We need to do this, so that the
@@ -276,8 +276,14 @@ def run(name='__main__'):
 if __name__ == '__main__':
     from discover import defaultTestLoader as loader
 
+    # Parse the command-line arguments
+    parser = argparse.ArgumentParser(description='Run the compatibility test suite.')
+    parser.add_argument('-v', '--verbose', metavar='N', type=int, choices=range(5), default=1,
+                        help='set verboseness to N (0 <= N <= 4, default=1)')
+    opts = parser.parse_args()
+
     # Global setup: set up paths, default parameter values, and test subsystems.
-    global_setup()
+    global_setup(verbose=opts.verbose)
 
     # Load the tests.
     suite_dir = os.path.dirname(os.path.abspath(__file__))
