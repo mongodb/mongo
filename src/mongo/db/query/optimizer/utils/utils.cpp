@@ -1616,21 +1616,10 @@ static void consolidateEqDisjunctions(ABTVector& childResults) {
             pathCompare != nullptr && pathCompare->getVal().is<Constant>()) {
             switch (pathCompare->op()) {
                 case Operations::EqMember: {
-                    // Unpack this node's values into the new eqMembersArray.
-                    const auto [arrayTag, arrayVal] = pathCompare->getVal().cast<Constant>()->get();
-                    if (arrayTag != sbe::value::TypeTags::Array) {
-                        continue;
-                    }
-
-                    const auto valsArray = sbe::value::getArrayView(arrayVal);
-                    for (size_t j = 0; j < valsArray->size(); j++) {
-                        const auto [tag, val] = valsArray->getAt(j);
-                        // If this is found to be a bottleneck, could be implemented with moving,
-                        // rather than copying, the values into the array (same in Eq case).
-                        const auto [newTag, newVal] = sbe::value::copyValue(tag, val);
-                        eqMembersArray->push_back(newTag, newVal);
-                    }
-                    break;
+                    // This is unreachable since the PSR is assumed to be in DNF form when converted
+                    // to a filter node. This means that any EqMember from translation would have
+                    // first been decomposed into individual EQ predicates under a disjunction.
+                    tasserted(7987902, "Unexpected eqMember");
                 }
                 case Operations::Eq: {
                     // Copy this node's value into the new eqMembersArray.

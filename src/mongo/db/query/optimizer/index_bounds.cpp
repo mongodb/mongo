@@ -295,18 +295,8 @@ ResidualRequirementWithOptionalCE::ResidualRequirementWithOptionalCE(PartialSche
                                                                      boost::optional<CEType> ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
-bool ResidualRequirementWithOptionalCE::operator==(
-    const ResidualRequirementWithOptionalCE& other) const {
-    return _key == other._key && _req == other._req && _ce == other._ce;
-}
-
 EqualityPrefixEntry::EqualityPrefixEntry(const size_t startPos)
     : _startPos(startPos), _interval(CompoundIntervalReqExpr::makeSingularDNF()), _predPosSet() {}
-
-bool EqualityPrefixEntry::operator==(const EqualityPrefixEntry& other) const {
-    return _startPos == other._startPos && _interval == other._interval &&
-        _predPosSet == other._predPosSet;
-}
 
 CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
     : _indexDefName(std::move(indexDefName)),
@@ -316,18 +306,5 @@ CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
       _residualRequirements(),
       _predTypes(),
       _intervalPrefixSize(0) {}
-
-bool CandidateIndexEntry::operator==(const CandidateIndexEntry& other) const {
-    return _indexDefName == other._indexDefName &&
-        _fieldProjectionMap == other._fieldProjectionMap && _eqPrefixes == other._eqPrefixes &&
-        _correlatedProjNames == other._correlatedProjNames &&
-        _residualRequirements == other._residualRequirements && _predTypes == other._predTypes &&
-        _intervalPrefixSize == other._intervalPrefixSize;
-}
-
-bool ScanParams::operator==(const ScanParams& other) const {
-    return _fieldProjectionMap == other._fieldProjectionMap &&
-        _residualRequirements == other._residualRequirements;
-}
 
 }  // namespace mongo::optimizer

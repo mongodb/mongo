@@ -85,7 +85,7 @@ struct DistributionAndPaths {
 struct IndexCollationEntry {
     IndexCollationEntry(ABT path, CollationOp op);
 
-    bool operator==(const IndexCollationEntry& other) const;
+    bool operator==(const IndexCollationEntry& other) const = default;
 
     ABT _path;
     CollationOp _op;

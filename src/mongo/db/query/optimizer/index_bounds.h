@@ -298,7 +298,6 @@ struct PartialSchemaRequirementComparator {
         bool operator()(const PartialSchemaRequirement& req1,
                         const PartialSchemaRequirement& req2) const;
     };
-
     struct Cmp3W {
         int operator()(const PartialSchemaRequirement& req1,
                        const PartialSchemaRequirement& req2) const;
@@ -333,8 +332,6 @@ struct ResidualRequirementWithOptionalCE {
                                       PartialSchemaRequirement req,
                                       boost::optional<CEType> ce);
 
-    bool operator==(const ResidualRequirementWithOptionalCE& other) const;
-
     PartialSchemaKey _key;
     PartialSchemaRequirement _req;
     boost::optional<CEType> _ce;
@@ -343,8 +340,6 @@ using ResidualRequirementsWithOptionalCE = BoolExpr<ResidualRequirementWithOptio
 
 struct EqualityPrefixEntry {
     EqualityPrefixEntry(size_t startPos);
-
-    bool operator==(const EqualityPrefixEntry& other) const;
 
     // Which one is the first index field in the prefix.
     size_t _startPos;
@@ -399,8 +394,6 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(IndexFieldPredType, INDEXFIELD_PREDTYPE_OPNAMES);
 struct CandidateIndexEntry {
     CandidateIndexEntry(std::string indexDefName);
 
-    bool operator==(const CandidateIndexEntry& other) const;
-
     std::string _indexDefName;
 
     // Indicates which fields we are retrieving and how we assign them to projections.
@@ -435,8 +428,6 @@ struct CandidateIndexEntry {
  * fields, compared to doing N separate getField calls.
  */
 struct ScanParams {
-    bool operator==(const ScanParams& other) const;
-
     FieldProjectionMap _fieldProjectionMap;
 
     // Requirements which are not satisfied directly by a PhysicalScan or Seek. Each Conjunction is

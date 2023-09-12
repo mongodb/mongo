@@ -97,13 +97,6 @@ static void updateBoundHash(size_t& result, const BoundRequirement& bound) {
     updateHash(result, ABTHashGenerator::generate(bound.getBound()));
 };
 
-static void updateCompoundBoundHash(size_t& result, const CompoundBoundRequirement& bound) {
-    updateHash(result, std::hash<bool>()(bound.isInclusive()));
-    for (const auto& expr : bound.getBound()) {
-        updateHash(result, ABTHashGenerator::generate(expr));
-    }
-}
-
 template <class T>
 class BoolExprHasher {
 public:
@@ -138,13 +131,6 @@ size_t ABTHashGenerator::generate(const IntervalRequirement& req) {
     updateBoundHash(result, req.getLowBound());
     updateBoundHash(result, req.getHighBound());
     return 17;
-}
-
-size_t ABTHashGenerator::generate(const CompoundIntervalRequirement& req) {
-    size_t result = 19;
-    updateCompoundBoundHash(result, req.getLowBound());
-    updateCompoundBoundHash(result, req.getHighBound());
-    return result;
 }
 
 size_t ABTHashGenerator::generate(const PartialSchemaEntry& entry) {

@@ -122,10 +122,6 @@ void MultikeynessTrie::add(const ABT& path) {
     merge(MultikeynessTrie::fromIndexPath(path));
 }
 
-bool IndexCollationEntry::operator==(const IndexCollationEntry& other) const {
-    return _path == other._path && _op == other._op;
-}
-
 IndexCollationEntry::IndexCollationEntry(ABT path, CollationOp op)
     : _path(std::move(path)), _op(op) {}
 

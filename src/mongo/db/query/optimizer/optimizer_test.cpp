@@ -738,6 +738,30 @@ TEST(IntervalNormalize, IntervalNormalizeConstantsFirst) {
         intervalExpr);
 }
 
+TEST(IntervalNormalize, MixedTypes) {
+    auto intervalExpr = _disj(_conj(_interval(_incl("str1"_cstr), _incl("str2"_cstr))),
+                              _conj(_interval(_incl("7"_cint64), _incl("8"_cint64))));
+
+    ASSERT_INTERVAL_AUTO(
+        "{\n"
+        "    {{[Const [\"str1\"], Const [\"str2\"]]}}\n"
+        " U \n"
+        "    {{[Const [7], Const [8]]}}\n"
+        "}\n",
+        intervalExpr);
+
+    normalizeIntervals(intervalExpr);
+
+    // Note that numerics are sorted before strings.
+    ASSERT_INTERVAL_AUTO(
+        "{\n"
+        "    {{[Const [7], Const [8]]}}\n"
+        " U \n"
+        "    {{[Const [\"str1\"], Const [\"str2\"]]}}\n"
+        "}\n",
+        intervalExpr);
+}
+
 TEST(Optimizer, ExplainRIDUnion) {
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(make<PathGet>("a",

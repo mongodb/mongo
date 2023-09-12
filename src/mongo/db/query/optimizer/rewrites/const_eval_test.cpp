@@ -84,5 +84,16 @@ TEST(ConstEvalTest, RIDUnion) {
         "          Scan [test, {p0}]\n",
         rootNode);
 }
+
+TEST(ConstEvalTest, FoldRedundantExists) {
+    ABT exists = make<FunctionCall>("exists", makeSeq(Constant::int32(1)));
+
+    // Eliminates the exists call in favor of a boolean true.
+    ConstEval::constFold(exists);
+
+    ASSERT_EXPLAIN_AUTO(  // NOLINT
+        "Const [true]\n",
+        exists);
+}
 }  // namespace
 }  // namespace mongo::optimizer
