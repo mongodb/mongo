@@ -161,7 +161,7 @@ public:
         return "Reshard an already sharded collection on a new shard key.";
     }
 };
-MONGO_REGISTER_COMMAND(ReshardCollectionCmd);
+MONGO_REGISTER_COMMAND(ReshardCollectionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

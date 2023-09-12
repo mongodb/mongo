@@ -157,9 +157,9 @@ public:
                                  false /* do not log cmd */) {}
 };
 
-MONGO_REGISTER_COMMAND(BalancerStartCommand);
-MONGO_REGISTER_COMMAND(BalancerStopCommand);
-MONGO_REGISTER_COMMAND(BalancerStatusCommand);
+MONGO_REGISTER_COMMAND(BalancerStartCommand).forRouter();
+MONGO_REGISTER_COMMAND(BalancerStopCommand).forRouter();
+MONGO_REGISTER_COMMAND(BalancerStatusCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

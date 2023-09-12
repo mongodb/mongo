@@ -93,8 +93,8 @@ protected:
     }
 };
 
-MONGO_REGISTER_COMMAND(ProfileCmd);
-MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd);
+MONGO_REGISTER_COMMAND(ProfileCmd).forRouter();
+MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

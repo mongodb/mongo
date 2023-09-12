@@ -144,6 +144,6 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 };
-MONGO_REGISTER_COMMAND(CmdConnectionStatus);
+MONGO_REGISTER_COMMAND(CmdConnectionStatus).forRouter().forShard();
 
 }  // namespace mongo

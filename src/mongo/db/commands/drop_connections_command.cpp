@@ -98,7 +98,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(DropConnectionsCmd);
+MONGO_REGISTER_COMMAND(DropConnectionsCmd).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

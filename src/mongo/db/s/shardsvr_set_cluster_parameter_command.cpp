@@ -154,7 +154,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrSetClusterParameterCommand);
+MONGO_REGISTER_COMMAND(ShardsvrSetClusterParameterCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

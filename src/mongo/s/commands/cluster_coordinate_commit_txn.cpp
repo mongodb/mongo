@@ -90,6 +90,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CoordinateCommitTransactionCmd);
+MONGO_REGISTER_COMMAND(CoordinateCommitTransactionCmd).forRouter();
 
 }  // namespace mongo

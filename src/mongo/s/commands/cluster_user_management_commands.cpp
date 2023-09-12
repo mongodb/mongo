@@ -210,7 +210,7 @@ public:
         return {kPwdField};
     }
 };
-MONGO_REGISTER_COMMAND(CmdCreateUser);
+MONGO_REGISTER_COMMAND(CmdCreateUser).forRouter();
 
 class CmdUpdateUser : public CmdUMCPassthrough<UpdateUserCommand, UserCacheInvalidatorUser> {
 public:
@@ -219,20 +219,28 @@ public:
         return {kPwdField};
     }
 };
-MONGO_REGISTER_COMMAND(CmdUpdateUser);
+MONGO_REGISTER_COMMAND(CmdUpdateUser).forRouter();
 
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropUserCommand, UserCacheInvalidatorUser>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropAllUsersFromDatabaseCommand, UserCacheInvalidatorDB>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantRolesToUserCommand, UserCacheInvalidatorUser>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokeRolesFromUserCommand, UserCacheInvalidatorUser>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<CreateRoleCommand, UserCacheInvalidatorNOOP>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<UpdateRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantPrivilegesToRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokePrivilegesFromRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantRolesToRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokeRolesFromRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropRoleCommand, UserCacheInvalidatorAll>);
-MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropAllRolesFromDatabaseCommand, UserCacheInvalidatorAll>);
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropUserCommand, UserCacheInvalidatorUser>).forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropAllUsersFromDatabaseCommand, UserCacheInvalidatorDB>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantRolesToUserCommand, UserCacheInvalidatorUser>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokeRolesFromUserCommand, UserCacheInvalidatorUser>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<CreateRoleCommand, UserCacheInvalidatorNOOP>).forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<UpdateRoleCommand, UserCacheInvalidatorAll>).forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantPrivilegesToRoleCommand, UserCacheInvalidatorAll>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokePrivilegesFromRoleCommand, UserCacheInvalidatorAll>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<GrantRolesToRoleCommand, UserCacheInvalidatorAll>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<RevokeRolesFromRoleCommand, UserCacheInvalidatorAll>)
+    .forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropRoleCommand, UserCacheInvalidatorAll>).forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCPassthrough<DropAllRolesFromDatabaseCommand, UserCacheInvalidatorAll>)
+    .forRouter();
 
 /**
  * usersInfo and rolesInfo are simpler read-only passthrough commands.
@@ -289,8 +297,8 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdUMCInfo<UsersInfoCommand>);
-MONGO_REGISTER_COMMAND(CmdUMCInfo<RolesInfoCommand>);
+MONGO_REGISTER_COMMAND(CmdUMCInfo<UsersInfoCommand>).forRouter();
+MONGO_REGISTER_COMMAND(CmdUMCInfo<RolesInfoCommand>).forRouter();
 
 class CmdInvalidateUserCache : public TypedCommand<CmdInvalidateUserCache> {
 public:
@@ -327,7 +335,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdInvalidateUserCache);
+MONGO_REGISTER_COMMAND(CmdInvalidateUserCache).forRouter();
 
 class CmdMergeAuthzCollections
     : public CmdUMCPassthrough<MergeAuthzCollectionsCommand, UserCacheInvalidatorNOOP> {
@@ -336,7 +344,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdMergeAuthzCollections);
+MONGO_REGISTER_COMMAND(CmdMergeAuthzCollections).forRouter();
 
 }  // namespace
 }  // namespace mongo

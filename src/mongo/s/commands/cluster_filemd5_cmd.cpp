@@ -229,7 +229,7 @@ public:
         MONGO_UNREACHABLE;
     }
 };
-MONGO_REGISTER_COMMAND(FileMD5Cmd);
+MONGO_REGISTER_COMMAND(FileMD5Cmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

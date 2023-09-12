@@ -136,7 +136,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCmd);
+MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

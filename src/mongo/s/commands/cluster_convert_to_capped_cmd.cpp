@@ -155,7 +155,7 @@ public:
             &result);
     }
 };
-MONGO_REGISTER_COMMAND(ConvertToCappedCmd);
+MONGO_REGISTER_COMMAND(ConvertToCappedCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

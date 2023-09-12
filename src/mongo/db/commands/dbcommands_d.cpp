@@ -396,9 +396,9 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdProfile);
-MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd);
-MONGO_REGISTER_COMMAND(CmdFileMD5);
+MONGO_REGISTER_COMMAND(CmdProfile).forShard();
+MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd).forShard();
+MONGO_REGISTER_COMMAND(CmdFileMD5).forShard();
 
 }  // namespace
 }  // namespace mongo

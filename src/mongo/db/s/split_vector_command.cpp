@@ -187,7 +187,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(SplitVector);
+MONGO_REGISTER_COMMAND(SplitVector).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -93,7 +93,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdGetShardMap);
+MONGO_REGISTER_COMMAND(CmdGetShardMap).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

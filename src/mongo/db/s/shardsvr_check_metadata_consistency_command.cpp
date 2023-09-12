@@ -354,7 +354,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencyCommand);
+MONGO_REGISTER_COMMAND(ShardsvrCheckMetadataConsistencyCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

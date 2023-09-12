@@ -128,7 +128,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterMoveRangeCommand);
+MONGO_REGISTER_COMMAND(ClusterMoveRangeCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

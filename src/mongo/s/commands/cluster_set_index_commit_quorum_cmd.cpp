@@ -155,7 +155,7 @@ public:
         return ok;
     }
 };
-MONGO_REGISTER_COMMAND(SetIndexCommitQuorumCommand);
+MONGO_REGISTER_COMMAND(SetIndexCommitQuorumCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

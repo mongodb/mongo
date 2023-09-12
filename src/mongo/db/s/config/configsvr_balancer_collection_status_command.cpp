@@ -119,7 +119,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrBalancerCollectionStatusCmd);
+MONGO_REGISTER_COMMAND(ConfigsvrBalancerCollectionStatusCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

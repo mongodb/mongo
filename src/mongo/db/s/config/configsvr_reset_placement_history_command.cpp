@@ -110,7 +110,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigSvrResetPlacementHistoryCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrResetPlacementHistoryCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

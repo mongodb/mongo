@@ -59,7 +59,7 @@ struct ClusterAbortTransactionCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdS>);
+MONGO_REGISTER_COMMAND(ClusterAbortTransactionCmdBase<ClusterAbortTransactionCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

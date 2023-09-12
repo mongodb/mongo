@@ -242,5 +242,5 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdSleep).testOnly();
+MONGO_REGISTER_COMMAND(CmdSleep).testOnly().forShard();
 }  // namespace mongo

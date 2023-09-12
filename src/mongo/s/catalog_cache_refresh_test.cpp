@@ -91,10 +91,10 @@ using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
-class CatalogCacheRefreshTest : public CatalogCacheTestFixture {
+class CatalogCacheRefreshTest : public RouterCatalogCacheTestFixture {
 protected:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
 
         setupNShards(2);
     }

@@ -121,7 +121,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(TransitionToDedicatedConfigServerCmd);
+MONGO_REGISTER_COMMAND(TransitionToDedicatedConfigServerCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -128,7 +128,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CheckShardingIndex);
+MONGO_REGISTER_COMMAND(CheckShardingIndex).forShard();
 
 }  // namespace
 }  // namespace mongo

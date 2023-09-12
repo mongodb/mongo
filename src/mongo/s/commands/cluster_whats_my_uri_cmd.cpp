@@ -78,7 +78,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(WhatsMyUriCmd);
+MONGO_REGISTER_COMMAND(WhatsMyUriCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

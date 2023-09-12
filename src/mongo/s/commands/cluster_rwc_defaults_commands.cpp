@@ -145,7 +145,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ClusterSetDefaultRWConcernCommand);
+MONGO_REGISTER_COMMAND(ClusterSetDefaultRWConcernCommand).forRouter();
 
 /**
  * Implements the getDefaultRWConcern command on mongos.
@@ -219,7 +219,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ClusterGetDefaultRWConcernCommand);
+MONGO_REGISTER_COMMAND(ClusterGetDefaultRWConcernCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

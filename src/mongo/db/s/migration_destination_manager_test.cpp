@@ -182,7 +182,7 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
     ASSERT_EQ(operationContext()->getKillStatus(), 51008);
 }
 
-using MigrationDestinationManagerNetworkTest = CatalogCacheTestFixture;
+using MigrationDestinationManagerNetworkTest = RouterCatalogCacheTestFixture;
 
 // Verifies MigrationDestinationManager::getCollectionOptions() and
 // MigrationDestinationManager::getCollectionIndexes() won't use shard/db versioning without a chunk

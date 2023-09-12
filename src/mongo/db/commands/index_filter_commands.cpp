@@ -390,8 +390,8 @@ Status SetFilter::set(OperationContext* opCtx,
     return Status::OK();
 }
 
-MONGO_REGISTER_COMMAND(ListFilters);
-MONGO_REGISTER_COMMAND(ClearFilters);
-MONGO_REGISTER_COMMAND(SetFilter);
+MONGO_REGISTER_COMMAND(ListFilters).forShard();
+MONGO_REGISTER_COMMAND(ClearFilters).forShard();
+MONGO_REGISTER_COMMAND(SetFilter).forShard();
 
 }  // namespace mongo

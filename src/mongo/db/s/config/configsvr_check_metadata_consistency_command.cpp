@@ -250,7 +250,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigsvrCheckMetadataConsistencyCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrCheckMetadataConsistencyCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

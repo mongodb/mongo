@@ -440,7 +440,7 @@ public:
         cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
     }
 };
-MONGO_REGISTER_COMMAND(CmdCount);
+MONGO_REGISTER_COMMAND(CmdCount).forShard();
 
 }  // namespace
 }  // namespace mongo

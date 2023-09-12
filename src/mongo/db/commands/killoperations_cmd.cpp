@@ -67,6 +67,6 @@ public:
         }
     }
 };
-MONGO_REGISTER_COMMAND(KillOperationsCmd);
+MONGO_REGISTER_COMMAND(KillOperationsCmd).forShard();
 
 }  // namespace mongo

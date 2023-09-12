@@ -126,7 +126,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdRenameCollection);
+MONGO_REGISTER_COMMAND(CmdRenameCollection).forShard();
 
 }  // namespace
 }  // namespace mongo

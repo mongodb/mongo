@@ -85,7 +85,7 @@
 namespace mongo {
 namespace {
 
-class RecipientServiceExternalStateTest : public CatalogCacheTestFixture,
+class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture,
                                           public ServiceContextMongoDTest {
 public:
     const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("_id" << 1));
@@ -108,7 +108,7 @@ public:
     const Timestamp kDefaultFetchTimestamp = Timestamp(200, 1);
 
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        ShardCatalogCacheTestFixture::setUp();
 
         repl::ReplicationCoordinator::set(
             getServiceContext(),
@@ -130,7 +130,7 @@ public:
     }
 
     void tearDown() override {
-        CatalogCacheTestFixture::tearDown();
+        ShardCatalogCacheTestFixture::tearDown();
     }
 
     void expectListCollections(const NamespaceString& nss,

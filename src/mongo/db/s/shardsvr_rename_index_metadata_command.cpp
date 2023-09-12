@@ -209,7 +209,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrRenameIndexMetadataCommand);
+MONGO_REGISTER_COMMAND(ShardsvrRenameIndexMetadataCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

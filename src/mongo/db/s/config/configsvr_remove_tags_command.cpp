@@ -168,7 +168,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrRemoveTagsCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrRemoveTagsCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -349,7 +349,7 @@ public:
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
 };
-MONGO_REGISTER_COMMAND(CleanupStructuredEncryptionDataCmd);
+MONGO_REGISTER_COMMAND(CleanupStructuredEncryptionDataCmd).forShard();
 
 
 }  // namespace

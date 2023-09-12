@@ -131,7 +131,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrRepairShardedCollectionChunksHistoryCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrRepairShardedCollectionChunksHistoryCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

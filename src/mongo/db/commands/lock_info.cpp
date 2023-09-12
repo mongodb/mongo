@@ -109,5 +109,5 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdLockInfo);
+MONGO_REGISTER_COMMAND(CmdLockInfo).forShard();
 }  // namespace mongo

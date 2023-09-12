@@ -180,7 +180,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RecvChunkStartCommand);
+MONGO_REGISTER_COMMAND(RecvChunkStartCommand).forShard();
 
 class RecvChunkStatusCommand : public BasicCommand {
 public:
@@ -228,7 +228,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RecvChunkStatusCommand);
+MONGO_REGISTER_COMMAND(RecvChunkStatusCommand).forShard();
 
 class RecvChunkCommitCommand : public BasicCommand {
 public:
@@ -287,7 +287,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RecvChunkCommitCommand);
+MONGO_REGISTER_COMMAND(RecvChunkCommitCommand).forShard();
 
 class RecvChunkAbortCommand : public BasicCommand {
 public:
@@ -353,7 +353,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RecvChunkAbortCommand);
+MONGO_REGISTER_COMMAND(RecvChunkAbortCommand).forShard();
 
 class RecvChunkReleaseCritSecCommand : public BasicCommand {
 public:
@@ -411,7 +411,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RecvChunkReleaseCritSecCommand);
+MONGO_REGISTER_COMMAND(RecvChunkReleaseCritSecCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

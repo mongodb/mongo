@@ -105,7 +105,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(RotateCertificatesCmd);
+MONGO_REGISTER_COMMAND(RotateCertificatesCmd).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

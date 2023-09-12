@@ -54,7 +54,7 @@ struct ClusterBulkWriteCmdS {
     }
 };
 
-MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdS>);
+MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

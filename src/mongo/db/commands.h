@@ -72,6 +72,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/platform/source_location.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
@@ -611,14 +612,14 @@ public:
      * Increment counter for how many times this command has executed.
      */
     void incrementCommandsExecuted() const {
-        _commandsExecuted.increment();
+        _commandsExecuted->increment();
     }
 
     /**
      * Increment counter for how many times this command has failed.
      */
     void incrementCommandsFailed() const {
-        _commandsFailed.increment();
+        _commandsFailed->increment();
     }
 
     /**
@@ -709,8 +710,8 @@ private:
     const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
-    CounterMetric _commandsExecuted;
-    CounterMetric _commandsFailed;
+    std::shared_ptr<CounterMetric> _commandsExecuted;
+    std::shared_ptr<CounterMetric> _commandsFailed;
 };
 
 /**
@@ -1445,6 +1446,8 @@ public:
         bool testOnly = false;
         boost::optional<ClusterRole> roles;
         const std::type_info* typeInfo = nullptr;
+        boost::optional<SourceLocation> location;
+        std::string expr;
     };
 
     class EntryBuilder;
@@ -1470,7 +1473,9 @@ public:
      * Other criteria can be applied via the caller-supplied `pred`. A `Command`
      * will only be created for an `entry` if the `pred(entry)` passes.
      */
-    void execute(CommandRegistry* registry, const std::function<bool(const Entry&)>& pred) const;
+    void execute(CommandRegistry* registry,
+                 Service* service,
+                 const std::function<bool(const Entry&)>& pred) const;
 
     /**
      * Calls `execute` with a predicate that enables Commands appropriate for
@@ -1481,6 +1486,8 @@ public:
 private:
     std::vector<std::unique_ptr<Entry>> _entries;
 };
+
+BSONObj toBSON(const CommandConstructionPlan::Entry& e);
 
 /**
  * CommandRegisterer objects attach entries to this instance at static-init
@@ -1516,19 +1523,25 @@ public:
     EntryBuilder() = default;
 
     /**
-     * Chooses the ClusterRoles (i.e. services) for which the command will be
-     * created. Can be shard, router, or a combined role mask specifying both.
-     *
-     * This is an assignment rather than an append, so it should be specified
-     * only once.
-     *
-     * As a transitional technique, a Command registration that chooses no roles
-     * will exist in all services. This will be a mandatory call for all
-     * EntryBuilders.
+     * Role specification is mandatory for all EntryBuilders, through addRoles,
+     * forShard, and forRouter.
      */
-    EntryBuilder roles(ClusterRole roles) && {
-        _entry->roles = roles;
+    EntryBuilder addRoles(ClusterRole role) && {
+        _entry->roles = _entry->roles.value_or(ClusterRole::None);
+        for (auto&& r : {ClusterRole::ShardServer, ClusterRole::RouterServer})
+            if (role.has(r))
+                *_entry->roles += r;
         return std::move(*this);
+    }
+
+    /** Add the shard server role. */
+    EntryBuilder forShard() && {
+        return std::move(*this).addRoles(ClusterRole::ShardServer);
+    }
+
+    /** Add the router server role. */
+    EntryBuilder forRouter() && {
+        return std::move(*this).addRoles(ClusterRole::RouterServer);
     }
 
     /**
@@ -1557,6 +1570,16 @@ public:
         return std::move(*this);
     }
 
+    EntryBuilder location(SourceLocation loc) && {
+        _entry->location = loc;
+        return std::move(*this);
+    }
+
+    EntryBuilder expr(std::string name) && {
+        _entry->expr = std::move(name);
+        return std::move(*this);
+    }
+
     /** The deref operator executes the build, registering the product. */
     EntryBuilder operator*() && {
         _plan->addEntry(std::move(_entry));
@@ -1581,10 +1604,13 @@ private:
  *
  *     MONGO_REGISTER_COMMAND(MyCommandType)
  *        .testOnly()
- *        .forFeatureFlag(&myFeatureFlag);
+ *        .forFeatureFlag(&myFeatureFlag)
+ *        .forShard();
  */
 #define MONGO_REGISTER_COMMAND(...)                                              \
     static auto MONGO_COMMAND_DUMMY_ID_(mongoRegisterCommand_dummy_, __LINE__) = \
-        *CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()
+        *CommandConstructionPlan::EntryBuilder::make<__VA_ARGS__>()              \
+             .expr(#__VA_ARGS__)                                                 \
+             .location(MONGO_SOURCE_LOCATION_NO_FUNC())
 
 }  // namespace mongo

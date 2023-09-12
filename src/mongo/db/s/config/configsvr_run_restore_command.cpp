@@ -404,7 +404,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrRunRestoreCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrRunRestoreCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

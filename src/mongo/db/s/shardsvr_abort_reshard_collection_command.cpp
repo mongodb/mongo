@@ -190,7 +190,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrAbortReshardCollectionCommand);
+MONGO_REGISTER_COMMAND(ShardsvrAbortReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

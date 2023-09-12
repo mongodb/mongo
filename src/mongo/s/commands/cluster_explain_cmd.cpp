@@ -224,7 +224,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }
 
-MONGO_REGISTER_COMMAND(ClusterExplainCmd);
+MONGO_REGISTER_COMMAND(ClusterExplainCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

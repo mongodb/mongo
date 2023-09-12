@@ -233,6 +233,6 @@ public:
         return {GetQueryableEncryptionCountInfo::kTokensFieldName};
     }
 };
-MONGO_REGISTER_COMMAND(GetQueryableEncryptionCountInfoCmd);
+MONGO_REGISTER_COMMAND(GetQueryableEncryptionCountInfoCmd).forShard();
 }  // namespace
 }  // namespace mongo

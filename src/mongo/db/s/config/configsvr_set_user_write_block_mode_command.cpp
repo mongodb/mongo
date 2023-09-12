@@ -124,7 +124,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrSetUserWriteBlockModeCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrSetUserWriteBlockModeCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

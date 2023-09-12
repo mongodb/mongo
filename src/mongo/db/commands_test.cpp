@@ -251,7 +251,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ExampleIncrementCommand);
+MONGO_REGISTER_COMMAND(ExampleIncrementCommand).forShard();
 
 // Just like ExampleIncrementCommand, but using the MinimalInvocationBase.
 class ExampleMinimalCommand final : public TypedCommand<ExampleMinimalCommand> {
@@ -299,7 +299,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ExampleMinimalCommand);
+MONGO_REGISTER_COMMAND(ExampleMinimalCommand).forShard();
 
 // Just like ExampleIncrementCommand, but with a void typedRun.
 class ExampleVoidCommand final : public TypedCommand<ExampleVoidCommand> {
@@ -347,7 +347,7 @@ public:
 
     mutable std::int32_t iCapture = 0;
 };
-MONGO_REGISTER_COMMAND(ExampleVoidCommand);
+MONGO_REGISTER_COMMAND(ExampleVoidCommand).forShard();
 
 template <typename Derived>
 class MyCommand : public TypedCommand<MyCommand<Derived>> {
@@ -401,7 +401,7 @@ public:
         uasserted(ErrorCodes::UnknownError, "some error");
     }
 };
-MONGO_REGISTER_COMMAND(ThrowsStatusCommand);
+MONGO_REGISTER_COMMAND(ThrowsStatusCommand).forShard();
 
 class UnauthorizedCommand : public MyCommand<UnauthorizedCommand> {
 public:
@@ -410,7 +410,7 @@ public:
         uasserted(ErrorCodes::Unauthorized, "Not authorized");
     }
 };
-MONGO_REGISTER_COMMAND(UnauthorizedCommand);
+MONGO_REGISTER_COMMAND(UnauthorizedCommand).forShard();
 
 class TypedCommandTest : public ServiceContextMongoDTest {
 public:
@@ -737,7 +737,7 @@ TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateTrue) {
     CommandConstructionPlan plan;
     auto fullSet = registerSomeUniqueNops<2>(plan);
     CommandRegistry reg;
-    plan.execute(&reg, [](auto&&) { return true; });
+    plan.execute(&reg, nullptr, [](auto&&) { return true; });
     ASSERT_EQ(getCommandTypes(reg), fullSet);
 }
 
@@ -745,7 +745,7 @@ TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateFalse) {
     CommandConstructionPlan plan;
     auto fullSet = registerSomeUniqueNops<2>(plan);
     CommandRegistry reg;
-    plan.execute(&reg, [](auto&&) { return false; });
+    plan.execute(&reg, nullptr, [](auto&&) { return false; });
     ASSERT_EQ(getCommandTypes(reg), TypeInfoSet{});
 }
 
@@ -763,7 +763,9 @@ public:
         TypeInfoSet typesAdded;
         // Populate plan with a few commands, each configured for `serverRole()`.
         auto populateOneCommand = [&]<typename Cmd>(std::type_identity<Cmd>) {
-            *CommandConstructionPlan::EntryBuilder::make<Cmd>().roles(serverRole()).setPlan(&plan);
+            *CommandConstructionPlan::EntryBuilder::make<Cmd>()
+                 .addRoles(serverRole())
+                 .setPlan(&plan);
             typesAdded.insert(&typeid(Cmd));
         };
         [&]<int... i>(std::integer_sequence<int, i...>) {

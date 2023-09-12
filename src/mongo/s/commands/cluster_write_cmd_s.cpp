@@ -63,7 +63,7 @@ struct ClusterInsertCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdS>);
+MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdS>).forRouter();
 
 struct ClusterUpdateCmdS {
     static constexpr StringData kName = "update"_sd;
@@ -86,7 +86,7 @@ struct ClusterUpdateCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdS>);
+MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdS>).forRouter();
 
 struct ClusterDeleteCmdS {
     static constexpr StringData kName = "delete"_sd;
@@ -109,7 +109,7 @@ struct ClusterDeleteCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdS>);
+MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

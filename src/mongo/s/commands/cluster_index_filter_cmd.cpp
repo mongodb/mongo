@@ -195,9 +195,9 @@ public:
               "Sets index filter for a query shape. Overrides existing index filter."} {}
 };
 
-MONGO_REGISTER_COMMAND(PlanCacheListFiltersCmd);
-MONGO_REGISTER_COMMAND(PlanCacheClearFiltersCmd);
-MONGO_REGISTER_COMMAND(PlanCacheSetFiltersCmd);
+MONGO_REGISTER_COMMAND(PlanCacheListFiltersCmd).forRouter();
+MONGO_REGISTER_COMMAND(PlanCacheClearFiltersCmd).forRouter();
+MONGO_REGISTER_COMMAND(PlanCacheSetFiltersCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

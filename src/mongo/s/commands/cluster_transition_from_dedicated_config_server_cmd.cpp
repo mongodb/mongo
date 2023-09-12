@@ -118,7 +118,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(TransitionFromDedicatedConfigServerCommand);
+MONGO_REGISTER_COMMAND(TransitionFromDedicatedConfigServerCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

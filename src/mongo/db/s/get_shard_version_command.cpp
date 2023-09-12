@@ -199,7 +199,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(GetShardVersion);
+MONGO_REGISTER_COMMAND(GetShardVersion).forShard();
 
 }  // namespace
 }  // namespace mongo

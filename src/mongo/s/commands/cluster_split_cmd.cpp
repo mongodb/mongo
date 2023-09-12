@@ -316,7 +316,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(SplitCollectionCmd);
+MONGO_REGISTER_COMMAND(SplitCollectionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

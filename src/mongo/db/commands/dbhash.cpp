@@ -458,7 +458,7 @@ private:
         return hash;
     }
 };
-MONGO_REGISTER_COMMAND(DBHashCmd);
+MONGO_REGISTER_COMMAND(DBHashCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

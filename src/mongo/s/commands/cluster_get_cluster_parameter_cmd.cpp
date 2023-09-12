@@ -105,7 +105,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(GetClusterParameterCmd);
+MONGO_REGISTER_COMMAND(GetClusterParameterCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

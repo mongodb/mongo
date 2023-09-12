@@ -1566,7 +1566,7 @@ private:
         }
     }
 };
-MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand);
+MONGO_REGISTER_COMMAND(SetFeatureCompatibilityVersionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

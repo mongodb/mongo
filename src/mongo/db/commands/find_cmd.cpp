@@ -997,7 +997,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(FindCmd);
+MONGO_REGISTER_COMMAND(FindCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

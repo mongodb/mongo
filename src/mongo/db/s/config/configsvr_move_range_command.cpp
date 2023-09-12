@@ -125,7 +125,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigSvrMoveRangeCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrMoveRangeCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

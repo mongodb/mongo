@@ -188,7 +188,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdCommitTxn);
+MONGO_REGISTER_COMMAND(CmdCommitTxn).forShard();
 
 static const Status kOnlyTransactionsReadConcernsSupported{
     ErrorCodes::InvalidOptions, "only read concerns valid in transactions are supported"};
@@ -294,7 +294,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdAbortTxn);
+MONGO_REGISTER_COMMAND(CmdAbortTxn).forShard();
 
 }  // namespace
 }  // namespace mongo

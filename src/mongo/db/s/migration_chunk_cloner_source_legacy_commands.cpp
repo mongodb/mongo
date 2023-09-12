@@ -217,7 +217,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(InitialCloneCommand);
+MONGO_REGISTER_COMMAND(InitialCloneCommand).forShard();
 
 class TransferModsCommand : public BasicCommand {
 public:
@@ -269,7 +269,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(TransferModsCommand);
+MONGO_REGISTER_COMMAND(TransferModsCommand).forShard();
 
 /**
  * Command for extracting the oplog entries that needs to be migrated for the given migration
@@ -401,7 +401,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(MigrateSessionCommand);
+MONGO_REGISTER_COMMAND(MigrateSessionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

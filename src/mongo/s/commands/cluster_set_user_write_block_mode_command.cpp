@@ -111,6 +111,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand);
+MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand).forRouter();
 }  // namespace
 }  // namespace mongo

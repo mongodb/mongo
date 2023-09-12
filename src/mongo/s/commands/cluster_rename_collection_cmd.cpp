@@ -191,7 +191,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(RenameCollectionCmd);
+MONGO_REGISTER_COMMAND(RenameCollectionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

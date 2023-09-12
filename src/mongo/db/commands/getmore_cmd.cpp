@@ -928,7 +928,7 @@ public:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(GetMoreCmd);
+MONGO_REGISTER_COMMAND(GetMoreCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

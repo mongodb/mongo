@@ -96,5 +96,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(TopCommand);
+MONGO_REGISTER_COMMAND(TopCommand).forShard();
 }  // namespace

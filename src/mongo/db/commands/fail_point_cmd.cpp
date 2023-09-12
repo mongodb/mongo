@@ -179,6 +179,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(WaitForFailPointCommand);
-MONGO_REGISTER_COMMAND(FaultInjectCmd).testOnly();
+MONGO_REGISTER_COMMAND(WaitForFailPointCommand).forRouter().forShard();
+MONGO_REGISTER_COMMAND(FaultInjectCmd).testOnly().forRouter().forShard();
 }  // namespace mongo

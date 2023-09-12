@@ -355,7 +355,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdInsert);
+MONGO_REGISTER_COMMAND(CmdInsert).forShard();
 
 class CmdUpdate final : public write_ops::UpdateCmdVersion1Gen<CmdUpdate> {
 public:
@@ -635,7 +635,7 @@ public:
     // Update related command execution metrics.
     static UpdateMetrics updateMetrics;
 };
-MONGO_REGISTER_COMMAND(CmdUpdate);
+MONGO_REGISTER_COMMAND(CmdUpdate).forShard();
 
 UpdateMetrics CmdUpdate::updateMetrics{"update"};
 
@@ -795,7 +795,7 @@ public:
         const BSONObj& _commandObj;
     };
 };
-MONGO_REGISTER_COMMAND(CmdDelete);
+MONGO_REGISTER_COMMAND(CmdDelete).forShard();
 
 }  // namespace
 }  // namespace mongo

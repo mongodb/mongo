@@ -221,7 +221,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrSetUserWriteBlockCommand);
+MONGO_REGISTER_COMMAND(ShardsvrSetUserWriteBlockCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -343,7 +343,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(PipelineCommand);
+MONGO_REGISTER_COMMAND(PipelineCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

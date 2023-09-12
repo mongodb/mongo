@@ -331,7 +331,7 @@ public:
                "collection.";
     }
 };
-MONGO_REGISTER_COMMAND(ConfigureQueryAnalyzerCmd);
+MONGO_REGISTER_COMMAND(ConfigureQueryAnalyzerCmd).forShard();
 
 }  // namespace
 

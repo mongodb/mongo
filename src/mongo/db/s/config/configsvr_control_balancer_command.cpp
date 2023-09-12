@@ -183,9 +183,9 @@ private:
     }
 };
 
-MONGO_REGISTER_COMMAND(ConfigSvrBalancerStartCommand);
-MONGO_REGISTER_COMMAND(ConfigSvrBalancerStopCommand);
-MONGO_REGISTER_COMMAND(ConfigSvrBalancerStatusCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStartCommand).forShard();
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStopCommand).forShard();
+MONGO_REGISTER_COMMAND(ConfigSvrBalancerStatusCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

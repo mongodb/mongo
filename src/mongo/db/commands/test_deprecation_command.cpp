@@ -90,7 +90,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(TestDeprecationCmd).testOnly();
+MONGO_REGISTER_COMMAND(TestDeprecationCmd).testOnly().forRouter().forShard();
 
 
 }  // namespace mongo

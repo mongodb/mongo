@@ -168,7 +168,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrGetStatsForBalancingCmd);
+MONGO_REGISTER_COMMAND(ShardsvrGetStatsForBalancingCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

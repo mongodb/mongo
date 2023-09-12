@@ -276,7 +276,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdAnalyze);
+MONGO_REGISTER_COMMAND(CmdAnalyze).forShard();
 
 }  // namespace
 }  // namespace mongo

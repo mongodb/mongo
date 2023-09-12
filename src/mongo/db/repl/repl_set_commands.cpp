@@ -217,7 +217,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdReplSetTest).testOnly();
+MONGO_REGISTER_COMMAND(CmdReplSetTest).testOnly().forShard();
 
 /** get rollback id.  used to check if a rollback happened during some interval of time.
     as consumed, the rollback id is not in any particular order, it simply changes on each rollback.
@@ -237,7 +237,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetGetRBID);
+MONGO_REGISTER_COMMAND(CmdReplSetGetRBID).forShard();
 
 class CmdReplSetGetConfig : public ReplSetCommand {
 public:
@@ -280,7 +280,7 @@ private:
         return ActionSet{ActionType::replSetGetConfig};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetGetConfig);
+MONGO_REGISTER_COMMAND(CmdReplSetGetConfig).forShard();
 
 namespace {
 HostAndPort someHostAndPortForMe() {
@@ -464,7 +464,7 @@ private:
         return ActionSet{ActionType::replSetConfigure};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetInitiate);
+MONGO_REGISTER_COMMAND(CmdReplSetInitiate).forShard();
 
 class CmdReplSetReconfig : public ReplSetCommand {
 public:
@@ -532,7 +532,7 @@ private:
         return ActionSet{ActionType::replSetConfigure};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetReconfig);
+MONGO_REGISTER_COMMAND(CmdReplSetReconfig).forShard();
 
 class CmdReplSetFreeze : public ReplSetCommand {
 public:
@@ -564,7 +564,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetFreeze);
+MONGO_REGISTER_COMMAND(CmdReplSetFreeze).forShard();
 
 class CmdReplSetStepDown : public ReplSetCommand {
 public:
@@ -655,7 +655,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetStepDown);
+MONGO_REGISTER_COMMAND(CmdReplSetStepDown).forShard();
 
 class CmdReplSetMaintenance : public ReplSetCommand {
 public:
@@ -681,7 +681,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetMaintenance);
+MONGO_REGISTER_COMMAND(CmdReplSetMaintenance).forShard();
 
 class CmdReplSetSyncFrom : public ReplSetCommand {
 public:
@@ -712,7 +712,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetSyncFrom);
+MONGO_REGISTER_COMMAND(CmdReplSetSyncFrom).forShard();
 
 class CmdReplSetUpdatePosition : public ReplSetCommand {
 public:
@@ -760,7 +760,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetUpdatePosition);
+MONGO_REGISTER_COMMAND(CmdReplSetUpdatePosition).forShard();
 
 namespace {
 /**
@@ -841,7 +841,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetHeartbeat);
+MONGO_REGISTER_COMMAND(CmdReplSetHeartbeat).forShard();
 
 class CmdReplSetStepUp : public ReplSetCommand {
 public:
@@ -875,7 +875,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetStepUp);
+MONGO_REGISTER_COMMAND(CmdReplSetStepUp).forShard();
 
 class CmdReplSetAbortPrimaryCatchUp : public ReplSetCommand {
 public:
@@ -913,7 +913,7 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetAbortPrimaryCatchUp);
+MONGO_REGISTER_COMMAND(CmdReplSetAbortPrimaryCatchUp).forShard();
 
 }  // namespace repl
 }  // namespace mongo

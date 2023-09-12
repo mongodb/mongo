@@ -54,7 +54,11 @@
 
 namespace mongo {
 
-class CatalogCacheTestFixture : public ShardingTestFixture {
+/**
+ * The ServerRole-independent core of `RouterCatalogCacheTestFixture` and its
+ * `ShardCatalogCacheTestFixture` counterpart.
+ */
+class CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     void setUp() override;
 
@@ -176,5 +180,11 @@ protected:
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
+
+class RouterCatalogCacheTestFixture : public virtual service_context_test::RouterRoleOverride,
+                                      public CoreCatalogCacheTestFixture {};
+
+class ShardCatalogCacheTestFixture : public virtual service_context_test::ShardRoleOverride,
+                                     public CoreCatalogCacheTestFixture {};
 
 }  // namespace mongo

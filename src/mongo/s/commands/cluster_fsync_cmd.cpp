@@ -137,7 +137,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(FsyncCommand);
+MONGO_REGISTER_COMMAND(FsyncCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

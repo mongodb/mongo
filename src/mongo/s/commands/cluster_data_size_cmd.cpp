@@ -150,7 +150,7 @@ public:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(DataSizeCmd);
+MONGO_REGISTER_COMMAND(DataSizeCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

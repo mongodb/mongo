@@ -1910,10 +1910,10 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const int splitPoint = 0;
 
-class WriteWithoutShardKeyFixture : public CatalogCacheTestFixture {
+class WriteWithoutShardKeyFixture : public RouterCatalogCacheTestFixture {
 public:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
         const ShardKeyPattern shardKeyPattern(BSON("x" << 1));
         makeCollectionRoutingInfo(
             kNss, shardKeyPattern, nullptr, false, {BSON("x" << splitPoint)}, {});
@@ -2162,10 +2162,10 @@ TEST_F(WriteWithoutShardKeyFixture, MultipleUnorderedDeletesWithoutShardKey) {
 //
 // Tests targeting for retryable time-series updates.
 //
-class TimeseriesRetryableUpdateFixture : public CatalogCacheTestFixture {
+class TimeseriesRetryableUpdateFixture : public RouterCatalogCacheTestFixture {
 public:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
         const ShardKeyPattern shardKeyPattern(BSON("a" << 1));
         makeCollectionRoutingInfo(
             kNss, shardKeyPattern, nullptr, false, {BSON("a" << splitPoint)}, {});

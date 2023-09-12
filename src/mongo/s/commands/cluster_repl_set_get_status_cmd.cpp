@@ -88,7 +88,7 @@ public:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetGetStatus);
+MONGO_REGISTER_COMMAND(CmdReplSetGetStatus).forRouter();
 
 }  // namespace
 }  // namespace mongo

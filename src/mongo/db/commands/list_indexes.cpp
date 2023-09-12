@@ -424,7 +424,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdListIndexes);
+MONGO_REGISTER_COMMAND(CmdListIndexes).forShard();
 
 }  // namespace
 }  // namespace mongo

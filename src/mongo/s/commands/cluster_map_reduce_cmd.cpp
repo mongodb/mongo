@@ -66,7 +66,7 @@ public:
         return runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterMapReduceCommand);
+MONGO_REGISTER_COMMAND(ClusterMapReduceCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

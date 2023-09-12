@@ -110,7 +110,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CPULoadCommand).testOnly();
+MONGO_REGISTER_COMMAND(CPULoadCommand).testOnly().forRouter().forShard();
 
 
 }  // namespace mongo

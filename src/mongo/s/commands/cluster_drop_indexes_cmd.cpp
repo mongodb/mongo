@@ -166,7 +166,7 @@ public:
         return &::mongo::DropIndexes::kAuthorizationContract;
     }
 };
-MONGO_REGISTER_COMMAND(DropIndexesCmd);
+MONGO_REGISTER_COMMAND(DropIndexesCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

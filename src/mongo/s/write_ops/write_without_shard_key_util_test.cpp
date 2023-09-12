@@ -67,10 +67,10 @@ namespace {
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const int splitPoint = 50;
 
-class WriteWithoutShardKeyUtilTest : public CatalogCacheTestFixture {
+class WriteWithoutShardKeyUtilTest : public RouterCatalogCacheTestFixture {
 public:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
 
         // Shard key is a compound shard key: {a:1, b:1}.
         const ShardKeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
@@ -95,10 +95,10 @@ private:
     boost::optional<ChunkManager> _cm;
 };
 
-class UnshardedCollectionTest : public CatalogCacheTestFixture {
+class UnshardedCollectionTest : public RouterCatalogCacheTestFixture {
 protected:
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
         setupNShards(2);
     }
 

@@ -125,6 +125,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrNotifyShardingEventCommand);
+MONGO_REGISTER_COMMAND(ShardsvrNotifyShardingEventCommand).forShard();
 
 }  // namespace mongo

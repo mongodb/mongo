@@ -233,7 +233,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ListDatabasesCmd);
+MONGO_REGISTER_COMMAND(ListDatabasesCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

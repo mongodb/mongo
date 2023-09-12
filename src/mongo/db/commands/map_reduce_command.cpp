@@ -81,7 +81,7 @@ public:
         return map_reduce_agg::runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
 };
-MONGO_REGISTER_COMMAND(MapReduceCommand);
+MONGO_REGISTER_COMMAND(MapReduceCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

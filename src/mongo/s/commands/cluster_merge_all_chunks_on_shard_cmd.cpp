@@ -128,7 +128,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterMergeAllChunksOnShardCommand);
+MONGO_REGISTER_COMMAND(ClusterMergeAllChunksOnShardCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

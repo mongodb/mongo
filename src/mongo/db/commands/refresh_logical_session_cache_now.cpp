@@ -91,7 +91,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(RefreshLogicalSessionCacheNowCommand).testOnly();
+MONGO_REGISTER_COMMAND(RefreshLogicalSessionCacheNowCommand).testOnly().forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

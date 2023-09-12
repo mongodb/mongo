@@ -147,7 +147,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(FlushReshardingStateChangeCmd);
+MONGO_REGISTER_COMMAND(FlushReshardingStateChangeCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

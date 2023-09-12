@@ -142,7 +142,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(SplitVectorCmd);
+MONGO_REGISTER_COMMAND(SplitVectorCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

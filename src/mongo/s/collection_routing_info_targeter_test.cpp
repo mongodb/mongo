@@ -100,7 +100,7 @@ auto buildDelete(const NamespaceString& nss, BSONObj query) {
 /**
  * Fixture that populates the CatalogCache with 'kNss' as a sharded collection.
  */
-class CollectionRoutingInfoTargeterTest : public CatalogCacheTestFixture {
+class CollectionRoutingInfoTargeterTest : public RouterCatalogCacheTestFixture {
 public:
     CollectionRoutingInfoTargeter prepare(BSONObj shardKeyPattern,
                                           const std::vector<BSONObj>& splitPoints) {
@@ -258,7 +258,7 @@ void CollectionRoutingInfoTargeterTest::testTargetInsertWithRangePrefixHashedSha
 
 /**
  * Build and return a custom ChunkManager with the given shard pattern and split points.
- * This is similar to CatalogCacheTestFixture::makeChunkManager() which prepare() calls
+ * This is similar to CoreCatalogCacheTestFixture::makeChunkManager() which prepare() calls
  * with the distinction that it simply creates and returns a ChunkManager object
  * and does not assign it to the Global Catalog Cache ChunkManager.
  */
@@ -989,7 +989,7 @@ TEST(CollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocu
  * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection not tracked on the
  * configsvr, or a non-existent collection.
  */
-class CollectionRoutingInfoTargeterUntrackedTest : public CatalogCacheTestFixture {
+class CollectionRoutingInfoTargeterUntrackedTest : public RouterCatalogCacheTestFixture {
 public:
     CollectionRoutingInfoTargeter prepare() {
         const auto cri = makeUntrackedCollectionRoutingInfo(kNss);
@@ -1043,7 +1043,7 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimarySh
  * Fixture that populates the CatalogCache with 'kNss' as an unsharded collection tracked on the
  * configsvr.
  */
-class CollectionRoutingInfoTargeterUnshardedTest : public CatalogCacheTestFixture {
+class CollectionRoutingInfoTargeterUnshardedTest : public RouterCatalogCacheTestFixture {
 public:
     CollectionRoutingInfoTargeter prepare() {
         const auto cri = makeUnshardedCollectionRoutingInfo(kNss);

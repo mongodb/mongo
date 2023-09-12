@@ -150,7 +150,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetClusterParameterCommand);
+MONGO_REGISTER_COMMAND(SetClusterParameterCommand).forShard();
 
 auto setClusterParameterRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(setClusterParameter, setClusterParameterImpl);

@@ -279,7 +279,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetQuerySettingsCommand);
+MONGO_REGISTER_COMMAND(SetQuerySettingsCommand).forRouter().forShard();
 
 class RemoveQuerySettingsCommand final : public TypedCommand<RemoveQuerySettingsCommand> {
 public:
@@ -375,6 +375,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(RemoveQuerySettingsCommand);
+MONGO_REGISTER_COMMAND(RemoveQuerySettingsCommand).forRouter().forShard();
 }  // namespace
 }  // namespace mongo

@@ -195,7 +195,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(InternalRenameIfOptionsAndIndexesMatchCmd);
+MONGO_REGISTER_COMMAND(InternalRenameIfOptionsAndIndexesMatchCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

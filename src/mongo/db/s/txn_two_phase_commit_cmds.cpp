@@ -251,7 +251,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(PrepareTransactionCmd);
+MONGO_REGISTER_COMMAND(PrepareTransactionCmd).forShard();
 
 std::set<ShardId> validateParticipants(OperationContext* opCtx,
                                        const std::vector<mongo::CommitParticipant>& participants) {
@@ -446,7 +446,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CoordinateCommitTransactionCmd);
+MONGO_REGISTER_COMMAND(CoordinateCommitTransactionCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

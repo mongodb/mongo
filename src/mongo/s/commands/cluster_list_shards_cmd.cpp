@@ -101,7 +101,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ListShardsCmd);
+MONGO_REGISTER_COMMAND(ListShardsCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

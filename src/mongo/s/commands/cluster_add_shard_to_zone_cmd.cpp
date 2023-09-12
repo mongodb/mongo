@@ -137,7 +137,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(AddShardToZoneCmd);
+MONGO_REGISTER_COMMAND(AddShardToZoneCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -97,7 +97,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(StartSessionCommand);
+MONGO_REGISTER_COMMAND(StartSessionCommand).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

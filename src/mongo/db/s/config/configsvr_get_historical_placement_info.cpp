@@ -135,7 +135,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrGetHistoricalPlacementCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrGetHistoricalPlacementCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -239,7 +239,7 @@ public:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesCmd);
+MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesCmd).forShard();
 
 class FlushDatabaseCacheUpdatesWithWriteConcernCmd final
     : public FlushDatabaseCacheUpdatesCmdBase<FlushDatabaseCacheUpdatesWithWriteConcernCmd> {
@@ -250,7 +250,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesWithWriteConcernCmd);
+MONGO_REGISTER_COMMAND(FlushDatabaseCacheUpdatesWithWriteConcernCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

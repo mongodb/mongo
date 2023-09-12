@@ -437,7 +437,7 @@ BSONObj prepareCmdObjForPassthrough(
     return newCmdObj;
 }
 
-MONGO_REGISTER_COMMAND(FindAndModifyCmd);
+MONGO_REGISTER_COMMAND(FindAndModifyCmd).forRouter();
 
 }  // namespace
 

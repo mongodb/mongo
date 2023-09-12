@@ -172,7 +172,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrRemoveChunksCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrRemoveChunksCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

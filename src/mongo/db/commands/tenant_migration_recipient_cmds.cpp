@@ -219,7 +219,7 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(RecipientSyncDataCmd);
+MONGO_REGISTER_COMMAND(RecipientSyncDataCmd).forShard();
 
 class RecipientVoteImportedFilesCommand final
     : public TypedCommand<RecipientVoteImportedFilesCommand> {
@@ -289,7 +289,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(RecipientVoteImportedFilesCommand);
+MONGO_REGISTER_COMMAND(RecipientVoteImportedFilesCommand).forShard();
 
 class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigrationCmd> {
 public:
@@ -436,7 +436,7 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(RecipientForgetMigrationCmd);
+MONGO_REGISTER_COMMAND(RecipientForgetMigrationCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

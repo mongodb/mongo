@@ -118,7 +118,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RemoveShardCmd);
+MONGO_REGISTER_COMMAND(RemoveShardCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

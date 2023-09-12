@@ -154,6 +154,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd);
+MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd).forRouter();
 }  // namespace
 }  // namespace mongo

@@ -89,6 +89,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(IsSelfCommand);
+MONGO_REGISTER_COMMAND(IsSelfCommand).forRouter().forShard();
 
 }  // namespace mongo

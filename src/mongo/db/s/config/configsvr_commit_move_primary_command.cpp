@@ -123,7 +123,7 @@ private:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrCommitMovePrimaryCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrCommitMovePrimaryCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

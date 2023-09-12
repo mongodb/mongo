@@ -306,7 +306,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdGet);
+MONGO_REGISTER_COMMAND(CmdGet).forRouter().forShard();
 
 class CmdSet : public BasicCommand {
 public:
@@ -487,7 +487,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdSet);
+MONGO_REGISTER_COMMAND(CmdSet).forRouter().forShard();
 
 void LogLevelServerParameter::append(OperationContext*,
                                      BSONObjBuilder* builder,

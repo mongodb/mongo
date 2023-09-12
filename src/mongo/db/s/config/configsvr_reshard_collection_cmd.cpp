@@ -316,7 +316,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrReshardCollectionCommand).forShard();
 
 std::shared_ptr<const ReshardingCoordinator>
 ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(

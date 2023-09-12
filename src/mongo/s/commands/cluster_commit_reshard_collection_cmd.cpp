@@ -112,7 +112,7 @@ public:
                "during which writes are blocked.";
     }
 };
-MONGO_REGISTER_COMMAND(CommitReshardCollectionCmd);
+MONGO_REGISTER_COMMAND(CommitReshardCollectionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

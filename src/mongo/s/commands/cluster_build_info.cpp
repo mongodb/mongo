@@ -129,7 +129,7 @@ public:
         return ClusterBuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCmdBuildInfo);
+MONGO_REGISTER_COMMAND(ClusterCmdBuildInfo).forRouter();
 
 }  // namespace
 }  // namespace mongo

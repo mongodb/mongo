@@ -164,6 +164,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdListDatabases);
+MONGO_REGISTER_COMMAND(CmdListDatabases).forShard();
 }  // namespace
 }  // namespace mongo

@@ -103,7 +103,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ShardingStateCmd);
+MONGO_REGISTER_COMMAND(ShardingStateCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -386,7 +386,8 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(CheckMetadataConsistencyCmd)
-    .requiresFeatureFlag(&feature_flags::gCheckMetadataConsistency);
+    .requiresFeatureFlag(&feature_flags::gCheckMetadataConsistency)
+    .forRouter();
 
 }  // namespace
 }  // namespace mongo

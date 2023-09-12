@@ -117,7 +117,8 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ShardsvrCreateGlobalIndexCommand)
-    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes)
+    .forShard();
 
 }  // namespace
 }  // namespace mongo

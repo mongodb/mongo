@@ -105,7 +105,7 @@ public:
         return {CleanupStructuredEncryptionData::kCleanupTokensFieldName};
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCleanupStructuredEncryptionDataCmd);
+MONGO_REGISTER_COMMAND(ClusterCleanupStructuredEncryptionDataCmd).forRouter();
 
 using Cmd = ClusterCleanupStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {

@@ -137,7 +137,7 @@ private:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrCreateDatabaseCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrCreateDatabaseCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -487,6 +487,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(StageDebugCmd).testOnly();
+MONGO_REGISTER_COMMAND(StageDebugCmd).testOnly().forShard();
 
 }  // namespace mongo

@@ -127,7 +127,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(DropDatabaseCmd);
+MONGO_REGISTER_COMMAND(DropDatabaseCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

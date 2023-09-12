@@ -95,6 +95,6 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CstCommand).testOnly();
+MONGO_REGISTER_COMMAND(CstCommand).testOnly().forShard();
 
 }  // namespace mongo

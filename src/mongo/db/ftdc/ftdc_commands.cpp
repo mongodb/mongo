@@ -106,7 +106,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(GetDiagnosticDataCommand);
+MONGO_REGISTER_COMMAND(GetDiagnosticDataCommand).forShard();
 
 }  // namespace
 

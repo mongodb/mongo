@@ -91,7 +91,7 @@ private:
         return ActionSet{ActionType::replSetGetStatus};
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetGetStatus);
+MONGO_REGISTER_COMMAND(CmdReplSetGetStatus).forShard();
 
 }  // namespace repl
 }  // namespace mongo

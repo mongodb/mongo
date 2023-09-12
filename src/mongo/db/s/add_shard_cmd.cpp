@@ -140,7 +140,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(AddShardCommand);
+MONGO_REGISTER_COMMAND(AddShardCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

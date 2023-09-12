@@ -185,7 +185,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardSvrParticipantBlockCommand);
+MONGO_REGISTER_COMMAND(ShardSvrParticipantBlockCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

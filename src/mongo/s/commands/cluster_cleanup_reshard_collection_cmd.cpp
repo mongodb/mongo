@@ -112,7 +112,7 @@ public:
         return "Abort and cleanup any in-progress resharding operations for this collection.";
     }
 };
-MONGO_REGISTER_COMMAND(CleanupReshardCollectionCmd);
+MONGO_REGISTER_COMMAND(CleanupReshardCollectionCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -156,7 +156,7 @@ public:
         }
     }
 };
-MONGO_REGISTER_COMMAND(ClusterLockInfoCmd);
+MONGO_REGISTER_COMMAND(ClusterLockInfoCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

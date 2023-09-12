@@ -121,7 +121,7 @@ public:
         return "Refreshes the query analyzer configurations for all collections.";
     }
 };
-MONGO_REGISTER_COMMAND(RefreshQueryAnalyzerConfigurationCmd);
+MONGO_REGISTER_COMMAND(RefreshQueryAnalyzerConfigurationCmd).forShard();
 
 }  // namespace
 

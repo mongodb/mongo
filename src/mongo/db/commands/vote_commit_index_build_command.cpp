@@ -135,7 +135,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(VoteCommitIndexBuildCommand);
+MONGO_REGISTER_COMMAND(VoteCommitIndexBuildCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

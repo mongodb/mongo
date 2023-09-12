@@ -78,7 +78,7 @@ using shard_key_pattern_query_util::QueryTargetingInfo;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
-class ChunkManagerQueryTest : public CatalogCacheTestFixture {
+class ChunkManagerQueryTest : public RouterCatalogCacheTestFixture {
 protected:
     void runGetShardIdsForRangeTest(const BSONObj& shardKey,
                                     bool unique,

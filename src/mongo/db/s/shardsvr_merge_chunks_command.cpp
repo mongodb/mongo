@@ -244,7 +244,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(MergeChunksCommand);
+MONGO_REGISTER_COMMAND(MergeChunksCommand).forShard();
 
 BSONField<std::string> MergeChunksCommand::nsField("mergeChunks");
 BSONField<std::vector<BSONObj>> MergeChunksCommand::boundsField("bounds");

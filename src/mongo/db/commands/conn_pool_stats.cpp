@@ -130,7 +130,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(PoolStats);
+MONGO_REGISTER_COMMAND(PoolStats).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

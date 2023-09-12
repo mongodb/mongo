@@ -167,7 +167,7 @@ public:
                "   { clearJumboFlag : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n";
     }
 };
-MONGO_REGISTER_COMMAND(ClearJumboFlagCommand);
+MONGO_REGISTER_COMMAND(ClearJumboFlagCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -78,7 +78,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdWhatsMyUri);
+MONGO_REGISTER_COMMAND(CmdWhatsMyUri).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -372,7 +372,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(DistinctCmd);
+MONGO_REGISTER_COMMAND(DistinctCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

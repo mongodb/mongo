@@ -150,7 +150,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdHttpClient).testOnly();
+MONGO_REGISTER_COMMAND(CmdHttpClient).testOnly().forShard();
 
 }  // namespace
 }  // namespace mongo

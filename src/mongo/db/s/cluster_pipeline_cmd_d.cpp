@@ -105,7 +105,7 @@ struct ClusterPipelineCommandD {
             opCtx, opMsgRequest.getDbName(), modifiedRequestBody, explainVerbosity, apiStrict);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>);
+MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>).forShard();
 
 }  // namespace
 }  // namespace mongo

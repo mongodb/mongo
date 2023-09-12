@@ -182,6 +182,6 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(AppendOplogNoteCmd);
+MONGO_REGISTER_COMMAND(AppendOplogNoteCmd).forShard();
 
 }  // namespace mongo

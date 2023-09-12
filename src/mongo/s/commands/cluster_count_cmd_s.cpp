@@ -66,7 +66,7 @@ struct ClusterCountCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>);
+MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -220,7 +220,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
 }
 
-MONGO_REGISTER_COMMAND(CmdExplain);
+MONGO_REGISTER_COMMAND(CmdExplain).forShard();
 
 }  // namespace
 }  // namespace mongo

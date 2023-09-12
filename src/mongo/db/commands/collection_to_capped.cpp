@@ -151,7 +151,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdCloneCollectionAsCapped);
+MONGO_REGISTER_COMMAND(CmdCloneCollectionAsCapped).forShard();
 
 /**
  * Converts the given collection to a capped collection w/ the specified size. This command is not
@@ -200,7 +200,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdConvertToCapped);
+MONGO_REGISTER_COMMAND(CmdConvertToCapped).forShard();
 
 }  // namespace
 }  // namespace mongo

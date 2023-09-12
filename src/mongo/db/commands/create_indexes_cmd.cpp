@@ -833,7 +833,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdCreateIndexes);
+MONGO_REGISTER_COMMAND(CmdCreateIndexes).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -259,7 +259,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(MoveChunkCmd);
+MONGO_REGISTER_COMMAND(MoveChunkCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

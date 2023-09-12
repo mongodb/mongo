@@ -136,7 +136,8 @@ void ShardsvrWriteGlobalIndexKeysCmd::Invocation::typedRun(OperationContext* opC
 }
 
 MONGO_REGISTER_COMMAND(ShardsvrWriteGlobalIndexKeysCmd)
-    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes);
+    .requiresFeatureFlag(&mongo::gFeatureFlagGlobalIndexes)
+    .forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -139,7 +139,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(RefineCollectionShardKeyCommand);
+MONGO_REGISTER_COMMAND(RefineCollectionShardKeyCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

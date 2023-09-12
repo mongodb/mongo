@@ -1790,7 +1790,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(DbCheckCmd);
+MONGO_REGISTER_COMMAND(DbCheckCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -83,7 +83,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(PoolFlushCmd);
+MONGO_REGISTER_COMMAND(PoolFlushCmd).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

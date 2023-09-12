@@ -156,7 +156,7 @@ FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
     reply.setOidMachine(static_cast<long>(OID::getMachineId()));
     return reply;
 }
-MONGO_REGISTER_COMMAND(FeaturesCmd);
+MONGO_REGISTER_COMMAND(FeaturesCmd).forRouter().forShard();
 
 struct AnyDbNoTenant {
     static constexpr bool kAdminOnly = false;
@@ -211,7 +211,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     return reply;
 }
-MONGO_REGISTER_COMMAND(HostInfoCmd);
+MONGO_REGISTER_COMMAND(HostInfoCmd).forRouter().forShard();
 
 // { getCmdLineOpts: 1}
 using GetCmdLineOptsCmd = GenericTC<GetCmdLineOptsCommand>;
@@ -235,7 +235,7 @@ GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext* op
     reply.setParsed(serverGlobalParams.parsedOpts);
     return reply;
 }
-MONGO_REGISTER_COMMAND(GetCmdLineOptsCmd);
+MONGO_REGISTER_COMMAND(GetCmdLineOptsCmd).forRouter().forShard();
 
 // { logRotate: 1 || string }
 using LogRotateCmd = GenericTC<LogRotateCommand>;
@@ -276,7 +276,7 @@ OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     return OkReply();
 }
-MONGO_REGISTER_COMMAND(LogRotateCmd);
+MONGO_REGISTER_COMMAND(LogRotateCmd).forRouter().forShard();
 
 // { getLog: '*' or 'logName' }
 // We use BasicCommand here instead of TypedCommand
@@ -358,7 +358,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(GetLogCmd);
+MONGO_REGISTER_COMMAND(GetLogCmd).forRouter().forShard();
 
 // { clearLog: 'name' }
 using ClearLogCmd = GenericTC<ClearLogCommand>;
@@ -380,7 +380,7 @@ OkReply ClearLogCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     return OkReply();
 }
-MONGO_REGISTER_COMMAND(ClearLogCmd).testOnly();
+MONGO_REGISTER_COMMAND(ClearLogCmd).testOnly().forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

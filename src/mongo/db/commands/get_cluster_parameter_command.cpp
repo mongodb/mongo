@@ -113,7 +113,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(GetClusterParameterCommand);
+MONGO_REGISTER_COMMAND(GetClusterParameterCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

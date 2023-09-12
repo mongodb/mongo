@@ -157,6 +157,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdListDatabasesForAllTenants);
+MONGO_REGISTER_COMMAND(CmdListDatabasesForAllTenants).forShard();
 }  // namespace
 }  // namespace mongo

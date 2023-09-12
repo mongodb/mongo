@@ -113,7 +113,7 @@ public:
         return "Abort any in-progress resharding operations for this collection.";
     }
 };
-MONGO_REGISTER_COMMAND(AbortReshardCollectionCommand);
+MONGO_REGISTER_COMMAND(AbortReshardCollectionCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

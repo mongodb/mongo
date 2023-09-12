@@ -132,7 +132,7 @@ public:
         return "invoke fsync unlock on all shards belonging to the cluster";
     }
 };
-MONGO_REGISTER_COMMAND(FsyncUnlockCommand);
+MONGO_REGISTER_COMMAND(FsyncUnlockCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

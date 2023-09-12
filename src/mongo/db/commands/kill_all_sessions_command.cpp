@@ -119,6 +119,6 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(KillAllSessionsCommand);
+MONGO_REGISTER_COMMAND(KillAllSessionsCommand).forRouter().forShard();
 
 }  // namespace mongo

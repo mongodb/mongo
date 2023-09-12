@@ -223,7 +223,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigsvrCheckClusterMetadataConsistencyCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrCheckClusterMetadataConsistencyCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

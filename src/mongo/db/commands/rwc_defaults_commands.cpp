@@ -198,7 +198,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetDefaultRWConcernCommand);
+MONGO_REGISTER_COMMAND(SetDefaultRWConcernCommand).forShard();
 
 class GetDefaultRWConcernCommand : public TypedCommand<GetDefaultRWConcernCommand> {
 public:
@@ -252,7 +252,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(GetDefaultRWConcernCommand);
+MONGO_REGISTER_COMMAND(GetDefaultRWConcernCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

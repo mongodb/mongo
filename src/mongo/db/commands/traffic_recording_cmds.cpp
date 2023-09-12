@@ -92,7 +92,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 };
-MONGO_REGISTER_COMMAND(StartRecordingCommand);
+MONGO_REGISTER_COMMAND(StartRecordingCommand).forRouter().forShard();
 
 class StopRecordingCommand final : public TypedCommand<StopRecordingCommand> {
 public:
@@ -129,7 +129,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 };
-MONGO_REGISTER_COMMAND(StopRecordingCommand);
+MONGO_REGISTER_COMMAND(StopRecordingCommand).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

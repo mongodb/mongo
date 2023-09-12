@@ -235,7 +235,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigsvrDropIndexCatalogEntryCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrDropIndexCatalogEntryCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -78,7 +78,7 @@ public:
         uasserted(ErrorCodes::CommandNotSupported, "compact not allowed through mongos");
     }
 };
-MONGO_REGISTER_COMMAND(CompactCmd);
+MONGO_REGISTER_COMMAND(CompactCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

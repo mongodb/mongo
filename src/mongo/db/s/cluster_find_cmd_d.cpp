@@ -84,7 +84,7 @@ struct ClusterFindCmdD {
                   "Cannot explain a cluster find command on a mongod");
     }
 };
-MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdD>);
+MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdD>).forShard();
 
 }  // namespace
 }  // namespace mongo

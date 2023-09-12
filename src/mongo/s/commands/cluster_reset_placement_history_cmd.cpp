@@ -115,7 +115,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterResetPlacementHistoryCommand);
+MONGO_REGISTER_COMMAND(ClusterResetPlacementHistoryCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

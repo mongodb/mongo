@@ -49,7 +49,7 @@ public:
 
     static void beginShutdown(OperationContext* opCtx, bool force, Milliseconds timeout) {}
 };
-MONGO_REGISTER_COMMAND(ClusterShutdownCmd);
+MONGO_REGISTER_COMMAND(ClusterShutdownCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

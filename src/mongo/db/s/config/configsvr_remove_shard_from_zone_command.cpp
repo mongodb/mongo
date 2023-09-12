@@ -129,7 +129,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrRemoveShardFromZoneCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrRemoveShardFromZoneCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -1593,7 +1593,7 @@ public:
         const mongo::BulkWriteUpdateOp* _firstUpdateOp{nullptr};
     };
 };
-MONGO_REGISTER_COMMAND(BulkWriteCmd);
+MONGO_REGISTER_COMMAND(BulkWriteCmd).forShard();
 
 }  // namespace
 

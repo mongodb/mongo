@@ -337,7 +337,7 @@ public:
         return fsyncCore.runFsyncCommand(opCtx, cmdObj, result);
     }
 };
-MONGO_REGISTER_COMMAND(FSyncCommand);
+MONGO_REGISTER_COMMAND(FSyncCommand).forShard();
 
 class FSyncUnlockCommand : public BasicCommand {
 public:
@@ -373,7 +373,7 @@ public:
         return fsyncCore.runFsyncUnlockCommand(opCtx, cmdObj, result);
     }
 };
-MONGO_REGISTER_COMMAND(FSyncUnlockCommand);
+MONGO_REGISTER_COMMAND(FSyncUnlockCommand).forShard();
 
 bool FSyncCore::runFsyncUnlockCommand(OperationContext* opCtx,
                                       const BSONObj& cmdObj,

@@ -250,7 +250,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CleanupOrphanedCommand);
+MONGO_REGISTER_COMMAND(CleanupOrphanedCommand).forShard();
 
 BSONField<std::string> CleanupOrphanedCommand::nsField("cleanupOrphaned");
 BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField("startingFromKey");

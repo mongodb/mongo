@@ -178,7 +178,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(_shardsvrCleanupStructuredEncryptionDataCommand);
+MONGO_REGISTER_COMMAND(_shardsvrCleanupStructuredEncryptionDataCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -138,7 +138,8 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(VoteAbortIndexBuildCommand)
-    .requiresFeatureFlag(&feature_flags::gIndexBuildGracefulErrorHandling);
+    .requiresFeatureFlag(&feature_flags::gIndexBuildGracefulErrorHandling)
+    .forShard();
 
 }  // namespace
 }  // namespace mongo

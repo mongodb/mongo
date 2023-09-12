@@ -132,7 +132,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrReshardCollectionCommand);
+MONGO_REGISTER_COMMAND(ShardsvrReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -110,7 +110,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrEnsureChunkVersionIsGreaterThanCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrEnsureChunkVersionIsGreaterThanCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

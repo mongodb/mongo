@@ -140,7 +140,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdDropIndexes);
+MONGO_REGISTER_COMMAND(CmdDropIndexes).forShard();
 
 class CmdReIndex : public BasicCommand {
 public:
@@ -315,7 +315,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReIndex);
+MONGO_REGISTER_COMMAND(CmdReIndex).forShard();
 
 }  // namespace
 }  // namespace mongo

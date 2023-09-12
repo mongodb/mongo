@@ -82,7 +82,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(ReapLogicalSessionCacheNowCommand).testOnly();
+MONGO_REGISTER_COMMAND(ReapLogicalSessionCacheNowCommand).testOnly().forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo

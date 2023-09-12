@@ -197,7 +197,7 @@ private:
     bool _hasBeenCalled{false};
     BSONObj _msg;
 };
-MONGO_REGISTER_COMMAND(MockReplReconfigCommand);
+MONGO_REGISTER_COMMAND(MockReplReconfigCommand).forShard();
 
 std::ostream& operator<<(std::ostream& builder, mongo::ShardSplitDonorStateEnum state) {
     switch (state) {

@@ -162,7 +162,7 @@ private:
         return "Internal command. Do not call directly.";
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryCommand);
+MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

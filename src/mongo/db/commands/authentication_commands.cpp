@@ -164,7 +164,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdLogout);
+MONGO_REGISTER_COMMAND(CmdLogout).forRouter().forShard();
 
 #ifdef MONGO_CONFIG_SSL
 }  // namespace
@@ -393,7 +393,7 @@ public:
         return HandshakeRole::kAuth;
     }
 };
-MONGO_REGISTER_COMMAND(CmdAuthenticate);
+MONGO_REGISTER_COMMAND(CmdAuthenticate).forRouter().forShard();
 
 }  // namespace
 

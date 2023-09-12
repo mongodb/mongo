@@ -71,7 +71,7 @@ struct ClusterKillCursorsCmd {
         return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, cursorId);
     }
 };
-MONGO_REGISTER_COMMAND(KillCursorsCmdBase<ClusterKillCursorsCmd>);
+MONGO_REGISTER_COMMAND(KillCursorsCmdBase<ClusterKillCursorsCmd>).forRouter();
 
 }  // namespace
 }  // namespace mongo

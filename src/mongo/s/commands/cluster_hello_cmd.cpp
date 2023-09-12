@@ -344,7 +344,7 @@ protected:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(CmdHello);
+MONGO_REGISTER_COMMAND(CmdHello).forRouter();
 
 class CmdIsMaster : public CmdHello {
 public:
@@ -359,7 +359,7 @@ protected:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdIsMaster);
+MONGO_REGISTER_COMMAND(CmdIsMaster).forRouter();
 
 }  // namespace
 }  // namespace mongo

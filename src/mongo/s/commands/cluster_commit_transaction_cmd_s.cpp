@@ -61,7 +61,7 @@ struct ClusterCommitTransactionCmdS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCommitTransactionCmdBase<ClusterCommitTransactionCmdS>);
+MONGO_REGISTER_COMMAND(ClusterCommitTransactionCmdBase<ClusterCommitTransactionCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -533,6 +533,7 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ClusterWriteWithoutShardKeyCmd)
+    .forRouter()
     .requiresFeatureFlag(&feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
 
 }  // namespace

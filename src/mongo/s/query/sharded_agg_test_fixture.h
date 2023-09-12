@@ -51,13 +51,13 @@ public:
     }
 };
 
-class ShardedAggTestFixture : public CatalogCacheTestFixture {
+class ShardedAggTestFixture : public ShardCatalogCacheTestFixture {
 public:
     const NamespaceString kTestAggregateNss =
         NamespaceString::createNamespaceString_forTest("unittests", "sharded_agg_test");
 
     void setUp() {
-        CatalogCacheTestFixture::setUp();
+        ShardCatalogCacheTestFixture::setUp();
         _expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kTestAggregateNss);
         _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>(executor());
         _expCtx->inMongos = true;

@@ -212,7 +212,7 @@ private:
     const Date_t _started;
 };
 
-MONGO_REGISTER_COMMAND(CmdServerStatus);
+MONGO_REGISTER_COMMAND(CmdServerStatus).forRouter().forShard();
 
 }  // namespace
 

@@ -122,7 +122,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterGetQueryableEncryptionCountInfoCmd);
+MONGO_REGISTER_COMMAND(ClusterGetQueryableEncryptionCountInfoCmd).forRouter();
 
 ClusterGetQueryableEncryptionCountInfoCmd::Reply
 ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext* opCtx) {

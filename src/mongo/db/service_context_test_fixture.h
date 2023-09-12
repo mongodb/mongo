@@ -71,6 +71,10 @@ private:
     ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, getClusterRole(roleIndex))};
 };
 
+using ShardRoleOverride = RoleOverride<ServerRoleIndex::shard>;
+using RouterRoleOverride = RoleOverride<ServerRoleIndex::router>;
+using ShardRouterRoleOverride = RoleOverride<ServerRoleIndex::shardRouter>;
+
 class ScopedGlobalServiceContextForTest {
 public:
     /**

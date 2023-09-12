@@ -140,7 +140,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterAnalyzeCmd);
+MONGO_REGISTER_COMMAND(ClusterAnalyzeCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

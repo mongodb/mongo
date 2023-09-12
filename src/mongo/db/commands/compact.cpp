@@ -123,5 +123,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CompactCmd);
+MONGO_REGISTER_COMMAND(CompactCmd).forShard();
 }  // namespace mongo

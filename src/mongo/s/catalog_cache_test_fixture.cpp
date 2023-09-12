@@ -84,7 +84,7 @@ BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
         .toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 
-void CatalogCacheTestFixture::setUp() {
+void CoreCatalogCacheTestFixture::setUp() {
     ShardingTestFixture::setUp();
     setRemote(HostAndPort("FakeRemoteClient:34567"));
     configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
@@ -93,7 +93,7 @@ void CatalogCacheTestFixture::setUp() {
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
-CatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceString& nss) {
+CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
         auto client = getServiceContext()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
@@ -105,7 +105,7 @@ CatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceString&
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
-CatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss) {
+CoreCatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
         auto client = getServiceContext()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
@@ -116,7 +116,7 @@ CatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceStrin
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
-CatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss) {
+CoreCatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss) {
     auto catalogCache = Grid::get(getServiceContext())->catalogCache();
     const auto [cm, _] =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
@@ -135,7 +135,7 @@ CatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceSt
     });
 }
 
-std::vector<ShardType> CatalogCacheTestFixture::setupNShards(int numShards) {
+std::vector<ShardType> CoreCatalogCacheTestFixture::setupNShards(int numShards) {
     std::vector<ShardType> shards;
     for (int i = 0; i < numShards; i++) {
         ShardId name(str::stream() << i);
@@ -157,7 +157,7 @@ std::vector<ShardType> CatalogCacheTestFixture::setupNShards(int numShards) {
     return shards;
 }
 
-CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
+CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
@@ -246,7 +246,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
     return *future.default_timed_get();
 }
 
-CollectionRoutingInfo CatalogCacheTestFixture::makeUnshardedCollectionRoutingInfo(
+CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutingInfo(
     const NamespaceString& nss) {
     return makeCollectionRoutingInfo(nss,
                                      ShardKeyPattern(BSON("_id" << 1)),
@@ -258,7 +258,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeUnshardedCollectionRoutingInf
                                      true /* unsplittable */);
 }
 
-CollectionRoutingInfo CatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
+CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
     const NamespaceString& nss) {
     setupNShards(1);
     DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
@@ -269,18 +269,18 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeUntrackedCollectionRoutingInf
     return *future.default_timed_get();
 }
 
-void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
+void CoreCatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         DatabaseType db(nss.dbName(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }
 
-void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
-                                                  OID epoch,
-                                                  Timestamp timestamp,
-                                                  UUID uuid,
-                                                  const ShardKeyPattern& shardKeyPattern) {
+void CoreCatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
+                                                      OID epoch,
+                                                      Timestamp timestamp,
+                                                      UUID uuid,
+                                                      const ShardKeyPattern& shardKeyPattern) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         CollectionType collType(
             nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
@@ -288,7 +288,7 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
     }());
 }
 
-void CatalogCacheTestFixture::expectCollectionAndChunksAggregation(
+void CoreCatalogCacheTestFixture::expectCollectionAndChunksAggregation(
     NamespaceString nss,
     OID epoch,
     Timestamp timestamp,
@@ -308,7 +308,7 @@ void CatalogCacheTestFixture::expectCollectionAndChunksAggregation(
     }());
 }
 
-void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
+void CoreCatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     NamespaceString nss,
     OID epoch,
     Timestamp timestamp,
@@ -330,13 +330,13 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     }
 }
 
-ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
+ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
     NamespaceString nss) {
 
     return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss, BSON("_id" << 1));
 }
 
-ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsHash(
+ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsHash(
     NamespaceString nss) {
 
     return loadRoutingTableWithTwoChunksAndTwoShardsImpl(nss,
@@ -344,7 +344,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsH
                                                               << "hashed"));
 }
 
-ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsImpl(
+ChunkManager CoreCatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsImpl(
     NamespaceString nss,
     const BSONObj& shardKey,
     boost::optional<std::string> primaryShardId,

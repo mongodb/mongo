@@ -200,7 +200,7 @@ private:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryEnterCriticalSectionCommand);
+MONGO_REGISTER_COMMAND(ShardsvrMovePrimaryEnterCriticalSectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

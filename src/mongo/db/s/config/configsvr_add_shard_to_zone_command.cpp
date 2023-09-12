@@ -126,7 +126,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrAddShardToZoneCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrAddShardToZoneCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

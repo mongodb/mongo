@@ -136,7 +136,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrReshardingOperationTimeCmd);
+MONGO_REGISTER_COMMAND(ShardsvrReshardingOperationTimeCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

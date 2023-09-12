@@ -131,7 +131,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrValidateShardKeyCandidateCommand);
+MONGO_REGISTER_COMMAND(ShardsvrValidateShardKeyCandidateCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

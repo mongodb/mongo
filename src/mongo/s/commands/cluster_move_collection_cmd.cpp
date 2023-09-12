@@ -127,7 +127,8 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ClusterMoveCollectionCmd)
-    .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection);
+    .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection)
+    .forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -113,7 +113,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result);
 };
-MONGO_REGISTER_COMMAND(ClusterPlanCacheClearCmd);
+MONGO_REGISTER_COMMAND(ClusterPlanCacheClearCmd).forRouter();
 
 bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
                                    const DatabaseName& dbName,

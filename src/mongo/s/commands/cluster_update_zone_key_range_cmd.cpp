@@ -154,7 +154,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(UpdateZoneKeyRangeCmd);
+MONGO_REGISTER_COMMAND(UpdateZoneKeyRangeCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

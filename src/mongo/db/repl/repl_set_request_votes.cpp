@@ -72,7 +72,7 @@ private:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetRequestVotes);
+MONGO_REGISTER_COMMAND(CmdReplSetRequestVotes).forShard();
 
 }  // namespace repl
 }  // namespace mongo

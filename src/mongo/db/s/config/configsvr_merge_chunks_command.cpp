@@ -135,7 +135,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigSvrMergeChunksCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrMergeChunksCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

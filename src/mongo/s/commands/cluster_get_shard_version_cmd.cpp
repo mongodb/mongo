@@ -201,7 +201,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(GetShardVersion);
+MONGO_REGISTER_COMMAND(GetShardVersion).forRouter();
 
 }  // namespace
 }  // namespace mongo

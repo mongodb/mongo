@@ -137,7 +137,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetChangeStreamStateCommand);
+MONGO_REGISTER_COMMAND(SetChangeStreamStateCommand).forShard();
 
 class GetChangeStreamStateCommand final : public TypedCommand<GetChangeStreamStateCommand> {
 public:
@@ -205,7 +205,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(GetChangeStreamStateCommand);
+MONGO_REGISTER_COMMAND(GetChangeStreamStateCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -132,7 +132,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(RepairShardedCollectionChunksHistoryCommand);
+MONGO_REGISTER_COMMAND(RepairShardedCollectionChunksHistoryCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

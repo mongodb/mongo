@@ -172,7 +172,7 @@ public:
         return false;
     }
 };
-MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmd);
+MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmd).forShard();
 
 class FlushRoutingTableCacheUpdatesCmdWithWriteConcern
     : public FlushRoutingTableCacheUpdatesCmdBase<
@@ -184,7 +184,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmdWithWriteConcern);
+MONGO_REGISTER_COMMAND(FlushRoutingTableCacheUpdatesCmdWithWriteConcern).forShard();
 
 }  // namespace
 }  // namespace mongo

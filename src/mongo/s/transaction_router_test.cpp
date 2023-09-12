@@ -107,7 +107,8 @@ const BSONObj kNoSuchTransactionResponse =
 const BSONObj kDummyFindCmd = BSON("find"
                                    << "dummy");
 
-class TransactionRouterTest : public ShardingTestFixture {
+class TransactionRouterTest : public virtual service_context_test::RouterRoleOverride,
+                              public ShardingTestFixture {
 protected:
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
 

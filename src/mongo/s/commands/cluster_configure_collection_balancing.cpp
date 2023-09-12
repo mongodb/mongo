@@ -123,7 +123,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigCollectionBalancingCmd);
+MONGO_REGISTER_COMMAND(ConfigCollectionBalancingCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

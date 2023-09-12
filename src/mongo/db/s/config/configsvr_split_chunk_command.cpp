@@ -153,6 +153,6 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigSvrSplitChunkCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrSplitChunkCommand).forShard();
 }  // namespace
 }  // namespace mongo

@@ -305,7 +305,7 @@ private:
     // Update related command execution metrics.
     static UpdateMetrics _updateMetrics;
 };
-MONGO_REGISTER_COMMAND(CmdFindAndModify);
+MONGO_REGISTER_COMMAND(CmdFindAndModify).forShard();
 
 UpdateMetrics CmdFindAndModify::_updateMetrics{"findAndModify"};
 

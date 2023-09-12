@@ -274,7 +274,7 @@ public:
         return applyOpsStatus;
     }
 };
-MONGO_REGISTER_COMMAND(ApplyOpsCmd);
+MONGO_REGISTER_COMMAND(ApplyOpsCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

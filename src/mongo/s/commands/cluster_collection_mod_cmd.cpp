@@ -211,7 +211,7 @@ public:
         return &::mongo::CollMod::kAuthorizationContract;
     }
 };
-MONGO_REGISTER_COMMAND(CollectionModCmd);
+MONGO_REGISTER_COMMAND(CollectionModCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

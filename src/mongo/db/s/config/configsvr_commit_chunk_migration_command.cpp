@@ -172,7 +172,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ConfigSvrCommitChunkMigrationCommand);
+MONGO_REGISTER_COMMAND(ConfigSvrCommitChunkMigrationCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

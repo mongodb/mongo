@@ -166,7 +166,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdListIndexes);
+MONGO_REGISTER_COMMAND(CmdListIndexes).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -65,6 +65,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(InternalTransactionsTestCommandS).testOnly();
+MONGO_REGISTER_COMMAND(InternalTransactionsTestCommandS).testOnly().forRouter();
 }  // namespace
 }  // namespace mongo

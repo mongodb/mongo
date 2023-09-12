@@ -157,7 +157,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CloneCatalogDataCommand);
+MONGO_REGISTER_COMMAND(CloneCatalogDataCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

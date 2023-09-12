@@ -109,6 +109,6 @@ public:
         return appendRawResponses(opCtx, &errmsg, &result, shardResponses).responseOK;
     }
 };
-MONGO_REGISTER_COMMAND(AppendOplogNoteCmd);
+MONGO_REGISTER_COMMAND(AppendOplogNoteCmd).forRouter();
 
 }  // namespace mongo

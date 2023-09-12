@@ -160,7 +160,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(GodInsert).testOnly();
+MONGO_REGISTER_COMMAND(GodInsert).testOnly().forShard();
 
 class CapTrunc : public BasicCommand {
 public:
@@ -239,7 +239,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CapTrunc).testOnly();
+MONGO_REGISTER_COMMAND(CapTrunc).testOnly().forShard();
 
 class EmptyCapped : public BasicCommand {
 public:
@@ -270,7 +270,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(EmptyCapped).testOnly();
+MONGO_REGISTER_COMMAND(EmptyCapped).testOnly().forShard();
 
 class DurableHistoryReplicatedTestCmd : public BasicCommand {
 public:
@@ -354,7 +354,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(DurableHistoryReplicatedTestCmd).testOnly();
+MONGO_REGISTER_COMMAND(DurableHistoryReplicatedTestCmd).testOnly().forShard();
 
 // TODO SERVER-80003 remove this test command when 8.0 branches off.
 class TimeseriesCatalogBucketParamsChangedTestCmd : public BasicCommand {
@@ -404,7 +404,7 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd).testOnly();
+MONGO_REGISTER_COMMAND(TimeseriesCatalogBucketParamsChangedTestCmd).testOnly().forShard();
 
 }  // namespace
 

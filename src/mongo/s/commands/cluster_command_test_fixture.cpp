@@ -74,8 +74,8 @@
 namespace mongo {
 
 void ClusterCommandTestFixture::setUp() {
-    CatalogCacheTestFixture::setUp();
-    CatalogCacheTestFixture::setupNShards(numShards);
+    RouterCatalogCacheTestFixture::setUp();
+    RouterCatalogCacheTestFixture::setupNShards(numShards);
 
     Grid::get(getServiceContext())->setShardingInitialized();
 

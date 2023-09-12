@@ -130,7 +130,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(AutoSplitVectorCommand);
+MONGO_REGISTER_COMMAND(AutoSplitVectorCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -71,7 +71,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(IsDbGridCmd);
+MONGO_REGISTER_COMMAND(IsDbGridCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

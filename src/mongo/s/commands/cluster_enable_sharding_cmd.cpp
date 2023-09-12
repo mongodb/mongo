@@ -142,7 +142,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(EnableShardingCmd);
+MONGO_REGISTER_COMMAND(EnableShardingCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

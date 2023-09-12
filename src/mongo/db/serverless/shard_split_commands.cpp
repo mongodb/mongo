@@ -146,7 +146,7 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(CommitShardSplitCmd);
+MONGO_REGISTER_COMMAND(CommitShardSplitCmd).forShard();
 
 class AbortShardSplitCmd : public TypedCommand<AbortShardSplitCmd> {
 public:
@@ -222,7 +222,7 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(AbortShardSplitCmd);
+MONGO_REGISTER_COMMAND(AbortShardSplitCmd).forShard();
 
 class ForgetShardSplitCmd : public TypedCommand<ForgetShardSplitCmd> {
 public:
@@ -297,7 +297,7 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ForgetShardSplitCmd);
+MONGO_REGISTER_COMMAND(ForgetShardSplitCmd).forShard();
 
 
 }  // namespace

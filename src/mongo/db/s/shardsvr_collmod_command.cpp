@@ -143,7 +143,7 @@ public:
         coll_mod_reply_validation::validateReply(reply);
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrCollModCommand);
+MONGO_REGISTER_COMMAND(ShardsvrCollModCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

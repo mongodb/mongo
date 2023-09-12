@@ -133,6 +133,6 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(GetDatabaseVersionCmd);
+MONGO_REGISTER_COMMAND(GetDatabaseVersionCmd).forShard();
 
 }  // namespace mongo

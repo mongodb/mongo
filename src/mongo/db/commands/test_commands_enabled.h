@@ -39,7 +39,7 @@ namespace mongo {
  * which consults this flag:
  *
  *     class MyTestCommand ...;
- *     MONGO_REGISTER_COMMAND(MyTestCommand).testOnly();
+ *     MONGO_REGISTER_COMMAND(MyTestCommand).forShard().testOnly();
  *
  * To make testing commands available by default, change the value to true before running any
  * mongo initializers:

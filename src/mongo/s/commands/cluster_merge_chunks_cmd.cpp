@@ -215,7 +215,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ClusterMergeChunksCommand);
+MONGO_REGISTER_COMMAND(ClusterMergeChunksCommand).forRouter();
 
 BSONField<std::string> ClusterMergeChunksCommand::nsField("mergeChunks");
 BSONField<std::vector<BSONObj>> ClusterMergeChunksCommand::boundsField("bounds");

@@ -90,7 +90,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(NetStatCmd);
+MONGO_REGISTER_COMMAND(NetStatCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

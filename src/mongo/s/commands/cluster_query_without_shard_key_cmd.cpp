@@ -639,7 +639,8 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ClusterQueryWithoutShardKeyCmd)
-    .requiresFeatureFlag(&feature_flags::gFeatureFlagUpdateOneWithoutShardKey);
+    .requiresFeatureFlag(&feature_flags::gFeatureFlagUpdateOneWithoutShardKey)
+    .forRouter();
 
 }  // namespace
 }  // namespace mongo

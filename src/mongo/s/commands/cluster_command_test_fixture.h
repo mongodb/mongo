@@ -50,7 +50,7 @@ namespace mongo {
 
 using InspectionCallback = std::function<void(const executor::RemoteCommandRequest& request)>;
 
-class ClusterCommandTestFixture : public CatalogCacheTestFixture {
+class ClusterCommandTestFixture : public RouterCatalogCacheTestFixture {
 protected:
     const size_t numShards = 2;
 

@@ -124,7 +124,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CreateCmd);
+MONGO_REGISTER_COMMAND(CreateCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

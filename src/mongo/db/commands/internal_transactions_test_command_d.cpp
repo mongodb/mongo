@@ -81,6 +81,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(InternalTransactionsTestCommandD).testOnly();
+MONGO_REGISTER_COMMAND(InternalTransactionsTestCommandD).testOnly().forShard();
 }  // namespace
 }  // namespace mongo

@@ -107,6 +107,6 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand);
+MONGO_REGISTER_COMMAND(ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand).forShard();
 }  // namespace
 }  // namespace mongo

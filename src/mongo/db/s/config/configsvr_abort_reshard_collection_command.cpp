@@ -201,7 +201,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrAbortReshardCollectionCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrAbortReshardCollectionCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

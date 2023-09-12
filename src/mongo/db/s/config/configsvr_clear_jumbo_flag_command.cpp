@@ -146,7 +146,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrClearJumboFlagCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrClearJumboFlagCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

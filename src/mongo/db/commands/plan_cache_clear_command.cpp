@@ -169,7 +169,7 @@ public:
         return "Drops one or all plan cache entries in a collection.";
     }
 };
-MONGO_REGISTER_COMMAND(PlanCacheClearCommand);
+MONGO_REGISTER_COMMAND(PlanCacheClearCommand).forShard();
 
 Status PlanCacheClearCommand::checkAuthForOperation(OperationContext* opCtx,
                                                     const DatabaseName& dbName,

@@ -123,7 +123,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrConfigureCollectionBalancingCmd);
+MONGO_REGISTER_COMMAND(ConfigsvrConfigureCollectionBalancingCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

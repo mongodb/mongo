@@ -272,5 +272,5 @@ public:
         ValidateDBMetadataCommandReply _reply;
     };
 };
-MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd);
+MONGO_REGISTER_COMMAND(ValidateDBMetadataCmd).forShard();
 }  // namespace mongo

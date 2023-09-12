@@ -299,7 +299,7 @@ public:
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
 };
-MONGO_REGISTER_COMMAND(CompactStructuredEncryptionDataCmd);
+MONGO_REGISTER_COMMAND(CompactStructuredEncryptionDataCmd).forShard();
 
 }  // namespace
 }  // namespace mongo

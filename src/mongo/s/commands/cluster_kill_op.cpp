@@ -137,7 +137,7 @@ private:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ClusterKillOpCommand);
+MONGO_REGISTER_COMMAND(ClusterKillOpCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

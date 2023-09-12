@@ -304,7 +304,7 @@ public:
         return &::mongo::ListCollections::kAuthorizationContract;
     }
 };
-MONGO_REGISTER_COMMAND(CmdListCollections);
+MONGO_REGISTER_COMMAND(CmdListCollections).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -114,7 +114,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrJoinMigrationsCommand);
+MONGO_REGISTER_COMMAND(ShardsvrJoinMigrationsCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

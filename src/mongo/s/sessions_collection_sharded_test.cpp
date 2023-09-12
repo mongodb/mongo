@@ -69,13 +69,13 @@ LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
 /**
  * Mimics a two shards backend.
  */
-class SessionsCollectionShardedTest : public CatalogCacheTestFixture {
+class SessionsCollectionShardedTest : public RouterCatalogCacheTestFixture {
 public:
     SessionsCollectionShardedTest() = default;
     ~SessionsCollectionShardedTest() = default;
 
     void setUp() override {
-        CatalogCacheTestFixture::setUp();
+        RouterCatalogCacheTestFixture::setUp();
 
         _shards = {std::move(setupNShards(2))};
     }

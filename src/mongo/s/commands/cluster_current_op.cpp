@@ -103,6 +103,6 @@ private:
     }
 };
 
-MONGO_REGISTER_COMMAND(ClusterCurrentOpCommand);
+MONGO_REGISTER_COMMAND(ClusterCurrentOpCommand).forRouter();
 }  // namespace
 }  // namespace mongo

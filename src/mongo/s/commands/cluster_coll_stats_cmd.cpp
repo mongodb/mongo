@@ -423,7 +423,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(CollectionStats);
+MONGO_REGISTER_COMMAND(CollectionStats).forRouter();
 
 }  // namespace
 }  // namespace mongo

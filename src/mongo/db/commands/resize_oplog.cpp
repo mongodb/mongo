@@ -131,7 +131,7 @@ public:
         });
     }
 };
-MONGO_REGISTER_COMMAND(CmdReplSetResizeOplog);
+MONGO_REGISTER_COMMAND(CmdReplSetResizeOplog).forShard();
 
 }  // namespace
 }  // namespace mongo

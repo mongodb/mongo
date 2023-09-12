@@ -155,6 +155,6 @@ public:
         Mutex _mutex = MONGO_MAKE_LATCH("SetUserWriteBlockModeCommand::_mutex");
     };
 };
-MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand);
+MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand).forShard();
 }  // namespace
 }  // namespace mongo

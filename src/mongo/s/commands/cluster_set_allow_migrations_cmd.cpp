@@ -115,7 +115,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(SetAllowMigrationsCmd);
+MONGO_REGISTER_COMMAND(SetAllowMigrationsCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

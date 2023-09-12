@@ -138,7 +138,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_COMMAND(ConfigsvrUpdateZoneKeyRangeCommand);
+MONGO_REGISTER_COMMAND(ConfigsvrUpdateZoneKeyRangeCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

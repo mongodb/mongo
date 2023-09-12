@@ -178,9 +178,9 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(TestVersion2Cmd).testOnly();
-MONGO_REGISTER_COMMAND(TestVersions1And2Cmd).testOnly();
-MONGO_REGISTER_COMMAND(TestDeprecationInVersion2Cmd).testOnly();
-MONGO_REGISTER_COMMAND(TestRemovalCmd).testOnly();
+MONGO_REGISTER_COMMAND(TestVersion2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestVersions1And2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestDeprecationInVersion2Cmd).testOnly().forRouter().forShard();
+MONGO_REGISTER_COMMAND(TestRemovalCmd).testOnly().forRouter().forShard();
 
 }  // namespace mongo

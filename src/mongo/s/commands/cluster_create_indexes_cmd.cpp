@@ -216,7 +216,7 @@ public:
         return &::mongo::CreateIndexesCommand::kAuthorizationContract;
     }
 };
-MONGO_REGISTER_COMMAND(CreateIndexesCmd);
+MONGO_REGISTER_COMMAND(CreateIndexesCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

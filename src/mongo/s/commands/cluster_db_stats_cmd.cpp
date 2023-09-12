@@ -187,7 +187,7 @@ public:
         DBStats::parse(IDLParserContext{"dbstats.reply"}, resultObj);
     }
 };
-MONGO_REGISTER_COMMAND(CmdDBStats);
+MONGO_REGISTER_COMMAND(CmdDBStats).forRouter();
 
 }  // namespace
 }  // namespace mongo

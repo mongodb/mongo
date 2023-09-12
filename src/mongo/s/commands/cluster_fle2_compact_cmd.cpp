@@ -105,7 +105,7 @@ public:
         return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCompactStructuredEncryptionDataCmd);
+MONGO_REGISTER_COMMAND(ClusterCompactStructuredEncryptionDataCmd).forRouter();
 
 using Cmd = ClusterCompactStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {

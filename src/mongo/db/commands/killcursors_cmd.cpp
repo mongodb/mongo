@@ -68,6 +68,6 @@ struct KillCursorsCmd {
         return cursorManager->killCursor(opCtx, id);
     }
 };
-MONGO_REGISTER_COMMAND(KillCursorsCmdBase<KillCursorsCmd>);
+MONGO_REGISTER_COMMAND(KillCursorsCmdBase<KillCursorsCmd>).forShard();
 
 }  // namespace mongo

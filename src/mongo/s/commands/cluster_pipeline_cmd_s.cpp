@@ -88,7 +88,7 @@ struct ClusterPipelineCommandS {
             opCtx, opMsgRequest.getDbName(), opMsgRequest.body, explainVerbosity, apiStrict);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>);
+MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -248,7 +248,8 @@ BSONObj expectInsertsReturnTenantMigrationAbortedErrorsBase(
  * Mimics a single shard backend for a particular collection which can be initialized with a
  * set of write command results to return.
  */
-class BatchWriteExecTest : public ShardingTestFixture {
+class BatchWriteExecTest : public virtual service_context_test::RouterRoleOverride,
+                           public ShardingTestFixture {
 public:
     BatchWriteExecTest() = default;
     ~BatchWriteExecTest() = default;

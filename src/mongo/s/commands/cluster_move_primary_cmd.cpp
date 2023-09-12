@@ -134,7 +134,7 @@ private:
         return "Reassigns the primary shard holding all un-sharded collections in the database";
     }
 };
-MONGO_REGISTER_COMMAND(MovePrimaryCommand);
+MONGO_REGISTER_COMMAND(MovePrimaryCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

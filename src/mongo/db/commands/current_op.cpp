@@ -125,6 +125,6 @@ public:
         }
     }
 };
-MONGO_REGISTER_COMMAND(CurrentOpCommand);
+MONGO_REGISTER_COMMAND(CurrentOpCommand).forShard();
 
 }  // namespace mongo

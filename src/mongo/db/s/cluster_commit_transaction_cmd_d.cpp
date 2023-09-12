@@ -78,7 +78,7 @@ struct ClusterCommitTransactionCmdD {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCommitTransactionCmdBase<ClusterCommitTransactionCmdD>);
+MONGO_REGISTER_COMMAND(ClusterCommitTransactionCmdBase<ClusterCommitTransactionCmdD>).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -81,6 +81,6 @@ public:
             4664806, "_killOperations command killed cursors", "numKilled"_attr = numCursorsKilled);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterKillOperationsCmd);
+MONGO_REGISTER_COMMAND(ClusterKillOperationsCmd).forRouter();
 
 }  // namespace mongo
