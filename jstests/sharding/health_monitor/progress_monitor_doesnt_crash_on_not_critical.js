@@ -13,7 +13,6 @@ const params = {
         healthMonitoringIntervals: tojson({values: [{type: "test", interval: NumberInt(500)}]}),
         progressMonitor:
             tojson({interval: PROGRESS_TIMEOUT_SECONDS * 1000, deadline: PROGRESS_TIMEOUT_SECONDS}),
-        featureFlagHealthMonitoring: true
     }
 };
 let st = new ShardingTest({

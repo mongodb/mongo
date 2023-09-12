@@ -15,7 +15,6 @@ const params = {
                 {type: "dns", intensity: "off"}
             ]
         }),
-        featureFlagHealthMonitoring: true
     }
 };
 

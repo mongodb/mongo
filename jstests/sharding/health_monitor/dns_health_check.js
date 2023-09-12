@@ -10,7 +10,6 @@ const kMonitoringIntervalMs = 200;
 const params = {
     setParameter: {
         healthMonitoringIntensities: tojson({values: [{type: "dns", intensity: "critical"}]}),
-        featureFlagHealthMonitoring: true,
         healthMonitoringIntervals:
             tojson({values: [{type: "dns", interval: kMonitoringIntervalMs}]})
     }

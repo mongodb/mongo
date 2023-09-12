@@ -69,7 +69,6 @@ using test::FaultManagerTestImpl;
 namespace {
 
 TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSuccessful) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kOk; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return Severity::kOk; });
 
@@ -93,7 +92,6 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSucce
 }
 
 TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkAfterFailureThenSuccess) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
@@ -113,8 +111,6 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkAfterFailureThenSuccess)
 }
 
 TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailure) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
-
     const auto faultFacetType = FaultFacetType::kMock1;
     registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
@@ -136,7 +132,6 @@ TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailur
 }
 
 TEST_F(FaultManagerTest, StaysInOkOnSuccess) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
@@ -158,7 +153,6 @@ TEST_F(FaultManagerTest, StaysInOkOnSuccess) {
 }
 
 TEST_F(FaultManagerTest, StaysInTransientFault) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
@@ -186,7 +180,6 @@ TEST_F(FaultManagerTest, StaysInTransientFault) {
 }
 
 TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
@@ -214,7 +207,6 @@ TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) 
 }
 
 TEST_F(FaultManagerTest, OneFacetIsResolved) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kFailure; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return Severity::kFailure; });
 
@@ -237,7 +229,6 @@ TEST_F(FaultManagerTest, OneFacetIsResolved) {
 }
 
 DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransientFault, "Fatal") {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
@@ -254,7 +245,6 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransient
 
 TEST_F(FaultManagerTest,
        NonCriticalFacetDoesNotTransitionToActiveFaultAfterTimeoutFromTransientFault) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
     auto config = test::getConfigWithDisabledPeriodicChecks();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kNonCritical);
@@ -275,7 +265,6 @@ TEST_F(FaultManagerTest,
 }
 
 DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCheck, "Fatal") {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
@@ -289,7 +278,6 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCh
 
 TEST_F(FaultManagerTest,
        NonCriticalFacetDoesNotTransitionToActiveFaultAfterTimeoutFromStartupCheck) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
     auto config = test::getConfigWithDisabledPeriodicChecks();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kNonCritical);
@@ -307,7 +295,6 @@ TEST_F(FaultManagerTest,
 }
 
 TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
@@ -327,7 +314,6 @@ TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
 }
 
 TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     auto config = std::make_unique<FaultManagerConfig>();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
@@ -345,7 +331,6 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
 }
 
 TEST_F(FaultManagerTest, AllOffFacetsSkipStartupCheck) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     auto config = std::make_unique<FaultManagerConfig>();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
@@ -359,7 +344,6 @@ TEST_F(FaultManagerTest, AllOffFacetsSkipStartupCheck) {
 }
 
 TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
     auto config = std::make_unique<FaultManagerConfig>();
     config->disablePeriodicChecksForTests();
@@ -385,7 +369,6 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
 }
 
 TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSuccess) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     RAIIServerParameterControllerForTest serverParamController{"activeFaultDurationSecs", 30};
     const auto faultFacetType = FaultFacetType::kDns;
     auto config = std::make_unique<FaultManagerConfig>();

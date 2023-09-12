@@ -26,7 +26,6 @@ const mongosParams = {
         }),
         healthMonitoringIntervals: tojson({values: [{type: "configServer", interval: 1}]}),
         activeFaultDurationSecs: kActiveFaultDurationSec,
-        featureFlagHealthMonitoring: true
     }
 };
 
@@ -95,6 +94,7 @@ assert.soon(() => {
 
 // Mongos should not crash yet.
 assert.commandWorked(st.s0.adminCommand({"ping": 1}));
+let numPidsBefore = _runningMongoChildProcessIds().length;
 
 jsTest.log('Partitioning the final config server replica from the mongos');
 st.config2.discardMessagesFrom(st.s, 1.0);
@@ -116,8 +116,16 @@ assert.soon(() => {
 
 try {
     // Refresh PIDs to force de-registration of the crashed mongos.
-    var pids = _runningMongoChildProcessIds();
-    jsTestLog(`Running processes: ${tojson(pids)}`);
+    assert.soon(
+        () => {
+            var numPidsNow = _runningMongoChildProcessIds().length;
+            return (numPidsBefore - numPidsNow) == 1;
+        },
+        () => {
+            var pids = _runningMongoChildProcessIds();
+            return `Encountered incorrect number of running processes. Expected: 11. Running processes: ${
+                tojson(pids)}`;
+        });
     st.stop({skipValidatingExitCode: true, skipValidation: true});
 } catch (e) {
     jsTestLog(`Exception during shutdown: ${e}`);

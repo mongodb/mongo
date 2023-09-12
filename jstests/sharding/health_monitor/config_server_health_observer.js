@@ -14,7 +14,6 @@ const params = {
             ]
         }),
         healthMonitoringIntervals: tojson({values: [{type: "configServer", interval: 200}]}),
-        featureFlagHealthMonitoring: true
     }
 };
 

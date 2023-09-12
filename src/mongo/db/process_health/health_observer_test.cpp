@@ -81,20 +81,7 @@ TEST_F(FaultManagerTest, Registration) {
     ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }
 
-TEST_F(FaultManagerTest, InitialHealthCheckDoesNotRunIfFeatureFlagNotEnabled) {
-    resetManager();
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", false};
-
-    registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kOk; });
-    static_cast<void>(manager().schedulePeriodicHealthCheckThreadTest());
-
-    auto currentFault = manager().currentFault();
-    ASSERT_TRUE(!currentFault);  // Is not created.
-    ASSERT_TRUE(manager().getFaultState() == FaultState::kStartupCheck);
-}
-
 TEST_F(FaultManagerTest, Stats) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     resetManager(std::make_unique<FaultManagerConfig>());
     auto faultFacetType = FaultFacetType::kMock1;
     AtomicWord<Severity> mockResult(Severity::kFailure);
@@ -150,7 +137,6 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
     });
 
     // Health check should get stuck here.
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     auto observer = manager().getHealthObserversTest()[0];
     manager().healthCheckTest(observer, CancellationToken::uncancelable());
@@ -178,7 +164,6 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
         BSON("values" << BSON_ARRAY(BSON("type"
                                          << "test"
                                          << "interval" << 1)))};
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
     AtomicWord<Severity> severity{Severity::kOk};
     registerMockHealthObserver(faultFacetType, [&severity] { return severity.load(); });
@@ -195,7 +180,6 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
 
 TEST_F(FaultManagerTest, PeriodicHealthCheckOnErrorMakesBadHealthStatus) {
     resetManager(std::make_unique<FaultManagerConfig>());
-    RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
     registerMockHealthObserver(faultFacetType, [] {
@@ -219,7 +203,6 @@ TEST_F(FaultManagerTest,
         BSON("values" << BSON_ARRAY(BSON("type"
                                          << "test"
                                          << "interval" << 1)))};
-    RAIIServerParameterControllerForTest _flagController{"featureFlagHealthMonitoring", true};
     RAIIServerParameterControllerForTest _serverParamController{"activeFaultDurationSecs", 5};
 
     AtomicWord<bool> shouldBlock{true};
