@@ -519,14 +519,21 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             // A previous request already created and committed the collection
                             // but there was a stepdown after the commit.
 
+                            auto requestForChangeStream = [&] {
+                                if (_timeseriesNssResolvedByCommandHandler()) {
+                                    return _request.toBSON();
+                                }
+                                return patchedRequestForChangeStream(
+                                           _request, *_doc.getTranslatedRequestParams())
+                                    .toBSON();
+                            }();
+
                             // Ensure that the change stream event gets emitted at least once.
                             notifyChangeStreamsOnShardCollection(
                                 opCtx,
                                 nss(),
                                 *createCollectionResponseOpt->getCollectionUUID(),
-                                patchedRequestForChangeStream(_request,
-                                                              *_doc.getTranslatedRequestParams())
-                                    .toBSON(),
+                                std::move(requestForChangeStream),
                                 CommitPhase::kSuccessful);
 
                             // The critical section might have been taken by a migration, we force
