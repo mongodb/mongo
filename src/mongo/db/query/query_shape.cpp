@@ -218,7 +218,6 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
     bob.append(FindCommandRequest::kFilterFieldName, findRequest.filter->serialize(opts));
-
     // Let Spec.
     if (auto letSpec = findCmd.getLet()) {
         auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);

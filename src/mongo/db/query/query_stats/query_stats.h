@@ -53,6 +53,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo::query_stats {
@@ -74,6 +75,58 @@ using QueryStatsStore = PartitionedCache<std::size_t,
                                          QueryStatsStoreEntryBudgetor,
                                          QueryStatsPartitioner>;
 
+/**
+ * A manager for the queryStats store allows a "pointer swap" on the queryStats store itself. The
+ * usage patterns are as follows:
+ *
+ * - Updating the queryStats store uses the `getQueryStatsStore()` method. The queryStats store
+ *   instance is obtained, entries are looked up and mutated, or created anew.
+ * - The queryStats store is "reset". This involves atomically allocating a new instance, once
+ * there are no more updaters (readers of the store "pointer"), and returning the existing
+ * instance.
+ */
+class QueryStatsStoreManager {
+public:
+    template <typename... QueryStatsStoreArgs>
+    QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
+        : _queryStatsStore(std::make_unique<QueryStatsStore>(cacheSize, numPartitions)),
+          _maxSize(cacheSize) {}
+
+    /**
+     * Acquire the instance of the queryStats store.
+     */
+    QueryStatsStore& getQueryStatsStore() {
+        return *_queryStatsStore;
+    }
+
+    size_t getMaxSize() {
+        return _maxSize;
+    }
+
+    /**
+     * Resize the queryStats store and return the number of evicted
+     * entries.
+     */
+    size_t resetSize(size_t cacheSize) {
+        _maxSize = cacheSize;
+        return _queryStatsStore->reset(cacheSize);
+    }
+
+private:
+    std::unique_ptr<QueryStatsStore> _queryStatsStore;
+
+    /**
+     * Max size of the queryStats store. Tracked here to avoid having to recompute after it's
+     * divided up into partitions.
+     */
+    size_t _maxSize;
+};
+
+const auto queryStatsStoreDecoration =
+    ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
+
+const auto queryStatsRateLimiter =
+    ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
 /**
  * Acquire a reference to the global queryStats store.
  */
