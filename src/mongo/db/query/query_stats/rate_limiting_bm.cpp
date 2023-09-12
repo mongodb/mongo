@@ -28,18 +28,18 @@
  */
 
 
-#include "mongo/db/query/query_shape.h"
-#include "mongo/util/duration.h"
 #include <benchmark/benchmark.h>
+#include <climits>
+#include <memory>
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
-#include <climits>
-#include <memory>
 
 namespace mongo {
 namespace {
