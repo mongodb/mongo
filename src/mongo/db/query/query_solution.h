@@ -1742,10 +1742,7 @@ struct SearchNode : public QuerySolutionNode {
         : isSearchMeta(isSearchMeta),
           searchQuery(searchQuery),
           limit(limit),
-          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion) {
-        // TODO SERVER-78565: Support $search in SBE plan cache
-        eligibleForPlanCache = false;
-    }
+          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion) {}
 
     StageType getType() const override {
         return STAGE_SEARCH;

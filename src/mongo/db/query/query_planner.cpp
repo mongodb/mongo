@@ -1839,7 +1839,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             // In the $search case, we create the $search query solution node in QueryPlanner::Plan
             // instead of here. The empty branch here assures that we don't hit the tassert below
             // and continue in creating the query plan.
-            // TODO: SERVER-78565 add tests to test pushing down $search + $group and $search +
+            // TODO: SERVER-79255 add tests to test pushing down $search + $group and $search +
             // $lookup pipelines to make sure pushdown works correctly.
             continue;
         }

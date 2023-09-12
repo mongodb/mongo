@@ -1086,13 +1086,15 @@ void encodePipeline(const OperationContext* opCtx,
     bufBuilder->appendChar(kEncodeSectionDelimiter);
     std::vector<Value> serializedArray;
     for (auto& stage : cqPipeline) {
-        auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage->documentSource());
-        if (matchStage) {
+        auto documentSource = stage->documentSource();
+        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
             // Match expressions are parameterized so need to be encoded differently.
             encodeKeyForAutoParameterizedMatchSBE(matchStage->getMatchExpression(), bufBuilder);
+        } else if (getSearchHelpers(opCtx->getServiceContext())
+                       ->encodeSearchForSbeCache(documentSource, bufBuilder)) {
         } else {
             serializedArray.clear();
-            stage->documentSource()->serializeToArray(serializedArray);
+            documentSource->serializeToArray(serializedArray);
 
             for (const auto& value : serializedArray) {
                 tassert(6443201,

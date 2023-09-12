@@ -167,6 +167,62 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
     auto stage = makeLimitCoScanTree(nodeId, 0);
     return {std::move(stage), std::move(outputs)};
 }
+
+// Establish the search query cursor and fill in the search slots.
+void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq) {
+    if (cq.cqPipeline().empty()) {
+        return;
+    }
+    auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
+    auto stage = cq.cqPipeline().front()->documentSource();
+    if (!searchHelper->isSearchStage(stage) && !searchHelper->isSearchMetaStage(stage)) {
+        return;
+    }
+
+    // Build a SearchNode in order to retrieve the search info.
+    auto sn = searchHelper->getSearchNode(stage);
+    auto& env = data->env;
+
+    // TODO: SERVER-78560 handle the second cursor (search metadata cursor).
+    auto [cursor, _] = searchHelper->establishSearchQueryCursors(cq.getExpCtxRaw(), sn.get());
+    auto firstBatch = cursor.releaseBatch();
+    auto cursorId = cursor.getCursorId();
+
+    // Set values for cursorId and first batch slots.
+    env->resetSlot(env->getSlot("searchCursorId"_sd),
+                   sbe::value::TypeTags::NumberInt64,
+                   cursorId,
+                   true /* owned */);
+
+    BSONArrayBuilder firstBatchBuilder;
+    for (const auto& obj : firstBatch) {
+        firstBatchBuilder.append(obj);
+    }
+
+    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
+    env->resetSlot(
+        env->getSlot("searchFirstBatch"_sd), firstBatchTag, firstBatchVal, true /* owned */);
+
+    // Set value for search query.
+    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
+    env->resetSlot(
+        env->getSlot("searchQuery"_sd), searchQueryTag, searchQueryVal, true /* owned */);
+
+    // Set values for QSN slots.
+    if (sn->limit) {
+        env->resetSlot(env->getSlot("searchLimit"_sd),
+                       sbe::value::TypeTags::NumberInt64,
+                       *sn->limit,
+                       true /* owned */);
+    }
+
+    if (sn->intermediateResultsProtocolVersion) {
+        env->resetSlot(env->getSlot("searchProtocolVersion"_sd),
+                       sbe::value::TypeTags::NumberInt32,
+                       *sn->intermediateResultsProtocolVersion,
+                       true /* owned */);
+    }
+}
 }  // namespace
 
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
@@ -286,7 +342,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
 
-    // TODO: SERVER-78565 set cursor and other info of $search here.
+    prepareSearchQueryParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
@@ -3977,47 +4033,33 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto& collection = getCurrentCollection(reqs);
     auto expCtx = _cq.getExpCtxRaw();
 
-    // get the first batch and cursor id information
-    // TODO: SERVER-78565 move this to the place after 'prepare()'.
-    auto [cursor, _] = getSearchHelpers(_cq.getOpCtx()->getServiceContext())
-                           ->establishSearchQueryCursors(expCtx, sn);
-    auto firstBatch = cursor.getBatch();
-    auto cursorId = cursor.getCursorId();
-
-    // cursorId and first batch slots adding values
-    auto cursorIdSlot = _env->registerSlot("cursorId"_sd,
-                                           sbe::value::TypeTags::NumberInt64,
-                                           cursorId,
-                                           true /* owned */,
+    // Register search query parameter slots.
+    auto cursorIdSlot = _env->registerSlot("searchCursorId"_sd,
+                                           sbe::value::TypeTags::Nothing,
+                                           0 /* val */,
+                                           false /* owned */,
                                            &_slotIdGenerator);
+    auto firstBatchSlot = _env->registerSlot("searchFirstBatch"_sd,
+                                             sbe::value::TypeTags::Nothing,
+                                             0 /* val */,
+                                             false /* owned */,
+                                             &_slotIdGenerator);
+    auto searchQuerySlot = _env->registerSlot("searchQuery"_sd,
+                                              sbe::value::TypeTags::Nothing,
+                                              0 /* val */,
+                                              false /* owned */,
+                                              &_slotIdGenerator);
+    auto limitSlot = _env->registerSlot("searchLimit"_sd,
+                                        sbe::value::TypeTags::Nothing,
+                                        0 /* val */,
+                                        false /* owned */,
+                                        &_slotIdGenerator);
 
-    BSONArrayBuilder firstBatchBuilder;
-    for (const auto& obj : firstBatch) {
-        firstBatchBuilder.append(obj);
-    }
-    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
-    auto firstBatchSlot = _env->registerSlot(
-        "firstBatch"_sd, firstBatchTag, firstBatchVal, true /* owned */, &_slotIdGenerator);
-
-    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
-    auto searchQuerySlot = _env->registerSlot(
-        "searchQuery"_sd, searchQueryTag, searchQueryVal, true /* owned */, &_slotIdGenerator);
-
-    // QSN slots
-    auto limitSlot = _env->registerSlot(
-        "limit"_sd, sbe::value::TypeTags::Nothing, 0, false /* owned */, &_slotIdGenerator);
-    if (sn->limit) {
-        _env->resetSlot(limitSlot, sbe::value::TypeTags::NumberInt64, *sn->limit, true /* owned */);
-    }
-
-    auto protocolVersionSlot = _env->registerSlot(
-        "protocolVersion"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
-    if (sn->intermediateResultsProtocolVersion) {
-        _env->resetSlot(protocolVersionSlot,
-                        sbe::value::TypeTags::NumberInt32,
-                        *sn->intermediateResultsProtocolVersion,
-                        true /* owned */);
-    }
+    auto protocolVersionSlot = _env->registerSlot("searchProtocolVersion"_sd,
+                                                  sbe::value::TypeTags::Nothing,
+                                                  0 /* val */,
+                                                  false /* owned */,
+                                                  &_slotIdGenerator);
 
     PlanStageSlots outputs;
     // Search cursor stage output slots

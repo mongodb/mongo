@@ -167,6 +167,14 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const SearchNode* searchNode) {
         return {CursorResponse(), CursorResponse()};
     }
+
+    /**
+     * Encode $search/$searchMeta to SBE plan cache.
+     * Returns true if $search/$searchMeta is at the front of the 'pipeline' and encoding is done.
+     */
+    virtual bool encodeSearchForSbeCache(DocumentSource* ds, BufBuilder* bufBuilder) {
+        return false;
+    }
 };
 
 /**
