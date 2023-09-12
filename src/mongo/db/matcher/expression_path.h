@@ -196,11 +196,12 @@ public:
     }
 
     void serialize(BSONObjBuilder* out, const SerializationOptions& opts) const override {
-        auto&& rhs = getSerializedRightHandSide(opts);
         if (opts.includePath) {
-            out->append(opts.serializeFieldPathFromString(path()), rhs);
+            BSONObjBuilder subObj(out->subobjStart(opts.serializeFieldPathFromString(path())));
+            appendSerializedRightHandSide(&subObj, opts);
+            subObj.doneFast();
         } else {
-            out->appendElements(rhs);
+            appendSerializedRightHandSide(out, opts);
         }
     }
 

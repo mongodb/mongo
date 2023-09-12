@@ -56,6 +56,27 @@ static const NamespaceStringOrUUID kDefaultTestNss =
 
 static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
+// This is a snapshot of the client metadata generated from our IDHACK genny workload. The
+// specifics aren't so important, but it chosen in an attempt to be indicative of the size/shape
+// of this kind of thing "in the wild".
+const auto kMetadataWrapper = fromjson(R"({metadata: {
+        "application" : {
+            "name" : "Genny"
+        },
+        "driver" : {
+            "name" : "mongoc / mongocxx",
+            "version" : "1.23.2 / 3.7.0"
+        },
+        "os" : {
+            "type" : "Linux",
+            "name" : "Ubuntu",
+            "version" : "22.04",
+            "architecture" : "aarch64"
+        },
+        "platform" : "cfg=0x03215e88e9 posix=200809 stdc=201710 CC=GCC 11.3.0 CFLAGS=\"-fPIC\" LDFLAGS=\"\""
+    }})");
+auto kMockClientMetadataElem = kMetadataWrapper["metadata"];
+
 auto makeFindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const ParsedFindCommand& parsedFind) {
     return std::make_unique<query_stats::FindKeyGenerator>(
@@ -82,27 +103,31 @@ void BM_ShapfiyIDHack(benchmark::State& state) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
     auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
     fcr->setFilter(fromjson("{_id: 4}"));
-    // This is a snapshot of the client metadata generated from our IDHACK genny workload. The
-    // specifics aren't so important, but it was chosen in an attempt to be indicative of the
-    // size/shape of this kind of thing "in the wild".
-    auto metadataWrapper = fromjson(R"({metadata: {
-            "application" : {
-                "name" : "Genny"
-            },
-            "driver" : {
-                "name" : "mongoc / mongocxx",
-                "version" : "1.23.2 / 3.7.0"
-            },
-            "os" : {
-                "type" : "Linux",
-                "name" : "Ubuntu",
-                "version" : "22.04",
-                "architecture" : "aarch64"
-            },
-            "platform" : "cfg=0x03215e88e9 posix=200809 stdc=201710 CC=GCC 11.3.0 CFLAGS=\"-fPIC\" LDFLAGS=\"\""
-        }})");
-    auto metadataElem = metadataWrapper["metadata"];
-    ClientMetadata::setFromMetadata(opCtx->getClient(), metadataElem, false);
+    ClientMetadata::setFromMetadata(opCtx->getClient(), kMockClientMetadataElem, false);
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
+
+    // Run the benchmark.
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(shapifyAndHashRequest(expCtx, *parsedFind));
+    }
+}
+
+// Benchmark computing the query stats key and its hash for a mildly complex query predicate.
+void BM_ShapfiyMildlyComplex(benchmark::State& state) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("query_test");
+
+    auto opCtx = client->makeOperationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
+    auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
+    fcr->setFilter(fromjson(R"({
+        clientId: {$nin: ["432345", "4386945", "111111"]},
+        nEmployees: {$gte: 4, $lt: 20},
+        deactivated: false,
+        region: "US",
+        yearlySpend: {$lte: 1000}
+    })"));
+    ClientMetadata::setFromMetadata(opCtx->getClient(), kMockClientMetadataElem, false);
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
 
     // Run the benchmark.
@@ -112,6 +137,7 @@ void BM_ShapfiyIDHack(benchmark::State& state) {
 }
 
 BENCHMARK(BM_ShapfiyIDHack)->Threads(1);
+BENCHMARK(BM_ShapfiyMildlyComplex)->Threads(1);
 
 }  // namespace
 }  // namespace mongo

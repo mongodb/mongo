@@ -99,6 +99,21 @@ static const StringMap<StringData> kArrayTypeStringConstants{
     {kMaxKeyTypeString.rawData(), "?array<?maxKey>"_sd},
 };
 
+static constexpr auto kRepresentativeString = "?"_sd;
+static constexpr auto kRepresentativeNumber = 1;
+static const auto kRepresentativeObject = BSON("?"
+                                               << "?");
+static const auto kRepresentativeArray = BSONArray();
+static constexpr auto kRepresentativeBinData = BSONBinData();
+static const auto kRepresentativeObjectId = OID::max();
+static constexpr auto kRepresentativeBool = true;
+static const auto kRepresentativeDate = Date_t::fromMillisSinceEpoch(0);
+static const auto kRepresentativeRegex = BSONRegEx("/\?/");
+static const auto kRepresentativeDbPointer = BSONDBRef("?.?", OID::max());
+static const auto kRepresentativeJavascript = BSONCode("return ?;");
+static const auto kRepresentativeJavascriptWithScope = BSONCodeWScope("return ?;", BSONObj());
+static const auto kRepresentativeTimestamp = Timestamp::min();
+
 /**
  * Computes a debug string meant to represent "any value of type t", where "t" is the type of the
  * provided argument. For example "?number" for any number (int, double, etc.).
@@ -166,39 +181,39 @@ ImplicitValue defaultLiteralOfType(BSONType t) {
             return BSONUndefined;
         case Symbol:
         case String:
-            return "?"_sd;
+            return kRepresentativeString;
         case NumberInt:
         case NumberLong:
         case NumberDouble:
         case NumberDecimal:
-            return 1;
+            return kRepresentativeNumber;
         case MinKey:
             return MINKEY;
         case Object:
-            return Document{{"?"_sd, "?"_sd}};
+            return kRepresentativeObject;
         case Array:
             // This case should only happen if we have an array within an array.
-            return BSONArray();
+            return kRepresentativeArray;
         case BinData:
-            return BSONBinData();
+            return kRepresentativeBinData;
         case jstOID:
-            return OID::max();
+            return kRepresentativeObjectId;
         case Bool:
-            return true;
+            return kRepresentativeBool;
         case Date:
-            return Date_t::fromMillisSinceEpoch(0);
+            return kRepresentativeDate;
         case jstNULL:
             return BSONNULL;
         case RegEx:
-            return BSONRegEx("/\?/");
+            return kRepresentativeRegex;
         case DBRef:
-            return BSONDBRef("?.?", OID::max());
+            return kRepresentativeDbPointer;
         case Code:
-            return BSONCode("return ?;");
+            return kRepresentativeJavascript;
         case CodeWScope:
-            return BSONCodeWScope("return ?;", BSONObj());
+            return kRepresentativeJavascriptWithScope;
         case bsonTimestamp:
-            return Timestamp::min();
+            return kRepresentativeTimestamp;
         case MaxKey:
             return MAXKEY;
         default:
@@ -318,6 +333,68 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
     return determineArraySubType(arrayVal.getArray());
 }
 
+void appendDefaultOfNonArrayType(BSONObjBuilder* bob, StringData name, const BSONElement& e) {
+    switch (e.type()) {
+        case EOO:
+        case Undefined:
+            bob->appendUndefined(name);
+            return;
+        case Symbol:
+        case String:
+            bob->append(name, kRepresentativeString);
+            return;
+        case NumberInt:
+        case NumberLong:
+        case NumberDouble:
+        case NumberDecimal:
+            bob->append(name, kRepresentativeNumber);
+            return;
+        case MinKey:
+            bob->appendMinKey(name);
+            return;
+        case Object:
+            bob->append(name, kRepresentativeObject);
+            return;
+        case Array:
+            // This case is more complicated and callers should use a more generic helper.
+            MONGO_UNREACHABLE_TASSERT(8094100);
+        case BinData:
+            bob->append(name, kRepresentativeBinData);
+            return;
+        case jstOID:
+            bob->append(name, kRepresentativeObjectId);
+            return;
+        case Bool:
+            bob->append(name, kRepresentativeBool);
+            return;
+        case Date:
+            bob->append(name, kRepresentativeDate);
+            return;
+        case jstNULL:
+            bob->appendNull(name);
+            return;
+        case RegEx:
+            bob->append(name, kRepresentativeRegex);
+            return;
+        case DBRef:
+            bob->append(name, kRepresentativeDbPointer);
+            return;
+        case Code:
+            bob->append(name, kRepresentativeJavascript);
+            return;
+        case CodeWScope:
+            bob->append(name, kRepresentativeJavascriptWithScope);
+            return;
+        case bsonTimestamp:
+            bob->append(name, kRepresentativeTimestamp);
+            return;
+        case MaxKey:
+            bob->appendMaxKey(name);
+            return;
+        default:
+            MONGO_UNREACHABLE_TASSERT(8094101);
+    };
+}
 }  // namespace
 
 const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
@@ -346,7 +423,34 @@ ImplicitValue defaultLiteralOfType(BSONElement e) {
 }
 
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob, const BSONElement& e) const {
-    serializeLiteral(e).addToBsonObj(bob, e.fieldNameStringData());
+    appendLiteral(bob, e.fieldNameStringData(), e);
+}
+void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
+                                         StringData name,
+                                         const BSONElement& e) const {
+    // The first two cases are particularly performance sensitive. We could answer everything here
+    // with the code inside the 'kToDebugTypeString' branch, but there are some relatively easy ways
+    // to accomplish the first two policy cases (in the common cases), so we'll special case those
+    // in order to avoid constructing a temporary Value.
+    switch (literalPolicy) {
+        case LiteralSerializationPolicy::kUnchanged:
+            bob->appendAs(e, name);
+            return;
+        case LiteralSerializationPolicy::kToRepresentativeParseableValue: {
+            if (e.type() != BSONType::Array) {
+                appendDefaultOfNonArrayType(bob, name, e);
+                return;
+            }
+            // If it's an array we'll default to the slow but general codepath below.
+            [[fallthrough]];
+        }
+        case LiteralSerializationPolicy::kToDebugTypeString: {
+            // Performance isn't as sensitive here.
+            return serializeLiteral(e).addToBsonObj(bob, name);
+        }
+        default:
+            MONGO_UNREACHABLE_TASSERT(8094102);
+    }
 }
 
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob,

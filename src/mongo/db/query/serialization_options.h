@@ -184,6 +184,7 @@ struct SerializationOptions {
      * using the same name as 'e'.
      */
     void appendLiteral(BSONObjBuilder* bob, const BSONElement& e) const;
+    void appendLiteral(BSONObjBuilder* bob, StringData name, const BSONElement& e) const;
     /**
      * Helper method to call 'serializeLiteral()' on 'v' and append the result to 'bob' using field
      * name 'fieldName'.
