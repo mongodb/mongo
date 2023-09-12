@@ -2762,9 +2762,17 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     }
     statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toBSON());
     if (_coordinatorDoc.getStartTime()) {
-        statsBuilder.append("startTime", *_coordinatorDoc.getStartTime());
+        auto startTime = *_coordinatorDoc.getStartTime();
+        statsBuilder.append("startTime", startTime);
+
+        auto endTime = getCurrentTime();
+        statsBuilder.append("endTime", endTime);
+
+        auto elapsedMillis = (endTime - startTime).count();
+        statsBuilder.append("totalElapsedMillis", elapsedMillis);
+    } else {
+        statsBuilder.append("endTime", getCurrentTime());
     }
-    statsBuilder.append("endTime", getCurrentTime());
     _metrics->reportOnCompletion(&statsBuilder);
 
     int64_t totalWritesDuringCriticalSection = 0;
