@@ -24,7 +24,8 @@ function getAdditionalParameters(cmdObj) {
      "updates",
      "deletes",
      "collectionUUID",
-     "encryptionInformation"]
+     "encryptionInformation",
+     "isTimeseriesNamespace"]
         .forEach(property => {
             if (cmdCopy.hasOwnProperty(property)) {
                 delete cmdCopy[property];

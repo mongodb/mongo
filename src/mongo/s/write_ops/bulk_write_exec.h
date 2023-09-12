@@ -138,7 +138,9 @@ public:
     /**
      * Fills a BulkWriteCommandRequest from a TargetedWriteBatch for this BulkWriteOp.
      */
-    BulkWriteCommandRequest buildBulkCommandRequest(const TargetedWriteBatch& targetedBatch) const;
+    BulkWriteCommandRequest buildBulkCommandRequest(
+        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+        const TargetedWriteBatch& targetedBatch) const;
 
     /**
      * Returns false if the bulk write op needs more processing.
@@ -167,6 +169,24 @@ public:
                            stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace);
 
     /**
+     * Processes the response to a single WriteOp at index opIdx directly and cleans up all
+     * associated childOps. The response is captured by the BulkWriteReplyItem. We don't expect
+     * sharding related stale version/db errors because response set by this method should be final
+     * (i.e. not retryable).
+     *
+     * This is currently used by retryable timeseries updates and writes without shard key because
+     * those operations are processed individually with the use of internal transactions.
+     */
+    void noteWriteOpFinalResponse(size_t opIdx, const BulkWriteReplyItem& reply);
+
+    /**
+     * Mark the corresponding targeter stale based on errorsPerNamespace.
+     */
+    void noteStaleResponses(
+        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+        const stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace);
+
+    /**
      * Returns a vector of BulkWriteReplyItem based on the end state of each individual write in
      * this bulkWrite operation, along with the number of error replies contained in the vector.
      */
@@ -177,6 +197,10 @@ public:
      * go into each sub-batch command sent to a shard, i.e. all fields besides the actual write ops.
      */
     int getBaseBatchCommandSizeEstimate() const;
+
+    const BulkWriteCommandRequest& getClientRequest() const {
+        return _clientRequest;
+    }
 
 private:
     // The OperationContext the client bulkWrite request is run on.

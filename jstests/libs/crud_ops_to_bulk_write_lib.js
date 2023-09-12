@@ -238,7 +238,8 @@ export const BulkWriteUtils = (function() {
         return responses;
     }
 
-    function getNsInfoIdx(nsInfoEntry, collectionUUID, encryptionInformation) {
+    function getNsInfoIdx(
+        nsInfoEntry, collectionUUID, encryptionInformation, isTimeseriesNamespace) {
         let idx = nsInfos.findIndex((element) => element.ns == nsInfoEntry);
         if (idx == -1) {
             idx = nsInfos.length;
@@ -248,6 +249,9 @@ export const BulkWriteUtils = (function() {
             }
             if (encryptionInformation) {
                 nsInfo["encryptionInformation"] = encryptionInformation;
+            }
+            if (isTimeseriesNamespace) {
+                nsInfo["isTimeseriesNamespace"] = isTimeseriesNamespace;
             }
             nsInfos.push(nsInfo);
         }
@@ -322,8 +326,10 @@ export const BulkWriteUtils = (function() {
         }
 
         let nsInfoEntry = dbName + "." + cmdObj[cmdName];
-        let nsInfoIdx =
-            getNsInfoIdx(nsInfoEntry, cmdObj.collectionUUID, cmdObj.encryptionInformation);
+        let nsInfoIdx = getNsInfoIdx(nsInfoEntry,
+                                     cmdObj.collectionUUID,
+                                     cmdObj.encryptionInformation,
+                                     cmdObj.isTimeseriesNamespace);
 
         let numOps = 0;
 

@@ -227,13 +227,13 @@ function runTest(collConfig, reqConfig, insert) {
             ],
             isTimeseriesNamespace: true,
         };
-        assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand), 5916401);
+        assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand), [5916401, 7934201]);
 
         // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series buckets
         // namespace.
         failingDeleteCommand.delete = collName;
         assert.commandFailedWithCode(st.shard0.getDB(dbName).runCommand(failingDeleteCommand),
-                                     5916400);
+                                     [5916400, 7934201]);
     }
 
     // Reset database profiler.
@@ -267,7 +267,10 @@ function runTest(collConfig, reqConfig, insert) {
 
     // Check that the query was routed to the correct shards.
     const profilerFilter = {
-        op: 'remove',
+        $or: [
+            {op: 'remove'},
+            {op: 'bulkWrite', "command.delete": {$exists: true}},
+        ],
         ns: `${dbName}.${collName}`,
         // Filter out events recorded because of StaleConfig error.
         ok: {$ne: 0},

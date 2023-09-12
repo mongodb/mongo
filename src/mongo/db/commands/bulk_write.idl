@@ -209,7 +209,7 @@ structs:
 
     BulkWriteCommandReply:
         description: "Holds reply information for the 'bulkWrite' command."
-        strict: true
+        strict: false
         is_command_reply: true
         fields:
             cursor:

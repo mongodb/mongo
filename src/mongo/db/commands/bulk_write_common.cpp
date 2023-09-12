@@ -54,7 +54,7 @@
 namespace mongo {
 namespace bulk_write_common {
 
-void validateRequest(const BulkWriteCommandRequest& req) {
+void validateRequest(const BulkWriteCommandRequest& req, bool isRouter) {
     const auto& ops = req.getOps();
     const auto& nsInfos = req.getNsInfo();
 
@@ -82,10 +82,16 @@ void validateRequest(const BulkWriteCommandRequest& req) {
 
     // Validate the namespaces in nsInfo.
     for (const auto& nsInfo : nsInfos) {
+        auto& ns = nsInfo.getNs();
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified for bulkWrite: '"
                               << nsInfo.getNs().toStringForErrorMsg() << "'",
-                nsInfo.getNs().isValid());
+                ns.isValid());
+        uassert(7934201,
+                "'isTimeseriesNamespace' parameter can only be set when the request is sent on "
+                "'system.buckets' namespace to each shard",
+                !nsInfo.getIsTimeseriesNamespace() ||
+                    (!isRouter && ns.isTimeseriesBucketsCollection()));
     }
 
     // Validate that every ops entry has a valid nsInfo index.

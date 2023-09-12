@@ -243,6 +243,13 @@ void WriteOp::_updateOpState() {
     }
 
     if (!childErrors.empty() && isRetryError) {
+        if (!childSuccesses.empty()) {
+            // Some child operations were successful on some of the shards. We must remember the
+            // previous replies before we retry targeting this operation. This is because it is
+            // possible to only target shards in _successfulShardSet on retry and as a result, we
+            // may transition to Completed immediately after that.
+            _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
+        }
         _state = WriteOpState_Ready;
     } else if (!childErrors.empty()) {
         _error = combineOpErrors(childErrors);
@@ -291,6 +298,13 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
     childOp.error->setIndex(_itemRef.getItemIndex());
     childOp.state = WriteOpState_Error;
     _updateOpState();
+}
+
+void WriteOp::setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem) {
+    dassert(_state == WriteOpState_Ready);
+    _bulkWriteReplyItem = std::move(bulkWriteReplyItem);
+    _state = WriteOpState_Completed;
+    // No need to updateOpState, set directly
 }
 
 void WriteOp::setOpError(const write_ops::WriteError& error) {

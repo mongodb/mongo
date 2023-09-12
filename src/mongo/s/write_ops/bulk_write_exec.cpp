@@ -82,6 +82,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/bulk_write_command_modifier.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -105,13 +106,14 @@ bool isVerboseWc(const BSONObj& wc) {
 // Send and process the child batches. Each child batch is targeted at a unique shard: therefore
 // one shard will have only one batch incoming.
 void executeChildBatches(OperationContext* opCtx,
+                         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                          TargetedBatchMap& childBatches,
                          BulkWriteOp& bulkWriteOp,
                          stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto& childBatch : childBatches) {
         auto request = [&]() {
-            auto bulkReq = bulkWriteOp.buildBulkCommandRequest(*childBatch.second);
+            auto bulkReq = bulkWriteOp.buildBulkCommandRequest(targeters, *childBatch.second);
 
             // Transform the request into a sendable BSON.
             BSONObjBuilder builder;
@@ -177,37 +179,6 @@ void executeChildBatches(OperationContext* opCtx,
         // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
         // they may be re-targeted if needed.
         bulkWriteOp.noteBatchResponse(*writeBatch, replyItems, errorsPerNamespace);
-    }
-}
-
-void noteStaleResponses(
-    OperationContext* opCtx,
-    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-    const stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
-    for (auto& targeter : targeters) {
-        auto errors = errorsPerNamespace.find(targeter->getNS());
-        if (errors != errorsPerNamespace.cend()) {
-            for (const auto& error : errors->second.getErrors(ErrorCodes::StaleConfig)) {
-                LOGV2_DEBUG(7279201,
-                            4,
-                            "Noting stale config response.",
-                            "shardId"_attr = error.endpoint.shardName,
-                            "status"_attr = error.error.getStatus());
-                targeter->noteStaleShardResponse(
-                    opCtx, error.endpoint, *error.error.getStatus().extraInfo<StaleConfigInfo>());
-            }
-            for (const auto& error : errors->second.getErrors(ErrorCodes::StaleDbVersion)) {
-                LOGV2_DEBUG(7279202,
-                            4,
-                            "Noting stale database response.",
-                            "shardId"_attr = error.endpoint.shardName,
-                            "status"_attr = error.error.getStatus());
-                targeter->noteStaleDbResponse(
-                    opCtx,
-                    error.endpoint,
-                    *error.error.getStatus().extraInfo<StaleDbRoutingVersion>());
-            }
-        }
     }
 }
 
@@ -360,14 +331,81 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
     }
 }
 
+void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
+                                      TargetedBatchMap& childBatches,
+                                      BulkWriteOp& bulkWriteOp) {
+    invariant(!childBatches.empty());
+    // Get the index of the targeted operation in the client bulkWrite request.
+    auto opIdx = childBatches.begin()->second->getWrites()[0]->writeOpRef.first;
+
+    // Construct a single-op update request based on the update operation at opIdx.
+    auto& bulkWriteReq = bulkWriteOp.getClientRequest();
+
+    BulkWriteCommandRequest singleUpdateRequest;
+    singleUpdateRequest.setOps({bulkWriteReq.getOps()[opIdx]});
+    singleUpdateRequest.setNsInfo(bulkWriteReq.getNsInfo());
+    singleUpdateRequest.setBypassDocumentValidation(bulkWriteReq.getBypassDocumentValidation());
+    singleUpdateRequest.setLet(bulkWriteReq.getLet());
+    singleUpdateRequest.setStmtId(bulk_write_common::getStatementId(bulkWriteReq, opIdx));
+    singleUpdateRequest.setDbName(DatabaseName::kAdmin);
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+    BulkWriteCommandReply bulkWriteResponse;
+
+    // Execute the singleUpdateRequest (a bulkWrite command) in an internal transaction to perform
+    // the retryable timeseries update operation. This separate bulkWrite command will get executed
+    // on its own via bulkWrite execute() logic again as a transaction, which handles retries of all
+    // kinds. This function is just a client of the internal transaction spawned. As a result, we
+    // must only receive a single final (non-retryable) response for the timeseries update
+    // operation.
+    auto swResult =
+        txn.runNoThrow(opCtx,
+                       [&singleUpdateRequest, &bulkWriteResponse](
+                           const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                           auto updateResponse = txnClient.runCRUDOpSync(singleUpdateRequest);
+                           bulkWriteResponse = std::move(updateResponse);
+
+                           return SemiFuture<void>::makeReady();
+                       });
+    Status responseStatus = Status::OK();
+    if (!swResult.isOK()) {
+        responseStatus = swResult.getStatus();
+    } else {
+        if (!swResult.getValue().cmdStatus.isOK()) {
+            responseStatus = swResult.getValue().cmdStatus;
+        }
+        if (auto wcError = swResult.getValue().wcError; !wcError.toStatus().isOK()) {
+            // TODO (SERVER-76954): Handle write concern errors.
+        }
+    }
+    // TODO (SERVER-80481): Handle local error correctly.
+    uassertStatusOK(responseStatus);
+
+    auto cursor = bulkWriteResponse.getCursor();
+    const auto& replyItems = cursor.getFirstBatch();
+
+    // We should get back just one reply item for the single update we are running.
+    tassert(7934203, "unexpected reply for retryable timeseries update", replyItems.size() == 1);
+
+    LOGV2_DEBUG(7934204,
+                4,
+                "Processing bulk write response for retryable timeseries update",
+                "opIdx"_attr = opIdx,
+                "singleUpdateRequest"_attr = redact(singleUpdateRequest.toBSON({})),
+                "replyItem"_attr = replyItems[0]);
+    bulkWriteOp.noteWriteOpFinalResponse(opIdx, replyItems[0]);
+}
+
 BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                            const BulkWriteCommandRequest& clientRequest) {
     LOGV2_DEBUG(7263700,
                 4,
                 "Starting execution of a bulkWrite",
-                "size"_attr = clientRequest.getOps().size(),
-                "nsInfoSize"_attr = clientRequest.getNsInfo().size());
+                "clientRequest"_attr = redact(clientRequest.toBSON({})));
 
     BulkWriteOp bulkWriteOp(opCtx, clientRequest);
 
@@ -399,14 +437,20 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
             refreshedTargeter = true;
         } else {
             stdx::unordered_map<NamespaceString, TrackedErrors> errorsPerNamespace;
-
-            // Send the child batches and wait for responses.
-            executeChildBatches(opCtx, childBatches, bulkWriteOp, errorsPerNamespace);
+            if (targetStatus.getValue() == WriteType::TimeseriesRetryableUpdate) {
+                executeRetryableTimeseriesUpdate(opCtx, childBatches, bulkWriteOp);
+            } else {
+                // Send the child batches and wait for responses.
+                executeChildBatches(
+                    opCtx, targeters, childBatches, bulkWriteOp, errorsPerNamespace);
+            }
 
             // If we saw any staleness errors, tell the targeters to invalidate their cache
             // so that they may be refreshed.
-            noteStaleResponses(opCtx, targeters, errorsPerNamespace);
+            bulkWriteOp.noteStaleResponses(targeters, errorsPerNamespace);
         }
+
+        rounds++;
 
         if (bulkWriteOp.isFinished()) {
             // No need to refresh the targeters if we are done.
@@ -447,6 +491,14 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
             numRoundsWithoutProgress = 0;
         }
         numCompletedOps = currCompletedOps;
+
+        LOGV2_DEBUG(7934202,
+                    2,
+                    "Completed a round of bulkWrite execution",
+                    "rounds"_attr = rounds,
+                    "numCompletedOps"_attr = numCompletedOps,
+                    "targeterChanged"_attr = targeterChanged,
+                    "numRoundsWithoutProgress"_attr = numRoundsWithoutProgress);
 
         if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
             bulkWriteOp.abortBatch(
@@ -509,6 +561,7 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
 }
 
 BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
     const TargetedWriteBatch& targetedBatch) const {
     BulkWriteCommandRequest request;
 
@@ -536,7 +589,19 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
         // null OR the new versions in the targetedWrite match the existing version in
         // nsInfo.
         const auto& bulkWriteOp = BulkWriteCRUDOp(ops.back());
-        auto& nsInfoEntry = nsInfo.at(bulkWriteOp.getNsInfoIdx());
+        auto nsIdx = bulkWriteOp.getNsInfoIdx();
+        auto& nsInfoEntry = nsInfo.at(nsIdx);
+        auto& targeter = targeters.at(nsIdx);
+
+        auto isClientRequestOnTimeseriesBucketCollection =
+            nsInfoEntry.getNs().isTimeseriesBucketsCollection();
+        if (targeter->isShardedTimeSeriesBucketsNamespace() &&
+            !isClientRequestOnTimeseriesBucketCollection) {
+            // For sharded timeseries collections, only the bucket collections are sharded. This
+            // sets the namespace to the namespace of the sharded bucket collection.
+            nsInfoEntry.setNs(targeter->getNS());
+            nsInfoEntry.setIsTimeseriesNamespace(true);
+        }
 
         invariant((!nsInfoEntry.getShardVersion() ||
                    nsInfoEntry.getShardVersion() == targetedWrite->endpoint.shardVersion) &&
@@ -639,8 +704,9 @@ void BulkWriteOp::noteBatchResponse(
 
         // On most errors (for example, a DuplicateKeyError) unordered bulkWrite on a shard attempts
         // to execute following operations even if a preceding operation errored. This isn't true
-        // for StaleConfig or StaleDbVersion errors. On these errors, since the shard knows that it
-        // following operations will also be stale, it stops right away.
+        // for StaleConfig or StaleDbVersion errors. On these errors, since the shard knows that
+        // following operations will also be stale, it stops right away (except for unordered
+        // timeseries inserts, see SERVER-80796).
         // For that reason, although typically we can expect the size of replyItems to match the
         // size of the number of operations sent (even in the case of errors), when a staleness
         // error is received the size of replyItems will be <= the size of the number of operations.
@@ -648,7 +714,8 @@ void BulkWriteOp::noteBatchResponse(
         // replyItem as having failed with a staleness error.
         if (!ordered && lastError &&
             (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
-             ErrorCodes::isStaleShardVersionError(lastError->getStatus()))) {
+             ErrorCodes::isStaleShardVersionError(lastError->getStatus())) &&
+            (index == (int)replyItems.size())) {
             // Decrement the index so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
             LOGV2_DEBUG(7695304,
@@ -656,7 +723,6 @@ void BulkWriteOp::noteBatchResponse(
                         "Duplicating the error for op",
                         "opIdx"_attr = write->writeOpRef.first,
                         "error"_attr = lastError->getStatus());
-            invariant(index == (int)replyItems.size());
             index--;
         }
 
@@ -683,6 +749,20 @@ void BulkWriteOp::noteBatchResponse(
                 trackedErrors->second.addError(ShardError(write->endpoint, *lastError));
             }
         }
+    }
+}
+
+void BulkWriteOp::noteWriteOpFinalResponse(size_t opIdx, const BulkWriteReplyItem& reply) {
+    WriteOp& writeOp = _writeOps[opIdx];
+
+    // Cancel all childOps if any.
+    writeOp.cancelWrites();
+
+    if (reply.getStatus().isOK()) {
+        writeOp.setOpComplete(reply);
+    } else {
+        auto writeError = write_ops::WriteError(opIdx, reply.getStatus());
+        writeOp.setOpError(writeError);
     }
 }
 
@@ -718,6 +798,42 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
     }
 
     return {replyItems, numErrors};
+}
+
+void BulkWriteOp::noteStaleResponses(
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+    const stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
+    auto& nsInfo = _clientRequest.getNsInfo();
+    for (size_t i = 0; i < nsInfo.size(); i++) {
+        auto& nsEntry = nsInfo.at(i);
+        auto& targeter = targeters.at(i);
+        // We must use the namespace from the original client request instead of the targeter's
+        // namespace because the targeter's namespace could be pointing to the bucket collection for
+        // sharded timeseries collections.
+        auto errors = errorsPerNamespace.find(nsEntry.getNs());
+        if (errors != errorsPerNamespace.cend()) {
+            for (const auto& error : errors->second.getErrors(ErrorCodes::StaleConfig)) {
+                LOGV2_DEBUG(7279201,
+                            4,
+                            "Noting stale config response.",
+                            "shardId"_attr = error.endpoint.shardName,
+                            "status"_attr = error.error.getStatus());
+                targeter->noteStaleShardResponse(
+                    _opCtx, error.endpoint, *error.error.getStatus().extraInfo<StaleConfigInfo>());
+            }
+            for (const auto& error : errors->second.getErrors(ErrorCodes::StaleDbVersion)) {
+                LOGV2_DEBUG(7279202,
+                            4,
+                            "Noting stale database response.",
+                            "shardId"_attr = error.endpoint.shardName,
+                            "status"_attr = error.error.getStatus());
+                targeter->noteStaleDbResponse(
+                    _opCtx,
+                    error.endpoint,
+                    *error.error.getStatus().extraInfo<StaleDbRoutingVersion>());
+            }
+        }
+    }
 }
 
 int BulkWriteOp::getBaseBatchCommandSizeEstimate() const {

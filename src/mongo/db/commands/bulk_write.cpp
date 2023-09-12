@@ -440,11 +440,15 @@ BSONObj getInsertOpDesc(const std::vector<BSONObj>& docs, std::int32_t nsIdx) {
 void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
                                   CurOp* curOp,
                                   LogicalOp logicalOp,
-                                  const NamespaceString& nsString,
+                                  const NamespaceInfoEntry& nsEntry,
                                   const BSONObj& opDescription) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-    curOp->setNS_inlock(nsString);
+    // For timeseries operations with the 'isTimeseriesNamespace' field set (i.e. sent from mongos),
+    // use the view namespace for logging/profiling purposes.
+    curOp->setNS_inlock(nsEntry.getIsTimeseriesNamespace()
+                            ? nsEntry.getNs().getTimeseriesViewNamespace()
+                            : nsEntry.getNs());
     curOp->setNetworkOp_inlock(NetworkOp::dbBulkWrite);
     curOp->setLogicalOp_inlock(LogicalOp::opBulkWrite);
     curOp->setOpDescription_inlock(opDescription);
@@ -681,7 +685,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
     // Initialize curOp information.
     setCurOpInfoAndEnsureStarted(
-        opCtx, &curOp, LogicalOp::opInsert, nsString, getInsertOpDesc(insertDocs, nsIdx));
+        opCtx, &curOp, LogicalOp::opInsert, nsEntry, getInsertOpDesc(insertDocs, nsIdx));
 
     // Handle timeseries inserts.
     TimeseriesBucketNamespace tsNs(nsString, nsEntry.getIsTimeseriesNamespace());
@@ -923,17 +927,17 @@ bool handleUpdateOp(OperationContext* opCtx,
                     !opCtx->isRetryableWrite());
         }
 
-        const NamespaceString& nsString = nsInfo[idx].getNs();
+        const NamespaceString& nsString = nsEntry.getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
         doTransactionValidationForWrites(opCtx, nsString);
 
         // Handle FLE updates.
-        if (nsInfo[idx].getEncryptionInformation().has_value()) {
+        if (nsEntry.getEncryptionInformation().has_value()) {
             // For BulkWrite, re-entry is un-expected.
-            invariant(!nsInfo[idx].getEncryptionInformation()->getCrudProcessed().value_or(false));
+            invariant(!nsEntry.getEncryptionInformation()->getCrudProcessed().value_or(false));
 
             // Map to processFLEUpdate.
-            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
+            return attemptProcessFLEUpdate(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         auto stmtId = opCtx->isRetryableWrite()
@@ -983,12 +987,13 @@ bool handleUpdateOp(OperationContext* opCtx,
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp, LogicalOp::opUpdate); });
 
         // Initialize curOp information.
-        setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opUpdate, nsString, op->toBSON());
+        setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opUpdate, nsEntry, op->toBSON());
 
         // Handle non-retryable normal and timeseries updates, as well as retryable normal
         // updates that were not already executed.
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nsString);
+        updateRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
         updateRequest.setQuery(op->getFilter());
         updateRequest.setProj(BSONObj());
         updateRequest.setUpdateModification(op->getUpdateMods());
@@ -1030,7 +1035,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 opCtx->inMultiDocumentTransaction(),
                                                                 false,
                                                                 updateRequest.isUpsert(),
-                                                                nsInfo[idx].getCollectionUUID(),
+                                                                nsEntry.getCollectionUUID(),
                                                                 docFound,
                                                                 updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
@@ -1062,7 +1067,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         responses.addUpdateErrorReply(opCtx, currentOpIdx, ex.toStatus());
         write_ops_exec::WriteResult out;
         return write_ops_exec::handleError(
-            opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), op->getMulti(), boost::none, &out);
+            opCtx, ex, nsEntry.getNs(), req.getOrdered(), op->getMulti(), boost::none, &out);
     }
 }
 
@@ -1074,6 +1079,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                     BulkWriteReplies& responses) {
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getDeleteCommand();
+    auto& nsEntry = nsInfo.at(idx);
     try {
         if (op->getMulti()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -1081,13 +1087,13 @@ bool handleDeleteOp(OperationContext* opCtx,
                     !opCtx->isRetryableWrite());
         }
 
-        const NamespaceString& nsString = nsInfo[idx].getNs();
+        const NamespaceString& nsString = nsEntry.getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
         doTransactionValidationForWrites(opCtx, nsString);
 
         // Handle FLE deletes.
-        if (nsInfo[idx].getEncryptionInformation().has_value()) {
-            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
+        if (nsEntry.getEncryptionInformation().has_value()) {
+            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsEntry);
         }
 
         // Non-FLE deletes (including timeseries deletes) will be handled by
@@ -1115,10 +1121,11 @@ bool handleDeleteOp(OperationContext* opCtx,
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp, LogicalOp::opDelete); });
 
         // Initialize curOp information.
-        setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opDelete, nsString, op->toBSON());
+        setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opDelete, nsEntry, op->toBSON());
 
         auto deleteRequest = DeleteRequest();
         deleteRequest.setNsString(nsString);
+        deleteRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
         deleteRequest.setQuery(op->getFilter());
         deleteRequest.setProj(BSONObj());
         deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
@@ -1141,7 +1148,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                                                           deleteRequest,
                                                           &curOp,
                                                           inTransaction,
-                                                          nsInfo[idx].getCollectionUUID(),
+                                                          nsEntry.getCollectionUUID(),
                                                           docFound);
             lastOpFixer.finishedOpSuccessfully();
             responses.addDeleteReply(currentOpIdx, nDeleted, boost::none);
@@ -1155,7 +1162,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         responses.addErrorReply(opCtx, currentOpIdx, ex.toStatus());
         write_ops_exec::WriteResult out;
         return write_ops_exec::handleError(
-            opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), false, boost::none, &out);
+            opCtx, ex, nsEntry.getNs(), req.getOrdered(), false, boost::none, &out);
     }
 }
 
@@ -1305,7 +1312,7 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            bulk_write_common::validateRequest(request());
+            bulk_write_common::validateRequest(request(), /*isRouter=*/false);
 
             // Extract and store the first update op for building mirrored read request.
             _extractFirstUpdateOp();
@@ -1599,9 +1606,29 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
     for (const auto& nsInfo : req.getNsInfo()) {
-        // TODO (SERVER-79342): Support timeseries collections.
-        OperationShardingState::setShardRole(
-            opCtx, nsInfo.getNs(), nsInfo.getShardVersion(), nsInfo.getDatabaseVersion());
+        auto& ns = nsInfo.getNs();
+        auto& shardVersion = nsInfo.getShardVersion();
+        auto& databaseVersion = nsInfo.getDatabaseVersion();
+
+        if (shardVersion || databaseVersion) {
+            // If a timeseries collection is sharded, only the buckets collection would be sharded.
+            // We expect all versioned commands to be sent over 'system.buckets' namespace. But it
+            // is possible that a stale mongos may send the request over a view namespace. In this
+            // case, we initialize the 'OperationShardingState' with buckets namespace. The bucket
+            // namespace is used because if the shard recognizes this is a timeseries collection,
+            // the timeseries write path will eventually execute on the bucket namespace and locks
+            // will be acquired with the bucket namespace. So we must initialize the
+            // 'OperationShardingState' with the bucket namespace to trigger the shard version
+            // checks.
+            TimeseriesBucketNamespace tsNs(ns, nsInfo.getIsTimeseriesNamespace());
+            // The returned namespaceForSharding will be the timeseries system bucket collection if
+            // the request is made on a timeseries collection. Otherwise, it will stay unchanged
+            // (i.e. the namespace from the client request).
+            auto [_, namespaceForSharding] = timeseries::isTimeseriesViewRequest(opCtx, tsNs);
+
+            OperationShardingState::setShardRole(
+                opCtx, namespaceForSharding, shardVersion, databaseVersion);
+        }
 
         if (nsInfo.getEncryptionInformation().has_value()) {
             hasEncryptionInformation = true;

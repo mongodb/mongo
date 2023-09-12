@@ -1,0 +1,32 @@
+test_kind: js_test
+
+# Override selected targeted tests to run with the bulkWrite override to make sure bulkWrite provides feature
+# parity with regular CRUD ops.
+selector:
+  roots:
+  - jstests/sharding/timeseries_delete_multi.js
+  - jstests/sharding/timeseries_delete_one_with_shard_key.js
+  - jstests/sharding/timeseries_delete_with_meta.js
+  - jstests/sharding/timeseries_insert.js
+  - jstests/sharding/timeseries_multiple_mongos.js
+  - jstests/sharding/timeseries_update.js
+  - jstests/sharding/timeseries_update_multi.js
+  - jstests/sharding/timeseries_update_routing.js
+  - jstests/sharding/timeseries_user_system_buckets_sharding.js
+  # TODO (SERVER-72793): WouldChangeOwningShard.
+  # - jstests/sharding/timeseries_shardkey_update.js
+  # - jstests/sharding/timeseries_upsert.js
+  # TODO (SERVER-72983): Update/Delete one without shardKey.
+  # - jstests/sharding/timeseries_delete_one_without_shard_key.js
+  # - jstests/sharding/timeseries_update_one.js
+  # - jstests/sharding/timeseries_write_one_stale_sharding_state.js
+  # TODO (SERVER-80831): Explain.
+  # - jstests/sharding/timeseries_update_multi_explain.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      nodb: ''
+      eval: await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');

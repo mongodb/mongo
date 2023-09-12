@@ -589,10 +589,22 @@ ExecutorFuture<BulkWriteCommandReply> SEPTransactionClient::_runCRUDOp(
     return runCommand(DatabaseName::kAdmin, cmdBob.obj())
         .thenRunOn(_executor)
         .then([](BSONObj reply) {
-            uassertStatusOK(getStatusFromWriteCommandReply(reply));
+            uassertStatusOK(getStatusFromCommandResult(reply));
 
-            IDLParserContext ctx("BulkWriteCommandReplyParse");
+            IDLParserContext ctx("BulkWriteCommandReply");
             auto response = BulkWriteCommandReply::parse(ctx, reply);
+
+            // TODO (SERVER-80794): Support iterating through the cursor for internal transactions.
+            uassert(7934200,
+                    "bulkWrite requires multiple batches to fetch all responses but it is "
+                    "currently not supported in internal transactions",
+                    response.getCursor().getId() == 0);
+            for (auto&& replyItem : response.getCursor().getFirstBatch()) {
+                uassertStatusOK(replyItem.getStatus());
+            }
+
+            uassertStatusOK(getWriteConcernStatusFromCommandResult(reply));
+
             return response;
         });
 }

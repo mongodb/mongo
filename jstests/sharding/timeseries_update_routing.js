@@ -57,7 +57,13 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 
     // Verify profiling output.
     if (shardsTargetedCount > 0) {
-        let filter = {"op": "update", "ns": "testDB.weather"};
+        let filter = {
+            $or: [
+                {op: 'update'},
+                {op: 'bulkWrite', "command.update": {$exists: true}},
+            ],
+            ns: "testDB.weather",
+        };
         let actualCount = 0;
         for (const db of [primaryDB, otherShardDB]) {
             const expectedEntries = db.system.profile.find(filter).toArray();

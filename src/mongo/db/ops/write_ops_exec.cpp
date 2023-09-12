@@ -767,7 +767,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesViewUpdate || !opCtx->isRetryableWrite());
+            !isTimeseriesViewUpdate || !updateRequest.shouldReturnAnyDocs() ||
+                !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,

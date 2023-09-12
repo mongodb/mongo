@@ -857,6 +857,84 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_RecordTargetErrors) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
 }
 
+// Tests targeting retryable timeseries update op.
+TEST_F(BulkWriteOpTest, TargetRetryableTimeseriesUpdate) {
+    ShardId shardId("shard");
+    NamespaceString nonTsNs = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo.t");
+    NamespaceString bucketNs =
+        NamespaceString::createNamespaceString_forTest("foo.system.buckets.t");
+    ShardEndpoint endpoint1(
+        shardId,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+
+    // Set up targeters for both the bucket collection and the non-timeseries collection.
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nonTsNs, endpoint0));
+    targeters.push_back(initTargeterFullRange(bucketNs, endpoint1));
+
+    auto bucketTargeter = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
+    bucketTargeter->setIsShardedTimeSeriesBucketsNamespace(true);
+
+    BulkWriteCommandRequest request(
+        {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("y" << 1))),
+         BulkWriteUpdateOp(0, BSON("x" << 2), BSON("$set" << BSON("y" << 2))),
+         BulkWriteUpdateOp(1, BSON("x" << 1), BSON("$set" << BSON("y" << 1))),
+         BulkWriteUpdateOp(1, BSON("x" << 2), BSON("$set" << BSON("y" << 2)))},
+        {NamespaceInfoEntry(nonTsNs), NamespaceInfoEntry(ns)});
+    request.setOrdered(false);
+
+    // Set up the opCtx for retryable writes.
+    _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    _opCtx->setTxnNumber(5);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    TargetedBatchMap targeted;
+
+    // The first two retryable updates on nonTsNs should be batched together.
+    auto swWriteType = bulkWriteOp.target(targeters, false, targeted);
+    ASSERT_OK(swWriteType);
+    ASSERT_EQUALS(swWriteType.getValue(), WriteType::Ordinary);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardId]->getWrites().size(), 2u);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    targeted.clear();
+
+    // Each of the retryable timeseries updates should be in its own batch.
+    swWriteType = bulkWriteOp.target(targeters, false, targeted);
+    ASSERT_OK(swWriteType);
+    ASSERT_EQUALS(swWriteType.getValue(), WriteType::TimeseriesRetryableUpdate);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardId]->getWrites().size(), 1u);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    targeted.clear();
+
+    swWriteType = bulkWriteOp.target(targeters, false, targeted);
+    ASSERT_OK(swWriteType);
+    ASSERT_EQUALS(swWriteType.getValue(), WriteType::TimeseriesRetryableUpdate);
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardId]->getWrites().size(), 1u);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+}
+
 // Tests that a targeted write batch to be sent to a shard is correctly converted to a
 // bulk command request.
 TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
@@ -903,7 +981,7 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
 
     auto& batch = targeted.begin()->second;
 
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
 
     ASSERT_EQUALS(childRequest.getOrdered(), request.getOrdered());
     ASSERT_EQUALS(childRequest.getBypassDocumentValidation(),
@@ -958,7 +1036,7 @@ TEST_F(BulkWriteOpTest, TestOrderedOpsNoExistingStmtIds) {
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
 
     auto* batch = targeted.begin()->second.get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 0);
@@ -969,7 +1047,7 @@ TEST_F(BulkWriteOpTest, TestOrderedOpsNoExistingStmtIds) {
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
 
     batch = targeted.begin()->second.get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 2);
@@ -1012,7 +1090,7 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsNoExistingStmtIds) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 0);
@@ -1020,7 +1098,7 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsNoExistingStmtIds) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 1);
@@ -1064,7 +1142,7 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdsExist) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 6);
@@ -1072,7 +1150,7 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdsExist) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 7);
@@ -1116,7 +1194,7 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdFieldExists) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 6);
@@ -1124,12 +1202,45 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdFieldExists) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 7);
     ASSERT_EQUALS(childStmtIds->at(1), 9);
 }
+
+// Test building a child bulkWrite request to send to shards involving timeseries collections.
+TEST_F(BulkWriteOpTest, BuildTimeseriesChildRequest) {
+    ShardId shardId("shard");
+    ShardEndpoint endpoint(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo.t");
+    NamespaceString bucketNs =
+        NamespaceString::createNamespaceString_forTest("foo.system.buckets.t");
+
+    // Set up targeter for the bucket collection.
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(bucketNs, endpoint));
+    auto bucketTargeter = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
+    bucketTargeter->setIsShardedTimeSeriesBucketsNamespace(true);
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -1))},
+                                    {NamespaceInfoEntry(ns)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    auto* batch = targeted[ShardId("shard")].get();
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+
+    // Test that we translate to bucket namespace and set the isTimeseriesNamespace flag.
+    auto& nsInfoEntry = childRequest.getNsInfo()[0];
+    ASSERT_EQUALS(nsInfoEntry.getIsTimeseriesNamespace(), true);
+    ASSERT_EQUALS(nsInfoEntry.getNs(), bucketNs);
+}
+
 
 // Test BatchItemRef.getLet().
 TEST_F(BulkWriteOpTest, BatchItemRefGetLet) {

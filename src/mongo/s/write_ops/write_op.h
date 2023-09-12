@@ -201,6 +201,13 @@ public:
     void noteWriteError(const TargetedWrite& targetedWrite, const write_ops::WriteError& error);
 
     /**
+     * Sets the reply for this write op directly, and forces the state to _Completed.
+     *
+     * Should only be used when in state _Ready.
+     */
+    void setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem);
+
+    /**
      * Sets the error for this write op directly, and forces the state to _Error.
      *
      * Should only be used when in state _Ready.
@@ -232,7 +239,8 @@ private:
     // filled when state == _Error
     boost::optional<write_ops::WriteError> _error;
 
-    // filled when state == _Complete and this is an op from a bulkWrite command.
+    // filled for bulkWrite op when state == _Complete or before we reset state to _Ready after
+    // receiving successful replies from some shards with a retryable error.
     boost::optional<BulkWriteReplyItem> _bulkWriteReplyItem;
 
     // Whether this write is part of a transaction.

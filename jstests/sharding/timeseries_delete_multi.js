@@ -191,7 +191,11 @@ const requestConfigurations = {
 
 function getProfilerEntriesForSuccessfulMultiDelete(db) {
     const profilerFilter = {
-        op: 'remove',
+        $or: [
+            {op: 'remove'},
+            {op: 'bulkWrite', "command.delete": {$exists: true}},
+        ],
+        op: {$in: ['remove', 'bulkWrite']},
         ns: `${dbName}.${collName}`,
         // Filters out events recorded because of StaleConfig error.
         ok: {$ne: 0},

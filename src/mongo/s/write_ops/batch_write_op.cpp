@@ -258,6 +258,11 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     //  [{ skey : [c,x] }],
     //  [{ skey : y }, { skey : z }]
     //
+    // For retryable timeseries updates and writes without shard key, they are always batched in its
+    // own batch for both the ordered and unordered cases. This means that when we encounter a
+    // retryable timeseries update or a write without shard key, we would either send out what we
+    // previously have batched first (e.g. when !batchMap.empty()) or send out that single write in
+    // its own batch.
 
     WriteType writeType = WriteType::Ordinary;
 
@@ -365,8 +370,13 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
         if (targeter.isShardedTimeSeriesBucketsNamespace() &&
             writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
-            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() && batchMap.empty()) {
-            writeType = WriteType::TimeseriesRetryableUpdate;
+            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
+            if (!batchMap.empty()) {
+                writeOp.cancelWrites();
+                break;
+            } else {
+                writeType = WriteType::TimeseriesRetryableUpdate;
+            }
         }
 
         // Check if an updateOne or deleteOne necessitates using the two phase write in the case

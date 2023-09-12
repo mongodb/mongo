@@ -297,7 +297,10 @@ const requestConfigurations = {
 
 function getProfilerEntriesForSuccessfulMultiUpdate(db) {
     const profilerFilter = {
-        op: 'update',
+        $or: [
+            {op: 'update'},
+            {op: 'bulkWrite', "command.update": {$exists: true}},
+        ],
         ns: `${dbName}.${collName}`,
         // Filters out events recorded because of StaleConfig error.
         ok: {$ne: 0},

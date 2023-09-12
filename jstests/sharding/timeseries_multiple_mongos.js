@@ -39,6 +39,7 @@ function generateId() {
  * command by running against mongos1 with stale config.
  */
 function runTest({shardKey, cmdObj, numProfilerEntries}) {
+    const isInsert = cmdObj["insert"] !== undefined;
     const isDelete = cmdObj["delete"] !== undefined;
     const isUpdate = cmdObj["update"] !== undefined;
     const isCollMod = cmdObj["collMod"] !== undefined;
@@ -114,11 +115,25 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
             ]
         };
 
-        // We currently do not log 'shardVersion' for updates. See SERVER-60354 for details.
         if (isUpdate) {
-            filter = {"op": "update", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
+            // We currently do not log 'shardVersion' for updates. See SERVER-60354 for details.
+            filter = {
+                $or: [
+                    {op: 'update'},
+                    {op: 'bulkWrite', "command.update": {$exists: true}},
+                ],
+                "ns": `${dbName}.${cmdCollName}`,
+                "ok": {$ne: 0}
+            };
         } else if (isDelete) {
-            filter = {"op": "remove", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
+            filter = {
+                $or: [
+                    {op: 'remove'},
+                    {op: 'bulkWrite', "command.delete": {$exists: true}},
+                ],
+                "ns": `${dbName}.${cmdCollName}`,
+                "ok": {$ne: 0}
+            };
         } else if (isCollMod) {
             const command = unVersioned ? "_shardsvrCollMod" : "_shardsvrCollModParticipant";
             filter = {[`command.${command}`]: cmdCollName, "ok": {$ne: 0}};
@@ -130,6 +145,15 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
                     {"command.shardVersion.v": ShardVersioningUtil.kIgnoredShardVersion.v},
                 ]
             };
+        }
+
+        if (isInsert) {
+            filter = {
+                $or: [
+                    filter,
+                    {op: 'bulkWrite', "command.insert": {$exists: true}},
+                ]
+            }
         }
 
         // Filter out the profiler entries with $indexStats pipeline stage, as the
