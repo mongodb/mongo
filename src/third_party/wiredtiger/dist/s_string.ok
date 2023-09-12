@@ -425,6 +425,7 @@ WinNT
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerChunkCache
 WiredTigerHS
 WiredTigerLAS
 WiredTigerLog

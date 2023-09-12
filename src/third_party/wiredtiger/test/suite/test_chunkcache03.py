@@ -44,10 +44,10 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         ('row_string', dict(key_format='S', value_format='S')),
     ]
 
-    cache_types = [('in-memory', dict(chunk_cache_type='dram'))]
+    cache_types = [('in-memory', dict(chunk_cache_type='DRAM'))]
     if sys.byteorder == 'little':
         # WT's filesystem layer doesn't support mmap on big-endian platforms.
-        cache_types.append(('on-disk', dict(chunk_cache_type='file')))
+        cache_types.append(('on-disk', dict(chunk_cache_type='FILE')))
 
     scenarios = make_scenarios(format_values, cache_types)
 
@@ -55,14 +55,8 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         if not os.path.exists('bucket2'):
             os.mkdir('bucket2')
 
-        if self.chunk_cache_type == 'dram':
-            chunk_cache_extra_config = 'type=DRAM'
-        else:
-            current_dir = os.getcwd()
-            chunk_cache_extra_config = 'type=FILE,storage_path=' +  current_dir + '/WiredTigerChunkCache'
-
         return 'tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store),' \
-            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=("table:chunkcache01", "table:chunkcache02"),{}],'.format(chunk_cache_extra_config)
+            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=("table:chunkcache01", "table:chunkcache02"),type={},storage_path=WiredTigerChunkCache]'.format(self.chunk_cache_type)
 
     def conn_extensions(self, extlist):
         if os.name == 'nt':
