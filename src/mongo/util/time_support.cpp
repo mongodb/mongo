@@ -121,26 +121,47 @@ long long jsTime_virtual_skew = 0;
 thread_local long long jsTime_virtual_thread_skew = 0;
 
 void time_t_to_Struct(time_t t, struct tm* buf, bool local) {
+    bool itWorked;
 #if defined(_WIN32)
     if (local)
-        localtime_s(buf, &t);
+        itWorked = localtime_s(buf, &t) == 0;
     else
-        gmtime_s(buf, &t);
+        itWorked = gmtime_s(buf, &t) == 0;
 #else
     if (local)
-        localtime_r(&t, buf);
+        itWorked = localtime_r(&t, buf) != nullptr;
     else
-        gmtime_r(&t, buf);
+        itWorked = gmtime_r(&t, buf) != nullptr;
 #endif
+
+    if (!itWorked) {
+        if (t < 0) {
+            // Windows docs say it doesn't support these, but empirically it seems to work
+            uasserted(1125400, "gmtime failed - your system doesn't support dates before 1970");
+        } else {
+            uasserted(1125401, str::stream() << "gmtime failed to convert time_t of " << t);
+        }
+    }
 }
 
 std::string time_t_to_String_short(time_t t) {
     char buf[64];
+    bool itWorked;
 #if defined(_WIN32)
-    ctime_s(buf, sizeof(buf), &t);
+    itWorked = ctime_s(buf, sizeof(buf), &t) == 0;
 #else
-    ctime_r(&t, buf);
+    itWorked = ctime_r(&t, buf) != nullptr;
 #endif
+
+    if (!itWorked) {
+        if (t < 0) {
+            // Windows docs say it doesn't support these, but empirically it seems to work
+            uasserted(1125402, "ctime failed - your system doesn't support dates before 1970");
+        } else {
+            uasserted(1125403, str::stream() << "ctime failed to convert time_t of " << t);
+        }
+    }
+
     buf[19] = 0;
     if (buf[0] && buf[1] && buf[2] && buf[3])
         return buf + 4;  // skip day of week
@@ -195,7 +216,10 @@ DateStringBuffer& DateStringBuffer::iso8601(Date_t date, bool local) {
         // savings time.  We can do no better without completely reimplementing localtime_s and
         // related time library functions.
         long msTimeZone;
-        _get_timezone(&msTimeZone);
+        int ret = _get_timezone(&msTimeZone);
+        if (ret != 0) {
+            uasserted(1125404, str::stream() << "_get_timezone failed with errno: " << ret);
+        }
         if (t.tm_isdst)
             msTimeZone -= 3600;
         const bool tzIsWestOfUTC = msTimeZone > 0;
@@ -235,11 +259,21 @@ DateStringBuffer& DateStringBuffer::ctime(Date_t date) {
     // "Wed Jun 30 21:49:08.996"    // append millis
     //  12345678901234567890123456
     time_t t = date.toTimeT();
+    bool itWorked;
 #if defined(_WIN32)
-    ctime_s(_data.data(), _data.size(), &t);
+    itWorked = ctime_s(_data.data(), _data.size(), &t) == 0;
 #else
-    ctime_r(&t, _data.data());
+    itWorked = ctime_r(&t, _data.data()) != nullptr;
 #endif
+
+    if (!itWorked) {
+        if (t < 0) {
+            // Windows docs say it doesn't support these, but empirically it seems to work
+            uasserted(1125405, "ctime failed - your system doesn't support dates before 1970");
+        } else {
+            uasserted(1125406, str::stream() << "ctime failed to convert time_t of " << t);
+        }
+    }
 
     static constexpr size_t ctimeSubstrLen = 19;
     static constexpr size_t millisSubstrLen = 4;
@@ -700,7 +734,12 @@ StatusWith<Date_t> dateFromISOString(StringData dateString) {
     dateStruct.tm_wday = 0;
     dateStruct.tm_yday = 0;
 
-    resultMillis = (1000 * static_cast<unsigned long long>(timegm(&dateStruct))) + millis;
+    time_t calendarTime = timegm(&dateStruct);
+    if (calendarTime == -1) {
+        uasserted(1125407, str::stream() << "timegm failed with errno: " << errno);
+    }
+
+    resultMillis = (1000 * static_cast<unsigned long long>(calendarTime)) + millis;
 #endif
 
     resultMillis += (tzAdjSecs * 1000);
@@ -816,7 +855,10 @@ unsigned long long curTimeMicros64() {
 #else
 unsigned long long curTimeMillis64() {
     timeval tv;
-    gettimeofday(&tv, nullptr);
+    int ret = gettimeofday(&tv, nullptr);
+    if (ret == -1) {
+        uasserted(1125408, str::stream() << "gettimeofday failed with errno " << errno);
+    }
     return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
 }
 
@@ -849,7 +891,10 @@ Nanoseconds getMinimumTimerResolution() {
     Nanoseconds minTimerResolution;
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
     struct timespec tp;
-    clock_getres(CLOCK_REALTIME, &tp);
+    int ret = clock_getres(CLOCK_REALTIME, &tp);
+    if (ret == -1) {
+        uasserted(1125409, str::stream() << "clock_getres failed with errno: " << errno);
+    }
     minTimerResolution = Nanoseconds{tp.tv_nsec};
 #elif defined(_WIN32)
     // see https://msdn.microsoft.com/en-us/library/windows/desktop/dd743626(v=vs.85).aspx

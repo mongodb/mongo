@@ -431,6 +431,22 @@ TEST(TimeParsing, InvalidDates) {
     }
 }
 
+TEST(TimeParsing, InvalidTimeT) {
+    // This value of time_t is too large to be processed by gmtime_r
+    time_t f = LLONG_MAX;
+    struct tm t;
+
+    ASSERT_THROWS(time_t_to_Struct(f, &t, true), DBException);
+    ASSERT_THROWS(time_t_to_Struct(f, &t, false), DBException);
+}
+
+TEST(TimeParsing, InvalidDateT) {
+    // This value of Date_t is too large to be processed by ctime_r
+    Date_t f = Date_t::fromMillisSinceEpoch(LLONG_MAX);
+
+    ASSERT_THROWS(dateToCtimeString(f), DBException);
+}
+
 TEST(TimeParsing, LeapYears) {
     int maxYear = isTimeTSmall ? 2036 : 9999;
     for (int y = 1972; y <= maxYear; y += 4) {
