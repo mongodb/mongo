@@ -93,6 +93,36 @@ const insensitive = {
     assert.eq(1, res2.itcount(), res2.toArray());  // should match only "5"
 }());
 
+(function testFind_OnlyQueryHasCollation() {
+    coll.drop();
+
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+
+    // This should generate a bucket with control.min.value = 'C' and control.max.value = 'c'.
+    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "C"}));
+    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "b"}));
+    assert.commandWorked(coll.insert({time: ISODate(), meta: 42, value: "c"}));
+
+    // A query with default collation would use the bucket's min/max and find the two matches.
+    const resWithNoCollation = coll.find({value: {$lt: "c"}});
+    assert.eq(2,
+              resWithNoCollation.itcount(),
+              resWithNoCollation.toArray());  // should match "C" and "b".
+
+    // If a query with 'insensitive' collation used the bucket's min/max it would miss the bucket.
+    // Check, that it doesn't.
+    const resWithCollation_find = coll.find({value: {$lt: "c"}}).collation(insensitive);
+    assert.eq(1,
+              resWithCollation_find.itcount(),
+              resWithCollation_find.toArray());  // should match only "b".
+
+    // Run the same test with aggregate command.
+    const resWithCollation_agg =
+        coll.aggregate([{$match: {value: {$lt: "c"}}}], {collation: insensitive}).toArray();
+    assert.eq(1, resWithCollation_agg.length, resWithCollation_agg);
+}());
+
 (function testAgg_GroupByMetaField() {
     coll.drop();
 
