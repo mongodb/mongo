@@ -79,6 +79,7 @@ TEST_F(TransportLayerManagerTest, StartAndShutdown) {
     }
 
     TransportLayerManager manager(std::move(layers), layerPtrs[0]);
+    ASSERT_OK(manager.setup());
     ASSERT_OK(manager.start());
     for (auto layer : layerPtrs) {
         ASSERT_TRUE(layer->isStarted());
@@ -99,6 +100,7 @@ TEST_F(TransportLayerManagerTest, ConnectEgressLayer) {
     layers.push_back(std::make_unique<TransportLayerMock>());
 
     TransportLayerManager manager(std::move(layers), egressPtr);
+    uassertStatusOK(manager.setup());
     uassertStatusOK(manager.start());
     auto swSession = manager.connect(
         HostAndPort("localhost:1234"), ConnectSSLMode::kDisableSSL, Milliseconds(100), boost::none);

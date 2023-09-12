@@ -52,16 +52,6 @@
 namespace mongo {
 namespace transport {
 
-template <typename Callable>
-void TransportLayerManager::_foreach(Callable&& cb) const {
-    {
-        stdx::lock_guard<Latch> lk(_tlsMutex);
-        for (auto&& tl : _tls) {
-            cb(tl.get());
-        }
-    }
-}
-
 TransportLayerManager::TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
                                              TransportLayer* egressLayer)
     : _tls(std::move(tls)), _egressLayer(egressLayer) {
@@ -86,7 +76,6 @@ Future<std::shared_ptr<Session>> TransportLayerManager::asyncConnect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-
     return _egressLayer->asyncConnect(
         peer, sslMode, reactor, timeout, connectionMetrics, transientSSLContext);
 }
@@ -98,10 +87,10 @@ ReactorHandle TransportLayerManager::getReactor(WhichReactor which) {
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
 // exits with an error and this isn't an issue, but we should make this more robust.
 Status TransportLayerManager::start() {
+    invariant(_state.swap(State::kStarted) == State::kSetUp);
     for (auto&& tl : _tls) {
         auto status = tl->start();
         if (!status.isOK()) {
-            _tls.clear();
             return status;
         }
     }
@@ -110,15 +99,17 @@ Status TransportLayerManager::start() {
 }
 
 void TransportLayerManager::shutdown() {
-    _foreach([](TransportLayer* tl) { tl->shutdown(); });
+    invariant(_state.swap(State::kShutdown) != State::kShutdown);
+    for (auto&& tl : _tls) {
+        tl->shutdown();
+    }
 }
 
-// TODO Same comment as start()
 Status TransportLayerManager::setup() {
+    invariant(_state.swap(State::kSetUp) == State::kNotInitialized);
     for (auto&& tl : _tls) {
         auto status = tl->setup();
         if (!status.isOK()) {
-            _tls.clear();
             return status;
         }
     }
@@ -127,20 +118,15 @@ Status TransportLayerManager::setup() {
 }
 
 void TransportLayerManager::appendStatsForServerStatus(BSONObjBuilder* bob) const {
-    _foreach([&](const TransportLayer* tl) { tl->appendStatsForServerStatus(bob); });
+    for (auto&& tl : _tls) {
+        tl->appendStatsForServerStatus(bob);
+    }
 }
 
 void TransportLayerManager::appendStatsForFTDC(BSONObjBuilder& bob) const {
-    _foreach([&](const TransportLayer* tl) { tl->appendStatsForFTDC(bob); });
-}
-
-Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl) {
-    auto ptr = tl.get();
-    {
-        stdx::lock_guard<Latch> lk(_tlsMutex);
-        _tls.emplace_back(std::move(tl));
+    for (auto&& tl : _tls) {
+        tl->appendStatsForFTDC(bob);
     }
-    return ptr->start();
 }
 
 std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgressTransportLayer() {
@@ -151,7 +137,7 @@ std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgress
     auto ret = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
     uassertStatusOK(ret->setup());
     uassertStatusOK(ret->start());
-    return std::unique_ptr<TransportLayer>(std::move(ret));
+    return ret;
 }
 
 std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
@@ -175,8 +161,7 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
 Status TransportLayerManager::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                  bool asyncOCSPStaple) {
     for (auto&& tl : _tls) {
-        auto status = tl->rotateCertificates(manager, asyncOCSPStaple);
-        if (!status.isOK()) {
+        if (auto status = tl->rotateCertificates(manager, asyncOCSPStaple); !status.isOK()) {
             return status;
         }
     }

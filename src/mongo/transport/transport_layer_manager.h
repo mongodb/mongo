@@ -29,13 +29,9 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <memory>
-#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -48,30 +44,26 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
-struct ServerGlobalParams;
-class ServiceContext;
-
-namespace transport {
+namespace mongo::transport {
 
 /**
  * This TransportLayerManager is a TransportLayer implementation that holds other
  * TransportLayers. Mongod and Mongos can treat this like the "only" TransportLayer
  * and not be concerned with which other TransportLayer implementations it holds
  * underneath.
+ *
+ * The manager must be provided with an immutable list of TransportLayers that it will manage at
+ * construction (preferably through factory functions) to obviate the need for synchronization.
  */
 class TransportLayerManager final : public TransportLayer {
     TransportLayerManager(const TransportLayerManager&) = delete;
@@ -106,14 +98,10 @@ public:
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
     /**
-     * Gets a handle to the reactor assoicated with the transport layer that is configured for
+     * Gets a handle to the reactor associated with the transport layer that is configured for
      * egress networking.
      */
     ReactorHandle getReactor(WhichReactor which) override;
-
-    // TODO This method is not called anymore, but may be useful to add new TransportLayers
-    // to the manager after it's been created.
-    Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);
 
     /*
      * This initializes a TransportLayerManager with the global configuration of the server.
@@ -136,7 +124,6 @@ public:
      * Makes a baton using the transport layer that is configured for egress networking.
      */
     BatonHandle makeBaton(OperationContext* opCtx) const override {
-        stdx::lock_guard<Latch> lk(_tlsMutex);
         return _egressLayer->makeBaton(opCtx);
     }
 
@@ -148,14 +135,17 @@ public:
         const TransientSSLParams& transientSSLParams) override;
 #endif
 private:
-    template <typename Callable>
-    void _foreach(Callable&& cb) const;
+    /**
+     * Expects the following order of state transitions, or terminates the process:
+     * kNotInitialized --> kSetup --> kStarted --> kShutdown
+     *       |                |                       ^
+     *       -----------------------------------------'
+     */
+    enum class State { kNotInitialized, kSetUp, kStarted, kShutdown };
+    AtomicWord<State> _state{State::kNotInitialized};
 
-    mutable Mutex _tlsMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "TransportLayerManager::_tlsMutex");
-    std::vector<std::unique_ptr<TransportLayer>> _tls;
+    const std::vector<std::unique_ptr<TransportLayer>> _tls;
     TransportLayer* const _egressLayer;
 };
 
-}  // namespace transport
-}  // namespace mongo
+}  // namespace mongo::transport
