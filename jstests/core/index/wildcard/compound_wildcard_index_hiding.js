@@ -5,6 +5,7 @@
  * @tags: [
  *   not_allowed_with_security_token,
  *   does_not_support_stepdowns,
+ *   does_not_support_transaction,
  *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
  * ]
