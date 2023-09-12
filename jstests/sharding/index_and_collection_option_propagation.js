@@ -141,7 +141,8 @@ assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
 assert.commandWorked(res);
 checkShardIndexes("idx1", [], [st.shard1, st.shard2]);
 
-// collMod
+// collMod targets all shards, regardless of whether they have chunks. The shards that have no
+// chunks for the collection will not be included in the responses, except for the primary.
 const validationOption2 = {
     dummyField2: {$type: "string"}
 };
@@ -152,10 +153,10 @@ res = st.s.getDB(dbName).runCommand({
     validationAction: "warn"
 });
 assert.commandWorked(res);
-assert.eq(undefined, res.raw[st.shard0.host], tojson(res));
-assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));
+assert.eq(1, res.raw[st.shard0.host].ok, tojson(res));
+assert.eq(1, res.raw[st.shard1.host].ok, tojson(res));
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));
-checkShardCollOption("validator", validationOption2, [st.shard1], [st.shard2]);
+checkShardCollOption("validator", validationOption2, [st.shard0, st.shard1], [st.shard2]);
 
 // Check that errors from shards are aggregated correctly.
 

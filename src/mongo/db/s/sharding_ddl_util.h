@@ -99,7 +99,8 @@ template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
-    const std::vector<ShardId>& shardIds) {
+    const std::vector<ShardId>& shardIds,
+    bool ignoreResponses = false) {
     if (shardIds.size() == 0) {
         return {};
     }
@@ -155,6 +156,10 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                         reply.targetUsed, replyBob.obj(), reply.elapsed)};
             })
             .getNoThrow();
+
+    if (ignoreResponses) {
+        return {};
+    }
 
     if (auto status = responses.getStatus(); status != Status::OK()) {
         uassertStatusOK(async_rpc::unpackRPCStatus(status));

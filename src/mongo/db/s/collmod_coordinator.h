@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/collmod_coordinator_document_gen.h"
+#include "mongo/db/s/sharded_collmod_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/shard_id.h"
@@ -92,8 +93,12 @@ private:
     struct ShardingInfo {
         // The primary shard for the collection, only set if the collection is sharded.
         ShardId primaryShard;
-        // The shards owning chunks for the collection, only set if the collection is sharded.
-        std::vector<ShardId> shardsOwningChunks;
+        // The participant shards owning chunks for the collection, only set if the collection is
+        // sharded.
+        std::vector<ShardId> participantsOwningChunks;
+        // The participant shards not owning chunks for the collection, only set if the collection
+        // is sharded.
+        std::vector<ShardId> participantsNotOwningChunks;
     };
 
     StringData serializePhase(const Phase& phase) const override {
@@ -109,6 +114,18 @@ private:
     void _saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
 
     void _saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
+
+    std::vector<AsyncRequestsSender::Response> _sendCollModToPrimaryShard(
+        OperationContext* opCtx,
+        ShardsvrCollModParticipant& request,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
+
+    std::vector<AsyncRequestsSender::Response> _sendCollModToParticipantShards(
+        OperationContext* opCtx,
+        ShardsvrCollModParticipant& request,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     const mongo::CollModRequest _request;
 
