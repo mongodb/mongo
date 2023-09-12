@@ -6,6 +6,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [1337]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -33,7 +35,7 @@ Evaluation [{otherID}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[9] filter {((getField(s3, "a") == 1337) ?: false)} 
+[9] filter {(((getField(s3, "a") <=> 1337) == 0ll) ?: false)} 
 [8] hj 
     left [s5] [s6] 
         [7] project [s6 = getField(s4, "other_info")] 
@@ -51,6 +53,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [56]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -95,7 +99,7 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[13] filter {((getField(s10, "a") == 56) ?: false)} 
+[13] filter {(((getField(s10, "a") <=> 56) == 0ll) ?: false)} 
 [12] hj 
     left [s8, s9] [s10] 
         [11] project [s10 = getField(s7, "another")] 

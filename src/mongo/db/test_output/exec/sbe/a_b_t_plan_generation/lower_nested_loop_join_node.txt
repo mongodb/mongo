@@ -6,6 +6,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [10024]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -14,6 +16,8 @@ NestedLoopJoin [joinType: Inner, {proj0}]
 |   |   BinaryOp [FillEmpty]
 |   |   |   Const [false]
 |   |   BinaryOp [Eq]
+|   |   |   Const [0]
+|   |   BinaryOp [Cmp3w]
 |   |   |   Variable [proj1]
 |   |   Variable [proj0]
 |   Evaluation [{proj1}]
@@ -32,8 +36,8 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[7] filter {((getField(s3, "a") == 10024) ?: false)} 
-[6] nlj inner [s3] [s2] {((s2 == s5) ?: false)} 
+[7] filter {(((getField(s3, "a") <=> 10024) == 0ll) ?: false)} 
+[6] nlj inner [s3] [s2] {(((s2 <=> s5) == 0ll) ?: false)} 
     left 
         [3] project [s3 = getField(s1, "zipcode")] 
         [1] project [s2 = getField(s1, "city")] 
@@ -49,6 +53,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [10024]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -57,6 +63,8 @@ NestedLoopJoin [joinType: Left, {proj0}]
 |   |   BinaryOp [FillEmpty]
 |   |   |   Const [false]
 |   |   BinaryOp [Eq]
+|   |   |   Const [0]
+|   |   BinaryOp [Cmp3w]
 |   |   |   Variable [proj1]
 |   |   Variable [proj0]
 |   Evaluation [{proj1}]
@@ -75,8 +83,8 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[7] filter {((getField(s3, "a") == 10024) ?: false)} 
-[6] nlj left [s3] [s2] {((s2 == s5) ?: false)} 
+[7] filter {(((getField(s3, "a") <=> 10024) == 0ll) ?: false)} 
+[6] nlj left [s3] [s2] {(((s2 <=> s5) == 0ll) ?: false)} 
     left 
         [3] project [s3 = getField(s1, "zipcode")] 
         [1] project [s2 = getField(s1, "city")] 

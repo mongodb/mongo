@@ -21,9 +21,6 @@ for (const leaf of leafs()) {
     // TODO SERVER-67550 Equality to null does not match undefined, in Bonsai.
     if (tojson(leaf).match(/null|undefined/))
         continue;
-    // TODO SERVER-67818 Bonsai NaN $eq NaN should be true.
-    if (tojson(leaf).match(/NaN/))
-        continue;
 
     const query = coll.find({a: {$eq: leaf}}, {_id: 0});
     jsTestLog(`Query: ${tojsononeline(query._convertToCommand())}`);

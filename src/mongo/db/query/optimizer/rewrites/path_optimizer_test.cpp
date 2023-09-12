@@ -909,8 +909,10 @@ TEST(Path, LowerPathCompare) {
     ASSERT_EXPLAIN(
         "BinaryOp [FillEmpty]\n"
         "  BinaryOp [Eq]\n"
-        "    Variable [root]\n"
-        "    Const [1]\n"
+        "    BinaryOp [Cmp3w]\n"
+        "      Variable [root]\n"
+        "      Const [1]\n"
+        "    Const [0]\n"
         "  Const [false]\n",
         tree);
 }

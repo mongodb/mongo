@@ -235,6 +235,16 @@ Collection count: 213
 
 
 [jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NaN } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NaN }
+{  "a" : NumberDecimal("NaN") }
+{  "a" : [ NaN ] }
+{  "a" : [ NumberDecimal("NaN") ] }
+
+
+[jsTest] ----
 [jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -Infinity } },  "projection" : {  "_id" : 0 } }
 [jsTest] ----
 
@@ -780,6 +790,16 @@ Collection count: 213
 
 {  "a" : NumberLong("9223372036854775807") }
 {  "a" : [ NumberLong("9223372036854775807") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("NaN") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NaN }
+{  "a" : NumberDecimal("NaN") }
+{  "a" : [ NaN ] }
+{  "a" : [ NumberDecimal("NaN") ] }
 
 
 [jsTest] ----

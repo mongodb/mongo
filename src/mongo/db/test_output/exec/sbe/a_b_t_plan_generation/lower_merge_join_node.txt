@@ -142,6 +142,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const ["NYC"]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -171,7 +173,7 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[9] filter {((getField(s6, "a") == "NYC") ?: false)} 
+[9] filter {(((getField(s6, "a") <=> "NYC") == 0ll) ?: false)} 
 [8] mj 
     [asc] left [s2] [s3] 
         [3] project [s3 = getField(s1, "city")] 
@@ -269,6 +271,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const ["NYC"]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -298,7 +302,7 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[9] filter {((getField(s6, "a") == "NYC") ?: false)} 
+[9] filter {(((getField(s6, "a") <=> "NYC") == 0ll) ?: false)} 
 [8] mj 
     [desc] left [s2] [s3] 
         [3] project [s3 = getField(s1, "city")] 

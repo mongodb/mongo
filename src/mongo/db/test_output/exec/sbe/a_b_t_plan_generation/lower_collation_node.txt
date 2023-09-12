@@ -6,6 +6,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [23]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -26,7 +28,7 @@ Evaluation [{sortA}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[5] filter {((getField(s3, "a") == 23) ?: false)} 
+[5] filter {(((getField(s3, "a") <=> 23) == 0ll) ?: false)} 
 [0] sort [s2] [asc] [s3, s4] 
 [4] project [s4 = getField(s1, "c")] 
 [3] project [s3 = getField(s1, "b")] 
@@ -39,6 +41,8 @@ Filter []
 |   BinaryOp [FillEmpty]
 |   |   Const [false]
 |   BinaryOp [Eq]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
 |   |   Const [35]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -59,7 +63,7 @@ Evaluation [{sortA}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[5] filter {((getField(s4, "a") == 35) ?: false)} 
+[5] filter {(((getField(s4, "a") <=> 35) == 0ll) ?: false)} 
 [0] sort [s2, s3] [asc, desc] [s4] 
 [4] project [s4 = getField(s1, "c")] 
 [3] project [s3 = getField(s1, "b")] 

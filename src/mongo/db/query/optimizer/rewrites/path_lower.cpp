@@ -285,24 +285,23 @@ void EvalFilterLowering::transport(ABT& n, const PathDefault&, ABT& c) {
 void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
     const ProjectionName name{_prefixId.getNextId("valCmp")};
 
-    if (cmp.op() == Operations::Eq) {
-        // ABT Eq matches the semantics of SBE eq exactly, so lower the expression directly without
-        // dealing with cross-type comparisons.
-        n = make<LambdaAbstraction>(
-            name,
-            make<BinaryOp>(cmp.op(), make<Variable>(name), std::exchange(c, make<Blackhole>())));
-    } else if (cmp.op() == Operations::EqMember) {
+    if (cmp.op() == Operations::EqMember) {
+        // If c is not an array we want EqMember to have the same behavior as Eq (for example:
+        // EqMember (Const 5) should have the same behavior as Eq (Const 5)). Thus, we use cmp3w in
+        // the non-array case in the lowering below.
         n = make<LambdaAbstraction>(
             name,
             make<If>(make<FunctionCall>("isArray", makeSeq(c)),
                      make<FunctionCall>("isMember", makeSeq(make<Variable>(name), c)),
-                     make<BinaryOp>(Operations::Eq, make<Variable>(name), c)));
+                     make<BinaryOp>(Operations::Eq,
+                                    make<BinaryOp>(Operations::Cmp3w, make<Variable>(name), c),
+                                    Constant::int64(0))));
     } else {
-        // ABT gt/lt/gte/lte and neq operators work across types, but SBE equivalents will return
-        // Nothing if the types do not match. We can express a type-agnostic comparison in an SBE
-        // compatible way using cmp3w (<=>), which works with any two values of any types in SBE.
-        // cmp(X, Y) is equivalent to cmp(X <=> Y, 0) in ABT, but will return a boolean rather than
-        // Nothing in SBE.
+        // All ABT comparisons (eq/neq, gt/lt, gte/lte) work across types, but SBE equivalents will
+        // return Nothing if the types do not match. We can express a type-agnostic comparison in an
+        // SBE compatible way using cmp3w (<=>), which works with any two values of any types in
+        // SBE. cmp(X, Y) is equivalent to cmp(X <=> Y, 0) in ABT, but will return a boolean rather
+        // than Nothing in SBE.
         n = make<LambdaAbstraction>(
             name,
             make<BinaryOp>(cmp.op(),
