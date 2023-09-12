@@ -1081,7 +1081,7 @@ Status runAggregate(OperationContext* opCtx,
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
             try {
                 invariant(collatorToUse.has_value());
-                query_stats::registerRequest(opCtx, nss, [&]() {
+                query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
                     // In this path we haven't yet parsed the pipeline, but we need to do so for
                     // query shape stats - which should track the queries before views are resolved.
                     // Inside this callback we know we have already checked that query stats are
@@ -1153,9 +1153,14 @@ Status runAggregate(OperationContext* opCtx,
         // with encrypted fields. We still collect query stats on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(opCtx, nss, [&]() {
+            query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request, *pipeline, expCtx, pipelineInvolvedNamespaces, nss, collectionType);
+                    request,
+                    *pipeline,
+                    expCtx,
+                    pipelineInvolvedNamespaces,
+                    request.getNamespace(),
+                    collectionType);
             });
         }
 
