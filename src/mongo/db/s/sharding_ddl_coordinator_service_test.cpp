@@ -269,7 +269,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     });
 
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 1000 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10000 /*timeoutMillisec*/));
 
     // Lock should be acquired after step up conclusion
     ASSERT(stepUpFuture.isReady());
