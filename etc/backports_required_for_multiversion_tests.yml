@@ -433,6 +433,12 @@ last-continuous:
     ticket: SERVER-78530
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-78530
+  - test_file: jstests/core/timeseries/nondefault_collation.js
+    ticket: SERVER-81013
+  - test_file: jstests/core/timeseries/timeseries_delete_collation.js
+    ticket: SERVER-81013
+  - test_file: jstests/core/timeseries/timeseries_update_collation.js
+    ticket: SERVER-81013
   suites: null
 last-lts:
   all:
@@ -932,4 +938,10 @@ last-lts:
     ticket: SERVER-78530
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-78530
+  - test_file: jstests/core/timeseries/nondefault_collation.js
+    ticket: SERVER-81013
+  - test_file: jstests/core/timeseries/timeseries_delete_collation.js
+    ticket: SERVER-81013
+  - test_file: jstests/core/timeseries/timeseries_update_collation.js
+    ticket: SERVER-81013
   suites: null

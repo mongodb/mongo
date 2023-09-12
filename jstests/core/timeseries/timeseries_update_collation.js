@@ -133,31 +133,22 @@ function runTest({
     });
 })();
 
+// Since the query collation does not match the collection collation, there should be no predicates
+// on control fields. The predicates on meta field are okay because buckets are grouped based on
+// real values, ignoring their collation.
 (function testQueryLevelCollation() {
     // Residual filter.
     runTest({
         updateFilter: {str: "Hello"},
         queryCollation: caseSensitive,
         nModified: 0,
-        expectedBucketQuery: {
-            $and: [
-                closedBucketFilter,
-                {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
-        },
+        expectedBucketQuery: closedBucketFilter,
     });
     runTest({
         updateFilter: {str: "Hello"},
         queryCollation: caseInsensitive,
         nModified: 6,
-        expectedBucketQuery: {
-            $and: [
-                closedBucketFilter,
-                {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
-        },
+        expectedBucketQuery: closedBucketFilter,
     });
 
     // Bucket filter.
