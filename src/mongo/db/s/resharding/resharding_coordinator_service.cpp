@@ -1402,6 +1402,8 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                     ->onStepDown(ReshardingMetrics::Role::kCoordinator);
             }
 
+            _logStatsOnCompletion(status.isOK());
+
             if (!status.isOK()) {
                 {
                     auto lg = stdx::lock_guard(_fulfillmentMutex);
@@ -2062,6 +2064,24 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_updateChunkImbalanceM
                       "namespace"_attr = nss,
                       "error"_attr = redact(ex.toStatus()));
     }
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_logStatsOnCompletion(bool success) {
+    BSONObjBuilder builder;
+    BSONObjBuilder statsBuilder;
+    builder.append("uuid", _coordinatorDoc.getReshardingUUID().toBSON());
+    builder.append("status", success ? "success" : "failed");
+    statsBuilder.append("ns", _coordinatorDoc.getSourceNss().toString());
+    statsBuilder.append("sourceUUID", _coordinatorDoc.getSourceUUID().toBSON());
+    statsBuilder.append("newUUID", _coordinatorDoc.getReshardingUUID().toBSON());
+    statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toBSON());
+    if (_coordinatorDoc.getStartTime()) {
+        statsBuilder.append("startTime", *_coordinatorDoc.getStartTime());
+    }
+    statsBuilder.append("endTime", getCurrentTime());
+
+    builder.append("statistics", statsBuilder.obj());
+    LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }
 
 }  // namespace mongo
