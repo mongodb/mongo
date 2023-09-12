@@ -161,9 +161,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !_doc.getReshardingUUID().has_value());
                 if (!resharding::gFeatureFlagMoveCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                    !resharding::gFeatureFlagUnshardCollection.isEnabled(
                         serverGlobalParams.featureCompatibility)) {
                     uassert(ErrorCodes::InvalidOptions,
-                            "Move collection is not enabled, reject provenance parameter",
+                            "Feature flag move collection or unshard collection is not enabled, "
+                            "reject provenance parameter",
                             !_doc.getProvenance().has_value());
                 }
             }

@@ -4,7 +4,7 @@
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
- *  featureFlagMoveCollection
+ *  featureFlagUnshardCollection
  * ]
  */
 

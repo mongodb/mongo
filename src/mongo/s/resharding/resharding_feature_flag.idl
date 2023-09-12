@@ -47,3 +47,8 @@ feature_flags:
         cpp_varname: gFeatureFlagMoveCollection
         default: false
         shouldBeFCVGated: true
+    featureFlagUnshardCollection:
+        description: "Feature flag for implementing unshard collection."
+        cpp_varname: gFeatureFlagUnshardCollection
+        default: false
+        shouldBeFCVGated: true

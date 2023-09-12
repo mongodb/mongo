@@ -140,7 +140,7 @@ public:
 };
 
 MONGO_REGISTER_COMMAND(ClusterUnshardCollectionCmd)
-    .requiresFeatureFlag(&resharding::gFeatureFlagMoveCollection);
+    .requiresFeatureFlag(&resharding::gFeatureFlagUnshardCollection);
 
 }  // namespace
 }  // namespace mongo

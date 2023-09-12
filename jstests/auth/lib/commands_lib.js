@@ -251,7 +251,7 @@ export const authCommandsLib = {
           command: {abortUnshardCollection: "test.x"},
           skipUnlessSharded: true,
           skipTest: (conn) => {
-            return !TestData.setParameters.featureFlagMoveCollection;
+            return !TestData.setParameters.featureFlagUnshardCollection;
           },
           testcases: [
               {
@@ -6759,7 +6759,7 @@ export const authCommandsLib = {
           command: {unshardCollection: "test.x", toShard: "unshard_collection-rs"},
           skipUnlessSharded: true,
           skipTest: (conn) => {
-              return !TestData.setParameters.featureFlagMoveCollection;
+              return !TestData.setParameters.featureFlagUnshardCollection;
           },
           testcases: [
               {

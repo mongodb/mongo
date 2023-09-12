@@ -185,9 +185,12 @@ public:
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !request().getReshardingUUID().has_value());
                 if (!resharding::gFeatureFlagMoveCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                    !resharding::gFeatureFlagUnshardCollection.isEnabled(
                         serverGlobalParams.featureCompatibility)) {
                     uassert(ErrorCodes::InvalidOptions,
-                            "Move collection is not enabled, reject provenance parameter",
+                            "Feature flag move collection or unshard collection is not enabled, "
+                            "reject provenance parameter",
                             !request().getProvenance().has_value());
                 }
             }
