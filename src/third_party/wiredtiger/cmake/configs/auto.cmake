@@ -147,13 +147,6 @@ config_func(
 )
 
 config_func(
-    HAVE_FTRUNCATE
-    "Function ftruncate exists."
-    FUNC "ftruncate"
-    FILES "unistd.h;sys/types.h"
-)
-
-config_func(
     HAVE_GETTIMEOFDAY
     "Function gettimeofday exists."
     FUNC "gettimeofday"

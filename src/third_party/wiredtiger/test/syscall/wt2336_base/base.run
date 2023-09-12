@@ -39,14 +39,10 @@ SYSTEM("Darwin");
 #define OPEN_EXISTING(name, flags)		OPEN(name, flags, 0)
 #endif /* __linux__ */
 
-#ifdef HAVE_FTRUNCATE
 #ifdef __linux__
 #define FTRUNCATE(fd, len)			ftruncate(fd, len)
 #else
 #define FTRUNCATE(fd, len)			ftruncate(fd, len, len)
-#endif
-#else
-#define FTRUNCATE(fd, len)			/* do nothing */
 #endif
 
 #ifdef WT_USE_OPENAT
