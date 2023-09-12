@@ -46,7 +46,7 @@ megabyte = 1024 * 1024
 # - Foreground compaction can be executed and can compact the first file with the lowest threshold. 
 class test_compact07(wttest.WiredTigerTestCase):
     create_params = 'key_format=i,value_format=S,allocation_size=4KB,leaf_page_max=32KB,'
-    conn_config = 'cache_size=100MB,statistics=(all)'
+    conn_config = 'cache_size=100MB,statistics=(all),debug_mode=(background_compact)'
     uri_prefix = 'table:test_compact07'
     
     table_numkv = 100 * 1000
@@ -65,6 +65,12 @@ class test_compact07(wttest.WiredTigerTestCase):
         compact_running = stat_cursor[stat.conn.background_compact_running][2]
         stat_cursor.close()
         return compact_running
+    
+    def get_bg_compaction_files_tracked(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        files = stat_cursor[stat.conn.background_compact_files_tracked][2]
+        stat_cursor.close()
+        return files
 
     def get_files_compacted(self):
         files_compacted = 0
@@ -176,6 +182,22 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Check that foreground compaction has done some work on the small table.
         self.assertGreater(self.get_pages_rewritten(uri_small), 0)
 
+        # Check that we have some files in the background compaction tracking list.
+        self.assertGreater(self.get_bg_compaction_files_tracked(), 0)
+
+        # Drop the tables and wait for sometime for them to be removed from the background 
+        # compaction server list.
+        for i in range(self.n_tables):
+            uri = self.uri_prefix + f'_{i}'
+            self.dropUntilSuccess(self.session, uri)
+        
+        self.session.checkpoint()
+        
+        # The tables should get removed from the tracking list once they exceed the max idle time 
+        # after they're dropped.
+        while self.get_bg_compaction_files_tracked() > 1:
+            time.sleep(1)
+        
         # Stop the background compaction server.
         self.session.compact(None, 'background=false')
 

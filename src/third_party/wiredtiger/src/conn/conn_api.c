@@ -2054,6 +2054,39 @@ err:
 }
 
 /*
+ * __debug_mode_background_compact_config --
+ *     Set the debug configurations for the background compact server.
+ */
+static int
+__debug_mode_background_compact_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+#define WT_BACKGROUND_COMPACT_MAX_IDLE_TIME_DEBUG 10
+#define WT_BACKGROUND_COMPACT_MAX_SKIP_TIME_DEBUG 5
+#define WT_BACKGROUND_COMPACT_WAIT_TIME_DEBUG 2
+#define WT_BACKGROUND_COMPACT_MAX_IDLE_TIME WT_DAY
+#define WT_BACKGROUND_COMPACT_MAX_SKIP_TIME 60 * WT_MINUTE
+#define WT_BACKGROUND_COMPACT_WAIT_TIME 10
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.background_compact", &cval));
+    if (cval.val) {
+        conn->background_compact.max_file_idle_time = WT_BACKGROUND_COMPACT_MAX_IDLE_TIME_DEBUG;
+        conn->background_compact.max_file_skip_time = WT_BACKGROUND_COMPACT_MAX_SKIP_TIME_DEBUG;
+        conn->background_compact.full_iteration_wait_time = WT_BACKGROUND_COMPACT_WAIT_TIME_DEBUG;
+    } else {
+        conn->background_compact.max_file_idle_time = WT_BACKGROUND_COMPACT_MAX_IDLE_TIME;
+        conn->background_compact.max_file_skip_time = 60 * WT_BACKGROUND_COMPACT_MAX_SKIP_TIME;
+        conn->background_compact.full_iteration_wait_time = WT_BACKGROUND_COMPACT_WAIT_TIME;
+    }
+
+    return (0);
+}
+
+/*
  * __wt_debug_mode_config --
  *     Set debugging configuration.
  */
@@ -2068,6 +2101,7 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     txn_global = &conn->txn_global;
 
     WT_RET(__debug_mode_log_retention_config(session, cfg));
+    WT_RET(__debug_mode_background_compact_config(session, cfg));
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.corruption_abort", &cval));
     if (cval.val)

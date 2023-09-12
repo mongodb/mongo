@@ -71,6 +71,8 @@ struct __wt_addr_copy;
 typedef struct __wt_addr_copy WT_ADDR_COPY;
 struct __wt_background_compact;
 typedef struct __wt_background_compact WT_BACKGROUND_COMPACT;
+struct __wt_background_compact_stat;
+typedef struct __wt_background_compact_stat WT_BACKGROUND_COMPACT_STAT;
 struct __wt_backup_target;
 typedef struct __wt_backup_target WT_BACKUP_TARGET;
 struct __wt_blkcache;
