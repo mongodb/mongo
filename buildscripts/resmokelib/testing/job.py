@@ -298,36 +298,30 @@ class Job(object):
             run_hooks_after_suite_span.set_status(
                 StatusCode.ERROR if hooks_failed else StatusCode.OK)
 
-    @TRACER.start_as_current_span("job._run_hooks_before_tests")
     def _run_hooks_before_tests(self, test: TestCase, hook_failure_flag: Optional[threading.Event]):
         """Run the before_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
         failure, and reraises any other exceptions.
         """
-        run_hooks_before_tests_span = trace.get_current_span()
-        run_hooks_before_tests_span.set_attributes(attributes=test.get_test_otel_attributes())
 
         try:
             for hook in self.hooks:
                 self._run_hook(hook, hook.before_test, test, hook_failure_flag)
 
         except errors.StopExecution:
-            run_hooks_before_tests_span.set_status(StatusCode.ERROR)
             raise
 
         except errors.ServerFailure:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
                                   test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=2)
-            run_hooks_before_tests_span.set_status(StatusCode.ERROR)
             raise errors.StopExecution("A hook's before_test failed")
 
         except errors.TestFailure:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
                                   test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=1)
-            run_hooks_before_tests_span.set_status(StatusCode.ERROR)
             if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's before_test failed")
 
@@ -336,12 +330,8 @@ class Job(object):
             self.report.startTest(test)
             self.report.addError(test, sys.exc_info())
             self.report.stopTest(test)
-            run_hooks_before_tests_span.set_status(StatusCode.ERROR)
             raise
 
-        run_hooks_before_tests_span.set_status(StatusCode.OK)
-
-    @TRACER.start_as_current_span("job._run_hooks_after_tests")
     def _run_hooks_after_tests(self, test: TestCase, hook_failure_flag: Optional[threading.Event],
                                background: bool = False):
         """Run the after_test method on each of the hooks.
@@ -352,10 +342,6 @@ class Job(object):
         @param test: the test after which we run the hooks.
         @param background: whether to run background hooks.
         """
-
-        run_hooks_after_tests_span = trace.get_current_span()
-        run_hooks_after_tests_span.set_attributes(attributes=test.get_test_otel_attributes())
-        run_hooks_after_tests_span.set_attribute(TestCase.METRIC_NAMES.BACKGROUND, background)
 
         suite_with_balancer = isinstance(
             self.fixture, shardedcluster.ShardedClusterFixture) and self.fixture.enable_balancer
@@ -368,7 +354,6 @@ class Job(object):
                 self.logger.exception("%s failed while stopping the balancer for end-test hooks",
                                       test.short_description())
                 self.report.setFailure(test, return_code=2)
-                run_hooks_after_tests_span.set_status(StatusCode.ERROR)
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
@@ -380,27 +365,23 @@ class Job(object):
                     self._run_hook(hook, hook.after_test, test, hook_failure_flag)
 
         except errors.StopExecution:
-            run_hooks_after_tests_span.set_status(StatusCode.ERROR)
             raise
 
         except errors.ServerFailure:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
                                   test.short_description())
             self.report.setFailure(test, return_code=2)
-            run_hooks_after_tests_span.set_status(StatusCode.ERROR)
             raise errors.StopExecution("A hook's after_test failed")
 
         except errors.TestFailure:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
                                   test.short_description())
             self.report.setFailure(test, return_code=1)
-            run_hooks_after_tests_span.set_status(StatusCode.ERROR)
             if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's after_test failed")
 
         except:
             self.report.setError(test, sys.exc_info())
-            run_hooks_after_tests_span.set_status(StatusCode.ERROR)
             raise
 
         if not background and suite_with_balancer:
@@ -412,7 +393,6 @@ class Job(object):
                     "%s failed while re-starting the balancer after end-test hooks",
                     test.short_description())
                 self.report.setFailure(test, return_code=2)
-                run_hooks_after_tests_span.set_status(StatusCode.ERROR)
                 if self.archival:
                     result = TestResult(test=test, hook=None, success=False)
                     self.archival.archive(self.logger, result, self.manager)
