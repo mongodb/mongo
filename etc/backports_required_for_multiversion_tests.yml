@@ -345,6 +345,8 @@ last-continuous:
     ticket: SERVER-75356
   - test_file: jstests/core/field_name_validation.js
     ticket: SERVER-75517
+  - test_file: jstests/core/timeseries/nondefault_collation.js
+    ticket: SERVER-81013
   - test_file: jstests/sharding/conn_pool_stats.js
     ticket: SERVER-75911
   - test_file: jstests/sharding/database_versioning_all_commands.js
@@ -842,5 +844,6 @@ last-lts:
     ticket: SERVER-78149
   - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
     ticket: SERVER-79912
-
+  - test_file: jstests/core/timeseries/nondefault_collation.js
+    ticket: SERVER-81013
   suites: null

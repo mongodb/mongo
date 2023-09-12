@@ -146,11 +146,21 @@ public:
                     BSONObj userCollation,
                     const CollectionPtr& collection) {
         if (!collection || !collection->getDefaultCollator()) {
-            return {userCollation.isEmpty()
-                        ? nullptr
-                        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(userCollation)),
-                    ExpressionContext::CollationMatchesDefault::kNoDefault};
+            if (userCollation.isEmpty()) {
+                return {nullptr, ExpressionContext::CollationMatchesDefault::kYes};
+            } else {
+                auto userCollator =
+                    uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                        ->makeFromBSON(userCollation));
+                return {std::move(userCollator),
+                        // If the user explicitly provided a simple collation, we can still treat it
+                        // as 'CollationMatchesDefault::kYes', as no collation and simple collation
+                        // are functionally equivalent in the query code.
+                        (SimpleBSONObjComparator::kInstance.evaluate(userCollation ==
+                                                                     CollationSpec::kSimpleSpec))
+                            ? ExpressionContext::CollationMatchesDefault::kYes
+                            : ExpressionContext::CollationMatchesDefault::kNo};
+            }
         }
         if (userCollation.isEmpty()) {
             return {collection->getDefaultCollator()->clone(),
@@ -158,11 +168,11 @@ public:
         }
         auto userCollator = uassertStatusOK(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
-        return {
-            std::move(userCollator),
-            CollatorInterface::collatorsMatch(collection->getDefaultCollator(), userCollator.get())
-                ? ExpressionContext::CollationMatchesDefault::kYes
-                : ExpressionContext::CollationMatchesDefault::kNo};
+        auto userCollatorPtr = userCollator.get();
+        return {std::move(userCollator),
+                CollatorInterface::collatorsMatch(collection->getDefaultCollator(), userCollatorPtr)
+                    ? ExpressionContext::CollationMatchesDefault::kYes
+                    : ExpressionContext::CollationMatchesDefault::kNo};
     }
 
 private:
