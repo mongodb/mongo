@@ -96,7 +96,6 @@ TenantMigrationAccessBlockerRegistry::TenantMigrationAccessBlockerRegistry() {
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
 
-        // TODO(SERVER-74661): Please revisit if this thread could be made killable.
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
     };

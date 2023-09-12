@@ -155,6 +155,12 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanRunCommandFu
                   repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
         return ExecutorFuture(executor)
             .then([timestamp = *_rejectBeforeTimestamp, deadline = opCtx->getDeadline()] {
+                // Donor traffic is redirected to the recipient for migrating tenants only after all
+                // recipient nodes have successfully applied `rejectBeforeTimestamp` state doc
+                // change. So, it's safe to synchronously wait for rejectBeforeTimestamp to reach
+                // the current committed snapshot in asyncBlockingOperationsExecutor (unkillable by
+                // step down and rollback) without worrying about rejectBeforeTimestamp  state doc
+                // change getting rolled back, and causing potential executor thread exhaustion.
                 auto uniqueOpCtx = cc().makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();
                 opCtx->setDeadlineByDate(deadline, ErrorCodes::MaxTimeMSExpired);
