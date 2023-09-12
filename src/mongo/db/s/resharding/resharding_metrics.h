@@ -160,6 +160,8 @@ public:
 
     void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
+    void reportOnCompletion(BSONObjBuilder* builder);
+
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
     virtual StringData getStateString() const noexcept override;

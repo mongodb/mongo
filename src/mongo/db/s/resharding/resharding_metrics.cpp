@@ -264,4 +264,11 @@ void ReshardingMetrics::restoreExternallyTrackedRecipientFields(
                    values.writesToStashCollections);
     _ableToEstimateRemainingRecipientTime.store(true);
 }
+
+void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
+    invariant(builder);
+    reportDurationsForAllPhases<Seconds>(
+        kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
+}
+
 }  // namespace mongo

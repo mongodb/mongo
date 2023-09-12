@@ -1667,6 +1667,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
+            _logStatsOnCompletion(status.isOK());
 
             // Destroy metrics early so its lifetime will not be tied to the lifetime of this
             // state machine. This is because we have future callbacks copy shared pointers to this
@@ -2389,6 +2390,25 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
                       logAttrs(nss),
                       "error"_attr = redact(ex.toStatus()));
     }
+}
+
+void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
+    BSONObjBuilder builder;
+    BSONObjBuilder statsBuilder;
+    builder.append("uuid", _coordinatorDoc.getReshardingUUID().toBSON());
+    builder.append("status", success ? "success" : "failed");
+    statsBuilder.append("ns", toStringForLogging(_coordinatorDoc.getSourceNss()));
+    statsBuilder.append("sourceUUID", _coordinatorDoc.getSourceUUID().toBSON());
+    statsBuilder.append("newUUID", _coordinatorDoc.getReshardingUUID().toBSON());
+    statsBuilder.append("newShardKey", _coordinatorDoc.getReshardingKey().toBSON());
+    if (_coordinatorDoc.getStartTime()) {
+        statsBuilder.append("startTime", *_coordinatorDoc.getStartTime());
+    }
+    statsBuilder.append("endTime", getCurrentTime());
+    _metrics->reportOnCompletion(&statsBuilder);
+
+    builder.append("statistics", statsBuilder.obj());
+    LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }
 
 }  // namespace mongo
