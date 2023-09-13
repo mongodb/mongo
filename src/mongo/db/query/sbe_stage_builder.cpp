@@ -1284,6 +1284,10 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
                                  boost::optional<TypedSlot> fieldSlot = boost::none) {
     invariant(level < fp.getPathLength());
 
+    tassert(8102000,
+            "Expected either 'inputExpr' or 'fieldSlot' to be defined",
+            !inputExpr.isNull() || fieldSlot.has_value());
+
     SbExprBuilder b(state);
     auto resultExpr = [&] {
         auto fieldExpr = fieldSlot ? b.makeVariable(fieldSlot->slotId)
@@ -1316,7 +1320,7 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
  * corresponding sort key for that path.
  */
 std::unique_ptr<sbe::EExpression> generateSortTraverse(
-    const sbe::EVariable& inputVar,
+    boost::optional<sbe::EVariable> inputVar,
     bool isAscending,
     boost::optional<sbe::value::SlotId> collatorSlot,
     const FieldPath& fp,
@@ -1327,12 +1331,16 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
 
     invariant(level < fp.getPathLength());
 
+    tassert(8102001,
+            "Expected either 'inputVar' or 'fieldSlot' to be defined",
+            inputVar.has_value() || fieldSlot.has_value());
+
     StringData helperFn = isAscending ? "_internalLeast"_sd : "_internalGreatest"_sd;
 
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldExpr = fieldSlot
         ? makeVariable(*fieldSlot)
-        : makeFunction("getField"_sd, inputVar.clone(), makeStrConstant(fp.getFieldName(level)));
+        : makeFunction("getField"_sd, inputVar->clone(), makeStrConstant(fp.getFieldName(level)));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
@@ -1439,7 +1447,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    auto childReqs = reqs.copy().set(kResult).setFields(fields);
+    auto childReqs = reqs.copy().setIf(kResult, hasPartsWithCommonPrefix).setFields(fields);
     auto [stage, childOutputs] = build(child, childReqs);
     auto outputs = std::move(childOutputs);
 
@@ -1447,7 +1455,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
-    const sbe::value::SlotId childResultSlotId = outputs.get(kResult).slotId;
 
     if (!hasPartsWithCommonPrefix) {
         // Handle the case where we are using kResult and there are no common prefixes.
@@ -1470,7 +1477,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 auto makeIsNotArrayCheck = [&](const FieldPath& fp) {
                     return b.makeNot(generateArrayCheckForSort(
                         _state,
-                        b.makeVariable(childResultSlotId),
+                        SbExpr{},
                         fp,
                         0 /* level */,
                         &_frameIdGenerator,
@@ -1491,7 +1498,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     return b.makeBinaryOp(
                         sbe::EPrimBinary::cmp3w,
                         generateArrayCheckForSort(_state,
-                                                  b.makeVariable(childResultSlotId),
+                                                  SbExpr{},
                                                   fp,
                                                   0,
                                                   &_frameIdGenerator,
@@ -1529,14 +1536,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 outputs.get(std::make_pair(PlanStageSlots::kField, part.fieldPath->getFieldName(0)))
                     .slotId;
 
-            std::unique_ptr<sbe::EExpression> sortExpr =
-                generateSortTraverse(sbe::EVariable{childResultSlotId},
-                                     part.isAscending,
-                                     collatorSlot,
-                                     *part.fieldPath,
-                                     0,
-                                     &_frameIdGenerator,
-                                     topLevelFieldSlot);
+            std::unique_ptr<sbe::EExpression> sortExpr = generateSortTraverse(boost::none,
+                                                                              part.isAscending,
+                                                                              collatorSlot,
+                                                                              *part.fieldPath,
+                                                                              0,
+                                                                              &_frameIdGenerator,
+                                                                              topLevelFieldSlot);
 
             // Apply the transformation required by the collation, if specified.
             if (collatorSlot) {
@@ -1559,6 +1565,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // number of key generations (n) can actually dominate the runtime. So for all top-k sorts
         // we use a "cheap" sort key: it's cheaper to construct but more expensive to compare. The
         // assumption here is that k << n.
+
+        const sbe::value::SlotId childResultSlotId = outputs.get(kResult).slotId;
 
         StringData sortKeyGenerator = sn->limit ? "generateCheapSortKey" : "generateSortKey";
 
