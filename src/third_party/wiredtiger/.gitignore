@@ -1,5 +1,13 @@
+**/.DS_Store
 **/tags
-*.swp
+**/*.sw?
+.vscode/
+.cache/
+.ccls-cache/
+compile_commands.json
+cscope.in.out
+cscope.out
+cscope.po.out
 build/
 dist/clang-format
 /docs/
