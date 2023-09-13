@@ -129,6 +129,18 @@ structs:
         validator:
           gte: 102400
           lte: 268435456
+      maxDocsPerSec:
+        type: safeInt64
+        default: 5000
+        validator:
+          gte: 1
+          lte: 80000
+      maxBytesPerSec:
+        type: safeInt64
+        default: 20 * 1024 * 1024
+        validator:
+          gte: 102400
+          lte: 268435456
       maxBatchTimeMillis:
         type: safeInt64
         default: 1000
@@ -171,6 +183,18 @@ structs:
           gte: 1
           lte: 10000
       maxBytesPerBatch:
+        type: safeInt64
+        default: 20 * 1024 * 1024
+        validator:
+          gte: 102400
+          lte: 268435456
+      maxDocsPerSec:
+        type: safeInt64
+        default: 5000
+        validator:
+          gte: 1
+          lte: 80000
+      maxBytesPerSec:
         type: safeInt64
         default: 20 * 1024 * 1024
         validator:

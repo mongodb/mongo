@@ -154,6 +154,8 @@ struct DbCheckCollectionInfo {
     int64_t maxRate;
     int64_t maxDocsPerBatch;
     int64_t maxBytesPerBatch;
+    int64_t maxDocsPerSec;
+    int64_t maxBytesPerSec;
     int64_t maxBatchTimeMillis;
     WriteConcernOptions writeConcern;
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters;
@@ -295,6 +297,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     const auto maxRate = invocation.getMaxCountPerSecond();
     const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
     const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
+    const auto maxDocsPerSec = invocation.getMaxDocsPerSec();
+    const auto maxBytesPerSec = invocation.getMaxBytesPerSec();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters = boost::none;
     if (gSecondaryIndexChecksInDbCheck) {
@@ -318,6 +322,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxRate,
                                             maxDocsPerBatch,
                                             maxBytesPerBatch,
+                                            maxDocsPerSec,
+                                            maxBytesPerSec,
                                             maxBatchTimeMillis,
                                             invocation.getBatchWriteConcern(),
                                             secondaryIndexCheckParameters};
@@ -344,6 +350,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
     const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
+    const auto maxDocsPerSec = invocation.getMaxDocsPerSec();
+    const auto maxBytesPerSec = invocation.getMaxBytesPerSec();
     auto result = std::make_unique<DbCheckRun>();
     auto perCollectionWork = [&](const Collection* coll) {
         if (!coll->ns().isReplicated()) {
@@ -358,6 +366,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    rate,
                                    maxDocsPerBatch,
                                    maxBytesPerBatch,
+                                   maxDocsPerSec,
+                                   maxBytesPerSec,
                                    maxBatchTimeMillis,
                                    invocation.getBatchWriteConcern(),
                                    boost::none};
