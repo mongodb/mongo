@@ -99,23 +99,41 @@ const updateDoc2 = {
     }
 };
 
-// Inserts measurement 0 and 1, and then inserts them again through update oplog entries on the
-// buckets collection. Only two measurements are expected to exist.
+// First inserts measurement 0 and 1.
 testDB.getCollection(bucketsCollName).insertOne(insertDocFull);
-assert.commandWorked(testDB.runCommand({
-    update: bucketsCollName,
-    updates: [
-        {
-            q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
-            u: [{$_internalApplyOplogUpdate: {oplogUpdate: updateDoc1}}]
-        },
-        {
-            q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
-            u: [{$_internalApplyOplogUpdate: {oplogUpdate: updateDoc2}}]
-        },
-    ]
-}));
-assert.eq(testDB.getCollection(collName).find().itcount(), 2);
+
+function runTest(runInTxn) {
+    // Inserts measurement 0 and 1 again through update oplog entries on the buckets collection.
+    // Only two measurements are expected to exist.
+    const updCmd = {
+        update: bucketsCollName,
+        updates: [
+            {
+                q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
+                u: [{$_internalApplyOplogUpdate: {oplogUpdate: updateDoc1}}]
+            },
+            {
+                q: {"_id": ObjectId("64d3c7004c83948224c45ddf")},
+                u: [{$_internalApplyOplogUpdate: {oplogUpdate: updateDoc2}}]
+            },
+        ]
+    };
+    if (runInTxn) {
+        const session = testDB.getMongo().startSession();
+        const sessionDB = session.getDatabase("test");
+        session.startTransaction();
+        assert.commandWorked(sessionDB.runCommand(updCmd));
+        assert.commandWorked(session.commitTransaction_forTesting());
+        session.endSession();
+    } else {
+        assert.commandWorked(testDB.runCommand(updCmd));
+    }
+
+    assert.eq(testDB.getCollection(collName).find().itcount(), 2);
+}
+
+runTest(/*runInTxn=*/ true);
+runTest(/*runInTxn=*/ false);
 
 rst.stopSet();
 })();
