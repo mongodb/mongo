@@ -282,17 +282,37 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
 
         case Operations::Or: {
             // Nothing and short-circuiting semantics of the 'or' operation in SBE allow us to
-            // interrogate 'lhs' only.
-            if (auto lhsConst = lhs.cast<Constant>(); lhsConst) {
-                auto [lhsTag, lhsValue] = lhsConst->get();
-                if (lhsTag == sbe::value::TypeTags::Boolean &&
-                    !sbe::value::bitcastTo<bool>(lhsValue)) {
-                    // false || rhs -> rhs
-                    swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
-                } else if (lhsTag == sbe::value::TypeTags::Boolean &&
-                           sbe::value::bitcastTo<bool>(lhsValue)) {
-                    // true || rhs -> true
-                    swapAndUpdate(n, Constant::boolean(true));
+            // interrogate 'lhs' only provided the right side is not a constant.
+            if (const auto* lhsConst = lhs.cast<Constant>()) {
+                if (const auto [lhsTag, lhsValue] = lhsConst->get();
+                    lhsTag == sbe::value::TypeTags::Boolean) {
+                    const bool lhsBool = sbe::value::bitcastTo<bool>(lhsValue);
+                    if (const auto* rhsConst = rhs.cast<Constant>()) {
+                        if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                            rhsTag == sbe::value::TypeTags::Boolean) {
+                            // Both left and right sides are boolean constants.
+                            swapAndUpdate(n,
+                                          Constant::boolean(lhsBool ||
+                                                            sbe::value::bitcastTo<bool>(rhsValue)));
+                        }
+                    } else {
+                        // Right side is not constant.
+                        if (lhsBool) {
+                            // true || rhs -> true.
+                            swapAndUpdate(n, Constant::boolean(true));
+                        } else {
+                            // false || rhs -> rhs.
+                            swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
+                        }
+                    }
+                }
+            } else if (const auto* rhsConst = rhs.cast<Constant>()) {
+                // Left side is not constant and right side is a "false" constant.
+                if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                    rhsTag == sbe::value::TypeTags::Boolean &&
+                    !sbe::value::bitcastTo<bool>(rhsValue)) {
+                    // x || false -> x.
+                    swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
                 }
             }
             break;
@@ -300,17 +320,37 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
 
         case Operations::And: {
             // Nothing and short-circuiting semantics of the 'and' operation in SBE allow us to
-            // interrogate 'lhs' only.
-            if (auto lhsConst = lhs.cast<Constant>(); lhsConst) {
-                auto [lhsTag, lhsValue] = lhsConst->get();
-                if (lhsTag == sbe::value::TypeTags::Boolean &&
-                    !sbe::value::bitcastTo<bool>(lhsValue)) {
-                    // false && rhs -> false
-                    swapAndUpdate(n, Constant::boolean(false));
-                } else if (lhsTag == sbe::value::TypeTags::Boolean &&
-                           sbe::value::bitcastTo<bool>(lhsValue)) {
-                    // true && rhs -> rhs
-                    swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
+            // interrogate 'lhs' only provided the right side is not a constant.
+            if (const auto* lhsConst = lhs.cast<Constant>()) {
+                if (const auto [lhsTag, lhsValue] = lhsConst->get();
+                    lhsTag == sbe::value::TypeTags::Boolean) {
+                    const bool lhsBool = sbe::value::bitcastTo<bool>(lhsValue);
+                    if (const auto* rhsConst = rhs.cast<Constant>()) {
+                        if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                            rhsTag == sbe::value::TypeTags::Boolean) {
+                            // Both left and right sides are boolean constants.
+                            swapAndUpdate(n,
+                                          Constant::boolean(lhsBool &&
+                                                            sbe::value::bitcastTo<bool>(rhsValue)));
+                        }
+                    } else {
+                        // Right side is not constant.
+                        if (lhsBool) {
+                            // true && rhs -> rhs.
+                            swapAndUpdate(n, std::exchange(rhs, make<Blackhole>()));
+                        } else {
+                            // false && rhs -> false.
+                            swapAndUpdate(n, Constant::boolean(false));
+                        }
+                    }
+                }
+            } else if (const auto* rhsConst = rhs.cast<Constant>()) {
+                // Left side is not constant and right side is a "true" constant.
+                if (const auto [rhsTag, rhsValue] = rhsConst->get();
+                    rhsTag == sbe::value::TypeTags::Boolean &&
+                    sbe::value::bitcastTo<bool>(rhsValue)) {
+                    // x && true -> x.
+                    swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
                 }
             }
             break;
@@ -430,6 +470,14 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
             break;
         }
 
+        case Operations::FillEmpty:
+            if (const auto* lhsConst = lhs.cast<Constant>()) {
+                if (auto [tag, val] = lhsConst->get(); tag != sbe::value::TypeTags::Nothing) {
+                    swapAndUpdate(n, std::exchange(lhs, make<Blackhole>()));
+                }
+            }
+            break;
+
         default:
             // Not implemented.
             break;
@@ -437,11 +485,11 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
 }
 
 void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args) {
-    // We can simplify exists(constant) to true if the said constant is not Nothing.
-    if (op.name() == "exists" && args.size() == 1 && args[0].is<Constant>()) {
-        auto [tag, val] = args[0].cast<Constant>()->get();
-        if (tag != sbe::value::TypeTags::Nothing) {
-            swapAndUpdate(n, Constant::boolean(true));
+    if (op.name() == "exists") {
+        if (args.size() == 1 && args[0].is<Constant>()) {
+            // We can simplify exists(constant).
+            const bool v = args[0].cast<Constant>()->get().first != sbe::value::TypeTags::Nothing;
+            swapAndUpdate(n, Constant::boolean(v));
         }
     } else if (op.name() == "newArray") {
         bool allConstants = true;
@@ -474,27 +522,60 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
                 swapAndUpdate(n, args.front());
             }
         }
-    } else if (op.name() == "isArray" && args.size() == 1 && args[0].is<Constant>()) {
-        auto [tag, _] = args[0].cast<Constant>()->get();
-        swapAndUpdate(n,
-                      tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::ArraySet
-                          ? Constant::boolean(true)
-                          : Constant::boolean(false));
+    } else if (op.name() == "isArray") {
+        if (args.size() == 1 && args[0].is<Constant>()) {
+            const auto tag = args[0].cast<Constant>()->get().first;
+            const bool v =
+                tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::ArraySet;
+            swapAndUpdate(n, Constant::boolean(v));
+        }
     }
 }
 
 void ConstEval::transport(ABT& n, const If& op, ABT& cond, ABT& thenBranch, ABT& elseBranch) {
-    // If the condition is a boolean constant we can simplify.
-    if (auto condConst = cond.cast<Constant>(); condConst) {
-        auto [condTag, condValue] = condConst->get();
-        if (condTag == sbe::value::TypeTags::Boolean && sbe::value::bitcastTo<bool>(condValue)) {
-            // if true -> thenBranch
-            swapAndUpdate(n, std::exchange(thenBranch, make<Blackhole>()));
-        } else if (condTag == sbe::value::TypeTags::Boolean &&
-                   !sbe::value::bitcastTo<bool>(condValue)) {
-            // if false -> elseBranch
-            swapAndUpdate(n, std::exchange(elseBranch, make<Blackhole>()));
+    if (const auto* condConst = cond.cast<Constant>()) {
+        // If the condition is a boolean constant we can simplify.
+        if (const auto [condTag, condValue] = condConst->get();
+            condTag == sbe::value::TypeTags::Boolean) {
+            if (sbe::value::bitcastTo<bool>(condValue)) {
+                // If true then x else y -> x.
+                swapAndUpdate(n, std::exchange(thenBranch, make<Blackhole>()));
+            } else {
+                // If false then x else y -> y.
+                swapAndUpdate(n, std::exchange(elseBranch, make<Blackhole>()));
+            }
         }
+    } else if (thenBranch.is<Constant>() && elseBranch.is<Constant>()) {
+        // If both branches are boolean constants then we can simplify.
+        if (const auto [tag1, val1] = thenBranch.cast<Constant>()->get();
+            tag1 == sbe::value::TypeTags::Boolean) {
+            const bool v1 = sbe::value::bitcastTo<bool>(val1);
+            if (const auto [tag2, val2] = elseBranch.cast<Constant>()->get();
+                tag2 == sbe::value::TypeTags::Boolean) {
+                const bool v2 = sbe::value::bitcastTo<bool>(val2);
+                if (v1) {
+                    if (v2) {
+                        // if (x) then true else true -> true.
+                        swapAndUpdate(n, Constant::boolean(true));
+                    } else {
+                        // if (x) then true else false -> (x).
+                        swapAndUpdate(n, std::move(cond));
+                    }
+                } else if (v2) {
+                    // If (x) then false else true -> !(x).
+                    swapAndUpdate(n, make<UnaryOp>(Operations::Not, std::move(cond)));
+                } else {
+                    // if (x) then false else false -> false.
+                    swapAndUpdate(n, Constant::boolean(false));
+                }
+            }
+        }
+    } else if (const auto* condNot = cond.cast<UnaryOp>();
+               condNot != nullptr && condNot->op() == Operations::Not) {
+        // If (Not (x)) then y else z -> if (x) then z else y.
+        swapAndUpdate(
+            n,
+            make<If>(std::move(condNot->getChild()), std::move(elseBranch), std::move(thenBranch)));
     }
 }
 

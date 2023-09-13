@@ -251,12 +251,11 @@ TEST_F(IntervalIntersection, VariableIntervals1) {
         "{\n"
         "    {{>If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable [v2]}}\n"
         " U \n"
-        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] "
-        "BinaryOp [Lt] Variable [v2] Variable [v1] Const [true] BinaryOp [And] BinaryOp [Lt] "
-        "Variable [v2] Const [maxKey] Const [true] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] "
-        "Variable [v1] Variable [v2] BinaryOp [Lt] Variable [v2] Const [maxKey] Const [true] "
-        "BinaryOp [Lt] Variable [v2] Const [maxKey] BinaryOp [Gt] Variable [v1] Variable [v2] "
-        "Variable [v1] Const [maxKey], Variable [v1]]}}\n"
+        "    {{[If [] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [Lt] "
+        "Variable [v2] Variable [v1] BinaryOp [Lt] Variable [v2] Const [maxKey] BinaryOp [Or] "
+        "BinaryOp [And] BinaryOp [Lt] Variable [v1] Variable [v2] BinaryOp [Lt] Variable [v2] "
+        "Const [maxKey] Const [true] BinaryOp [Lt] Variable [v2] Const [maxKey] BinaryOp [Gt] "
+        "Variable [v1] Variable [v2] Variable [v1] Const [maxKey], Variable [v1]]}}\n"
         "}\n",
         *result);
 

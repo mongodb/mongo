@@ -1472,19 +1472,19 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         "GroupBy [{rid_0}]\n"
         "|   aggregations: \n"
         "Union [{rid_0}]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[If ["
-        "] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt]"
-        " FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0] BinaryOp "
-        "[Lt] FunctionCall [getQueryParam] Const [0] Const [maxKey] Const [true] BinaryOp [Or] Bi"
-        "naryOp [And] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] FunctionCall [getQuery"
-        "Param] Const [1] Const [true] BinaryOp [And] BinaryOp [Lt] FunctionCall [getQueryParam] "
-        "Const [0] Const [maxKey] Const [true] BinaryOp [And] BinaryOp [Lt] FunctionCall [getQuer"
-        "yParam] Const [0] Const [maxKey] Const [true] BinaryOp [Gt] FunctionCall [getQueryParam]"
-        " Const [1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1]"
-        " Const [maxKey], FunctionCall [getQueryParam] Const [1]]}]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {>If [] Bi"
-        "naryOp [Gte] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const ["
-        "1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1]}]\n",
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[If "
+        "[] BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] BinaryOp "
+        "[Lt] FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0] "
+        "BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] Const [maxKey] Const [true] "
+        "BinaryOp [Or] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] FunctionCall "
+        "[getQueryParam] Const [1] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] Const "
+        "[maxKey] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] Const [maxKey] BinaryOp "
+        "[Gt] FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0] "
+        "FunctionCall [getQueryParam] Const [1] Const [maxKey], FunctionCall [getQueryParam] "
+        "Const [1]]}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {>If [] "
+        "BinaryOp [Gte] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const "
+        "[1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1]}]\n",
         optimized);
 }
 

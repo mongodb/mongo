@@ -165,8 +165,49 @@ TEST(Optimizer, ConstantEquality) {
                          Constant::boolean(true),
                          Constant::boolean(false));
     auto env = VariableEnvironment::build(tree);
-    ConstEval{env}.optimize(tree);
+    while (ConstEval{env}.optimize(tree))
+        ;
     ASSERT_TRUE(tree.is<Constant>());
+}
+
+TEST(Optimizer, ConstFoldIf) {
+    auto tree = _if("x"_var, _cbool(true), _cbool(false))._n;
+    auto env = VariableEnvironment::build(tree);
+    while (ConstEval{env}.optimize(tree))
+        ;
+
+    // Simplify "if (x) then true else false" -> x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldIf1) {
+    auto tree = _if("x"_var, _cbool(false), _cbool(true))._n;
+    auto env = VariableEnvironment::build(tree);
+    while (ConstEval{env}.optimize(tree))
+        ;
+
+    // Simplify "if (x) then false else true" -> NOT x.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "UnaryOp [Not]\n"
+        "Variable [x]\n",
+        tree);
+}
+
+TEST(Optimizer, ConstFoldIf2) {
+    auto tree = _if(_unary("Not", "x"_var), "y"_var, "z"_var)._n;
+    auto env = VariableEnvironment::build(tree);
+    while (ConstEval{env}.optimize(tree))
+        ;
+
+    // Simplify "if (not (x)) then y else z" -> "if (x) then z else y"
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "If []\n"
+        "|   |   Variable [y]\n"
+        "|   Variable [z]\n"
+        "Variable [x]\n",
+        tree);
 }
 
 TEST(Optimizer, Tracker1) {
