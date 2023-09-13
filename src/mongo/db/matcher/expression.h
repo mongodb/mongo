@@ -366,6 +366,12 @@ public:
         InputParamId startingParamId = 0,
         bool* parameterized = nullptr);
 
+    /**
+     * Sets max param count in MatchExpression::parameterize to 0, clearing MatchExpression
+     * auto-parameterization before CanonicalQuery to ABT translation.
+     */
+    static std::vector<const MatchExpression*> unparameterize(MatchExpression* tree);
+
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}
 
