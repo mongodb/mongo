@@ -622,7 +622,10 @@ struct Instruction {
 };
 static_assert(sizeof(Instruction) == sizeof(uint8_t));
 
-enum class Builtin : uint8_t {
+// Builtins which can fit into one byte and have small arity are encoded using a special instruction
+// tag, functionSmall.
+using SmallBuiltinType = uint8_t;
+enum class Builtin : uint16_t {
     split,
     regexMatch,
     replaceOne,
@@ -837,7 +840,10 @@ enum class Builtin : uint8_t {
     aggLinearFillAdd,
     aggLinearFillFinalize,
 
-    valueBlockExists,
+    // Additional one-byte builtins go here.
+
+    // Start of 2 byte builtins.
+    valueBlockExists = 256,
     valueBlockFillEmpty,
     valueBlockMin,
     valueBlockMax,

@@ -333,18 +333,21 @@ public:
                        << ", mask: " << mask;
                     break;
                 }
-                case Instruction::function:
                 case Instruction::functionSmall: {
+                    auto f = readFromMemory<SmallBuiltinType>(pcPointer);
+                    pcPointer += sizeof(f);
+                    ArityType arity{0};
+                    arity = readFromMemory<SmallArityType>(pcPointer);
+                    pcPointer += sizeof(SmallArityType);
+                    os << "f: " << builtinToString(static_cast<Builtin>(f)) << ", arity: " << arity;
+                    break;
+                }
+                case Instruction::function: {
                     auto f = readFromMemory<Builtin>(pcPointer);
                     pcPointer += sizeof(f);
                     ArityType arity{0};
-                    if (i.tag == Instruction::function) {
-                        arity = readFromMemory<ArityType>(pcPointer);
-                        pcPointer += sizeof(ArityType);
-                    } else {
-                        arity = readFromMemory<SmallArityType>(pcPointer);
-                        pcPointer += sizeof(SmallArityType);
-                    }
+                    arity = readFromMemory<ArityType>(pcPointer);
+                    pcPointer += sizeof(ArityType);
                     os << "f: " << builtinToString(f) << ", arity: " << arity;
                     break;
                 }

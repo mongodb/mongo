@@ -997,7 +997,10 @@ void CodeFragment::appendValueBlockApplyLambda() {
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
     Instruction i;
     const bool isSmallArity = (arity <= std::numeric_limits<SmallArityType>::max());
-    i.tag = isSmallArity ? Instruction::functionSmall : Instruction::function;
+    const bool isSmallBuiltin =
+        (f <= static_cast<Builtin>(std::numeric_limits<SmallBuiltinType>::max()));
+    const bool isSmallFunction = isSmallArity && isSmallBuiltin;
+    i.tag = isSmallFunction ? Instruction::functionSmall : Instruction::function;
 
     _maxStackSize = std::max(_maxStackSize, _stackSize + 1);
     // Account for consumed arguments
@@ -1005,13 +1008,19 @@ void CodeFragment::appendFunction(Builtin f, ArityType arity) {
     // and the return value.
     _stackSize += 1;
 
-    auto offset = allocateSpace(sizeof(Instruction) + sizeof(f) +
-                                (isSmallArity ? sizeof(SmallArityType) : sizeof(ArityType)));
+    auto offset = allocateSpace(sizeof(Instruction) +
+                                (isSmallFunction ? sizeof(SmallBuiltinType) : sizeof(Builtin)) +
+                                (isSmallFunction ? sizeof(SmallArityType) : sizeof(ArityType)));
 
     offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, f);
-    offset += isSmallArity ? writeToMemory(offset, static_cast<SmallArityType>(arity))
-                           : writeToMemory(offset, arity);
+    if (isSmallFunction) {
+        SmallBuiltinType smallBuiltin = static_cast<SmallBuiltinType>(f);
+        offset += writeToMemory(offset, smallBuiltin);
+    } else {
+        offset += writeToMemory(offset, f);
+    }
+    offset += isSmallFunction ? writeToMemory(offset, static_cast<SmallArityType>(arity))
+                              : writeToMemory(offset, arity);
 }
 
 void CodeFragment::appendLabelJump(LabelId labelId) {
@@ -9954,18 +9963,29 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
                 break;
             }
-            case Instruction::function:
             case Instruction::functionSmall: {
+                auto f = readFromMemory<SmallBuiltinType>(pcPointer);
+                pcPointer += sizeof(f);
+                SmallArityType arity{0};
+                arity = readFromMemory<SmallArityType>(pcPointer);
+                pcPointer += sizeof(SmallArityType);
+
+                auto [owned, tag, val] = dispatchBuiltin(static_cast<Builtin>(f), arity, code);
+
+                for (ArityType cnt = 0; cnt < arity; ++cnt) {
+                    popAndReleaseStack();
+                }
+
+                pushStack(owned, tag, val);
+
+                break;
+            }
+            case Instruction::function: {
                 auto f = readFromMemory<Builtin>(pcPointer);
                 pcPointer += sizeof(f);
                 ArityType arity{0};
-                if (i.tag == Instruction::function) {
-                    arity = readFromMemory<ArityType>(pcPointer);
-                    pcPointer += sizeof(ArityType);
-                } else {
-                    arity = readFromMemory<SmallArityType>(pcPointer);
-                    pcPointer += sizeof(SmallArityType);
-                }
+                arity = readFromMemory<ArityType>(pcPointer);
+                pcPointer += sizeof(ArityType);
 
                 auto [owned, tag, val] = dispatchBuiltin(f, arity, code);
 
