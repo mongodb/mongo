@@ -616,6 +616,9 @@ stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     bucket.numMeasurements++;
     bucket.size += sizeToBeAdded;
     if (isNewlyOpenedBucket) {
+        if (info.openedDuetoMetadata) {
+            batch->openedDueToMetadata = true;
+        }
         // The namespace is stored two times: the bucket itself and openBucketsByKey.
         // We don't have a great approximation for the
         // _schema size, so we use initial document size minus metadata as an approximation. Since
@@ -1216,10 +1219,6 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     }
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
-    if (info.openedDuetoMetadata) {
-        info.stats.incNumBucketsOpenedDueToMetadata();
-    }
-
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
     bucket->minmax.update(

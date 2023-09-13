@@ -94,6 +94,10 @@ struct WriteBatch {
     StringMap<std::size_t> newFieldNamesToBeInserted;   // Value is hash of string key
     boost::optional<DecompressionResult> decompressed;  // If set, bucket is compressed on-disk.
 
+    bool openedDueToMetadata =
+        false;  // If true, bucket has been opened due to the inserted measurement having different
+                // metadata than available buckets.
+
     AtomicWord<bool> commitRights{false};
     SharedPromise<CommitInfo> promise;
 };

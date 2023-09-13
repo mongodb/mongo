@@ -41,6 +41,11 @@ const runTest = (ordered) => {
     const id2 = bucketsColl.findOne({meta: 2})._id;
     assert.eq(id2, incrementOID(id1));
 
+    // Check that the numBucketsOpenedDueToMetadata metric is increased twice, once for
+    // each bucket we created from inserting a measurement with a new metadata.
+    let stats = assert.commandWorked(coll.stats());
+    let expectedNumBucketsOpenedDueToMetadata = stats.timeseries['numBucketsOpenedDueToMetadata'];
+
     // Now directly insert a bogus bucket with the next sequential OID.
     const bogusBucket = bucketsColl.findOne({meta: 2});
     bogusBucket._id = incrementOID(id2);
@@ -53,6 +58,14 @@ const runTest = (ordered) => {
     const id3 = bucketsColl.findOne({meta: 3})._id;
     assert.neq(id3, incrementOID(id2));
     assert.neq(id3, incrementOID(incrementOID(id2)));
+
+    // Check that the retry logic that handles bucket OID collision did not increment the
+    // numBucketsOpenedDueToMetadata metric more than intended - in this case it should have only
+    // been incremented once
+    expectedNumBucketsOpenedDueToMetadata++;
+    stats = assert.commandWorked(coll.stats());
+    assert.eq(stats.timeseries['numBucketsOpenedDueToMetadata'],
+              expectedNumBucketsOpenedDueToMetadata);
 };
 
 runTest(true);

@@ -275,6 +275,10 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
         stats.incNumBucketUpdates();
     }
 
+    if (batch->openedDueToMetadata) {
+        stats.incNumBucketsOpenedDueToMetadata();
+    }
+
     stats.incNumMeasurementsCommitted(batch->measurements.size());
     if (bucket) {
         bucket->numCommittedMeasurements += batch->measurements.size();
