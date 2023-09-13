@@ -1567,6 +1567,17 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'true'}
+  - name: tie-breaking-heuristics
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: tie-breaking,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: geo_read_commands
     commands:
       - func: f_run_dsi_workload
@@ -3845,6 +3856,7 @@ buildvariants:
     - name: javascript
     - name: compound_wildcard_index_write_commands
     - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
 
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
@@ -3880,6 +3892,7 @@ buildvariants:
     - name: javascript
     - name: compound_wildcard_index_write_commands
     - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
 
 # Specialized Temporary Variants to understand the impact of query stats better.
   - <<: *linux-microbenchmarks-standalone-arm
@@ -4007,6 +4020,7 @@ buildvariants:
     - name: javascript
     - name: compound_wildcard_index_write_commands
     - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
 
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
