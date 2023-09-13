@@ -1,0 +1,112 @@
+==== VARIATION: $match with $in, empty list ====
+-- INPUTS:
+find command: {find: 'collection', '$db': 'test', filter: {a: {$in: []}}}
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: (empty)
+
+-- OUTPUT:
+Root [{test}]
+Filter []
+|   EvalFilter []
+|   |   Variable [test]
+|   PathConstant []
+|   Const [false]
+Scan [test, {test}]
+
+
+==== VARIATION: $match with $in, singleton list ====
+-- INPUTS:
+find command: {find: 'collection', '$db': 'test', filter: {a: {$in: [1]}}}
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: (empty)
+
+-- OUTPUT:
+Root [{test}]
+Filter []
+|   EvalFilter []
+|   |   Variable [test]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [Eq]
+|   FunctionCall [getParam]
+|   |   Const [1]
+|   Const [0]
+Scan [test, {test}]
+
+
+==== VARIATION: $match with $in and a list of equalities becomes a comparison to an EqMember list ====
+-- INPUTS:
+find command: {find: 'collection', '$db': 'test', filter: {a: {$in: [1, 2, 3]}}}
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: (empty)
+
+-- OUTPUT:
+Root [{test}]
+Filter []
+|   EvalFilter []
+|   |   Variable [test]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [EqMember]
+|   FunctionCall [getParam]
+|   |   Const [15]
+|   Const [0]
+Scan [test, {test}]
+
+
+==== VARIATION: $match with $in over an array, duplicated equalities removed ====
+-- INPUTS:
+find command: {find: 'collection', '$db': 'test', filter: {a: {$in: ['abc', 'def', 'ghi', 'def']}}}
+metadata: 
+	number of partitions: 1
+	scan definitions: 
+		collection: 
+			options: 
+			distribution and paths: 
+				distribution type: Centralized
+				distribution paths: 
+			indexes: 
+			collection exists: 1
+			CE type: (empty)
+
+-- OUTPUT:
+Root [{test}]
+Filter []
+|   EvalFilter []
+|   |   Variable [test]
+|   PathGet [a]
+|   PathTraverse [1]
+|   PathCompare [EqMember]
+|   FunctionCall [getParam]
+|   |   Const [15]
+|   Const [0]
+Scan [test, {test}]
+
+

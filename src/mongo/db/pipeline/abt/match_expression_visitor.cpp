@@ -111,7 +111,18 @@ private:
 };
 
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
+
 public:
+    /**
+     * Function that replaces parameterized constants in a MatchExpression with their corresponding
+     * param id's in ABT.
+     *
+     * Represented by an ABT FunctionCall node with two children:
+     * (1) parameter id (int) that maps to the constant value
+     * (2) enum/int representation of the constant's sbe type tag
+     */
+    static constexpr auto parameterFunctionName = "getParam";
+
     ABTMatchExpressionVisitor(ExpressionAlgebrizerContext& ctx, const bool allowAggExpressions)
         : _allowAggExpressions(allowAggExpressions), _ctx(ctx) {}
 
@@ -242,10 +253,28 @@ public:
         if (arrTraversePtr->size() == 1) {
             const auto [tagSingle, valSingle] = sbe::value::copyValue(
                 arrTraversePtr->getAt(0).first, arrTraversePtr->getAt(0).second);
-            result = make<PathCompare>(Operations::Eq, make<Constant>(tagSingle, valSingle));
+
+            if (expr->getInputParamId())
+                result =
+                    make<FunctionCall>(parameterFunctionName,
+                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                                              *expr->getInputParamId()),
+                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                                              static_cast<int>(tagSingle))));
+            else
+                result = make<Constant>(tagSingle, valSingle);
+            result = make<PathCompare>(Operations::Eq, result);
         } else {
-            result =
-                make<PathCompare>(Operations::EqMember, make<Constant>(tagTraverse, valTraverse));
+            if (expr->getInputParamId())
+                result =
+                    make<FunctionCall>(parameterFunctionName,
+                                       makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                                              *expr->getInputParamId()),
+                                               make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                                              static_cast<int>(tagTraverse))));
+            else
+                result = make<Constant>(tagTraverse, valTraverse);
+            result = make<PathCompare>(Operations::EqMember, result);
             arrGuard.reset();
         }
 
@@ -449,13 +478,23 @@ public:
         assertSupportedPathExpression(expr);
 
         const ProjectionName lambdaProjName{_ctx.getNextId("lambda_sizeMatch")};
-        ABT result = make<PathLambda>(make<LambdaAbstraction>(
+        auto result = [&]() {
+            if (expr->getInputParamId())
+                return make<FunctionCall>(
+                    parameterFunctionName,
+                    makeSeq(
+                        make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
+                        make<Constant>(sbe::value::TypeTags::NumberInt32,
+                                       static_cast<int>(sbe::value::TypeTags::NumberInt32))));
+            else
+                return Constant::int64(expr->getData());
+        }();
+        result = make<PathLambda>(make<LambdaAbstraction>(
             lambdaProjName,
             make<BinaryOp>(
                 Operations::Eq,
                 make<FunctionCall>("getArraySize", makeSeq(make<Variable>(lambdaProjName))),
-                Constant::int64(expr->getData()))));
-
+                result)));
         if (shouldGeneratePath(expr)) {
             result = translateFieldRef(*(expr->fieldRef()), std::move(result));
         }
@@ -551,7 +590,15 @@ private:
         assertSupportedPathExpression(expr);
 
         auto [tag, val] = sbe::value::makeValue(Value(expr->getData()));
-        ABT result = make<PathCompare>(op, make<Constant>(tag, val));
+        auto result = ABT{make<PathIdentity>()};
+        if (expr->getInputParamId())
+            result = make<FunctionCall>(
+                parameterFunctionName,
+                makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
+                        make<Constant>(sbe::value::TypeTags::NumberInt32, static_cast<int>(tag))));
+        else
+            result = make<Constant>(tag, val);
+        result = make<PathCompare>(op, result);
 
         bool tagNullMatchMissingField =
             tag == sbe::value::TypeTags::Null && (op == Operations::Lte || op == Operations::Gte);
