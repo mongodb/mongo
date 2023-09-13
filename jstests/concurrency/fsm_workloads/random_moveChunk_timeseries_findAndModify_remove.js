@@ -7,7 +7,7 @@
  *  # Time-series findAndModify does not support retryable writes.
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
- *  requires_fcv_71,
+ *  requires_fcv_72,
  * ]
  */
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";

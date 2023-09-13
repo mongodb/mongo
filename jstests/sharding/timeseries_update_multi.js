@@ -5,9 +5,7 @@
  * @tags: [
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   requires_fcv_71,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_72,
  * ]
  */
 

@@ -2,7 +2,7 @@
  * Tests running time-series multi-update commands that spill to disk.
  *
  * @tags: [
- *   requires_fcv_71,
+ *   requires_fcv_72,
  * ]
  */
 

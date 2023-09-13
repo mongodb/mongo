@@ -7,7 +7,7 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_non_retryable_writes,
- *   requires_fcv_71,
+ *   requires_fcv_72,
  *   featureFlagLargeBatchedOperations,
  * ]
  */

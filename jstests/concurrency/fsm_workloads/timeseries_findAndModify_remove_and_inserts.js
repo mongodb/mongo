@@ -8,7 +8,7 @@
  *   requires_timeseries,
  *   # Time-series findAndModify does not support retryable writes.
  *   requires_non_retryable_writes,
- *   requires_fcv_71,
+ *   requires_fcv_72,
  * ]
  */
 
