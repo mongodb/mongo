@@ -55,17 +55,7 @@ const auto kKeySize = sizeof(std::size_t);
 class QueryStatsEntry {
 public:
     QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
-        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {
-        // Increment by size of query stats store key (hash returns size_t) and value
-        // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
-    }
-
-    ~QueryStatsEntry() {
-        // Decrement by size of query stats store key (hash returns size_t) and value
-        // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.decrement(kKeySize + size());
-    }
+        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {}
 
     BSONObj toBSON() const;
 
