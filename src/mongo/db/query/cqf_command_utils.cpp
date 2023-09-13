@@ -145,10 +145,10 @@ public:
           _queryHasNaturalHint(queryHasNaturalHint) {}
 
     void visit(const LTEMatchExpression* expr) override {
-        assertSupportedPathExpression(expr);
+        assertSupportedComparisonMatchExpression(expr);
     }
     void visit(const LTMatchExpression* expr) override {
-        assertSupportedPathExpression(expr);
+        assertSupportedComparisonMatchExpression(expr);
     }
     void visit(const ElemMatchObjectMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
@@ -157,16 +157,24 @@ public:
         assertSupportedPathExpression(expr);
     }
     void visit(const EqualityMatchExpression* expr) override {
-        assertSupportedPathExpression(expr);
+        assertSupportedComparisonMatchExpression(expr);
     }
     void visit(const GTEMatchExpression* expr) override {
-        assertSupportedPathExpression(expr);
+        assertSupportedComparisonMatchExpression(expr);
     }
     void visit(const GTMatchExpression* expr) override {
-        assertSupportedPathExpression(expr);
+        assertSupportedComparisonMatchExpression(expr);
     }
     void visit(const InMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
+
+        // Dotted path equality to null is not supported.
+        const auto fieldRef = expr->fieldRef();
+        if (fieldRef && fieldRef->numParts() > 1) {
+            _eligible &= std::none_of(expr->getEqualities().begin(),
+                                      expr->getEqualities().end(),
+                                      [](auto&& elt) { return elt.isNull(); });
+        }
 
         // $in over a regex predicate is not supported.
         if (!expr->getRegexes().empty()) {
@@ -368,6 +376,16 @@ public:
 private:
     void unsupportedExpression(const MatchExpression* expr) {
         _eligible = false;
+    }
+
+    void assertSupportedComparisonMatchExpression(const ComparisonMatchExpression* expr) {
+        assertSupportedPathExpression(expr);
+
+        // Dotted path equality to null is not supported.
+        const auto fieldRef = expr->fieldRef();
+        if (fieldRef && fieldRef->numParts() > 1 && expr->getData().isNull()) {
+            _eligible = false;
+        }
     }
 
     void assertSupportedPathExpression(const PathMatchExpression* expr) {

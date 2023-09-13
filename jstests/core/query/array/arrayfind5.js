@@ -1,8 +1,4 @@
 // Test indexed elemmatch of missing field.
-// @tags: [
-//   # TODO SERVER-67506: Dotted path equality to null matches non-object array elements in CQF.
-//   cqf_incompatible,
-// ]
 
 let t = db.jstests_arrayfind5;
 t.drop();

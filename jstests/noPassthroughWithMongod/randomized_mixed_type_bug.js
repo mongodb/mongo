@@ -2,15 +2,9 @@
  * Tests that randomly generated documents can be queried from timeseries collections in the same
  * manner as a tradional collection.
  */
-import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-// TODO SERVER-67506: Re-enable this test when a decision is made about how Bonsai will handle
-// comparison to null. Other semantic difference tickets are also relevant here.
-let scalars = [fc.string(), fc.double(), fc.boolean(), fc.date()];
-if (!checkCascadesOptimizerEnabled(db)) {
-    scalars.push(fc.constant(null));
-}
+const scalars = [fc.string(), fc.double(), fc.boolean(), fc.date(), fc.constant(null)];
 
 const pathComponents = fc.constant("a", "b");
 // Define our grammar for documents.
