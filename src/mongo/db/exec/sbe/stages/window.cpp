@@ -142,11 +142,11 @@ bool WindowStage::fetchNextRow() {
     }
 }
 
-void WindowStage::freeUntilRow(size_t untilId) {
-    for (size_t id = _firstRowId; id <= untilId && _rows.size(); id++) {
+void WindowStage::freeUntilRow(size_t requiredId) {
+    for (size_t id = _firstRowId; id < requiredId && _rows.size(); id++) {
         _rows.pop_front();
     }
-    _firstRowId = untilId + 1;
+    _firstRowId = std::max(_firstRowId, requiredId);
     // Clear next partition id once we free everything from the previous partition.
     if (_nextPartitionId && _firstRowId >= *_nextPartitionId) {
         _nextPartitionId = boost::none;
@@ -219,7 +219,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
         _boundTestingAccessorMap.emplace(slot, _boundTestingAccessors.back().get());
     }
 
-    _emptyAccessor = std::unique_ptr<value::OwnedValueAccessor>();
+    _emptyAccessor = std::make_unique<value::OwnedValueAccessor>();
     _outFrameFirstAccessors.reserve(_windows.size());
     _outFrameFirstRowAccessors.reserve(_windows.size());
     _frameFirstRowIdxes.reserve(_windows.size());
@@ -348,7 +348,7 @@ PlanState WindowStage::getNext() {
 
     // Partition boundary check.
     if (_currId == _nextPartitionId) {
-        freeUntilRow(_currId - 1);
+        freeUntilRow(_currId);
         resetPartition(_currId);
     }
 
@@ -442,7 +442,7 @@ PlanState WindowStage::getNext() {
             }
         }
     }
-    freeUntilRow(requiredIdLow - 1);
+    freeUntilRow(requiredIdLow);
 
     // Set current and frame first/last accessors for the document.
     setCurrAccessors(_currId);
