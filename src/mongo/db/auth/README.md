@@ -310,7 +310,7 @@ While it is possible to create local users and roles on a data bearing shard (ma
 authentication possible), this should be avoided. All connecting clients should access members
 via mongos only.
 
-### <a name="lhabp">Localhost Auth Bypass
+### <a name="lhabp"></a>Localhost Auth Bypass
 
 When first setting up database authentication (using the `--auth` command to start a server), there
 is a feature called `localhostAuthBypass`. The `localhostAuthBypass` allows a client to connect over

@@ -147,7 +147,7 @@ The primary interface for waiting on futures in a cancelable manner is the free 
 template <typename FutureT, typename Value = typename FutureT::value_type>
 SemiFuture<Value> future_util::withCancellation(FutureT&& f, const CancellationToken& token);
 ```
-Note that this function also works with executor futures. This function returns a SemiFuture<T> that is resolved when either the input future `f` is resolved or the input `CancellationToken token` is canceled - whichever comes first. The returned `SemiFuture` is set with the result of the input future when it resolves first, and with an `ErrorCodes::CallbackCanceled` status if cancellation occurs first.
+Note that this function also works with executor futures. This function returns a SemiFuture\<T\> that is resolved when either the input future `f` is resolved or the input `CancellationToken token` is canceled - whichever comes first. The returned `SemiFuture` is set with the result of the input future when it resolves first, and with an `ErrorCodes::CallbackCanceled` status if cancellation occurs first.
 
 For example, if we have a `Future<Request> requestFuture` and `CancellationToken token`, and we want to do some work when _either_ `requestFuture` is resolved _or_ `token` is canceled, we can simply do the following:
 ```c++

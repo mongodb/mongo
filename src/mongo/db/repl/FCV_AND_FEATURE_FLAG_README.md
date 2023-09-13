@@ -12,8 +12,10 @@ feature *f* while there are still older version nodes in the cluster that are un
 
 FCV is persisted as a document in the `admin.system.version` collection. It will look something like
 the following if a node were to be in FCV 5.0:
-<pre><code>
-   { "_id" : "featureCompatibilityVersion", "version" : "5.0" }</code></pre>
+
+```
+   { "_id" : "featureCompatibilityVersion", "version" : "5.0" }
+```
 
 This document is present in every mongod in the cluster and is replicated to other members of the
 replica set whenever it is updated via writes to the `admin.system.version` collection. The FCV
@@ -117,7 +119,7 @@ able to communicate with downgraded binary nodes until the FCV is completely dow
     e.g. if the requested FCV is not a valid transition).
 
 Some examples of on-disk representations of the upgrading and downgrading states:
-<pre><code>
+```
 kUpgradingFrom_5_0_To_5_1:
 {
     version: 5.0,
@@ -130,7 +132,7 @@ kDowngradingFrom_5_1_To_5_0:
     targetVersion: 5.0,
     previousVersion: 5.1
 }
-</code></pre>
+```
 
 
 2. **Run [`_prepareToUpgrade` or `_prepareToDowngrade`](https://github.com/10gen/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L497-L501):** 
@@ -162,7 +164,7 @@ After this point, if the FCV downgrade fails, it is no longer safe to transition
 upgraded FCV, and the user must retry the FCV downgrade. Then we perform any internal server downgrade cleanup.
 
 Examples on-disk representation of the `isCleaningServerMetadata` state:
-<pre><code>
+```
 isCleaningServerMetadata after kDowngradingFrom_5_1_To_5_0:
 { 
     version: 5.0, 
@@ -170,7 +172,7 @@ isCleaningServerMetadata after kDowngradingFrom_5_1_To_5_0:
     previousVersion: 5.1,
     isCleaningServerMetadata: true
 }
-</code></pre>
+```
 
 4. Finally, we [complete transition](https://github.com/10gen/mongo/blob/c6e5701933a98b4fe91c2409c212fcce2d3d34f0/src/mongo/db/commands/set_feature_compatibility_version_command.cpp#L541-L548) by updating the
 local FCV document to the fully upgraded or downgraded version. As part of transitioning to the 
@@ -549,7 +551,7 @@ Feature flags are created by adding it to an IDL file:
 
 A feature flag has the following properties:
 
-* Server Parameter Name: featureFlag<MyFeatureName>
+* Server Parameter Name: featureFlag\<MyFeatureName\>
     * The name should not include "Use", "Allow", "Enable", or "Disable".
 * Server Parameter set_at value: [ startup ]
     * Feature flags should generally be settable at server startup only. This supports the use of
