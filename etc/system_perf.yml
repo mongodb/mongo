@@ -36,6 +36,12 @@ variables:
         variant: compile-amazon-linux2-arm64-mongocrypt-shlib
       - name: schedule_global_auto_tasks
         variant: task_generation
+  _real_compile_amazon2_streams: &_compile_amazon2_streams
+      - name: compile
+        variant: compile-amazon2-streams
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+
   _real_expansions: &_expansion_updates
       []
   ###
@@ -52,6 +58,9 @@ variables:
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
+#  _skip_compile_amazon2_streams: &_compile_amazon2_streams
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_expansions: &_expansion_updates
@@ -1765,6 +1774,25 @@ buildvariants:
     tasks:
       - name: compile
 
+  - &compile-amazon2-streams
+    name: compile-amazon2-streams
+    display_name: Compile Mongo Streams for Amazon2
+    modules: *modules
+    cron: "0 0 * * *"  # Everyday at 00:00
+    expansions:
+      <<: *compile-expansions
+      compile_flags: >-
+        --ssl
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --streams-release-build
+    run_on:
+      - "amazon2-xlarge"
+    tasks:
+      - name: compile
+
   - &compile-amazon-linux2-arm64
     name: compile-amazon-linux2-arm64
     display_name: Compile for Amazon Linux 2 arm64
@@ -2253,6 +2281,27 @@ buildvariants:
       - name: column_store_tpch_10_denormalized
       - name: column_store_tpch_10_denormalized_unindexed
       - name: ssb_column_store_comparison
+
+  - name: linux-standalone-streams.2023-09
+    display_name: Linux Standalone (Streams) 2023-09
+    cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-streams
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2_streams
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
 
   - name: linux-standalone-classic-query-engine.2022-11
     display_name: Linux Standalone (Classic Query Engine) 2022-11
