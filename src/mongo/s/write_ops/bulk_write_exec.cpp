@@ -55,6 +55,7 @@
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -68,7 +69,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
@@ -85,6 +85,7 @@
 #include "mongo/s/write_ops/bulk_write_command_modifier.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -103,8 +104,10 @@ bool isVerboseWc(const BSONObj& wc) {
     return !wElem.isNumber() || wElem.Number() != 0;
 }
 
-// Send and process the child batches. Each child batch is targeted at a unique shard: therefore
-// one shard will have only one batch incoming.
+/**
+ * Send and process the child batches. Each child batch is targeted at a unique shard: therefore one
+ * shard will have only one batch incoming.
+ */
 void executeChildBatches(OperationContext* opCtx,
                          const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                          TargetedBatchMap& childBatches,
@@ -144,6 +147,10 @@ void executeChildBatches(OperationContext* opCtx,
         requests.emplace_back(childBatch.first, request);
     }
 
+    // Note we check this rather than `isRetryableWrite()` because we do not want to retry
+    // commands within retryable internal transactions.
+    bool shouldRetry = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
+
     // Use MultiStatementTransactionRequestsSender to send any ready sub-batches to targeted
     // shard endpoints. Requests are sent on construction.
     MultiStatementTransactionRequestsSender ars(
@@ -152,33 +159,38 @@ void executeChildBatches(OperationContext* opCtx,
         DatabaseName::kAdmin,
         requests,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        opCtx->isRetryableWrite() ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
+        shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
-    while (!ars.done()) {
+    // The BulkWriteOp may be marked finished early if we are in a transaction and encounter an
+    // error, which aborts the transaction. In those cases, we do not bother waiting for any
+    // outstanding responses from shards.
+    while (!ars.done() && !bulkWriteOp.isFinished()) {
         // Block until a response is available.
         auto response = ars.next();
 
-        Status responseStatus = response.swResponse.getStatus();
+        TargetedWriteBatch* writeBatch = childBatches.find(response.shardId)->second.get();
+        tassert(8048101, "Unexpectedly could not find write batch for shard", writeBatch);
+
         // When the responseStatus is not OK, this means that mongos was unable to receive a
         // response from the shard the write batch was sent to, or mongos faced some other local
-        // error (for example, mongos was shutting down). In these cases, throw and return the
-        // error to the client.
-        // Note that this is different from an operation within the bulkWrite command having an
-        // error.
-        uassertStatusOK(responseStatus);
+        // error (for example, mongos was shutting down).
+        // The status being OK does not mean that all operations within the bulkWrite succeeded, nor
+        // that we got an ok:1 response from the shard.
+        if (!response.swResponse.getStatus().isOK()) {
+            bulkWriteOp.processLocalChildBatchError(*writeBatch, response);
+        } else {
+            auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
+                                                        response.swResponse.getValue().data);
 
-        auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
-                                                    response.swResponse.getValue().data);
+            // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the
+            // first batch.
+            auto cursor = bwReply.getCursor();
+            const auto& replyItems = cursor.getFirstBatch();
 
-        // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the
-        // first batch.
-        auto cursor = bwReply.getCursor();
-        const auto& replyItems = cursor.getFirstBatch();
-        TargetedWriteBatch* writeBatch = childBatches.find(response.shardId)->second.get();
-
-        // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
-        // they may be re-targeted if needed.
-        bulkWriteOp.noteBatchResponse(*writeBatch, replyItems, errorsPerNamespace);
+            // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
+            // they may be re-targeted if needed.
+            bulkWriteOp.noteChildBatchResponse(*writeBatch, replyItems, errorsPerNamespace);
+        }
     }
 }
 
@@ -381,7 +393,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
             // TODO (SERVER-76954): Handle write concern errors.
         }
     }
-    // TODO (SERVER-80481): Handle local error correctly.
+    // TODO (SERVER-81006): Handle local error correctly.
     uassertStatusOK(responseStatus);
 
     auto cursor = bulkWriteResponse.getCursor();
@@ -475,7 +487,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                 "Failed to refresh all targeters for bulkWrite because collection was dropped",
                 "error"_attr = redact(ex));
 
-            bulkWriteOp.abortBatch(
+            bulkWriteOp.noteErrorForRemainingWrites(
                 ex.toStatus("collection was dropped in the middle of the operation"));
             break;
         } catch (const DBException& ex) {
@@ -501,7 +513,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
                     "numRoundsWithoutProgress"_attr = numRoundsWithoutProgress);
 
         if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
-            bulkWriteOp.abortBatch(
+            bulkWriteOp.noteErrorForRemainingWrites(
                 {ErrorCodes::NoProgressMade,
                  str::stream() << "no progress was made executing bulkWrite ops in after "
                                << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
@@ -556,7 +568,7 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
                          : 0);
             return writeSizeBytes;
         },
-        getBaseBatchCommandSizeEstimate(),
+        getBaseChildBatchCommandSizeEstimate(),
         targetedBatches);
 }
 
@@ -636,6 +648,12 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
 }
 
 bool BulkWriteOp::isFinished() const {
+    // We encountered some error requiring us to abort execution. Note this may mean that some ops
+    // are left in state pending.
+    if (_aborted) {
+        return true;
+    }
+
     // TODO: Track ops lifetime.
     const bool ordered = _clientRequest.getOrdered();
     for (auto& writeOp : _writeOps) {
@@ -659,7 +677,7 @@ int BulkWriteOp::numWriteOpsIn(WriteOpState opState) const {
         });
 }
 
-void BulkWriteOp::abortBatch(const Status& status) {
+void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
     dassert(!isFinished());
     dassert(numWriteOpsIn(WriteOpState_Pending) == 0);
 
@@ -678,10 +696,10 @@ void BulkWriteOp::abortBatch(const Status& status) {
     dassert(isFinished());
 }
 
-void BulkWriteOp::noteBatchResponse(
-    TargetedWriteBatch& targetedBatch,
+void BulkWriteOp::noteChildBatchResponse(
+    const TargetedWriteBatch& targetedBatch,
     const std::vector<BulkWriteReplyItem>& replyItems,
-    stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace) {
+    boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
     LOGV2_DEBUG(7279200,
                 4,
                 "Processing bulk write response from shard.",
@@ -694,11 +712,12 @@ void BulkWriteOp::noteBatchResponse(
         ++index;
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
         // When an error is encountered on an ordered bulk write, it is impossible for any of the
-        // remaining operations to have been executed. For that reason we cancel them here so they
-        // may be retargeted and retried.
+        // remaining operations to have been executed. For that reason we reset them here so they
+        // may be retargeted and retried if the error we saw is one we can retry after (e.g.
+        // StaleConfig.).
         if (ordered && lastError) {
             invariant(index >= (int)replyItems.size());
-            writeOp.cancelWrites();
+            writeOp.resetWriteToReady();
             continue;
         }
 
@@ -736,27 +755,103 @@ void BulkWriteOp::noteBatchResponse(
             auto origWrite = BulkWriteCRUDOp(_clientRequest.getOps()[write->writeOpRef.first]);
             auto nss = _clientRequest.getNsInfo()[origWrite.getNsInfoIdx()].getNs();
 
-            if (errorsPerNamespace.find(nss) == errorsPerNamespace.end()) {
-                TrackedErrors trackedErrors;
-                trackedErrors.startTracking(ErrorCodes::StaleConfig);
-                trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
-                errorsPerNamespace.emplace(nss, trackedErrors);
-            }
+            // We don't always want to track errors per-namespace, e.g. when we encounter errors
+            // local to mongos.
+            if (errorsPerNamespace) {
+                if (errorsPerNamespace->find(nss) == errorsPerNamespace->end()) {
+                    TrackedErrors trackedErrors;
+                    trackedErrors.startTracking(ErrorCodes::StaleConfig);
+                    trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
+                    errorsPerNamespace->emplace(nss, trackedErrors);
+                }
 
-            auto trackedErrors = errorsPerNamespace.find(nss);
-            invariant(trackedErrors != errorsPerNamespace.end());
-            if (trackedErrors->second.isTracking(reply.getStatus().code())) {
-                trackedErrors->second.addError(ShardError(write->endpoint, *lastError));
+                auto trackedErrors = errorsPerNamespace->find(nss);
+                invariant(trackedErrors != errorsPerNamespace->end());
+                if (trackedErrors->second.isTracking(reply.getStatus().code())) {
+                    trackedErrors->second.addError(ShardError(write->endpoint, *lastError));
+                }
             }
         }
     }
+}
+
+void BulkWriteOp::processLocalChildBatchError(const TargetedWriteBatch& batch,
+                                              const AsyncRequestsSender::Response& response) {
+    const auto& responseStatus = response.swResponse.getStatus();
+    invariant(!responseStatus.isOK(), "Response status was unexpectedly OK");
+
+    const auto shardInfo =
+        response.shardHostAndPort ? response.shardHostAndPort->toString() : batch.getShardId();
+
+    const Status status = responseStatus.withContext(
+        str::stream() << "bulkWrite results unavailable "
+                      << (response.shardHostAndPort ? "from "
+                                                    : "from failing to target a host in the shard ")
+                      << shardInfo);
+
+    noteChildBatchError(batch, status);
+
+    LOGV2_DEBUG(8048100,
+                4,
+                "Unable to receive bulkWrite results from shard",
+                "shardInfo"_attr = shardInfo,
+                "error"_attr = redact(status));
+
+    // If we see a local shutdown error, it means mongos itself is shutting down. A remote shutdown
+    // error would have been returned with response.swResponse.getStatus() being OK.
+    // If we see a local CallbackCanceled error, it is likely also due to mongos shutting down,
+    // therefore shutting down executor thread pools and cancelling any work scheduled on them.
+    // While we don't currently know of any other cases we'd see CallbackCanceled here, we check
+    // the shutdown flag as well to ensure the cancellation is due to shutdown.
+    // While the shutdown flag check is deprecated, that is because modules shouldn't consult it
+    // to coordinate their own shutdowns. But it is OK to use here because we are only checking
+    // whether a shutdown has started.
+    if (ErrorCodes::isShutdownError(responseStatus) ||
+        (responseStatus == ErrorCodes::CallbackCanceled && globalInShutdownDeprecated())) {
+        // We shouldn't continue execution (even if unordered) if we are shutting down since
+        // further batches will fail to execute as well.
+        _aborted = true;
+
+        // We want to throw such an error at the top level so that it can be returned to the client
+        // directly with the appropriate error labels,  allowing them to retry it.
+        uassertStatusOK(responseStatus);
+    }
+
+    // If we are in a transaction, we must stop immediately (even for unordered).
+    if (_inTransaction) {
+        // Even if we aren't throwing a top-level error, we won't continue processing any
+        // outstanding writes after seeing this error since the transaction is aborted.
+        _aborted = true;
+
+        // Throw when there is a transient transaction error as those must be returned to the client
+        // at the top level to allow them to retry.
+        if (isTransientTransactionError(status.code(), false, false)) {
+            uassertStatusOK(status);
+        }
+    }
+}
+
+void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
+                                      const Status& status) {
+    // Treat an error to get a batch response as failures of the contained write(s).
+    const int numErrors = _clientRequest.getOrdered() ? 1 : targetedBatch.getWrites().size();
+
+    std::vector<BulkWriteReplyItem> emulatedReplies;
+    emulatedReplies.reserve(numErrors);
+
+    for (int i = 0; i < numErrors; i++) {
+        emulatedReplies.emplace_back(i, status);
+    }
+
+    // This error isn't actually specific to any namespaces and so we do not want to track it.
+    noteChildBatchResponse(targetedBatch, emulatedReplies, /* errorsPerNamespace*/ boost::none);
 }
 
 void BulkWriteOp::noteWriteOpFinalResponse(size_t opIdx, const BulkWriteReplyItem& reply) {
     WriteOp& writeOp = _writeOps[opIdx];
 
     // Cancel all childOps if any.
-    writeOp.cancelWrites();
+    writeOp.resetWriteToReady();
 
     if (reply.getStatus().isOK()) {
         writeOp.setOpComplete(reply);
@@ -774,7 +869,9 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
 
     const auto ordered = _clientRequest.getOrdered();
     for (auto& writeOp : _writeOps) {
-        dassert(writeOp.getWriteState() != WriteOpState_Pending);
+        // If we encountered an error causing us to abort execution we may not have waited for
+        // responses to all outstanding requests.
+        dassert(writeOp.getWriteState() != WriteOpState_Pending || _aborted);
         if (writeOp.getWriteState() == WriteOpState_Completed) {
             replyItems.push_back(writeOp.takeBulkWriteReplyItem());
         } else if (writeOp.getWriteState() == WriteOpState_Error) {
@@ -836,7 +933,7 @@ void BulkWriteOp::noteStaleResponses(
     }
 }
 
-int BulkWriteOp::getBaseBatchCommandSizeEstimate() const {
+int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     // For simplicity, we build a dummy bulk write command request that contains all the common
     // fields and serialize it to get the base command size.
     // TODO SERVER-78301: Re-evaluate this estimation method and consider switching to a more

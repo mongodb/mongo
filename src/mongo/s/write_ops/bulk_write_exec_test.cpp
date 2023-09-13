@@ -76,17 +76,21 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/mock_ns_targeter.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
@@ -1446,6 +1450,484 @@ TEST_F(BulkWriteOpTest, TestBulkWriteBatchSplittingLargeBaseCommandSize) {
     auto remainingTargeted = targeted.begin()->second->getWrites().size();
     // We should have been able to target all the remaining writes in a second batch.
     ASSERT_EQ(targetedSoFar + remainingTargeted, bigReq.getOps().size());
+}
+
+class BulkWriteOpLocalErrorTest : public ServiceContextTest {
+protected:
+    BulkWriteOpLocalErrorTest() {
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+        targeters.push_back(initTargeterFullRange(kNss1, kEndpoint1));
+        targeters.push_back(initTargeterFullRange(kNss2, kEndpoint2));
+    }
+
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx;
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+
+    BulkWriteCommandRequest request =
+        BulkWriteCommandRequest({BulkWriteInsertOp(0, BSON("x" << 1)),
+                                 BulkWriteInsertOp(0, BSON("x" << 2)),
+                                 BulkWriteInsertOp(1, BSON("x" << 1)),
+                                 BulkWriteInsertOp(1, BSON("x" << 2))},
+                                {NamespaceInfoEntry(kNss1), NamespaceInfoEntry(kNss2)});
+
+
+    // Set up state such that targeting for an ordered bulkWrite would take two rounds:
+    // - First round: a child batch targeting shard1 with the writes to nss1
+    // - Second round: a child batch targeting shard2 with the writes to nss2
+    // And so that targeting for an unordered bulkWrite would take one round:
+    // - 2 child batches, one targeting shard1 with the writes to nss1 and one targeting shard2 with
+    // the writes to nss2.
+    static const inline ShardId kShardId1 = ShardId("shard1");
+    static const inline ShardId kShardId2 = ShardId("shard2");
+    static const inline NamespaceString kNss1 =
+        NamespaceString::createNamespaceString_forTest("foo.bar");
+    static const inline NamespaceString kNss2 =
+        NamespaceString::createNamespaceString_forTest("bar.foo");
+    static const inline ShardEndpoint kEndpoint1 = ShardEndpoint(
+        kShardId1, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    static const inline ShardEndpoint kEndpoint2 = ShardEndpoint(
+        kShardId2, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    // Various mock error responses used for testing.
+    static const inline AsyncRequestsSender::Response kCallbackCanceledResponse =
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(ErrorCodes::CallbackCanceled,
+                                                        "simulating callback canceled"),
+            boost::none};
+    static const inline AsyncRequestsSender::Response kNetworkErrorResponse =
+        AsyncRequestsSender::Response{kShardId1,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          ErrorCodes::NetworkTimeout, "simulating network error"),
+                                      boost::none};
+    static const inline AsyncRequestsSender::Response kInterruptedErrorResponse =
+        AsyncRequestsSender::Response{kShardId1,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          ErrorCodes::Interrupted, "simulating interruption"),
+                                      boost::none};
+
+    TargetedBatchMap targetOp(BulkWriteOp& op, bool ordered) const {
+        TargetedBatchMap targeted;
+        ASSERT_OK(op.target(targeters, false, targeted));
+
+        // These assertions are redundant to re-run on every test execution but are here to
+        // illustrate the expected state after targeting.
+        if (ordered) {
+            ASSERT_EQUALS(targeted.size(), 1);
+            ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 2u);
+            // We should have targeted only the first 2 writes.
+            ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+            ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+            ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+            ASSERT_EQ(op.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+        } else {
+            ASSERT_EQUALS(targeted.size(), 2);
+            ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 2u);
+            ASSERT_EQUALS(targeted[kShardId2]->getWrites().size(), 2u);
+            // We should have targeted all the writes.
+            ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+            ASSERT_EQ(op.getWriteOp_forTest(1).getWriteState(), WriteOpState_Pending);
+            ASSERT_EQ(op.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+            ASSERT_EQ(op.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+        }
+
+        return targeted;
+    }
+};
+
+// Test a local shutdown error (i.e. because mongos is shutting down.)
+TEST_F(BulkWriteOpLocalErrorTest, LocalShutdownError) {
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate a shutdown error.
+    auto shutdownStatus = StatusWith<executor::RemoteCommandResponse>(
+        ErrorCodes::ShutdownInProgress, "simulating shutdown");
+    auto shutdownResponse = AsyncRequestsSender::Response{kShardId1, shutdownStatus, boost::none};
+    ASSERT_THROWS_CODE(
+        bulkWriteOp.processLocalChildBatchError(*targeted.begin()->second, shutdownResponse),
+        DBException,
+        ErrorCodes::ShutdownInProgress);
+
+    // In practice, we expect the thrown error to propagate up past the scope where the op is
+    // created. But to be thorough the assertions below check that our bookkeeping when
+    // encountering this error is correct.
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    // Since we saw an execution-aborting error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+}
+
+// Test a local CallbackCanceled error that is received when not in shutdown.
+TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // We have to set the shutdown flag in order for a CallbackCanceled error to be treated as a
+    // shutdown error. Since we have not set the flag this should be treated like any other
+    // local error.
+    bulkWriteOp.processLocalChildBatchError(*targeted.begin()->second, kCallbackCanceledResponse);
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    // Since we are ordered and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first op should be the cancellation error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+              kCallbackCanceledResponse.swResponse.getStatus());
+    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus(), kCallbackCanceledResponse.swResponse.getStatus());
+    ASSERT_EQ(numErrors, 1);
+}
+
+// Test a local CallbackCanceled error received during shutdown.
+// This isn't truly a death test but is written as one in order to isolate test execution in its
+// own process. This is needed because otherwise calling shutdownNoTerminate() would lead any
+// future tests run in the same process to also have the shutdown flag set.
+DEATH_TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorInShutdown, "12345") {
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // We have to set the shutdown flag in order for a CallbackCanceled error to be treated as a
+    // shutdown error.
+    shutdownNoTerminate();
+
+    // We expect the error to be raised as a top-level error.
+    ASSERT_THROWS_CODE(bulkWriteOp.processLocalChildBatchError(*targeted.begin()->second,
+                                                               kCallbackCanceledResponse),
+                       DBException,
+                       ErrorCodes::CallbackCanceled);
+
+    // In practice, we expect the thrown error to propagate up past the scope where the op is
+    // created. But to be thorough the assertions below check that our bookkeeping when
+    // encountering this error is correct.
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    // We should have reset the second op from the batch to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    // These were never targeted and so are still ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    // Since we saw an execution-aborting error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // Trigger abnormal exit to satisfy the DEATH_TEST checks.
+    fassertFailed(12345);
+}
+
+// Ordered bulkWrite: test handling of a local network error.
+TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorOrdered) {
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, true);
+
+    // Simulate a network error.
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse);
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    // We never targeted these so they should still be ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    // Since we are ordered and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first op should be the network error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+              kNetworkErrorResponse.swResponse.getStatus());
+    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
+    ASSERT_EQ(numErrors, 1);
+}
+
+// Unordered bulkWrite: test handling of a local network error.
+TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
+    request.setOrdered(false);
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate a network error.
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse);
+
+    // For unordered writes, we will treat the batch error as a failure of all the writes in the
+    // batch.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+    // These should still be pending.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+
+    // Since we are unordered and have outstanding responses, we should not be finished.
+    ASSERT(!bulkWriteOp.isFinished());
+
+    // Simulate successful response to the second batch.
+    bulkWriteOp.noteChildBatchResponse(
+        *targeted[kShardId2], {BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, boost::none);
+
+    // We should now be finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first two ops should be the network error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+              kNetworkErrorResponse.swResponse.getStatus());
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
+              kNetworkErrorResponse.swResponse.getStatus());
+    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 4);
+    ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
+    ASSERT_EQ(replies[1].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
+    ASSERT_OK(replies[2].getStatus());
+    ASSERT_OK(replies[3].getStatus());
+    ASSERT_EQ(numErrors, 2);
+}
+
+// Ordered bulkWrite: Test handling of a local TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnOrdered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate a network error (which is a transient transaction error.)
+    // We expect the error to be raised as a top-level error.
+    ASSERT_THROWS_CODE(
+        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
+        DBException,
+        ErrorCodes::NetworkTimeout);
+
+    // In practice, we expect the thrown error to propagate up past the scope where the op is
+    // created. But to be thorough the assertions below check that our bookkeeping when
+    // encountering this error is correct.
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    // Since we are in a txn and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+}
+
+// Ordered bulkWrite: Test handling of a local non-TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnOrdered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate an interruption error (which is not a TransientTransactionError.)
+    bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    // Since we are both ordered and in a txn and we saw an error, the command should be
+    // considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first op should be the interruption error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+              kInterruptedErrorResponse.swResponse.getStatus());
+    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
+    ASSERT_EQ(numErrors, 1);
+}
+
+// Unordered bulkWrite: Test handling of a local TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnUnordered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    // Case 1: we receive the failed batch response with other batches outstanding.
+    {
+        request.setOrdered(false);
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate a network error (which is a transient transaction error.)
+        // We expect the error to be raised as a top-level error.
+        ASSERT_THROWS_CODE(
+            bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
+            DBException,
+            ErrorCodes::NetworkTimeout);
+
+        // In practice, we expect the thrown error to propagate up past the scope where the op is
+        // created. But to be thorough the assertions below check that our bookkeeping when
+        // encountering this error is correct.
+
+        // For unordered writes, we will treat the batch error as a failure of all of the writes
+        // in the batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // Since these were targeted but we didn't receive a response yet they should still be
+        // Pending.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+
+        // Since we saw an execution-aborting error, the command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+    }
+
+    // Case 2: we receive the failed batch response after receiving successful response for other
+    // batch.
+    {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate successful response to second batch.
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                           {
+                                               BulkWriteReplyItem(0),
+                                               BulkWriteReplyItem(1),
+                                           },
+                                           boost::none);
+
+        // Simulate a network error (which is a transient transaction error.)
+        // We expect the error to be raised as a top-level error.
+        ASSERT_THROWS_CODE(
+            bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kNetworkErrorResponse),
+            DBException,
+            ErrorCodes::NetworkTimeout);
+
+        // In practice, we expect the thrown error to propagate up past the scope where the op is
+        // created. But to be thorough the assertions below check that our bookkeeping when
+        // encountering this error is correct.
+
+        // For unordered writes, we will treat the batch error as a failure of all of the writes
+        // in the batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // We already received successful responses for these writes.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
+
+        // The command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+    }
+}
+
+// Unordered bulkWrite: Test handling of a local non-TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    // Case 1: we receive the failed batch response with other batches outstanding.
+    {
+        request.setOrdered(false);
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate an interruption error (which is not a TransientTransactionError.)
+        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+
+        // For unordered writes, we will treat the error as a failure of all the writes in the
+        // batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // We didn't receive responses for these yet.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+        // However, since we are in a txn and we saw an execution-aborting error, the command should
+        // be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+
+        // The error for the first two ops should be the interruption error.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+                  kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
+                  kInterruptedErrorResponse.swResponse.getStatus());
+
+        auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+        ASSERT_EQ(replies.size(), 2);
+        ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_EQ(numErrors, 2);
+    }
+
+    // Case 2: we receive the failed batch response after receiving successful response for other
+    // batch.
+    {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate successful response to second batch.
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                           {
+                                               BulkWriteReplyItem(0),
+                                               BulkWriteReplyItem(1),
+                                           },
+                                           boost::none);
+
+        // Simulate an interruption error (which is not a TransientTransactionError.)
+        bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
+
+        // For unordered writes, we will treat the error as a failure of all the writes in the
+        // batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
+        // The command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+
+        // The error for the first two ops should be the interruption error.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
+                  kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
+                  kInterruptedErrorResponse.swResponse.getStatus());
+
+        auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+        ASSERT_EQ(replies.size(), 4);
+        ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
+        ASSERT_OK(replies[2].getStatus());
+        ASSERT_OK(replies[3].getStatus());
+        ASSERT_EQ(numErrors, 2);
+    }
 }
 
 /**

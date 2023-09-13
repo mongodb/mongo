@@ -66,12 +66,6 @@ enum WriteOpState {
 
     // Op failed with some error
     WriteOpState_Error,
-
-    // Op was cancelled before sending (only child write ops can be cancelled)
-    WriteOpState_Cancelled,
-
-    // Catch-all error state.
-    WriteOpState_Unknown
 };
 
 /**
@@ -180,7 +174,7 @@ public:
      * Can only be called when state is _Pending, or is a no-op if called when the state
      * is still _Ready (and therefore no writes are pending).
      */
-    void cancelWrites();
+    void resetWriteToReady();
 
     /**
      * Marks the targeted write as finished for this write op. Optionally, if this write is part of

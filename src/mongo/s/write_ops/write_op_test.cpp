@@ -441,12 +441,10 @@ TEST_F(WriteOpTest, CancelSingle) {
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
 
-    writeOp.cancelWrites();
+    writeOp.resetWriteToReady();
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }
-
-// WriteOp makeWriteOp(BulkWriteCommandRequest& req, int32_t idx) {}
 
 BulkWriteReplyItem makeBulkWriteReplyItem(int32_t idx,
                                           boost::optional<int32_t> n,

@@ -303,7 +303,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                         // NOTE: We may repeatedly cancel a write op here, but that's fast and we
                         // want to cancel before erasing the TargetedWrite* (which owns the
                         // cancelled targeting info) for reporting reasons.
-                        writeOps[write->writeOpRef.first].cancelWrites();
+                        writeOps[write->writeOpRef.first].resetWriteToReady();
                     }
 
                     it = batchMap.erase(it);
@@ -337,7 +337,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
                 // Send out what we have, but don't record an error yet, since there may be an error
                 // in the writes before this point.
-                writeOp.cancelWrites();
+                writeOp.resetWriteToReady();
                 break;
             }
         }
@@ -347,7 +347,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
             if (isNewBatchRequiredOrdered(writes, batchMap)) {
-                writeOp.cancelWrites();
+                writeOp.resetWriteToReady();
                 break;
             }
         }
@@ -356,7 +356,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
 
         if (wouldMakeBatchesTooBig(writes, estWriteSizeBytes, batchMap)) {
             invariant(!batchMap.empty());
-            writeOp.cancelWrites();
+            writeOp.resetWriteToReady();
             break;
         }
 
@@ -364,7 +364,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         // the same shard with a different shardVersion.
         if (!ordered &&
             isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
-            writeOp.cancelWrites();
+            writeOp.resetWriteToReady();
             break;
         }
 
@@ -372,7 +372,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
             opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
             if (!batchMap.empty()) {
-                writeOp.cancelWrites();
+                writeOp.resetWriteToReady();
                 break;
             } else {
                 writeType = WriteType::TimeseriesRetryableUpdate;
@@ -398,7 +398,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             if (!isMultiWrite && useTwoPhaseWriteProtocol) {
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
-                    writeOp.cancelWrites();
+                    writeOp.resetWriteToReady();
                     break;
                 } else {
                     writeType = WriteType::WithoutShardKeyOrId;
@@ -733,7 +733,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             } else {
                 // We didn't actually apply this write - cancel so we can retarget
                 dassert(writeOp.getNumTargeted() == 1u);
-                writeOp.cancelWrites();
+                writeOp.resetWriteToReady();
             }
         } else {
             writeOp.noteWriteError(*write, *writeError);

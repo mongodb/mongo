@@ -267,7 +267,7 @@ void WriteOp::_updateOpState() {
     _childOps.clear();
 }
 
-void WriteOp::cancelWrites() {
+void WriteOp::resetWriteToReady() {
     invariant(_state == WriteOpState_Pending || _state == WriteOpState_Ready);
     _state = WriteOpState_Ready;
     _childOps.clear();

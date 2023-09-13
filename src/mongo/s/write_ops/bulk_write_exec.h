@@ -45,6 +45,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_op.h"
@@ -90,18 +91,20 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
  * 0) Client request comes in, a BulkWriteOp is initialized.
  *
  * 1a) One or more ops in the bulkWrite are targeted, resulting in TargetedWriteBatches for these
- *     ops.
- * 1b) There are targeting errors, and the batch must be retargeted after refreshing the NSTargeter.
+ *     ops. OR
+ * 1b) There are targeting errors, and the ops must be retargeted after refreshing the
+ *     NSTargeter(s).
  *
- * 2) Child bulkWrite requests are built for each TargetedWriteBatch before sending.
+ * 2) Child bulkWrite requests (referred to in code as child batches) are built for each
+ *    TargetedWriteBatch before sending.
  *
- * 3) Responses for sent TargetedWriteBatches are noted, errors are stored and aggregated
- *    per-write-op. Errors the caller is interested in are returned.
+ * 3) Responses for sent child batches are noted, and errors are stored and aggregated per-write-op.
+ *    Certain errors are returned immediately (e.g. any error in a transaction).
  *
  * 4) If the whole bulkWrite is not finished, goto 0.
  *
- * 5) When all responses come back for all write ops, errors are aggregated and returned in
- *    a client response.
+ * 5) When all responses come back for all write ops, success responses and errors are aggregated
+ *    and returned in a client response.
  *
  */
 class BulkWriteOp {
@@ -152,21 +155,38 @@ public:
     int numWriteOpsIn(WriteOpState opState) const;
 
     /**
-     * Aborts any further writes in the batch with the provided error status.  There must be no
-     * pending ops awaiting results when a batch is aborted.
-     *
-     * Batch is finished immediately after aborting.
+     * Marks any further writes for this BulkWriteOp as failed with the provided error status. There
+     * must be no pending ops awaiting results when this method is called.
      */
-    void abortBatch(const Status& status);
+    void noteErrorForRemainingWrites(const Status& status);
 
     /**
      * Processes the response to a TargetedWriteBatch. The response is captured by the vector of
      * BulkWriteReplyItems. Sharding related errors are then grouped by namespace and captured in
      * the map passed in.
      */
-    void noteBatchResponse(TargetedWriteBatch& targetedBatch,
-                           const std::vector<BulkWriteReplyItem>& replyItems,
-                           stdx::unordered_map<NamespaceString, TrackedErrors>& errorsPerNamespace);
+    void noteChildBatchResponse(
+        const TargetedWriteBatch& targetedBatch,
+        const std::vector<BulkWriteReplyItem>& replyItems,
+        boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
+
+
+    /**
+     * Records the error contained in the given status for write(s) in the given targetedBatch.
+     * This is used in cases where we get a top-level error in response to a batch sent to a shard
+     * but that we do not want to return the top-level error directly to the user.
+     * Instead, we treat the error as a failure of the relevant write(s) within the batch: for
+     * unordered writes that is all writes in the batch, and for ordered writes it is only the first
+     * write (since we would stop after that failed and not attempt execution of further writes.)
+     */
+    void noteChildBatchError(const TargetedWriteBatch& targetedBatch, const Status& status);
+
+    /**
+     * Processes a local error encountered while trying to send a child batch to a shard. This could
+     * be e.g. a network error or an error due to this mongos shutting down.
+     */
+    void processLocalChildBatchError(const TargetedWriteBatch& batch,
+                                     const AsyncRequestsSender::Response& response);
 
     /**
      * Processes the response to a single WriteOp at index opIdx directly and cleans up all
@@ -194,9 +214,10 @@ public:
 
     /**
      * Calculates an estimate of the size, in bytes, required to store the common fields that will
-     * go into each sub-batch command sent to a shard, i.e. all fields besides the actual write ops.
+     * go into each child batch command sent to a shard, i.e. all fields besides the actual write
+     * ops.
      */
-    int getBaseBatchCommandSizeEstimate() const;
+    int getBaseChildBatchCommandSizeEstimate() const;
 
     const BulkWriteCommandRequest& getClientRequest() const {
         return _clientRequest;
@@ -221,6 +242,13 @@ private:
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};
     const bool _isRetryableWrite{false};
+
+    // Set to true if we encountered an error that prevents us from executing the rest of the
+    // bulkWrite. Note this does *not* include cases where we saw an error for an individual
+    // statement in an ordered bulkWrite, but instead covers these cases:
+    // - Any error encountered while in a transaction.
+    // - A local error indicating that this process is shutting down.
+    bool _aborted = false;
 };
 
 /**
