@@ -65,6 +65,7 @@
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -248,8 +249,52 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     queryStatsStoreTwo.forEach(
         [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
     ASSERT_EQ(numKeys, 0);
+}
 
-    // TODO SERVER-79794 test if writing a queryShape >= 16 MB to the store triggers a failure.
+TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+    FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
+    // This creates a query that is just below the 16 MB memory limit.
+    int limit = 225500;
+    BSONObjBuilder bob;
+    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
+    for (int i = 1; i <= limit; i++) {
+        BSONObjBuilder childrenBob;
+        childrenBob.append("x", BSON("$lt" << i << "$gte" << i));
+        andBob.append(childrenBob.obj());
+    }
+    andBob.doneFast();
+    fcr.setFilter(bob.obj());
+    auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
+    auto opCtx = makeOperationContext();
+    auto parsedFindPair =
+        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcrCopy)));
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
+    RAIIServerParameterControllerForTest queryKnobController{"internalQueryStatsRateLimit", -1};
+
+    auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
+    globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
+
+    // The shapification process will bloat the input query over the 16 MB memory limit. Assert that
+    // calling registerRequest() doesn't throw and that the opDebug isn't registered with a key hash
+    // (thus metrics won't be tracked for this query).
+    ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
+        opCtx.get(),
+        nss,
+        [&]() {
+            BSONObj queryShape = query_shape::extractQueryShape(
+                *parsedFindPair.second,
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                parsedFindPair.first);
+            return std::make_unique<query_stats::FindKeyGenerator>(
+                parsedFindPair.first,
+                *parsedFindPair.second,
+                std::move(queryShape),
+                query_shape::CollectionType::kCollection);
+        },
+        /*requiresFullQueryStatsFeatureFlag*/ false));
+    auto& opDebug = CurOp::get(*opCtx)->debug();
+    ASSERT_EQ(opDebug.queryStatsStoreKeyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

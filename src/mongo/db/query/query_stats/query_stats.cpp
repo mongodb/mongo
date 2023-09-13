@@ -47,7 +47,6 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/query/query_stats/util.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/util/memory_util.h"
@@ -99,59 +98,6 @@ size_t getQueryStatsStoreSize() {
     return capQueryStatsStoreSize(requestedSize);
 }
 
-/**
- * A manager for the queryStats store allows a "pointer swap" on the queryStats store itself. The
- * usage patterns are as follows:
- *
- * - Updating the queryStats store uses the `getQueryStatsStore()` method. The queryStats store
- *   instance is obtained, entries are looked up and mutated, or created anew.
- * - The queryStats store is "reset". This involves atomically allocating a new instance, once
- * there are no more updaters (readers of the store "pointer"), and returning the existing
- * instance.
- */
-class QueryStatsStoreManager {
-public:
-    template <typename... QueryStatsStoreArgs>
-    QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
-        : _queryStatsStore(std::make_unique<QueryStatsStore>(cacheSize, numPartitions)),
-          _maxSize(cacheSize) {}
-
-    /**
-     * Acquire the instance of the queryStats store.
-     */
-    QueryStatsStore& getQueryStatsStore() {
-        return *_queryStatsStore;
-    }
-
-    size_t getMaxSize() {
-        return _maxSize;
-    }
-
-    /**
-     * Resize the queryStats store and return the number of evicted
-     * entries.
-     */
-    size_t resetSize(size_t cacheSize) {
-        _maxSize = cacheSize;
-        return _queryStatsStore->reset(cacheSize);
-    }
-
-private:
-    std::unique_ptr<QueryStatsStore> _queryStatsStore;
-
-    /**
-     * Max size of the queryStats store. Tracked here to avoid having to recompute after it's
-     * divided up into partitions.
-     */
-    size_t _maxSize;
-};
-
-const auto queryStatsStoreDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
-
-const auto queryStatsRateLimiter =
-    ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
-
 class TelemetryOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
@@ -187,7 +133,6 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
         auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
-
         // Initially the queryStats store used the same number of partitions as the plan cache, that
         // is the number of cpu cores. However, with performance investigation we found that when
         // the size of the partitions was too large, it took too long to copy out and read one
@@ -292,8 +237,21 @@ void registerRequest(OperationContext* opCtx,
                     "collection"_attr = collection);
         return;
     }
-
-    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    // There are a few cases where a query shape can be larger than the original query. For example,
+    // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
+    // an input query has thousands of clauses, the cumulative bloat that shapification adds results
+    // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
+    // original query from queryStats metrics collection and let it execute normally.
+    try {
+        opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        LOGV2_DEBUG(7979400,
+                    1,
+                    "Query Stats shapification has exceeded the 16 MB memory limit. Metrics will "
+                    "not be collected ");
+        queryStatsStoreWriteErrorsMetric.increment();
+        return;
+    }
     opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
