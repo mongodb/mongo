@@ -129,7 +129,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryStatsKeyGenerator(
           std::move(CurOp::get(operationUsingCursor)->debug().queryStatsKeyGenerator)),
       _shouldOmitDiagnosticInformation(
-          CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
+          CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);

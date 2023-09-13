@@ -424,9 +424,6 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
-
-    // Flag to decide if diagnostic information should be omitted.
-    bool shouldOmitDiagnosticInformation{false};
 };
 
 /**
@@ -998,6 +995,13 @@ public:
         _tickSource = tickSource;
     }
 
+    void setShouldOmitDiagnosticInformation_inlock(WithLock, bool shouldOmitDiagnosticInfo) {
+        _shouldOmitDiagnosticInformation = shouldOmitDiagnosticInfo;
+    }
+    bool getShouldOmitDiagnosticInformation() const {
+        return _shouldOmitDiagnosticInformation;
+    }
+
 private:
     class CurOpStack;
 
@@ -1089,6 +1093,9 @@ private:
     // We cannot use std::atomic in OpDebug since it is not copy assignable, but using a non-atomic
     // allows for a data race between stopWaitForWriteConcernTimer and curop::reportState.
     std::atomic<Milliseconds> _atomicWaitForWriteConcernDurationMillis{Milliseconds{0}};  // NOLINT
+
+    // Flag to decide if diagnostic information should be omitted.
+    bool _shouldOmitDiagnosticInformation{false};
 };
 
 }  // namespace mongo

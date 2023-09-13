@@ -625,8 +625,11 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
     // Handle FLE inserts.
     if (nsEntry.getEncryptionInformation().has_value()) {
-        // Flag set here and in fle_crud.cpp since this only executes on a mongod.
-        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+        {
+            // Flag set here and in fle_crud.cpp since this only executes on a mongod.
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+        }
 
         auto processed = attemptGroupedFLEInserts(opCtx, req, firstOpIdx, numOps, out);
         if (processed) {
@@ -789,7 +792,10 @@ bool attemptProcessFLEUpdate(OperationContext* opCtx,
                              size_t currentOpIdx,
                              BulkWriteReplies& responses,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     write_ops::UpdateCommandRequest updateCommand =
         bulk_write_common::makeUpdateCommandRequestFromUpdateOp(op, req, currentOpIdx);
@@ -830,7 +836,10 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
                              size_t currentOpIdx,
                              BulkWriteReplies& responses,
                              const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     write_ops::DeleteCommandRequest deleteRequest =
         bulk_write_common::makeDeleteCommandRequestForFLE(opCtx, op, req, nsInfoEntry);

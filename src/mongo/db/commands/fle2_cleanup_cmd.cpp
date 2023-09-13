@@ -140,7 +140,10 @@ void dropQEStateCollection(OperationContext* opCtx, const NamespaceString& nss) 
  */
 CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                                         const CleanupStructuredEncryptionData& request) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     uassert(7618803,
             str::stream() << "Feature flag `FLE2CleanupCommand` must be enabled to run "

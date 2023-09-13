@@ -618,7 +618,10 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("ClusterFindAndModify"), request.body);
         if (shouldDoFLERewrite(findAndModifyRequest)) {
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            }
 
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
             return newRequest.first.toBSON(request.body);

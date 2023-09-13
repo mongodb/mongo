@@ -87,7 +87,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
-      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
+      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
       _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
@@ -107,7 +107,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
-      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
+      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
       _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||

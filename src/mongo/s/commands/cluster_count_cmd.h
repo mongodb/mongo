@@ -122,8 +122,8 @@ public:
                 if (!countRequest.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLECountS(opCtx, nss, &countRequest);
                 }
-
-                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
             }
 
             // We only need to factor in the skip value when sending to the shards if we
@@ -240,7 +240,8 @@ public:
         if (shouldDoFLERewrite(countRequest)) {
             processFLECountS(opCtx, nss, &countRequest);
 
-            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
         BSONObj targetingQuery = countRequest.getQuery();

@@ -450,8 +450,11 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& insertRequest,
     GetTxnCallback getTxns) {
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     auto documents = insertRequest.getDocuments();
 
     std::vector<write_ops::WriteError> writeErrors;
@@ -522,9 +525,11 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     {
         auto deletes = deleteRequest.getDeletes();
         uassert(6371302, "Only single document deletes are permitted", deletes.size() == 1);
+
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
     }
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
@@ -619,9 +624,11 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                         write_ops::UpdateModification::Type::kReplacement);
 
         assertTransactionCompatibilty(opCtx);
+
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
     }
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
@@ -867,7 +874,11 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<ReplyType> processCallback) {
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
+
     validateFindAndModifyRequest(findAndModifyRequest);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
@@ -1156,7 +1167,10 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch) {
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
         return FLEBatchResult::kNotProcessed;
@@ -1245,7 +1259,10 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         return expCtx;
     };
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         auto deleteRequest = request.getDeleteRequest();
@@ -1292,7 +1309,11 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     assertTransactionCompatibilty(expCtx->opCtx);
 
-    CurOp::get(expCtx->opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*expCtx->opCtx->getClient());
+        CurOp::get(expCtx->opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
+
     auto edcNss = findAndModifyRequest.getNamespace();
     auto ei = findAndModifyRequest.getEncryptionInformation().value();
 
@@ -1482,7 +1503,10 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
     }
 
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+    }
 
     // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as
     // findAndModify so query can do any necessary transformations. But on the nested call, CRUD
