@@ -864,6 +864,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+        if (args.updateArgs->mustCheckExistenceForInsertOperations) {
+            operation.setCheckExistenceForDiffInsert(true);
+        }
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
@@ -925,6 +928,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+        if (args.updateArgs->mustCheckExistenceForInsertOperations) {
+            operation.setCheckExistenceForDiffInsert(true);
+        }
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
