@@ -767,6 +767,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             shardingWriteRouter.getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue_BackwardsCompatible(args.updateArgs->source ==
                                                            OperationSource::kFromMigrate);
+        if (args.updateArgs->mustCheckExistenceForInsertOperations) {
+            operation.setCheckExistenceForDiffInsert(true);
+        }
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
