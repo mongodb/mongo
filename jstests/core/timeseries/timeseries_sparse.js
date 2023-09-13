@@ -2,9 +2,10 @@
  * Typically, time-series collections use measurements that always contain data for every field.
  * This test provides coverage for when this is not the case.
  * @tags: [
- *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
- *   # writes splitting between two primaries, and thus different buckets.
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
+ *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  * ]

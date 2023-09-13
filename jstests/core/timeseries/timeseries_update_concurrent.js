@@ -9,9 +9,10 @@
  *   # This test only synchronizes updates on the primary.
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
- *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
- *   # writes splitting between two primaries, and thus different buckets.
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns and tenant
+ *   # migrations may result in writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
+ *   tenant_migration_incompatible,
  *   # Specifically testing multi-updates.
  *   requires_multi_updates,
  *   # We need a timeseries collection.
