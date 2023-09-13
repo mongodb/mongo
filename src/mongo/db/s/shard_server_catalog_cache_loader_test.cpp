@@ -42,8 +42,10 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -74,15 +76,23 @@ using unittest::assertGet;
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo.bar");
-const std::string kPattern = "_id";
+const KeyPattern kKeyPattern = KeyPattern(BSON("a" << 1));
+const KeyPattern kKeyPattern2 = KeyPattern(BSON("a" << 1 << "b" << 1));
 const ShardId kShardId = ShardId("shard0");
 
 class ShardServerCatalogCacheLoaderTest : public ShardServerTestFixture {
 public:
     /**
-     * Returns five chunks using collectionPlacementVersion as a starting version.
+     * Returns five chunks using collectionPlacementVersion as a starting version, and
+     * shardKeyPattern 'kKeyPattern'.
      */
     vector<ChunkType> makeFiveChunks(const ChunkVersion& collectionPlacementVersion);
+
+    /**
+     * Returns five chunks using collectionPlacementVersion as a starting version, and
+     * shardKeyPattern 'kKeyPattern2'.
+     */
+    vector<ChunkType> makeFiveRefinedChunks(const ChunkVersion& collectionPlacementVersion);
 
     /**
      * Returns a chunk update diff GTE 'collectionPlacementVersion' for the chunks created by
@@ -100,7 +110,8 @@ public:
     /**
      * This helper makes a CollectionType with the current _maxCollPlacementVersion.
      */
-    CollectionType makeCollectionType(const ChunkVersion& collPlacementVersion);
+    CollectionType makeCollectionType(const ChunkVersion& collPlacementVersion,
+                                      const KeyPattern& shardKeyPattern = kKeyPattern);
 
     /**
      * Sets up the _shardLoader with the results of makeFiveChunks().
@@ -109,8 +120,6 @@ public:
 
     void refreshCollectionEpochOnRemoteLoader();
     void refreshDatabaseOnRemoteLoader();
-
-    const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 
     CatalogCacheLoaderMock* _remoteLoaderMock;
     std::unique_ptr<ShardServerCatalogCacheLoader> _shardLoader;
@@ -149,6 +158,39 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
         BSON("a" << MINKEY), BSON("a" << 10), BSON("a" << 50), BSON("a" << 100), BSON("a" << 200)};
     BSONObj maxs[] = {
         BSON("a" << 10), BSON("a" << 50), BSON("a" << 100), BSON("a" << 200), BSON("a" << MAXKEY)};
+
+    for (int i = 0; i < 5; ++i) {
+        collPlacementVersion.incMajor();
+
+        ChunkType chunk;
+        chunk.setCollectionUUID(uuid);
+        chunk.setMin(mins[i]);
+        chunk.setMax(maxs[i]);
+        chunk.setShard(kShardId);
+        chunk.setVersion(collPlacementVersion);
+
+        chunks.push_back(chunk);
+    }
+
+    return chunks;
+}
+
+vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveRefinedChunks(
+    const ChunkVersion& collectionPlacementVersion) {
+    ChunkVersion collPlacementVersion(collectionPlacementVersion);
+    vector<ChunkType> chunks;
+    const UUID uuid = UUID::gen();
+
+    BSONObj mins[] = {BSON("a" << MINKEY << "b" << MINKEY),
+                      BSON("a" << 10 << "b" << MINKEY),
+                      BSON("a" << 50 << "b" << MINKEY),
+                      BSON("a" << 100 << "b" << MINKEY),
+                      BSON("a" << 200 << "b" << MINKEY)};
+    BSONObj maxs[] = {BSON("a" << 10 << "b" << MINKEY),
+                      BSON("a" << 50 << "b" << MINKEY),
+                      BSON("a" << 100 << "b" << MINKEY),
+                      BSON("a" << 200 << "b" << MINKEY),
+                      BSON("a" << MAXKEY << "b" << MAXKEY)};
 
     for (int i = 0; i < 5; ++i) {
         collPlacementVersion.incMajor();
@@ -220,13 +262,13 @@ ShardServerCatalogCacheLoaderTest::makeCombinedOriginalFiveChunksAndThreeNewChun
 }
 
 CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
-    const ChunkVersion& collPlacementVersion) {
+    const ChunkVersion& collPlacementVersion, const KeyPattern& shardKeyPattern) {
     return {kNss,
             collPlacementVersion.epoch(),
             collPlacementVersion.getTimestamp(),
             Date_t::now(),
             UUID::gen(),
-            kKeyPattern};
+            shardKeyPattern};
 }
 
 std::pair<CollectionType, vector<ChunkType>>
@@ -547,6 +589,72 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
     // updates on metadata
     refreshCollectionEpochOnRemoteLoader();
     _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+}
+
+/**
+ * Refine shard key currently only changes the epoch and does not change the major/minor versions
+ * in the chunks. This test simulates a stepDown in the middle of making changes to the
+ * config.cache collections by the ShardServerCatalogCacheLoader after a refine shard key and makes
+ * sure that the shard will be able to reach the valid state on config.cache on the next refresh.
+ */
+TEST_F(ShardServerCatalogCacheLoaderTest, RecoverAfterPartiallyFlushedMetadata) {
+    // Initialize the cache and wait for it to be flushed to disk.
+    const auto initialCollAndChunks = setUpChunkLoaderWithFiveChunks();
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    // Do a refresh, that simulates the metadata after a refineCollectionShardKey (new
+    // epoch/timestamp and chunks with refined bounds). Wait for it to be flushed.
+    ChunkVersion collPlacementVersionWithNewEpoch({OID::gen(), Timestamp(2, 0)}, {1, 0});
+    CollectionType collectionTypeWithNewEpoch =
+        makeCollectionType(collPlacementVersionWithNewEpoch, kKeyPattern2);
+    vector<ChunkType> chunksWithNewEpoch = makeFiveRefinedChunks(collPlacementVersionWithNewEpoch);
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunksWithNewEpoch);
+
+    _shardLoader->getChunksSince(kNss, initialCollAndChunks.second.back().getVersion()).get();
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    // "Rollback" the persisted metadata as if only the update to config.cache.collections had
+    // happened, but not the update on config.cache.chunks.<nss>
+    ASSERT_OK(shardmetadatautil::updateShardChunks(operationContext(),
+                                                   kNss,
+                                                   initialCollAndChunks.second,
+                                                   initialCollAndChunks.first.getEpoch()));
+
+    ASSERT_OK(shardmetadatautil::updateShardCollectionsEntry(
+        operationContext(),
+        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(kNss)),
+        BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
+        false));
+
+    // Refresh again and expect the SSCCL to be able to recover and return the correct collection
+    // and chunks metadata (i.e. post-refine).
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionTypeWithNewEpoch);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunksWithNewEpoch);
+    const auto newChunks =
+        _shardLoader->getChunksSince(kNss, initialCollAndChunks.second.back().getVersion()).get();
+
+    ASSERT_BSONOBJ_EQ(kKeyPattern2.toBSON(), newChunks.shardKeyPattern);
+    ASSERT_EQ(5, newChunks.changedChunks.size());
+    ASSERT_BSONOBJ_EQ(chunksWithNewEpoch.front().getMin(),
+                      newChunks.changedChunks.front().getMin());
+
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    const auto newPersistedChunks = uassertStatusOK(
+        shardmetadatautil::readShardChunks(operationContext(),
+                                           kNss,
+                                           BSONObj(),
+                                           BSONObj(),
+                                           boost::none,
+                                           collPlacementVersionWithNewEpoch.epoch(),
+                                           collPlacementVersionWithNewEpoch.getTimestamp()));
+    ASSERT_EQ(5, newPersistedChunks.size());
+    ASSERT_BSONOBJ_EQ(chunksWithNewEpoch.front().getMin(), newPersistedChunks.front().getMin());
+
+    const auto persistedCollection =
+        uassertStatusOK(shardmetadatautil::readShardCollectionsEntry(operationContext(), kNss));
+    ASSERT_FALSE(persistedCollection.getRefreshing().value_or(false));
 }
 
 }  // namespace
