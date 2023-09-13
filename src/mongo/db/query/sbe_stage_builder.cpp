@@ -1361,7 +1361,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
-    sbe::value::SlotId outputSlotId = outputs.get(kResult);
+    sbe::value::SlotId childResultSlotId = outputs.get(kResult);
 
     if (!hasPartsWithCommonPrefix) {
         // Handle the case where we are using kResult and there are no common prefixes.
@@ -1384,7 +1384,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 auto makeIsNotArrayCheck = [&](const FieldPath& fp) {
                     return b.makeNot(generateArrayCheckForSort(
                         _state,
-                        b.makeVariable(outputSlotId),
+                        b.makeVariable(childResultSlotId),
                         fp,
                         0 /* level */,
                         &_frameIdGenerator,
@@ -1405,7 +1405,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     return b.makeBinaryOp(
                         sbe::EPrimBinary::cmp3w,
                         generateArrayCheckForSort(_state,
-                                                  b.makeVariable(outputSlotId),
+                                                  b.makeVariable(childResultSlotId),
                                                   fp,
                                                   0,
                                                   &_frameIdGenerator,
@@ -1443,7 +1443,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 std::make_pair(PlanStageSlots::kField, part.fieldPath->getFieldName(0)));
 
             std::unique_ptr<sbe::EExpression> sortExpr =
-                generateSortTraverse(sbe::EVariable{outputSlotId},
+                generateSortTraverse(sbe::EVariable{childResultSlotId},
                                      part.isAscending,
                                      collatorSlot,
                                      *part.fieldPath,
@@ -1489,11 +1489,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                       fullSortKeySlot,
                                       collatorSlot ? makeFunction(sortKeyGenerator,
                                                                   std::move(sortSpecExpr),
-                                                                  makeVariable(outputSlotId),
+                                                                  makeVariable(childResultSlotId),
                                                                   makeVariable(*collatorSlot))
                                                    : makeFunction(sortKeyGenerator,
                                                                   std::move(sortSpecExpr),
-                                                                  makeVariable(outputSlotId)));
+                                                                  makeVariable(childResultSlotId)));
 
         if (sortKeyGenerator == "generateSortKey") {
             // In this case generateSortKey() produces a mem-comparable KeyString so we use for
@@ -1533,6 +1533,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // sorting.
     auto forwardedSlots = getSlotsToForward(reqs, outputs);
 
+    outputs.clearNonRequiredSlots(reqs);
+    if (!reqs.has(kResult)) {
+        outputs.clear(kResult);
+    }
+
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
                                    std::move(orderBy),
@@ -1542,8 +1547,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                    sn->maxMemoryUsageBytes,
                                    _cq.getExpCtx()->allowDiskUse,
                                    root->nodeId());
-
-    outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -1771,6 +1774,10 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
     });
 
     auto childReqs = reqs.copy().clearAllFields().setFields(std::move(fields));
+    if (!additionalFields.empty()) {
+        childReqs.set(kResult);
+    }
+
     auto [stage, childOutputs] = build(pn->children[0].get(), childReqs);
     auto outputs = std::move(childOutputs);
 
@@ -3821,7 +3828,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     typedef std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> (
         SlotBasedStageBuilder::*builderCallback)(const QuerySolutionNode* root,
                                                  const PlanStageReqs& reqs);
-
     static const stdx::unordered_map<StageType, builderCallback> kStageBuilders = {
         {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},
         {STAGE_COUNT_SCAN, &SlotBasedStageBuilder::buildCountScan},
