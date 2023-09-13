@@ -417,4 +417,39 @@ Thus, in the presence of a memory tracker, uses
 of "stray" pointers will be detected.  Even without a memory tracker, uses of "stray" pointers into
 the freed storage will likely yield the overwritten bytes, and not the previously seen key or value.
 
+@section arch_random_cursor Random Cursor
+
+WiredTiger uses a pseudo-random algorithm for random cursors with the goal of deriving good random
+distributions while maintaining performance. Only the \c cursor->next function can be used to fetch
+a random record.
+
+The algorithm starts from the root page being descended down randomly using WiredTiger's
+random number generator (RNG) until we reach a leaf page. Once we find a leaf page, we then evaluate
+three different conditions that determine our next steps to grab a record from the leaf page.
+- First condition: If the page has a sufficiently large number of disk records (1000 or more entries), attempt to find a
+random visible disk record from the page using WiredTiger's RNG.
+- Second condition: Loop through all insert lists, and find one that is large (1000 or more entries), once found attempt
+to find a random insert record from the page.
+- Third condition: If the page has small amount of disk records (200 or less entries) or the leaf page is clean, attempt to
+find a random visible disk record from the page using WiredTiger's RNG.
+
+Failing all of the conditions, move to the previous or the next visible record in the btree
+a randomly decided number of times (between 0 - 250). Return the record that the cursor ends up stopping
+on. Note: The record can be fetched on a different leaf page than our original page that we descended
+down from.
+
+The algorithm doesn't guarantee a complete randomness to the user and can lead to skewed results depending on the
+underlying tree structure. Examples of instances that could typically lead to these skewed results are:
+- The tree structure is not balanced, which can happen as a result of the records in the btree not being
+uniformly distributed.
+- A high number of deleted items are within the btree.
+- A high number of invisible records in the transaction of the cursor.
+
+The \c next_random_sample_size configuration is an option that can be used for users looking for a better distribution.
+The concept is that the btree becomes divided into \c next_random_sample_size pieces, and each subsequent
+\c cursor->next call will retrieve a random record from the following divided piece. Internally, this
+configuration results in a slight modification to the original pseudo-random algorithm described at the start
+of this section. The process remains the same except for Step 1, where instead of performing a random descent,
+the algorithm will now start from the beginning of the btree and traverse a fixed number of times
+to next the divided segment.
 */
