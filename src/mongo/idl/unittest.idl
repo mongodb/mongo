@@ -798,6 +798,15 @@ structs:
                     variant: [int, string]
                 optional: true
 
+    one_variant_optional_with_generated_type:
+        description: UnitTest for an optional variant with an IDL-generated type
+        strict: false
+        fields:
+            value:
+                type:
+                    variant: [one_object_basic_type, string]
+                optional: true
+
     one_array_variant:
         description: UnitTest for an array of variant
         strict: false

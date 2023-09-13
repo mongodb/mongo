@@ -1501,6 +1501,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 beginning_str = '} else '
                 self._writer.indent()
             object_value = '%s::parse(ctxt, %s)' % (variant_type.cpp_type, bson_element)
+            if field.optional:
+                cpp_type_info = cpp_types.get_cpp_type(field)
+                object_value = '%s(%s)' % (cpp_type_info.get_getter_setter_type(), object_value)
 
             if field.chained_struct_field:
                 self._writer.write_line(
