@@ -4,6 +4,7 @@ import SCons
 import stat
 import urllib.request
 
+# TODO(SERVER-81038): remove /tmp/ bazel/bazelisk is added to the toolchain.
 # Note: The /tmp location is, ironically, temporary. We expect to implement Bazilisk-installation
 # as a standard part of the Bazel solution soon.
 BAZELISK_PATH = "/tmp/bazelisk"
@@ -69,6 +70,7 @@ def generate(env):
             raise Exception(
                 f'Bazel not supported on this architecture ({current_architecture}); supported architectures are: [{supported_architectures}]'
             )
+        # TODO(SERVER-81038): remove once bazel/bazelisk is added to the toolchain.
         if not os.path.exists("bazelisk"):
             urllib.request.urlretrieve(
                 "https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64",

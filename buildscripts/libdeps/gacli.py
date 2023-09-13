@@ -177,6 +177,12 @@ def setup_args_parser():
         "Find candidate nodes for merging by searching the graph for nodes with only one node which depends on them."
     )
 
+    parser.add_argument(
+        '--bazel-conv-candidates', action='store_true', default=False, help=
+        "Find candidate nodes ready for bazel conversion. This effectively means the node is currently not being built "
+        "with bazel and the node does not have any dependency nodes that are not being built in bazel."
+    )
+
     args = parser.parse_args()
 
     for arg_list in args.graph_paths:
@@ -280,6 +286,9 @@ def main():
 
     if args.indegree_one:
         analysis.append(libdeps_analyzer.InDegreeOne(libdeps_graph))
+
+    if args.bazel_conv_candidates:
+        analysis.append(libdeps_analyzer.BazelConversionCandidates(libdeps_graph))
 
     analysis += libdeps_analyzer.linter_factory(libdeps_graph, args.lint)
 

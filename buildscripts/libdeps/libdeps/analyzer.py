@@ -36,6 +36,7 @@ import json
 import inspect
 import functools
 from pathlib import Path
+import subprocess
 
 import networkx
 import cxxfilt
@@ -496,6 +497,75 @@ class InDegreeOne(Analyzer):
         """Add the indegree one list to the report."""
 
         report[DependsReportTypes.IN_DEGREE_ONE.name] = self.run()
+
+
+class BazelConversionCandidates(Analyzer):
+    """
+    Finds nodes ready for bazel conversion.
+    
+    This effectively means that they are not currently being built with bazel and
+    do not have any dependencies that are not being built with bazel.
+
+    Such nodes are ready to be built as bazel targets.
+    """
+
+    def get_bazel_converted_scons_targets(self):
+        # Extract a list of all bazel targets from the root of the tree.
+
+        # Note: //... is the bazel catch-all for referencing all targets in that directory. For
+        # example, //src/... will expand to include all targets under //src/.
+        # TODO(SERVER-81038): remove /tmp/ prefix once bazel/bazelisk is added to the toolchain.
+        proc = subprocess.run(["/tmp/bazelisk", "query", "//..."], capture_output=True, text=True,
+                              check=True)
+
+        # "bazel query" outputs how many packages were loaded in addition to the targets.
+        # Ignore lines not starting with // to skip over that line.
+        targets = [
+            self.simplify_bazel_target(line) for line in proc.stdout.split("\n")
+            if line.startswith("//")
+        ]
+        return targets
+
+    def simplify_bazel_target(self, bazel_target: str):
+        # Remove leading // and "src" to make comparison with scons targets simpler.
+        bazel_target = bazel_target.lstrip("/")
+        if bazel_target.startswith("src/"):
+            bazel_target = bazel_target[4:]
+        return bazel_target
+
+    def scons_target_to_bazel(self, scons_target: str):
+        # Remove library extensions, "lib" prefix, and replace final / with : to make it possible
+        # to compare scons target strings with bazel target strings.
+        if scons_target.endswith(".so") or scons_target.endswith(".a"):
+            scons_target = scons_target.rsplit(".", 1)[0]
+            scons_target = ":".join(scons_target.rsplit("/lib", 1))
+        else:
+            scons_target = ":".join(scons_target.rsplit("/", 1))
+        return scons_target
+
+    @schema_check(schema_version=1)
+    def run(self):
+        """Finds bazel conversion candidate nodes."""
+
+        # Exclude counting dependencies that already have bazel targets.
+        bazelfied_scons_targets = set(self.get_bazel_converted_scons_targets())
+
+        candidate_nodes = []
+        for node, _ in self._dependency_graph.nodes(data=True):
+            if self.scons_target_to_bazel(node) not in bazelfied_scons_targets:
+                non_bazelfied_deps = list(
+                    filter(
+                        lambda dep: self.scons_target_to_bazel(dep) not in bazelfied_scons_targets,
+                        self._dependency_graph[node]))
+                if len(non_bazelfied_deps) == 0:
+                    candidate_nodes.append(node)
+
+        return sorted(candidate_nodes)
+
+    def report(self, report):
+        """Adds scons target list to the report."""
+
+        report[DependsReportTypes.BAZEL_CONV_CANDIDATES.name] = self.run()
 
 
 class GraphPaths(Analyzer):
@@ -966,6 +1036,11 @@ class GaPrettyPrinter(GaPrinter):
                 for to_node in data:
                     print('[ ' + str(round(data[to_node]['efficiency'] * 100, 1)) + '% ] ' +
                           from_node + ' -> ' + to_node)
+
+        if DependsReportTypes.BAZEL_CONV_CANDIDATES.name in results:
+            print("\nNon-bazelfied nodes with no non-bazelfied dependencies:")
+            for node in results[DependsReportTypes.BAZEL_CONV_CANDIDATES.name]:
+                print(f"\t{node}")
 
         if LinterTypes.EFFICIENCY_LINT.name in results:
             data = results[LinterTypes.EFFICIENCY_LINT.name]
