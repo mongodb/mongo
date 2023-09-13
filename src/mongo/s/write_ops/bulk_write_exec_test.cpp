@@ -2085,6 +2085,32 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
     ASSERT_EQUALS(numErrors, 2);
 }
 
+TEST(BulkWriteTest, getApproximateSize) {
+    BulkWriteReplyItem item{0, Status::OK()};
+    ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
+
+    item = BulkWriteReplyItem{0, Status::OK()};
+    item.setUpserted(IDLAnyTypeOwned{BSON_ARRAY("_id" << 5)[0]});
+    ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
+
+    std::string reason{"test"};
+    item = BulkWriteReplyItem{0, Status{ErrorCodes::ExceededMemoryLimit, reason}};
+    ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
+
+    DuplicateKeyErrorInfo extra{BSON("key" << 1),
+                                BSON("value" << 1),
+                                BSON("collation"
+                                     << "simple"),
+                                {},
+                                boost::none};
+    BSONObjBuilder builder;
+    extra.serialize(&builder);
+    int extraSize = builder.obj().objsize();
+    ASSERT_GREATER_THAN(extraSize, 0);
+    item = BulkWriteReplyItem{0, Status{std::move(extra), reason}};
+    ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
+}
+
 // TODO(SERVER-72790): Test refreshing targeters on stale config errors, including the case where
 // NoProgressMade is returned if stale config retry doesn't make any progress after
 // kMaxRoundsWithoutProgress.

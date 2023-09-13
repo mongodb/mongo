@@ -75,6 +75,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -178,12 +179,12 @@ public:
             if (auto error = write_ops_exec::generateError(
                     opCtx, writes.results[i].getStatus(), idx, _numErrors)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
-                _replies.emplace_back(replyItem);
+                _addReply(replyItem);
                 _numErrors++;
             } else {
                 auto replyItem = BulkWriteReplyItem(idx);
                 replyItem.setN(writes.results[i].getValue().getN());
-                _replies.emplace_back(replyItem);
+                _addReply(replyItem);
             }
         }
     }
@@ -201,7 +202,7 @@ public:
         if (auto error = write_ops_exec::generateError(
                 opCtx, writeResult.results[0].getStatus(), currentOpIdx, _numErrors)) {
             auto replyItem = BulkWriteReplyItem(currentOpIdx, error.get().getStatus());
-            _replies.emplace_back(replyItem);
+            _addReply(replyItem);
             _numErrors++;
         } else {
             auto replyItem = BulkWriteReplyItem(currentOpIdx);
@@ -210,7 +211,7 @@ public:
             if (auto idElement = writeResult.results[0].getValue().getUpsertedId().firstElement()) {
                 replyItem.setUpserted(write_ops::Upserted(0, idElement));
             }
-            _replies.emplace_back(replyItem);
+            _addReply(replyItem);
         }
     }
 
@@ -232,7 +233,7 @@ public:
             _retriedStmtIds.emplace_back(*stmtId);
         }
 
-        _replies.emplace_back(replyItem);
+        _addReply(replyItem);
     }
 
     void addUpdateReply(size_t currentOpIdx,
@@ -270,7 +271,7 @@ public:
             _retriedStmtIds.emplace_back(*stmtId);
         }
 
-        _replies.emplace_back(replyItem);
+        _addReply(replyItem);
     }
 
     void addUpdateErrorReply(OperationContext* opCtx, size_t currentOpIdx, const Status& status) {
@@ -292,20 +293,25 @@ public:
         replyItem.setStatus(error.get().getStatus());
         replyItem.setOk(status.isOK() ? 1.0 : 0.0);
         replyItem.setN(0);
-        _replies.emplace_back(replyItem);
+        _addReply(replyItem);
         _numErrors++;
     }
 
-    std::vector<BulkWriteReplyItem>& getReplies() {
+    const std::vector<BulkWriteReplyItem>& getReplies() const {
         return _replies;
     }
 
-    std::vector<int>& getRetriedStmtIds() {
+    const std::vector<int>& getRetriedStmtIds() const {
         return _retriedStmtIds;
     }
 
-    int getNumErrors() {
+    int getNumErrors() const {
         return _numErrors;
+    }
+
+    // Approximate Size in bytes.
+    int32_t getApproximateSize() const {
+        return _approximateSize;
     }
 
 private:
@@ -314,7 +320,28 @@ private:
     std::vector<int32_t> _retriedStmtIds;
     /// The number of error replies contained in _replies.
     int _numErrors = 0;
+    int32_t _approximateSize = 0;  // Only accounting for _replies.
+
+    // Helper to keep _approximateSize up to date when appending to _replies.
+    void _addReply(const BulkWriteReplyItem& replyItem) {
+        _replies.emplace_back(replyItem);
+        _approximateSize += replyItem.getApproximateSize();
+    }
 };
+
+bool aboveBulkWriteRepliesMaxSize(OperationContext* opCtx,
+                                  size_t idx,
+                                  BulkWriteReplies& responses) {
+    int32_t bulkWriteRepliesMaxSize = gBulkWriteMaxRepliesSize.loadRelaxed();
+    if (responses.getApproximateSize() >= bulkWriteRepliesMaxSize) {
+        Status status{ErrorCodes::ExceededMemoryLimit,
+                      fmt::format("BulkWrite response size exceeded limit ({} bytes)",
+                                  bulkWriteRepliesMaxSize)};
+        responses.addErrorReply(opCtx, idx, status);
+        return true;
+    }
+    return false;
+}
 
 /*
  * InsertGrouper is a helper class to group consecutive insert operations for the same namespace in
@@ -808,6 +835,9 @@ bool handleInsertOp(OperationContext* opCtx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses,
                     InsertGrouper& insertGrouper) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+        return false;
+    }
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getInsert();
     const auto& ns = nsInfo[idx].getNs();
@@ -917,6 +947,10 @@ bool handleUpdateOp(OperationContext* opCtx,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+        return false;
+    }
+
     const auto& nsInfo = req.getNsInfo();
     const auto idx = op->getUpdate();
     const auto& nsEntry = nsInfo[idx];
@@ -1077,6 +1111,10 @@ bool handleDeleteOp(OperationContext* opCtx,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+        return false;
+    }
+
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getDeleteCommand();
     auto& nsEntry = nsInfo.at(idx);
@@ -1498,9 +1536,7 @@ public:
             if (exec->isEOF()) {
                 invariant(numRepliesInFirstBatch == replies.size());
                 auto reply = BulkWriteCommandReply(
-                    BulkWriteCommandResponseCursor(
-                        0, std::vector<BulkWriteReplyItem>(std::move(replies))),
-                    numErrors);
+                    BulkWriteCommandResponseCursor(0, std::move(replies)), numErrors);
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
@@ -1531,9 +1567,7 @@ public:
 
             replies.resize(numRepliesInFirstBatch);
             auto reply = BulkWriteCommandReply(
-                BulkWriteCommandResponseCursor(cursorId,
-                                               std::vector<BulkWriteReplyItem>(std::move(replies))),
-                numErrors);
+                BulkWriteCommandResponseCursor(cursorId, std::move(replies)), numErrors);
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
@@ -1665,6 +1699,7 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!handleGroupedInserts(opCtx, req, insertGrouper, lastOpFixer, responses)) {
                 break;
             }
+
             if (hasEncryptionInformation) {
                 uassert(
                     ErrorCodes::InvalidOptions,
@@ -1680,6 +1715,7 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!handleGroupedInserts(opCtx, req, insertGrouper, lastOpFixer, responses)) {
                 break;
             }
+
             if (hasEncryptionInformation) {
                 uassert(
                     ErrorCodes::InvalidOptions,

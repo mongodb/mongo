@@ -131,6 +131,10 @@ void BulkWriteReplyItem::parseProtected(const BSONObj& bsonObject) {
 
 
 BSONObj BulkWriteReplyItem::serialize() const {
+    if (_cached) {
+        return *_cached;
+    }
+
     invariant(_hasOk && _hasIdx);
 
     BSONObjBuilder builder;
@@ -162,7 +166,8 @@ BSONObj BulkWriteReplyItem::serialize() const {
         _upserted.get().serializeToBSON("_id", &builder);
     }
 
-    return builder.obj();
+    _cached = builder.obj();
+    return *_cached;
 }
 
 

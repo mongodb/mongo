@@ -43,3 +43,12 @@ server_parameters:
         cpp_vartype: AtomicWord<long long>
         cpp_varname: gCursorTimeoutMillis
         default: 600000
+
+    bulkWriteMaxRepliesSize:
+        description: >-
+            Limit the size of the bulkWrite replies. Test-only.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gBulkWriteMaxRepliesSize
+        default:
+            expr: 30 * 1024 * 1024

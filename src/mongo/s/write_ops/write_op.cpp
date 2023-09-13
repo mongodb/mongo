@@ -317,33 +317,30 @@ void WriteOp::setOpError(const write_ops::WriteError& error) {
 
 boost::optional<BulkWriteReplyItem> WriteOp::combineBulkWriteReplyItems(
     std::vector<BulkWriteReplyItem const*> replies) {
-    boost::optional<BulkWriteReplyItem> combinedReply;
-    for (auto reply : replies) {
-        if (!combinedReply) {
-            combinedReply = *reply;
-        } else {
-            if (auto n = reply->getN(); n.has_value()) {
-                combinedReply->setN(combinedReply->getN().get_value_or(0) + n.value());
-            }
-            if (auto nModified = reply->getNModified(); nModified.has_value()) {
-                combinedReply->setNModified(combinedReply->getNModified().get_value_or(0) +
-                                            nModified.value());
-            }
-
-            if (auto upserted = reply->getUpserted(); upserted.has_value()) {
-                tassert(7700400,
-                        "Unexpectedly got bulkWrite upserted replies from multiple shards for a "
-                        "single update operation",
-                        !combinedReply->getUpserted().has_value());
-                combinedReply->setUpserted(reply->getUpserted());
-            }
-        }
+    if (replies.empty()) {
+        return boost::none;
     }
-    if (combinedReply) {
-        // The combined item will currently have its idx set to the idx the first reply item we
-        // processed had in the batch it was sent to a shard in. We need to correct it so the idx
-        // corresponds to the idx this write had in the client request.
-        combinedReply->setIdx(getWriteItem().getItemIndex());
+
+    BulkWriteReplyItem combinedReply;
+    combinedReply.setOk(1);
+    combinedReply.setIdx(getWriteItem().getItemIndex());
+
+    for (auto reply : replies) {
+        if (auto n = reply->getN(); n.has_value()) {
+            combinedReply.setN(combinedReply.getN().get_value_or(0) + n.value());
+        }
+        if (auto nModified = reply->getNModified(); nModified.has_value()) {
+            combinedReply.setNModified(combinedReply.getNModified().get_value_or(0) +
+                                       nModified.value());
+        }
+
+        if (auto upserted = reply->getUpserted(); upserted.has_value()) {
+            tassert(7700400,
+                    "Unexpectedly got bulkWrite upserted replies from multiple shards for a "
+                    "single update operation",
+                    !combinedReply.getUpserted().has_value());
+            combinedReply.setUpserted(reply->getUpserted());
+        }
     }
 
     return combinedReply;
