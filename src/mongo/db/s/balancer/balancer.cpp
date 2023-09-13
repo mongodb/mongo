@@ -95,10 +95,15 @@ class BalanceRoundDetails {
 public:
     BalanceRoundDetails() : _executionTimer() {}
 
-    void setSucceeded(int candidateChunks, int chunksMoved) {
+    void setSucceeded(int candidateChunks,
+                      int chunksMoved,
+                      Milliseconds selectionTime,
+                      Milliseconds migrationTime) {
         invariant(!_errMsg);
         _candidateChunks = candidateChunks;
         _chunksMoved = chunksMoved;
+        _selectionTime = selectionTime;
+        _migrationTime = migrationTime;
     }
 
     void setFailed(const string& errMsg) {
@@ -115,6 +120,10 @@ public:
         } else {
             builder.append("candidateChunks", _candidateChunks);
             builder.append("chunksMoved", _chunksMoved);
+            BSONObjBuilder timeInfo{builder.subobjStart("times"_sd)};
+            timeInfo.append("selectionTimeMillis"_sd, _selectionTime.count());
+            timeInfo.append("migrationTimeMillis"_sd, _migrationTime.count());
+            timeInfo.done();
         }
 
         return builder.obj();
@@ -122,6 +131,8 @@ public:
 
 private:
     const Timer _executionTimer;
+    Milliseconds _selectionTime;
+    Milliseconds _migrationTime;
 
     // Set only on success
     int _candidateChunks{0};
@@ -379,21 +390,21 @@ void Balancer::_mainThread() {
                 continue;
             }
 
+            LOGV2_DEBUG(21860,
+                        1,
+                        "Start balancing round. waitForDelete: {waitForDelete}, "
+                        "secondaryThrottle: {secondaryThrottle}",
+                        "Start balancing round",
+                        "waitForDelete"_attr = balancerConfig->waitForDelete(),
+                        "secondaryThrottle"_attr = balancerConfig->getSecondaryThrottle().toBSON());
+
+            static Occasionally sampler;
+            if (sampler.tick()) {
+                warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
+            }
+
+            // Split chunk to match zones boundaries
             {
-                LOGV2_DEBUG(21860,
-                            1,
-                            "Start balancing round. waitForDelete: {waitForDelete}, "
-                            "secondaryThrottle: {secondaryThrottle}",
-                            "Start balancing round",
-                            "waitForDelete"_attr = balancerConfig->waitForDelete(),
-                            "secondaryThrottle"_attr =
-                                balancerConfig->getSecondaryThrottle().toBSON());
-
-                static Occasionally sampler;
-                if (sampler.tick()) {
-                    warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
-                }
-
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
                     LOGV2_WARNING(21878,
@@ -403,18 +414,27 @@ void Balancer::_mainThread() {
                 } else {
                     LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
                 }
+            }
 
+            // Select and migrate chunks
+            {
+                Timer selectionTimer;
                 const auto candidateChunks =
                     uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx.get()));
+                const Milliseconds selectionTimeMillis{selectionTimer.millis()};
 
                 if (candidateChunks.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
                     _balancedLastTime = 0;
                 } else {
+                    Timer migrationTimer;
                     _balancedLastTime = _moveChunks(opCtx.get(), candidateChunks);
+                    const Milliseconds migrationTimeMillis{migrationTimer.millis()};
 
                     roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
-                                              _balancedLastTime);
+                                              _balancedLastTime,
+                                              selectionTimeMillis,
+                                              migrationTimeMillis);
 
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
