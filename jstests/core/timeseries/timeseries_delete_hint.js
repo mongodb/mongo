@@ -15,8 +15,6 @@
  *   requires_timeseries,
  *   # Uses parallel shell to wait on fail point
  *   uses_parallel_shell,
- *   # TODO(SERVER-80252): Uses namespace strings which are too long for Serverless
- *   simulate_atlas_proxy_incompatible,
  * ]
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
