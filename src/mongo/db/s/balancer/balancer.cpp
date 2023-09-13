@@ -100,11 +100,17 @@ public:
 
     void setSucceeded(int numCandidateChunks,
                       int numChunksMoved,
-                      int numImbalancedCachedCollections) {
+                      int numImbalancedCachedCollections,
+                      Milliseconds selectionTime,
+                      Milliseconds throttleTime,
+                      Milliseconds migrationTime) {
         invariant(!_errMsg);
         _numCandidateChunks = numCandidateChunks;
         _numChunksMoved = numChunksMoved;
         _numImbalancedCachedCollections = numImbalancedCachedCollections;
+        _selectionTime = selectionTime;
+        _throttleTime = throttleTime;
+        _migrationTime = migrationTime;
     }
 
     void setFailed(const string& errMsg) {
@@ -122,12 +128,20 @@ public:
             builder.append("candidateChunks", _numCandidateChunks);
             builder.append("chunksMoved", _numChunksMoved);
             builder.append("imbalancedCachedCollections", _numImbalancedCachedCollections);
+            BSONObjBuilder timeInfo{builder.subobjStart("times"_sd)};
+            timeInfo.append("selectionTimeMillis"_sd, _selectionTime.count());
+            timeInfo.append("throttleTimeMillis"_sd, _throttleTime.count());
+            timeInfo.append("migrationTimeMillis"_sd, _migrationTime.count());
+            timeInfo.done();
         }
         return builder.obj();
     }
 
 private:
     const Timer _executionTimer;
+    Milliseconds _selectionTime;
+    Milliseconds _throttleTime;
+    Milliseconds _migrationTime;
 
     // Set only on success
     int _numCandidateChunks{0};
@@ -749,24 +763,25 @@ void Balancer::_mainThread() {
             // The current configuration is allowing the balancer to perform operations.
             // Unblock the secondary thread if needed.
             _defragmentationCondVar.notify_all();
+
+            LOGV2_DEBUG(21860,
+                        1,
+                        "Start balancing round. waitForDelete: {waitForDelete}, "
+                        "secondaryThrottle: {secondaryThrottle}",
+                        "Start balancing round",
+                        "waitForDelete"_attr = balancerConfig->waitForDelete(),
+                        "secondaryThrottle"_attr = balancerConfig->getSecondaryThrottle().toBSON());
+
+            static Occasionally sampler;
+            if (sampler.tick()) {
+                warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
+            }
+
+            // Collect and apply up-to-date configuration values on the cluster collections.
+            _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
+
+            // Split chunk to match zones boundaries
             {
-                LOGV2_DEBUG(21860,
-                            1,
-                            "Start balancing round. waitForDelete: {waitForDelete}, "
-                            "secondaryThrottle: {secondaryThrottle}",
-                            "Start balancing round",
-                            "waitForDelete"_attr = balancerConfig->waitForDelete(),
-                            "secondaryThrottle"_attr =
-                                balancerConfig->getSecondaryThrottle().toBSON());
-
-                static Occasionally sampler;
-                if (sampler.tick()) {
-                    warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
-                }
-
-                // Collect and apply up-to-date configuration values on the cluster collections.
-                _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
-
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
                     LOGV2_WARNING(21878,
@@ -776,6 +791,11 @@ void Balancer::_mainThread() {
                 } else {
                     LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
                 }
+            }
+
+            // Select and migrate chunks
+            {
+                Timer selectionTimer;
 
                 const std::vector<ClusterStatistics::ShardStatistics> shardStats =
                     uassertStatusOK(_clusterStats->getStats(opCtx.get()));
@@ -797,6 +817,7 @@ void Balancer::_mainThread() {
                                                               shardStats,
                                                               &availableShards,
                                                               _imbalancedCollectionsCache.get()));
+                const Milliseconds selectionTimeMillis{selectionTimer.millis()};
 
                 if (chunksToRebalance.empty() && chunksToDefragment.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
@@ -806,21 +827,36 @@ void Balancer::_mainThread() {
                               forcedBalancerRoundInterval ? *forcedBalancerRoundInterval
                                                           : kBalanceRoundDefaultInterval);
                 } else {
-                    auto timeSinceLastMigration = Date_t::now() - lastMigrationTime;
-                    _sleepFor(opCtx.get(),
-                              forcedBalancerRoundInterval
-                                  ? *forcedBalancerRoundInterval - timeSinceLastMigration
-                                  : Milliseconds(balancerMigrationsThrottlingMs.load()) -
-                                      timeSinceLastMigration);
 
+                    // Sleep according to the migration throttling settings
+                    const auto throttleTimeMillis = [&] {
+                        const auto& minRoundinterval = forcedBalancerRoundInterval
+                            ? *forcedBalancerRoundInterval
+                            : Milliseconds(balancerMigrationsThrottlingMs.load());
+
+                        const auto timeSinceLastMigration = Date_t::now() - lastMigrationTime;
+                        if (timeSinceLastMigration < minRoundinterval) {
+                            return minRoundinterval - timeSinceLastMigration;
+                        }
+                        return Milliseconds::zero();
+                    }();
+                    _sleepFor(opCtx.get(), throttleTimeMillis);
+
+                    // Migrate chunks
+                    Timer migrationTimer;
                     _balancedLastTime =
                         _moveChunks(opCtx.get(), chunksToRebalance, chunksToDefragment);
                     lastMigrationTime = Date_t::now();
+                    const Milliseconds migrationTimeMillis{migrationTimer.millis()};
 
+                    // Complete round
                     roundDetails.setSucceeded(
                         static_cast<int>(chunksToRebalance.size() + chunksToDefragment.size()),
                         _balancedLastTime,
-                        _imbalancedCollectionsCache->size());
+                        _imbalancedCollectionsCache->size(),
+                        selectionTimeMillis,
+                        throttleTimeMillis,
+                        migrationTimeMillis);
 
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
