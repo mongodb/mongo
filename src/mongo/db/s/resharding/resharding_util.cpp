@@ -163,12 +163,7 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
     const auto& tempNss =
         constructTemporaryReshardingNss(sourceNss.db_forSharding(), reshardingUUID);
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto [cm, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << tempNss.toStringForErrorMsg()
-                          << " to be sharded",
-            cm.isSharded());
+    auto [cm, _] = catalogCache->getTrackedCollectionRoutingInfo(opCtx, tempNss);
 
     std::set<ShardId> recipients;
     cm.getAllShardIds(&recipients);

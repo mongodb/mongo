@@ -123,7 +123,7 @@ public:
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
 
-    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
+    CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
                                                           const NamespaceString& nss) override {
         invariant(nss == _sourceNss);
 

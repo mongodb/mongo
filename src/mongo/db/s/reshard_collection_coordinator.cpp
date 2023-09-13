@@ -131,7 +131,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassertStatusOK(
                     Grid::get(opCtx)
                         ->catalogCache()
-                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
+                        ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()))
                     .cm;
 
             StateDoc newDoc(_doc);
