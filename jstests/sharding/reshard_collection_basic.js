@@ -38,7 +38,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 jsTest.log("Fail if collection is unsharded.");
 assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
-                             [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+                             ErrorCodes.NamespaceNotSharded);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 

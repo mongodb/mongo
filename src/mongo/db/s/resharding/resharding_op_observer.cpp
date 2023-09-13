@@ -112,7 +112,7 @@ void assertCanExtractShardKeyFromDocs(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Temporary resharding collection " << nss.toStringForErrorMsg()
                           << " is not sharded",
-            collDesc.hasRoutingTable());
+            collDesc.isSharded());
 
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     for (auto it = begin; it != end; ++it) {

@@ -264,28 +264,6 @@ public:
     StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithPlacementRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
-
-    /**
-     * Same as getCollectionRoutingInfo above, but throws NamespaceNotFound error if the namespace
-     * is not tracked.
-     */
-    CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
-                                                          const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
-     * NamespaceNotFound error if the collection is not tracked.
-     */
-    StatusWith<CollectionRoutingInfo> getTrackedCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
-     * Same as getCollectionRoutingInfoWithPlacementRefresh above, but in addition returns a
-     * NamespaceNotFound error if the collection is not tracked.
-     */
-    StatusWith<CollectionRoutingInfo> getTrackedCollectionRoutingInfoWithPlacementRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
-
     /**
      * Advances the version in the cache for the given database.
      *

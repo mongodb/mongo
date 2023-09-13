@@ -216,7 +216,7 @@ public:
                     const auto [cm, _] = uassertStatusOK(
                         Grid::get(opCtx)
                             ->catalogCache()
-                            ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
+                            ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 
                     auto tempReshardingNss = resharding::constructTemporaryReshardingNss(
                         nss.db_forSharding(), cm.getUUID());

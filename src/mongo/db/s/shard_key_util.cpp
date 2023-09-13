@@ -479,7 +479,7 @@ std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
     const NamespaceString& nss) const {
     invariant(_opCtx);
     auto catalogCache = Grid::get(_opCtx)->catalogCache();
-    auto cri = catalogCache->getTrackedCollectionRoutingInfo(_opCtx, nss);
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
     auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
         _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);
     return indexSpecs;
@@ -489,7 +489,7 @@ void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     invariant(_opCtx);
     auto catalogCache = Grid::get(_opCtx)->catalogCache();
-    auto cri = catalogCache->getTrackedCollectionRoutingInfo(_opCtx, nss);
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
     auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
         _opCtx, cri.cm.getMinKeyShardIdWithSimpleCollation()));
     auto checkShardingIndexRes = uassertStatusOK(shard->runCommand(

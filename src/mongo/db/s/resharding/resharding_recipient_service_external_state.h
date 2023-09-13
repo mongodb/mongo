@@ -73,7 +73,7 @@ public:
 
     virtual void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
-    virtual CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
+    virtual CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
                                                                   const NamespaceString& nss) = 0;
 
     virtual MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
@@ -126,7 +126,7 @@ public:
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override;
 
-    CollectionRoutingInfo getTrackedCollectionRoutingInfo(OperationContext* opCtx,
+    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
                                                           const NamespaceString& nss) override;
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(

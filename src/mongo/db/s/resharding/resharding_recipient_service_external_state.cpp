@@ -155,15 +155,14 @@ ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* servic
 
 void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
-    uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss));
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 }
 
-CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getTrackedCollectionRoutingInfo(
+CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getShardedCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return catalogCache->getTrackedCollectionRoutingInfo(opCtx, nss);
+    return catalogCache->getShardedCollectionRoutingInfo(opCtx, nss);
 }
 
 MigrationDestinationManager::CollectionOptionsAndUUID
@@ -174,7 +173,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* o
                                                              StringData reason) {
     // Load the collection options from the primary shard for the database.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto [cm, _] = getTrackedCollectionRoutingInfo(opCtx, nss);
+        auto [cm, _] = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionOptions(
             opCtx, NamespaceStringOrUUID{nss.dbName(), uuid}, cm.dbPrimary(), cm, afterClusterTime);
     });
@@ -188,7 +187,7 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              StringData reason) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cri = getTrackedCollectionRoutingInfo(opCtx, nss);
+        auto cri = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionIndexes(
             opCtx,
             NamespaceStringOrUUID{nss.dbName(), uuid},

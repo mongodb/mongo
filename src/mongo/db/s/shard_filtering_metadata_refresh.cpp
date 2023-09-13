@@ -433,7 +433,7 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
 
             auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
 
-            if (currentMetadata.hasRoutingTable()) {
+            if (currentMetadata.isSharded()) {
                 // Abort and join any ongoing migration if migrations are disallowed for the
                 // namespace.
                 if (!currentMetadata.allowMigrations()) {
