@@ -53,7 +53,11 @@ var pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$limit"]);
+if (featureFlagSbeFull) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$limit"]);
+}
 checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
 
 // Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
@@ -66,7 +70,7 @@ pipeline = [
 ];
 if (featureFlagSbeFull) {
     checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "$limit"]);
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
     checkResults(
         pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
 } else {

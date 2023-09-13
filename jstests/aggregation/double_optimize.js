@@ -23,19 +23,16 @@ const coll = db.double_optimize;
 coll.drop();
 
 assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]));
-// Test that this $match can be split in two and partially swapped before the $project stage. This
-// will test that the $match stage gets optimized and removes the $or to realize that the predicate
-// is independent of the field "b".
-const inputPipe = [{$project: {b: 0}}, {$match: {$or: [{_id: 4, b: 3}]}}];
-const explain = getSingleNodeExplain(coll.explain().aggregate(inputPipe));
-if (featureFlagSbeFull) {
-    assert.eq(undefined, explain.stages, "Entire pipeline should be pushed down to SBE. ", explain);
-} else {
-    const lastStage = explain.stages[explain.stages.length - 1];
-    assert(lastStage.hasOwnProperty("$match"), tojson(explain));
-    assert.eq(
-        {$match: {b: {$eq: 3}}},
-        lastStage,
-        "The $match stage should have been split in two and moved in front of the $project. " +
-            explain);
-}
+// Test that this $match can be split in two and partially swapped before the $addFields stage. We
+// expect optimization to examine the $or and observe that the {_id: 4} portion of the predicate is
+// independent of the "trap" field and can be evaluated before the "trap" computation.
+//
+// If the optimizer fails to move the {_id: 4} filter to the front of the pipeline, the $addFields
+// stage will evaluate sqrt(_id - 4) on every document, resulting in a fatal error when (_id - 4) is
+// negative.
+const inputPipe = [
+    {$addFields: {trap: {$sqrt: {$subtract: ["$_id", 4]}}}},
+    {$match: {$or: [{_id: 4, trap: {$ne: 0}}]}}
+];
+const result = coll.aggregate(inputPipe).toArray();
+assert.sameMembers([], result);

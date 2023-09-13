@@ -73,6 +73,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
@@ -1828,6 +1829,18 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             auto limit = sortStage->getLimit().get_value_or(0);
             solnForAgg =
                 std::make_unique<SortNodeDefault>(std::move(solnForAgg), std::move(pattern), limit);
+            continue;
+        }
+
+        auto limitStage = dynamic_cast<DocumentSourceLimit*>(innerStage->documentSource());
+        if (limitStage) {
+            solnForAgg = std::make_unique<LimitNode>(std::move(solnForAgg), limitStage->getLimit());
+            continue;
+        }
+
+        auto skipStage = dynamic_cast<DocumentSourceSkip*>(innerStage->documentSource());
+        if (skipStage) {
+            solnForAgg = std::make_unique<SkipNode>(std::move(solnForAgg), skipStage->getSkip());
             continue;
         }
 

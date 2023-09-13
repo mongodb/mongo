@@ -98,6 +98,7 @@
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -217,6 +218,7 @@ struct CompatiblePipelineStages {
 
     bool match : 1;
     bool sort : 1;
+    bool limitSkip : 1;
     bool search : 1;
 
     bool window : 1;
@@ -281,6 +283,15 @@ bool pushDownPipelineStageIfCompatible(
 
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(sortStage, isLastSource));
+        return true;
+    } else if (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
+               dynamic_cast<DocumentSourceSkip*>(stage.get())) {
+        if (!allowedStages.limitSkip) {
+            return false;
+        }
+
+        stagesForPushdown.push_back(
+            std::make_unique<InnerPipelineStageImpl>(stage.get(), isLastSource));
         return true;
     } else if (const auto& searchHelpers = getSearchHelpers(opCtx->getServiceContext());
                searchHelpers->isSearchStage(stage.get()) ||
@@ -403,8 +414,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         .lookup = !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
-        // TODO (SERVER-72549): SBE execution of 'transform' and 'match' stages requires
-        // 'featureFlagSbeFull' to be enabled.
+        // TODO (SERVER-72549): SBE execution of "transform stages" ($project and $addFields),
+        // $match, $sort, $limit, and $skip requires 'featureFlagSbeFull' to be enabled.
         .transform = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
         .match = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
 
@@ -413,6 +424,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
         .sort = (SbeCompatibility::flagGuarded >= minRequiredCompatibility) && !needsMerge,
+
+        .limitSkip = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.

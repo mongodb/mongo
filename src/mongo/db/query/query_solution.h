@@ -1197,6 +1197,8 @@ struct SortNodeSimple final : public SortNode {
 
 struct LimitNode : public QuerySolutionNode {
     LimitNode() {}
+    LimitNode(std::unique_ptr<QuerySolutionNode> child, long long limit)
+        : QuerySolutionNode(std::move(child)), limit(limit) {}
     virtual ~LimitNode() {}
 
     virtual StageType getType() const {
@@ -1225,6 +1227,8 @@ struct LimitNode : public QuerySolutionNode {
 
 struct SkipNode : public QuerySolutionNode {
     SkipNode() {}
+    SkipNode(std::unique_ptr<QuerySolutionNode> child, long long skip)
+        : QuerySolutionNode(std::move(child)), skip(skip) {}
     virtual ~SkipNode() {}
 
     virtual StageType getType() const {
