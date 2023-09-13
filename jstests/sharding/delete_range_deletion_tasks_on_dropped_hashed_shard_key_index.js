@@ -3,8 +3,7 @@
  * deleted and allows other range deletion processes to continue.
  *
  * @tags: [
- *   requires_fcv_71,
- *   featureFlagShardKeyIndexOptionalHashedSharding
+ *   requires_fcv_72,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

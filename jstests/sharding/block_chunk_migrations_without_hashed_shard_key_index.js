@@ -2,8 +2,7 @@
  * Tests that chunk migrations are blocked when there is no index on a hashed shard key.
  *
  * @tags: [
- *   requires_fcv_71,
- *   featureFlagShardKeyIndexOptionalHashedSharding
+ *   requires_fcv_72,
  * ]
  */
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
