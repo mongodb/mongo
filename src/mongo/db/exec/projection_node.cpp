@@ -332,8 +332,17 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
             tassert(7241728,
                     "reached end of the expression iterator",
                     expressionIt != _expressions.end());
-            output->addField(options.serializeFieldPathFromString(field),
-                             expressionIt->second->serialize(options));
+
+            auto isExpressionObject = dynamic_cast<ExpressionObject*>(expressionIt->second.get());
+
+            if (isExpressionObject) {
+                output->addField(
+                    options.serializeFieldPathFromString(field),
+                    Value(Document{{"$expr", expressionIt->second->serialize(options)}}));
+            } else {
+                output->addField(options.serializeFieldPathFromString(field),
+                                 expressionIt->second->serialize(options));
+            }
         }
     }
 }

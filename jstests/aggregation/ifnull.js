@@ -12,7 +12,8 @@ assert.commandWorked(t.insertOne({
     my_null: null,
     my_undefined: undefined,
     my_obj: {},
-    my_list: []
+    my_list: [],
+    my_list_of_docs: [{z: 1}, {z: 2}]
 }));
 
 function assertError(expectedErrorCode, ifNullSpec) {
@@ -22,6 +23,11 @@ function assertError(expectedErrorCode, ifNullSpec) {
 function assertResult(expectedResult, ifNullSpec) {
     const res = t.aggregate({$project: {_id: 0, a: {$ifNull: ifNullSpec}}}).toArray()[0];
     assert.docEq({a: expectedResult}, res);
+}
+
+function assertQueryResult(expectedResult, pipeline) {
+    const res = t.aggregate(pipeline).toArray()[0];
+    assert.docEq(expectedResult, res);
 }
 
 // Wrong number of args.
@@ -93,3 +99,13 @@ assertResult('foo', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assert.commandWorked(t.updateMany({}, {$set: {b: 'bar'}}));
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}, '$e']);
+
+// Test $set priority of expression objects.
+t.drop();
+assert.commandWorked(t.insertOne({three: 3, my_list_of_docs: [{z: 1}, {z: 2}]}));
+
+// Ensure the correct interpretation of ExpressionObject when $ifNull is optimized out.
+assertQueryResult({"three": 3, "my_list_of_docs": {"b": 3}}, [
+    {$set: {my_list_of_docs: {$ifNull: [null, {b: "$three"}]}}},
+    {$project: {_id: 0, my_list_of_docs: 1, three: 1}}
+])

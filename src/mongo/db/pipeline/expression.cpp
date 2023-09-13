@@ -242,6 +242,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
     // Look up the parser associated with the expression name.
     const char* opName = obj.firstElementFieldName();
     auto it = parserMap.find(opName);
+
     uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Unrecognized expression '" << opName << "'",
             it != parserMap.end());
@@ -8182,4 +8183,14 @@ REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())
+
+/* --------------------------------- Parenthesis --------------------------------------------- */
+
+REGISTER_STABLE_EXPRESSION(expr, parseParenthesisExprObj);
+static intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* const expCtx,
+                                                         BSONElement bsonExpr,
+                                                         const VariablesParseState& vpsIn) {
+    return Expression::parseOperand(expCtx, bsonExpr, vpsIn);
+}
+
 }  // namespace mongo

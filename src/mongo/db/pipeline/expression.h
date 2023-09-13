@@ -4743,4 +4743,9 @@ public:
         return visitor->visit(this);
     }
 };
+
+static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
+                                                                BSONElement expr,
+                                                                const VariablesParseState& vpsIn);
+
 }  // namespace mongo

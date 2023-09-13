@@ -4708,5 +4708,37 @@ TEST(ExpressionBitNotTest, Arrays) {
                        AssertionException,
                        16020);
 }
+
+TEST(ExpressionParseParenthesisExpressionObjTest, MultipleExprSimplification) {
+    auto expCtx = ExpressionContextForTest{};
+    auto specObject = fromjson(
+        "{input: {$expr: {$expr: {$expr: "
+        "{$eq: [123,123]}}}}}");
+    auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
+    ASSERT_EQ(expr->serialize().toString(), "{input: {$eq: [{$const: 123}, {$const: 123}]}}");
+}
+
+TEST(ExpressionParseParenthesisExpressionObjTest, SetSingleExprSimplification) {
+    auto expCtx = ExpressionContextForTest{};
+    auto specObject = fromjson("{input: {a: {$expr: {b: 1}}}}");
+    auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
+    ASSERT_EQ(expr->serialize().toString(), "{input: {a: {b: {$const: 1}}}}");
+}
+
+TEST(ExpressionParseParenthesisExpressionObjTest, MatchSingleExprSimplification) {
+
+    auto expCtx = ExpressionContextForTest{};
+    auto specObject = fromjson("{input: {$expr: [false]}}");
+    auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
+    ASSERT_EQ(expr->serialize().toString(), "{input: [{$const: false}]}");
+}
+
+TEST(ExpressionParseParenthesisExpressionObjTest, SingleExprSimplification) {
+    auto expCtx = ExpressionContextForTest{};
+    auto specObject = fromjson("{$expr: [123]}");
+    auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
+    ASSERT_EQ(expr->serialize().toString(), "[{$const: 123}]");
+}
+
 }  // namespace ExpressionTests
 }  // namespace mongo
