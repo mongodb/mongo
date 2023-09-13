@@ -1168,6 +1168,7 @@ buildvariants:
     - rhel80-xlarge
   - name: streams
   - name: streams_auth
+  - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1313,6 +1314,7 @@ buildvariants:
   - name: .shard_split
   - name: streams
   - name: streams_auth
+  - name: streams_kafka
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
