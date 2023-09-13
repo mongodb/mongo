@@ -74,7 +74,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
-      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation),
+      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _telemetryStoreKey(CurOp::get(opCtx)->debug().telemetryStoreKey) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
@@ -93,7 +93,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
-      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation) {
+      _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));

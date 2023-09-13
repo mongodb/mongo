@@ -126,7 +126,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _telemetryStoreKey(CurOp::get(operationUsingCursor)->debug().telemetryStoreKey),
       _shouldOmitDiagnosticInformation(
-          CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
+          CurOp::get(operationUsingCursor)->getShouldOmitDiagnosticInformation()),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);

@@ -386,9 +386,6 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
-
-    // Flag to decide if diagnostic information should be omitted.
-    bool shouldOmitDiagnosticInformation{false};
 };
 
 /**
@@ -958,6 +955,13 @@ public:
      */
     void incrementMatchExprCounter(StringData name);
 
+    void setShouldOmitDiagnosticInformation_inlock(WithLock, bool shouldOmitDiagnosticInfo) {
+        _shouldOmitDiagnosticInformation = shouldOmitDiagnosticInfo;
+    }
+    bool getShouldOmitDiagnosticInformation() const {
+        return _shouldOmitDiagnosticInformation;
+    }
+
 private:
     class CurOpStack;
 
@@ -1045,6 +1049,9 @@ private:
     // These values are used to calculate the amount of time spent waiting for write concern.
     std::atomic<TickSource::Tick> _waitForWriteConcernStart{0};  // NOLINT
     std::atomic<TickSource::Tick> _waitForWriteConcernEnd{0};    // NOLINT
+
+    // Flag to decide if diagnostic information should be omitted.
+    bool _shouldOmitDiagnosticInformation{false};
 };
 
 }  // namespace mongo

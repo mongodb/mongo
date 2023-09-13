@@ -809,8 +809,9 @@ public:
                 }
                 // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
                 // FLE rewrite.
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
                 CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
-                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
             }
 
             if (findCommand->getMirrored().value_or(false)) {

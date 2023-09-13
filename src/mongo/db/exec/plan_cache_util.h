@@ -189,7 +189,7 @@ void updatePlanCache(
             winningPlan.solution->cacheData->indexFilterApplied =
                 winningPlan.solution->indexFilterApplied;
             auto& collection = collections.getMainCollection();
-            auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
+            auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
@@ -223,7 +223,7 @@ void updatePlanCache(
                                        plan_cache_debug_info::DebugInfoSBE>
                     callbacks{query, buildDebugInfoFn};
 
-                auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
+                auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
                 uassertStatusOK(sbe::getPlanCache(opCtx).set(
                     plan_cache_key_factory::make(query, collections),
                     std::move(cachedPlan),
