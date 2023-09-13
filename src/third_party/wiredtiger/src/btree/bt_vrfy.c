@@ -537,7 +537,19 @@ __verify_tree(
      * (just created), it won't have a disk image; if there is no disk image, there is no page
      * content to check.
      */
-    if (page->dsk != NULL)
+    if (page->dsk != NULL) {
+        /*
+         * Compare the write generation number on the page to the write generation number on the
+         * parent. Since a parent page's reconciliation takes place once all of its child pages have
+         * been completed, the parent page's write generation number must be higher than that of its
+         * children.
+         */
+        if (!__wt_ref_is_root(ref) && page->dsk->write_gen >= ref->home->dsk->write_gen)
+            WT_RET_MSG(session, EINVAL,
+              "child write generation number %" PRIu64
+              " is greater/equal to the parent page write generation number %" PRIu64,
+              page->dsk->write_gen, ref->home->dsk->write_gen);
+
         switch (page->type) {
         case WT_PAGE_COL_FIX:
             WT_RET(__verify_page_content_fix(session, ref, addr_unpack, vs));
@@ -551,6 +563,7 @@ __verify_tree(
             WT_RET(__verify_page_content_leaf(session, ref, addr_unpack, vs));
             break;
         }
+    }
 
     /* Compare the address type against the page type. */
     switch (page->type) {
