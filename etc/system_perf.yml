@@ -14,59 +14,72 @@ parameters:
 variables:
   ###
   # Leave this section uncommented to enable compile.
-  _real_compile_amazon2: &_compile_amazon2
-      - name: compile
-        variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-  _real_compile_rhel70: &_compile_rhel70
-      - name: compile
-        variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-  _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-      - name: compile
-        variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-      - name: compile
-        variant: compile-amazon-linux2-arm64
-      - name: compile_mongocrypt_shlib
-        variant: compile-amazon-linux2-arm64-mongocrypt-shlib
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-  _real_expansions: &_expansion_updates
-      []
+  # _real_compile_amazon2: &_compile_amazon2
+  #     - name: compile
+  #       variant: compile-amazon2
+  #     - name: schedule_global_auto_tasks
+  #       variant: task_generation
+  # _real_compile_rhel70: &_compile_rhel70
+  #     - name: compile
+  #       variant: compile-rhel70
+  #     - name: schedule_global_auto_tasks
+  #       variant: task_generation
+  # _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+  #     - name: compile
+  #       variant: compile-amazon-linux2-arm64
+  #     - name: schedule_global_auto_tasks
+  #       variant: task_generation
+  # _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+  #     - name: compile
+  #       variant: compile-amazon-linux2-arm64
+  #     - name: compile_mongocrypt_shlib
+  #       variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+  #     - name: schedule_global_auto_tasks
+  #       variant: task_generation
+  # _real_expansions: &_expansion_updates
+  #     []
   ###
 
 ###
 # **Or**: Leave this section uncommented to bypass/skip compile.
-#  _skip_compile_amazon2: &_compile_amazon2
-#      - name: schedule_global_auto_tasks
-#        variant: task_generation
-#  _skip_compile_rhel70: &_compile_rhel70
-#      - name: schedule_global_auto_tasks
-#        variant: task_generation
-#  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-#  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-#  _skip_expansions: &_expansion_updates
-#      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
-#      - key: mdb_binary_for_client
-#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
-#      - key: mdb_binary_for_server
-#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+  _skip_compile_amazon2: &_compile_amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _skip_compile_rhel70: &_compile_rhel70
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _skip_expansions: &_expansion_updates
+      # ARM compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon_linux2_arm64_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
+      - key: mdb_binary_for_client
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-arm64-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      - key: mdb_binary_for_server
+        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-arm64-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      #
+      # # Intel compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_amazon2_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
+      # - key: mdb_binary_for_client
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      # - key: mdb_binary_for_server
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      #
+      # # Atlas-like compile artifact from https://spruce.mongodb.com/task/sys_perf_compile_rhel70_compile_7549228848ddccacff45912ff072036e63ff7470_23_08_15_23_26_59/files?execution=0
+      # - key: mdb_binary_for_client
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-rhel70-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      # - key: mdb_binary_for_server
+      #   value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_7549228848ddccacff45912ff072036e63ff7470/7549228848ddccacff45912ff072036e63ff7470/linux/mongodb-rhel70-sys_perf_7549228848ddccacff45912ff072036e63ff7470.tar.gz
+      #
 ###
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
     - enterprise
     - mongo-tools
-    # - mongo
+    - mongo
     - dsi
     - genny
     - workloads
@@ -90,10 +103,12 @@ modules:
     repo: git@github.com:10gen/dsi.git
     prefix: ${workdir}/src
     branch: master
+    auto_update: true
   - name: genny
     repo: git@github.com:10gen/genny.git
     prefix: ${workdir}/src
     branch: master
+    auto_update: true
   - name: workloads
     repo: git@github.com:10gen/workloads.git
     prefix: ${workdir}/src
