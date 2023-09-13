@@ -83,6 +83,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
                                                       const boost::optional<UUID>& collectionUUID,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
+                                                      ScopeEnum scope,
                                                       OplogEntriesEnum operation,
                                                       const boost::optional<BSONObj>& data);
 
@@ -93,6 +94,7 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
+    ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err,
     const BSONObj& context = BSONObj());
@@ -101,6 +103,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
+    ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err);
 /**
@@ -198,7 +201,7 @@ public:
 
 private:
     /**
-     * Can we hash `obj` without going over our limits?
+     * Checks if we can hash `obj` without going over our limits.
      */
     bool _canHash(const BSONObj& obj);
 

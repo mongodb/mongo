@@ -7,6 +7,7 @@
  *   assumes_against_mongod_not_mongos,
  *   # snapshotRead:false behavior has been removed in 6.2
  *   requires_fcv_62,
+ *   featureFlagSecondaryIndexChecksInDbCheck,
  * ]
  */
 
@@ -19,6 +20,7 @@ import {
     forEachNonArbiterNode,
     forEachNonArbiterSecondary,
     injectInconsistencyOnSecondary,
+    logEveryBatch,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
@@ -31,6 +33,8 @@ let replSet = new ReplSetTest({name: "dbCheckSet", nodes: 2});
 replSet.startSet();
 replSet.initiate();
 replSet.awaitSecondaryNodes();
+
+logEveryBatch(replSet);
 
 let dbName = "dbCheck-test";
 let collName = "dbcheck-collection";
@@ -46,33 +50,24 @@ replSet.getPrimary().getDB(dbName)[multiBatchSimpleCollName].insertMany(
 // inconsistencies.
 function checkLogAllConsistent(conn) {
     let healthlog = conn.getDB("local").system.healthlog;
+    assert(healthlog.find().count(), "dbCheck put no batches in health log");
 
-    const debugBuild = conn.getDB('admin').adminCommand('buildInfo').debug;
+    let maxResult = healthlog.aggregate(
+        [{$match: {operation: "dbCheckBatch"}}, {$group: {_id: 1, key: {$max: "$data.batchEnd"}}}]);
 
-    if (debugBuild) {
-        // These tests only run on debug builds because they rely on dbCheck health-logging
-        // all info-level batch results.
-        assert(healthlog.find().count(), "dbCheck put no batches in health log");
+    assert(maxResult.hasNext(), "dbCheck put no batches in health log");
+    assert.eq(
+        maxResult.next().key, {"_id": {"$maxKey": 1}}, "dbCheck batches should end at MaxKey");
 
-        let maxResult = healthlog.aggregate([
-            {$match: {operation: "dbCheckBatch"}},
-            {$group: {_id: 1, key: {$max: "$data.batchEnd"}}}
-        ]);
+    let minResult = healthlog.aggregate([
+        {$match: {operation: "dbCheckBatch"}},
+        {$group: {_id: 1, key: {$min: "$data.batchStart"}}}
+    ]);
 
-        assert(maxResult.hasNext(), "dbCheck put no batches in health log");
-        assert.eq(
-            maxResult.next().key, {"_id": {"$maxKey": 1}}, "dbCheck batches should end at MaxKey");
+    assert(minResult.hasNext(), "dbCheck put no batches in health log");
+    assert.eq(
+        minResult.next().key, {"_id": {"$minKey": 1}}, "dbCheck batches should start at MinKey");
 
-        let minResult = healthlog.aggregate([
-            {$match: {operation: "dbCheckBatch"}},
-            {$group: {_id: 1, key: {$min: "$data.batchStart"}}}
-        ]);
-
-        assert(minResult.hasNext(), "dbCheck put no batches in health log");
-        assert.eq(minResult.next().key,
-                  {"_id": {"$minKey": 1}},
-                  "dbCheck batches should start at MinKey");
-    }
     // Assert no errors (i.e., found inconsistencies).
     let errs = healthlog.find({"severity": {"$ne": "info"}});
     if (errs.hasNext()) {
@@ -85,29 +80,24 @@ function checkLogAllConsistent(conn) {
         assert(false, "dbCheck batch failed: " + tojson(failedChecks.next()));
     }
 
-    if (debugBuild) {
-        // These tests only run on debug builds because they rely on dbCheck health-logging
-        // all info-level batch results.
-
-        // Finds an entry with data.batchStart === MinKey, and then matches its batchEnd against
-        // another document's batchStart, and so on, and then checks that the result of that search
-        // has data.batchEnd === MaxKey.
-        let completeCoverage = healthlog.aggregate([
-            {$match: {"operation": "dbCheckBatch", "data.batchStart._id": MinKey}},
-            {
-            $graphLookup: {
-                from: "system.healthlog",
-                startWith: "$data.batchStart",
-                connectToField: "data.batchStart",
-                connectFromField: "data.batchEnd",
-                as: "batchLimits",
-                restrictSearchWithMatch: {"operation": "dbCheckBatch"}
-            }
-            },
-            {$match: {"batchLimits.data.batchEnd._id": MaxKey}}
-        ]);
-        assert(completeCoverage.hasNext(), "dbCheck batches do not cover full key range");
-    }
+    // Finds an entry with data.batchStart === MinKey, and then matches its batchEnd against
+    // another document's batchStart, and so on, and then checks that the result of that search
+    // has data.batchEnd === MaxKey.
+    let completeCoverage = healthlog.aggregate([
+        {$match: {"operation": "dbCheckBatch", "data.batchStart._id": MinKey}},
+        {
+        $graphLookup: {
+            from: "system.healthlog",
+            startWith: "$data.batchStart",
+            connectToField: "data.batchStart",
+            connectFromField: "data.batchEnd",
+            as: "batchLimits",
+            restrictSearchWithMatch: {"operation": "dbCheckBatch"}
+        }
+        },
+        {$match: {"batchLimits.data.batchEnd._id": MaxKey}}
+    ]);
+    assert(completeCoverage.hasNext(), "dbCheck batches do not cover full key range");
 }
 
 // Check that the total of all batches in the health log on `conn` is equal to the total number
@@ -116,12 +106,6 @@ function checkLogAllConsistent(conn) {
 // Returns a document with fields "totalDocs" and "totalBytes", representing the total size of
 // the batches in the health log.
 function healthLogCounts(healthlog) {
-    // These tests only run on debug builds because they rely on dbCheck health-logging
-    // all info-level batch results.
-    const debugBuild = healthlog.getDB().getSiblingDB('admin').adminCommand('buildInfo').debug;
-    if (!debugBuild) {
-        return;
-    }
     let result = healthlog.aggregate([
         {$match: {"operation": "dbCheckBatch"}},
         {
@@ -139,12 +123,6 @@ function healthLogCounts(healthlog) {
 }
 
 function checkTotalCounts(conn, coll) {
-    // These tests only run on debug builds because they rely on dbCheck health-logging
-    // all info-level batch results.
-    const debugBuild = conn.getDB('admin').adminCommand('buildInfo').debug;
-    if (!debugBuild) {
-        return;
-    }
     let result = healthLogCounts(conn.getDB("local").system.healthlog);
 
     assert.eq(result.totalDocs, coll.count(), "dbCheck batches do not count all documents");
@@ -232,12 +210,6 @@ function testDbCheckParameters() {
 
     function checkEntryBounds(start, end) {
         forEachNonArbiterNode(replSet, function(node) {
-            // These tests only run on debug builds because they rely on dbCheck health-logging
-            // all info-level batch results.
-            const debugBuild = node.getDB('admin').adminCommand('buildInfo').debug;
-            if (!debugBuild) {
-                return;
-            }
             let healthlog = node.getDB("local").system.healthlog;
 
             let keyBoundsResult = healthlog.aggregate([
@@ -312,14 +284,6 @@ function testDbCheckParameters() {
     runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
     checkEntryBounds(start, start + maxCount);
-
-    // The remaining tests only run on debug builds because they rely on dbCheck health-logging
-    // all info-level batch results.
-
-    const debugBuild = primary.getDB('admin').adminCommand('buildInfo').debug;
-    if (!debugBuild) {
-        return;
-    }
 
     const healthlog = db.getSiblingDB('local').system.healthlog;
     {

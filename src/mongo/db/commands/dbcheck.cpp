@@ -186,6 +186,7 @@ public:
                                                         boost::none /*collectionUUID*/,
                                                         SeverityEnum::Info,
                                                         "",
+                                                        ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Start,
                                                         boost::none /*data*/);
             if (_info && _info.value().secondaryIndexCheckParameters) {
@@ -213,6 +214,7 @@ public:
                                                         boost::none /*collectionUUID*/,
                                                         SeverityEnum::Info,
                                                         "",
+                                                        ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Stop,
                                                         boost::none /*data*/);
             if (_info && _info.value().secondaryIndexCheckParameters) {
@@ -491,6 +493,7 @@ protected:
                     coll.uuid,
                     "abandoning dbCheck batch because collection no longer exists, but "
                     "there is a view with the identical name",
+                    ScopeEnum::Collection,
                     OplogEntriesEnum::Batch,
                     Status(ErrorCodes::NamespaceNotFound,
                            "Collection under dbCheck no longer exists, but there is a view "
@@ -498,8 +501,13 @@ protected:
                 HealthLogInterface::get(opCtx)->log(*entry);
                 return;
             } catch (const DBException& e) {
-                std::unique_ptr<HealthLogEntry> logEntry = dbCheckErrorHealthLogEntry(
-                    coll.nss, coll.uuid, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
+                std::unique_ptr<HealthLogEntry> logEntry =
+                    dbCheckErrorHealthLogEntry(coll.nss,
+                                               coll.uuid,
+                                               "dbCheck failed",
+                                               ScopeEnum::Cluster,
+                                               OplogEntriesEnum::Batch,
+                                               e.toStatus());
                 HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*logEntry);
                 return;
             }
@@ -568,6 +576,7 @@ private:
                             "abandoning dbCheck batch because collection no longer exists, but "
                             "there "
                             "is a view with the identical name",
+                            ScopeEnum::Collection,
                             OplogEntriesEnum::Batch,
                             Status(ErrorCodes::NamespaceNotFound,
                                    "Collection under dbCheck no longer existsCollection under "
@@ -579,6 +588,7 @@ private:
                             dbCheckErrorHealthLogEntry(info.nss,
                                                        info.uuid,
                                                        "dbCheck batch failed",
+                                                       ScopeEnum::Index,
                                                        OplogEntriesEnum::Batch,
                                                        ex.toStatus());
                         HealthLogInterface::get(opCtx)->log(*entry);
@@ -615,6 +625,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because collection no longer exists",
+                ScopeEnum::Collection,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -633,6 +644,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because index no longer exists",
+                ScopeEnum::Index,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -722,6 +734,7 @@ private:
             // 2. Get the actual first and last keystrings processed from reverse lookup.
             batchFirst = batchStats.firstIndexKey;
             auto batchLast = batchStats.lastIndexKey;
+
             // If batchLast is not initialized, that means there was an error with batching.
             if (batchLast.isEmpty()) {
                 LOGV2_DEBUG(7844903,
@@ -737,6 +750,7 @@ private:
                     info.nss,
                     info.uuid,
                     "abandoning dbCheck extra index keys check because of error with batching",
+                    ScopeEnum::Index,
                     OplogEntriesEnum::Batch,
                     status);
                 HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -835,6 +849,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because collection no longer exists",
+                ScopeEnum::Index,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -864,6 +879,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because index no longer exists",
+                ScopeEnum::Index,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -945,6 +961,7 @@ private:
                                               info.uuid,
                                               SeverityEnum::Info,
                                               "dbcheck extra keys check batch on primary",
+                                              ScopeEnum::Index,
                                               OplogEntriesEnum::Batch,
                                               builder.obj());
 
@@ -1033,6 +1050,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because collection no longer exists",
+                ScopeEnum::Collection,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -1054,6 +1072,7 @@ private:
                 info.nss,
                 info.uuid,
                 "abandoning dbCheck extra index keys check because index no longer exists",
+                ScopeEnum::Index,
                 OplogEntriesEnum::Batch,
                 status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -1122,6 +1141,7 @@ private:
                                              info.uuid,
                                              "abandoning dbCheck extra index keys check because "
                                              "there are no keys left in the index",
+                                             ScopeEnum::Index,
                                              OplogEntriesEnum::Batch,
                                              status);
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -1247,6 +1267,7 @@ private:
                 info.nss,
                 info.uuid,
                 "found extra index key entry without corresponding document",
+                ScopeEnum::Index,
                 OplogEntriesEnum::Batch,
                 status,
                 context.done());
@@ -1325,6 +1346,7 @@ private:
                                                    "found index key entry with corresponding "
                                                    "document/keystring set that does not "
                                                    "contain the expected key string",
+                                                   ScopeEnum::Index,
                                                    OplogEntriesEnum::Batch,
                                                    status,
                                                    context.done());
@@ -1373,6 +1395,7 @@ private:
                     info.nss,
                     info.uuid,
                     "abandoning dbCheck batch because collection no longer exists",
+                    ScopeEnum::Collection,
                     OplogEntriesEnum::Batch,
                     Status(ErrorCodes::NamespaceNotFound, collNotFoundMsg));
                 HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*entry);
@@ -1426,6 +1449,7 @@ private:
                         info.nss,
                         info.uuid,
                         "retrying dbCheck batch after timeout due to lock unavailability",
+                        ScopeEnum::Collection,
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (code == ErrorCodes::SnapshotUnavailable) {
@@ -1434,6 +1458,7 @@ private:
                         info.nss,
                         info.uuid,
                         "retrying dbCheck batch after conflict with pending catalog operation",
+                        ScopeEnum::Collection,
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (code == ErrorCodes::NamespaceNotFound) {
@@ -1441,6 +1466,7 @@ private:
                         info.nss,
                         info.uuid,
                         "abandoning dbCheck batch because collection no longer exists",
+                        ScopeEnum::Collection,
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (code == ErrorCodes::CommandNotSupportedOnView) {
@@ -1449,6 +1475,7 @@ private:
                                                          "abandoning dbCheck batch because "
                                                          "collection no longer exists, but there "
                                                          "is a view with the identical name",
+                                                         ScopeEnum::Collection,
                                                          OplogEntriesEnum::Batch,
                                                          result.getStatus());
                 } else if (code == ErrorCodes::IndexNotFound) {
@@ -1456,6 +1483,7 @@ private:
                         info.nss,
                         info.uuid,
                         "skipping dbCheck on collection because it is missing an _id index",
+                        ScopeEnum::Collection,
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code)) {
@@ -1463,12 +1491,14 @@ private:
                         info.nss,
                         info.uuid,
                         "stopping dbCheck because node is no longer primary",
+                        ScopeEnum::Cluster,
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else {
                     entry = dbCheckErrorHealthLogEntry(info.nss,
                                                        info.uuid,
                                                        "dbCheck batch failed",
+                                                       ScopeEnum::Collection,
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
                     if (code == ErrorCodes::NoSuchKey) {
@@ -1510,6 +1540,7 @@ private:
                 auto entry = dbCheckWarningHealthLogEntry(info.nss,
                                                           info.uuid,
                                                           "dbCheck failed waiting for writeConcern",
+                                                          ScopeEnum::Collection,
                                                           OplogEntriesEnum::Batch,
                                                           status);
                 HealthLogInterface::get(opCtx)->log(*entry);
@@ -1592,6 +1623,7 @@ private:
                 readTimestamp);
 
         boost::optional<DbCheckHasher> hasher;
+        Status status = Status::OK();
         try {
             hasher.emplace(opCtx,
                            collectionPtr,
@@ -1601,16 +1633,27 @@ private:
                            boost::none,
                            std::min(batchDocs, info.maxCount),
                            std::min(batchBytes, info.maxSize));
+
+            const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
+            status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);
         } catch (const DBException& e) {
             return e.toStatus();
         }
 
-        const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
-
-        Status status = hasher->hashForCollectionCheck(opCtx, collectionPtr, batchDeadline);
-
         if (!status.isOK()) {
-            return status;
+            // dbCheck should still continue if we get an error fetching a record.
+            if (status.code() == ErrorCodes::KeyNotFound) {
+                std::unique_ptr<HealthLogEntry> healthLogEntry =
+                    dbCheckErrorHealthLogEntry(info.nss,
+                                               info.uuid,
+                                               "Error fetching record from record id",
+                                               ScopeEnum::Index,
+                                               OplogEntriesEnum::Batch,
+                                               status);
+                HealthLogInterface::get(opCtx)->log(*healthLogEntry);
+            } else {
+                return status;
+            }
         }
 
         std::string md5 = hasher->total();
