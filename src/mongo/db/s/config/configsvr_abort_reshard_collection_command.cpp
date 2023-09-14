@@ -76,7 +76,7 @@ void assertExistsReshardingDocument(OperationContext* opCtx, UUID reshardingUUID
 }
 
 auto assertGetReshardingMachine(OperationContext* opCtx, UUID reshardingUUID) {
-    auto machine = resharding::tryGetReshardingStateMachine<
+    auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
         ReshardingCoordinatorService,
         ReshardingCoordinatorService::ReshardingCoordinator,
         ReshardingCoordinatorDocument>(opCtx, reshardingUUID);
