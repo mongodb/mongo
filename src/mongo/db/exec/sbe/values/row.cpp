@@ -72,6 +72,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
 
     switch (tag) {
         case TypeTags::Nothing:
+            val = 0;
             break;
         case TypeTags::NumberInt32:
             val = bitcastFrom<int32_t>(buf.read<LittleEndian<int32_t>>());
