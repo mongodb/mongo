@@ -5925,10 +5925,17 @@ private:
             return Value(std::signbit(doubleValue) ? "-Infinity"_sd : "Infinity"_sd);
         } else if (std::isnan(doubleValue)) {
             return Value("NaN"_sd);
-        } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
-            return Value("-0"_sd);
+        } else if (doubleValue == 0.0) {
+            return std::signbit(doubleValue) ? Value("-0"_sd) : Value("0"_sd);
         } else {
-            return Value(static_cast<std::string>(str::stream() << doubleValue));
+            std::string formatted = fmt::format("{}", doubleValue);
+            // Handle case with trailing zero after decimal point.
+            size_t pos = formatted.find_last_not_of('0');
+            if (pos != std::string::npos && formatted[pos] == '.') {
+                // If the last character is a decimal point, remove it as well
+                formatted.erase(pos);
+            }
+            return Value(formatted);
         }
     }
 
