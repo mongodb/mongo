@@ -46,7 +46,9 @@ function runPipeline(predValue) {
 
     const explain = coll.explain().aggregate(pipeline);
     const unpackStage = getAggPlanStages(explain, "$_internalUnpackBucket");
-    assert.eq(1, unpackStage.length, `Expected $_internalUnpackBucket in ${tojson(explain)}`);
+    // If data is on both of the shards, we will see 2 "$_internalUnpackBucket" stages in the
+    // explain plan.
+    assert.gte(unpackStage.length, 1, `Expected $_internalUnpackBucket in ${tojson(explain)}`);
     return unpackStage[0]["$_internalUnpackBucket"];
 }
 
