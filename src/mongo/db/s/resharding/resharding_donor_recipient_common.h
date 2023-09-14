@@ -50,15 +50,50 @@ namespace resharding {
 using ReshardingFields = TypeCollectionReshardingFields;
 
 /**
- * Looks up the StateMachine by the 'reshardingUUID'. If it does not exist, returns boost::none.
+ * Looks up the StateMachine by the 'reshardingUUID'. Returns boost::none in the following cases:
+ * 1. The state machine does not exist.
+ * 2. In certain cases when the node is shutting down.
+ * Additionally returns a bool indicating if the node is stepping or shutting down to disambiguate
+ * the two.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+std::pair<boost::optional<std::shared_ptr<StateMachine>>, bool>
+tryGetReshardingStateMachineAndShutdownState(OperationContext* opCtx, const UUID& reshardingUUID) {
+    auto instanceId = BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID);
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+    auto service = registry->lookupServiceByName(Service::kServiceName);
+    return StateMachine::lookup(opCtx, service, instanceId);
+}
+
+/**
+ * Same as tryGetReshardingStateMachineAndShutdownState, except does not return the shutdown state.
  */
 template <class Service, class StateMachine, class ReshardingDocument>
 boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
     OperationContext* opCtx, const UUID& reshardingUUID) {
-    auto instanceId = BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID);
-    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-    auto service = registry->lookupServiceByName(Service::kServiceName);
-    auto [instance, _] = StateMachine::lookup(opCtx, service, instanceId);
+    auto [instance, _] =
+        tryGetReshardingStateMachineAndShutdownState<Service, StateMachine, ReshardingDocument>(
+            opCtx, reshardingUUID);
+    return instance;
+}
+
+/**
+ * Same as tryGetReshardingStateMachine, except throws if we were stepping or shutting down when we
+ * tried to access the PrimaryOnlyService. Use this function in situations where you need to
+ * guarantee that a return of boost::none means that there is no state document on disk for the
+ * associated state machine.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachineAndThrowIfShuttingDown(
+    OperationContext* opCtx, const UUID& reshardingUUID) {
+    auto [instance, steppingOrShuttingDown] =
+        tryGetReshardingStateMachineAndShutdownState<Service, StateMachine, ReshardingDocument>(
+            opCtx, reshardingUUID);
+
+    uassert(ErrorCodes::InterruptedDueToReplStateChange,
+            "Unable to get resharding state machine, if it exists, because the node is "
+            "stepping or shutting down.",
+            !steppingOrShuttingDown);
 
     return instance;
 }

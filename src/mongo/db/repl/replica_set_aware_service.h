@@ -154,6 +154,8 @@ public:
 
     /**
      * Called as part of ReplicationCoordinator shutdown.
+     * Note that it is possible that we are still a writable primary after onShutdown() has been
+     * called (see SERVER-81115).
      */
     virtual void onShutdown() = 0;
 

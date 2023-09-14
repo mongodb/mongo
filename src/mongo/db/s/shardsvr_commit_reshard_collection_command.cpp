@@ -96,12 +96,13 @@ public:
             std::vector<SharedSemiFuture<void>> futuresToWait;
 
             {
-                auto recipientMachine = resharding::tryGetReshardingStateMachine<
-                    ReshardingRecipientService,
-                    ReshardingRecipientService::RecipientStateMachine,
-                    ReshardingRecipientDocument>(opCtx, uuid());
+                auto recipientMachine =
+                    resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
+                        ReshardingRecipientService,
+                        ReshardingRecipientService::RecipientStateMachine,
+                        ReshardingRecipientDocument>(opCtx, uuid());
 
-                auto donorMachine = resharding::tryGetReshardingStateMachine<
+                auto donorMachine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                     ReshardingDonorService,
                     ReshardingDonorService::DonorStateMachine,
                     ReshardingDonorDocument>(opCtx, uuid());
