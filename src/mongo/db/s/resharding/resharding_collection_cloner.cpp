@@ -111,12 +111,7 @@ namespace {
 
 bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    auto [sourceChunkMgr, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << nss.toStringForErrorMsg()
-                          << " to be sharded",
-            sourceChunkMgr.isSharded());
+    auto [sourceChunkMgr, _] = catalogCache->getTrackedCollectionRoutingInfo(opCtx, nss);
 
     return !sourceChunkMgr.getDefaultCollator();
 }
@@ -757,8 +752,8 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         // writes to the temporary resharding collection. We attach shard version IGNORED to the
         // insert operations and retry once on a StaleConfig error to allow the collection metadata
         // information to be recovered.
-        auto [_, sii] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
+        auto [_, sii] =
+            Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfo(opCtx, _outputNss);
         if (useNaturalOrderCloner) {
             return resharding::data_copy::insertBatchTransactionally(opCtx,
                                                                      _outputNss,

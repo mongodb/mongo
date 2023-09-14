@@ -563,7 +563,7 @@ let viewsCommandTests = {
         setup: function(conn) {
             assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
         },
-        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,
@@ -641,7 +641,7 @@ let viewsCommandTests = {
         setup: function(conn) {
             assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
         },
-        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,
@@ -752,7 +752,7 @@ let viewsCommandTests = {
         setup: function(conn) {
             assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
         },
-        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,

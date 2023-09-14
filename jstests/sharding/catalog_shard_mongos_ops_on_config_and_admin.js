@@ -58,7 +58,7 @@ assert.commandWorked(res);
     assert.commandFailedWithCode(
         mongosAdminDB.adminCommand(
             {reshardCollection: "admin.system.roles", key: {uid: 1}, numInitialChunks: 2}),
-        ErrorCodes.NamespaceNotSharded);
+        [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
 }
 
 // Mongos commands on the config database that previously failed that should still fail when run

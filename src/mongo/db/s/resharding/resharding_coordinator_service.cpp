@@ -534,14 +534,19 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                                         boost::optional<ChunkVersion> chunkVersion,
                                         boost::optional<const BSONObj&> collation,
                                         boost::optional<CollectionIndexes> indexVersion,
+                                        boost::optional<bool> isUnsplittable,
                                         TxnNumber txnNumber) {
     BatchedCommandRequest request([&] {
         auto nextState = coordinatorDoc.getState();
         switch (nextState) {
             case CoordinatorStateEnum::kPreparingToDonate: {
                 // Insert new entry for the temporary nss into config.collections
-                auto collType = resharding::createTempReshardingCollectionType(
-                    opCtx, coordinatorDoc, chunkVersion.value(), collation.value(), indexVersion);
+                auto collType = resharding::createTempReshardingCollectionType(opCtx,
+                                                                               coordinatorDoc,
+                                                                               chunkVersion.value(),
+                                                                               collation.value(),
+                                                                               indexVersion,
+                                                                               isUnsplittable);
                 return BatchedCommandRequest::buildInsertOp(
                     CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
             }
@@ -793,7 +798,8 @@ CollectionType createTempReshardingCollectionType(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation,
-    boost::optional<CollectionIndexes> indexVersion) {
+    boost::optional<CollectionIndexes> indexVersion,
+    boost::optional<bool> isUnsplittable) {
     CollectionType collType(coordinatorDoc.getTempReshardingNss(),
                             chunkVersion.epoch(),
                             chunkVersion.getTimestamp(),
@@ -801,6 +807,10 @@ CollectionType createTempReshardingCollectionType(
                             coordinatorDoc.getReshardingUUID(),
                             coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
+
+    if (isUnsplittable.has_value() && isUnsplittable.get()) {
+        collType.setUnsplittable(isUnsplittable.get());
+    }
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
@@ -853,8 +863,13 @@ void writeDecisionPersistedState(OperationContext* opCtx,
             writeToConfigIndexesForTempNss(opCtx, coordinatorDoc, txnNumber);
 
             // Remove the config.collections entry for the temporary collection
-            writeToConfigCollectionsForTempNss(
-                opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
+            writeToConfigCollectionsForTempNss(opCtx,
+                                               coordinatorDoc,
+                                               boost::none,
+                                               boost::none,
+                                               boost::none,
+                                               boost::none,
+                                               txnNumber);
 
             // Update the config.collections entry for the original namespace to reflect the new
             // shard key, new epoch, and new UUID
@@ -948,7 +963,8 @@ void writeParticipantShardsAndTempCollInfo(
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
     std::vector<ChunkType> initialChunks,
     std::vector<BSONObj> zones,
-    boost::optional<CollectionIndexes> indexVersion) {
+    boost::optional<CollectionIndexes> indexVersion,
+    boost::optional<bool> isUnsplittable) {
     const auto tagsQuery = BSON(
         TagsType::ns(NamespaceStringUtil::serialize(updatedCoordinatorDoc.getTempReshardingNss())));
 
@@ -968,6 +984,7 @@ void writeParticipantShardsAndTempCollInfo(
                                                chunkVersion,
                                                CollationSpec::kSimpleSpec,
                                                indexVersion,
+                                               isUnsplittable,
                                                txnNumber);
             // Copy the original indexes to the temporary uuid.
             writeToConfigIndexesForTempNss(opCtx, updatedCoordinatorDoc, txnNumber);
@@ -1008,8 +1025,13 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
                 // removed the entry for the temporary collection and updated the entry with
                 // original namespace to have the new shard key, UUID, and epoch
                 if (nextState < CoordinatorStateEnum::kCommitting) {
-                    writeToConfigCollectionsForTempNss(
-                        opCtx, coordinatorDoc, boost::none, boost::none, boost::none, txnNumber);
+                    writeToConfigCollectionsForTempNss(opCtx,
+                                                       coordinatorDoc,
+                                                       boost::none,
+                                                       boost::none,
+                                                       boost::none,
+                                                       boost::none,
+                                                       txnNumber);
 
                     // Copy the original indexes to the temporary uuid.
                     writeToConfigIndexesForTempNss(opCtx, coordinatorDoc, txnNumber);
@@ -1103,6 +1125,13 @@ boost::optional<CollectionIndexes> ReshardingCoordinatorExternalState::getCatalo
     return boost::none;
 }
 
+bool ReshardingCoordinatorExternalState::getIsUnsplittable(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
+    auto [cm, _] =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    return cm.isUnsplittable();
+}
+
 boost::optional<CollectionIndexes>
 ReshardingCoordinatorExternalState::getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
@@ -1144,8 +1173,9 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
 ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+
     const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
+        Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithPlacementRefresh(
             opCtx, coordinatorDoc.getSourceNss()));
 
     std::set<ShardId> donorShardIds;
@@ -2104,17 +2134,19 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                // placement.
                if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
                        serverGlobalParams.featureCompatibility)) {
+
                    auto cri = uassertStatusOK(
-                       Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                       Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithRefresh(
                            opCtx, _coordinatorDoc.getSourceNss()));
                    cm.emplace(cri.cm);
                } else {
-                   cm.emplace(
+
+                   auto cri =
                        uassertStatusOK(Grid::get(opCtx)
                                            ->catalogCache()
-                                           ->getShardedCollectionRoutingInfoWithPlacementRefresh(
-                                               opCtx, _coordinatorDoc.getSourceNss()))
-                           .cm);
+                                           ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
+                                               opCtx, _coordinatorDoc.getSourceNss()));
+                   cm.emplace(cri.cm);
                }
 
                const auto currentShardKey = cm->getShardKeyPattern().getKeyPattern();
@@ -2221,12 +2253,16 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         updatedCoordinatorDoc.getSourceNss(),
         updatedCoordinatorDoc.getReshardingUUID());
 
+    auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
+        opCtx.get(), updatedCoordinatorDoc.getSourceNss());
+
     resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
                                                       _metrics.get(),
                                                       updatedCoordinatorDoc,
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones),
-                                                      std::move(indexVersion));
+                                                      std::move(indexVersion),
+                                                      isUnsplittable);
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
     reshardingPauseCoordinatorAfterPreparingToDonate.pauseWhileSetAndNotCanceled(
@@ -2444,11 +2480,13 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     auto reshardedCollectionPlacement = [&] {
         std::set<ShardId> collectionPlacement;
         std::vector<ShardId> collectionPlacementAsVector;
+
         const auto [cm, _] =
             uassertStatusOK(Grid::get(opCtx.get())
                                 ->catalogCache()
-                                ->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                                ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
                                     opCtx.get(), coordinatorDoc.getTempReshardingNss()));
+
         cm.getAllShardIds(&collectionPlacement);
 
         collectionPlacementAsVector.reserve(collectionPlacement.size());
@@ -2488,7 +2526,7 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
 
     const auto cm = uassertStatusOK(Grid::get(opCtx.get())
                                         ->catalogCache()
-                                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                                        ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
                                             opCtx.get(), _coordinatorDoc.getSourceNss()))
                         .cm;
 
@@ -2717,7 +2755,7 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
 
     try {
         auto [routingInfo, _] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(
+            Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, nss));
 
         const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();

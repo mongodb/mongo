@@ -31,9 +31,9 @@ assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNo
 const coll = st.s.getDB(dbName)["collName"];
 assert.commandWorked(coll.insert({oldKey: 1}));
 
-// Fail if collection is unsharded.
+// Fail if collection is not tracked.
 // TODO(SERVER-80156): update test case to succeed on unsharded collections
-assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));

@@ -78,7 +78,8 @@ CollectionType createTempReshardingCollectionType(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation,
-    boost::optional<CollectionIndexes> indexVersion);
+    boost::optional<CollectionIndexes> indexVersion,
+    boost::optional<bool> isUnsplittable);
 
 void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
 
@@ -103,7 +104,8 @@ void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            std::vector<ChunkType> initialChunks,
                                            std::vector<BSONObj> zones,
-                                           boost::optional<CollectionIndexes> indexVersion);
+                                           boost::optional<CollectionIndexes> indexVersion,
+                                           boost::optional<bool> isUnsplittable);
 
 void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     OperationContext* opCtx,
@@ -135,6 +137,8 @@ public:
     boost::optional<CollectionIndexes> getCatalogIndexVersion(OperationContext* opCtx,
                                                               const NamespaceString& nss,
                                                               const UUID& uuid);
+
+    bool getIsUnsplittable(OperationContext* opCtx, const NamespaceString& nss);
 
     boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                        const NamespaceString& nss);
