@@ -207,6 +207,7 @@ clientDriverEnv.Library(
         'connpool.cpp',
         'dbclient_connection.cpp',
         'dbclient_rs.cpp',
+        'dbclient_session.cpp',
         'global_conn_pool.cpp',
         'global_conn_pool.idl',
         'replica_set_change_notifier.cpp',

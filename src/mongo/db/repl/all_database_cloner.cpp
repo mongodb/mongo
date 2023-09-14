@@ -143,9 +143,9 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
             [this](const executor::RemoteCommandResponse& helloReply) {
                 return ensurePrimaryOrSecondary(helloReply);
             });
-        uassertStatusOK(client->connect(getSource(), StringData(), boost::none));
+        client->connect(getSource(), StringData(), boost::none);
     } else {
-        client->checkConnection();
+        client->ensureConnection();
     }
     uassertStatusOK(replAuthenticate(client).withContext(
         str::stream() << "Failed to authenticate to " << getSource()));

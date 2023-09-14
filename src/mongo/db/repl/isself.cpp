@@ -284,25 +284,26 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         // We need to avoid the "hello" call triggered by a normal connect, which would cause a
         // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
         // configuration document, but the "hello" command requires a lock on the replication
-        // coordinator to execute. As such we call we call 'connectSocketOnly', which does not call
+        // coordinator to execute. As such we call we call 'connectNoHello', which does not call
         // "hello".
-        auto connectSocketResult = conn.connectSocketOnly(hostAndPort, boost::none);
-        if (!connectSocketResult.isOK()) {
+        try {
+            conn.connectNoHello(hostAndPort, boost::none);
+        } catch (const DBException& e) {
             LOGV2(4834700,
-                  "isSelf could not connect via connectSocketOnly",
+                  "isSelf could not connect via connectNoHello",
                   "hostAndPort"_attr = hostAndPort,
-                  "error"_attr = connectSocketResult);
+                  "error"_attr = e);
             return false;
         }
 
         if (auth::isInternalAuthSet()) {
-            auto authInternalUserResult =
+            try {
                 conn.authenticateInternalUser(auth::StepDownBehavior::kKeepConnectionOpen);
-            if (!authInternalUserResult.isOK()) {
+            } catch (const DBException& e) {
                 LOGV2(4834701,
                       "isSelf could not authenticate internal user",
                       "hostAndPort"_attr = hostAndPort,
-                      "error"_attr = authInternalUserResult);
+                      "error"_attr = e);
                 return false;
             }
         }

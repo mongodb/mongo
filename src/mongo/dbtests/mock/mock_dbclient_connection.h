@@ -133,14 +133,13 @@ public:
 
     bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
-    Status connect(const HostAndPort& host,
-                   StringData applicationName,
-                   boost::optional<TransientSSLParams> transientSSLParams) override {
+    void connect(const HostAndPort& host,
+                 StringData applicationName,
+                 boost::optional<TransientSSLParams> transientSSLParams) override {
         std::string errmsg;
         if (!connect(host.toString().c_str(), applicationName, errmsg)) {
-            return {ErrorCodes::HostUnreachable, errmsg};
+            uasserted(ErrorCodes::HostUnreachable, errmsg);
         }
-        return Status::OK();
     }
 
     using DBClientBase::runCommandWithTarget;
@@ -167,7 +166,7 @@ public:
                 bool removeMany = true,
                 boost::optional<BSONObj> writeConcernObj = boost::none) override;
 
-    Status recv(mongo::Message& m, int lastRequestId) override;
+    mongo::Message recv(int lastRequestId) override;
 
     void shutdown() override;
     void shutdownAndDisallowReconnect() override;
@@ -203,10 +202,8 @@ public:
              std::string* actualServer = nullptr) override;
 
 private:
-    void _call(mongo::Message& toSend,
-               mongo::Message& response,
-               std::string* actualServer) override;
-    void checkConnection() override;
+    mongo::Message _call(mongo::Message& toSend, std::string* actualServer) override;
+    void ensureConnection() override;
 
     std::unique_ptr<DBClientCursor> bsonArrayToCursor(BSONArray results,
                                                       int nToSkip,

@@ -108,7 +108,7 @@ void setPromiseOkifNotReady(WithLock lk, Promise& promise) {
  * Connect to the donor source and uses the default authentication mode.
  */
 void connectAndAuth(const HostAndPort& source, DBClientConnection* client) {
-    uassertStatusOK(client->connect(source, "TenantFileImporterService", boost::none));
+    client->connect(source, "TenantFileImporterService", boost::none);
     uassertStatusOK(replAuthenticate(client).withContext(
         str::stream() << "TenantFileImporterService failed to authenticate to " << source));
 }

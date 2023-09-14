@@ -328,15 +328,16 @@ bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
 
 void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
     if (_internalAuthRequested) {
-        auto status = conn->authenticateInternalUser();
-        if (!status.isOK()) {
+        try {
+            conn->authenticateInternalUser();
+        } catch (const DBException& e) {
             LOGV2_WARNING(20148,
                           "Cached auth failed for set {replicaSet}: {error}",
                           "Cached auth failed",
                           "replicaSet"_attr = _setName,
-                          "error"_attr = status);
+                          "error"_attr = e.toStatus());
+            return;
         }
-        return;
     }
 
     for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
@@ -396,7 +397,7 @@ Status DBClientReplicaSet::connect() {
 }
 
 template <typename Authenticate>
-Status DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
+void DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
     // We prefer to authenticate against a primary, but otherwise a secondary is ok too
     // Empty tag matches every secondary
     const auto readPref =
@@ -431,47 +432,44 @@ Status DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
                 resetPrimary();
             }
 
-            return Status::OK();
+            return;
         } catch (const DBException& e) {
-            auto status = e.toStatus();
-            if (status == ErrorCodes::AuthenticationFailed) {
-                return status;
+            if (e.code() == ErrorCodes::AuthenticationFailed) {
+                throw;
             }
-
-            lastNodeStatus =
-                status.withContext(str::stream() << "can't authenticate against replica set node "
-                                                 << _lastSecondaryOkHost);
+            lastNodeStatus = e.toStatus().withContext(
+                str::stream() << "can't authenticate against replica set node "
+                              << _lastSecondaryOkHost);
             _invalidateLastSecondaryOkCache(lastNodeStatus);
         }
     }
 
     if (lastNodeStatus.isOK()) {
-        return Status(ErrorCodes::HostNotFound,
-                      str::stream() << "Failed to authenticate, no good nodes in "
-                                    << _getMonitor()->getName());
+        uasserted(ErrorCodes::HostNotFound,
+                  str::stream() << "Failed to authenticate, no good nodes in "
+                                << _getMonitor()->getName());
     } else {
-        return lastNodeStatus;
+        uassertStatusOK(lastNodeStatus);  // always throws
     }
 }
 
-Status DBClientReplicaSet::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
-    if (!auth::isInternalAuthSet()) {
-        return {ErrorCodes::AuthenticationFailed,
-                "No authentication parameters set for internal user"};
-    }
+void DBClientReplicaSet::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
+    uassert(ErrorCodes::AuthenticationFailed,
+            "No authentication parameters set for internal user",
+            auth::isInternalAuthSet());
 
     _internalAuthRequested = true;
-    return _runAuthLoop([stepDownBehavior](DBClientConnection* conn) {
-        uassertStatusOK(conn->authenticateInternalUser(stepDownBehavior));
+    _runAuthLoop([stepDownBehavior](DBClientConnection* conn) {
+        conn->authenticateInternalUser(stepDownBehavior);
     });
 }
 
 void DBClientReplicaSet::_auth(const BSONObj& params) {
-    uassertStatusOK(_runAuthLoop([&](DBClientConnection* conn) {
+    _runAuthLoop([&](DBClientConnection* conn) {
         conn->auth(params);
         // Cache the new auth information since we now validated it's good
         _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
-    }));
+    });
 }
 
 void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {
@@ -733,18 +731,17 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
     return;
 }
 
-Status DBClientReplicaSet::recv(Message& m, int lastRequestId) {
+Message DBClientReplicaSet::recv(int lastRequestId) {
     MONGO_verify(_lastClient);
 
     try {
-        return _lastClient->recv(m, lastRequestId);
+        return _lastClient->recv(lastRequestId);
     } catch (DBException& e) {
         LOGV2(20143,
-              "Could not receive data from {connString}: {error}",
               "Could not receive data",
               "connString"_attr = _lastClient->toString(),
               "error"_attr = redact(e));
-        return e.toStatus();
+        throw;
     }
 }
 
@@ -814,7 +811,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientReplicaSet::r
     return {std::move(out.first), std::move(conn)};
 }
 
-void DBClientReplicaSet::_call(Message& toSend, Message& response, string* actualServer) {
+Message DBClientReplicaSet::_call(Message& toSend, string* actualServer) {
     LOGV2_DEBUG(20146,
                 3,
                 "dbclient_rs call to primary node in {replicaSet}",
@@ -825,7 +822,7 @@ void DBClientReplicaSet::_call(Message& toSend, Message& response, string* actua
     if (actualServer)
         *actualServer = m->getServerAddress();
 
-    m->call(toSend, response);
+    return m->call(toSend);
 }
 
 void DBClientReplicaSet::_invalidateLastSecondaryOkCache(const Status& status) {

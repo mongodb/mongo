@@ -854,8 +854,9 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     params.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
     params.targetedClusterConnectionString = ConnectionString::forLocal();
 
-    auto status = conn.connectSocketOnly({testHostName(), port}, std::move(params));
-    ASSERT_EQ(status, ErrorCodes::HostUnreachable);
+    ASSERT_THROWS_CODE(conn.connectNoHello({testHostName(), port}, std::move(params)),
+                       DBException,
+                       ErrorCodes::HostUnreachable);
 }
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL

@@ -145,8 +145,8 @@ std::string EncryptedDBClientBase::getServerAddress() const {
     return _conn->getServerAddress();
 }
 
-void EncryptedDBClientBase::_call(Message& toSend, Message& response, std::string* actualServer) {
-    _conn->call(toSend, response, actualServer);
+Message EncryptedDBClientBase::_call(Message& toSend, std::string* actualServer) {
+    return _conn->call(toSend, actualServer);
 }
 
 void EncryptedDBClientBase::say(Message& toSend, bool isRetry, std::string* actualServer) {

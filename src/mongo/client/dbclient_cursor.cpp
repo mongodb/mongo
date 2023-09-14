@@ -147,7 +147,7 @@ bool DBClientCursor::init() {
     MONGO_verify(_client);
     Message reply;
     try {
-        _client->call(toSend, reply, &_originalHost);
+        reply = _client->call(toSend, &_originalHost);
     } catch (const DBException&) {
         // log msg temp?
         LOGV2(20127, "DBClientCursor::init call() failed");
@@ -176,8 +176,7 @@ void DBClientCursor::requestMore() {
 
     auto doRequestMore = [&] {
         Message toSend = assembleGetMore();
-        Message response;
-        _client->call(toSend, response);
+        Message response = _client->call(toSend);
         dataReceived(response);
     };
     if (_client)
@@ -200,9 +199,13 @@ void DBClientCursor::exhaustReceiveMore() {
     MONGO_verify(_batch.pos == _batch.objs.size());
     Message response;
     MONGO_verify(_client);
-    uassertStatusOK(
-        _client->recv(response, _lastRequestId).withContext("recv failed while exhausting cursor"));
-    dataReceived(response);
+    try {
+        auto response = _client->recv(_lastRequestId);
+        dataReceived(response);
+    } catch (DBException& e) {
+        e.addContext("recv failed while exhausting cursor");
+        throw;
+    }
 }
 
 BSONObj DBClientCursor::commandDataReceived(const Message& reply) {

@@ -140,7 +140,7 @@ TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
     OpMsg::setFlag(&request, 1u << 15);  // This should be the last required flag to be assigned.
 
     Message reply;
-    ASSERT_THROWS_CODE(conn->call(request, reply), DBException, ErrorCodes::HostUnreachable);
+    ASSERT_THROWS_CODE(conn->call(request), DBException, ErrorCodes::HostUnreachable);
 }
 
 TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
@@ -149,8 +149,7 @@ TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
     auto request = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, BSON("ping" << 1)).serialize();
     OpMsg::setFlag(&request, 1u << 31);  // This should be the last optional flag to be assigned.
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     uassertStatusOK(getStatusFromCommandResult(
         conn->parseCommandReplyMessage(conn->getServerAddress(), reply)->getCommandReply()));
 }
@@ -196,8 +195,7 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     })"));
 
     Message request = msgBuilder.finishWithoutSizeChecking();
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
 
     ASSERT_EQ(conn->count(NamespaceString::createNamespaceString_forTest("test.collection")), 3u);
     conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
@@ -229,8 +227,7 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     msgBuilder.setBody(std::move(body));
 
     Message request = msgBuilder.finishWithoutSizeChecking();
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
 
     ASSERT_EQ(conn->count(NamespaceString::createNamespaceString_forTest("test.collection")),
               write_ops::kMaxWriteBatchSize);
@@ -248,7 +245,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
     bool foundSecondary = false;
     for (auto host : connStr.getServers()) {
         DBClientConnection conn;
-        uassertStatusOK(conn.connect(host, "integration_test", boost::none));
+        conn.connect(host, "integration_test", boost::none);
         bool isPrimary;
         ASSERT(conn.isPrimary(isPrimary));
         if (isPrimary)
@@ -268,8 +265,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
 
         // Round-trip command fails with NotWritablePrimary error. Note that this failure is in
         // command dispatch which ignores w:0.
-        Message reply;
-        conn.call(request, reply);
+        Message reply = conn.call(request);
         ASSERT_EQ(
             getStatusFromCommandResult(
                 conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()),
@@ -282,9 +278,9 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // conn.call() calculated the request checksum, but setFlag() makes it invalid. Clear the
         // checksum so the next conn.call() recalculates it.
         OpMsg::removeChecksum(&request);
-        ASSERT_THROWS(conn.call(request, reply), ExceptionForCat<ErrorCategory::NetworkError>);
+        ASSERT_THROWS(conn.call(request), ExceptionForCat<ErrorCategory::NetworkError>);
 
-        uassertStatusOK(conn.connect(host, "integration_test", boost::none));  // Reconnect.
+        conn.connect(host, "integration_test", boost::none);  // Reconnect.
 
         // Disable eager checking of primary to simulate a stepdown occurring after the check. This
         // should respect w:0.
@@ -297,7 +293,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
                                output))
             << output;
         ON_BLOCK_EXIT([&] {
-            uassertStatusOK(conn.connect(host, "integration_test-cleanup", boost::none));
+            conn.connect(host, "integration_test-cleanup", boost::none);
             ASSERT(conn.runCommand(DatabaseName::kAdmin,
                                    fromjson(R"({
                                           configureFailPoint:
@@ -312,14 +308,14 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // Round-trip command claims to succeed due to w:0.
         OpMsg::removeChecksum(&request);
         OpMsg::replaceFlags(&request, 0);
-        conn.call(request, reply);
+        reply = conn.call(request);
         ASSERT_OK(getStatusFromCommandResult(
             conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()));
 
         // Fire-and-forget should still close connection.
         OpMsg::setFlag(&request, OpMsg::kMoreToCome);
         OpMsg::removeChecksum(&request);
-        ASSERT_THROWS(conn.call(request, reply), ExceptionForCat<ErrorCategory::NetworkError>);
+        ASSERT_THROWS(conn.call(request), ExceptionForCat<ErrorCategory::NetworkError>);
 
         break;
     }
@@ -333,8 +329,7 @@ TEST(OpMsg, DocumentSequenceReturnsWork) {
     opMsgRequest.sequences.push_back({"example", {BSON("a" << 1), BSON("b" << 2)}});
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
 
     auto opMsgReply = OpMsg::parse(reply);
     ASSERT_EQ(opMsgReply.sequences.size(), 1u);
@@ -355,7 +350,7 @@ TEST(OpMsg, DocumentSequenceReturnsWork) {
                                   << "admin"));
 }
 
-constexpr auto kDisableChecksum = "dbClientConnectionDisableChecksum";
+constexpr auto kDisableChecksum = "dbClientSessionDisableChecksum";
 
 void disableClientChecksum() {
     auto failPoint = globalFailPointRegistry().find(kDisableChecksum);
@@ -396,8 +391,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.dbName(), findCmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -415,7 +409,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run getMore to initiate the exhaust stream.
-    conn->call(request, reply);
+    reply = conn->call(request);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -428,7 +422,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 1));
 
     // Receive next exhaust batch.
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -441,7 +435,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 3));
 
     // Receive terminal batch.
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
     res = OpMsg::parse(reply).body;
@@ -483,8 +477,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
     auto request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
     // The response should not have set moreToCome. We only expect getMore response to set
@@ -514,8 +507,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.dbName(), findCmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -533,7 +525,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run getMore. This should not start an exhaust stream.
-    conn->call(request, reply);
+    reply = conn->call(request);
     // The response should not have set moreToCome.
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -565,8 +557,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     const long long cursorId = res["cursor"]["id"].numberLong();
     ASSERT(res["cursor"]["firstBatch"].Array().empty());
@@ -597,19 +588,19 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
         };
 
     // Run getMore to initiate the exhaust stream.
-    conn->call(request, reply);
+    reply = conn->call(request);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     assertNextBatch(reply, cursorId, {BSON("_id" << 0), BSON("_id" << 1)});
 
     // Receive next exhaust batch.
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     assertNextBatch(reply, cursorId, {BSON("_id" << 2), BSON("_id" << 3)});
 
     // Receive terminal batch.
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     assertNextBatch(reply, 0, {BSON("_id" << 4)});
 }
@@ -633,8 +624,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, isMasterCmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -649,7 +639,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
 
     // Run isMaster command to initiate the exhaust stream.
     auto beforeExhaustCommand = clockSource->now();
-    conn->call(request, reply);
+    reply = conn->call(request);
     auto afterFirstResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_GT(duration_cast<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
@@ -662,7 +652,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
 
     // Receive next exhaust message.
     auto lastRequestId = reply.header().getId();
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     auto afterSecondResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_GT(duration_cast<Milliseconds>(afterSecondResponse - afterFirstResponse),
@@ -695,8 +685,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, isMasterCmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -714,7 +703,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
     // Run isMaster command to initiate the exhaust stream. The first response should be received
     // immediately.
     auto beforeExhaustCommand = clockSource->now();
-    conn->call(request, reply);
+    reply = conn->call(request);
     auto afterFirstResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_LT(duration_cast<Milliseconds>(afterFirstResponse - beforeExhaustCommand),
@@ -727,7 +716,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
 
     // Receive next exhaust message. The second response waits for 'maxAwaitTimeMS'.
     auto lastRequestId = reply.header().getId();
-    ASSERT_OK(conn->recv(reply, lastRequestId));
+    reply = conn->recv(lastRequestId);
     auto afterSecondResponse = clockSource->now();
     // Allow for clock skew when testing the response time.
     ASSERT_GT(duration_cast<Milliseconds>(afterSecondResponse - afterFirstResponse),
@@ -759,8 +748,7 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
     auto request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_NOT_OK(getStatusFromCommandResult(res));
 }
@@ -789,8 +777,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -802,7 +789,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    conn->call(request, reply);
+    reply = conn->call(request);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -868,8 +855,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn1->call(request, reply);
+    Message reply = conn1->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -881,7 +867,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    conn1->call(request, reply);
+    reply = conn1->call(request);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -921,7 +907,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
     ASSERT(waitForCondition([&] {
-        const auto status = conn1->recv(reply, lastRequestId);
+        reply = conn1->recv(lastRequestId);
         lastRequestId = reply.header().getId();
         res = OpMsg::parse(reply).body;
         return !getStatusFromCommandResult(res).isOK();
@@ -949,7 +935,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
-    conn1->call(request, reply);
+    reply = conn1->call(request);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -1005,8 +991,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn1->call(request, reply);
+    Message reply = conn1->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -1018,7 +1003,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    conn1->call(request, reply);
+    reply = conn1->call(request);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -1058,7 +1043,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
     ASSERT(waitForCondition([&] {
-        const auto status = conn1->recv(reply, lastRequestId);
+        reply = conn1->recv(lastRequestId);
         lastRequestId = reply.header().getId();
         res = OpMsg::parse(reply).body;
         return !getStatusFromCommandResult(res).isOK();
@@ -1119,8 +1104,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn1->call(request, reply);
+    Message reply = conn1->call(request);
     auto res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
     auto topologyVersion = res["topologyVersion"].Obj().getOwned();
@@ -1132,7 +1116,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command to initiate the exhaust stream.
-    conn1->call(request, reply);
+    reply = conn1->call(request);
     auto lastRequestId = reply.header().getId();
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
@@ -1172,7 +1156,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
 
     // Wait for the exhaust stream to close from the error returned by hello or isMaster.
     ASSERT(waitForCondition([&] {
-        const auto status = conn1->recv(reply, lastRequestId);
+        reply = conn1->recv(lastRequestId);
         lastRequestId = reply.header().getId();
         res = OpMsg::parse(reply).body;
         return !getStatusFromCommandResult(res).isOK();
@@ -1193,7 +1177,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
     // Run hello or isMaster command on conn1 to initiate a new exhaust stream.
-    conn1->call(request, reply);
+    reply = conn1->call(request);
     ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
     res = OpMsg::parse(reply).body;
     ASSERT_OK(getStatusFromCommandResult(res));
@@ -1284,8 +1268,7 @@ void checksumTest(bool enableChecksum) {
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, BSON("ping" << 1));
     auto request = opMsgRequest.serialize();
 
-    Message reply;
-    conn->call(request, reply);
+    Message reply = conn->call(request);
 
     auto opMsgReply = OpMsg::parse(reply);
     ASSERT_EQ(OpMsg::isFlagSet(reply, OpMsg::kChecksumPresent), enableChecksum);
@@ -1318,8 +1301,7 @@ TEST(OpMsg, ServerHandlesReallyLargeMessagesGracefully) {
     ASSERT_GT(request.body.objsize(), BSONObjMaxInternalSize);
     auto requestMsg = request.serializeWithoutSizeChecking();
 
-    Message replyMsg;
-    conn->call(requestMsg, replyMsg);
+    Message replyMsg = conn->call(requestMsg);
 
     auto reply = OpMsg::parse(replyMsg);
     auto replyStatus = getStatusFromCommandResult(reply.body);

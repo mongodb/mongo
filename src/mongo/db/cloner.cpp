@@ -515,9 +515,10 @@ Status DefaultClonerImpl::setupConn(OperationContext* opCtx, const std::string& 
     _conn = std::make_unique<ScopedDbConnection>(cs);
 
     if (auth::isInternalAuthSet()) {
-        auto authStatus = getConn()->authenticateInternalUser();
-        if (!authStatus.isOK()) {
-            return authStatus;
+        try {
+            getConn()->authenticateInternalUser();
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
     }
     return Status::OK();

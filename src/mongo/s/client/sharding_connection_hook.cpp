@@ -73,10 +73,13 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                     "Calling onCreate auth for {connectionString}",
                     "Calling onCreate auth",
                     "connectionString"_attr = conn->toString());
-
-        uassertStatusOKWithContext(conn->authenticateInternalUser(),
-                                   str::stream() << "can't authenticate to server "
-                                                 << conn->getServerAddress());
+        try {
+            conn->authenticateInternalUser();
+        } catch (DBException& e) {
+            e.addContext(str::stream()
+                         << "can't authenticate to server " << conn->getServerAddress());
+            throw;
+        }
     }
 
     conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {

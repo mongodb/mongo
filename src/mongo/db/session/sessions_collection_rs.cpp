@@ -82,7 +82,7 @@ auto SessionsCollectionRS::_makePrimaryConnection(OperationContext* opCtx) {
 
     // Make a connection to the primary, auth, then send
     if (auth::isInternalAuthSet()) {
-        uassertStatusOK(conn->get()->authenticateInternalUser());
+        conn->get()->authenticateInternalUser();
     }
 
     return conn;

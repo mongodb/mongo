@@ -47,13 +47,15 @@ AuthorizationManager* getGlobalAuthorizationManager() {
 
 }  // namespace
 
-Status replAuthenticate(DBClientBase* conn) {
-    if (auth::isInternalAuthSet())
-        return conn->authenticateInternalUser();
-    if (getGlobalAuthorizationManager()->isAuthEnabled())
+Status replAuthenticate(DBClientBase* conn) try {
+    if (auth::isInternalAuthSet()) {
+        conn->authenticateInternalUser();
+    } else if (getGlobalAuthorizationManager()->isAuthEnabled())
         return {ErrorCodes::AuthenticationFailed,
                 "Authentication is enabled but no internal authentication data is available."};
     return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 }  // namespace repl

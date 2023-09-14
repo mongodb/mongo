@@ -85,7 +85,7 @@ bool MockDBClientConnection::connect(const char* hostName,
 std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWithTarget(
     OpMsgRequest request) {
 
-    checkConnection();
+    ensureConnection();
 
     try {
         _lastCursorMessage = boost::none;
@@ -167,7 +167,7 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
     FindCommandRequest findRequest,
     const ReadPreferenceSetting& /*unused*/,
     ExhaustMode /*unused*/) {
-    checkConnection();
+    ensureConnection();
     try {
         int nToSkip = nToSkipFromResumeAfter(findRequest.getResumeAfter());
         bool provideResumeToken = findRequest.getRequestResumeToken();
@@ -216,9 +216,7 @@ void MockDBClientConnection::killCursor(const NamespaceString& ns, long long cur
     // It is not worth the bother of killing the cursor in the mock.
 }
 
-void MockDBClientConnection::_call(mongo::Message& toSend,
-                                   mongo::Message& response,
-                                   string* actualServer) {
+Message MockDBClientConnection::_call(Message& toSend, string* actualServer) {
     // Here we check for a getMore command, and if it is that, we respond with the next
     // reply message from the previous command that returned a cursor response.
     // This allows us to mock commands with implicit cursors (e.g. listCollections).
@@ -234,15 +232,14 @@ void MockDBClientConnection::_call(mongo::Message& toSend,
         if (!parsedMsg.body.isEmpty() &&
             parsedMsg.body.firstElement().fieldName() == "getMore"_sd) {
             auto reply = runCommandWithTarget(*_lastCursorMessage).first;
-            response = reply.releaseMessage();
-            return;
+            return reply.releaseMessage();
         }
     }
 
     ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
     stdx::unique_lock lk(_netMutex);
-    checkConnection();
+    ensureConnection();
     if (!isStillConnected() || !_remoteServer->isRunning()) {
         uasserted(ErrorCodes::SocketException, "Broken pipe in call");
     }
@@ -261,32 +258,31 @@ void MockDBClientConnection::_call(mongo::Message& toSend,
 
     const auto& swResponse = *_callIter;
     _callIter++;
-    response = uassertStatusOK(swResponse);
+    return uassertStatusOK(swResponse);
 }
 
-Status MockDBClientConnection::recv(mongo::Message& m, int lastRequestId) {
+Message MockDBClientConnection::recv(int lastRequestId) {
     ScopeGuard killSessionOnDisconnect([this] { shutdown(); });
 
     stdx::unique_lock lk(_netMutex);
-    if (!isStillConnected() || !_remoteServer->isRunning()) {
-        return Status(ErrorCodes::SocketException, "Broken pipe in recv");
-    }
+    uassert(ErrorCodes::SocketException,
+            "Broken pipe in recv",
+            isStillConnected() && _remoteServer->isRunning());
 
     _mockRecvResponsesCV.wait(lk, [&] {
         _blockedOnNetwork = (_recvIter == _mockRecvResponses.end());
         return !_blockedOnNetwork || !isStillConnected() || !_remoteServer->isRunning();
     });
 
-    if (!isStillConnected() || !_remoteServer->isRunning()) {
-        return Status(ErrorCodes::HostUnreachable, "Socket was shut down while in recv");
-    }
+    uassert(ErrorCodes::HostUnreachable,
+            "Socket was shut down while in recv",
+            isStillConnected() && _remoteServer->isRunning());
 
     killSessionOnDisconnect.dismiss();
 
     const auto& swResponse = *_recvIter;
     _recvIter++;
-    m = uassertStatusOK(swResponse);
-    return Status::OK();
+    return uassertStatusOK(swResponse);
 }
 
 void MockDBClientConnection::shutdown() {
@@ -327,9 +323,9 @@ void MockDBClientConnection::say(mongo::Message& toSend, bool isRetry, string* a
     invariant(false);  // unimplemented
 }
 
-void MockDBClientConnection::checkConnection() {
+void MockDBClientConnection::ensureConnection() {
     if (_failed.load()) {
-        uassert(ErrorCodes::SocketException, toString(), autoReconnect);
+        uassert(ErrorCodes::SocketException, toString(), _autoReconnect);
         uassert(ErrorCodes::HostUnreachable,
                 "cannot connect to " + _remoteServer->getServerAddress(),
                 _remoteServer->isRunning());

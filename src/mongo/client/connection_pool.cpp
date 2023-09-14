@@ -201,11 +201,11 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     // the number of seconds with a fractional part.
     conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
 
-    uassertStatusOK(conn->connect(target, StringData(), boost::none));
+    conn->connect(target, StringData(), boost::none);
     conn->setTags(_messagingPortTags);
 
     if (auth::isInternalAuthSet()) {
-        uassertStatusOK(conn->authenticateInternalUser());
+        conn->authenticateInternalUser();
     }
 
     if (_hook) {

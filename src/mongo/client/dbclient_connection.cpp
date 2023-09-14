@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-/**
- * Connect to a Mongo database as a database, from C++.
- */
-
-
 #include <boost/none.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
@@ -103,153 +98,34 @@ using std::map;
 using std::string;
 using std::unique_ptr;
 
-MONGO_FAIL_POINT_DEFINE(dbClientConnectionDisableChecksum);
-
-namespace {
-
-StatusWith<bool> completeSpeculativeAuth(DBClientConnection* conn,
-                                         auth::SpeculativeAuthType speculativeAuthType,
-                                         std::shared_ptr<SaslClientSession> session,
-                                         const MongoURI& uri,
-                                         BSONObj helloReply) {
-    auto specAuthElem = helloReply[auth::kSpeculativeAuthenticate];
-    if (specAuthElem.eoo()) {
-        return false;
-    }
-
-    if (speculativeAuthType == auth::SpeculativeAuthType::kNone) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Unexpected hello." << auth::kSpeculativeAuthenticate << " reply"};
-    }
-
-    if (specAuthElem.type() != Object) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "hello." << auth::kSpeculativeAuthenticate
-                              << " reply must be an object"};
-    }
-
-    auto specAuth = specAuthElem.Obj();
-    if (specAuth.isEmpty()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "hello." << auth::kSpeculativeAuthenticate
-                              << " reply must be a non-empty obejct"};
-    }
-
-    if (speculativeAuthType == auth::SpeculativeAuthType::kAuthenticate) {
-        return specAuth.hasField(saslCommandUserFieldName);
-    }
-
-    invariant(speculativeAuthType == auth::SpeculativeAuthType::kSaslStart);
-
-    const auto hook = [conn](OpMsgRequest request) -> Future<BSONObj> {
-        try {
-            auto ret = conn->runCommand(std::move(request));
-            auto status = getStatusFromCommandResult(ret->getCommandReply());
-            if (!status.isOK()) {
-                return status;
-            }
-            return ret->getCommandReply();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    };
-
-    return asyncSaslConversation(hook,
-                                 session,
-                                 BSON(saslContinueCommandName << 1),
-                                 specAuth,
-                                 uri.getAuthenticationDatabase(),
-                                 kSaslClientLogLevelDefault)
-        .getNoThrow()
-        .isOK();
+DBClientConnection::DBClientConnection(bool autoReconnect,
+                                       double so_timeout,
+                                       MongoURI uri,
+                                       const HandshakeValidationHook& hook,
+                                       const ClientAPIVersionParameters* apiParameters)
+    : DBClientSession(autoReconnect, so_timeout, uri, hook, apiParameters),
+      _autoReconnectBackoff(Seconds(1), Seconds(2)) {
+    _numConnections.fetchAndAdd(1);
 }
 
-/**
- * Initializes the wire version of conn, and returns the "hello" reply.
- */
-executor::RemoteCommandResponse initWireVersion(
-    DBClientConnection* conn,
-    StringData applicationName,
-    const MongoURI& uri,
-    std::vector<std::string>* saslMechsForAuth,
-    auth::SpeculativeAuthType* speculativeAuthType,
-    std::shared_ptr<SaslClientSession>* saslClientSession) try {
-
-    BSONObjBuilder bob;
-    bob.append("hello", 1);
-
-    if (uri.isHelloOk()) {
-        // Attach "helloOk: true" to the initial handshake to indicate that the client supports the
-        // hello command.
-        bob.append("helloOk", true);
+StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession(
+    const HostAndPort& host,
+    transport::ConnectSSLMode sslMode,
+    Milliseconds timeout,
+    boost::optional<TransientSSLParams> transientSSLParams) {
+    auto swSession = getGlobalServiceContext()->getTransportLayer()->connect(
+        host,
+        transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
+        _socketTimeout.value_or(Milliseconds(5000)),
+        transientSSLParams);
+    if (swSession.isOK()) {
+        swSession.getValue()->setTags(_tagMask);
     }
-
-    auto loadBalancedOpt = uri.getOption("loadBalanced");
-    if (loadBalancedOpt && (loadBalancedOpt.value() == "true")) {
-        bob.append("loadBalanced", true);
-    }
-
-    *speculativeAuthType = auth::speculateAuth(&bob, uri, saslClientSession);
-    if (!uri.getUser().empty()) {
-        UserName user(uri.getUser(), uri.getAuthenticationDatabase());
-        bob.append("saslSupportedMechs", user.getUnambiguousName());
-    }
-
-    if (getTestCommandsEnabled()) {
-        // Only include the host:port of this process in the "hello" command request if test
-        // commands are enabled. mongobridge uses this field to identify the process opening a
-        // connection to it.
-        StringBuilder sb;
-        sb << getHostName() << ':' << serverGlobalParams.port;
-        bob.append("hostInfo", sb.str());
-    }
-
-    auto versionString = VersionInfoInterface::instance().version();
-
-    Status serializeStatus =
-        ClientMetadata::serialize("MongoDB Internal Client", versionString, applicationName, &bob);
-    if (!serializeStatus.isOK()) {
-        return serializeStatus;
-    }
-
-    conn->getCompressorManager().clientBegin(&bob);
-
-    if (auto& wireSpec = WireSpec::getWireSpec(getGlobalServiceContext());
-        wireSpec.get()->isInternalClient) {
-        wireSpec.appendInternalClientWireVersion(wireSpec.get()->outgoing, &bob);
-    }
-
-    Date_t start{Date_t::now()};
-    auto result = conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));
-    Date_t finish{Date_t::now()};
-
-    BSONObj helloObj = result->getCommandReply().getOwned();
-
-    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(helloObj);
-    if (replyWireVersion.isOK()) {
-        conn->setWireVersions(replyWireVersion.getValue().minWireVersion,
-                              replyWireVersion.getValue().maxWireVersion);
-    }
-
-    if (helloObj.hasField("saslSupportedMechs") && helloObj["saslSupportedMechs"].type() == Array) {
-        auto array = helloObj["saslSupportedMechs"].Array();
-        for (const auto& elem : array) {
-            saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
-        }
-    }
-
-    conn->getCompressorManager().clientFinish(helloObj);
-
-    return executor::RemoteCommandResponse{std::move(helloObj), finish - start};
-
-} catch (...) {
-    return exceptionToStatus();
+    return swSession;
 }
-
-}  // namespace
 
 void DBClientConnection::_auth(const BSONObj& params) {
-    if (autoReconnect) {
+    if (_autoReconnect) {
         /* note we remember the auth info before we attempt to auth -- if the connection is broken,
          * we will then have it for the next autoreconnect attempt.
          */
@@ -259,188 +135,13 @@ void DBClientConnection::_auth(const BSONObj& params) {
     DBClientBase::_auth(params);
 }
 
-Status DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
-    if (autoReconnect) {
+void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
+    if (_autoReconnect) {
         _internalAuthOnReconnect = true;
         _internalAuthStepDownBehavior = stepDownBehavior;
     }
 
     return DBClientBase::authenticateInternalUser(stepDownBehavior);
-}
-
-bool DBClientConnection::connect(const HostAndPort& server,
-                                 StringData applicationName,
-                                 std::string& errmsg,
-                                 boost::optional<TransientSSLParams> transientSSLParams) {
-    auto connectStatus = connect(server, applicationName, transientSSLParams);
-    if (!connectStatus.isOK()) {
-        errmsg = connectStatus.reason();
-        return false;
-    }
-    return true;
-}
-
-Status DBClientConnection::connect(const HostAndPort& serverAddress,
-                                   StringData applicationName,
-                                   boost::optional<TransientSSLParams> transientSSLParams) {
-    auto connectStatus = connectSocketOnly(serverAddress, transientSSLParams);
-    if (!connectStatus.isOK()) {
-        return connectStatus;
-    }
-
-    // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
-    // happens, for instance, in the call to DBClientConnection::connect from
-    // DBClientConnection::_checkConnection then the following line will invalidate the
-    // 'applicationName' parameter, since the memory that it views within _applicationName will be
-    // freed. Do not reference the 'applicationName' parameter after this line. If you need to
-    // access the application name, do it through the _applicationName member.
-    _applicationName = applicationName.toString();
-
-    auto speculativeAuthType = auth::SpeculativeAuthType::kNone;
-    std::shared_ptr<SaslClientSession> saslClientSession;
-    auto swHelloReply = initWireVersion(
-        this, _applicationName, _uri, &_saslMechsForAuth, &speculativeAuthType, &saslClientSession);
-    if (!swHelloReply.isOK()) {
-        _markFailed(kSetFlag);
-        swHelloReply.status.addContext(
-            "Connection handshake failed. Is your mongod/mongos 3.4 or older?"_sd);
-        return swHelloReply.status;
-    }
-
-    // Ensure that the "hello" response is "ok:1".
-    auto helloStatus = getStatusFromCommandResult(swHelloReply.data);
-    if (!helloStatus.isOK()) {
-        return helloStatus;
-    }
-
-    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(swHelloReply.data);
-    if (!replyWireVersion.isOK()) {
-        return replyWireVersion.getStatus();
-    }
-
-    {
-        // The Server Discovery and Monitoring (SDAM) specification identifies a replica set member
-        // as either (a) having a "setName" field in the "hello" response, or (b) having
-        // "isreplicaset: true" in the "hello" response.
-        //
-        // https://github.com/mongodb/specifications/blob/c386e23724318e2fa82f4f7663d77581b755b2c3/
-        // source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#type
-        const bool hasSetNameField = swHelloReply.data.hasField("setName");
-        const bool isReplicaSetField = swHelloReply.data.getBoolField("isreplicaset");
-        _isReplicaSetMember = hasSetNameField || isReplicaSetField;
-    }
-
-    {
-        std::string msgField;
-        auto msgFieldExtractStatus = bsonExtractStringField(swHelloReply.data, "msg", &msgField);
-
-        if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
-            _isMongos = false;
-        } else if (!msgFieldExtractStatus.isOK()) {
-            return msgFieldExtractStatus;
-        } else {
-            _isMongos = (msgField == "isdbgrid");
-        }
-    }
-
-    auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-    auto validateStatus =
-        wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion.getValue());
-    if (!validateStatus.isOK()) {
-        LOGV2_WARNING(20126,
-                      "Remote host has incompatible wire version: {error}",
-                      "Remote host has incompatible wire version",
-                      "error"_attr = validateStatus);
-
-        return validateStatus;
-    }
-
-    if (_hook) {
-        auto validationStatus = _hook(swHelloReply);
-        if (!validationStatus.isOK()) {
-            // Disconnect and mark failed.
-            _markFailed(kReleaseSession);
-            return validationStatus;
-        }
-    }
-
-    {
-        auto swAuth = completeSpeculativeAuth(
-            this, speculativeAuthType, saslClientSession, _uri, swHelloReply.data);
-        if (!swAuth.isOK()) {
-            return swAuth.getStatus();
-        }
-
-        if (swAuth.getValue()) {
-            _authenticatedDuringConnect = true;
-        }
-    }
-
-    return Status::OK();
-}
-
-Status DBClientConnection::connectSocketOnly(
-    const HostAndPort& serverAddress, boost::optional<TransientSSLParams> transientSSLParams) {
-    _serverAddress = serverAddress;
-    _transientSSLParams = transientSSLParams;
-    _markFailed(kReleaseSession);
-
-
-    if (_stayFailed.load()) {
-        // This is just an optimization so we don't waste time connecting just to throw it away.
-        // The check below is the one that is important for correctness.
-        return makeSocketError(SocketErrorKind::FAILED_STATE, toString());
-    }
-
-    if (serverAddress.host().empty()) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "couldn't connect to server " << _serverAddress.toString()
-                                    << ", host is empty");
-    }
-
-    if (serverAddress.host() == "0.0.0.0") {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "couldn't connect to server " << _serverAddress.toString()
-                                    << ", address resolved to 0.0.0.0");
-    }
-
-    auto sws = getGlobalServiceContext()->getTransportLayer()->connect(
-        serverAddress,
-        transientSSLParams ? transport::kEnableSSL : _uri.getSSLMode(),
-        _socketTimeout.value_or(Milliseconds{5000}),
-        transientSSLParams);
-    if (!sws.isOK()) {
-        auto connectStatus = sws.getStatus();
-        // InvalidSSLConfiguration error needs to be propagated up since it is not a retriable
-        // error.
-        auto code = connectStatus == ErrorCodes::InvalidSSLConfiguration
-            ? ErrorCodes::InvalidSSLConfiguration
-            : ErrorCodes::HostUnreachable;
-        return Status(code,
-                      str::stream() << "couldn't connect to server " << _serverAddress.toString()
-                                    << ", connection attempt failed: " << connectStatus);
-    }
-
-    {
-        stdx::lock_guard<Latch> lk(_sessionMutex);
-        if (_stayFailed.load()) {
-            // This object is still in a failed state. The session we just created will be destroyed
-            // immediately since we aren't holding on to it.
-            return makeSocketError(SocketErrorKind::FAILED_STATE, toString());
-        }
-        _session = std::move(sws.getValue());
-        _failed.store(false);
-    }
-    _sessionCreationMicros = curTimeMicros64();
-    _lastConnectivityCheck = Date_t::now();
-    _session->setTimeout(_socketTimeout);
-    _session->setTags(_tagMask);
-    LOGV2_DEBUG(20119,
-                1,
-                "Connected to host {connString}",
-                "Connected to host",
-                "connString"_attr = toString());
-    return Status::OK();
 }
 
 void DBClientConnection::logout(const string& dbname, BSONObj& info) {
@@ -487,58 +188,6 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
     }
 }
 
-void DBClientConnection::_markFailed(FailAction action) {
-    _failed.store(true);
-    if (_session) {
-        if (action == kEndSession) {
-            _session->end();
-        } else if (action == kReleaseSession) {
-            std::shared_ptr<transport::Session> destroyedOutsideMutex;
-
-            stdx::lock_guard<Latch> lk(_sessionMutex);
-            _session.swap(destroyedOutsideMutex);
-        }
-    }
-}
-
-bool DBClientConnection::isStillConnected() {
-    // This method tries to figure out whether the connection is still open, but with several
-    // caveats.
-
-    // If we don't have a _session then we are definitely not connected. If we've been marked failed
-    // then we are supposed to pretend that we aren't connected, even though we may be.
-    // HOWEVER, some unit tests have poorly designed mocks that never populate _session, even when
-    // the DBClientConnection should be considered healthy and connected.
-
-    if (_stayFailed.load()) {
-        // Ensures there is no chance that a perma-failed connection can go back into a pool.
-        return false;
-    } else if (!_session) {
-        // This should always return false in practice, but needs to do this to work around poorly
-        // designed mocks as described above.
-        return !_failed.load();
-    } else if (_failed.load()) {
-        return false;
-    }
-
-    // Checking whether the socket actually has an error by calling _session->isConnected()
-    // is actually pretty expensive, so we cache the result for 5 seconds
-    auto now = getGlobalServiceContext()->getFastClockSource()->now();
-    if (now - _lastConnectivityCheck < Seconds{5}) {
-        return true;
-    }
-
-    _lastConnectivityCheck = now;
-
-    // This will poll() the underlying socket and do a 1 byte recv to see if the connection
-    // has been closed.
-    if (_session->isConnected())
-        return true;
-
-    _markFailed(kSetFlag);
-    return false;
-}
-
 void DBClientConnection::setTags(transport::Session::TagMask tags) {
     _tagMask = tags;
     if (!_session)
@@ -546,55 +195,31 @@ void DBClientConnection::setTags(transport::Session::TagMask tags) {
     _session->setTags(tags);
 }
 
-void DBClientConnection::shutdown() {
-    stdx::lock_guard<Latch> lk(_sessionMutex);
-    _markFailed(kEndSession);
-}
-
-void DBClientConnection::shutdownAndDisallowReconnect() {
-    stdx::lock_guard<Latch> lk(_sessionMutex);
-    _stayFailed.store(true);
-    _markFailed(kEndSession);
-}
-
-void DBClientConnection::_checkConnection() {
-    dassert(_failed.load());  // only called when in failed state.
-
-    if (!autoReconnect)
-        throwSocketError(SocketErrorKind::FAILED_STATE, toString());
-
+void DBClientConnection::_ensureSession() {
     // Don't hammer reconnects, backoff if needed
     sleepFor(_autoReconnectBackoff.nextSleep());
 
-    LOGV2_DEBUG(20120,
-                _logLevel.toInt(),
-                "Trying to reconnect to {connString}",
-                "Trying to reconnect",
-                "connString"_attr = toString());
+    LOGV2_DEBUG(20120, _logLevel.toInt(), "Trying to reconnect", "connString"_attr = toString());
 
-    auto connectStatus = connect(_serverAddress, _applicationName, _transientSSLParams);
-    if (!connectStatus.isOK()) {
+    try {
+        connect(_serverAddress, _applicationName, _transientSSLParams);
+    } catch (const DBException& e) {
         _markFailed(kSetFlag);
         LOGV2_DEBUG(20121,
                     _logLevel.toInt(),
-                    "Reconnect attempt to {connString} failed: {reason}",
                     "Reconnect attempt failed",
                     "connString"_attr = toString(),
-                    "error"_attr = connectStatus);
-        if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
-            uassertStatusOK(connectStatus);  // Will always throw
+                    "error"_attr = e.toStatus());
+        if (e.code() == ErrorCodes::IncompatibleCatalogManager) {
+            throw;
         } else {
-            throwSocketError(SocketErrorKind::CONNECT_ERROR, connectStatus.reason());
+            throwSocketError(SocketErrorKind::CONNECT_ERROR, e.reason());
         }
     }
 
-    LOGV2_DEBUG(20122,
-                _logLevel.toInt(),
-                "Reconnected to {connString}",
-                "Reconnected",
-                "connString"_attr = toString());
+    LOGV2_DEBUG(20122, _logLevel.toInt(), "Reconnected", "connString"_attr = toString());
     if (_internalAuthOnReconnect) {
-        uassertStatusOK(authenticateInternalUser(_internalAuthStepDownBehavior));
+        authenticateInternalUser(_internalAuthStepDownBehavior);
     } else {
         for (const auto& kv : authCache) {
             try {
@@ -602,7 +227,6 @@ void DBClientConnection::_checkConnection() {
             } catch (ExceptionFor<ErrorCodes::AuthenticationFailed>& ex) {
                 LOGV2_DEBUG(20123,
                             _logLevel.toInt(),
-                            "Reconnect: auth failed for on {db} using {user}: {reason}",
                             "Reconnect: auth failed",
                             "db"_attr = kv.second[auth::getSaslCommandUserDBFieldName()],
                             "user"_attr = kv.second[auth::getSaslCommandUserFieldName()],
@@ -612,131 +236,11 @@ void DBClientConnection::_checkConnection() {
     }
 }
 
-void DBClientConnection::setSoTimeout(double timeout) {
-    Milliseconds::rep timeoutMs = std::floor(timeout * 1000);
-    if (timeout <= 0) {
-        _socketTimeout = boost::none;
-    } else if (timeoutMs >= Milliseconds::max().count()) {
-        _socketTimeout = Milliseconds::max();
-    } else {
-        _socketTimeout = Milliseconds{timeoutMs};
+void DBClientConnection::_shutdownSession() {
+    if (!_session) {
+        return;
     }
-
-    if (_session) {
-        _session->setTimeout(_socketTimeout);
-    }
-}
-
-uint64_t DBClientConnection::getSockCreationMicroSec() const {
-    if (_session) {
-        return _sessionCreationMicros;
-    } else {
-        return INVALID_SOCK_CREATION_TIME;
-    }
-}
-
-DBClientConnection::DBClientConnection(bool _autoReconnect,
-                                       double so_timeout,
-                                       MongoURI uri,
-                                       const HandshakeValidationHook& hook,
-                                       const ClientAPIVersionParameters* apiParameters)
-    : DBClientBase(apiParameters),
-      autoReconnect(_autoReconnect),
-      _autoReconnectBackoff(Seconds(1), Seconds(2)),
-      _hook(hook),
-      _uri(std::move(uri)) {
-    _numConnections.fetchAndAdd(1);
-}
-
-void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer) {
-    checkConnection();
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
-
-    toSend.header().setId(nextMessageId());
-    toSend.header().setResponseToMsgId(0);
-    if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
-#ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS()) {
-            OpMsg::appendChecksum(&toSend);
-        }
-#else
-        OpMsg::appendChecksum(&toSend);
-#endif
-    }
-    uassertStatusOK(
-        _session->sinkMessage(uassertStatusOK(_compressorManager.compressMessage(toSend))));
-    killSessionOnError.dismiss();
-}
-
-Status DBClientConnection::recv(Message& m, int lastRequestId) {
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
-    auto swm = _session->sourceMessage();
-    if (!swm.isOK()) {
-        return swm.getStatus();
-    }
-
-    m = std::move(swm.getValue());
-    uassert(40570,
-            "Response ID did not match the sent message ID.",
-            m.header().getResponseToMsgId() == lastRequestId);
-
-    if (m.operation() == dbCompressed) {
-        m = uassertStatusOK(_compressorManager.decompressMessage(m));
-    }
-
-    killSessionOnError.dismiss();
-    return Status::OK();
-}
-
-void DBClientConnection::_call(Message& toSend, Message& response, string* actualServer) {
-    checkConnection();
-    ScopeGuard killSessionOnError([this] { _markFailed(kEndSession); });
-
-    toSend.header().setId(nextMessageId());
-    toSend.header().setResponseToMsgId(0);
-    if (!MONGO_unlikely(dbClientConnectionDisableChecksum.shouldFail())) {
-#ifdef MONGO_CONFIG_SSL
-        if (!SSLPeerInfo::forSession(_session).isTLS()) {
-            OpMsg::appendChecksum(&toSend);
-        }
-#else
-        OpMsg::appendChecksum(&toSend);
-#endif
-    }
-    auto swm = _compressorManager.compressMessage(toSend);
-    uassertStatusOK(swm.getStatus());
-
-    auto sinkStatus = _session->sinkMessage(swm.getValue());
-    if (!sinkStatus.isOK()) {
-        LOGV2(20124,
-              "DBClientConnection failed to send message to {connString}: {error}",
-              "DBClientConnection failed to send message",
-              "connString"_attr = getServerAddress(),
-              "error"_attr = redact(sinkStatus));
-        uassertStatusOKWithContext(sinkStatus,
-                                   str::stream() << "dbclient error communicating with server "
-                                                 << getServerAddress());
-    }
-
-    swm = _session->sourceMessage();
-    if (swm.isOK()) {
-        response = std::move(swm.getValue());
-    } else {
-        LOGV2(20125,
-              "DBClientConnection failed to receive message from {connString}: {error}",
-              "DBClientConnection failed to receive message",
-              "connString"_attr = getServerAddress(),
-              "error"_attr = redact(swm.getStatus()));
-        uassertStatusOKWithContext(swm.getStatus(),
-                                   str::stream() << "dbclient error communicating with server "
-                                                 << getServerAddress());
-    }
-
-    if (response.operation() == dbCompressed) {
-        response = uassertStatusOK(_compressorManager.decompressMessage(response));
-    }
-
-    killSessionOnError.dismiss();
+    _session->end();
 }
 
 void DBClientConnection::setParentReplSetName(const string& replSetName) {

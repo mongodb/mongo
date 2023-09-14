@@ -513,9 +513,9 @@ Status OplogFetcher::_connect() {
                           "OplogFetcher reconnecting due to error: {error}",
                           "OplogFetcher reconnecting due to error",
                           "error"_attr = connectStatus);
-                    _conn->checkConnection();
+                    _conn->ensureConnection();
                 } else {
-                    uassertStatusOK(_conn->connect(_config.source, "OplogFetcher", boost::none));
+                    _conn->connect(_config.source, "OplogFetcher", boost::none);
                 }
                 uassertStatusOK(replAuthenticate(_conn.get())
                                     .withContext(str::stream()

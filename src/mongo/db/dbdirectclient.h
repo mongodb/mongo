@@ -146,7 +146,7 @@ private:
 
     void _auth(const BSONObj& params) override;
 
-    void _call(Message& toSend, Message& response, std::string* actualServer) override;
+    Message _call(Message& toSend, std::string* actualServer) override;
 
     OperationContext* _opCtx;
 };

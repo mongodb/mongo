@@ -335,8 +335,7 @@ void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
 
     const auto connStr = unittest::getFixtureConnectionString();
     const auto queryConnection = std::make_unique<DBClientConnection>();
-    uassertStatusOK(
-        queryConnection->connect(connStr.getServers()[0], testBackgroundAppName, boost::none));
+    queryConnection->connect(connStr.getServers()[0], testBackgroundAppName, boost::none);
     CursorId queryCursorId;
 
     // Execute a query on a separate thread, with the 'exhaust' flag set.

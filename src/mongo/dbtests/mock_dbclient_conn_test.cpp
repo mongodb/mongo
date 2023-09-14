@@ -80,7 +80,7 @@ namespace mongo {
 TEST(MockDBClientConnTest, ServerAddress) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
-    uassertStatusOK(conn.connect(server.getServerHostAndPort(), mongo::StringData(), boost::none));
+    conn.connect(server.getServerHostAndPort(), mongo::StringData(), boost::none);
 
     ASSERT_EQUALS("test:27017", conn.getServerAddress());
     ASSERT_EQUALS("test:27017", conn.toString());
@@ -851,10 +851,10 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     conn.setRecvResponses(recvResponses);
 
     // The first recv() call gets a network exception.
-    ASSERT_THROWS_CODE_AND_WHAT(cursor.more(),
-                                mongo::DBException,
-                                mongo::ErrorCodes::NetworkTimeout,
-                                "Fake socket timeout");
+    ASSERT_THROWS_WITH_CHECK(cursor.more(), mongo::DBException, [](auto& exception) {
+        ASSERT_EQ(exception.code(), mongo::ErrorCodes::NetworkTimeout);
+        ASSERT_STRING_CONTAINS(exception.what(), "Fake socket timeout");
+    });
     // Cursor is still valid on network exceptions.
     ASSERT_FALSE(cursor.isDead());
 
@@ -931,9 +931,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
 TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
-
-    ASSERT_OK(
-        conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
+    conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none);
     mongo::DBClientCursor cursor(
         &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 
@@ -976,8 +974,7 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server, autoReconnect);
 
-    ASSERT_OK(
-        conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none));
+    conn.connect(mongo::HostAndPort("localhost", 12345), mongo::StringData(), boost::none);
     mongo::DBClientCursor cursor(
         &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
 

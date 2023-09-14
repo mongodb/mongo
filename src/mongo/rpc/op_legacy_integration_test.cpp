@@ -143,8 +143,7 @@ int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
             DatabaseName::createDatabaseName_forTest(boost::none, "testOpLegacy"),
             BSON("find" << collName << "batchSize" << 2))
             .serialize();
-    Message findCmdReply;
-    conn->call(findCmdRequest, findCmdReply);
+    Message findCmdReply = conn->call(findCmdRequest);
     BSONObj findCmdReplyBody = OpMsg::parse(findCmdReply).body;
     auto cr = CursorResponse::parseFromBSON(findCmdReplyBody.getOwned());
     ASSERT_OK(cr.getStatus());
@@ -179,15 +178,14 @@ TEST(OpLegacy, UnsupportedWriteOps) {
     const BSONObj update = fromjson("{$set: {b: 2}}");
 
     // Issue the requests. They are expected to fail.
-    Message ignore;
     auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opInsert), ExceptionForCat<ErrorCategory::NetworkError>);
 
     auto opUpdate = makeUnsupportedOpUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opUpdate), ExceptionForCat<ErrorCategory::NetworkError>);
 
     auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
-    ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opDelete), ExceptionForCat<ErrorCategory::NetworkError>);
 }
 
 void assertFailure(const Message response, StringData expectedErr) {
@@ -222,21 +220,17 @@ TEST(OpLegacy, UnsupportedReadOps) {
                                                            0 /*nToSkip*/,
                                                            nullptr /*fieldsToReturn*/,
                                                            0 /*queryOptions*/);
-    Message opQueryReply;
-    conn->call(opQueryRequest, opQueryReply);
+    Message opQueryReply = conn->call(opQueryRequest);
     assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
     const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOps");
 
     auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
-    Message opGetMoreReply;
-    conn->call(opGetMore, opGetMoreReply);
+    Message opGetMoreReply = conn->call(opGetMore);
     assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
     auto opKillCursors = makeUnsupportedOpKillCursorsMessage(cursorId);
-    Message opKillCursorsReply;
-    ASSERT_THROWS(conn->call(opKillCursors, opKillCursorsReply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opKillCursors), ExceptionForCat<ErrorCategory::NetworkError>);
 }
 
 TEST(OpLegacy, GenericCommandViaOpQuery) {
@@ -249,8 +243,7 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
                                                  0 /*nToSkip*/,
                                                  nullptr /*fieldsToReturn*/,
                                                  0 /*queryOptions*/);
-    Message replyQuery;
-    conn->call(opQuery, replyQuery);
+    Message replyQuery = conn->call(opQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
     BufReader data(qr.data(), qr.dataLen());
     BSONObj obj = data.read<BSONObj>();
@@ -277,8 +270,7 @@ void testAllowedCommand(const char* command,
     auto opCountersPrior = serverStatus["opcounters"]["deprecated"];
     const auto queryCountPrior = opCountersPrior ? opCountersPrior["query"].Long() : 0;
 
-    Message replyQuery;
-    conn->call(opQuery, replyQuery);
+    Message replyQuery = conn->call(opQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
     BufReader data(qr.data(), qr.dataLen());
     BSONObj obj = data.read<BSONObj>();

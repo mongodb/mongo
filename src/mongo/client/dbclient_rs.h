@@ -98,7 +98,7 @@ public:
      */
     Status connect();
 
-    Status authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) override;
+    void authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) override;
 
     /**
      * Logs out the connection for the given database.
@@ -156,7 +156,7 @@ public:
     // ---- callback pieces -------
 
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
-    Status recv(Message& toRecv, int lastRequestId) override;
+    Message recv(int lastRequestId) override;
 
     /* this is the callback from our underlying connections to notify us that we got a "not primary"
      * error.
@@ -261,10 +261,10 @@ private:
 
     DBClientConnection* checkPrimary();
 
-    void _call(Message& toSend, Message& response, std::string* actualServer) override;
+    Message _call(Message& toSend, std::string* actualServer) override;
 
     template <typename Authenticate>
-    Status _runAuthLoop(Authenticate authCb);
+    void _runAuthLoop(Authenticate authCb);
 
     /**
      * Helper method for selecting a node based on the read preference. Will advance

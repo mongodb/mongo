@@ -76,9 +76,8 @@ public:
         _serverAddress = HostAndPort("localhost", 27017);  // dummy server address.
     }
 
-    Status recv(Message& m, int lastRequestId) override {
-        m = _mockRecvResponse;
-        return Status::OK();
+    Message recv(int lastRequestId) override {
+        return _mockRecvResponse;
     }
 
     // No-op.
@@ -103,7 +102,7 @@ public:
     }
 
 private:
-    void _call(Message& toSend, Message& response, std::string* actualServer) override {
+    Message _call(Message& toSend, std::string* actualServer) override {
 
         // Intercept request.
         const auto reqId = nextMessageId();
@@ -113,10 +112,12 @@ private:
         _lastSent = toSend;
 
         // Mock response.
-        response = _mockCallResponse;
+        Message response = _mockCallResponse;
         response.header().setId(nextMessageId());
         response.header().setResponseToMsgId(reqId);
         OpMsg::appendChecksum(&response);
+
+        return response;
     }
 
     Message _mockCallResponse;

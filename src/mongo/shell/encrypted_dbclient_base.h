@@ -273,7 +273,7 @@ protected:
     FLEDecryptionFrame createDecryptionFrame(ConstDataRange data);
 
 private:
-    void _call(Message& toSend, Message& response, std::string* actualServer) final;
+    Message _call(Message& toSend, std::string* actualServer) final;
 
     virtual void encryptMarking(const BSONObj& elem, BSONObjBuilder* builder, StringData elemName);
 

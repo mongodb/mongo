@@ -42,7 +42,6 @@
 #include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -127,7 +126,7 @@ public:
     /**
      * Reconnect if needed and allowed.
      */
-    virtual void checkConnection() {}
+    virtual void ensureConnection() {}
 
     /**
      * If not checked recently, checks whether the underlying socket/sockets are still valid.
@@ -289,9 +288,9 @@ public:
 
     /**
      * Authenticates to another cluster member using appropriate authentication data.
-     * Returns true if the authentication was successful.
+     * Throws an exception if authentication fails.
      */
-    virtual Status authenticateInternalUser(
+    virtual void authenticateInternalUser(
         auth::StepDownBehavior stepDownBehavior = auth::StepDownBehavior::kKillConnection);
 
     /**
@@ -323,7 +322,7 @@ public:
      * number of databases on a single connection. The "admin" database is special and once
      * authenticated provides access to all databases on the server.
      */
-    Status auth(const DatabaseName& dbname, StringData username, StringData pwd);
+    void auth(const DatabaseName& dbname, StringData username, StringData pwd);
 
     /**
      * Logs out the connection for the given database.
@@ -497,11 +496,13 @@ public:
     static std::string genIndexName(const BSONObj& keys);
 
     /**
+     * Sends the provided message, returning the server's reponse.
+     *
      * 'actualServer' is set to the actual server where they call went if there was a choice (for
      * example SecondaryOk).
      */
-    void call(Message& toSend, Message& response, std::string* actualServer = nullptr) {
-        _call(toSend, response, actualServer);
+    Message call(Message& toSend, std::string* actualServer = nullptr) {
+        return _call(toSend, actualServer);
     };
 
     virtual void say(Message& toSend,
@@ -511,9 +512,9 @@ public:
     /**
      * Used by QueryOption_Exhaust. To use that your subclass must implement this.
      */
-    virtual Status recv(Message& m, int lastRequestId) {
+    virtual Message recv(int lastRequestId) {
         MONGO_verify(false);
-        return {ErrorCodes::NotImplemented, "recv() not implemented"};
+        uasserted(ErrorCodes::NotImplemented, "recv() not implemented");
     }
 
     /**
@@ -729,7 +730,7 @@ protected:
     std::vector<std::string> _saslMechsForAuth;
 
 private:
-    virtual void _call(Message& toSend, Message& response, std::string* actualServer) = 0;
+    virtual Message _call(Message& toSend, std::string* actualServer) = 0;
 
     /**
      * Implementation for getIndexes() and getReadyIndexes().

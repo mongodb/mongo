@@ -92,11 +92,13 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                             "Creating new connection",
                             "hostAndPort"_attr = server,
                             "gRPC"_attr = newURI.isGRPC());
-                lastError = c->connect(
-                    server,
-                    applicationName,
-                    transientSSLParams ? boost::make_optional(*transientSSLParams) : boost::none);
-                if (!lastError.isOK()) {
+                try {
+                    c->connect(server,
+                               applicationName,
+                               transientSSLParams ? boost::make_optional(*transientSSLParams)
+                                                  : boost::none);
+                } catch (const DBException& e) {
+                    lastError = e.toStatus();
                     continue;
                 }
 
