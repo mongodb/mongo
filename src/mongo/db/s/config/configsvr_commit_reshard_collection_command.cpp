@@ -87,10 +87,10 @@ public:
 
             UUID reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 
-            auto machine = resharding::tryGetReshardingStateMachine<ReshardingCoordinatorService,
-                                                                    ReshardingCoordinator,
-                                                                    ReshardingCoordinatorDocument>(
-                opCtx, reshardingUUID);
+            auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
+                ReshardingCoordinatorService,
+                ReshardingCoordinator,
+                ReshardingCoordinatorDocument>(opCtx, reshardingUUID);
 
             uassert(ErrorCodes::NoSuchReshardCollection,
                     "Could not find in-progress resharding operation to commit",
