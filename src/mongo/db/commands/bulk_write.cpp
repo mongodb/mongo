@@ -1536,7 +1536,7 @@ public:
             if (exec->isEOF()) {
                 invariant(numRepliesInFirstBatch == replies.size());
                 auto reply = BulkWriteCommandReply(
-                    BulkWriteCommandResponseCursor(0, std::move(replies)), numErrors);
+                    BulkWriteCommandResponseCursor(0, std::move(replies), cursorNss), numErrors);
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
@@ -1567,7 +1567,7 @@ public:
 
             replies.resize(numRepliesInFirstBatch);
             auto reply = BulkWriteCommandReply(
-                BulkWriteCommandResponseCursor(cursorId, std::move(replies)), numErrors);
+                BulkWriteCommandResponseCursor(cursorId, std::move(replies), cursorNss), numErrors);
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }

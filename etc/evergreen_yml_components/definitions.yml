@@ -6233,6 +6233,14 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: bulk_write_multi_op_causally_consistent_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: bulk_write_targeted_override_gen
   tags: ["bulk_write"]
   commands:

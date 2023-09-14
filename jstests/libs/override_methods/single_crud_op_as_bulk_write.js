@@ -41,8 +41,11 @@ function runCommandSingleOpBulkWriteOverride(
         BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
         let additionalParameters = getAdditionalParameters(cmdObj);
         try {
-            let response = BulkWriteUtils.flushCurrentBulkWriteBatch(
-                conn, originalRunCommand, makeRunCommandArgs, additionalParameters);
+            let response = BulkWriteUtils.flushCurrentBulkWriteBatch(conn,
+                                                                     null /* lsid */,
+                                                                     originalRunCommand,
+                                                                     makeRunCommandArgs,
+                                                                     additionalParameters);
             assert.eq(response.length, 1);
             BulkWriteUtils.resetBulkWriteBatch();
             return response[0];

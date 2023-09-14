@@ -60,7 +60,8 @@ protected:
             BulkWriteReplyItem item{0};
             item.setN(1);
             replyItems.push_back(item);
-            auto cursor = BulkWriteCommandResponseCursor(0, replyItems);
+            auto cursor = BulkWriteCommandResponseCursor(
+                0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
             bob.append("numErrors", 0);
             appendTxnResponseMetadata(bob);
@@ -77,7 +78,8 @@ protected:
             BulkWriteReplyItem item{0};
             item.setN(1);
             replyItems.push_back(item);
-            auto cursor = BulkWriteCommandResponseCursor(0, replyItems);
+            auto cursor = BulkWriteCommandResponseCursor(
+                0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
             bob.append("numErrors", 0);
             appendTxnResponseMetadata(bob);

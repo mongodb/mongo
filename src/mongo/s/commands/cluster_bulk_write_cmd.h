@@ -252,7 +252,7 @@ public:
             CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (numRepliesInFirstBatch == replyItems.size()) {
                 return BulkWriteCommandReply(
-                    BulkWriteCommandResponseCursor(0, std::move(replyItems)), numErrors);
+                    BulkWriteCommandResponseCursor(0, std::move(replyItems), cursorNss), numErrors);
             }
 
             ccc->detachFromOperationContext();
@@ -273,7 +273,8 @@ public:
 
             replyItems.resize(numRepliesInFirstBatch);
             return BulkWriteCommandReply(
-                BulkWriteCommandResponseCursor(cursorId, std::move(replyItems)), numErrors);
+                BulkWriteCommandResponseCursor(cursorId, std::move(replyItems), cursorNss),
+                numErrors);
         }
 
         bool runImpl(OperationContext* opCtx,

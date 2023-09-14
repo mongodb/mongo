@@ -2022,7 +2022,8 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         BulkWriteCommandReply reply;
         reply.setCursor(BulkWriteCommandResponseCursor(
             0,  // cursorId
-            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)}));
+            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)},
+            NamespaceString::makeBulkWriteNSS(boost::none)));
         reply.setNumErrors(0);
         return reply.toBSON();
     });

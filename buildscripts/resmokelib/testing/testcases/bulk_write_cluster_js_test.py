@@ -15,9 +15,16 @@ class BulkWriteClusterTestCase(jsrunnerfile.JSRunnerFileTestCase):
     def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
         """Initialize the BulkWriteClusterTestCase."""
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "BulkWriteCluster Test", js_filename, test_runner_file=js_filename,
+            self, logger, "BulkWriteCluster Test", js_filename,
+            test_runner_file="jstests/libs/bulk_write_passthrough_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 
+    @property
+    def js_filename(self):
+        """Return the name of the test file."""
+        return self.test_name
+
     def _populate_test_data(self, test_data):
+        test_data["jsTestFile"] = self.js_filename
         test_data["bulkWriteCluster"] = self.fixture.clusters[0].get_driver_connection_url()
         test_data["normalCluster"] = self.fixture.clusters[1].get_driver_connection_url()

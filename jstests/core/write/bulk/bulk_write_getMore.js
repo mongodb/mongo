@@ -44,6 +44,7 @@ assert.eq(res.numErrors, 0);
 assert(res.cursor.id != 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 assert(!res.cursor.firstBatch[1]);
+assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite");
 
 // First batch only had 1 of 2 responses so run a getMore to get the next batch.
 var getMoreRes =
@@ -52,8 +53,18 @@ var getMoreRes =
 assert(getMoreRes.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 assert(!getMoreRes.cursor.nextBatch[1]);
+assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite");
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 1);
 coll.drop();
 coll1.drop();
+
+// Want to test ns is properly applied to a cursor that does not need a getMore. This test
+// is in this file so it does not run in tenant migration suites since that would change the ns
+// name.
+res = assert.commandWorked(db.adminCommand(
+    {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: "test.coll"}]}));
+
+assert.commandWorked(res);
+assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite");

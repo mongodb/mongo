@@ -206,6 +206,10 @@ structs:
             firstBatch:
                 type: array<BulkWriteReplyItem>
                 stability: unstable
+            ns:
+                description: "The namespace of the cursor."
+                type: namespacestring
+                stability: unstable
 
     BulkWriteCommandReply:
         description: "Holds reply information for the 'bulkWrite' command."
