@@ -142,6 +142,31 @@ TEST(IndexPrefixHeuristicTest, SingleIndexScan_LongerPointPrefixWins) {
     ASSERT_EQ(1, winners[0]);
 }
 
+TEST(IndexPrefixHeuristicTest, SingleIndexScan_ClosedIntervalPrefixWins) {
+    // a: [[1, 1], [2, 2]]; b: [[1, MaxKey]]
+    auto indexScan1 =
+        makeIndexScan(BSON("a" << 1 << "b" << 1),
+                      {
+                          makeOIL("a", {BSON("" << 1 << "" << 1), BSON("" << 2 << "" << 2)}),
+                          makeOIL("b", {BSON("" << 1 << "" << MAXKEY)}),
+                      });
+    auto solution1 = makeSolution(std::move(indexScan1));
+
+    // c: [[1, 1], [2, 2]]; d: [[1, 3]]
+    auto indexScan2 =
+        makeIndexScan(BSON("c" << 1 << "d" << 1 << "e" << 1),
+                      {
+                          makeOIL("c", {BSON("" << 1 << "" << 1), BSON("" << 2 << "" << 2)}),
+                          makeOIL("b", {BSON("" << 1 << "" << 3)}),
+                      });
+    auto solution2 = makeSolution(std::move(indexScan2));
+
+    std::vector<const QuerySolution*> solutions{solution1.get(), solution2.get()};
+    auto winners = applyIndexPrefixHeuristic(solutions);
+    ASSERT_EQ(1, winners.size());
+    ASSERT_EQ(1, winners[0]);
+}
+
 TEST(IndexPrefixHeuristicTest, SingleIndexScan_LongerPrefixWins) {
     // a: [[2, 3]]; b: [[1, 1]]
     auto indexScan1 = makeIndexScan(BSON("a" << 1 << "b" << 1),
