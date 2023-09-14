@@ -187,17 +187,161 @@ bool areNodesCompatible(const std::vector<const QuerySolutionNode*>& nodes) {
 }
 
 /**
+ * Returns true if the value can serve as a type lower bound for the purposes of type bracketing.
+ * The function is designed to work with the 'interesting' for index prefix heuristic types only:
+ * Number, String, Date, Timestamp, Boolean, Object, Array, ObjectId. For other types it may return
+ * false positive results. The code of the function is based on index bounds build logic from
+ * 'index_bounds_builder.cpp'.
+ */
+bool isLowerBound(const BSONElement& value, bool isInclusive) {
+    switch (value.type()) {
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+        case NumberDecimal:
+            // Lower bound value for numbers.
+            return (std::isinf(value.numberDouble()) || std::isnan(value.numberDouble())) &&
+                isInclusive == true;
+        case String:
+            // Lower bound value for strings.
+            return value.str().empty() && isInclusive == true;
+        case Date:
+            // Lower bound value for dates.
+            return value.date() == Date_t::min() && isInclusive == true;
+        case bsonTimestamp:
+            // Lower bound value for timestamps.
+            return value.timestamp() == Timestamp::min() && isInclusive == true;
+        case jstOID:
+            // Lower bound value for ObjectID.
+            return value.OID() == OID() && isInclusive == true;
+        case Object:
+        case Array:
+            // Lower bound value for Object and Array.
+            return value.Obj().isEmpty() && isInclusive == true;
+        case BinData:
+        case EOO:
+        case MinKey:
+        case MaxKey:
+        case Bool:  // Boolean bounds are considered always open since they are non-selective.
+        case jstNULL:
+        case Undefined:
+        case Symbol:
+        case RegEx:
+        case DBRef:
+        case Code:
+        case CodeWScope:
+            return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8102100);
+}
+
+/**
+ * Returns true if the value can serve as a type upper bound for the purposes of type bracketing.
+ * The function is designed to work with the 'interesting' for index prefix heuristic types only:
+ * Number, String, Date, Timestamp, Boolean, Object, Array, ObjectId. For other types it may return
+ * false positive results. The code of the function is based on index bounds build logic from
+ * 'index_bounds_builder.cpp'.
+ */
+bool isUpperBound(const BSONElement& value, bool isInclusive) {
+    switch (value.type()) {
+        case NumberInt:
+        case NumberDouble:
+        case NumberLong:
+        case NumberDecimal:
+            // Upper bound value for numbers.
+            return std::isinf(value.numberDouble()) && isInclusive == true;
+        case String:
+            // A string value cannot be an upper bound value.
+            return false;
+        case Date:
+            // Upper bound value for Date.
+            return value.date() == Date_t::max() && isInclusive == true;
+        case bsonTimestamp:
+            // Upper bound value for Timestamp.
+            return value.timestamp() == Timestamp::max() && isInclusive == true;
+        case jstOID:
+            // Upper bound value for ObjectID.
+            return value.OID() == OID::max() && isInclusive == true;
+        case Object:
+            // Upper bound value for String.
+            return value.Obj().isEmpty() && isInclusive == false;
+        case Array:
+            // Upper bound value for Object.
+            return value.Obj().isEmpty() && isInclusive == false;
+        case BinData:
+            // Upper bound value for Array.
+            return value.valuesize() == 0 && isInclusive == false;
+        case EOO:
+        case MinKey:
+        case MaxKey:
+        case Bool:  // Boolean bounds are considered always open since they are non-selective.
+        case jstNULL:
+        case Undefined:
+        case Symbol:
+        case RegEx:
+        case DBRef:
+        case Code:
+        case CodeWScope:
+            return true;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8102101);
+}
+
+/**
+ * The function tries to detect if the interval is closed on both ends. Can return false
+ * positive results for the types not mentioned in the comment to 'isMinMaxValue' function.
+ */
+bool isClosedInterval(const Interval& interval) {
+    // If the bound types are different the interval is considered to be open.
+    if (interval.start.type() != interval.end.type()) {
+        return false;
+    }
+
+    switch (interval.getDirection()) {
+        // Point intervals, empty intervals, and null intervals have no direction.
+        case Interval::Direction::kDirectionNone:
+            return true;
+        case Interval::Direction::kDirectionAscending:
+            return !isLowerBound(interval.start, interval.startInclusive) &&
+                !isUpperBound(interval.end, interval.endInclusive);
+        case Interval::Direction::kDirectionDescending:
+            return !isUpperBound(interval.start, interval.startInclusive) &&
+                !isLowerBound(interval.end, interval.endInclusive);
+    }
+
+    MONGO_UNREACHABLE_TASSERT(8102102);
+}
+
+/**
+ * Returns true if this OIL contains only closed intervals.
+ */
+bool containsOnlyClosedIntervals(const OrderedIntervalList& oil) {
+    for (const auto& interval : oil.intervals) {
+        if (!isClosedInterval(interval)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Calculates score for the given index bounds. The score reflects the following rules:
  * - IndexBounds that has longest single point interval prefix wins,
- * - if winner is not defined on the previous step then IndexBounds with the longest point interval
- * prefix wins,
- * - if winner is not defined, then IndexBounds with longest prefix wins
+ * - if winner is not defined on the previous step then IndexBounds with the longest point
+ * interval prefix wins,
+ * - if winner is not defined on the previous step then IndexBounds with the longest closed
+ * interval prefix wins,
+ * - if winner is not defined, then IndexBounds with longest interval prefix wins
  * - if winner is not defined, them IndexBounds with shortest index key pattern wins.
  */
 uint64_t getIndexBoundsScore(const IndexBounds& bounds) {
     const uint64_t indexKeyLength = static_cast<uint64_t>(bounds.fields.size());
     uint64_t singlePointIntervalPrefix = 0;
     uint64_t pointsIntervalPrefix = 0;
+    uint64_t closedIntervalPrefix = 0;
     uint64_t intervalLength = 0;
 
     for (const auto& field : bounds.fields) {
@@ -219,16 +363,21 @@ uint64_t getIndexBoundsScore(const IndexBounds& bounds) {
             ++pointsIntervalPrefix;
         }
 
+        if (intervalLength == closedIntervalPrefix && containsOnlyClosedIntervals(field)) {
+            ++closedIntervalPrefix;
+        }
+
         ++intervalLength;
     }
 
-    // We pack calculated stats into one value to make their comparison simplier. For every prefix
-    // length we allocate 16 bits (65536 values) which is more then enough since an index can have
-    // no more than 32 fields (see "MongoDB Limits and Thresholds" reference). 'indexKeyLength' is
-    // treated differently because, unlike others, we prefer shorter index key prefix length (see
-    // the comment to the function for details).
-    uint64_t result = (singlePointIntervalPrefix << 48) | (pointsIntervalPrefix << 32) |
-        (intervalLength << 16) | (std::numeric_limits<uint16_t>::max() - indexKeyLength);
+    // We pack calculated stats into one value to make their comparison simplier. For every
+    // prefix length we allocate 12 bits (4096 values) which is more then enough since an index
+    // can have no more than 32 fields (see "MongoDB Limits and Thresholds" reference).
+    // 'indexKeyLength' is treated differently because, unlike others, we prefer shorter index
+    // key prefix length (see the comment to the function for details).
+    uint64_t result = (singlePointIntervalPrefix << 52) | (pointsIntervalPrefix << 40) |
+        (closedIntervalPrefix << 28) | (intervalLength << 16) |
+        (std::numeric_limits<uint16_t>::max() - indexKeyLength);
 
     return result;
 }
