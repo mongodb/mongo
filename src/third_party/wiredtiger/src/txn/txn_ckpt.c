@@ -679,6 +679,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
         __wt_verbose_timestamp(
           session, txn_global->checkpoint_timestamp, "Checkpoint requested at stable timestamp");
 
+    WT_STAT_CONN_SET(session, txn_checkpoint_snapshot_acquired, 1);
+
     /*
      * Get a list of handles we want to flush; for named checkpoints this may pull closed objects
      * into the session cache.
@@ -984,6 +986,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
     /* Release the snapshot so we aren't pinning updates in cache. */
     __wt_txn_release_snapshot(session);
+
+    WT_STAT_CONN_SET(session, txn_checkpoint_snapshot_acquired, 0);
 
     /* Mark all trees as open for business (particularly eviction). */
     WT_ERR(__checkpoint_apply_to_dhandles(session, cfg, __checkpoint_presync));
