@@ -86,7 +86,7 @@ public:
 
             UUID reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 
-            auto machine = resharding::tryGetReshardingStateMachine<
+            auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                 ReshardingCoordinatorService,
                 ReshardingCoordinatorService::ReshardingCoordinator,
                 ReshardingCoordinatorDocument>(opCtx, reshardingUUID);
