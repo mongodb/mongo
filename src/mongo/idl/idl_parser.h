@@ -483,7 +483,7 @@ void throwComparisonError(
  */
 template <typename T>
 void throwComparisonError(StringData fieldName, StringData op, T actualValue, T expectedValue) {
-    uasserted(51024,
+    uasserted(ErrorCodes::BadValue,
               str::stream() << "BSON field '" << fieldName << "' value must be " << op << " "
                             << expectedValue << ", actual value '" << actualValue << "'");
 }

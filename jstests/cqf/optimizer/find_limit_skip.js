@@ -16,8 +16,10 @@ let numReturned = coll.find().limit(-1).itcount();
 assert.eq(numReturned, 1);
 
 // This command will fail since a negative $limit field cannot be specified.
-assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}, limit: -1}),
-                             invalidValueErrorCode);
+assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}, limit: -1}), [
+    ErrorCodes.BadValue,
+    invalidValueErrorCode
+]);  // getting BadValue when binary is > 7.1, else idlInvalidValueError
 
 // Specify the batch size to ensure only one batch is returned with a negative limit. The default
 // batch size is greater than the limit.
@@ -43,8 +45,10 @@ numReturned = coll.find().batchSize(3).limit(10).itcount();
 assert.eq(numReturned, 10);
 
 // NEGATIVE SKIP
-assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}, skip: -1}),
-                             invalidValueErrorCode);
+assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}, skip: -1}), [
+    ErrorCodes.BadValue,
+    invalidValueErrorCode
+]);  // getting BadValue when binary is > 7.1, else idlInvalidValueError
 
 // ZERO SKIP
 numReturned = coll.find().skip(0).itcount();

@@ -604,7 +604,7 @@ TEST(MemberConfig, ParseVotes) {
                                                    << "votes" << 2 << "priority" << 0),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS(MemberConfig(BSON("_id" << 0 << "host"
@@ -626,7 +626,7 @@ TEST(MemberConfig, ParseVotes) {
                                                    << "votes" << -1 << "priority" << 0),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
 }
 
@@ -673,7 +673,7 @@ TEST(MemberConfig, ParsePriority) {
                                                    << "priority" << -1),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS_CODE(MemberConfig(BSON("_id" << 0 << "host"
@@ -681,7 +681,7 @@ TEST(MemberConfig, ParsePriority) {
                                                    << "priority" << 1001),
                                         &tagConfig),
                            AssertionException,
-                           51024);
+                           ErrorCodes::BadValue);
     }
 }
 
@@ -720,7 +720,7 @@ TEST(MemberConfig, ParseSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << -1),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
     {
         ASSERT_THROWS_CODE(
@@ -729,7 +729,7 @@ TEST(MemberConfig, ParseSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << 3600 * 24 * 400),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
 }
 
@@ -770,7 +770,7 @@ TEST(MemberConfig, ParseAcceptsAnyNumberSecondaryDelay) {
                                     << "priority" << 0 << "secondaryDelaySecs" << -1.5),
                          &tagConfig),
             AssertionException,
-            51024);
+            ErrorCodes::BadValue);
     }
     {
         MemberConfig mc(BSON("_id" << 0 << "host"

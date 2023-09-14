@@ -143,12 +143,18 @@ assert.commandFailedWithCode(db.runCommand({count: 'foo', query: {$c: {$abc: 3}}
                              ErrorCodes.BadValue);
 
 // ii. Negative skip values should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2}),
-                             [ErrorCodes.FailedToParse, 51024]);
+assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2}), [
+    ErrorCodes.BadValue,
+    ErrorCodes.FailedToParse,
+    51024
+]);  // getting BadValue when binary is > 7.1, else 51024
 
 // iii. Negative skip values with positive limit should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2, limit: 1}),
-                             [ErrorCodes.FailedToParse, 51024]);
+assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2, limit: 1}), [
+    ErrorCodes.BadValue,
+    ErrorCodes.FailedToParse,
+    51024
+]);  // getting BadValue when binary is > 7.1, else 51024
 
 // iv. Unknown options should return error.
 assert.commandFailedWithCode(db.runCommand({count: 'foo', random: true}), 40415);

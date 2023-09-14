@@ -182,12 +182,18 @@ function runTest(db, cmd, logFailpoint) {
                                  ErrorCodes.TypeMismatch);
 
     // Check that the command fails if there is a valid topologyVersion but negative maxAwaitTimeMS.
-    assert.commandFailedWithCode(db.runCommand({
-        [cmd]: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: -1,
-    }),
-                                 [31373, 51759, kIDLParserComparisonError]);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            [cmd]: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: -1,
+        }),
+        [
+            31373,
+            51759,
+            ErrorCodes.BadValue,
+            kIDLParserComparisonError
+        ]);  // getting BadValue when binary is > 7.1, else kIDLParserComparisonError
 }
 
 // Set command log verbosity to 0 to avoid logging *all* commands in the "slow query" log.

@@ -192,12 +192,17 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
 
     // Verify the create command fails when bucketRoundingSeconds or bucketMaxSpanSeconds is a
     // negative value.
-    verifyCreateCommandFails({bucketRoundingSeconds: -1, bucketMaxSpanSeconds: -1},
-                             idlInvalidValueError);
+    verifyCreateCommandFails({bucketRoundingSeconds: -1, bucketMaxSpanSeconds: -1}, [
+        ErrorCodes.BadValue,
+        idlInvalidValueError
+    ]);  // getting BadValue when binary is > 7.1, else idlInvalidValueError
 
     // Verify the create command fails when we go over the maximum value for bucketMaxSpanSeconds
     // and bucketRoundingSeconds.
     verifyCreateCommandFails(
         {bucketRoundingSeconds: bucketingValueMax + 1, bucketMaxSpanSeconds: bucketingValueMax + 1},
-        idlInvalidValueError);
+        [
+            ErrorCodes.BadValue,
+            idlInvalidValueError
+        ]);  // getting BadValue when binary is > 7.1, else idlInvalidValueError
 })();

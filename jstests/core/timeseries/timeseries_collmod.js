@@ -183,14 +183,18 @@ assert.commandWorked(
     db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
 
 // Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
-assert.commandFailedWithCode(db.runCommand({
-    "collMod": collName,
-    "timeseries": {
-        "bucketMaxSpanSeconds": bucketingValueMax + 1,
-        "bucketRoundingSeconds": bucketingValueMax + 1
-    }
-}),
-                             idlInvalidValueError);
+assert.commandFailedWithCode(
+    db.runCommand({
+        "collMod": collName,
+        "timeseries": {
+            "bucketMaxSpanSeconds": bucketingValueMax + 1,
+            "bucketRoundingSeconds": bucketingValueMax + 1
+        }
+    }),
+    [
+        ErrorCodes.BadValue,
+        idlInvalidValueError
+    ]);  // getting BadValue when binary is > 7.1, else idlInvalidValueError
 
 // Successfully set the bucketMaxSpanSeconds and bucketRoundingSeconds to the limit.
 assert.commandWorked(db.runCommand({

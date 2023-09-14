@@ -118,7 +118,8 @@ setup();
     assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: 1.5});
-    assert.commandFailedWithCode(res, 51024);
+    assert.commandFailedWithCode(
+        res, [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: null});
     assert.commandWorked(res);
@@ -130,7 +131,8 @@ setup();
     assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleSize: -5});
-    assert.commandFailedWithCode(res, 51024);
+    assert.commandFailedWithCode(
+        res, [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleSize: null});
     assert.commandWorked(res);

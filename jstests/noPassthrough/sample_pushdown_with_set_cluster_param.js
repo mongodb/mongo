@@ -47,8 +47,9 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
     const clusterParameterValue0 = {sampleCutoff: 0};
     const clusterParameterName0 = 'internalQueryCutoffForSampleFromRandomCursor';
     const clusterParameter0 = {[clusterParameterName0]: clusterParameterValue0};
-    assert.commandFailedWithCode(testDB.runCommand({setClusterParameter: clusterParameter0}),
-                                 51024);
+    assert.commandFailedWithCode(
+        testDB.runCommand({setClusterParameter: clusterParameter0}),
+        [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
 
     // Set the cluster parameter to have a cutoff of 7%.
     const clusterParameterValue = {sampleCutoff: 0.07};

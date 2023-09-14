@@ -87,7 +87,7 @@ static const NamespaceString testns =
 
 TEST(QueryRequestTest, NegativeSkip) {
     FindCommandRequest findCommand(testns);
-    ASSERT_THROWS_CODE(findCommand.setSkip(-1), DBException, 51024);
+    ASSERT_THROWS_CODE(findCommand.setSkip(-1), DBException, ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ZeroSkip) {
@@ -104,7 +104,7 @@ TEST(QueryRequestTest, PositiveSkip) {
 
 TEST(QueryRequestTest, NegativeLimit) {
     FindCommandRequest findCommand(testns);
-    ASSERT_THROWS_CODE(findCommand.setLimit(-1), DBException, 51024);
+    ASSERT_THROWS_CODE(findCommand.setLimit(-1), DBException, ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ZeroLimit) {
@@ -121,7 +121,7 @@ TEST(QueryRequestTest, PositiveLimit) {
 
 TEST(QueryRequestTest, NegativeBatchSize) {
     FindCommandRequest findCommand(testns);
-    ASSERT_THROWS_CODE(findCommand.setBatchSize(-1), DBException, 51024);
+    ASSERT_THROWS_CODE(findCommand.setBatchSize(-1), DBException, ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ZeroBatchSize) {
@@ -138,7 +138,7 @@ TEST(QueryRequestTest, PositiveBatchSize) {
 
 TEST(QueryRequestTest, NegativeMaxTimeMS) {
     FindCommandRequest findCommand(testns);
-    ASSERT_THROWS_CODE(findCommand.setMaxTimeMS(-1), DBException, 51024);
+    ASSERT_THROWS_CODE(findCommand.setMaxTimeMS(-1), DBException, ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ZeroMaxTimeMS) {
@@ -875,8 +875,9 @@ TEST(QueryRequestTest, ParseFromCommandNegativeSkipError) {
         "{find: 'testns',"
         "skip: -3,"
         "filter: {a: 3}, '$db': 'test'}");
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 51024);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
@@ -895,8 +896,9 @@ TEST(QueryRequestTest, ParseFromCommandNegativeLimitError) {
         "{find: 'testns',"
         "limit: -3,"
         "filter: {a: 3}, '$db': 'test'}");
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 51024);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
@@ -915,8 +917,9 @@ TEST(QueryRequestTest, ParseFromCommandNegativeBatchSizeError) {
         "{find: 'testns',"
         "batchSize: -10,"
         "filter: {a: 3}, '$db': 'test'}");
-    ASSERT_THROWS_CODE(
-        query_request_helper::makeFromFindCommandForTests(cmdObj), DBException, 51024);
+    ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseFromCommandBatchSizeZero) {

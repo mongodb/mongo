@@ -158,7 +158,7 @@ TEST(CountCommandTest, FailParseBadSkipValue) {
                                                        << "query" << BSON("a" << BSON("$gte" << 11))
                                                        << "skip" << -1000)),
                        AssertionException,
-                       51024);
+                       ErrorCodes::BadValue);
 }
 
 TEST(CountCommandTest, FailParseBadCollationType) {
