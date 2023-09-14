@@ -451,10 +451,12 @@ err:
 static inline uint64_t
 __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_TXN_GLOBAL *txn_global;
-    uint64_t checkpoint_pinned, oldest_id;
+    uint64_t checkpoint_pinned, oldest_id, recovery_ckpt_snap_min;
 
-    txn_global = &S2C(session)->txn_global;
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
 
     /*
      * The metadata is tracked specially because of optimizations for checkpoints.
@@ -474,19 +476,25 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
      */
     WT_READ_BARRIER();
 
-    /*
-     * Checkpoint transactions often fall behind ordinary application threads. Take special effort
-     * to not keep changes pinned in cache if they are only required for the checkpoint and it has
-     * already seen them.
-     *
-     * If there is no active checkpoint or this handle is up to date with the active checkpoint then
-     * it's safe to ignore the checkpoint ID in the visibility check.
-     */
-    checkpoint_pinned = txn_global->checkpoint_txn_shared.pinned_id;
-    if (checkpoint_pinned == WT_TXN_NONE || WT_TXNID_LT(oldest_id, checkpoint_pinned))
-        return (oldest_id);
-
-    return (checkpoint_pinned);
+    if (!F_ISSET(conn, WT_CONN_RECOVERING)) {
+        /*
+         * Checkpoint transactions often fall behind ordinary application threads. If there is an
+         * active checkpoint, keep changes until checkpoint is finished.
+         */
+        checkpoint_pinned = txn_global->checkpoint_txn_shared.pinned_id;
+        if (checkpoint_pinned == WT_TXN_NONE || WT_TXNID_LT(oldest_id, checkpoint_pinned))
+            return (oldest_id);
+        return (checkpoint_pinned);
+    } else {
+        /*
+         * Recovered checkpoint snapshot rarely fall behind ordinary application threads. Keep the
+         * changes until the recovery is finished.
+         */
+        recovery_ckpt_snap_min = conn->recovery_ckpt_snap_min;
+        if (recovery_ckpt_snap_min == WT_TXN_NONE || WT_TXNID_LT(oldest_id, recovery_ckpt_snap_min))
+            return (oldest_id);
+        return (recovery_ckpt_snap_min);
+    }
 }
 
 /*
