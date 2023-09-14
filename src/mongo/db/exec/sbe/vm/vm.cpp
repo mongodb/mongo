@@ -453,9 +453,21 @@ size_t CodeFragment::appendParameters(uint8_t* ptr, Ts&&... params) {
 size_t CodeFragment::appendParameter(uint8_t* ptr,
                                      Instruction::Parameter param,
                                      int& popCompensation) {
+    // 'pop' means that the location we're reading from is a temporary value on the VM stack
+    // (i.e. not a local variable) and that it needs to be popped off the stack immediately
+    // after we read it.
+    bool pop = !param.frameId;
+
+    // 'moveFrom' means that the location we're reading from is eligible to be the right hand
+    // side of a "move assignment" (i.e. it's an "rvalue reference"). If 'pop' is true, then
+    // 'moveFrom' must always be true as well.
+    bool moveFrom = pop || param.moveFrom;
+
     // If the parameter is not coming from a frame then we have to pop it off the stack once the
     // instruction is done.
-    ptr += writeToMemory(ptr, !param.frameId);
+    uint8_t flags = static_cast<uint8_t>(pop) | (static_cast<uint8_t>(moveFrom) << 1);
+
+    ptr += writeToMemory(ptr, flags);
 
     if (param.frameId) {
         auto& frame = getOrDeclareFrame(*param.frameId);
@@ -9034,7 +9046,7 @@ MONGO_COMPILER_NORETURN void ByteCode::runFailInstruction() {
 
 template <typename T>
 void ByteCode::runTagCheck(const uint8_t*& pcPointer, T&& predicate) {
-    auto [popParam, offsetParam] = decodeParam(pcPointer);
+    auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
     auto [owned, tag, val] = getFromStack(offsetParam, popParam);
 
     if (tag != value::TypeTags::Nothing) {
@@ -9127,10 +9139,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 pcPointer += sizeof(stackOffset);
 
                 auto [owned, tag, val] = getFromStack(stackOffset);
-                setStack(stackOffset, false, value::TypeTags::Nothing, 0);
+                setTagToNothing(stackOffset);
 
                 pushStack(owned, tag, val);
-
                 break;
             }
             case Instruction::pushLocalLambda: {
@@ -9151,8 +9162,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::add: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9166,8 +9177,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::sub: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9180,8 +9191,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::mul: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9194,8 +9205,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::div: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9208,8 +9219,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::idiv: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9222,8 +9233,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::mod: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9236,7 +9247,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::negate: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
                 value::ValueGuard paramGuard(owned && popParam, tag, val);
 
@@ -9263,7 +9274,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::logicNot: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
                 value::ValueGuard paramGuard(owned && popParam, tag, val);
 
@@ -9273,8 +9284,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::less: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9287,9 +9298,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collLess: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9305,8 +9316,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::lessEq: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9319,9 +9330,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collLessEq: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9337,8 +9348,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::greater: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9352,9 +9363,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collGreater: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9370,8 +9381,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::greaterEq: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9385,9 +9396,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collGreaterEq: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9403,8 +9414,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::eq: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9417,9 +9428,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collEq: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9435,8 +9446,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::neq: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9450,9 +9461,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collNeq: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9469,8 +9480,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::cmp3w: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9484,9 +9495,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collCmp3w: {
-                auto [popColl, offsetColl] = decodeParam(pcPointer);
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popColl, moveFromColl, offsetColl] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9550,11 +9561,12 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::getField: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
+
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
@@ -9570,7 +9582,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::getFieldImm: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
                 auto size = readFromMemory<uint8_t>(pcPointer);
                 pcPointer += sizeof(size);
                 StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
@@ -9578,6 +9590,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
                 value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
+
                 auto [owned, tag, val] = getField(lhsTag, lhsVal, fieldName);
 
                 // Copy value only if needed
@@ -9590,8 +9603,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::getElement: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9610,7 +9623,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::getArraySize: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
                 value::ValueGuard paramGuard(owned && popParam, tag, val);
 
@@ -9619,8 +9632,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::collComparisonKey: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9636,9 +9649,15 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                         auto [tag, val] = collComparisonKey(lhsTag, lhsVal, collator);
                         pushStack(true, tag, val);
                     } else {
-                        pushStack(lhsOwned, lhsTag, lhsVal);
-                        // Set 'lhsOwned' to false so that lhs doesn't get released below.
-                        lhsOwned = false;
+                        if (popLhs) {
+                            pushStack(lhsOwned, lhsTag, lhsVal);
+                            lhsGuard.reset();
+                        } else if (moveFromLhs) {
+                            setTagToNothing(offsetLhs);
+                            pushStack(lhsOwned, lhsTag, lhsVal);
+                        } else {
+                            pushStack(false, lhsTag, lhsVal);
+                        }
                     }
                 } else {
                     // If lhs was Nothing or rhs wasn't Collator, return Nothing.
@@ -9647,8 +9666,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::getFieldOrElement: {
-                auto [popLhs, offsetLhs] = decodeParam(pcPointer);
-                auto [popRhs, offsetRhs] = decodeParam(pcPointer);
+                auto [popLhs, moveFromLhs, offsetLhs] = decodeParam(pcPointer);
+                auto [popRhs, moveFromRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
                 value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
@@ -9855,7 +9874,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::exists: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
 
                 pushStack(false,
@@ -9896,7 +9915,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::isNaN: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
 
                 if (tag != value::TypeTags::Nothing) {
@@ -9913,7 +9932,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::isInfinity: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
 
                 if (tag != value::TypeTags::Nothing) {
@@ -9945,7 +9964,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::typeMatchImm: {
-                auto [popParam, offsetParam] = decodeParam(pcPointer);
+                auto [popParam, moveFromParam, offsetParam] = decodeParam(pcPointer);
                 auto mask = readFromMemory<uint32_t>(pcPointer);
                 pcPointer += sizeof(mask);
 

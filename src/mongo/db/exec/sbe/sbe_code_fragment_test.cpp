@@ -127,7 +127,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code.appendConstVal(value::TypeTags::Nothing, 0);
 
         code.appendConstVal(rhsValue.first, rhsValue.second);
-        code.appendSub({0, frameId}, {});
+        code.appendSub({0, 0, frameId}, {});
         code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
@@ -149,7 +149,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         vm::CodeFragment code2;
         code2.appendConstVal(rhsValue.first, rhsValue.second);
-        code2.appendSub({0, frameId}, {});
+        code2.appendSub({0, 0, frameId}, {});
 
         code.append(std::move(code2));
         code.removeFrame(frameId);
@@ -175,7 +175,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         rhs.appendConstVal(rhsValue.first, rhsValue.second);
 
         vm::CodeFragment instr;
-        instr.appendSub({0, frameId}, {});
+        instr.appendSub({0, 0, frameId}, {});
 
         vm::CodeFragment code;
         code.append(std::move(frame));
@@ -206,7 +206,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         vm::CodeFragment instr;
         instr.append(std::move(rhs));
-        instr.appendSub({0, frameId}, {});
+        instr.appendSub({0, 0, frameId}, {});
 
         vm::CodeFragment code;
         code.append(std::move(frame));
@@ -238,7 +238,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         code.appendConstVal(value::TypeTags::Nothing, 0);
 
         code.appendConstVal(lhsValue.first, lhsValue.second);
-        code.appendSub({}, {0, frameId});
+        code.appendSub({}, {0, 0, frameId});
         code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
@@ -260,7 +260,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
 
         vm::CodeFragment code2;
         code2.appendConstVal(lhsValue.first, lhsValue.second);
-        code2.appendSub({}, {0, frameId});
+        code2.appendSub({}, {0, 0, frameId});
 
         code.append(std::move(code2));
         code.removeFrame(frameId);
@@ -286,7 +286,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         lhs.appendConstVal(lhsValue.first, lhsValue.second);
 
         vm::CodeFragment instr;
-        instr.appendSub({}, {0, frameId});
+        instr.appendSub({}, {0, 0, frameId});
 
         vm::CodeFragment code;
         code.append(std::move(frame));
@@ -317,7 +317,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
 
         vm::CodeFragment instr;
         instr.append(std::move(lhs));
-        instr.appendSub({}, {0, frameId});
+        instr.appendSub({}, {0, 0, frameId});
 
         vm::CodeFragment code;
         code.append(std::move(frame));
@@ -350,7 +350,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code.appendConstVal(rhsValue.first, rhsValue.second);
         code.appendConstVal(value::TypeTags::Nothing, 0);
 
-        code.appendSub({0, frameId}, {1, frameId});
+        code.appendSub({0, 0, frameId}, {1, 0, frameId});
         code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
@@ -372,7 +372,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code.appendConstVal(value::TypeTags::Nothing, 0);
 
         vm::CodeFragment code2;
-        code2.appendSub({0, frameId}, {1, frameId});
+        code2.appendSub({0, 0, frameId}, {1, 0, frameId});
 
         code.append(std::move(code2));
         code.removeFrame(frameId);
@@ -396,7 +396,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         frame.appendConstVal(value::TypeTags::Nothing, 0);
 
         vm::CodeFragment instr;
-        instr.appendSub({0, frameId}, {1, frameId});
+        instr.appendSub({0, 0, frameId}, {1, 0, frameId});
 
         vm::CodeFragment code;
         code.append(std::move(frame));

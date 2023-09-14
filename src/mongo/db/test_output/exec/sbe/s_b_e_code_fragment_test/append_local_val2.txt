@@ -7,7 +7,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();
@@ -26,7 +26,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();
@@ -45,7 +45,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();
@@ -64,7 +64,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();
@@ -83,7 +83,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();
@@ -102,7 +102,7 @@
 0x0014: pushConstVal(value: Nothing);
 0x001e: pushLocalVal(arg: 2);
 0x0023: pushLocalVal(arg: 2);
-0x0028: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0028: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x002b: swap();
 0x002c: pop();
 0x002d: swap();

@@ -5,7 +5,7 @@
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
-0x001e: sub(popLhs: 0, offsetLhs: 2, popRhs: 0, offsetRhs: 1);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
 0x0029: swap();
 0x002a: pop();
 0x002b: swap();
@@ -22,7 +22,7 @@
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
-0x001e: sub(popLhs: 0, offsetLhs: 2, popRhs: 0, offsetRhs: 1);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
 0x0029: swap();
 0x002a: pop();
 0x002b: swap();
@@ -39,7 +39,7 @@
 0x0000: pushConstVal(value: 10);
 0x000a: pushConstVal(value: 20);
 0x0014: pushConstVal(value: Nothing);
-0x001e: sub(popLhs: 0, offsetLhs: 2, popRhs: 0, offsetRhs: 1);
+0x001e: sub(popLhs: 0, moveFromLhs: 0, offsetLhs: 2, popRhs: 0, moveFromRhs: 0, offsetRhs: 1);
 0x0029: swap();
 0x002a: pop();
 0x002b: swap();

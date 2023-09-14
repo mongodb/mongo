@@ -12,7 +12,7 @@
 0x002a: jmp(target: 0x0043);
 0x002f: pop();
 0x0030: pushConstVal(value: 20);
-0x003a: sub(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x003a: sub(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x003d: jmp(target: 0x0043);
 0x0042: pop();
 

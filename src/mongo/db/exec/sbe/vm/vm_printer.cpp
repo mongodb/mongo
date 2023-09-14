@@ -184,13 +184,18 @@ public:
                 case Instruction::collEq:
                 case Instruction::collNeq:
                 case Instruction::collCmp3w: {
-                    auto [popColl, offsetColl] = Instruction::Parameter::decodeParam(pcPointer);
-                    auto [popLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
-                    auto [popRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popColl, moveFromColl, offsetColl] =
+                        Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popLhs, moveFromLhs, offsetLhs] =
+                        Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popRhs, moveFromRhs, offsetRhs] =
+                        Instruction::Parameter::decodeParam(pcPointer);
 
-                    os << "popLhs: " << popLhs << ", offsetLhs: " << offsetLhs
-                       << ", popRhs: " << popRhs << ", offsetRhs: " << offsetRhs
-                       << ", popColl: " << popColl << ", offsetColl: " << offsetColl;
+                    os << "popLhs: " << popLhs << ", moveFromLhs: " << moveFromLhs
+                       << ", offsetLhs: " << offsetLhs << ", popRhs: " << popRhs
+                       << ", moveFromRhs: " << moveFromRhs << ", offsetRhs: " << offsetRhs
+                       << ", popColl: " << popColl << ", moveFromColl: " << moveFromColl
+                       << ", offsetColl: " << offsetColl;
                     break;
                 }
                 // Instructions with 2 arguments.
@@ -211,11 +216,14 @@ public:
                 case Instruction::getElement:
                 case Instruction::collComparisonKey:
                 case Instruction::getFieldOrElement: {
-                    auto [popLhs, offsetLhs] = Instruction::Parameter::decodeParam(pcPointer);
-                    auto [popRhs, offsetRhs] = Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popLhs, moveFromLhs, offsetLhs] =
+                        Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popRhs, moveFromRhs, offsetRhs] =
+                        Instruction::Parameter::decodeParam(pcPointer);
 
-                    os << "popLhs: " << popLhs << ", offsetLhs: " << offsetLhs
-                       << ", popRhs: " << popRhs << ", offsetRhs: " << offsetRhs;
+                    os << "popLhs: " << popLhs << ", moveFromLhs: " << moveFromLhs
+                       << ", offsetLhs: " << offsetLhs << ", popRhs: " << popRhs
+                       << ", moveFromRhs: " << moveFromRhs << ", offsetRhs: " << offsetRhs;
                     break;
                 }
                 // Instructions with 1 argument.
@@ -236,8 +244,10 @@ public:
                 case Instruction::isMinKey:
                 case Instruction::isMaxKey:
                 case Instruction::isTimestamp: {
-                    auto [popParam, offsetParam] = Instruction::Parameter::decodeParam(pcPointer);
-                    os << "popParam: " << popParam << ", offsetParam: " << offsetParam;
+                    auto [popParam, moveFromParam, offsetParam] =
+                        Instruction::Parameter::decodeParam(pcPointer);
+                    os << "popParam: " << popParam << ", moveFromParam: " << moveFromParam
+                       << ", offsetParam: " << offsetParam;
                     break;
                 }
                 // Instructions with a single integer argument.
@@ -289,14 +299,15 @@ public:
                     break;
                 }
                 case Instruction::getFieldImm: {
-                    auto [popParam, offsetParam] = Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popParam, moveFromParam, offsetParam] =
+                        Instruction::Parameter::decodeParam(pcPointer);
                     auto size = readFromMemory<uint8_t>(pcPointer);
                     pcPointer += sizeof(size);
                     StringData fieldName(reinterpret_cast<const char*>(pcPointer), size);
                     pcPointer += size;
 
-                    os << "popParam: " << popParam << ", offsetParam: " << offsetParam
-                       << ", value: \"" << fieldName << "\"";
+                    os << "popParam: " << popParam << ", moveFromParam: " << moveFromParam
+                       << ", offsetParam: " << offsetParam << ", value: \"" << fieldName << "\"";
                     break;
                 }
                 case Instruction::pushConstVal: {
@@ -326,11 +337,12 @@ public:
                     break;
                 }
                 case Instruction::typeMatchImm: {
-                    auto [popParam, offsetParam] = Instruction::Parameter::decodeParam(pcPointer);
+                    auto [popParam, moveFromParam, offsetParam] =
+                        Instruction::Parameter::decodeParam(pcPointer);
                     auto mask = readFromMemory<uint32_t>(pcPointer);
                     pcPointer += sizeof(mask);
-                    os << "popParam: " << popParam << ", offsetParam: " << offsetParam
-                       << ", mask: " << mask;
+                    os << "popParam: " << popParam << ", moveFromParam: " << moveFromParam
+                       << ", offsetParam: " << offsetParam << ", mask: " << mask;
                     break;
                 }
                 case Instruction::functionSmall: {

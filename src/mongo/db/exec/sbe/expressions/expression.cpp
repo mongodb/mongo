@@ -62,7 +62,7 @@ namespace sbe {
  */
 EVariable* getFrameVariable(EExpression* e) {
     auto var = e->as<EVariable>();
-    if (var && var->getFrameId() && !var->isMoveFrom()) {
+    if (var && var->getFrameId()) {
         return var;
     }
     return nullptr;
@@ -73,7 +73,7 @@ EVariable* getFrameVariable(EExpression* e) {
  */
 vm::Instruction::Parameter getParam(EVariable* var) {
     if (var) {
-        return {(int)var->getSlotId(), var->getFrameId()};
+        return {(int)var->getSlotId(), var->isMoveFrom(), var->getFrameId()};
     } else {
         return {};
     }

@@ -408,6 +408,7 @@ struct Instruction {
      */
     struct Parameter {
         int variable{0};
+        bool moveFrom{false};
         boost::optional<FrameId> frameId;
 
         // Get the size in bytes of an instruction parameter encoded in byte code.
@@ -416,8 +417,10 @@ struct Instruction {
         }
 
         MONGO_COMPILER_ALWAYS_INLINE_OPT
-        static std::pair<bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
-            auto pop = readFromMemory<bool>(pcPointer);
+        static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
+            auto flags = readFromMemory<uint8_t>(pcPointer);
+            bool pop = flags & 1u;
+            bool moveFrom = flags & 2u;
             pcPointer += sizeof(pop);
             int offset = 0;
             if (!pop) {
@@ -425,7 +428,7 @@ struct Instruction {
                 pcPointer += sizeof(offset);
             }
 
-            return {pop, offset};
+            return {pop, moveFrom, offset};
         }
     };
 
@@ -1361,7 +1364,7 @@ private:
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
 
     MONGO_COMPILER_ALWAYS_INLINE
-    static std::pair<bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
+    static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
         return Instruction::Parameter::decodeParam(pcPointer);
     }
 
@@ -2038,6 +2041,16 @@ private:
         }
 
         return {tag, val};
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    void setTagToNothing(size_t offset) noexcept {
+        if (MONGO_likely(offset == 0)) {
+            writeToMemory(_argStackTop + offsetTag, value::TypeTags::Nothing);
+        } else {
+            auto ptr = _argStackTop - offset * sizeOfElement;
+            writeToMemory(ptr + offsetTag, value::TypeTags::Nothing);
+        }
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT

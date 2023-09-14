@@ -8,7 +8,7 @@
 0x000a: pushConstVal(value: 2ll);
 0x0014: pushConstVal(value: "test");
 0x001e: fail();
-0x001f: add(popLhs: 1, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x001f: add(popLhs: 1, moveFromLhs: 1, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 
 
 -- EXECUTE VARIATION:

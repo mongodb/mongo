@@ -20,7 +20,7 @@
 0x001d: jmp(target: 0x0039);
 0x0022: allocStack(size:1);
 0x0027: pushConstVal(value: 3);
-0x0031: eq(popLhs: 0, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0031: eq(popLhs: 0, moveFromLhs: 0, offsetLhs: 0, popRhs: 1, moveFromRhs: 1, offsetRhs: 0);
 0x0038: ret();
 0x0039: pushLocalVal(arg: 2);
 0x003e: traverseFImm(k: False, target: 0x0022);
