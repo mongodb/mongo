@@ -428,7 +428,8 @@ private:
      * Holder of shared state between CollectionImpl clones
      */
     struct SharedState {
-        SharedState(CollectionImpl* collection,
+        SharedState(OperationContext* opCtx,
+                    CollectionImpl* collection,
                     std::unique_ptr<RecordStore> recordStore,
                     const CollectionOptions& options);
         ~SharedState();

@@ -76,7 +76,7 @@ public:
     bool isRecordVisible(const RecordId& rid) const {
         if (_lowestUncommittedRecord.isNull()) {
             if (_highestRecord.isNull()) {
-                return true;
+                return false;
             } else {
                 return rid <= _highestRecord;
             }

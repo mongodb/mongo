@@ -85,6 +85,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterEstablishCappedSnapshot);
+
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
 /**
@@ -193,6 +195,10 @@ void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
     auto coll = catalog->lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
     if (coll && coll->usesCappedSnapshots()) {
         CappedSnapshots::get(opCtx).establish(opCtx, coll);
+        if (MONGO_unlikely(hangAfterEstablishCappedSnapshot.shouldFail())) {
+            LOGV2(7996000, "Hanging after establishing capped snapshot");
+            hangAfterEstablishCappedSnapshot.pauseWhileSet(opCtx);
+        }
     }
 }
 

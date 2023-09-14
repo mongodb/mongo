@@ -295,6 +295,8 @@ public:
 
     typedef stdx::variant<int64_t, WiredTigerItem> CursorKey;
 
+    RecordId getLargestKey(OperationContext* opCtx) const final;
+
     void reserveRecordIds(OperationContext* opCtx,
                           std::vector<RecordId>* out,
                           size_t nRecords) final;

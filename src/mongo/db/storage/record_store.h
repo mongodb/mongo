@@ -673,6 +673,15 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const;
 
     /**
+     * Returns the largest RecordId in the RecordStore, regardless of visibility rules. If the store
+     * is empty, returns a null RecordId.
+     *
+     * May throw WriteConflictException in certain cache-stuck scenarios even if the operation isn't
+     * part of a WriteUnitOfWork.
+     */
+    virtual RecordId getLargestKey(OperationContext* opCtx) const = 0;
+
+    /**
      * Reserve a range of contiguous RecordIds. Returns the first valid RecordId in the range. Must
      * only be called on a RecordStore with KeyFormat::Long.
      */

@@ -67,6 +67,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -873,7 +874,21 @@ const Collection* CollectionCatalog::establishConsistentCollection(
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
     if (_needsOpenCollection(opCtx, nssOrUUID, readTimestamp)) {
-        return _openCollection(opCtx, nssOrUUID, readTimestamp);
+        auto coll = _openCollection(opCtx, nssOrUUID, readTimestamp);
+
+        // Usually, CappedSnapshots must be established before opening the storage snapshot. Thus,
+        // the lookup must be done from the in-memory catalog. It is possible that the required
+        // CappedSnapshot was not properly established when this operation was collection creation,
+        // because a Collection instance was not found in the in-memory catalog.
+
+        // This can only be the case with concurrent collection creation (MODE_IX), and it is
+        // semantically correct to establish an empty snapshot, causing the reader to see no
+        // records. Other DDL ops should have successfully established the snapshot, because a
+        // Collection must have been found in the in-memory catalog.
+        if (coll && coll->usesCappedSnapshots() && !CappedSnapshots::get(opCtx).getSnapshot(coll)) {
+            CappedSnapshots::get(opCtx).establish(opCtx, coll, /*isNewCollection=*/true);
+        }
+        return coll;
     }
 
     return lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);

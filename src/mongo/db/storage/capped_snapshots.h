@@ -59,9 +59,16 @@ public:
      * Must be called before opening a forward cursor on this capped collection. Establishes a
      * consistent view of the capped visibility for this collection. The snapshot is invalidated for
      * this collection when the storage engine snapshot is closed.
+     *
+     * The 'isNewCollection' indicates the CappedSnapshot is being established after the storage
+     * snapshot was opened, because it was not possible to do so due to a concurrent collection
+     * creation. This is the only case where it is safe to establish the CappedSnapshot after the
+     * storage snapshot. The snapshot will be empty, and the reader will not see anything.
      */
-    void establish(OperationContext* opCtx, const CollectionPtr& coll);
-    void establish(OperationContext* opCtx, const Collection* coll);
+    void establish(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   bool isNewCollection = false);
+    void establish(OperationContext* opCtx, const Collection* coll, bool isNewCollection = false);
 
     /**
      * Retrieve a previously established visibility snapshot. If no prior call to establish() has
@@ -70,6 +77,7 @@ public:
      * that would return records past the capped visibility point.
      */
     boost::optional<CappedVisibilitySnapshot> getSnapshot(StringData ident) const;
+    boost::optional<CappedVisibilitySnapshot> getSnapshot(const Collection* coll) const;
 
 private:
     void _setSnapshot(StringData ident, CappedVisibilitySnapshot snapshot);

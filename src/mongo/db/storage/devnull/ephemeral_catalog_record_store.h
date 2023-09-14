@@ -144,6 +144,11 @@ public:
         _data->dataSize = dataSize;
     }
 
+    RecordId getLargestKey(OperationContext* opCtx) const final {
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        return RecordId(_data->nextId - 1);
+    }
+
     virtual void reserveRecordIds(OperationContext* opCtx,
                                   std::vector<RecordId>* out,
                                   size_t nRecords) final{};

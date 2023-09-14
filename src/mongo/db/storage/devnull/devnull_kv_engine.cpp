@@ -192,6 +192,10 @@ public:
                                         long long numRecords,
                                         long long dataSize) {}
 
+    RecordId getLargestKey(OperationContext* opCtx) const final {
+        return RecordId();
+    }
+
     virtual void reserveRecordIds(OperationContext* opCtx,
                                   std::vector<RecordId>* out,
                                   size_t nRecords) final {
