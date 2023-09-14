@@ -1,5 +1,6 @@
 /**
  * Tests 'changeStreams.largeEventsFailed' metric.
+ * @tags: [multiversion_incompatible]
  */
 
 (function() {
@@ -31,16 +32,20 @@ if (FixtureHelpers.numberOfShardsForCollection(testColl) >= 2) {
     });
 }
 
-function getChangeStreamMetricSum(metricName) {
-    return FixtureHelpers
-        .mapOnEachShardNode(
-            {db: testDB, func: (db) => db.serverStatus().metrics.changeStreams[metricName]})
-        .reduce((total, val) => total + val, 0);
-}
+function getChangeStreamMetricSum(metricName, tag) {
+    let metric = 0;
 
-// Enable pre- and post-images.
-assert.commandWorked(testDB.runCommand(
-    {collMod: testColl.getName(), changeStreamPreAndPostImages: {enabled: true}}));
+    if (isMongos(testDB)) {
+        metric = testDB.serverStatus().metrics.changeStreams[metricName];
+    }
+    let list = FixtureHelpers.mapOnEachShardNode({
+        db: testDB,
+        func: (db) => db.serverStatus().metrics.changeStreams[metricName],
+        primaryNodeOnly: false
+    });
+
+    return list.reduce((total, val) => total + val, metric);
+}
 
 // Open a change stream without pre- and post-images.
 let csCursor = testColl.watch([]);
@@ -67,25 +72,21 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
     // Test that for events which are over the size limit, $changeStreamSplitLargeEvent is
     // required. Additionally, test that 'changeStreams.largeEventsFailed' metric is counted
     // correctly.
-    for (const postImageMode of ["required", "updateLookup"]) {
-        const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
+    const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
 
-        const csCursor = testColl.watch([], {
-            batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-            fullDocument: postImageMode,
-            fullDocumentBeforeChange: "required",
-            resumeAfter: testStartToken
-        });
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
-                              ErrorCodes.BSONObjectTooLarge);
+    const csCursor = testColl.watch([], {
+        batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+        fullDocument: "updateLookup",
+        resumeAfter: testStartToken
+    });
+    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
+                          ErrorCodes.BSONObjectTooLarge);
 
-        const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
-        // We will hit the 'BSONObjectTooLarge' error once on each shard that encounters a large
-        // change event document. The error will occur maximum on 2 shards, because we trigger only
-        // 2 change events. The error might occur only on 1 shard when the collection is not sharded
-        // or due to the timing of exceptions on sharded clusters.
-        assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed,
-                        [1, 2]);
-    }
+    const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
+    // We will hit the 'BSONObjectTooLarge' error once on each shard that encounters a large
+    // change event document. The error will occur maximum on 2 shards, because we trigger only
+    // 2 change events. The error might occur only on 1 shard when the collection is not sharded
+    // or due to the timing of exceptions on sharded clusters.
+    assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed, [1, 2]);
 }
 }());

@@ -39,6 +39,12 @@
 
 namespace mongo {
 
+namespace {
+Counter64 changeStreamsLargeEventsFailedCounter;
+ServerStatusMetricField<Counter64> dChangeStreamsLargeEventsFailedCounter(
+    "changeStreams.largeEventsFailed", &changeStreamsLargeEventsFailedCounter);
+}  // namespace
+
 RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->opCtx),
       _mergePipeline(std::move(mergePipeline)) {
@@ -96,7 +102,15 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
         return event.toBson();
     }
     // Confirm that the document _id field matches the original resume token in the sort key field.
-    auto eventBSON = event.toBson();
+    BSONObj eventBSON;
+    try {
+        eventBSON = event.toBson();
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        // In a change stream pipeline, increment change stream large event failed error
+        // count metric.
+        changeStreamsLargeEventsFailedCounter.increment();
+        throw;
+    }
     auto resumeToken = event.metadata().getSortKey();
     auto idField = eventBSON.getObjectField("_id");
     invariant(!resumeToken.missing());
