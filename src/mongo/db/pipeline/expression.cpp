@@ -6771,7 +6771,7 @@ private:
         } else if (doubleValue == 0.0 && std::signbit(doubleValue)) {
             return Value("-0"_sd);
         } else {
-            return Value(static_cast<std::string>(str::stream() << doubleValue));
+            return Value(static_cast<std::string>(str::stream() << fmt::format("{}", doubleValue)));
         }
     }
 

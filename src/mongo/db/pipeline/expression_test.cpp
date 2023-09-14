@@ -197,6 +197,54 @@ std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
+/**
+ * Generates a string representation of a random double with a variable number of decimal places
+ * between 1 and 15 and no trailing zeros or decimal point.
+ */
+std::string randomDoubleAsString() {
+    // Initialize random number generator.
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Generate a random number between 0 and 1.
+    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    double randomValue = dis(gen);
+
+    // Generate a random number of decimal places between 1 and 15.
+    std::uniform_int_distribution<int> decimalPlaces(1, 15);
+    int numDecimalPlaces = decimalPlaces(gen);
+
+    // Convert the random double to a string with the specified decimal places.
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(numDecimalPlaces) << randomValue;
+
+    // Remove trailing zeros from the string.
+    std::string result = oss.str();
+    result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+
+    // Remove the decimal point if it's the last character.
+    if (result.back() == '.') {
+        result.pop_back();
+    }
+
+    return result;
+}
+
+/**
+ * Verifies that a string representation of a double can be correctly round-tripped through
+ * conversion to a double value and back to a string.
+ */
+void verifyStringDoubleConvertRoundtripsCorrectly(StringData doubleAsString) {
+    Value stringConvertedToDouble = evaluateExpression("$toDouble", {doubleAsString});
+    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::NumberDouble);
+
+    Value doubleConvertedToString = evaluateExpression("$toString", {stringConvertedToDouble});
+    ASSERT_EQ(doubleConvertedToString.getType(), BSONType::String);
+
+    // Verify the conversion round-trips correctly.
+    ASSERT_VALUE_EQ(doubleConvertedToString, Value(doubleAsString));
+}
+
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
 TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
@@ -4738,6 +4786,18 @@ TEST(ExpressionParseParenthesisExpressionObjTest, SingleExprSimplification) {
     auto specObject = fromjson("{$expr: [123]}");
     auto expr = Expression::parseObject(&expCtx, specObject, expCtx.variablesParseState);
     ASSERT_EQ(expr->serialize().toString(), "[{$const: 123}]");
+}
+
+/**
+ * Test case for round-trip conversion of random double strings using $convert.
+ *
+ * Generates and verifies 1000 random double strings, ensuring they can be
+ * correctly converted to double values and back to strings.
+ */
+TEST(ExpressionConvert, StringToDouble) {
+    for (int i = 0; i < 1000; ++i) {
+        verifyStringDoubleConvertRoundtripsCorrectly(randomDoubleAsString());
+    }
 }
 
 }  // namespace ExpressionTests
