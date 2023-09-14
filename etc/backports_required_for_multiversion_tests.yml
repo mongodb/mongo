@@ -413,8 +413,6 @@ last-continuous:
     ticket: SERVER-78752
   - test_file: jstests/sharding/fsync_deadlock.js
     ticket: SERVER-78793
-  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
-    ticket: SERVER-78855
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
@@ -439,6 +437,38 @@ last-continuous:
     ticket: SERVER-81013
   - test_file: jstests/core/timeseries/timeseries_update_collation.js
     ticket: SERVER-81013
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_and_modify.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_no_orphans_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_no_orphans_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_delete.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_delete_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_find_and_modify.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_find_and_modify_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_insert.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_insert_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_sharded.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update_range.js
+    ticket: SERVER-78952
   suites: null
 last-lts:
   all:
@@ -914,8 +944,6 @@ last-lts:
     ticket: SERVER-78786
   - test_file: jstests/sharding/fsync_deadlock.js
     ticket: SERVER-78793
-  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
-    ticket: SERVER-78855
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
@@ -944,4 +972,36 @@ last-lts:
     ticket: SERVER-81013
   - test_file: jstests/core/timeseries/timeseries_update_collation.js
     ticket: SERVER-81013
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_and_modify.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_no_orphans_getMore_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_no_orphans_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/find_txn.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_delete.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_delete_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_find_and_modify.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_find_and_modify_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_insert.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_insert_range.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_sharded.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update.js
+    ticket: SERVER-78952
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update_range.js
+    ticket: SERVER-78952
   suites: null

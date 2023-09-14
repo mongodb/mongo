@@ -69,7 +69,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -331,20 +330,6 @@ EncryptionInformation makeEmptyProcessEncryptionInformation() {
     return encryptionInformation;
 }
 
-void assertTransactionCompatibilty(OperationContext* opCtx) {
-    // TODO SERVER-78952: On any node in a shard, we only permit snapshot transactions with QE
-    //
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::None) &&
-        opCtx->inMultiDocumentTransaction()) {
-        auto readConcern = repl::ReadConcernArgs::get(opCtx);
-
-        uassert(7885501,
-                "Queryable Encryption operations are only permitted in transactions with "
-                "readConcern snapshot",
-                readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    }
-}
-
 }  // namespace
 
 using VTS = auth::ValidatedTenancyScope;
@@ -471,8 +456,6 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
                 FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
         }
     }
-
-    assertTransactionCompatibilty(opCtx);
 
     for (auto& document : documents) {
         const auto& [swResult, reply] =
@@ -622,8 +605,6 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                 updateOpEntry.getU().type() == write_ops::UpdateModification::Type::kModifier ||
                     updateOpEntry.getU().type() ==
                         write_ops::UpdateModification::Type::kReplacement);
-
-        assertTransactionCompatibilty(opCtx);
 
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
@@ -1179,20 +1160,9 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Insert) {
         auto insertRequest = request.getInsertRequest();
 
-        auto readConcern = repl::ReadConcernArgs::get(opCtx);
-
-        // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
-        // transactions
-        if (!opCtx->inMultiDocumentTransaction()) {
-            repl::ReadConcernArgs::get(opCtx) =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-        }
-
         auto [batchResult, insertReply] =
             processInsert(opCtx, insertRequest, &getTransactionWithRetriesForMongoS);
         if (batchResult == FLEBatchResult::kNotProcessed) {
-            // Restore the original read concern when this is not QE insert
-            repl::ReadConcernArgs::get(opCtx) = readConcern;
             return FLEBatchResult::kNotProcessed;
         }
 
@@ -1209,13 +1179,6 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
         return FLEBatchResult::kProcessed;
 
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-
-        // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
-        // transactions
-        if (!opCtx->inMultiDocumentTransaction()) {
-            repl::ReadConcernArgs::get(opCtx) =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-        }
 
         auto updateRequest = request.getUpdateRequest();
 
@@ -1306,8 +1269,6 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     FLEQueryInterface* queryImpl,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
-
-    assertTransactionCompatibilty(expCtx->opCtx);
 
     {
         stdx::lock_guard<Client> lk(*expCtx->opCtx->getClient());
@@ -1494,13 +1455,6 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 
     if (!request.getEncryptionInformation().has_value()) {
         return FLEBatchResult::kNotProcessed;
-    }
-
-    // TODO SERVER-78952 - Until SERVER-77506 is fixed, force snapshot readConcern for sharded
-    // transactions
-    if (!opCtx->inMultiDocumentTransaction()) {
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
     }
 
     {
