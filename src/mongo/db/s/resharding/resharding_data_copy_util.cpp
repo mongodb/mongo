@@ -373,10 +373,11 @@ int insertBatchTransactionally(OperationContext* opCtx,
             return numBytes;
         } catch (const DBException& ex) {
             // Stale config errors requires that we refresh shard version, not just try again, so
-            // we let the layer above handle them.
+            // we let the layer above handle them. We set isCommitOrAbort to true to avoid retrying
+            // on errors in ErrorCodes::isRetriableError like InterruptedDueToReplStateChange.
             if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
                 !isTransientTransactionError(
-                    ex.code(), false /* hasWriteConcernError */, false /* isCommitOrAbort */))
+                    ex.code(), false /* hasWriteConcernError */, true /* isCommitOrAbort */))
                 throw;
             logAndBackoff(7973400,
                           MONGO_LOGV2_DEFAULT_COMPONENT,

@@ -132,6 +132,7 @@ private:
     void _runOnceWithNaturalOrder(OperationContext* opCtx,
                                   std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                                   std::shared_ptr<executor::TaskExecutor> executor,
+                                  std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                                   CancellationToken cancelToken);
 
     ReshardingMetrics* _metrics;

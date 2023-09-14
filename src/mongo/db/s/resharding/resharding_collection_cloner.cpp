@@ -302,16 +302,20 @@ public:
         WriteCallback;
 
     ReshardingCloneFetcher(std::shared_ptr<executor::TaskExecutor> executor,
+                           std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                            CancellationToken cancelToken,
                            sharded_agg_helpers::DispatchShardPipelineResults dispatchResults,
                            int batchSizeLimitBytes,
                            int numWriteThreads)
         : _executor(std::move(executor)),
+          _cleanupExecutor(std::move(cleanupExecutor)),
           _cancelSource(cancelToken),
           _factory(_cancelSource.token(), _executor),
           _dispatchResults(std::move(dispatchResults)),
           _numWriteThreads(numWriteThreads),
-          _queues(_numWriteThreads) {
+          _queues(_numWriteThreads),
+          _activeCursors(0),
+          _openConsumers(0) {
         constexpr int kQueueDepthPerDonor = 2;
         MultiProducerSingleConsumerQueue<QueueData>::Options qOptions;
         qOptions.maxQueueDepth = _dispatchResults.remoteCursors.size() * kQueueDepthPerDonor;
@@ -320,8 +324,25 @@ public:
         }
     }
 
+    ~ReshardingCloneFetcher() {
+        _cancelSource.cancel();
+        for (auto& queue : _queues) {
+            queue->closeProducerEnd();
+            queue->closeConsumerEnd();
+        }
+        {
+            stdx::unique_lock lk(_mutex);
+            _allProducerConsumerClosed.wait(
+                lk, [this]() { return _openConsumers == 0 && _activeCursors == 0; });
+        }
+    }
+
     void setUpWriterThreads(WriteCallback cb) {
         for (int i = 0; i < _numWriteThreads; i++) {
+            {
+                std::lock_guard lk(_mutex);
+                _openConsumers++;
+            }
             // Set up writer threads.
             auto writerFuture =
                 Future<void>::makeReady()
@@ -342,6 +363,7 @@ public:
                                std::move(qData.donorHost));
                         }
                     })
+                    .thenRunOn(_cleanupExecutor)
                     .onError([this, i](Status status) {
                         LOGV2_DEBUG(7763601,
                                     2,
@@ -357,6 +379,12 @@ public:
                             // If consumers fail, ensure that producers waiting on the queue
                             // exit rather than hanging.
                             _queues[i]->closeConsumerEnd();
+                        }
+                    })
+                    .onCompletion([this](Status status) {
+                        std::unique_lock lk(_mutex);
+                        if (--_openConsumers == 0) {
+                            _allProducerConsumerClosed.notify_all();
                         }
                     });
             _writerFutures.emplace_back(std::move(writerFuture));
@@ -401,11 +429,14 @@ public:
 
     void setupReaderThreads(OperationContext* opCtx) {
         auto& remoteCursors = _dispatchResults.remoteCursors;
-        _activeCursors = int(remoteCursors.size());
         // Network commands can start immediately, so reserve here to avoid the
         // vector being resized while setting up.
         _shardIds.reserve(remoteCursors.size());
         for (int i = 0; i < int(remoteCursors.size()); i++) {
+            {
+                std::lock_guard lk(_mutex);
+                _activeCursors++;
+            }
             auto& cursor = _dispatchResults.remoteCursors[i];
             GetMoreCommandRequest getMoreRequest(
                 cursor->getCursorResponse().getCursorId(),
@@ -469,6 +500,7 @@ public:
                             })
                             .on(_executor, _cancelSource.token());
                     })
+                    .thenRunOn(_cleanupExecutor)
                     .onCompletion(
                         [this](
                             StatusWith<executor::TaskExecutor::ResponseStatus> swResponseStatus) {
@@ -486,6 +518,7 @@ public:
                                 for (auto& queue : _queues) {
                                     queue->closeProducerEnd();
                                 }
+                                _allProducerConsumerClosed.notify_all();
                             }
                             return swResponseStatus;
                         });
@@ -506,6 +539,7 @@ public:
 
 private:
     std::shared_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     CancellationSource _cancelSource;
     CancelableOperationContextFactory _factory;
     sharded_agg_helpers::DispatchShardPipelineResults _dispatchResults;
@@ -527,14 +561,17 @@ private:
 
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCloneFetcher::_mutex");
     int _activeCursors;                  // (M)
+    int _openConsumers;                  // (M)
     Status _finalResult = Status::OK();  // (M)
     AtomicWord<bool> _failPointHit;
+    stdx::condition_variable _allProducerConsumerClosed;
 };
 
 void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
     OperationContext* opCtx,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken) {
     auto resumeData = resharding::data_copy::getRecipientResumeData(opCtx, _reshardingUUID);
     LOGV2_DEBUG(7763604,
@@ -637,6 +674,7 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
 
     ReshardingCloneFetcher reshardingCloneFetcher(
         std::move(executor),
+        std::move(cleanupExecutor),
         cancelToken,
         std::move(dispatchResults),
         resharding::gReshardingCollectionClonerBatchSizeInBytes.load(),
@@ -795,39 +833,45 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     auto reshardingImprovementsEnabled = resharding::gFeatureFlagReshardingImprovements.isEnabled(
         serverGlobalParams.featureCompatibility);
 
-    return resharding::WithAutomaticRetry(
-               [this, chainCtx, factory, executor, cancelToken, reshardingImprovementsEnabled] {
-                   reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
-                   if (reshardingImprovementsEnabled) {
-                       auto opCtx = factory.makeOperationContext(&cc());
-                       // We can run into StaleConfig errors when cloning collections. To make it
-                       // safer during retry, we retry the whole cloning process and rely on the
-                       // resume token to be correct.
-                       resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
-                           _runOnceWithNaturalOrder(opCtx.get(),
-                                                    MongoProcessInterface::create(opCtx.get()),
-                                                    executor,
-                                                    cancelToken);
-                       });
-                       // If we got here, we succeeded and there is no more to come.  Otherwise
-                       // _runOnceWithNaturalOrder would uassert.
-                       chainCtx->moreToCome = false;
-                       return;
-                   }
-                   if (!chainCtx->pipeline) {
-                       auto opCtx = factory.makeOperationContext(&cc());
-                       chainCtx->pipeline = _restartPipeline(opCtx.get(), executor);
-                   }
-
+    return resharding::WithAutomaticRetry([this,
+                                           chainCtx,
+                                           factory,
+                                           executor,
+                                           cleanupExecutor,
+                                           cancelToken,
+                                           reshardingImprovementsEnabled] {
+               reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
+               if (reshardingImprovementsEnabled) {
                    auto opCtx = factory.makeOperationContext(&cc());
-                   ScopeGuard guard([&] {
-                       chainCtx->pipeline->dispose(opCtx.get());
-                       chainCtx->pipeline.reset();
+                   // We can run into StaleConfig errors when cloning collections. To make it
+                   // safer during retry, we retry the whole cloning process and rely on the
+                   // resume token to be correct.
+                   resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                       _runOnceWithNaturalOrder(opCtx.get(),
+                                                MongoProcessInterface::create(opCtx.get()),
+                                                executor,
+                                                cleanupExecutor,
+                                                cancelToken);
                    });
-                   chainCtx->moreToCome =
-                       doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
-                   guard.dismiss();
-               })
+                   // If we got here, we succeeded and there is no more to come.  Otherwise
+                   // _runOnceWithNaturalOrder would uassert.
+                   chainCtx->moreToCome = false;
+                   return;
+               }
+               if (!chainCtx->pipeline) {
+                   auto opCtx = factory.makeOperationContext(&cc());
+                   chainCtx->pipeline = _restartPipeline(opCtx.get(), executor);
+               }
+
+               auto opCtx = factory.makeOperationContext(&cc());
+               ScopeGuard guard([&] {
+                   chainCtx->pipeline->dispose(opCtx.get());
+                   chainCtx->pipeline.reset();
+               });
+               chainCtx->moreToCome =
+                   doOneBatch(opCtx.get(), *chainCtx->pipeline, chainCtx->batchTxnNumber);
+               guard.dismiss();
+           })
         .onTransientError([this](const Status& status) {
             LOGV2(5269300,
                   "Transient error while cloning sharded collection",

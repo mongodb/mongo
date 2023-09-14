@@ -479,10 +479,16 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogAppliers
 
 void ReshardingDataReplication::shutdown() {
     _oplogFetcherExecutor->shutdown();
+    if (_collectionClonerExecutor) {
+        _collectionClonerExecutor->shutdown();
+    }
 }
 
 void ReshardingDataReplication::join() {
     _oplogFetcherExecutor->join();
+    if (_collectionClonerExecutor) {
+        _collectionClonerExecutor->join();
+    }
 }
 
 std::vector<NamespaceString> ReshardingDataReplication::ensureStashCollectionsExist(
