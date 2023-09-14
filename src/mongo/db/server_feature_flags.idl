@@ -82,3 +82,7 @@ feature_flags:
         primary."
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: false
+    featureFlagShardKeyIndexOptionalHashedSharding:
+        description: "Feature flag to make a supporting shard key index for hashed sharding optional"
+        cpp_varname: gFeatureFlagShardKeyIndexOptionalHashedSharding
+        default: false
