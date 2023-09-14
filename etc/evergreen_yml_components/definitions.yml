@@ -8787,13 +8787,6 @@ tasks:
       args:
       - "./src/evergreen/todos_check.sh"
 
-- <<: *task_template
-  name: mqlrun
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 - name: check_feature_flag_tags
   tags: []
   patch_only: true

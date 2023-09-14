@@ -255,7 +255,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -422,7 +421,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -534,7 +532,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -702,7 +699,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -820,7 +816,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -1220,7 +1215,6 @@ buildvariants:
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
-  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
@@ -2626,7 +2620,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -2670,7 +2663,6 @@ buildvariants:
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
-  - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
