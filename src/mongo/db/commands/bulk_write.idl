@@ -160,6 +160,26 @@ structs:
                 optional: true
                 stability: unstable
 
+    # TODO (SERVER-77798): Get rid of this struct that duplicates the definition of a WriteConcernError.
+    BulkWriteWriteConcernError:
+        description: "WriteConcernError structure shared by all commands."
+        strict: true
+        fields:
+            code:
+                type: int
+                stability: unstable
+            codeName:
+                type: string
+                optional: true
+                stability: unstable
+            errmsg:
+                type: string
+                stability: unstable
+            errInfo:
+                type: object
+                optional: true
+                stability: unstable
+
     NamespaceInfoEntry:
         description: "Holds information about each namespace in the bulk write"
         strict: true
@@ -235,6 +255,13 @@ structs:
                 description: "The statement numbers for the write statements that had already been
                               executed, thus were not executed by this command."
                 type: array<int>
+                optional: true
+                stability: unstable
+            writeConcernError:
+                description: "WriteConcernError returned when this command was run. In case multiple
+                              errors were returned from various shards, the errors are concatenated
+                              in the error message."
+                type: BulkWriteWriteConcernError
                 optional: true
                 stability: unstable
 

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/bulk_write_parser.h"
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -166,6 +167,29 @@ auto initTargeterHalfRange(const NamespaceString& nss, const ShardEndpoint& endp
     // x >= 0 values are untargetable
     std::vector<MockRange> range{MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))};
     return std::make_unique<BulkWriteMockNSTargeter>(nss, std::move(range));
+}
+
+// Helper to create the response that a shard returns to a bulkwrite command request.
+BulkWriteCommandReply createBulkWriteShardResponse(const executor::RemoteCommandRequest& request,
+                                                   bool withWriteConcernError = false) {
+    LOGV2(7695407,
+          "Shard received a request, sending mock response.",
+          "request"_attr = request.toString());
+    BulkWriteCommandReply reply;
+    reply.setCursor(BulkWriteCommandResponseCursor(
+        0,  // cursorId
+        std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)},
+        NamespaceString::makeBulkWriteNSS(boost::none)));
+    reply.setNumErrors(0);
+
+    if (withWriteConcernError) {
+        BulkWriteWriteConcernError wce;
+        wce.setCode(ErrorCodes::UnsatisfiableWriteConcern);
+        wce.setErrmsg("Dummy WriteConcernError");
+        reply.setWriteConcernError(boost::optional<mongo::BulkWriteWriteConcernError>(wce));
+    }
+
+    return reply;
 }
 
 using namespace bulk_write_exec;
@@ -1588,7 +1612,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
     // The error for the first op should be the cancellation error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kCallbackCanceledResponse.swResponse.getStatus());
-    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kCallbackCanceledResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1654,7 +1678,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorOrdered) {
     // The error for the first op should be the network error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1692,7 +1716,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
               kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 4);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(replies[1].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
@@ -1763,7 +1787,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnOrdered)
     // The error for the first op should be the interruption error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kInterruptedErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1881,7 +1905,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+        auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 2);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -1920,7 +1944,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, numErrors] = bulkWriteOp.generateReplyInfo();
+        auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 4);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -2004,7 +2028,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
         // try to refresh the targeters upon targeting errors.
         request.setOrdered(false);
-        auto [replyItems, numErrors] =
+        auto [replyItems, numErrors, _] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 2u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
@@ -2016,15 +2040,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
 
     // Mock a bulkWrite response to respond to the second op, which is valid.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        LOGV2(7695301,
-              "Shard received a request, sending mock response.",
-              "request"_attr = request.toString());
-        BulkWriteCommandReply reply;
-        reply.setCursor(BulkWriteCommandResponseCursor(
-            0,  // cursorId
-            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)},
-            NamespaceString::makeBulkWriteNSS(boost::none)));
-        reply.setNumErrors(0);
+        auto reply = createBulkWriteShardResponse(request);
         return reply.toBSON();
     });
     future.default_timed_get();
@@ -2036,7 +2052,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // Test ordered operations. This is mostly the same as the test case above except that we
         // should only return the first error for ordered operations.
         request.setOrdered(true);
-        auto [replyItems, numErrors] =
+        auto [replyItems, numErrors, _] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 1u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
@@ -2079,11 +2095,179 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 
     // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
     // exception which should abort the entire bulkWrite.
-    auto [replyItems, numErrors] = bulk_write_exec::execute(operationContext(), targeters, request);
+    auto [replyItems, numErrors, _] =
+        bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 2u);
     ASSERT_EQUALS(replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
     ASSERT_EQUALS(replyItems[1].getStatus().code(), ErrorCodes::StaleEpoch);
     ASSERT_EQUALS(numErrors, 2);
+}
+
+// Tests that WriteConcernErrors are surfaced back to the user correctly,
+// even when the operation is a no-op (due to an error like BadValue).
+TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint0(
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss0, endpoint0));
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss0)});
+
+    LOGV2(7695401, "Case 1) WCE with successful op.");
+    auto future = launchAsync([&] {
+        auto [replyItems, numErrors, writeConcernError] =
+            bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(replyItems.size(), 1u);
+        ASSERT_OK(replyItems[0].getStatus());
+        ASSERT_EQUALS(numErrors, 0);
+        ASSERT_EQUALS(writeConcernError->getCode(), ErrorCodes::UnsatisfiableWriteConcern);
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
+
+    // Even when the operation is a no-op due to an error (BadValue), any WCE that
+    // occurs should be returned to the user.
+    LOGV2(7695402, "Case 2) WCE with unsuccessful op (BadValue).");
+    future = launchAsync([&] {
+        auto [replyItems, numErrors, writeConcernError] =
+            bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(replyItems.size(), 1u);
+        ASSERT_NOT_OK(replyItems[0].getStatus());
+        ASSERT_EQUALS(numErrors, 1);
+        ASSERT_EQUALS(writeConcernError->getCode(), ErrorCodes::UnsatisfiableWriteConcern);
+    });
+
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        reply.setCursor(BulkWriteCommandResponseCursor(
+            0,  // cursorId
+            std::vector<mongo::BulkWriteReplyItem>{
+                BulkWriteReplyItem(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))},
+            NamespaceString::makeBulkWriteNSS(boost::none)));
+        reply.setNumErrors(1);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
+}
+
+// Tests that WriteConcernErrors from multiple shards are merged correctly. Also tests
+// that WriteConcernErrors do not halt progress in ordered operations.
+TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("knocks.allaboutyou");
+    NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("foster.thepeople");
+    ShardEndpoint endpoint0(
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpoint1(
+        kShardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    // Writes to nss0 go to endpoint0 (shardA) and writes to nss1 go to endpoint1 (shardB).
+    targeters.push_back(initTargeterFullRange(nss0, endpoint0));
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    request.setOrdered(true);
+
+    LOGV2(7695403, "Case 1) WCE in ordered case.");
+    auto future = launchAsync([&] {
+        auto [replyItems, numErrors, writeConcernError] =
+            bulk_write_exec::execute(operationContext(), targeters, request);
+        // Both operations executed, therefore the size of reply items is 2.
+        ASSERT_EQUALS(replyItems.size(), 2u);
+        ASSERT_OK(replyItems[0].getStatus());
+        ASSERT_OK(replyItems[1].getStatus());
+        ASSERT_EQUALS(numErrors, 0);
+        LOGV2(7695404, "WriteConcernError received", "wce"_attr = writeConcernError->getErrmsg());
+        ASSERT_EQUALS(writeConcernError->getCode(), ErrorCodes::WriteConcernFailed);
+    });
+
+    // ShardA response.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        return reply.toBSON();
+    });
+
+    // Shard B response.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
+
+    LOGV2(7695405, "Case 2) WCE in unordered case.");
+    BulkWriteCommandRequest unorderedReq(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    unorderedReq.setOrdered(false);
+
+    future = launchAsync([&] {
+        auto [replyItems, numErrors, writeConcernError] =
+            bulk_write_exec::execute(operationContext(), targeters, unorderedReq);
+        ASSERT_EQUALS(replyItems.size(), 2u);
+        ASSERT_OK(replyItems[0].getStatus());
+        ASSERT_OK(replyItems[1].getStatus());
+        ASSERT_EQUALS(numErrors, 0);
+        LOGV2(7695406, "WriteConcernError received", "wce"_attr = writeConcernError->getErrmsg());
+        ASSERT_EQUALS(writeConcernError->getCode(), ErrorCodes::WriteConcernFailed);
+    });
+
+    // In the unordered case it isn't clear which of these is triggered for which shard request, but
+    // since the two are the same, it doesn't matter in this case.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        return reply.toBSON();
+    });
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
+
+    LOGV2(7695408, "Case 3) WCE when write one fails due to bad value and the other succeeds.");
+    BulkWriteCommandRequest oneErrorReq(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(1, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    oneErrorReq.setOrdered(false);
+
+    future = launchAsync([&] {
+        auto [replyItems, numErrors, writeConcernError] =
+            bulk_write_exec::execute(operationContext(), targeters, oneErrorReq);
+        ASSERT_EQUALS(replyItems.size(), 2u);
+        // We don't really know which of the two mock responses below will be used for
+        // which operation, since this is an unordered request, so we can't assert on
+        // the exact status of each operation. However we can still assert on the number
+        // of errors.
+        ASSERT_EQUALS(numErrors, 1);
+        LOGV2(7695409, "WriteConcernError received", "wce"_attr = writeConcernError->getErrmsg());
+        ASSERT_EQUALS(writeConcernError->getCode(), ErrorCodes::UnsatisfiableWriteConcern);
+    });
+
+    // In the unordered case it isn't clear which of these is triggered for which shard request, but
+    // since the two are the same, it doesn't matter in this case.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        reply.setCursor(BulkWriteCommandResponseCursor(
+            0,  // cursorId
+            std::vector<mongo::BulkWriteReplyItem>{
+                BulkWriteReplyItem(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))},
+            NamespaceString::makeBulkWriteNSS(boost::none)));
+        reply.setNumErrors(1);
+        return reply.toBSON();
+    });
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request);
+        return reply.toBSON();
+    });
+    future.default_timed_get();
 }
 
 TEST(BulkWriteTest, getApproximateSize) {

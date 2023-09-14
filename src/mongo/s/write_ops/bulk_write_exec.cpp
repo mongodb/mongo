@@ -182,6 +182,17 @@ void executeChildBatches(OperationContext* opCtx,
             auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
                                                         response.swResponse.getValue().data);
 
+            LOGV2_DEBUG(7279200,
+                        4,
+                        "Processing bulk write response from shard.",
+                        "shard"_attr = response.shardId,
+                        "response"_attr = bwReply);
+
+            if (bwReply.getWriteConcernError()) {
+                bulkWriteOp.saveWriteConcernError(response.shardId,
+                                                  bwReply.getWriteConcernError().value());
+            }
+
             // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the
             // first batch.
             auto cursor = bwReply.getCursor();
@@ -194,23 +205,23 @@ void executeChildBatches(OperationContext* opCtx,
     }
 }
 
-void fillOKInsertReplies(BulkWriteReplyInfo& replies, int size) {
-    replies.first.reserve(size);
+void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
+    replyInfo.replyItems.reserve(size);
     for (int i = 0; i < size; ++i) {
         BulkWriteReplyItem reply;
         reply.setN(1);
         reply.setOk(1);
         reply.setIdx(i);
-        replies.first.push_back(reply);
+        replyInfo.replyItems.push_back(reply);
     }
 }
 
 BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType,
                                       const BatchedCommandResponse& response) {
-    BulkWriteReplyInfo replies;
+    BulkWriteReplyInfo replyInfo;
     if (response.toStatus().isOK()) {
         if (firstOpType == BulkWriteCRUDOp::kInsert) {
-            fillOKInsertReplies(replies, response.getN());
+            fillOKInsertReplies(replyInfo, response.getN());
         } else {
             BulkWriteReplyItem reply;
             reply.setN(response.getN());
@@ -227,18 +238,18 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
             }
             reply.setOk(1);
             reply.setIdx(0);
-            replies.first.push_back(reply);
+            replyInfo.replyItems.push_back(reply);
         }
     } else {
         if (response.isErrDetailsSet()) {
             const auto& errDetails = response.getErrDetails();
             if (firstOpType == BulkWriteCRUDOp::kInsert) {
-                fillOKInsertReplies(replies, response.getN() + errDetails.size());
+                fillOKInsertReplies(replyInfo, response.getN() + errDetails.size());
                 for (const auto& err : errDetails) {
                     int32_t idx = err.getIndex();
-                    replies.first[idx].setN(0);
-                    replies.first[idx].setOk(0);
-                    replies.first[idx].setStatus(err.getStatus());
+                    replyInfo.replyItems[idx].setN(0);
+                    replyInfo.replyItems[idx].setOk(0);
+                    replyInfo.replyItems[idx].setStatus(err.getStatus());
                 }
             } else {
                 invariant(errDetails.size() == 1 && response.getN() == 0);
@@ -247,11 +258,11 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                 if (firstOpType == BulkWriteCRUDOp::kUpdate) {
                     reply.setNModified(0);
                 }
-                replies.first.push_back(reply);
+                replyInfo.replyItems.push_back(reply);
             }
-            replies.second += errDetails.size();
+            replyInfo.numErrors += errDetails.size();
         } else if (response.isWriteConcernErrorSet()) {
-            // TODO SERVER-76954 handle write concern errors, use getWriteConcernError.
+            // TODO SERVER-80918 handle write concern errors, use getWriteConcernError.
         } else {
             // response.toStatus() is not OK but there is no errDetails or writeConcernError, so the
             // top level status should be not OK instead. Raising an exception.
@@ -259,7 +270,7 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
             MONGO_UNREACHABLE;
         }
     }
-    return replies;
+    return replyInfo;
 }
 
 }  // namespace
@@ -319,27 +330,27 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
         }
 
         if (fleResult == FLEBatchResult::kNotProcessed) {
-            return {FLEBatchResult::kNotProcessed, {}};
+            return {FLEBatchResult::kNotProcessed, BulkWriteReplyInfo()};
         }
 
-        BulkWriteReplyInfo replies = processFLEResponse(firstOpType, response);
-        return {FLEBatchResult::kProcessed, std::move(replies)};
+        BulkWriteReplyInfo replyInfo = processFLEResponse(firstOpType, response);
+        return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     } catch (const DBException& ex) {
         LOGV2_WARNING(7749700,
                       "Failed to process bulkWrite with Queryable Encryption",
                       "error"_attr = redact(ex));
         // If Queryable encryption adds support for update with multi: true, we might have to update
         // the way we make replies here to handle SERVER-15292 correctly.
-        BulkWriteReplyInfo replies;
+        BulkWriteReplyInfo replyInfo;
         BulkWriteReplyItem reply(0, ex.toStatus());
         reply.setN(0);
         if (firstOpType == BulkWriteCRUDOp::kUpdate) {
             reply.setNModified(0);
         }
 
-        replies.first.push_back(reply);
-        replies.second = 1;
-        return {FLEBatchResult::kProcessed, std::move(replies)};
+        replyInfo.replyItems.push_back(reply);
+        replyInfo.numErrors = 1;
+        return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     }
 }
 
@@ -390,7 +401,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
             responseStatus = swResult.getValue().cmdStatus;
         }
         if (auto wcError = swResult.getValue().wcError; !wcError.toStatus().isOK()) {
-            // TODO (SERVER-76954): Handle write concern errors.
+            // TODO (SERVER-80918): Handle write concern errors.
         }
     }
     // TODO (SERVER-81006): Handle local error correctly.
@@ -700,11 +711,7 @@ void BulkWriteOp::noteChildBatchResponse(
     const TargetedWriteBatch& targetedBatch,
     const std::vector<BulkWriteReplyItem>& replyItems,
     boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
-    LOGV2_DEBUG(7279200,
-                4,
-                "Processing bulk write response from shard.",
-                "shard"_attr = targetedBatch.getShardId(),
-                "replyItems"_attr = replyItems);
+
     int index = -1;
     bool ordered = _clientRequest.getOrdered();
     boost::optional<write_ops::WriteError> lastError;
@@ -894,7 +901,25 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         }
     }
 
-    return {replyItems, numErrors};
+    return {std::move(replyItems), numErrors, generateWriteConcernError()};
+}
+
+void BulkWriteOp::saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError) {
+    WriteConcernErrorDetail wce;
+    wce.setStatus(Status(ErrorCodes::Error(wcError.getCode()), wcError.getErrmsg()));
+    _wcErrors.push_back(ShardWCError(shardId, wce));
+}
+
+boost::optional<BulkWriteWriteConcernError> BulkWriteOp::generateWriteConcernError() const {
+    if (auto mergedWce = mergeWriteConcernErrors(_wcErrors)) {
+        auto totalWcError = BulkWriteWriteConcernError();
+        totalWcError.setCode(mergedWce->toStatus().code());
+        totalWcError.setErrmsg(mergedWce->toStatus().reason());
+
+        return boost::optional<BulkWriteWriteConcernError>(totalWcError);
+    }
+
+    return boost::none;
 }
 
 void BulkWriteOp::noteStaleResponses(

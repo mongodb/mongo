@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/rpc/write_concern_error_detail.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/cstdint.hpp>
@@ -213,6 +214,32 @@ int getEncryptionInformationSize(const BatchedCommandRequest& req) {
 }
 
 }  // namespace
+
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors) {
+    if (!wcErrors.size())
+        return boost::none;
+
+    StringBuilder msg;
+    auto errCode = wcErrors.front().error.toStatus().code();
+    if (wcErrors.size() != 1) {
+        msg << "Multiple errors reported :: ";
+        errCode = ErrorCodes::WriteConcernFailed;
+    }
+
+    for (auto it = wcErrors.begin(); it != wcErrors.end(); ++it) {
+        if (it != wcErrors.begin()) {
+            msg << " :: and :: ";
+        }
+
+        msg << it->error.toString() << " at " << it->shardName;
+    }
+
+    WriteConcernErrorDetail wce;
+    wce.setStatus(Status(errCode, msg.str()));
+
+    return boost::optional<WriteConcernErrorDetail>(wce);
+}
 
 // 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any
 // individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the
@@ -685,7 +712,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     if (response.isWriteConcernErrorSet()) {
         // For BatchWriteOp, all writes in the batch should share the same endpoint since they
         // target the same shard and namespace. So we just use the endpoint from the first write.
-        _wcErrors.emplace_back(targetedBatch.getWrites()[0]->endpoint,
+        _wcErrors.emplace_back(targetedBatch.getWrites()[0]->endpoint.shardName,
                                *response.getWriteConcernError());
     }
 
@@ -892,30 +919,8 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         }
     }
 
-    if (!_wcErrors.empty()) {
-        WriteConcernErrorDetail* error = new WriteConcernErrorDetail;
-
-        // Generate the multi-error message below
-        if (_wcErrors.size() == 1) {
-            auto status = _wcErrors.front().error.toStatus();
-            error->setStatus(status.withReason(str::stream()
-                                               << status.reason() << " at "
-                                               << _wcErrors.front().endpoint.shardName));
-        } else {
-            StringBuilder msg;
-            msg << "multiple errors reported : ";
-
-            for (auto it = _wcErrors.begin(); it != _wcErrors.end(); ++it) {
-                const auto& wcError = *it;
-                if (it != _wcErrors.begin()) {
-                    msg << " :: and :: ";
-                }
-                msg << wcError.error.toStatus().toString() << " at " << wcError.endpoint.shardName;
-            }
-
-            error->setStatus({ErrorCodes::WriteConcernFailed, msg.str()});
-        }
-        batchResp->setWriteConcernError(error);
+    if (auto wce = mergeWriteConcernErrors(_wcErrors)) {
+        batchResp->setWriteConcernError(new WriteConcernErrorDetail(wce.value()));
     }
 
     //

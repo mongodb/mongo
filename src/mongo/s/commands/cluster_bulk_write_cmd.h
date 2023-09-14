@@ -223,7 +223,11 @@ public:
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
-            auto& [replyItems, numErrors] = replyInfo;
+            auto& [replyItems, numErrors, wcErrors] = replyInfo;
+            BulkWriteCommandReply reply;
+            reply.setNumErrors(numErrors);
+            reply.setWriteConcernError(wcErrors);
+
             for (auto& replyItem : replyItems) {
                 queuedDataStage->queueResult(replyItem.toBSON());
             }
@@ -251,8 +255,9 @@ public:
             }
             CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (numRepliesInFirstBatch == replyItems.size()) {
-                return BulkWriteCommandReply(
-                    BulkWriteCommandResponseCursor(0, std::move(replyItems), cursorNss), numErrors);
+                reply.setCursor(BulkWriteCommandResponseCursor(
+                    0, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
+                return reply;
             }
 
             ccc->detachFromOperationContext();
@@ -272,9 +277,9 @@ public:
             CurOp::get(opCtx)->debug().cursorid = cursorId;
 
             replyItems.resize(numRepliesInFirstBatch);
-            return BulkWriteCommandReply(
-                BulkWriteCommandResponseCursor(cursorId, std::move(replyItems), cursorNss),
-                numErrors);
+            reply.setCursor(BulkWriteCommandResponseCursor(
+                cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
+            return reply;
         }
 
         bool runImpl(OperationContext* opCtx,

@@ -84,8 +84,11 @@
 namespace mongo {
 namespace {
 
-// BulkWriteCommand unit tests for a mongod that is a shard server. In order to
-// do so, in setup() we install collection metadata (shard version & database
+// BulkWriteCommand unit tests for a mongod that is a shard server. This is different
+// from BulkWrite unit tests for the mongos side; this file only covers the mongod
+// side of sharded BulkWrite.
+//
+// In setup() we install collection metadata (shard version & database
 // version) on the node. Consequently any collection metadata attached to the
 // bulk request will be compared to the installed metadata and a StaleConfig
 // error will be thrown in case of a mismatch.

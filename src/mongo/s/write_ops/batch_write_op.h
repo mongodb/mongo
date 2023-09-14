@@ -82,12 +82,12 @@ struct ShardError {
  * Certain types of errors are not stored in WriteOps or must be returned to a caller.
  */
 struct ShardWCError {
-    ShardWCError(const ShardEndpoint& endpoint, const WriteConcernErrorDetail& error)
-        : endpoint(endpoint) {
+    ShardWCError(const ShardId& shardName, const WriteConcernErrorDetail& error)
+        : shardName(shardName) {
         error.cloneTo(&this->error);
     }
 
-    ShardEndpoint endpoint;
+    ShardId shardName;
     WriteConcernErrorDetail error;
 };
 
@@ -282,6 +282,10 @@ private:
 
 typedef std::function<const NSTargeter&(const WriteOp& writeOp)> GetTargeterFn;
 typedef std::function<int(const WriteOp& writeOp)> GetWriteSizeFn;
+
+// Utility function to merge write concern errors received from various shards.
+boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
+    const std::vector<ShardWCError>& wcErrors);
 
 // Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
 StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,

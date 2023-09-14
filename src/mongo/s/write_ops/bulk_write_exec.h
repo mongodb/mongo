@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/ns_targeter.h"
@@ -58,7 +59,11 @@ namespace bulk_write_exec {
  * Contains replies for individual bulk write ops along with a count of how many replies in the
  * vector are errors.
  */
-using BulkWriteReplyInfo = std::pair<std::vector<BulkWriteReplyItem>, int>;
+struct BulkWriteReplyInfo {
+    std::vector<BulkWriteReplyItem> replyItems;
+    int numErrors = 0;
+    boost::optional<BulkWriteWriteConcernError> wcErrors;
+};
 
 /**
  * Attempt to run the bulkWriteCommandRequest through Queryable Encryption code path.
@@ -155,15 +160,20 @@ public:
     int numWriteOpsIn(WriteOpState opState) const;
 
     /**
+     * Saves all the write concern errors received from all the shards so that they can
+     * be concatenated into a single error when mongos responds to the client.
+     */
+    void saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError);
+
+    /**
      * Marks any further writes for this BulkWriteOp as failed with the provided error status. There
      * must be no pending ops awaiting results when this method is called.
      */
     void noteErrorForRemainingWrites(const Status& status);
 
     /**
-     * Processes the response to a TargetedWriteBatch. The response is captured by the vector of
-     * BulkWriteReplyItems. Sharding related errors are then grouped by namespace and captured in
-     * the map passed in.
+     * Processes the response to a TargetedWriteBatch. Sharding related errors are then grouped
+     * by namespace and captured in the map passed in.
      */
     void noteChildBatchResponse(
         const TargetedWriteBatch& targetedBatch,
@@ -213,6 +223,12 @@ public:
     BulkWriteReplyInfo generateReplyInfo();
 
     /**
+     * Creates a BulkWriteWriteConcernError object which combines write concern errors
+     * from all shards. If no write concern errors exist, returns boost::none.
+     */
+    boost::optional<BulkWriteWriteConcernError> generateWriteConcernError() const;
+
+    /**
      * Calculates an estimate of the size, in bytes, required to store the common fields that will
      * go into each child batch command sent to a shard, i.e. all fields besides the actual write
      * ops.
@@ -238,6 +254,8 @@ private:
 
     // The write concern that the bulk write command was issued with.
     WriteConcernOptions _writeConcern;
+    // A list of write concern errors from all shards.
+    std::vector<ShardWCError> _wcErrors;
 
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};
