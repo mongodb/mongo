@@ -183,6 +183,42 @@ std::string redactFieldNameForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
+/**
+ * Generates a random double with a variable number of decimal places between 1 and 15.
+ */
+double randomDouble() {
+    // Create a random number generator engine.
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Create a distribution and generate a double between -1 and 1.
+    std::uniform_real_distribution<double> dis(-1.0, 1.0);
+    double randomValue = dis(gen);
+
+    std::uniform_int_distribution<int> multiplier(0, 15);
+    int shift = multiplier(gen);
+    double factor = std::pow(10.0, shift);
+
+    // Multiply the random number by the factor to set the decimal places
+    double result = randomValue * factor;
+    return result;
+}
+
+/**
+ * Verifies that a double can correctly convert to a string and round-trip back to the original
+ * double.
+ */
+void verifyStringDoubleConvertRoundtripsCorrectly(double doubleToConvert) {
+    Value doubleConvertedToString = evaluateExpression("$toString", {doubleToConvert});
+    ASSERT_EQ(doubleConvertedToString.getType(), BSONType::String);
+
+    Value stringConvertedToDouble = evaluateExpression("$toDouble", {doubleConvertedToString});
+    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::NumberDouble);
+
+    // Verify the conversion round-trips correctly.
+    ASSERT_VALUE_EQ(stringConvertedToDouble, Value(doubleToConvert));
+}
+
 /* ------------------------- ExpressionArrayToObject -------------------------- */
 
 TEST(ExpressionArrayToObjectTest, KVFormatSimple) {
@@ -4671,5 +4707,18 @@ TEST(ExpressionBitNotTest, Arrays) {
                        AssertionException,
                        16020);
 }
+
+/**
+ * Test case for round-trip conversion of random double using $convert.
+ *
+ * Generates 1000 random doubles and verifies they can be correctly converted to string values and
+ * back to double.
+ */
+TEST(ExpressionConvert, StringToDouble) {
+    for (int i = 0; i < 1000; ++i) {
+        verifyStringDoubleConvertRoundtripsCorrectly(randomDouble());
+    }
+}
+
 }  // namespace ExpressionTests
 }  // namespace mongo
