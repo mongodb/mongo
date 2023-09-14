@@ -405,7 +405,11 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
 class WiredTigerRecordStore::RandomCursor final : public RecordCursor {
 public:
     RandomCursor(OperationContext* opCtx, const WiredTigerRecordStore& rs, StringData config)
-        : _cursor(nullptr), _rs(&rs), _opCtx(opCtx), _config(config.toString() + ",next_random") {
+        : _cursor(nullptr),
+          _keyFormat(rs._keyFormat),
+          _uri(rs._uri),
+          _opCtx(opCtx),
+          _config(config.toString() + ",next_random") {
         restore();
     }
 
@@ -435,7 +439,7 @@ public:
         invariantWTOK(advanceRet, _cursor->session);
 
         RecordId id;
-        if (_rs->keyFormat() == KeyFormat::String) {
+        if (_keyFormat == KeyFormat::String) {
             WT_ITEM item;
             invariantWTOK(_cursor->get_key(_cursor, &item), _cursor->session);
             id = RecordId(static_cast<const char*>(item.data), item.size);
@@ -451,7 +455,7 @@ public:
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
 
         auto keyLength = computeRecordIdSize(id);
-        metricsCollector.incrementOneDocRead(_rs->getURI(), value.size + keyLength);
+        metricsCollector.incrementOneDocRead(_uri, value.size + keyLength);
 
 
         return {
@@ -474,10 +478,9 @@ public:
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
         if (!_cursor) {
-            auto status =
-                wtRCToStatus(session->open_cursor(
-                                 session, _rs->_uri.c_str(), nullptr, _config.c_str(), &_cursor),
-                             session);
+            auto status = wtRCToStatus(
+                session->open_cursor(session, _uri.c_str(), nullptr, _config.c_str(), &_cursor),
+                session);
             if (status == ErrorCodes::ObjectIsBusy) {
                 // This can happen if you try to open a cursor on the oplog table and a verify is
                 // currently running on it.
@@ -511,7 +514,8 @@ public:
 
 private:
     WT_CURSOR* _cursor;
-    const WiredTigerRecordStore* _rs;
+    KeyFormat _keyFormat;
+    const std::string _uri;
     OperationContext* _opCtx;
     const std::string _config;
     bool _saveStorageCursorOnDetachFromOperationContext = false;
