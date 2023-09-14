@@ -523,10 +523,11 @@ public:
     }
 
     /**
-     * Override and return true if the readConcernCounters in serverStatus should not be incremented
-     * on behalf of this command.
+     * Override and return true if the readConcernCounters and readPreferenceCounters in
+     * serverStatus should be incremented on behalf of this command. This should be true for
+     * read operations.
      */
-    virtual bool shouldAffectReadConcernCounter() const {
+    virtual bool shouldAffectReadOptionCounters() const {
         return false;
     }
 

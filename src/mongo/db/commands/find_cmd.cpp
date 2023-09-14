@@ -346,7 +346,7 @@ public:
         return true;
     }
 
-    bool shouldAffectReadConcernCounter() const override {
+    bool shouldAffectReadOptionCounters() const override {
         return true;
     }
 

@@ -154,7 +154,7 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
-    bool shouldAffectReadConcernCounter() const override {
+    bool shouldAffectReadOptionCounters() const override {
         return true;
     }
 

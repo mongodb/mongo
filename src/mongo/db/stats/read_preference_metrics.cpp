@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/read_preference_metrics_gen.h"
 #include "mongo/util/decorable.h"
@@ -51,7 +52,44 @@ ReadPreferenceMetrics* ReadPreferenceMetrics::get(OperationContext* opCtx) {
 
 void ReadPreferenceMetrics::recordReadPreference(ReadPreferenceSetting readPref,
                                                  bool isInternal,
-                                                 repl::MemberState state) {}
+                                                 bool isPrimary) {
+    auto& counters = isPrimary ? primaryCounters : secondaryCounters;
+    counters.increment(readPref, isInternal);
+}
+
+void ReadPreferenceMetrics::Counters::increment(ReadPreferenceSetting readPref, bool isInternal) {
+    switch (readPref.pref) {
+        case ReadPreference::PrimaryOnly:
+            primary.increment(isInternal);
+            break;
+        case ReadPreference::PrimaryPreferred:
+            primaryPreferred.increment(isInternal);
+            break;
+        case ReadPreference::SecondaryOnly:
+            secondary.increment(isInternal);
+            break;
+        case ReadPreference::SecondaryPreferred:
+            secondaryPreferred.increment(isInternal);
+            break;
+        case ReadPreference::Nearest:
+            nearest.increment(isInternal);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    // For primary read preference, the tag set will be empty, which is represented by an empty BSON
+    // array. For other read preference values without tags, the tag set contains one empty document
+    // in the BSON array. See the TagSet class definition for more details.
+    if (readPref.tags != TagSet::primaryOnly() && readPref.tags != TagSet()) {
+        tagged.increment(isInternal);
+    }
+}
+
+void ReadPreferenceMetrics::Counter::increment(bool isInternal) {
+    auto& counter = isInternal ? internal : external;
+    counter.fetchAndAdd(1);
+}
 
 ReadPrefOps ReadPreferenceMetrics::Counter::toReadPrefOps() const {
     ReadPrefOps ops;
@@ -92,6 +130,9 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
+        if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+            return BSONObj();
+        }
         ReadPreferenceMetricsDoc stats;
         ReadPreferenceMetrics::get(opCtx)->generateMetricsDoc(&stats);
         return stats.toBSON();

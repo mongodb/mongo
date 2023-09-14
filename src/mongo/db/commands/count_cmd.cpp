@@ -159,7 +159,7 @@ public:
                 Status::OK()};
     }
 
-    bool shouldAffectReadConcernCounter() const override {
+    bool shouldAffectReadOptionCounters() const override {
         return true;
     }
 
