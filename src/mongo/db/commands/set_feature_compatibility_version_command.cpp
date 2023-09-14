@@ -697,6 +697,48 @@ private:
             // TODO SERVER-78330 remove this.
             deleteShardingStateRecoveryDoc(opCtx);
         }
+
+        // TODO SERVER-80490: Remove this once 8.0 is released.
+        // Sanitizes the wiredTiger.creationString option from the durable catalog. Removes the
+        // encryption config options since they are ephemeral in nature.
+        _sanitizeCreationConfigString(opCtx, requestedVersion);
+    }
+
+    // TODO SERVER-80490: Remove this method once 8.0 is released.
+    void _sanitizeCreationConfigString(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // We bypass the UserWritesBlock mode here in order to not see errors arising from the
+        // block. The user already has permission to run FCV at this point and the writes performed
+        // here aren't modifying any user data with the exception of fixing up the collection
+        // metadata.
+        auto originalValue = WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled();
+        ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
+        WriteBlockBypass::get(opCtx).set(true);
+
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            catalog::forEachCollectionFromDb(
+                opCtx,
+                dbName,
+                MODE_X,
+                [&](const Collection* collection) {
+                    NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
+                    CollMod collModCmd(collection->ns());
+                    BSONObjBuilder unusedBuilder;
+                    uassertStatusOK(
+                        processCollModCommand(opCtx, nsOrUUID, collModCmd, &unusedBuilder));
+
+                    return true;
+                },
+                [&](const Collection* coll) {
+                    // Performing sanitisation on node local collections is unnecessary since by
+                    // definition they can use configuration specific to this node.
+                    //
+                    // We also only focus on normal collections that are created by the user.
+                    const auto ns = coll->ns();
+                    return ns.isReplicated() && ns.isNormalCollection() && !ns.isOnInternalDb();
+                });
+        }
     }
 
     void _maybeMigrateAuditConfig(OperationContext* opCtx,

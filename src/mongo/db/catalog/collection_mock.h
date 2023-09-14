@@ -463,6 +463,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void sanitizeCollectionOptions(OperationContext* opCtx) {
+        MONGO_UNREACHABLE;
+    }
+
     bool needsCappedLock() const {
         MONGO_UNREACHABLE;
     }

@@ -33,8 +33,8 @@ const awaitResult =
 fp.wait();
 
 // Perform a collMod directly on the shard's primary to cause the moveChunk to abort.
-assert.commandWorked(
-    st.rs0.getPrimary().getDB(dbName).runCommand({collMod: collName, writeConcern: {w: 1}}));
+assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
+    {collMod: collName, validationLevel: "off", writeConcern: {w: 1}}));
 
 fp.off();
 awaitResult();

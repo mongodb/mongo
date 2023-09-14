@@ -400,6 +400,8 @@ public:
 
     bool isMetadataEqual(const BSONObj& otherMetadata) const final;
 
+    void sanitizeCollectionOptions(OperationContext* opCtx) final;
+
     bool needsCappedLock() const final;
 
     bool isCappedAndNeedsDelete(OperationContext* opCtx) const final;
