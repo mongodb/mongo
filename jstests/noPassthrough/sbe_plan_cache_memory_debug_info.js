@@ -56,7 +56,7 @@ function assertCacheEntryIsMissingDebugInfo(coll, queryShape) {
 }
 
 function getPlanCacheSize() {
-    return db.runCommand({serverStatus: 1}).metrics.query.planCacheTotalSizeEstimateBytes;
+    return db.runCommand({serverStatus: 1}).metrics.query.planCache.totalSizeEstimateBytes;
 }
 
 // Set a large value to internalQueryCacheMaxSizeBytesBeforeStripDebugInfo to make sure that Debug

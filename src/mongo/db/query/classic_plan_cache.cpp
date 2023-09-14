@@ -46,8 +46,8 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-CounterMetric planCacheTotalSizeEstimateBytes("query.planCacheTotalSizeEstimateBytes");
-CounterMetric planCacheEntries("query.planCacheTotalQueryShapes");
+CounterMetric planCacheTotalSizeEstimateBytes("query.planCache.totalSizeEstimateBytes");
+CounterMetric planCacheEntries("query.planCache.totalQueryShapes");
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
     stream << key.toString();

@@ -19,7 +19,7 @@ function createIndexesForColl(coll) {
 
 function totalPlanCacheSize() {
     const serverStatus = assert.commandWorked(db.serverStatus());
-    return serverStatus.metrics.query.planCacheTotalSizeEstimateBytes;
+    return serverStatus.metrics.query.planCache.totalSizeEstimateBytes;
 }
 
 function planCacheContents(coll) {

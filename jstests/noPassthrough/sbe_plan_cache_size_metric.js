@@ -1,5 +1,5 @@
 /**
- * Tests that planCacheTotalSizeEstimateBytes metric is updated when entries are added or evicted
+ * Tests that planCache.totalSizeEstimateBytes metric is updated when entries are added or evicted
  * from SBE and Classic Plan Cache entries.
  *
  * @tags: [
@@ -31,11 +31,11 @@ function getCacheEntriesByQueryHashKey(coll, queryHash) {
 }
 
 function getPlanCacheSize() {
-    return db.serverStatus().metrics.query.planCacheTotalSizeEstimateBytes;
+    return db.serverStatus().metrics.query.planCache.totalSizeEstimateBytes;
 }
 
 function getPlanCacheNumEntries() {
-    return db.serverStatus().metrics.query.planCacheTotalQueryShapes;
+    return db.serverStatus().metrics.query.planCache.totalQueryShapes;
 }
 function assertQueryInPlanCache(coll, query) {
     const explainResult = assert.commandWorked(coll.explain().find(query).finish());
