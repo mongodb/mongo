@@ -1,6 +1,5 @@
-
-
-
+#include "mongo/util/concurrency/thread_name.h"
+#include <string>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor;
 
 #include "mongo/platform/basic.h"
@@ -30,6 +29,64 @@ constexpr auto kReadyThreads = "readyThreads"_sd;
 constexpr auto kStartingThreads = "startingThreads"_sd;
 }  // namespace
 
+
+void ThreadGroup::EnqueueTask(Task task) {
+    task_queue_size_.fetch_add(1, std::memory_order_relaxed);
+    task_queue_.enqueue(std::move(task));
+
+    NotifyIfAsleep();
+}
+
+void ThreadGroup::ResumeTask(Task task) {
+    resume_queue_size_.fetch_add(1, std::memory_order_relaxed);
+    resume_queue_.enqueue(std::move(task));
+
+    NotifyIfAsleep();
+}
+
+void ThreadGroup::NotifyIfAsleep() {
+    if (_is_sleep.load(std::memory_order_relaxed)) {
+        std::unique_lock<std::mutex> lk(_sleep_mux);
+        _sleep_cv.notify_one();
+    }
+}
+
+
+void ThreadGroup::TrySleep() {
+
+    // If there are tasks in the , does not sleep.
+    if (!IsIdle()) {
+        return;
+    }
+
+    // Sets the sleep flag before entering the critical section. std::memory_order_relaxed is
+    // good enough, because the following mutex ensures that this instruction happens before the
+    // critical section
+    _is_sleep.store(true, std::memory_order_relaxed);
+
+    std::unique_lock<std::mutex> lk(_sleep_mux);
+
+    // Double checkes again in the critical section before going to sleep. If additional tasks
+    // are enqueued, does not sleep.
+    if (!IsIdle()) {
+        _is_sleep.store(false, std::memory_order_relaxed);
+        return;
+    }
+    log() << "thread sleep";
+    _sleep_cv.wait(lk, [this] { return !IsIdle(); });
+
+    // Woken up from sleep.
+    _is_sleep.store(false, std::memory_order_relaxed);
+    log() << "thread wake up";
+}
+
+void ThreadGroup::Terminate() {
+    _is_terminated.store(true, std::memory_order_relaxed);
+    std::unique_lock<std::mutex> lk(_sleep_mux);
+    _sleep_cv.notify_one();
+}
+
+
 thread_local std::deque<ServiceExecutor::Task> ServiceExecutorReserved::_localWorkQueue = {};
 thread_local int ServiceExecutorReserved::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
@@ -37,9 +94,10 @@ thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
 ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
                                                  const std::string& name,
                                                  size_t reservedThreads)
-    : _name(std::move(name)), _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
+    : _name{name}, _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
 
 Status ServiceExecutorReserved::start() {
+    log() << "ServiceExecutorReserved::start";
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true, std::memory_order_relaxed);
@@ -59,6 +117,9 @@ Status ServiceExecutorReserved::start() {
 Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
     log() << "Starting new worker thread for " << _name << " service executor";
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
+        std::string threadName("thread_group_");
+        threadName += std::to_string(threadGroupId);
+        setThreadName(threadName);
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
         auto numRunningGuard = MakeGuard([&] {
@@ -77,7 +138,9 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
             }
 
             ThreadGroup& threadGroup = _threadGroups[threadGroupId];
+
             threadGroup.TrySleep();
+
 
             size_t cnt = 0;
             if (threadGroup.resume_queue_size_.load(std::memory_order_relaxed) > 0) {
@@ -113,16 +176,19 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
 
             lk.unlock();
 
-            if (launchReplacement) {
-                auto threadStartStatus = _startWorker(threadGroupId);
-                if (!threadStartStatus.isOK()) {
-                    warning() << "Could not start new reserve worker thread: " << threadStartStatus;
-                }
-            }
+            // if (launchReplacement) {
+            //     auto threadStartStatus = _startWorker(threadGroupId);
+            //     if (!threadStartStatus.isOK()) {
+            //         warning() << "Could not start new reserve worker thread: " <<
+            //         threadStartStatus;
+            //     }
+            // }
 
             while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
                 _localRecursionDepth = 1;
+                log() << "thread " << threadGroupId << " do task";
                 _localWorkQueue.front()();
+                log() << "thread " << threadGroupId << " do task done";
                 _localWorkQueue.pop_front();
             }
 
@@ -163,6 +229,7 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
 Status ServiceExecutorReserved::schedule(Task task,
                                          ScheduleFlags flags,
                                          ServiceExecutorTaskName taskName) {
+    return schedule(task, flags, taskName, 0);
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
@@ -204,6 +271,7 @@ Status ServiceExecutorReserved::schedule(Task task,
                                          ScheduleFlags flags,
                                          ServiceExecutorTaskName taskName,
                                          uint16_t thd_group_id) {
+    MONGO_LOG(0) << "schedule with group id";
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
@@ -237,6 +305,14 @@ Status ServiceExecutorReserved::schedule(Task task,
     _threadGroups[thd_group_id].EnqueueTask(std::move(task));
 
     return Status::OK();
+}
+
+std::function<void()> ServiceExecutorReserved::CoroutineResumeFunctor(uint16_t thd_group_id,
+                                                                      Task task) {
+    assert(thd_group_id < _threadGroups.size());
+    return [thd_group = &_threadGroups[thd_group_id], tsk = std::move(task)]() {
+        thd_group->ResumeTask(std::move(tsk));
+    };
 }
 
 void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {

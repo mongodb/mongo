@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include <atomic>
@@ -22,62 +20,18 @@ class ThreadGroup {
     using Task = std::function<void()>;
 
 public:
-    void EnqueueTask(Task task) {
-        task_queue_size_.fetch_add(1, std::memory_order_relaxed);
-        task_queue_.enqueue(std::move(task));
+    void EnqueueTask(Task task);
 
-        NotifyIfAsleep();
-    }
+    void ResumeTask(Task task);
 
-    void ResumeTask(Task task) {
-        resume_queue_size_.fetch_add(1, std::memory_order_relaxed);
-        resume_queue_.enqueue(std::move(task));
-
-        NotifyIfAsleep();
-    }
-
-    void NotifyIfAsleep() {
-        if (_is_sleep.load(std::memory_order_relaxed)) {
-            std::unique_lock<std::mutex> lk(_sleep_mux);
-            _sleep_cv.notify_one();
-        }
-    }
+    void NotifyIfAsleep();
 
     /**
      * @brief Called by the thread bound to this thread group.
      *
      */
-    void TrySleep() {
-        // If there are tasks in the , does not sleep.
-        if (!IsIdle()) {
-            return;
-        }
-
-        // Sets the sleep flag before entering the critical section. std::memory_order_relaxed is
-        // good enough, because the following mutex ensures that this instruction happens before the
-        // critical section
-        _is_sleep.store(true, std::memory_order_relaxed);
-
-        std::unique_lock<std::mutex> lk(_sleep_mux);
-
-        // Double checkes again in the critical section before going to sleep. If additional tasks
-        // are enqueued, does not sleep.
-        if (!IsIdle()) {
-            _is_sleep.store(false, std::memory_order_relaxed);
-            return;
-        }
-
-        _sleep_cv.wait(lk, [this] { return !IsIdle(); });
-
-        // Woken up from sleep.
-        _is_sleep.store(false, std::memory_order_relaxed);
-    }
-
-    void Terminate() {
-        _is_terminated.store(true, std::memory_order_relaxed);
-        std::unique_lock<std::mutex> lk(_sleep_mux);
-        _sleep_cv.notify_one();
-    }
+    void TrySleep();
+    void Terminate();
 
 private:
     bool IsIdle() const {
@@ -111,7 +65,9 @@ private:
  */
 class ServiceExecutorReserved final : public ServiceExecutor {
 public:
-    explicit ServiceExecutorReserved(ServiceContext* ctx, const std::string& name, size_t reservedThreads);
+    explicit ServiceExecutorReserved(ServiceContext* ctx,
+                                     const std::string& name,
+                                     size_t reservedThreads = 1);
 
     Status start() override;
 
@@ -121,20 +77,15 @@ public:
                     ServiceExecutorTaskName taskName,
                     uint16_t thd_group_id) override;
 
+    std::function<void()> CoroutineResumeFunctor(uint16_t thd_group_id, Task task) override;
+
     Status shutdown(Milliseconds timeout) override;
 
     Mode transportMode() const override {
-        return Mode::kSynchronous;
+        return Mode::kAsynchronous;
     }
 
     void appendStats(BSONObjBuilder* bob) const override;
-
-    std::function<void()> CoroutineResumeFunctor(uint16_t thd_group_id, Task task) override {
-        assert(thd_group_id < _threadGroups.size());
-        return [thd_group = &_threadGroups[thd_group_id], tsk = std::move(task)]() {
-            thd_group->ResumeTask(std::move(tsk));
-        };
-    }
 
 private:
     Status _startWorker(uint16_t group_id);
@@ -143,7 +94,7 @@ private:
     static thread_local int _localRecursionDepth;
     static thread_local int64_t _localThreadIdleCounter;
 
-     std::atomic<bool> _stillRunning{false};
+    std::atomic<bool> _stillRunning{false};
 
     mutable stdx::mutex _mutex;
     stdx::condition_variable _threadWakeup;

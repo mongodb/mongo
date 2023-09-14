@@ -46,30 +46,32 @@ class ServiceEntryPoint {
 
 public:
     /**
-    * Stats for sessions open.
-    */
+     * Stats for sessions open.
+     */
     struct Stats {
         /**
-        * Returns the number of sessions currently open.
-        */
+         * Returns the number of sessions currently open.
+         */
         size_t numOpenSessions = 0;
 
         /**
-        * Returns the total number of sessions that have ever been created.
-        */
+         * Returns the total number of sessions that have ever been created.
+         */
         size_t numCreatedSessions = 0;
 
         /**
-        * Returns the number of available sessions we could still open. Only relevant
-        * when we are operating under a transport::Session limit (for example, in the
-        * legacy implementation, we respect a maximum number of connections). If there
-        * is no session limit, returns std::numeric_limits<int>::max().
-        */
+         * Returns the number of available sessions we could still open. Only relevant
+         * when we are operating under a transport::Session limit (for example, in the
+         * legacy implementation, we respect a maximum number of connections). If there
+         * is no session limit, returns std::numeric_limits<int>::max().
+         */
         size_t numAvailableSessions = 0;
     };
 
     virtual ~ServiceEntryPoint() = default;
 
+    virtual Status start() = 0;
+    
     /**
      * Begin running a new Session. This method returns immediately.
      */
@@ -81,18 +83,18 @@ public:
     virtual void endAllSessions(transport::Session::TagMask tags) = 0;
 
     /**
-    * Shuts down the service entry point.
-    */
+     * Shuts down the service entry point.
+     */
     virtual bool shutdown(Milliseconds timeout) = 0;
 
     /**
-    * Returns high-level stats about current sessions.
-    */
+     * Returns high-level stats about current sessions.
+     */
     virtual Stats sessionStats() const = 0;
 
     /**
-    * Returns the number of sessions currently open.
-    */
+     * Returns the number of sessions currently open.
+     */
     virtual size_t numOpenSessions() const = 0;
 
     /**

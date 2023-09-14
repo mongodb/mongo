@@ -29,9 +29,9 @@
 #pragma once
 
 #include "boost/optional/optional.hpp"
+#include <boost/context/continuation.hpp>
 #include <boost/context/continuation_fcontext.hpp>
 #include <boost/context/stack_context.hpp>
-#include <boost/context/continuation.hpp>
 
 #include <atomic>
 
@@ -77,16 +77,16 @@ public:
     static std::shared_ptr<ServiceStateMachine> create(ServiceContext* svcContext,
                                                        transport::SessionHandle session,
                                                        transport::Mode transportMode,
-                                                       uint16_t group_id = UINT16_MAX);
+                                                       uint16_t group_id = 0);
 
     ServiceStateMachine(ServiceContext* svcContext,
                         transport::SessionHandle session,
                         transport::Mode transportMode,
-                         uint16_t group_id = UINT16_MAX);
+                        uint16_t group_id = 0);
     void Reset(ServiceContext* svcContext,
                transport::SessionHandle session,
                transport::Mode transportMode,
-               uint16_t group_id = UINT16_MAX);
+               uint16_t group_id = 0);
     /*
      * Any state may transition to EndSession in case of an error, otherwise the valid state
      * transitions are:
@@ -164,6 +164,7 @@ public:
      */
     void setCleanupHook(stdx::function<void()> hook);
 
+    void setServiceExecutor(transport::ServiceExecutor* serviceExecutor);
 private:
     /*
      * A class that wraps up lifetime management of the _dbClient and _threadName for runNext();
@@ -202,6 +203,8 @@ private:
      */
     void _runNextInGuard(ThreadGuard guard);
 
+    void _runResumeProcess();
+
     /*
      * This function actually calls into the database and processes a request. It's broken out
      * into its own inline function for better readability.
@@ -229,9 +232,11 @@ private:
     AtomicWord<State> _state{State::Created};
 
     ServiceEntryPoint* _sep;
+    // ThreadGuard* _guard;
     transport::Mode _transportMode;
 
-    ServiceContext* const _serviceContext;
+    // remove const ???
+    ServiceContext* _serviceContext;
     transport::ServiceExecutor* _serviceExecutor;
 
     transport::SessionHandle _sessionHandle;
@@ -250,36 +255,33 @@ private:
 #endif
     std::string _oldThreadName;
 
-    class NoopAllocator{
-        public:
-        NoopAllocator()=default;
-    
-        boost::context::stack_context allocate(){
+    // Coroutine design
+    class NoopAllocator {
+    public:
+        NoopAllocator() = default;
+
+        boost::context::stack_context allocate() {
             boost::context::stack_context sc;
             return sc;
         }
 
-        void deallocate(boost::context::stack_context & sc){
-            // 
+        void deallocate(boost::context::stack_context& sc) {
+            //
         }
     };
 
-    static constexpr size_t kCoroStackSize=32*1024;
-    boost::context::stack_context coroStackContext(){
+    static constexpr size_t kCoroStackSize = 32 * 1024;
+    boost::context::stack_context coroStackContext() {
         boost::context::stack_context sc;
-        sc.size =kCoroStackSize;
-        sc.sp = _coroStack +kCoroStackSize;
+        sc.size = kCoroStackSize;
+        sc.sp = _coroStack + kCoroStackSize;
         return sc;
     }
 
     boost::context::continuation _source;
     char _coroStack[kCoroStackSize];
 
-    enum class CoroStatus{
-        Empty=0,
-        OnGoing,
-        Finished
-    };
+    enum class CoroStatus { Empty = 0, OnGoing, Finished };
     CoroStatus _coroStatus{CoroStatus::Empty};
     std::function<void()> _coroYield;
     std::function<void()> _coroResume;

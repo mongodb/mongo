@@ -444,8 +444,8 @@ ExitCode _initAndListen(int listenPort) {
         // accidentally buying into this behavior. New errors that are returned from the method
         // may or may not want to go through a clean shutdown, and they likely won't want the
         // program to return an exit code of `EXIT_NEED_DOWNGRADE`.
-        severe(LogComponent::kControl) << "** IMPORTANT: "
-                                       << swNonLocalDatabases.getStatus().reason();
+        severe(LogComponent::kControl)
+            << "** IMPORTANT: " << swNonLocalDatabases.getStatus().reason();
         invariant(swNonLocalDatabases == ErrorCodes::MustDowngrade);
         exitCleanly(EXIT_NEED_DOWNGRADE);
     }
@@ -647,6 +647,12 @@ ExitCode _initAndListen(int listenPort) {
         start = serviceContext->getTransportLayer()->start();
         if (!start.isOK()) {
             error() << "Failed to start the listener: " << start.toString();
+            return EXIT_NET_ERROR;
+        }
+
+        start = serviceContext->getServiceEntryPoint()->start();
+        if (!start.isOK()) {
+            error() << "Failed to start the service entry point: " << start;
             return EXIT_NET_ERROR;
         }
     }
@@ -926,8 +932,8 @@ void shutdownTask() {
     if (auto svcExec = serviceContext->getServiceExecutor()) {
         Status status = svcExec->shutdown(Seconds(5));
         if (!status.isOK()) {
-            log(LogComponent::kNetwork) << "Service executor failed to shutdown within timelimit: "
-                                        << status.reason();
+            log(LogComponent::kNetwork)
+                << "Service executor failed to shutdown within timelimit: " << status.reason();
         }
     }
 #endif

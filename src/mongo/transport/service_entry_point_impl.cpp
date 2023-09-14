@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/status.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
@@ -71,6 +72,19 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
     }
 
     _maxNumConnections = supportedMax;
+
+    if (true /*serverGlobalParams.reservedAdminThreads*/) {
+        _adminInternalPool = std::make_unique<transport::ServiceExecutorReserved>(
+            _svcCtx, "admin/internal connections", 1);
+        // _adminInternalPool->start();
+    }
+}
+
+Status ServiceEntryPointImpl::start() {
+    if (_adminInternalPool)
+        return _adminInternalPool->start();
+    else
+        return Status::OK();
 }
 
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
@@ -105,8 +119,12 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         if (!quiet) {
             log() << "connection refused because too many open connections: " << connectionCount;
         }
-        return;
+
+        // return;
     }
+
+    ssm->setServiceExecutor(_adminInternalPool.get());
+    MONGO_LOG(0)<<"use reserved service executor";
 
     if (!quiet) {
         const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
@@ -114,7 +132,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
               << connectionCount << word << " now open)";
     }
 
-    ssm->setCleanupHook([ this, ssmIt, session = std::move(session) ] {
+    ssm->setCleanupHook([this, ssmIt, session = std::move(session)] {
         size_t connectionCount;
         auto remote = session->remote();
         {
@@ -126,7 +144,6 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         _shutdownCondition.notify_one();
         const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);
         log() << "end connection " << remote << " (" << connectionCount << word << " now open)";
-
     });
 
     auto ownership = ServiceStateMachine::Ownership::kOwned;
@@ -168,8 +185,8 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     auto noWorkersLeft = [this] { return numOpenSessions() == 0; };
     while (timeSpent < timeout &&
            !_shutdownCondition.wait_for(lk, checkInterval.toSystemDuration(), noWorkersLeft)) {
-        log(LogComponent::kNetwork) << "shutdown: still waiting on " << numOpenSessions()
-                                    << " active workers to drain... ";
+        log(LogComponent::kNetwork)
+            << "shutdown: still waiting on " << numOpenSessions() << " active workers to drain... ";
         timeSpent += checkInterval;
     }
 

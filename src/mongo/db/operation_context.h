@@ -47,6 +47,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include <utility>
 
 namespace mongo {
 
@@ -432,6 +433,10 @@ public:
         _coroResume = resume;
     }
 
+    std::pair<const std::function<void()>*, const std::function<void()>*> getCoroutineFunctors() {
+        return {_coroYield, _coroResume};
+    }
+
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -522,8 +527,8 @@ private:
 
     bool _writesAreReplicated = true;
 
-    const std::function<void()>* _coroYield;
-    const std::function<void()>* _coroResume;
+    const std::function<void()>* _coroYield{nullptr};
+    const std::function<void()>* _coroResume{nullptr};
 };
 
 namespace repl {
