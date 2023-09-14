@@ -89,7 +89,7 @@ public:
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
     }
 
-    bool shouldAffectReadConcernCounter() const override {
+    bool shouldAffectReadOptionCounters() const override {
         return true;
     }
 

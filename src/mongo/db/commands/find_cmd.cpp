@@ -250,7 +250,7 @@ public:
         return false;
     }
 
-    bool shouldAffectReadConcernCounter() const override {
+    bool shouldAffectReadOptionCounters() const override {
         return true;
     }
 

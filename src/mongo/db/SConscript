@@ -1170,8 +1170,8 @@ env.Library(
         'repl/repl_server_parameters',
         'repl/replica_set_messages',
         'shared_request_handling',
-        'transaction',
         'stats/read_preference_metrics',
+        'transaction',
     ],
 )
 

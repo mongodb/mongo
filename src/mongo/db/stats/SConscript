@@ -79,10 +79,15 @@ env.Library(
         'read_preference_metrics.cpp',
         'read_preference_metrics.idl',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/repl_settings',
     ],
 )
 
