@@ -871,8 +871,20 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     auto exprIdBucket = ExpressionFieldPath::createPathFromString(
         pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
 
+    boost::intrusive_ptr<Expression> rewrittenIdExpression;
+    const auto& idFieldNames = groupPtr->getIdFieldNames();
+    if (idFieldNames.empty()) {
+        rewrittenIdExpression = exprIdBucket;
+    } else {
+        // idFieldNames can only have size 1 here since we only support simple group key.
+        // TODO: SERVER-68811. Allow rewrites of object group key if all its fields depend on the
+        // metaField only.
+        rewrittenIdExpression =
+            ExpressionObject::create(pExpCtx.get(), {{idFieldNames[0], exprIdBucket}});
+    }
+
     auto newGroup = DocumentSourceGroup::create(pExpCtx,
-                                                std::move(exprIdBucket),
+                                                std::move(rewrittenIdExpression),
                                                 std::move(accumulationStatementsBucket),
                                                 groupPtr->getMaxMemoryUsageBytes());
 

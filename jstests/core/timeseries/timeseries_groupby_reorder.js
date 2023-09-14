@@ -214,4 +214,20 @@ function runGroupRewriteTest(docs, pipeline, expectedResults) {
                         [{$group: {_id: "$meta", min: {$min: "$time"}}}],
                         [{_id: 1, min: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
+
+// Test a group key which is an object with single field path. Ensure that the output perseveres the
+// user requested object structure for _id field.
+(function testMetaGroupKey_ObjectWithSingleFieldPathElement() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: {a: 1}, val: 5},
+        {time: t, meta: {a: 2}, val: 4},
+        {time: t, meta: {a: 2}, val: 3},
+        {time: t, meta: {a: 1}, val: 1},
+    ];
+    runGroupRewriteTest(
+        docs,
+        [{$group: {_id: {d: "$meta.a"}, min: {$min: "$val"}}}, {$match: {_id: {d: 2}}}],
+        [{"_id": {d: 2}, "min": 3}]);
+})();
 })();
