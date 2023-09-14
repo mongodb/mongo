@@ -40,8 +40,10 @@ function checkStandardFieldsOK(ops, {
 
     if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
         assert.eq(op.tenantId, undefined);
+        assert(bsonBinaryEqual(op.tenantIds, [ObjectId(kTenantId)]), op);
     } else {
         assert.eq(bsonWoCompare(op.tenantId, kTenantId), 0);
+        assert.eq(op.tenantIds, undefined);
     }
 }
 

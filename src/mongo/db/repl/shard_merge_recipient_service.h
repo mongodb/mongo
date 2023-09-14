@@ -415,11 +415,6 @@ public:
         std::unique_ptr<DBClientCursor> _openCommittedTransactionsFindCursor();
 
         /**
-         * Opens and returns a cursor for entries from '_makeCommittedTransactionsAggregation()'.
-         */
-        std::unique_ptr<DBClientCursor> _openCommittedTransactionsAggregationCursor();
-
-        /**
          * Creates an aggregation pipeline to fetch transaction entries with 'lastWriteOpTime' <
          * 'startFetchingDonorOpTime' and 'state: committed'.
          */

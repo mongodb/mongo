@@ -1210,7 +1210,9 @@ TenantMigrationRecipientService::Instance::_openCommittedTransactionsAggregation
         LOGV2_ERROR(5351100,
                     "Fetch committed transactions aggregation failed",
                     "error"_attr = statusWith.getStatus());
-        uassertStatusOK(statusWith.getStatus());
+        uassertStatusOKWithContext(statusWith.getStatus(),
+                                   "Recipient migration instance committed transactions pre-fetch "
+                                   "aggregation cursor failed");
     }
 
     return std::move(statusWith.getValue());
@@ -1300,8 +1302,10 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
         aggRequest.setCursor(cursor);
     }
 
-    std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */));
+    std::unique_ptr<DBClientCursor> cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */),
+        "Recipient migration instance retryable writes pre-fetch aggregation cursor failed");
 
     // cursor->more() will automatically request more from the server if necessary.
     while (cursor->more()) {
@@ -1454,7 +1458,8 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         [this, self = shared_from_this()](const Status& s, int rbid) { _oplogFetcherCallback(s); },
         std::move(oplogFetcherConfig));
     _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
-    uassertStatusOK(_donorOplogFetcher->startup());
+    uassertStatusOKWithContext(_donorOplogFetcher->startup(),
+                               "Recipient migration instance oplog fetcher failed");
 
     lk.unlock();
     _stopOrHangOnFailPoint(&fpAfterStartingOplogFetcherMigrationRecipientInstance);
@@ -1548,7 +1553,9 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
                               _client->getServerHostAndPort(),
                               now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
         }
-        _interrupt(oplogFetcherStatus, /*skipWaitingForForgetMigration=*/false);
+        _interrupt(
+            oplogFetcherStatus.withContext("Recipient migration instance oplog fetcher failed"),
+            /*skipWaitingForForgetMigration=*/false);
     }
 }
 

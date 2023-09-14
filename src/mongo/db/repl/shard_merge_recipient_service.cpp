@@ -1594,8 +1594,10 @@ ShardMergeRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTim
         aggRequest.setCursor(cursor);
     }
 
-    std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */));
+    std::unique_ptr<DBClientCursor> cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */),
+        "Recipient migration instance retryable writes pre-fetch aggregation cursor failed");
 
     // cursor->more() will automatically request more from the server if necessary.
     while (cursor->more()) {
@@ -1738,7 +1740,8 @@ void ShardMergeRecipientService::Instance::_startOplogFetcher() {
         [this, self = shared_from_this()](const Status& s, int rbid) { _oplogFetcherCallback(s); },
         std::move(oplogFetcherConfig));
     _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
-    uassertStatusOK(_donorOplogFetcher->startup());
+    uassertStatusOKWithContext(_donorOplogFetcher->startup(),
+                               "Recipient migration instance oplog fetcher failed");
 }
 
 Status ShardMergeRecipientService::Instance::_enqueueDocuments(
@@ -1792,7 +1795,8 @@ void ShardMergeRecipientService::Instance::_oplogFetcherCallback(Status oplogFet
                               _client->getServerHostAndPort(),
                               now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
         }
-        interruptConditionally(oplogFetcherStatus);
+        interruptConditionally(
+            oplogFetcherStatus.withContext("Recipient migration instance oplog fetcher failed"));
     }
 }
 

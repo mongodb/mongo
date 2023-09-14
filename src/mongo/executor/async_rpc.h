@@ -124,7 +124,7 @@ struct AsyncRPCResponse<void> {
 
 template <typename CommandType>
 struct AsyncRPCOptions {
-    AsyncRPCOptions(CommandType cmd,
+    AsyncRPCOptions(const CommandType& cmd,
                     const std::shared_ptr<executor::TaskExecutor>& exec,
                     CancellationToken token,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
@@ -136,7 +136,7 @@ struct AsyncRPCOptions {
           retryPolicy{retryPolicy},
           genericArgs{genericArgs},
           baton{std::move(baton)} {}
-    AsyncRPCOptions(CommandType cmd,
+    AsyncRPCOptions(const CommandType& cmd,
                     const std::shared_ptr<executor::TaskExecutor>& exec,
                     CancellationToken token,
                     GenericArgs genericArgs,
