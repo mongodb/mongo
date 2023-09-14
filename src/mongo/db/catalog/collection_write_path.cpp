@@ -800,7 +800,8 @@ void deleteDocument(OperationContext* opCtx,
         storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes;
     if (shouldRecordPreImageForRetryableWrite) {
         deleteArgs.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
-        deleteArgs.oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+        deleteArgs.retryableFindAndModifyOplogSlots =
+            reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
 
     boost::optional<BSONObj> deletedDoc;

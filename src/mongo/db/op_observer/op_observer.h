@@ -143,8 +143,12 @@ struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     RetryableFindAndModifyLocation retryableFindAndModifyLocation =
         RetryableFindAndModifyLocation::kNone;
 
-    // Set if OpTime were reserved for the delete ahead of time.
-    std::vector<OplogSlot> oplogSlots;
+    // Set if OpTimes were reserved for the delete ahead of time for this retryable
+    // "findAndModify" operation.
+    // Implies 'retryableFindAndModifyLocation' is set to kSideCollection but the
+    // other way round (because of multi-doc transactions).
+    // See reserveOplogSlotsForRetryableFindAndModify() in collection_write_path.cpp.
+    std::vector<OplogSlot> retryableFindAndModifyOplogSlots;
 };
 
 struct IndexCollModInfo {

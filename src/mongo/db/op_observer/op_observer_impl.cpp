@@ -1065,8 +1065,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             invariant(opCtx->getTxnNumber());
 
             oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
-            if (!args.oplogSlots.empty()) {
-                oplogEntry.setOpTime(args.oplogSlots.back());
+            if (!args.retryableFindAndModifyOplogSlots.empty()) {
+                oplogEntry.setOpTime(args.retryableFindAndModifyOplogSlots.back());
             }
         }
 
