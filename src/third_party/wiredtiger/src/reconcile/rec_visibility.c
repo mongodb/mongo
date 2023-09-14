@@ -197,9 +197,12 @@ err:
  *     Return if we need to save the update chain
  */
 static inline bool
-__rec_need_save_upd(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE_SELECT *upd_select, bool has_newer_updates)
+__rec_need_save_upd(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE_SELECT *upd_select,
+  WT_CELL_UNPACK_KV *vpack, bool has_newer_updates)
 {
+    WT_UPDATE *upd;
+    bool supd_restore, visible_all;
+
     if (upd_select->tw.prepare)
         return (true);
 
@@ -220,9 +223,33 @@ __rec_need_save_upd(
         return (false);
 
     if (WT_TIME_WINDOW_HAS_STOP(&upd_select->tw))
-        return (!__wt_txn_tw_stop_visible_all(session, &upd_select->tw));
+        visible_all = __wt_txn_tw_stop_visible_all(session, &upd_select->tw);
     else
-        return (!__wt_txn_tw_start_visible_all(session, &upd_select->tw));
+        visible_all = __wt_txn_tw_start_visible_all(session, &upd_select->tw);
+
+    if (visible_all)
+        return (false);
+
+    /*
+     * Update chains are only need to be saved when there are:
+     * 1. Newer uncommitted updates or database is configured for in-memory storage.
+     * 2. On-disk entry exists.
+     * 3. Valid updates exist in the update chain to be written to the history store.
+     */
+    supd_restore =
+      F_ISSET(r, WT_REC_EVICT) && (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
+    if (!supd_restore && vpack == NULL && upd_select->upd != NULL) {
+        upd = upd_select->upd;
+        while (upd->next != NULL) {
+            upd = upd->next;
+            if (upd->txnid != WT_TXN_ABORTED)
+                return (true);
+        }
+        return (false);
+    }
+
+    return (true);
 }
 
 /*
@@ -747,7 +774,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      *
      * Additionally history store reconciliation is not set skip saving an update.
      */
-    if (__rec_need_save_upd(session, r, upd_select, has_newer_updates)) {
+    if (__rec_need_save_upd(session, r, upd_select, vpack, has_newer_updates)) {
         /*
          * We should restore the update chains to the new disk image if there are newer updates in
          * eviction, or for cases that don't support history store, such as in-memory database and
@@ -759,17 +786,18 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
 
         WT_ERR(__rec_update_save(session, r, ins, rip, onpage_upd, supd_restore, upd_memsize));
 
-        /*
-         * Mark the selected update (and potentially the tombstone preceding it) as being destined
-         * for the data store. Subsequent reconciliations should know that they can select this
-         * update regardless of visibility.
-         */
-        if (upd_select->upd != NULL)
-            F_SET(upd_select->upd, WT_UPDATE_DS);
-        if (tombstone != NULL)
-            F_SET(tombstone, WT_UPDATE_DS);
         upd_saved = upd_select->upd_saved = true;
     }
+
+    /*
+     * Mark the selected update (and potentially the tombstone preceding it) as being destined for
+     * the data store. Subsequent reconciliations should know that they can select this update
+     * regardless of visibility.
+     */
+    if (upd_select->upd != NULL)
+        F_SET(upd_select->upd, WT_UPDATE_DS);
+    if (tombstone != NULL)
+        F_SET(tombstone, WT_UPDATE_DS);
 
     /*
      * Set statistics for update restore evictions. Update restore eviction debug mode forces update
