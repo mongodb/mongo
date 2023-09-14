@@ -168,6 +168,10 @@ public:
         return &_stats;
     }
 
+    const std::vector<std::string>& getIdFieldNames() const {
+        return _idFieldNames;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     bool canRunInParallelBeforeWriteStage(
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
