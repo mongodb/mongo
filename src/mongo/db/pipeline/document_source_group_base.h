@@ -129,6 +129,10 @@ public:
         return &_stats;
     }
 
+    const std::vector<std::string>& getIdFieldNames() const {
+        return _idFieldNames;
+    }
+
     bool canRunInParallelBeforeWriteStage(
         const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 
