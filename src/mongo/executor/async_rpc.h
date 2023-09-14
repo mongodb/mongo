@@ -126,7 +126,7 @@ template <typename CommandType>
 struct AsyncRPCOptions {
     AsyncRPCOptions(const std::shared_ptr<executor::TaskExecutor>& exec,
                     CancellationToken token,
-                    CommandType cmd,
+                    const CommandType& cmd,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
                     GenericArgs genericArgs = GenericArgs(),
                     BatonHandle baton = nullptr)
@@ -138,7 +138,7 @@ struct AsyncRPCOptions {
           baton{std::move(baton)} {}
     AsyncRPCOptions(const std::shared_ptr<executor::TaskExecutor>& exec,
                     CancellationToken token,
-                    CommandType cmd,
+                    const CommandType& cmd,
                     GenericArgs genericArgs,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
                     BatonHandle baton = nullptr)
