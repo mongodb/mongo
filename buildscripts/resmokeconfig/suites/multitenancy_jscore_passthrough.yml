@@ -23,32 +23,15 @@ selector:
   # Skip any tests that use transactions
   - uses_transactions
 
-  # # These tests have operatons on "local" or "config" db which are blocked by Atlas Proxy.
-  # - jstests/core/catalog/list_indexes.js
-  # - jstests/core/clustered/clustered_collection_creation.js
-  # - jstests/core/ddl/create_indexes.js
-  # - jstests/core/index/index_id_options.js
-  # - jstests/core/index/index9.js
-  # - jstests/core/txns/no_writes_to_system_collections_in_txn.js
-  # - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
-  # - jstests/core/startup_log.js
-  # # TODO SERVER-79996: fix issues found by the following tests.
-  # - jstests/core/query/explain/explain_agg_write_concern.js
-  # - jstests/core/views/views_distinct.js
-  # - jstests/core/views/views_distinct_with_arrays.js
-  # - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
-  # - jstests/core/dbadmin.js
-  # - jstests/core/catalog/list_catalog.js
-  # - jstests/core/ddl/dropdb.js
-  # - jstests/core/dbcase.js
-  # - jstests/core/query/query_settings/query_settings_cmds.js
-  # - jstests/core/views/views_count.js
-  # - jstests/core/query/agg_hint.js
-  # - jstests/core/timeseries/timeseries_delete_hint.js
-  # - jstests/core/timeseries/timeseries_out_non_sharded.js
-  # - jstests/core/views/views_collation.js
-  # - jstests/core/queryable_encryption/basic_crud.js
-  # - jstests/core/timeseries/timeseries_update_hint.js
+  exclude_files:
+  # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
+  - jstests/core/query/explain/explain_agg_write_concern.js
+
+  # TODO(SERVER-80569): Remove the test exclusion when $listCatalog in response has expected prefix.
+  - jstests/core/catalog/list_catalog.js
+
+  # `rolesInfo` is returning unprefixed database names
+  - jstests/core/administrative/builtin_roles_external.js
 
 executor:
   archive:
@@ -66,6 +49,7 @@ executor:
         TestData: &TestData
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
+          useResponsePrefixChecking: true
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash

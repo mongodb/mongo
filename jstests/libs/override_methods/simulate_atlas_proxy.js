@@ -569,6 +569,7 @@ function runCommandRetryOnTenantMigrationErrors(
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const useDollarTenant = !!TestData.useDollarTenant;
     const useExpectPrefix = !!TestData.useExpectPrefix;
+    const useResponsePrefixChecking = !!TestData.useResponsePrefixChecking;
 
     const tenantId = getTenantIdForDatabase(dbName);
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName, tenantId);
@@ -599,8 +600,20 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
     // Remove the tenant prefix from all database names and namespaces in the result since tests
     // assume the command was run against the original database.
-    removeTenantIdAndMaybeCheckPrefixes(
-        resObj, useExpectPrefix ? {checkPrefix: true, tenantId, dbName} : {});
+    const cmdName = Object.keys(cmdObj)[0];
+    let checkPrefixOptions = {};
+    if (useExpectPrefix || useResponsePrefixChecking) {
+        checkPrefixOptions = {
+            checkPrefix: true,
+            tenantId,
+            dbName,
+            cmdName,
+            debugLog: "Failed to check tenant prefix in response : " + tojsononeline(resObj) +
+                ". The request command obj is " + tojsononeline(cmdObjWithTenantId)
+        };
+    }
+
+    removeTenantIdAndMaybeCheckPrefixes(resObj, checkPrefixOptions);
 
     return resObj;
 };

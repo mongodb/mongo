@@ -5,23 +5,13 @@ selector:
   - jstests/core/**/*.js
 
   exclude_files:
-  # $out
+  # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
   - jstests/core/query/explain/explain_agg_write_concern.js
 
-  # DBRef
-  - jstests/core/query/dbref/ref4.js
-  - jstests/core/query/dbref/ref.js
-  - jstests/core/query/dbref/dbref1.js
-  - jstests/core/query/dbref/dbref3.js
-
-  # $listCatalog not prefixing in response
+  # TODO(SERVER-80569): Remove the test exclusion when $listCatalog in response has expected prefix.
   - jstests/core/catalog/list_catalog.js
 
-  # currentOp / $currentOp not returning prefixed database names
-  - jstests/core/administrative/current_op/currentop_predicate.js
-  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
-
-  # `validate` is not prefixing in responses
+  # TODO(SERVER-80641): Remove the test exclusion when the reponses of `validate` have expected prefix.
   - jstests/core/compound_wildcard_index_validation.js
   - jstests/core/write/delete/remove2.js
   - jstests/core/index/wildcard/wildcard_index_update.js
@@ -44,16 +34,8 @@ selector:
   - jstests/core/write/delete/remove.js
   - jstests/core/doc_validation/doc_validation_encrypt_keywords.js
 
-  # Something wrong with explain for find
-  - jstests/core/query/explain/explain_db_mismatch.js
-
   # `rolesInfo` is returning unprefixed database names
   - jstests/core/administrative/builtin_roles_external.js
-
-  # TODO(SERVER-80407): Remove these test exclusions when we support explain for `count`
-  - jstests/core/query/agg_hint.js
-  - jstests/core/views/views_count.js
-  - jstests/core/views/views_collation.js
 
   exclude_with_any_tags:
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.

@@ -5,6 +5,18 @@ export function isDenylistedDb(dbName) {
     return kDenylistedDbNames.has(dbName);
 }
 
+const kCmdsNotExpectSameDbNameInResp = new Set([
+    // Following commands return different database names. It is by design.
+    "validateDBMetadata",
+    "connectionStatus",
+    "mapReduce",
+    "mapreduce",
+]);
+function shouldSkipPrefixCheck(cmdName, obj) {
+    return kCmdsNotExpectSameDbNameInResp.has(cmdName) || (obj instanceof DBRef) ||
+        (obj instanceof DBPointer);
+}
+
 /**
  * @returns Whether we are currently running an operation with multiple tenants.
  */
@@ -122,13 +134,17 @@ function prependTenantId(obj, tenantId) {
  * @param {boolean} [options.checkPrefix] Enable prefix checking for namespace strings
  * @param {string} [options.tenantId] The tenant the command is run on behalf of
  * @param {string} [options.dbName] The database name the command is run against
+ * @param {string} [options.cmdName] The command name
+ * @param {string} [options.debugLog] The debug log for a failed prefix checking
  */
 export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
     checkPrefix: false,
     tenantId: undefined,
-    dbName: undefined
+    dbName: undefined,
+    cmdName: undefined,
+    debugLog: undefined,
 }) {
-    const {checkPrefix, tenantId, dbName: requestDbName} = options;
+    const {checkPrefix, tenantId, dbName: requestDbName, cmdName, debugLog} = options;
     if (checkPrefix) {
         assert(tenantId != null, "Missing required option `tenantId` when checking prefixes");
         assert(requestDbName != null, "Missing required option `dbName` when checking prefixes");
@@ -139,16 +155,17 @@ export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
         let originalK = removeTenantIdFromString(k);
         if (typeof v === "string") {
             if (k === "dbName" || k == "db" || k == "dropped") {
-                if (checkPrefix && !isDenylistedDb(requestDbName)) {
-                    assert.eq(v, `${tenantId}_${requestDbName}`);
+                if (checkPrefix && !isDenylistedDb(requestDbName) &&
+                    !shouldSkipPrefixCheck(cmdName, obj)) {
+                    assert.eq(v, `${tenantId}_${requestDbName}`, debugLog);
                 }
 
                 obj[originalK] = extractOriginalDbName(v);
             } else if (k === "namespace" || k === "ns") {
                 if (checkPrefix) {
                     const responseDbName = v.split('.')[0];
-                    if (!isDenylistedDb(responseDbName)) {
-                        assert.eq(v.split('.')[0], `${tenantId}_${requestDbName}`);
+                    if (!isDenylistedDb(requestDbName) && !shouldSkipPrefixCheck(cmdName, obj)) {
+                        assert.eq(responseDbName, `${tenantId}_${requestDbName}`, debugLog);
                     }
                 }
 
