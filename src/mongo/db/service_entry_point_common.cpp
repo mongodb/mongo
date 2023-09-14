@@ -86,6 +86,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/read_preference_metrics.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -1089,7 +1090,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         auto command = invocation->definition();
         // Record readConcern usages for commands run inside transactions after unstashing the
         // transaction resources.
-        if (command->shouldAffectReadConcernCounter() && opCtx->inMultiDocumentTransaction()) {
+        if (command->shouldAffectReadOptionCounters() && opCtx->inMultiDocumentTransaction()) {
             ServerReadConcernMetrics::get(opCtx)->recordReadConcern(readConcernArgs,
                                                                     true /* isTransaction */);
         }
@@ -1193,10 +1194,26 @@ void RunCommandImpl::_prologue() {
     // Record readConcern usages for commands run outside of transactions, excluding DBDirectClient.
     // For commands inside a transaction, they inherit the readConcern from the transaction. So we
     // will record their readConcern usages after we have unstashed the transaction resources.
-    if (!opCtx->getClient()->isInDirectClient() && command->shouldAffectReadConcernCounter() &&
+    if (!opCtx->getClient()->isInDirectClient() && command->shouldAffectReadOptionCounters() &&
         !opCtx->inMultiDocumentTransaction()) {
         ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
                                                                 false /* isTransaction */);
+    }
+
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    // If the state is not primary or secondary, we skip collecting metrics. We also use the UNSAFE
+    // method in the replication coordinator, as collecting metrics around read preference usage is
+    // best-effort and should not contend for the replication coordinator mutex.
+    if (replCoord->getSettings().usingReplSets() &&
+        replCoord->isInPrimaryOrSecondaryState_UNSAFE()) {
+        auto isPrimary =
+            replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, DatabaseName::kAdmin.toString());
+        // Skip incrementing metrics when the command is not a read operation, as we expect to all
+        // commands sent via the driver to inherit the read preference, even if we don't use it.
+        if (command->shouldAffectReadOptionCounters()) {
+            ReadPreferenceMetrics::get(opCtx)->recordReadPreference(
+                ReadPreferenceSetting::get(opCtx), _isInternalClient(), isPrimary);
+        }
     }
 }
 
