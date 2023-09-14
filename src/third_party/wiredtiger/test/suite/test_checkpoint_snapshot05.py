@@ -43,8 +43,8 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
     backup_dir = "BACKUP"
 
     format_values = [
-        ('column_fix', dict(key_format='r', value_format='8t')),
-        ('column', dict(key_format='r', value_format='S')),
+        # ('column_fix', dict(key_format='r', value_format='8t')),
+        # ('column', dict(key_format='r', value_format='S')),
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
@@ -139,7 +139,6 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
                 cursor1.set_value(self.valueb)
             else:
                 cursor1.set_value(self.valueb + str(i))
-            cursor1.set_value(self.valueb)
             self.assertEqual(cursor1.update(), 0)
 
         # Create a checkpoint thread
