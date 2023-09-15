@@ -1437,6 +1437,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // sorting.
     auto forwardedSlots = getSlotsToForward(reqs, outputs);
 
+    outputs.clearNonRequiredSlots(reqs);
+    if (!reqs.has(kResult)) {
+        outputs.clear(kResult);
+    }
+
     stage =
         sbe::makeS<sbe::SortStage>(std::move(stage),
                                    std::move(orderBy),
@@ -1446,8 +1451,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                    sn->maxMemoryUsageBytes,
                                    _cq.getExpCtx()->allowDiskUse,
                                    root->nodeId());
-
-    outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -1639,6 +1642,10 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
     });
 
     auto childReqs = reqs.copy().clearAllFields().setFields(std::move(fields));
+    if (!additionalFields.empty()) {
+        childReqs.set(kResult);
+    }
+
     auto [stage, childOutputs] = build(pn->children[0].get(), childReqs);
     auto outputs = std::move(childOutputs);
 
