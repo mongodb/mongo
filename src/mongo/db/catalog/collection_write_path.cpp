@@ -788,10 +788,16 @@ void deleteDocument(OperationContext* opCtx,
     }
 
     OplogDeleteEntryArgs deleteArgs;
+
+    // TODO(SERVER-80956): remove this call.
     opCtx->getServiceContext()->getOpObserver()->aboutToDelete(
         opCtx, collection, doc.value(), &deleteArgs);
 
-    deleteArgs.deletedDoc = nullptr;
+    invariant(doc.value().isOwned(),
+              str::stream() << "Document to delete is not owned: snapshot id: " << doc.snapshotId()
+                            << " document: " << doc.value());
+
+    deleteArgs.deletedDoc = &(doc.value());
     deleteArgs.fromMigrate = fromMigrate;
     deleteArgs.changeStreamPreAndPostImagesEnabledForCollection =
         collection->isChangeStreamPreAndPostImagesEnabled();
@@ -804,21 +810,10 @@ void deleteDocument(OperationContext* opCtx,
             reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
 
-    boost::optional<BSONObj> deletedDoc;
-    const bool isTimeseriesCollection =
-        collection->getTimeseriesOptions() || nss.isTimeseriesBucketsCollection();
-
-    if (shouldRecordPreImageForRetryableWrite ||
-        collection->isChangeStreamPreAndPostImagesEnabled() || isTimeseriesCollection) {
-        deletedDoc.emplace(doc.value().getOwned());
-    }
     int64_t keysDeleted = 0;
     collection->getIndexCatalog()->unindexRecord(
         opCtx, collection, doc.value(), loc, noWarn, &keysDeleted, checkRecordId);
     collection->getRecordStore()->deleteRecord(opCtx, loc);
-    if (deletedDoc) {
-        deleteArgs.deletedDoc = &(deletedDoc.value());
-    }
 
     opCtx->getServiceContext()->getOpObserver()->onDelete(opCtx, collection, stmtId, deleteArgs);
 

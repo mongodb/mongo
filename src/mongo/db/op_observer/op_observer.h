@@ -308,8 +308,9 @@ public:
      * "ns" name of the collection from which deleteState.idDoc will be deleted.
      *
      * "args" is a reference to information detailing whether the pre-image of the doc should be
-     * preserved with deletion. If `retryableWritePreImageRecordingType != kNotRetryable`, then the
-     * opObserver must store the `deletedDoc` in addition to the documentKey.
+     * preserved with deletion. Regardless of the pre-image setting, `deletedDoc` is always
+     * provided. OpObserverImpl::aboutToDelete() initializes the documentKey as a decoration on
+     * OplogDeleteEntryArgs.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const CollectionPtr& coll,
