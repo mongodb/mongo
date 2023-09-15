@@ -797,7 +797,6 @@ void deleteDocument(OperationContext* opCtx,
               str::stream() << "Document to delete is not owned: snapshot id: " << doc.snapshotId()
                             << " document: " << doc.value());
 
-    deleteArgs.deletedDoc = &(doc.value());
     deleteArgs.fromMigrate = fromMigrate;
     deleteArgs.changeStreamPreAndPostImagesEnabledForCollection =
         collection->isChangeStreamPreAndPostImagesEnabled();
@@ -815,7 +814,8 @@ void deleteDocument(OperationContext* opCtx,
         opCtx, collection, doc.value(), loc, noWarn, &keysDeleted, checkRecordId);
     collection->getRecordStore()->deleteRecord(opCtx, loc);
 
-    opCtx->getServiceContext()->getOpObserver()->onDelete(opCtx, collection, stmtId, deleteArgs);
+    opCtx->getServiceContext()->getOpObserver()->onDelete(
+        opCtx, collection, stmtId, doc.value(), deleteArgs);
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);

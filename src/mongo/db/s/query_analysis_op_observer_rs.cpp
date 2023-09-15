@@ -42,12 +42,6 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-namespace {
-
-const auto docToDeleteDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
-
-}  // namespace
-
 void QueryAnalysisOpObserverRS::onInserts(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           std::vector<InsertStatement>::const_iterator begin,
@@ -72,23 +66,13 @@ void QueryAnalysisOpObserverRS::onUpdate(OperationContext* opCtx,
     }
 }
 
-void QueryAnalysisOpObserverRS::aboutToDelete(OperationContext* opCtx,
-                                              const CollectionPtr& coll,
-                                              const BSONObj& doc,
-                                              OplogDeleteEntryArgs* args,
-                                              OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
-        docToDeleteDecoration(args) = doc.getOwned();
-    }
-}
-
 void QueryAnalysisOpObserverRS::onDelete(OperationContext* opCtx,
                                          const CollectionPtr& coll,
                                          StmtId stmtId,
+                                         const BSONObj& doc,
                                          const OplogDeleteEntryArgs& args,
                                          OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
-        auto& doc = docToDeleteDecoration(args);
         invariant(!doc.isEmpty());
         deleteFromConfigQueryAnalyzersNamespaceImpl(opCtx, args, doc);
     }

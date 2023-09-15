@@ -83,6 +83,7 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
+                  const BSONObj& doc,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 

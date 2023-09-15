@@ -182,6 +182,7 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
+                  const BSONObj&,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override {
         if (coll->ns() != _stateDocumentNss) {

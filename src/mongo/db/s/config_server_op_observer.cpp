@@ -66,6 +66,7 @@ ConfigServerOpObserver::~ConfigServerOpObserver() = default;
 void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
                                       const CollectionPtr& coll,
                                       StmtId stmtId,
+                                      const BSONObj& doc,
                                       const OplogDeleteEntryArgs& args,
                                       OpStateAccumulator* opAccumulator) {
     if (coll->ns() == VersionType::ConfigNS) {

@@ -238,6 +238,7 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
 void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
                                                   StmtId stmtId,
+                                                  const BSONObj& doc,
                                                   const OplogDeleteEntryArgs& args,
                                                   OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&

@@ -160,6 +160,7 @@ void FallbackOpObserver::onUpdate(OperationContext* opCtx,
 void FallbackOpObserver::onDelete(OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   StmtId stmtId,
+                                  const BSONObj& doc,
                                   const OplogDeleteEntryArgs& args,
                                   OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();

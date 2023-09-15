@@ -93,6 +93,7 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
+                  const BSONObj& doc,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
@@ -172,13 +173,6 @@ public:
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
                             bool isDryRun) final;
-
-    // Note aboutToDelete is unchecked, but defined.
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 

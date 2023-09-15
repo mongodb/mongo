@@ -132,8 +132,6 @@ struct OplogUpdateEntryArgs {
  * the onDelete() method within the same implementation.
  */
 struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
-    const BSONObj* deletedDoc = nullptr;
-
     // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
     // should be ignored by the user as an internal maintenance operation and not a real delete.
     bool fromMigrate = false;
@@ -307,14 +305,16 @@ public:
      *
      * "ns" name of the collection from which deleteState.idDoc will be deleted.
      *
+     * "doc" holds the pre-image of the document to be deleted.
+     *
      * "args" is a reference to information detailing whether the pre-image of the doc should be
-     * preserved with deletion. Regardless of the pre-image setting, `deletedDoc` is always
-     * provided. OpObserverImpl::aboutToDelete() initializes the documentKey as a decoration on
-     * OplogDeleteEntryArgs.
+     * preserved with deletion. OpObserverImpl::aboutToDelete() initializes the documentKey as a
+     * decoration on OplogDeleteEntryArgs.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           StmtId stmtId,
+                          const BSONObj& doc,
                           const OplogDeleteEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 

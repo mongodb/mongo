@@ -436,6 +436,7 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
 void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
                                          const CollectionPtr& coll,
                                          StmtId stmtId,
+                                         const BSONObj& doc,
                                          const OplogDeleteEntryArgs& args,
                                          OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||

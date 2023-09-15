@@ -3172,6 +3172,7 @@ protected:
         _opObserver->onDeleteFn = [&](OperationContext*,
                                       const CollectionPtr& coll,
                                       StmtId,
+                                      const BSONObj&,
                                       const OplogDeleteEntryArgs& args) {
             stdx::lock_guard<Latch> lock(_deleteMutex);
             auto nss = coll->ns();

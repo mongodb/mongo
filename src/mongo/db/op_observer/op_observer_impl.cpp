@@ -996,6 +996,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               StmtId stmtId,
+                              const BSONObj& doc,
                               const OplogDeleteEntryArgs& args,
                               OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
@@ -1035,19 +1036,19 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             operation.setInitializedStatementIds({stmtId});
             if (args.retryableFindAndModifyLocation ==
                 RetryableFindAndModifyLocation::kSideCollection) {
-                invariant(!args.deletedDoc->isEmpty(),
+                invariant(!doc.isEmpty(),
                           str::stream()
                               << "Deleted document must be present for pre-image recording");
-                operation.setPreImage(args.deletedDoc->getOwned());
+                operation.setPreImage(doc.getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
             }
         }
 
         if (args.changeStreamPreAndPostImagesEnabledForCollection) {
-            invariant(!args.deletedDoc->isEmpty(),
+            invariant(!doc.isEmpty(),
                       str::stream() << "Deleted document must be present for pre-image recording");
-            operation.setPreImage(args.deletedDoc->getOwned());
+            operation.setPreImage(doc.getOwned());
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
@@ -1060,7 +1061,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         if (args.retryableFindAndModifyLocation ==
             RetryableFindAndModifyLocation::kSideCollection) {
-            invariant(!args.deletedDoc->isEmpty(),
+            invariant(!doc.isEmpty(),
                       str::stream() << "Deleted document must be present for pre-image recording");
             invariant(opCtx->getTxnNumber());
 
@@ -1086,11 +1087,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             // If the oplog entry has `needsRetryImage` (retryable findAndModify), gather the
             // pre/post image information to be stored in the the image collection.
             if (oplogEntry.getNeedsRetryImage()) {
-                const auto& dataImage = *(args.deletedDoc);
                 opAccumulator->retryableFindAndModifyImageToWrite =
-                    repl::ReplOperation::ImageBundle{repl::RetryImageEnum::kPreImage,
-                                                     dataImage,
-                                                     opTime.writeOpTime.getTimestamp()};
+                    repl::ReplOperation::ImageBundle{
+                        repl::RetryImageEnum::kPreImage, doc, opTime.writeOpTime.getTimestamp()};
             }
         }
 

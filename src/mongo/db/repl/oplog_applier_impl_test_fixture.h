@@ -122,6 +122,7 @@ public:
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
+                  const BSONObj& doc,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override;
 
@@ -188,8 +189,11 @@ public:
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>
         onInsertsFn;
 
-    std::function<void(
-        OperationContext*, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&)>
+    std::function<void(OperationContext*,
+                       const CollectionPtr&,
+                       StmtId,
+                       const BSONObj&,
+                       const OplogDeleteEntryArgs&)>
         onDeleteFn;
 
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;

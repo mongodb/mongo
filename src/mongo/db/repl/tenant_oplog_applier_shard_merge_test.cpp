@@ -438,10 +438,13 @@ TEST_F(TenantOplogApplierMergeTest, ApplyDelete_DatabaseMissing) {
                                     kTenantDB.toStringWithTenantId_forTest(), "bar"),
                                 UUID::gen());
     bool onDeleteCalled = false;
-    _opObserver->onDeleteFn =
-        [&](OperationContext* opCtx, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&) {
-            onDeleteCalled = true;
-        };
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        onDeleteCalled = true;
+    };
     pushOps({entry});
     ASSERT_OK(_applier->startup());
     auto opAppliedFuture = _applier->getNotificationForOpTime(entry.getOpTime());
@@ -457,10 +460,13 @@ TEST_F(TenantOplogApplierMergeTest, ApplyDelete_CollectionMissing) {
                                     kTenantDB.toStringWithTenantId_forTest(), "bar"),
                                 UUID::gen());
     bool onDeleteCalled = false;
-    _opObserver->onDeleteFn =
-        [&](OperationContext* opCtx, const CollectionPtr&, StmtId, const OplogDeleteEntryArgs&) {
-            onDeleteCalled = true;
-        };
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        onDeleteCalled = true;
+    };
     pushOps({entry});
     ASSERT_OK(_applier->startup());
     auto opAppliedFuture = _applier->getNotificationForOpTime(entry.getOpTime());
@@ -479,6 +485,7 @@ TEST_F(TenantOplogApplierMergeTest, ApplyDelete_Success) {
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   StmtId,
+                                  const BSONObj&,
                                   const OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
         ASSERT_TRUE(opCtx);

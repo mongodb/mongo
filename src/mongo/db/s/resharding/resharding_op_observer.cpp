@@ -291,6 +291,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx,
 void ReshardingOpObserver::onDelete(OperationContext* opCtx,
                                     const CollectionPtr& coll,
                                     StmtId stmtId,
+                                    const BSONObj& doc,
                                     const OplogDeleteEntryArgs& args,
                                     OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kDonorReshardingOperationsNamespace) {

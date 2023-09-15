@@ -103,6 +103,7 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
 void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const CollectionPtr& coll,
                                                 StmtId stmtId,
+                                                const BSONObj& doc,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
@@ -110,7 +111,6 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    const auto& doc = *(args.deletedDoc);
     auto elem = doc[kIdField];
     if (elem.type() != BSONType::String) {
         // This delete makes no sense, but it's safe to ignore since the insert/update

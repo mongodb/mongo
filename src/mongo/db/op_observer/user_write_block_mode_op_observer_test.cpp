@@ -138,7 +138,7 @@ protected:
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
-                opObserver.onDelete(opCtx, *autoColl, StmtId(), deleteArgs);
+                opObserver.onDelete(opCtx, *autoColl, StmtId(), preImageDoc, deleteArgs);
             } catch (...) {
                 // Make it easier to see that this is where we failed.
                 ASSERT_OK(exceptionToStatus());
@@ -153,7 +153,7 @@ protected:
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
-            ASSERT_THROWS(opObserver.onDelete(opCtx, *autoColl, StmtId(), deleteArgs),
+            ASSERT_THROWS(opObserver.onDelete(opCtx, *autoColl, StmtId(), preImageDoc, deleteArgs),
                           AssertionException);
         }
     }

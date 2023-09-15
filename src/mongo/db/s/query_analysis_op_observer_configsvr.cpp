@@ -47,12 +47,6 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-namespace {
-
-const auto docToDeleteDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
-
-}  // namespace
-
 void QueryAnalysisOpObserverConfigSvr::onInserts(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  std::vector<InsertStatement>::const_iterator begin,
@@ -91,31 +85,18 @@ void QueryAnalysisOpObserverConfigSvr::onUpdate(OperationContext* opCtx,
     }
 }
 
-void QueryAnalysisOpObserverConfigSvr::aboutToDelete(OperationContext* opCtx,
-                                                     const CollectionPtr& coll,
-                                                     const BSONObj& doc,
-                                                     OplogDeleteEntryArgs* args,
-                                                     OpStateAccumulator* opAccumulator) {
-    const auto& ns = coll->ns();
-
-    if (ns == NamespaceString::kConfigQueryAnalyzersNamespace || ns == MongosType::ConfigNS) {
-        docToDeleteDecoration(args) = doc.getOwned();
-    }
-}
-
 void QueryAnalysisOpObserverConfigSvr::onDelete(OperationContext* opCtx,
                                                 const CollectionPtr& coll,
                                                 StmtId stmtId,
+                                                const BSONObj& doc,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
     const auto& ns = coll->ns();
 
     if (ns == NamespaceString::kConfigQueryAnalyzersNamespace) {
-        auto& doc = docToDeleteDecoration(args);
         invariant(!doc.isEmpty());
         deleteFromConfigQueryAnalyzersNamespaceImpl(opCtx, args, doc);
     } else if (ns == MongosType::ConfigNS) {
-        auto& doc = docToDeleteDecoration(args);
         invariant(!doc.isEmpty());
         const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
         opCtx->recoveryUnit()->onCommit(

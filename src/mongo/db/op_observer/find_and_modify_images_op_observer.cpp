@@ -106,6 +106,7 @@ void FindAndModifyImagesOpObserver::onUpdate(OperationContext* opCtx,
 void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
                                              const CollectionPtr& coll,
                                              StmtId stmtId,
+                                             const BSONObj& doc,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     writeToImageCollection(opCtx, opAccumulator);

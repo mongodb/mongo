@@ -198,10 +198,6 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             // TODO(SERVER-80956): remove this call.
             opObserver->aboutToDelete(opCtx, collection, doc, &args);
 
-            // Explicitly setting values despite them being the defaults.
-            args.deletedDoc = &doc;
-            args.fromMigrate = false;
-
             // If collection has change stream pre-/post-images enabled, pass the 'deletedDoc' for
             // writing it in the pre-images collection.
             if (collection->isChangeStreamPreAndPostImagesEnabled()) {
@@ -209,7 +205,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             }
 
             // Reserves an optime for the deletion and sets the timestamp for future writes.
-            opObserver->onDelete(opCtx, collection, kUninitializedStmtId, args);
+            opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, args);
         }
 
         int64_t unusedKeysDeleted = 0;

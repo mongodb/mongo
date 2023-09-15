@@ -46,12 +46,6 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-
-const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
-
-}  // namespace
-
 PrimaryOnlyServiceOpObserver::PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext) {
     _registry = PrimaryOnlyServiceRegistry::get(serviceContext);
 }
@@ -59,23 +53,17 @@ PrimaryOnlyServiceOpObserver::PrimaryOnlyServiceOpObserver(ServiceContext* servi
 PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 
 
-void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                 const CollectionPtr& coll,
-                                                 BSONObj const& doc,
-                                                 OplogDeleteEntryArgs* args,
-                                                 OpStateAccumulator* opAccumulator) {
-    // Extract the _id field from the document. If it does not have an _id, use the
-    // document itself as the _id.
-    documentIdDecoration(args) = doc["_id"] ? doc["_id"].wrap() : doc;
-}
-
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             StmtId stmtId,
+                                            const BSONObj& doc,
                                             const OplogDeleteEntryArgs& args,
                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    auto& documentId = documentIdDecoration(args);
+
+    // Extract the _id field from the document. If it does not have an _id, use the
+    // document itself as the _id.
+    auto documentId = doc["_id"] ? doc["_id"].wrap() : doc;
     invariant(!documentId.isEmpty());
 
     auto service = _registry->lookupServiceByNamespace(nss);

@@ -530,9 +530,7 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
     OplogDeleteEntryArgs deleteArgs;
     _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
 
-    deleteArgs.deletedDoc = &bsonDoc;
-
-    _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, deleteArgs);
     wuow.commit();
 
     // Verify blockers have not been removed
@@ -570,9 +568,7 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
     OplogDeleteEntryArgs deleteArgs;
     _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
 
-    deleteArgs.deletedDoc = &bsonDoc;
-
-    _observer->onDelete(_opCtx.get(), *autoColl, 0 /* stmtId */, deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, deleteArgs);
     wuow.commit();
 
     // Verify blockers have been removed

@@ -138,8 +138,7 @@ public:
         WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         OplogDeleteEntryArgs args;
-        args.deletedDoc = &deletedDoc;
-        observer.onDelete(opCtx.get(), *autoColl, /*StmtId=*/1, args);
+        observer.onDelete(opCtx.get(), *autoColl, /*StmtId=*/1, deletedDoc, args);
         if (commit)
             wuow.commit();
     }

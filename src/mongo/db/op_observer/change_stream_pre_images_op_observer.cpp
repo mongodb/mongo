@@ -165,6 +165,7 @@ void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
 void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
                                                const CollectionPtr& coll,
                                                StmtId stmtId,
+                                               const BSONObj& doc,
                                                const OplogDeleteEntryArgs& args,
                                                OpStateAccumulator* opAccumulator) {
     if (!opAccumulator) {
@@ -188,10 +189,9 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
     if (args.changeStreamPreAndPostImagesEnabledForCollection &&
         !opTimeBundle.writeOpTime.isNull() && !args.fromMigrate &&
         !nss.isTemporaryReshardingCollection()) {
-        const auto& preImageDoc = args.deletedDoc;
         const auto uuid = coll->uuid();
         invariant(
-            !preImageDoc->isEmpty(),
+            !doc.isEmpty(),
             fmt::format("Deleted document must be set when writing to change streams pre-images "
                         "collection for update on collection {} (UUID: {}) with optime {}",
                         nss.toStringForErrorMsg(),
@@ -199,7 +199,7 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
                         opTimeBundle.writeOpTime.toString()));
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
-        ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, *preImageDoc);
+        ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, doc);
 
         writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
     }

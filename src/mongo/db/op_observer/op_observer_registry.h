@@ -311,6 +311,7 @@ public:
     void onDelete(OperationContext* const opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
+                  const BSONObj& doc,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
@@ -327,7 +328,7 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onDelete(opCtx, coll, stmtId, args, &opStateAccumulator);
+            o->onDelete(opCtx, coll, stmtId, doc, args, &opStateAccumulator);
     }
 
     void onInternalOpMessage(OperationContext* const opCtx,

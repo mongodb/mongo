@@ -568,6 +568,7 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const CollectionPtr& coll,
                                      StmtId stmtId,
+                                     const BSONObj& doc,
                                      const OplogDeleteEntryArgs& args,
                                      OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();

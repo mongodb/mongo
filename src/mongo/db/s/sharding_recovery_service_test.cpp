@@ -649,7 +649,8 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         OplogDeleteEntryArgs args;
         opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
-        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, args);
+        opObserver().onDelete(
+            opCtx(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
         wuow.commit();
     }
 
@@ -718,7 +719,8 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         OplogDeleteEntryArgs args;
         opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
-        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, args);
+        opObserver().onDelete(
+            opCtx(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
         wuow.commit();
     }
 

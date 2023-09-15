@@ -106,12 +106,13 @@ void OplogApplierImplOpObserver::onInserts(OperationContext* opCtx,
 void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           StmtId stmtId,
+                                          const BSONObj& doc,
                                           const OplogDeleteEntryArgs& args,
                                           OpStateAccumulator* opAccumulator) {
     if (!onDeleteFn) {
         return;
     }
-    onDeleteFn(opCtx, coll, stmtId, args);
+    onDeleteFn(opCtx, coll, stmtId, doc, args);
 }
 
 void OplogApplierImplOpObserver::onUpdate(OperationContext* opCtx,
@@ -304,6 +305,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   StmtId stmtId,
+                                  const BSONObj& doc,
                                   const OplogDeleteEntryArgs& args) {
         // Other threads may be calling into the opObserver. Only assert if we are writing to
         // the target ns, otherwise skip these asserts.
@@ -313,8 +315,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
 
         applyOpCalled = true;
         checkOpCtx(opCtx);
-        ASSERT(args.deletedDoc);
-        ASSERT_BSONOBJ_EQ(op.getObject(), *(args.deletedDoc));
+        ASSERT_BSONOBJ_EQ(op.getObject(), doc);
         return Status::OK();
     };
 

@@ -65,15 +65,10 @@ public:
                           const OplogUpdateEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
-    virtual void aboutToDelete(OperationContext* opCtx,
-                               const CollectionPtr& coll,
-                               const BSONObj& doc,
-                               OplogDeleteEntryArgs* args,
-                               OpStateAccumulator* opAccumulator = nullptr) = 0;
-
     virtual void onDelete(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           StmtId stmtId,
+                          const BSONObj& doc,
                           const OplogDeleteEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
