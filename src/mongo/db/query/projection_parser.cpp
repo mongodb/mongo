@@ -542,7 +542,16 @@ void parseSubObject(ParseContext* ctx,
         // It was likely intended to be an expression. Check if it's a valid field path or not to
         // confirm.
         try {
-            FieldPath fp(obj.firstElementFieldNameStringData());
+            const auto elementFieldName = obj.firstElementFieldNameStringData();
+            if (!hasPositionalOperator(elementFieldName)) {
+                FieldPath fp(elementFieldName);
+            } else {
+                // The 'FieldPath' parser doesn't take positional operators into account, but those
+                // are valid path projections so trim it off for this validation.
+                StringData pathWithoutPositionalOperator =
+                    elementFieldName.substr(0, elementFieldName.size() - 2);
+                FieldPath fp(pathWithoutPositionalOperator);
+            }
         } catch (const DBException&) {
             uasserted(31325,
                       str::stream()
