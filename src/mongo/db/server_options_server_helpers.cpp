@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/options_parser/option_description.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
 #include "mongo/db/server_options_server_helpers.h"
@@ -127,6 +128,12 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                             "sets the service executor implementation")
         .hidden()
         .setDefault(moe::Value("synchronous"));
+
+    // register options in config file
+    options->addOptionChaining("net.reservedThreadNum",
+                               "reservedThreadNum",
+                               moe::Unsigned,
+                               "set the thread num for coroutine service executor mode");
 
 #if MONGO_ENTERPRISE_VERSION
     options->addOptionChaining("security.redactClientLogData",
@@ -550,6 +557,13 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.serviceExecutor = "synchronous";
     }
 
+    if (params.count("net.reservedThreadNum")) {
+        serverGlobalParams.reservedThreadNum = params["net.reservedThreadNum"].as<unsigned>();
+        if (serverGlobalParams.reservedThreadNum < 1) {
+            return Status(ErrorCodes::BadValue, "reservedThreadNum has to be at least 1");
+        }
+    }
+
     if (params.count("security.transitionToAuth")) {
         serverGlobalParams.transitionToAuth = params["security.transitionToAuth"].as<bool>();
     }
@@ -595,10 +609,11 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     } else if (params.count("net.bindIp")) {
         std::string bind_ip = params["net.bindIp"].as<std::string>();
-        boost::split(serverGlobalParams.bind_ips,
-                     bind_ip,
-                     [](char c) { return c == ','; },
-                     boost::token_compress_on);
+        boost::split(
+            serverGlobalParams.bind_ips,
+            bind_ip,
+            [](char c) { return c == ','; },
+            boost::token_compress_on);
     }
 
     for (auto& ip : serverGlobalParams.bind_ips) {

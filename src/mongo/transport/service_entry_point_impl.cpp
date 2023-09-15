@@ -26,16 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/transport/service_entry_point_impl.h"
 
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/server_options.h"
+#include "mongo/platform/basic.h"
+#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/log.h"
@@ -73,10 +72,9 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
 
     _maxNumConnections = supportedMax;
 
-    if (true /*serverGlobalParams.reservedAdminThreads*/) {
+    if (serverGlobalParams.reservedThreadNum) {
         _adminInternalPool = std::make_unique<transport::ServiceExecutorReserved>(
-            _svcCtx, "admin/internal connections", 1);
-        // _adminInternalPool->start();
+            _svcCtx, serverGlobalParams.reservedThreadNum);
     }
 }
 
@@ -113,6 +111,11 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         }
     }
 
+    // work balance
+    size_t targetThreadGroupId = connectionCount % serverGlobalParams.reservedThreadNum;
+    ssm->setThreadGroupId(targetThreadGroupId);
+    MONGO_LOG(0) << "Current ssm is assigned to thread group " << targetThreadGroupId;
+
     // Checking if we successfully added a connection above. Separated from the lock so we don't log
     // while holding it.
     if (connectionCount > _maxNumConnections) {
@@ -124,7 +127,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     }
 
     ssm->setServiceExecutor(_adminInternalPool.get());
-    MONGO_LOG(0)<<"use reserved service executor";
+    MONGO_LOG(0) << "use reserved service executor";
 
     if (!quiet) {
         const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);

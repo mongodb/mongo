@@ -172,7 +172,7 @@ Status ServiceExecutorAdaptive::start() {
     invariant(!_isRunning.load());
     _isRunning.store(true);
     _controllerThread = stdx::thread(&ServiceExecutorAdaptive::_controllerThreadRoutine, this);
-    for (auto i = 0; i < _config->reservedThreads(); i++) {
+    for (auto i = 0; i <1;/* _config->reservedThreads();*/ i++) {
         _startWorkerThread(ThreadCreationReason::kReserveMinimum);
     }
 

@@ -63,11 +63,9 @@ private:
  * accept work. When threads exit, they will go back to waiting for work if there are fewer
  * than reservedThreads available.
  */
-class ServiceExecutorReserved final : public ServiceExecutor {
+class ServiceExecutorReserved : public ServiceExecutor {
 public:
-    explicit ServiceExecutorReserved(ServiceContext* ctx,
-                                     const std::string& name,
-                                     size_t reservedThreads = 1);
+    explicit ServiceExecutorReserved(ServiceContext* ctx, size_t reservedThreads = 1);
 
     Status start() override;
 
@@ -103,8 +101,8 @@ private:
     std::deque<Task> _readyTasks;
 
     AtomicUInt32 _numRunningWorkerThreads{0};
-    size_t _numReadyThreads{0};
-    size_t _numStartingThreads{0};
+    // size_t _numReadyThreads{0};
+    // size_t _numStartingThreads{0};
 
     const std::string _name;
     const size_t _reservedThreads;

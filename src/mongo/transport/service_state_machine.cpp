@@ -26,25 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
-#include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
-#include "mongo/db/operation_context.h"
-#include <boost/context/continuation_fcontext.hpp>
-#include <boost/context/preallocated.hpp>
-#include <boost/context/stack_context.hpp>
-#include <cstdint>
-#include <memory>
-#include <utility>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_state_machine.h"
-
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -60,6 +50,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/quick_exit.h"
+
+#include "mongo/db/modules/monograph/tx_service/include/moodycamelqueue.h"
 
 namespace mongo {
 namespace {
@@ -256,7 +248,7 @@ ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
       _threadName{str::stream() << "conn" << _session()->id()},
       _dbClient{svcContext->makeClient(_threadName, std::move(session))},
       _dbClientPtr{_dbClient.get()},
-      _thdGroupId(group_id) {
+      _threadGroupId(group_id) {
     MONGO_LOG(1) << "ServiceStateMachine::ServiceStateMachine";
 }
 
@@ -274,7 +266,7 @@ void ServiceStateMachine::Reset(ServiceContext* svcContext,
     // _threadName = str::stream() << "conn" << _session()->id();
     _dbClient = svcContext->makeClient(_threadName, std::move(session));
     _dbClientPtr = _dbClient.get();
-    _thdGroupId = group_id;
+    _threadGroupId = group_id;
 }
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {
@@ -426,15 +418,10 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
-
-    // _guard = &guard;
-
-    // guard.release();
-    // ThreadGuard tmpGuard(this);
     DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
-
-    guard.release();
-    guard = ThreadGuard(this);
+    
+    // guard.release();
+    // guard = ThreadGuard(this);
 
     _coroStatus = CoroStatus::Empty;
     // opCtx must be destroyed here so that the operation cannot show
@@ -500,19 +487,19 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
             case State::Process: {
                 // _processMessage(std::move(guard));
                 if (_coroStatus == CoroStatus::Empty) {
-                    MONGO_LOG(0) << "coroutine begin";
+                    MONGO_LOG(1) << "coroutine begin";
                     _coroStatus = CoroStatus::OnGoing;
                     auto func =
                         [this, ssm = shared_from_this(), ownershipModel{Ownership::kOwned}] {
                             std::stringstream ss;
                             ss << std::this_thread::get_id();
                             uint64_t id = std::stoull(ss.str());
-                            MONGO_LOG(0) << "thread id after resume: " << id;
+                            MONGO_LOG(1) << "thread id after resume: " << id;
                             Client::setCurrent(std::move(ssm->_dbClient));
                             _runResumeProcess();
                         };
 
-                    _coroResume = _serviceExecutor->CoroutineResumeFunctor(_thdGroupId, func);
+                    _coroResume = _serviceExecutor->CoroutineResumeFunctor(_threadGroupId, func);
 
                     // boost::context::stack_context sc = coroStackContext();
                     // boost::context::preallocated prealloc(sc.sp, sc.size, sc);
@@ -529,12 +516,11 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                     std::stringstream ss;
                     ss << std::this_thread::get_id();
                     uint64_t id = std::stoull(ss.str());
-                    MONGO_LOG(0) << "thread id before coroutine: " << id;
+                    MONGO_LOG(1) << "thread id before coroutine: " << id;
 
                     _source =
                         boost::context::callcc([this, &guard](boost::context::continuation&& sink) {
                             _coroYield = [this, &sink]() {
-                                // (*address)->release();
                                 _dbClient = Client::releaseCurrent();
                                 sink = sink.resume();
                             };
@@ -542,8 +528,7 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                             return std::move(sink);
                         });
                 } else if (_coroStatus == CoroStatus::OnGoing) {
-                    MONGO_LOG(0) << "coroutine ongoing";
-                    // _guard = &guard;
+                    MONGO_LOG(1) << "coroutine ongoing";
                     _source = _source.resume();
                 }
             } break;
@@ -571,9 +556,9 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
 }
 
 void ServiceStateMachine::_runResumeProcess() {
-    MONGO_LOG(0) << "ServiceStateMachine::_resumeRun";
+    MONGO_LOG(1) << "ServiceStateMachine::_resumeRun";
     if (_coroStatus == CoroStatus::OnGoing) {
-        MONGO_LOG(0) << "coroutine ongoing";
+        MONGO_LOG(1) << "coroutine ongoing";
         _source = _source.resume();
     }
 }
@@ -602,7 +587,7 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
     Status status = Status::OK();
     if (taskName == transport::ServiceExecutorTaskName::kSSMProcessMessage) {
         // reserved mode in actually
-        status = _serviceExecutor->schedule(std::move(func), flags, taskName);
+        status = _serviceExecutor->schedule(std::move(func), flags, taskName, _threadGroupId);
     } else {
         // use adaptive mode to handle network task
         status = _serviceContext->getServiceExecutor()->schedule(std::move(func), flags, taskName);
@@ -655,6 +640,11 @@ void ServiceStateMachine::setCleanupHook(stdx::function<void()> hook) {
 void ServiceStateMachine::setServiceExecutor(transport::ServiceExecutor* serviceExecutor) {
     MONGO_LOG(1) << "ServiceStateMachine::setServiceExecutor";
     _serviceExecutor = serviceExecutor;
+}
+
+void ServiceStateMachine::setThreadGroupId(size_t id) {
+    MONGO_LOG(1) << "ServiceStateMachine::setThreadGroupId. id: " << id;
+    _threadGroupId = id;
 }
 
 ServiceStateMachine::State ServiceStateMachine::state() {

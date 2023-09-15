@@ -113,8 +113,8 @@ tlEnv.Library(
     target='service_executor',
     source=[
         'service_executor_adaptive.cpp',
-        'service_executor_synchronous.cpp',
         'service_executor_reserved.cpp',
+        'service_executor_synchronous.cpp',
         'thread_idle_callback.cpp',
     ],
     LIBDEPS=[
@@ -124,9 +124,6 @@ tlEnv.Library(
         "$BUILD_DIR/mongo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
         'transport_layer_common',
-    ],
-    SYSLIBDEPS=[
-        'boost_context'
     ],
 )
 
@@ -173,10 +170,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/util/processinfo',
+        'service_executor',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/transport/message_compressor',
+    ],
+    SYSLIBDEPS=[
+        'boost_context'
     ],
 )
 

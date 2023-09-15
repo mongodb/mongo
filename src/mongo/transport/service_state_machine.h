@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include "boost/optional/optional.hpp"
+#include <atomic>
 #include <boost/context/continuation.hpp>
 #include <boost/context/continuation_fcontext.hpp>
 #include <boost/context/stack_context.hpp>
+#include <functional>
 
-#include <atomic>
-
+#include "boost/optional/optional.hpp"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
@@ -49,9 +49,6 @@
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
-#include <cstddef>
-#include <cstdint>
-#include <functional>
 
 namespace mongo {
 
@@ -165,6 +162,9 @@ public:
     void setCleanupHook(stdx::function<void()> hook);
 
     void setServiceExecutor(transport::ServiceExecutor* serviceExecutor);
+
+    void setThreadGroupId(size_t id);
+
 private:
     /*
      * A class that wraps up lifetime management of the _dbClient and _threadName for runNext();
@@ -285,7 +285,7 @@ private:
     CoroStatus _coroStatus{CoroStatus::Empty};
     std::function<void()> _coroYield;
     std::function<void()> _coroResume;
-    uint16_t _thdGroupId{UINT16_MAX};
+    uint16_t _threadGroupId{0};
 };
 
 template <typename T>

@@ -79,7 +79,8 @@ struct ServerGlobalParams {
     std::string serviceExecutor;
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
-
+    size_t reservedThreadNum = 8;
+    
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 
     std::string keyFile;           // Path to keyfile, or empty if none.
@@ -120,23 +121,23 @@ struct ServerGlobalParams {
     enum ClusterAuthModes {
         ClusterAuthMode_undefined,
         /**
-        * Authenticate using keyfile, accept only keyfiles
-        */
+         * Authenticate using keyfile, accept only keyfiles
+         */
         ClusterAuthMode_keyFile,
 
         /**
-        * Authenticate using keyfile, accept both keyfiles and X.509
-        */
+         * Authenticate using keyfile, accept both keyfiles and X.509
+         */
         ClusterAuthMode_sendKeyFile,
 
         /**
-        * Authenticate using X.509, accept both keyfiles and X.509
-        */
+         * Authenticate using X.509, accept both keyfiles and X.509
+         */
         ClusterAuthMode_sendX509,
 
         /**
-        * Authenticate using X.509, accept only X.509
-        */
+         * Authenticate using X.509, accept only X.509
+         */
         ClusterAuthMode_x509
     };
 
@@ -261,4 +262,4 @@ struct TraitNamedDomain {
         return ret;
     }
 };
-}
+}  // namespace mongo

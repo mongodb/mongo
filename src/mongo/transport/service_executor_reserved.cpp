@@ -1,16 +1,13 @@
-#include "mongo/util/concurrency/thread_name.h"
-#include <string>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor;
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_executor_reserved.h"
-
 #include "mongo/db/server_parameters.h"
+#include "mongo/platform/basic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/thread_idle_callback.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
@@ -91,17 +88,15 @@ thread_local std::deque<ServiceExecutor::Task> ServiceExecutorReserved::_localWo
 thread_local int ServiceExecutorReserved::_localRecursionDepth = 0;
 thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
 
-ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
-                                                 const std::string& name,
-                                                 size_t reservedThreads)
-    : _name{name}, _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
+ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx, size_t reservedThreads)
+    : _name{"coroutine"}, _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
 
 Status ServiceExecutorReserved::start() {
     log() << "ServiceExecutorReserved::start";
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true, std::memory_order_relaxed);
-        _numStartingThreads = _reservedThreads;
+        // _numStartingThreads = _reservedThreads;
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
@@ -115,7 +110,8 @@ Status ServiceExecutorReserved::start() {
 }
 
 Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
-    log() << "Starting new worker thread for " << _name << " service executor";
+    log() << "Starting new worker thread for " << _name << " service executor. "
+          << " group id: " << groupId;
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
         std::string threadName("thread_group_");
         threadName += std::to_string(threadGroupId);
@@ -126,9 +122,9 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
             _numRunningWorkerThreads.subtractAndFetch(1);
             _shutdownCondition.notify_one();
         });
-
-        _numStartingThreads--;
-        _numReadyThreads++;
+        lk.unlock();
+        // _numStartingThreads--;
+        // _numReadyThreads++;
 
         while (_stillRunning.load()) {
 
@@ -147,18 +143,24 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                 std::array<Task, 100> task_bulk;
                 cnt =
                     threadGroup.resume_queue_.try_dequeue_bulk(task_bulk.begin(), task_bulk.size());
-
+                threadGroup.resume_queue_size_.fetch_sub(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
+                }
+                if (cnt > 0) {
+                    MONGO_LOG(0) << "get resume task";
                 }
             }
 
             if (cnt == 0 && threadGroup.task_queue_size_.load(std::memory_order_relaxed) > 0) {
                 std::array<Task, 100> task_bulk;
                 cnt = threadGroup.task_queue_.try_dequeue_bulk(task_bulk.begin(), task_bulk.size());
-
+                threadGroup.task_queue_size_.fetch_sub(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
+                }
+                if (cnt > 0) {
+                    MONGO_LOG(0) << "get normal task";
                 }
             }
 
@@ -166,15 +168,15 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                 continue;
             }
 
-            _numReadyThreads -= 1;
+            // _numReadyThreads -= 1;
 
-            bool launchReplacement = false;
-            if (_numReadyThreads + _numStartingThreads < _reservedThreads) {
-                _numStartingThreads++;
-                launchReplacement = true;
-            }
+            // bool launchReplacement = false;
+            // if (_numReadyThreads + _numStartingThreads < _reservedThreads) {
+            //     _numStartingThreads++;
+            //     launchReplacement = true;
+            // }
 
-            lk.unlock();
+            // lk.unlock();
 
             // if (launchReplacement) {
             //     auto threadStartStatus = _startWorker(threadGroupId);
@@ -192,12 +194,12 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                 _localWorkQueue.pop_front();
             }
 
-            lk.lock();
-            if (_numReadyThreads + 1 > _reservedThreads) {
-                break;
-            } else {
-                _numReadyThreads += 1;
-            }
+            // lk.lock();
+            // if (_numReadyThreads + 1 > _reservedThreads) {
+            //     break;
+            // } else {
+            //     _numReadyThreads += 1;
+            // }
         }
 
         LOG(3) << "Exiting worker thread in " << _name << " service executor";
@@ -271,7 +273,7 @@ Status ServiceExecutorReserved::schedule(Task task,
                                          ScheduleFlags flags,
                                          ServiceExecutorTaskName taskName,
                                          uint16_t thd_group_id) {
-    MONGO_LOG(0) << "schedule with group id";
+    MONGO_LOG(0) << "schedule with group id: " << thd_group_id;
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
@@ -318,9 +320,9 @@ std::function<void()> ServiceExecutorReserved::CoroutineResumeFunctor(uint16_t t
 void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads
-         << static_cast<int>(_numReadyThreads) << kStartingThreads
-         << static_cast<int>(_numStartingThreads);
+         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads;
+    //  << static_cast<int>(_numReadyThreads) << kStartingThreads
+    //  << static_cast<int>(_numStartingThreads);
 }
 
 }  // namespace transport
