@@ -301,6 +301,14 @@ public:
         return _fromNs;
     }
 
+    const boost::intrusive_ptr<DocumentSourceUnwind>& getUnwindSource() const {
+        return _unwindSrc;
+    }
+
+    const boost::optional<BSONObj>& getAdditionalFilter() const {
+        return _additionalFilter;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
