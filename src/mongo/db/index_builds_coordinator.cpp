@@ -568,7 +568,7 @@ Status IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(Operati
     }
 
     // Must hold the global lock to ensure safe access to storageGlobalParams.dbpath.
-    dassert(opCtx->lockState()->isLocked());
+    Lock::GlobalLock globalLock{opCtx, MODE_IS};
     const auto availableBytes = getAvailableDiskSpaceBytesInDbPath(storageGlobalParams.dbpath);
     const int64_t requiredBytes = gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
     if (availableBytes <= requiredBytes) {
