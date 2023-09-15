@@ -4292,9 +4292,16 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       <<: *jstestfuzz_config_vars
-      num_files: 5
+      # We have seen some common scenarios where the generated pipelines take a while to run and can
+      # hit some timeouts. We'll split 20000 pipelines across 20 files, compared to 20000 pipelines
+      # across 5 files in the other generational agg fuzzers. This approach can be considered if we
+      # see similar timeouts elsewhere. It is not well understood whether/how we could pass
+      # 'numPipelines' as an argument in the yaml here, but it works as part of the
+      # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
+      # integration, please update this comment and/or move numPipelines to a yaml arg here.
+      num_files: 20
       num_tasks: 5
-      jstestfuzz_vars: --diffTestingMode timeseries
+      jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000
       npm_command: agg-fuzzer
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
