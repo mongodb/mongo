@@ -55,11 +55,26 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
     if (!gMultitenancySupport)
         return dbName.toString();
 
-    if (context.getSource() == SerializationContext::Source::Command)
-        return serializeForCommands(dbName, context);
+    switch (context.getSource()) {
+        case SerializationContext::Source::AuthPrevalidated:
+            return serializeForAuthPrevalidated(dbName, context);
+        case SerializationContext::Source::Command:
+            return serializeForCommands(dbName, context);
+        case SerializationContext::Source::Storage:
+        case SerializationContext::Source::Catalog:
+        case SerializationContext::Source::Default:
+            // Use forStorage as the default serializing rule
+            return serializeForStorage(dbName, context);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
-    // if we're not serializing a Command Reply, use the default serializing rules
-    return serializeForStorage(dbName, context);
+std::string DatabaseNameUtil::serializeForAuthPrevalidated(const DatabaseName& dbName,
+                                                           const SerializationContext& context) {
+    // We want everything in the DatabaseName (tenantId, db) to be present in the serialized output
+    // to prevent loss of information in the prevalidated context.
+    return dbName.toStringWithTenantId();
 }
 
 std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName,
@@ -129,21 +144,44 @@ DatabaseName DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(S
 DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
                                            StringData db,
                                            const SerializationContext& context) {
-    if (db.empty()) {
-        return DatabaseName(tenantId, "");
-    }
-
     if (!gMultitenancySupport) {
         uassert(7005302, "TenantId must not be set, but it is: ", tenantId == boost::none);
         return DatabaseName(boost::none, db);
     }
 
-    if (context.getSource() == SerializationContext::Source::Command &&
-        context.getCallerType() == SerializationContext::CallerType::Request)
-        return deserializeForCommands(std::move(tenantId), db, context);
+    if (db.empty()) {
+        return DatabaseName(tenantId, "");
+    }
 
-    // if we're not deserializing a Command Request, use the default deserializing rules
-    return deserializeForStorage(std::move(tenantId), db, context);
+    switch (context.getSource()) {
+        case SerializationContext::Source::AuthPrevalidated:
+            return deserializeForAuthPrevalidated(std::move(tenantId), db, context);
+        case SerializationContext::Source::Command:
+            if (context.getCallerType() == SerializationContext::CallerType::Request) {
+                return deserializeForCommands(std::move(tenantId), db, context);
+            }
+            [[fallthrough]];
+        case SerializationContext::Source::Storage:
+        case SerializationContext::Source::Catalog:
+        case SerializationContext::Source::Default:
+            // Use forStorage as the default deserializing rule
+            return deserializeForStorage(std::move(tenantId), db, context);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+DatabaseName DatabaseNameUtil::deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,
+                                                              StringData db,
+                                                              const SerializationContext& context) {
+    if (context.shouldExpectTenantPrefixForAuth()) {
+        // If there is a tenantId, expect that it's included in the DB string, and that the tenantId
+        // field passed will be empty.
+        uassert(7489600, "TenantId must not be set, but it is", tenantId == boost::none);
+        return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(db);
+    }
+    // Assumes that we are passing in validated and correct values for fields, and skip all checks.
+    return DatabaseName(std::move(tenantId), db);
 }
 
 DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> tenantId,

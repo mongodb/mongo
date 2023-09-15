@@ -258,29 +258,6 @@ public:
     }
 
     /**
-     * These functions construct a NamespaceString without checking for presence of TenantId. These
-     * must only be used by auth systems which are not yet tenant aware.
-     *
-     * TODO SERVER-74896 Remove these functions. Any remaining call sites must be changed to use a
-     * function on NamespaceStringUtil.
-     */
-    static NamespaceString createNamespaceStringForAuth(const boost::optional<TenantId>& tenantId,
-                                                        StringData db,
-                                                        StringData coll) {
-        return NamespaceString(tenantId, db, coll);
-    }
-
-    static NamespaceString createNamespaceStringForAuth(const boost::optional<TenantId>& tenantId,
-                                                        StringData ns) {
-        return NamespaceString(tenantId, ns);
-    }
-
-    static NamespaceString createNamespaceStringForAuth(const DatabaseName& dbName,
-                                                        StringData coll) {
-        return NamespaceString(dbName, coll);
-    }
-
-    /**
      * Constructs the namespace '<dbName>.$cmd.aggregate', which we use as the namespace for
      * aggregation commands with the format {aggregate: 1}.
      */

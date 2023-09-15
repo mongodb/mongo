@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -42,6 +43,8 @@
 #include "mongo/util/serialization_context.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 class NamespaceStringUtil {
 public:
@@ -84,17 +87,6 @@ public:
      * MUST only be used for serializing a NamespaceString object for catalog.
      */
     static std::string serializeForCatalog(const NamespaceString& ns);
-
-    /**
-     * This function serialize a NamespaceString without checking for presence of TenantId. This
-     * must only be used by auth systems which are not yet tenant aware.
-     *
-     * TODO SERVER-74896 Remove this function. Any remaining call sites must be changed to use the
-     * proper NamespaceStringUtil serialize method..
-     */
-    static std::string serializeForAuth(
-        const NamespaceString& ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
 
     /**
      * Deserializes StringData ns to a NamespaceString object.
@@ -157,23 +149,26 @@ public:
     static NamespaceString deserializeForErrorMsg(StringData nsInErrMsg);
 
 private:
-    static std::string serializeForStorage(
-        const NamespaceString& ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForStorage(const NamespaceString& ns,
+                                           const SerializationContext& context);
 
-    static std::string serializeForCommands(
-        const NamespaceString& ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForCommands(const NamespaceString& ns,
+                                            const SerializationContext& context);
 
-    static NamespaceString deserializeForStorage(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForAuthPrevalidated(const NamespaceString& ns,
+                                                    const SerializationContext& context);
 
-    static NamespaceString deserializeForCommands(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static NamespaceString deserializeForStorage(boost::optional<TenantId> tenantId,
+                                                 StringData ns,
+                                                 const SerializationContext& context);
+
+    static NamespaceString deserializeForCommands(boost::optional<TenantId> tenantId,
+                                                  StringData ns,
+                                                  const SerializationContext& context);
+
+    static NamespaceString deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,
+                                                          StringData ns,
+                                                          const SerializationContext& context);
 };
 
 }  // namespace mongo

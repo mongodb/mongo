@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+ResourcePattern::ResourcePattern(MatchTypeEnum type, const boost::optional<TenantId>& tenantId)
+    : ResourcePattern(type, NamespaceStringUtil::deserialize(tenantId, "")) {}
+
 std::string ResourcePattern::serialize(const SerializationContext& context) const {
     switch (_matchType) {
         case MatchTypeEnum::kMatchNever:
@@ -44,7 +47,7 @@ std::string ResourcePattern::serialize(const SerializationContext& context) cons
         case MatchTypeEnum::kMatchCollectionName:
             return "<collection " + _ns.coll().toString() + " in any database>";
         case MatchTypeEnum::kMatchExactNamespace:
-            return "<" + NamespaceStringUtil::serializeForAuth(_ns) + ">";
+            return "<" + NamespaceStringUtil::serialize(_ns, context) + ">";
         case MatchTypeEnum::kMatchAnyNormalResource:
             return "<all normal resources>";
         case MatchTypeEnum::kMatchAnyResource:

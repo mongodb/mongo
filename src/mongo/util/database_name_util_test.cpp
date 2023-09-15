@@ -456,4 +456,51 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
     }
 }
 
+TEST(DatabaseNameUtilTest, AuthPrevalidatedContext) {
+    const TenantId tid = TenantId(OID::gen());
+    auto ctxt = SerializationContext::stateAuthPrevalidated();
+    std::vector<std::pair<boost::optional<TenantId>, std::string>> casesToTest = {
+        {boost::none, ""},
+        {tid, ""},
+        {boost::none, "foo"},
+        {tid, "foo"},
+    };
+    for (bool multitenancy : {false, true}) {
+        for (bool ff : {false, true}) {
+            if (ff && !multitenancy)  // Feature flag on with multitenancy off is not handled
+                continue;
+            RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                        multitenancy);
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       ff);
+            for (auto [tenantId, dbName] : casesToTest) {
+                auto expectedNss = DatabaseName::createDatabaseName_forTest(tenantId, dbName);
+                std::string fullDbStr;
+                if (!tenantId) {
+                    fullDbStr = dbName;
+                } else {
+                    fullDbStr = str::stream() << tenantId->toString() << "_" << dbName;
+                }
+                if (tenantId && !multitenancy) {
+                    // Clang is stupid, so to use ASSERT_THROWS_CODE (which internally creates a
+                    // lambda function), we need to rebind the two structured bindings tenantId and
+                    // nsStr to real variables.
+                    auto t = tenantId;
+                    auto d = dbName;
+                    // Expect deserialization to fail when we have a tenant ID and multitenancy
+                    // support is disabled
+                    ASSERT_THROWS_CODE(
+                        DatabaseNameUtil::deserialize(t, d, ctxt), AssertionException, 7005302);
+                    // Expect serialization to drop the tenant ID when multitenancy support is
+                    // disabled
+                    ASSERT_EQ(DatabaseNameUtil::serialize(expectedNss, ctxt), dbName);
+                } else {
+                    ASSERT_EQ(DatabaseNameUtil::deserialize(tenantId, dbName, ctxt), expectedNss);
+                    ASSERT_EQ(DatabaseNameUtil::serialize(expectedNss, ctxt), fullDbStr);
+                }
+            }
+        }
+    }
+}
+
 }  // namespace mongo

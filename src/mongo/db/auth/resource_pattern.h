@@ -89,7 +89,7 @@ public:
      */
     static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
         return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,
-                               NamespaceString::createNamespaceStringForAuth(dbName, ""_sd));
+                               NamespaceStringUtil::deserialize(dbName, ""_sd));
     }
 
     /**
@@ -98,9 +98,14 @@ public:
      */
     static ResourcePattern forCollectionName(const boost::optional<TenantId>& tenantId,
                                              StringData collectionName) {
+        // While the namespace we create for here is not valid for use in commands/storage layer
+        // since it has an empty DB, it is useful to represent this ResourcePattern. We use the
+        // AuthPrevalidated serialization source to denote that we are only using this namespace
+        // internally.
         return ResourcePattern(
             MatchTypeEnum::kMatchCollectionName,
-            NamespaceString::createNamespaceStringForAuth(tenantId, ""_sd, collectionName));
+            NamespaceStringUtil::deserialize(
+                tenantId, "", collectionName, SerializationContext::stateAuthPrevalidated()));
     }
 
     /**
@@ -135,7 +140,8 @@ public:
         const boost::optional<TenantId>& tenantId, StringData collectionName) {
         return ResourcePattern(
             MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
-            NamespaceString::createNamespaceStringForAuth(boost::none, "", collectionName));
+            NamespaceStringUtil::deserialize(
+                tenantId, "", collectionName, SerializationContext::stateAuthPrevalidated()));
     }
 
     /**
@@ -295,9 +301,7 @@ public:
     }
 
 private:
-    ResourcePattern(MatchTypeEnum type, const boost::optional<TenantId>& tenantId)
-        : ResourcePattern(type,
-                          NamespaceString::createNamespaceStringForAuth(tenantId, ""_sd, ""_sd)) {}
+    ResourcePattern(MatchTypeEnum type, const boost::optional<TenantId>& tenantId);
     ResourcePattern(MatchTypeEnum type, const NamespaceString& ns) : _matchType(type), _ns(ns) {}
 
     MatchTypeEnum _matchType;

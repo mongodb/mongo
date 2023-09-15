@@ -122,23 +122,26 @@ public:
 private:
     static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 
-    static std::string serializeForStorage(
-        const DatabaseName& dbName,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForStorage(const DatabaseName& dbName,
+                                           const SerializationContext& context);
 
-    static std::string serializeForCommands(
-        const DatabaseName& dbName,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForCommands(const DatabaseName& dbName,
+                                            const SerializationContext& context);
 
-    static DatabaseName deserializeForStorage(
-        boost::optional<TenantId> tenantId,
-        StringData db,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serializeForAuthPrevalidated(const DatabaseName& dbName,
+                                                    const SerializationContext& context);
 
-    static DatabaseName deserializeForCommands(
-        boost::optional<TenantId> tenantId,
-        StringData db,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static DatabaseName deserializeForStorage(boost::optional<TenantId> tenantId,
+                                              StringData db,
+                                              const SerializationContext& context);
+
+    static DatabaseName deserializeForCommands(boost::optional<TenantId> tenantId,
+                                               StringData db,
+                                               const SerializationContext& context);
+
+    static DatabaseName deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,
+                                                       StringData db,
+                                                       const SerializationContext& context);
 };
 
 }  // namespace mongo

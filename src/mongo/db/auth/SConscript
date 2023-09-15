@@ -15,10 +15,9 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/jwt_types',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/auth/auth', '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_feature_flags', '$BUILD_DIR/mongo/db/service_context',
+        'authprivilege'
     ],
 )
 

@@ -593,6 +593,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
 }
 
 TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
     TenantId tid2 = TenantId(OID::gen());
     NamespaceString dbA = NamespaceString::createNamespaceString_forTest(tid1, "dbA.collA");

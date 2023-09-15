@@ -442,8 +442,14 @@ TEST(NamespaceStringUtilTest, ParseFailPointData) {
         {
             BSONObjBuilder bob;
             tid.serializeToBSON("$tenant", &bob);
-            auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
-            ASSERT_EQ(NamespaceString(), fpNss);
+            if (multitenancy) {
+                auto fpNss = NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd);
+                ASSERT_EQ(NamespaceString::createNamespaceString_forTest(tid, ""), fpNss);
+            } else {
+                ASSERT_THROWS_CODE(NamespaceStringUtil::parseFailPointData(bob.obj(), "nss"_sd),
+                                   AssertionException,
+                                   6972102);
+            }
         }
         // Test fail point data only has name space.
         {
@@ -457,6 +463,57 @@ TEST(NamespaceStringUtilTest, ParseFailPointData) {
         {
             auto fpNss = NamespaceStringUtil::parseFailPointData(BSONObj(), "nss"_sd);
             ASSERT_EQ(NamespaceString(), fpNss);
+        }
+    }
+}
+
+TEST(NamespaceStringUtilTest, AuthPrevalidatedContext) {
+    const TenantId tid = TenantId(OID::gen());
+    auto ctxt = SerializationContext::stateAuthPrevalidated();
+    std::vector<std::pair<boost::optional<TenantId>, std::string>> casesToTest = {
+        {boost::none, ""},
+        {tid, ""},
+        {boost::none, "foo"},
+        {tid, "foo"},
+        {boost::none, "foo.bar"},
+        {tid, "foo.bar"},
+        {boost::none, ".bar"},
+        {tid, ".bar"},
+    };
+    for (bool multitenancy : {false, true}) {
+        for (bool ff : {false, true}) {
+            if (ff && !multitenancy)  // Feature flag on with multitenancy off is not handled
+                continue;
+            RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                        multitenancy);
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       ff);
+            for (auto [tenantId, nsStr] : casesToTest) {
+                auto expectedNss = NamespaceString::createNamespaceString_forTest(tenantId, nsStr);
+                std::string fullNsStr;
+                if (!tenantId) {
+                    fullNsStr = nsStr;
+                } else {
+                    fullNsStr = str::stream() << tenantId->toString() << "_" << nsStr;
+                }
+                if (tenantId && !multitenancy) {
+                    // Clang is stupid, so to use ASSERT_THROWS_CODE (which internally creates a
+                    // lambda function), we need to rebind the two structured bindings tenantId and
+                    // nsStr to real variables.
+                    auto t = tenantId;
+                    auto n = nsStr;
+                    // Expect deserialization to fail when we have a tenant ID and multitenancy
+                    // support is disabled
+                    ASSERT_THROWS_CODE(
+                        NamespaceStringUtil::deserialize(t, n, ctxt), AssertionException, 6972102);
+                    // Expect serialization to drop the tenant ID when multitenancy support is
+                    // disabled
+                    ASSERT_EQ(NamespaceStringUtil::serialize(expectedNss, ctxt), nsStr);
+                } else {
+                    ASSERT_EQ(NamespaceStringUtil::deserialize(tenantId, nsStr, ctxt), expectedNss);
+                    ASSERT_EQ(NamespaceStringUtil::serialize(expectedNss, ctxt), fullNsStr);
+                }
+            }
         }
     }
 }

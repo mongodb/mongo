@@ -150,7 +150,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
                     ResourcePattern::forDatabaseName(DatabaseNameUtil::deserialize(tenantId, db));
             } else {
                 ret._resource = ResourcePattern::forExactNamespace(
-                    NamespaceString::createNamespaceStringForAuth(tenantId, db, coll));
+                    NamespaceStringUtil::deserialize(tenantId, db, coll));
             }
         } else if (hasSystemBuckets) {
             // { systemBuckets: '...' }
@@ -165,8 +165,7 @@ Privilege Privilege::resolvePrivilegeWithTenant(const boost::optional<TenantId>&
                 ret._resource = ResourcePattern::forAnySystemBucketsInAnyDatabase(tenantId, bucket);
             } else {
                 ret._resource = ResourcePattern::forExactSystemBucketsCollection(
-                    NamespaceString::createNamespaceStringForAuth(
-                        tenantId, rsrc.getDb().get(), bucket));
+                    NamespaceStringUtil::deserialize(tenantId, rsrc.getDb().get(), bucket));
             }
         } else {
             uasserted(ErrorCodes::BadValue,

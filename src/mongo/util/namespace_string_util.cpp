@@ -56,19 +56,35 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     if (!gMultitenancySupport)
         return ns.toString();
 
-    if (context.getSource() == SerializationContext::Source::Command &&
-        context.getCallerType() == SerializationContext::CallerType::Reply) {
-        return serializeForCommands(ns, context);
+    switch (context.getSource()) {
+        case SerializationContext::Source::AuthPrevalidated:
+            return serializeForAuthPrevalidated(ns, context);
+        case SerializationContext::Source::Command:
+            if (context.getCallerType() == SerializationContext::CallerType::Reply) {
+                return serializeForCommands(ns, context);
+            }
+            [[fallthrough]];
+        case SerializationContext::Source::Storage:
+        case SerializationContext::Source::Catalog:
+        case SerializationContext::Source::Default:
+            // Use forStorage as the default serializing rule
+            return serializeForStorage(ns, context);
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    // if we're not serializing a Command Reply, use the default serializing rules
-    return serializeForStorage(ns, context);
 }
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
                                            const SerializationOptions& options,
                                            const SerializationContext& context) {
     return options.serializeIdentifier(serialize(ns, context));
+}
+
+std::string NamespaceStringUtil::serializeForAuthPrevalidated(const NamespaceString& ns,
+                                                              const SerializationContext& context) {
+    // We want everything in the NamespaceString (tenantId, db, coll) to be present in the
+    // serialized output to prevent loss of information in the prevalidated context.
+    return ns.toStringWithTenantId();
 }
 
 std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
@@ -117,18 +133,9 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
     }
 }
 
-std::string NamespaceStringUtil::serializeForAuth(const NamespaceString& ns,
-                                                  const SerializationContext& context) {
-    return ns.toStringWithTenantId();
-}
-
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
                                                  StringData ns,
                                                  const SerializationContext& context) {
-    if (ns.empty()) {
-        return NamespaceString();
-    }
-
     if (!gMultitenancySupport) {
         massert(6972102,
                 str::stream() << "TenantId must not be set, but it is: " << tenantId->toString(),
@@ -136,12 +143,26 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         return NamespaceString(boost::none, ns);
     }
 
-    if (context.getSource() == SerializationContext::Source::Command &&
-        context.getCallerType() == SerializationContext::CallerType::Request)
-        return deserializeForCommands(std::move(tenantId), ns, context);
+    if (ns.empty()) {
+        return NamespaceString(tenantId, ns);
+    }
 
-    // if we're not deserializing a Command Request, use the default deserializing rules
-    return deserializeForStorage(std::move(tenantId), ns, context);
+    switch (context.getSource()) {
+        case SerializationContext::Source::AuthPrevalidated:
+            return deserializeForAuthPrevalidated(std::move(tenantId), ns, context);
+        case SerializationContext::Source::Command:
+            if (context.getCallerType() == SerializationContext::CallerType::Request) {
+                return deserializeForCommands(std::move(tenantId), ns, context);
+            }
+            [[fallthrough]];
+        case SerializationContext::Source::Storage:
+        case SerializationContext::Source::Catalog:
+        case SerializationContext::Source::Default:
+            // Use forStorage as the default deserializing rule
+            return deserializeForStorage(std::move(tenantId), ns, context);
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, StringData coll) {
@@ -150,6 +171,19 @@ NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, Str
     // NamespaceString object, because We allow only specific global internal collections to be
     // created without a tenantId.
     return NamespaceString{dbName, coll};
+}
+
+NamespaceString NamespaceStringUtil::deserializeForAuthPrevalidated(
+    boost::optional<TenantId> tenantId, StringData ns, const SerializationContext& context) {
+    if (context.shouldExpectTenantPrefixForAuth()) {
+        // If there is a tenantId, expect that it's included in the ns string, and that the tenantId
+        // field passed will be empty.
+        uassert(7489601, "TenantId must not be set, but it is", tenantId == boost::none);
+        return parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    }
+    // In the prevalidated context, we are passing in validated and correct values, so skip
+    // checks.
+    return NamespaceString(std::move(tenantId), ns);
 }
 
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
@@ -185,8 +219,8 @@ NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<Tenan
 NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<TenantId> tenantId,
                                                             StringData ns,
                                                             const SerializationContext& context) {
-    // we only get here if we are processing a Command Request.  We disregard the feature flag in
-    // this case, essentially letting the request dictate the state of the feature.
+    // we only get here if we are processing a Command Request.  We disregard the feature flag
+    // in this case, essentially letting the request dictate the state of the feature.
 
     // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none && context.receivedNonPrefixedTenantId()) {
@@ -202,12 +236,12 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
                                       << tenantId->toString()
                                       << "' with expectPrefix field set but without a prefix set",
                         nss.tenantId());
-                massert(
-                    8423381,
-                    str::stream()
-                        << "TenantId from $tenant or security token must match prefixed tenantId: "
-                        << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
-                    tenantId.value() == nss.tenantId());
+                massert(8423381,
+                        str::stream()
+                            << "TenantId from $tenant or security token must match prefixed "
+                               "tenantId: "
+                            << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
+                        tenantId.value() == nss.tenantId());
                 return nss;
             }
             default:
@@ -256,9 +290,9 @@ NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancy
 
     auto swOID = OID::parse(ns.substr(0, tenantDelim));
     if (!swOID.getStatus().isOK()) {
-        // If we fail to parse an OID, either the size of the substring is incorrect, or there is an
-        // invalid character. This indicates that the db has the "_" character, but it does not act
-        // as a delimeter for a tenantId prefix.
+        // If we fail to parse an OID, either the size of the substring is incorrect, or there
+        // is an invalid character. This indicates that the db has the "_" character, but it
+        // does not act as a delimeter for a tenantId prefix.
         return NamespaceString(boost::none, ns);
     }
 
