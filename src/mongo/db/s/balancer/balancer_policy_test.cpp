@@ -760,6 +760,46 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
     ASSERT_EQ(MigrateInfo::zoneViolation, migrations[0].reason);
 }
 
+TEST(BalancerPolicy, ChunksInNoZoneSpanOnAllShardsWithEmptyZones) {
+    // Balanacer is able to move chunks in the noZone to shards with tags
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 0}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 100), kSKeyPattern.globalMax(), "a")));
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false, false));
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId1, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+    ASSERT_EQ(MigrateInfo::chunksImbalance, migrations[0].reason);
+}
+
+TEST(BalancerPolicy, BalancingNoZoneIgnoreTotalShardSize) {
+    // Shard1 is overloaded and contains:
+    // [min, 1) [1, 2) [2, 3] -> zone("a")
+    // [3, 4) [4, 5) [5, 6)   -> NoZone
+    //
+    // But it won't donate any chunk since the
+    auto [cluster, cm] = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 3},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, {"a"}, emptyShardVersion), 6},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 3}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(kSKeyPattern.globalMin(), BSON("x" << 6), "a")));
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto migrations(balanceChunks(cluster.first, distribution, false, false));
+    ASSERT_EQ(0U, migrations.size());
+}
+
+
 TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
     auto [cluster, cm] = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2},
