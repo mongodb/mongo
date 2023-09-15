@@ -159,7 +159,7 @@ __wt_background_compact_start(WT_SESSION_IMPL *session)
 
     bm = S2BT(session)->bm;
     id = S2BT(session)->id;
-    uri = bm->block->name;
+    uri = session->dhandle->name;
 
     compact_stat = __background_compact_get_stat(session, uri, id);
 
@@ -200,7 +200,7 @@ __wt_background_compact_end(WT_SESSION_IMPL *session)
 
     bm = S2BT(session)->bm;
     id = S2BT(session)->id;
-    uri = bm->block->name;
+    uri = session->dhandle->name;
 
     compact_stat = __background_compact_get_stat(session, uri, id);
 
