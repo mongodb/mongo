@@ -639,15 +639,27 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
     tagsPlusEmpty.push_back(ZoneInfo::kNoZoneName);
 
     for (const auto& tag : tagsPlusEmpty) {
-        const size_t totalNumberOfChunksWithTag = distribution.totalChunksWithTag(tag);
 
-        size_t totalNumberOfShardsWithTag = 0;
-
-        for (const auto& stat : shardStats) {
-            if (tag == ZoneInfo::kNoZoneName || stat.shardTags.count(tag)) {
-                totalNumberOfShardsWithTag++;
+        const auto totalNumberOfChunksWithTag = [&] {
+            if (tag == ZoneInfo::kNoZoneName) {
+                return static_cast<size_t>(distribution.getChunkManager()->numChunks());
             }
-        }
+            return distribution.totalChunksWithTag(tag);
+        }();
+
+        const auto totalNumberOfShardsWithTag = [&] {
+            if (tag == ZoneInfo::kNoZoneName) {
+                return shardStats.size();
+            }
+
+            size_t numShardsWithTag{0};
+            for (const auto& stat : shardStats) {
+                if (stat.shardTags.count(tag)) {
+                    numShardsWithTag++;
+                }
+            }
+            return numShardsWithTag;
+        }();
 
         // Skip zones which have no shards assigned to them. This situation is not harmful, but
         // should not be possible so warn the operator to correct it.
