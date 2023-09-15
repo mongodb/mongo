@@ -141,6 +141,8 @@ public:
         LOGV2(6109511, "started session");
     }
 
+    void endSessionByClient(Client*) override {}
+
     void appendStats(BSONObjBuilder*) const override {}
 
     void endAllSessions(Client::TagMask tags) override {

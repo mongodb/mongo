@@ -204,9 +204,24 @@ public:
 };
 
 SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx)
+    : SessionManagerCommon(svcCtx, std::vector<std::unique_ptr<ClientTransportObserver>>()) {}
+
+// Helper for single observer constructor.
+// std::initializer_list uses copy semantics, so we can't just call the vector version with:
+// `{std::make_unique<MyObserver>()}`.
+// Instead, construct with an empty array then push our singular one in.
+SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx,
+                                           std::unique_ptr<ClientTransportObserver> observer)
+    : SessionManagerCommon(svcCtx) {
+    _observers.push_back(std::move(observer));
+}
+
+SessionManagerCommon::SessionManagerCommon(
+    ServiceContext* svcCtx, std::vector<std::unique_ptr<ClientTransportObserver>> observers)
     : _svcCtx(svcCtx),
       _maxOpenSessions(getSupportedMax()),
-      _sessions(std::make_unique<Sessions>()) {}
+      _sessions(std::make_unique<Sessions>()),
+      _observers(std::move(observers)) {}
 
 SessionManagerCommon::~SessionManagerCommon() = default;
 
@@ -258,7 +273,10 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         }
     }
 
-    onClientConnect(client);
+    for (auto&& observer : _observers) {
+        observer->onClientConnect(client);
+    }
+
     // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
     // instance of `ServiceEntryPoint`.
     workflow->start();
@@ -375,13 +393,21 @@ void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
         BSONObjBuilder section(bob->subobjStart("adminConnections"));
         adminExec->appendStats(&section);
     }
+
+    for (auto&& observer : _observers) {
+        observer->appendTransportServerStats(bob);
+    }
 }
 
 std::size_t SessionManagerCommon::numOpenSessions() const {
     return _sessions->size();
 }
 
-void SessionManagerCommon::onClientDisconnect(Client* client) {
+void SessionManagerCommon::endSessionByClient(Client* client) {
+    for (auto&& observer : _observers) {
+        observer->onClientDisconnect(client);
+    }
+
     {
         stdx::lock_guard lk(*client);
         ServiceExecutorContext::reset(client);

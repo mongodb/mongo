@@ -29,27 +29,36 @@
 
 #pragma once
 
-#include "mongo/base/counter.h"
-#include "mongo/transport/session_manager_common.h"
+#include <memory>
 
 namespace mongo {
+class BSONObjBuilder;
+class Client;
+
+namespace transport {
 
 /**
- * The SessionManager accepts new Sessions from the TransportLayer,
- * The mongos version of this class additionally tracks and reports
- * the number of active load balanced connections.
+ * ClientTransportObservers are notified during key events in a Client's lifecycle.
  */
-class SessionManagerMongos final : public transport::SessionManagerCommon {
+class ClientTransportObserver {
 public:
-    using SessionManagerCommon::SessionManagerCommon;
+    virtual ~ClientTransportObserver() = default;
 
-    void appendStats(BSONObjBuilder* bob) const final;
+    /**
+     * Called on a new client connection.
+     */
+    virtual void onClientConnect(Client* client) {}
 
-    void onClientConnect(Client* client) final;
-    void onClientDisconnect(Client* client) final;
+    /**
+     * Permits an observer to append additional ServerStatus information.
+     */
+    virtual void appendTransportServerStats(BSONObjBuilder* bob) {}
 
-private:
-    Counter64 _loadBalancedConnections;
+    /**
+     * Called on destruction of a client.
+     */
+    virtual void onClientDisconnect(Client* client) {}
 };
 
+}  // namespace transport
 }  // namespace mongo

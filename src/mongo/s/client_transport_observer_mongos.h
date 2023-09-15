@@ -29,27 +29,22 @@
 
 #pragma once
 
-#include "mongo/transport/session_manager.h"
+#include "mongo/base/counter.h"
+#include "mongo/transport/client_transport_observer.h"
 
 namespace mongo {
 
-class SessionManagerEmbedded final : public transport::SessionManager {
+/**
+ * Tracks and reports the number of active load balanced connections.
+ */
+class ClientTransportObserverMongos final : public transport::ClientTransportObserver {
 public:
-    SessionManagerEmbedded() = default;
+    void appendTransportServerStats(BSONObjBuilder* bob) final;
+    void onClientConnect(Client* client) final;
+    void onClientDisconnect(Client* client) final;
 
-    void startSession(std::shared_ptr<transport::Session> session) override {}
-    void endAllSessions(Client::TagMask tags) override {}
-    void endSessionByClient(Client* client) override {}
-    Status start() override {
-        return Status::OK();
-    }
-    bool shutdown(Milliseconds timeout) override {
-        return true;
-    }
-    void appendStats(BSONObjBuilder* bob) const override {}
-    std::size_t numOpenSessions() const override {
-        return 0;
-    }
+private:
+    Counter64 _loadBalancedConnections;
 };
 
 }  // namespace mongo

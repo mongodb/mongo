@@ -65,6 +65,11 @@ public:
     virtual void startSession(std::shared_ptr<Session> session) = 0;
 
     /**
+     * Terminate a session by Client pointer.
+     */
+    virtual void endSessionByClient(Client* client) = 0;
+
+    /**
      * End all sessions associated with this SessionManager that do not match the mask in tags.
      */
     virtual void endAllSessions(Client::TagMask tags) = 0;
@@ -95,25 +100,6 @@ public:
     virtual std::size_t maxOpenSessions() const {
         return std::numeric_limits<std::size_t>::max();
     }
-
-    /**
-     * Optional handler which is invoked after a session ends.
-     *
-     * This function implies that the Session itself will soon be destructed.
-     */
-    virtual void onEndSession(const std::shared_ptr<Session>&) {}
-
-    /**
-     * Optional handler which is invoked after a client connects.
-     */
-    virtual void onClientConnect(Client* client) {}
-
-    /**
-     * Optional handler which is invoked after a client disconnect. A client disconnect occurs when
-     * the connection between the mongo process and client is closed for any reason, and is defined
-     * by the destruction and cleanup of the SessionWorkflow that manages the client.
-     */
-    virtual void onClientDisconnect(Client* client) {}
 };
 }  // namespace transport
 }  // namespace mongo

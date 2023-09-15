@@ -36,6 +36,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/transport/client_transport_observer.h"
 #include "mongo/util/net/cidr.h"
 
 namespace mongo {
@@ -48,11 +49,15 @@ namespace transport {
  */
 class SessionManagerCommon : public SessionManager {
 public:
-    explicit SessionManagerCommon(ServiceContext* svcCtx);
+    explicit SessionManagerCommon(ServiceContext*);
+    SessionManagerCommon(ServiceContext*, std::unique_ptr<ClientTransportObserver> observer);
+    SessionManagerCommon(ServiceContext* svcCtx,
+                         std::vector<std::unique_ptr<ClientTransportObserver>> observers);
     ~SessionManagerCommon() override;
 
     void startSession(std::shared_ptr<Session> session) override;
     void endAllSessions(Client::TagMask tags) override;
+    void endSessionByClient(Client* client) override;
     void endAllSessionsNoTagMask();
 
     Status start() override;
@@ -65,8 +70,6 @@ public:
     std::size_t maxOpenSessions() const override {
         return _maxOpenSessions;
     }
-
-    void onClientDisconnect(Client* client) override;
 
 protected:
     /** Imbue the new Client with a ServiceExecutorContext. */
@@ -82,6 +85,9 @@ protected:
 
     class Sessions;
     std::unique_ptr<Sessions> _sessions;
+
+    // External observer which may receive client connect/disconnect events.
+    std::vector<std::unique_ptr<ClientTransportObserver>> _observers;
 };
 
 /**

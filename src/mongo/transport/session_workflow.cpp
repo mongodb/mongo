@@ -393,10 +393,6 @@ public:
           _sessionManager{_serviceContext->getSessionManager()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
 
-    ~Impl() {
-        _sessionManager->onEndSession(session());
-    }
-
     Client* client() const {
         return _clientStrand->getClientPointer();
     }
@@ -877,7 +873,7 @@ void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     }
     _cleanupExhaustResources();
     _taskRunner = {};
-    _sessionManager->onClientDisconnect(client());
+    _sessionManager->endSessionByClient(client());
 }
 
 SessionWorkflow::SessionWorkflow(PassKeyTag, ServiceContext::UniqueClient client)

@@ -62,6 +62,7 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow_test_util.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
@@ -239,8 +240,8 @@ public:
         return std::make_shared<Session>(this);
     }
 
-    MockSessionManager* sessionManager() {
-        return checked_cast<MockSessionManager*>(_sc->getSessionManager());
+    SessionManagerCommon* sessionManager() {
+        return checked_cast<SessionManagerCommon*>(_sc->getSessionManager());
     }
 
 private:
@@ -282,7 +283,7 @@ public:
         auto sc = getGlobalServiceContext();
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
         sc->setServiceEntryPoint(std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
-        sc->setSessionManager(std::make_unique<MockSessionManager>(sc));
+        sc->setSessionManager(std::make_unique<SessionManagerCommon>(sc));
         sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
         LOGV2_DEBUG(7015136, 3, "About to start sep");
         invariant(_coordinator->sessionManager()->start());

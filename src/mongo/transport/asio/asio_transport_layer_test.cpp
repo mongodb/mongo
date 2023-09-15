@@ -967,6 +967,8 @@ public:
             _join();
         }
 
+        void endSessionByClient(Client*) override {}
+
         bool shutdown(Milliseconds) override {
             _join();
             return true;

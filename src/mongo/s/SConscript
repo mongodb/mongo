@@ -425,8 +425,8 @@ env.Library(
 env.Library(
     target='startup_initialization',
     source=[
+        'client_transport_observer_mongos.cpp',
         'service_entry_point_mongos.cpp',
-        'session_manager_mongos.cpp',
         'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS_PRIVATE=[

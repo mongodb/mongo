@@ -115,6 +115,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
+#include "mongo/s/client_transport_observer_mongos.h"
 #include "mongo/s/commands/kill_sessions_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
@@ -128,7 +129,6 @@
 #include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/session_catalog_router.h"
-#include "mongo/s/session_manager_mongos.h"
 #include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_uptime_reporter.h"
@@ -138,6 +138,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
@@ -773,7 +774,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
-    serviceContext->setSessionManager(std::make_unique<SessionManagerMongos>(serviceContext));
+    serviceContext->setSessionManager(std::make_unique<transport::SessionManagerCommon>(
+        serviceContext, std::make_unique<ClientTransportObserverMongos>()));
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
     const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();

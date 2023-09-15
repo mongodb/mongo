@@ -119,35 +119,5 @@ public:
     std::function<Future<DbResponse>(OperationContext*, const Message&)> handleRequestCb;
 };
 
-class MockSessionManager : public SessionManagerCommon {
-public:
-    using SessionManagerCommon::SessionManagerCommon;
-
-    void onEndSession(const std::shared_ptr<Session>& session) override {
-        if (onEndSessionCb) {
-            onEndSessionCb(session);
-        }
-    }
-
-    void onClientDisconnect(Client* client) override {
-        if (derivedOnClientDisconnectCb) {
-            derivedOnClientDisconnectCb(client);
-        }
-        SessionManagerCommon::onClientDisconnect(client);
-    }
-
-    void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override {
-        if (configureServiceExecutorContextCb) {
-            configureServiceExecutorContextCb(client, isPrivilegedSession);
-        } else {
-            SessionManagerCommon::configureServiceExecutorContext(client, isPrivilegedSession);
-        }
-    }
-
-    std::function<void(const std::shared_ptr<Session>)> onEndSessionCb;
-    std::function<void(Client*)> derivedOnClientDisconnectCb;
-    std::function<void(Client*, bool)> configureServiceExecutorContextCb;
-};
-
 }  // namespace transport
 }  // namespace mongo
