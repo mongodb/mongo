@@ -124,18 +124,21 @@ namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {}
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
-    // in-memory version is unset.
-    WireSpec::Specification spec;
-    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.isInternalClient = true;
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
+        // in-memory version is unset.
+        WireSpec::Specification spec;
+        spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+        spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+        spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
+        spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+        spec.isInternalClient = true;
 
-    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
-}
+        WireSpec::getWireSpec(service).initialize(std::move(spec));
+    }};
+}  // namespace
 
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
@@ -255,7 +258,6 @@ ServiceContext* initialize(const char* yaml_config) {
 
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());
-    initializeWireSpec(serviceContext);
     serviceContext->setSessionManager(std::make_unique<SessionManagerEmbedded>());
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();

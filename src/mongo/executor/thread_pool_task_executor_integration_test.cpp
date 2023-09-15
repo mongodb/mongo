@@ -70,7 +70,7 @@ namespace mongo {
 namespace executor {
 namespace {
 
-class TaskExecutorFixture : public ServiceContextTest {
+class TaskExecutorFixture : public mongo::unittest::Test {
 public:
     TaskExecutorFixture() = default;
 
@@ -101,7 +101,6 @@ public:
         return false;
     }
 
-    ServiceContext::UniqueServiceContext _serviceCtx{ServiceContext::make()};
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
 };
 
@@ -154,7 +153,7 @@ private:
 };
 
 TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
-    auto client = _serviceCtx->makeClient("TaskExecutorExhaustTest");
+    auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
@@ -197,7 +196,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
 }
 
 TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
-    auto client = _serviceCtx->makeClient("TaskExecutorExhaustTest");
+    auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
@@ -232,7 +231,7 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
 TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
     // Turn on the failCommand failpoint for 'isMaster' on the server that we will schedule
     // 'isMaster' on below
-    auto failCmdClient = _serviceCtx->makeClient("TaskExecutorExhaustTest");
+    auto failCmdClient = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = failCmdClient->makeOperationContext();
 
     auto configureFailpointCmd = BSON("configureFailPoint"
@@ -281,7 +280,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
     });
 
     {
-        auto client = _serviceCtx->makeClient("TaskExecutorExhaustTest");
+        auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
         auto opCtx = client->makeOperationContext();
 
         RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),

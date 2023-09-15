@@ -74,7 +74,7 @@ namespace mongo {
 namespace executor {
 namespace {
 
-class TaskExecutorCursorFixture : public ServiceContextTest {
+class TaskExecutorCursorFixture : public mongo::unittest::Test {
 public:
     TaskExecutorCursorFixture() = default;
 
@@ -121,10 +121,10 @@ public:
     }
 
 private:
-    ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<NetworkInterface> _ni;
-    ServiceContext::UniqueClient _client = _serviceCtx->makeClient("TaskExecutorCursorTest");
+    ServiceContext::UniqueClient _client =
+        getGlobalServiceContext()->makeClient("TaskExecutorCursorTest");
 };
 
 size_t createTestData(std::string ns, size_t numDocs) {

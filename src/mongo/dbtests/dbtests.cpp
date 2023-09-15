@@ -91,23 +91,26 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    WireSpec::Specification spec;
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        WireSpec::Specification spec;
 
-    // Accept from any version external client.
-    spec.incomingExternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingExternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+        // Accept from any version external client.
+        spec.incomingExternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+        spec.incomingExternalClient.maxWireVersion = LATEST_WIRE_VERSION;
 
-    // Accept from internal clients of the same version, as in upgrade
-    // featureCompatibilityVersion.
-    spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+        // Accept from internal clients of the same version, as in upgrade
+        // featureCompatibilityVersion.
+        spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+        spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
 
-    // Connect to servers of the same version, as in upgrade featureCompatibilityVersion.
-    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+        // Connect to servers of the same version, as in upgrade featureCompatibilityVersion.
+        spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+        spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
-    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
+        WireSpec::getWireSpec(service).initialize(std::move(spec));
+    }};
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
@@ -231,7 +234,6 @@ int dbtestsMain(int argc, char** argv) {
     setGlobalServiceContext(ServiceContext::make());
 
     const auto service = getGlobalServiceContext();
-    mongo::dbtests::initializeWireSpec(service);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
     service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 

@@ -615,15 +615,16 @@ Status initializeSharding(
     return Status::OK();
 }
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    // Since the upgrade order calls for upgrading mongos last, it only needs to talk the latest
-    // wire version. This ensures that users will get errors if they upgrade in the wrong order.
-    WireSpec::Specification spec;
-    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.isInternalClient = true;
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        WireSpec::Specification spec;
+        spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+        spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+        spec.isInternalClient = true;
 
-    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
+        WireSpec::getWireSpec(service).initialize(std::move(spec));
+    }};
 }
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
@@ -932,7 +933,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     const auto service = getGlobalServiceContext();
-    initializeWireSpec(service);
 
     if (audit::setAuditInterface) {
         audit::setAuditInterface(service);

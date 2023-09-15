@@ -130,9 +130,7 @@ BSONObj AsyncDBClient::_buildHelloRequest(const std::string& appName,
 
     _compressorManager.clientBegin(&bob);
 
-    if (auto wireSpec = WireSpec::getWireSpec(_svcCtx).get(); wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(_svcCtx).appendInternalClientWireVersionIfNeeded(&bob);
 
     if (hook) {
         return hook->augmentHelloRequest(remote(), bob.obj());

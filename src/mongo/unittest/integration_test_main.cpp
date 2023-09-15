@@ -80,9 +80,12 @@ ConnectionString getFixtureConnectionString() {
 }  // namespace unittest
 }  // namespace mongo
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    WireSpec::getWireSpec(serviceContext).initialize(WireSpec::Specification{});
-}
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        WireSpec::getWireSpec(service).initialize(WireSpec::Specification{});
+    }};
+}  // namespace
 
 int main(int argc, char** argv) {
     setupSynchronousSignalHandlers();
@@ -90,7 +93,6 @@ int main(int argc, char** argv) {
     runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setTestCommandsEnabled(true);
     auto serviceContextHolder = ServiceContext::make();
-    initializeWireSpec(serviceContextHolder.get());
     setGlobalServiceContext(std::move(serviceContextHolder));
     quickExit(unittest::Suite::run(std::vector<std::string>(), "", "", 1));
 }

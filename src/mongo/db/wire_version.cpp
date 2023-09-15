@@ -59,10 +59,18 @@ WireSpec& WireSpec::getWireSpec(ServiceContext* sc) {
     return (*sc)[wireSpecDecoration];
 }
 
-void WireSpec::appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
-                                               BSONObjBuilder* builder) {
-    BSONObjBuilder subBuilder(builder->subobjStart("internalClient"));
-    WireVersionInfo::appendToBSON(wireVersionInfo, &subBuilder);
+void WireSpec::appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder) {
+    fassert(ErrorCodes::NotYetInitialized, isInitialized());
+
+    auto isInternalClient = [&]() -> bool {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _spec->isInternalClient;
+    }();
+
+    if (isInternalClient) {
+        BSONObjBuilder subBuilder(builder->subobjStart("internalClient"));
+        WireVersionInfo::appendToBSON(_spec->outgoing, &subBuilder);
+    }
 }
 
 BSONObj specToBSON(const WireSpec::Specification& spec) {
@@ -81,6 +89,7 @@ void WireSpec::initialize(Specification spec) {
 void WireSpec::reset(Specification spec) {
     BSONObj oldSpec, newSpec;
     {
+        stdx::lock_guard<Latch> lk(_mutex);
         iassert(ErrorCodes::NotYetInitialized, "WireSpec is not yet initialized", isInitialized());
 
         oldSpec = specToBSON(*_spec.get());
@@ -92,7 +101,8 @@ void WireSpec::reset(Specification spec) {
         4915702, "Updated wire specification", "oldSpec"_attr = oldSpec, "newSpec"_attr = newSpec);
 }
 
-std::shared_ptr<const WireSpec::Specification> WireSpec::get() const {
+std::shared_ptr<const WireSpec::Specification> WireSpec::get() {
+    stdx::lock_guard<Latch> lk(_mutex);
     fassert(ErrorCodes::NotYetInitialized, isInitialized());
     return _spec;
 }

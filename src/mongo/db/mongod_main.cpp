@@ -1390,17 +1390,20 @@ void setUpObservers(ServiceContext* serviceContext) {
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 }
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
-    // in-memory version is unset.
-    WireSpec::Specification spec;
-    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
-    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-    spec.isInternalClient = true;
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
+        // in-memory version is unset.
+        WireSpec::Specification spec;
+        spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
+        spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+        spec.outgoing.minWireVersion = SUPPORTS_OP_MSG;
+        spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+        spec.isInternalClient = true;
 
-    WireSpec::getWireSpec(serviceContext).initialize(std::move(spec));
+        WireSpec::getWireSpec(service).initialize(std::move(spec));
+    }};
 }
 
 #ifdef MONGO_CONFIG_SSL
@@ -1823,7 +1826,6 @@ int mongod_main(int argc, char* argv[]) {
         quickExit(ExitCode::auditRotateError);
     }
 
-    initializeWireSpec(service);
     setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);

@@ -190,7 +190,8 @@ public:
 public:
     /**
      * Appends the min and max versions in 'wireVersionInfo' to 'builder' in the format expected for
-     * reporting information about the internal client.
+     * reporting information about the internal client, if the WireSpec represents the internal
+     * client.
      *
      * Intended for use as part of performing the isMaster/hello handshake with a remote node. When
      * an internal clients make a connection to another node in the cluster, it includes internal
@@ -204,21 +205,24 @@ public:
      *
      * This information can be used to ensure correctness during upgrade in mixed version clusters.
      */
-    static void appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
-                                                BSONObjBuilder* builder);
+    void appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder);
 
     void initialize(Specification spec);
 
     void reset(Specification spec);
 
-    // Calling `get()` on uninitialized instances of `WireSpec` is prohibited.
-    std::shared_ptr<const Specification> get() const;
+    // Calling `get()` on uninitialized instances of `WireSpec` is an invariant failure.
+    std::shared_ptr<const Specification> get();
 
     bool isInitialized() const {
         return _spec ? true : false;
     }
 
 private:
+    // Ensures concurrent accesses to `get()`, `appendInternalClientWireVersionIfNeeded()`, and
+    // `reset()` are thread-safe.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("WireSpec::_mutex");
+
     std::shared_ptr<const Specification> _spec;
 };
 

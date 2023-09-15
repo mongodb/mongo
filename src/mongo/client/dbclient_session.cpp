@@ -209,10 +209,7 @@ executor::RemoteCommandResponse initWireVersion(
 
     conn->getCompressorManager().clientBegin(&bob);
 
-    if (auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-        wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     Date_t start{Date_t::now()};
     auto result = conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));

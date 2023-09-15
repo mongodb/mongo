@@ -451,9 +451,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
     bob.append("hello", 1);
     ServiceContext* sc = haveClient() ? cc().getServiceContext() : getGlobalServiceContext();
-    if (auto wireSpec = WireSpec::getWireSpec(sc); wireSpec.get()->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec.get()->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(sc).appendInternalClientWireVersionIfNeeded(&bob);
 
     BSONObj o;
     if (info == nullptr)

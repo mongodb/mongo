@@ -268,10 +268,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 
-    if (auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-        wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     const auto timeoutMS = _connectTimeout + kMaxAwaitTime;
     auto request = executor::RemoteCommandRequest(
@@ -327,10 +324,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     BSONObjBuilder bob;
     bob.append("hello", 1);
 
-    if (auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
-        wireSpec->isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
-    }
+    WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     auto request = executor::RemoteCommandRequest(
         HostAndPort(_host), DatabaseName::kAdmin, bob.obj(), nullptr, _connectTimeout);

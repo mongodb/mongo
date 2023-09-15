@@ -164,9 +164,12 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
         multiversion::GenericFCV::kLatest);
 }
 
-void initializeWireSpec(ServiceContext* serviceContext) {
-    WireSpec::getWireSpec(serviceContext).initialize(WireSpec::Specification{});
-}
+namespace {
+ServiceContext::ConstructorActionRegisterer registerWireSpec{
+    "RegisterWireSpec", [](ServiceContext* service) {
+        WireSpec::getWireSpec(service).initialize(WireSpec::Specification{});
+    }};
+}  // namespace
 
 const auto kAuthParam = "authSource"s;
 
@@ -757,7 +760,6 @@ int mongo_main(int argc, char* argv[]) {
 
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
-        initializeWireSpec(serviceContext);
 
 #ifdef MONGO_CONFIG_SSL
         OCSPManager::start(serviceContext);
