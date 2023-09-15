@@ -55,6 +55,7 @@ BURN_IN_TEST_MEMBERSHIP_FILE = "burn_in_test_membership_map_file_for_ci.json"
 SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
                         "multi_stmt_txn_passthrough", "parallel_fsm_workload_test",
                         "all_versions_js_test")
+RUN_ALL_FEATURE_FLAG_TESTS = "--runAllFeatureFlagTests"
 
 
 class RepeatConfig(object):
@@ -379,9 +380,9 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
-    run_options = ""
+    run_options = RUN_ALL_FEATURE_FLAG_TESTS
     if install_dir is not None:
-        run_options = f"--installDir={shlex.quote(install_dir)}"
+        run_options = f"{run_options} --installDir={shlex.quote(install_dir)}"
     buildscripts.resmokelib.parser.set_run_options(run_options)
 
     if changed_tests:
@@ -722,7 +723,7 @@ def generate_test_membership_map_file_for_ci():
     Run this command in CI before running the burn in task generator.
     """
     _configure_logging(False)
-    buildscripts.resmokelib.parser.set_run_options()
+    buildscripts.resmokelib.parser.set_run_options(RUN_ALL_FEATURE_FLAG_TESTS)
 
     LOGGER.info("Generating burn_in test membership mapping file.")
     test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
