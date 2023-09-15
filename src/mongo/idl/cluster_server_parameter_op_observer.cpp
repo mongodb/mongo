@@ -56,14 +56,6 @@ namespace {
 constexpr auto kIdField = "_id"_sd;
 constexpr auto kOplog = "oplog"_sd;
 
-/**
- * Per-operation scratch space indicating the document being deleted and the tenantId of the tenant
- * associated. This is used in the aboutToDelte/onDelete handlers since the document is not
- * necessarily available in the latter.
- */
-const auto aboutToDeleteDoc = OplogDeleteEntryArgs::declareDecoration<std::string>();
-const auto tenantIdToDelete = OplogDeleteEntryArgs::declareDecoration<boost::optional<TenantId>>();
-
 bool isConfigNamespace(const NamespaceString& nss) {
     return nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId());
 }
@@ -108,48 +100,33 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         });
 }
 
-void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                     const CollectionPtr& coll,
-                                                     const BSONObj& doc,
-                                                     OplogDeleteEntryArgs* args,
-                                                     OpStateAccumulator* opAccumulator) {
-    std::string docBeingDeleted;
-
-    if (isConfigNamespace(coll->ns())) {
-        // Store the tenantId associated with the doc to be deleted.
-        tenantIdToDelete(args) = coll->ns().dbName().tenantId();
-        auto elem = doc[kIdField];
-        if (elem.type() == String) {
-            docBeingDeleted = elem.str();
-        } else {
-            // This delete makes no sense,
-            // but it's safe to ignore since the insert/update
-            // would not have resulted in an in-memory update anyway.
-            LOGV2_DEBUG(6226304,
-                        3,
-                        "Deleting a cluster-wide server parameter with non-string name",
-                        "name"_attr = elem);
-        }
-    }
-
-    // Stash the name of the config doc being deleted (if any)
-    // in an opCtx decoration for use in the onDelete() hook below
-    // since OpLogDeleteEntryArgs isn't guaranteed to have the deleted doc.
-    aboutToDeleteDoc(args) = std::move(docBeingDeleted);
-}
-
 void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const CollectionPtr& coll,
                                                 StmtId stmtId,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
-    const auto& docName = aboutToDeleteDoc(args);
-    if (!docName.empty()) {
-        opCtx->recoveryUnit()->onCommit([docName, tenantId = tenantIdToDelete(args)](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            cluster_parameters::clearParameter(opCtx, docName, tenantId);
-        });
+    const auto& nss = coll->ns();
+    if (!isConfigNamespace(nss)) {
+        return;
     }
+
+    const auto& doc = *(args.deletedDoc);
+    auto elem = doc[kIdField];
+    if (elem.type() != BSONType::String) {
+        // This delete makes no sense, but it's safe to ignore since the insert/update
+        // would not have resulted in an in-memory update anyway.
+        LOGV2_DEBUG(6226304,
+                    3,
+                    "Deleting a cluster-wide server parameter with non-string name",
+                    "name"_attr = elem);
+        return;
+    }
+
+    // Store the tenantId associated with the doc to be deleted.
+    opCtx->recoveryUnit()->onCommit([doc = doc.getOwned(), tenantId = nss.dbName().tenantId()](
+                                        OperationContext* opCtx, boost::optional<Timestamp>) {
+        cluster_parameters::clearParameter(opCtx, doc[kIdField].valueStringData(), tenantId);
+    });
 }
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,

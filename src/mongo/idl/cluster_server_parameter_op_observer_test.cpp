@@ -133,17 +133,13 @@ public:
             wuow.commit();
     }
 
-    void doDelete(const NamespaceString& nss,
-                  BSONObj deletedDoc,
-                  bool includeDeletedDoc = true,
-                  bool commit = true) {
+    void doDelete(const NamespaceString& nss, BSONObj deletedDoc, bool commit) {
         auto opCtx = cc().makeOperationContext();
         WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         OplogDeleteEntryArgs args;
-        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc, &args);
-        args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
-        observer.onDelete(opCtx.get(), *autoColl, 1 /* StmtId */, args);
+        args.deletedDoc = &deletedDoc;
+        observer.onDelete(opCtx.get(), *autoColl, /*StmtId=*/1, args);
         if (commit)
             wuow.commit();
     }
@@ -422,39 +418,41 @@ TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
     const auto initialDoc = std::move(initialDocB);
 
     // Ignore deletes in other namespaces, whether with or without deleted doc.
-    assertIgnoredOtherNamespaces([this, initialDoc](const auto& nss) { doDelete(nss, initialDoc); },
-                                 boost::none);
+    assertIgnoredOtherNamespaces(
+        [this, initialDoc](const auto& nss) { doDelete(nss, initialDoc, /*commit=*/true); },
+        boost::none);
 
     // Ignore deletes where the _id does not correspond to a known cluster server parameter.
     assertIgnoredAlways(
         [this](const auto& nss) {
-            doDelete(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
+            doDelete(
+                nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"), /*commit=*/true);
         },
         boost::none);
 
     // Reset configuration to defaults when we claim to have deleted the doc.
-    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, /*commit=*/true);
 
     ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
-    // Restore configured state, and delete without including deleteDoc reference.
+    // Restore configured state, and delete.
     initializeState();
-    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, false);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, /*commit=*/true);
 
     ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     // Restore configured state, and delete other tenant with reference.
     initializeState();
-    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT);
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT, /*commit=*/true);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 
     // Restore and delete without reference.
     initializeState();
-    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT, false);
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId), initialDocT, /*commit=*/true);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
@@ -533,40 +531,35 @@ TEST_F(ClusterServerParameterOpObserverTest, abortsAfterObservation) {
 
     doInserts(NamespaceString::kClusterParametersNamespace,
               {makeClusterParametersDoc(LogicalTime(Timestamp(12345678)), 123, "abc")},
-              false /* commit */);
+              /*commit=*/false);
     doInserts(NamespaceString::makeClusterParametersNSS(kTenantId),
               {makeClusterParametersDoc(LogicalTime(Timestamp(23456789)), 456, "def")},
-              false /* commit */);
+              /*commit=*/false);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     doUpdate(NamespaceString::kClusterParametersNamespace,
              {makeClusterParametersDoc(LogicalTime(Timestamp(87654321)), 321, "cba")},
-             false /* commit */);
+             /*commit=*/false);
     doUpdate(NamespaceString::makeClusterParametersNSS(kTenantId),
              {makeClusterParametersDoc(LogicalTime(Timestamp(98765432)), 654, "fed")},
-             false /* commit */);
+             /*commit=*/false);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
-    doDelete(NamespaceString::kClusterParametersNamespace,
-             initialDoc,
-             true /* includeDeletedDoc */,
-             false /* commit */);
-    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId),
-             initialDocTenant,
-             true /* includeDeletedDoc */,
-             false /* commit */);
+    doDelete(NamespaceString::kClusterParametersNamespace, initialDoc, /*commit=*/false);
+    doDelete(
+        NamespaceString::makeClusterParametersNSS(kTenantId), initialDocTenant, /*commit=*/false);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
     doDropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, kConfigDB),
-                   false /* commit */);
+                   /*commit=*/false);
     doDropDatabase(DatabaseName::createDatabaseName_forTest(kTenantId, kConfigDB),
-                   false /* commit */);
+                   /*commit=*/false);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
