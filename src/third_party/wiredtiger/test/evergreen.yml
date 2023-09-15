@@ -4006,6 +4006,16 @@ tasks:
           config: ../../../test/format/CONFIG.mirror
           trace_args: -T all
 
+  # FIXME-WT-11606 Remove this temporary task.
+  - name: format-11507-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "format test script"
+        vars:
+          format_test_script_args: -c ../../../test/format/failure_configs/CONFIG.WT-11507 -t 360 -T all
+
   - name: format-stress-pull-request-test
     tags: ["pull_request"]
     commands:
@@ -6220,6 +6230,8 @@ buildvariants:
     additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
   tasks:
+    # FIXME-WT-11606 Remove this temporary task.
+    - name: format-11507-test
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
@@ -6253,6 +6265,8 @@ buildvariants:
     additional_env_vars: export LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
   tasks:
+    # FIXME-WT-11606 Remove this temporary task.
+    - name: format-11507-test
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"

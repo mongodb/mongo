@@ -1,6 +1,7 @@
 ############################################
 #  RUN PARAMETERS: V3
 ############################################
+# FIXME-WT-11606 Remove this temporary config.
 assert.read_timestamp=0
 background_compact=0
 background_compact.free_space_target=2
