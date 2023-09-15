@@ -51,6 +51,12 @@ struct ClientAndOpCtx {
 
 class CappedVisibilityTest : public unittest::Test, public ScopedGlobalServiceContextForTest {};
 
+TEST_F(CappedVisibilityTest, EmptySnapshotNoneVisible) {
+    CappedVisibilityObserver observer("test");
+    auto snapshot = observer.makeSnapshot();
+    ASSERT_FALSE(snapshot.isRecordVisible(RecordId(1)));
+}
+
 TEST_F(CappedVisibilityTest, BasicRecordIdHole) {
     CappedVisibilityObserver observer("test");
     observer.setRecordImmediatelyVisible(RecordId(1));

@@ -1757,27 +1757,33 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
         checkSize(opCtx);
     }
 
-    // Need to start at 1 so we are always higher than RecordId::minLong()
-    int64_t nextId = 1;
-
-    // Initialize the highest seen RecordId in a session without a read timestamp because that is
-    // required by the largest_key API.
-    WiredTigerSession sessRaii(_kvEngine->getConnection());
-
-    // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
-    // ourselves. The calling operation may have a session open that has written a large amount of
-    // data, and by creating a new session, we are preventing WT from being able to roll back that
-    // transaction to free up cache space. If we do block on cache eviction here, we must consider
-    // that the other session owned by this thread may be the one that needs to be rolled back. If
-    // this does time out, we will receive a WT_ROLLBACK and throw an error.
-    auto wtSession = sessRaii.getSession();
-    invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=1000"), wtSession);
-
-    auto cursor = sessRaii.getNewCursor(_uri);
-
     // Find the largest RecordId in the table and add 1 to generate our next RecordId. The
     // largest_key API returns the largest key in the table regardless of visibility. This ensures
     // we don't re-use RecordIds that are not visible.
+
+    // Need to start at 1 so we are always higher than RecordId::minLong(). This will be the case if
+    // the table is empty, and returned RecordId is null.
+    int64_t nextId = getLargestKey(opCtx).getLong() + 1;
+    _nextIdNum.store(nextId);
+}
+
+RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
+    // Initialize the highest seen RecordId in a session without a read timestamp because that is
+    // required by the largest_key API.
+    WiredTigerSession sessRaii(_kvEngine->getConnection());
+    auto wtSession = sessRaii.getSession();
+
+    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+        // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
+        // ourselves. The calling operation may have a session open that has written a large amount
+        // of data, and by creating a new session, we are preventing WT from being able to roll back
+        // that transaction to free up cache space. If we do block on cache eviction here, we must
+        // consider that the other session owned by this thread may be the one that needs to be
+        // rolled back. If this does time out, we will receive a WT_ROLLBACK and throw an error.
+        invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=1000"), wtSession);
+    }
+
+    auto cursor = sessRaii.getNewCursor(_uri);
     int ret = cursor->largest_key(cursor);
     if (ret == WT_ROLLBACK) {
         // Force the caller to rollback its transaction if we can't make progess with eviction.
@@ -1802,11 +1808,10 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
             }
         }
         invariantWTOK(ret, wtSession);
-        auto recordId = getKey(cursor);
-        nextId = recordId.getLong() + 1;
+        return getKey(cursor);
     }
-
-    _nextIdNum.store(nextId);
+    // Empty table.
+    return RecordId();
 }
 
 void WiredTigerRecordStore::reserveRecordIds(OperationContext* opCtx,

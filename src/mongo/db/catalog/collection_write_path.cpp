@@ -240,7 +240,11 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     timestamps.reserve(count);
 
     std::vector<RecordId> cappedRecordIds;
-    if (collection->usesCappedSnapshots()) {
+    // For capped collections requiring capped snapshots, usually RecordIds are reserved and
+    // registered here to handle visibility. If the RecordId is provided by the caller, it is
+    // assumed the caller already reserved and properly registered the inserts in the
+    // CappedVisibilityObserver.
+    if (collection->usesCappedSnapshots() && begin->recordId.isNull()) {
         cappedRecordIds = collection->reserveCappedRecordIds(opCtx, count);
     }
 

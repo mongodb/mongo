@@ -174,6 +174,11 @@ protected:
         unimplementedTasserted();
     }
 
+    RecordId getLargestKey(OperationContext* opCtx) const final {
+        unimplementedTasserted();
+        return RecordId();
+    }
+
     void reserveRecordIds(OperationContext* opCtx,
                           std::vector<RecordId>* out,
                           size_t nRecords) final {

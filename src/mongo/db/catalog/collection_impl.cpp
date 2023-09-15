@@ -257,6 +257,14 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
             str::stream() << "Index ident " << ident << " is being dropped or is already dropped."};
 }
 
+bool collUsesCappedSnapshots(const NamespaceString& nss, const CollectionOptions& options) {
+    // Only use the behavior for non-replicated capped collections (which can accept concurrent
+    // writes). This behavior relies on RecordIds being allocated in increasing order. For clustered
+    // collections, users define their RecordIds and are not constrained to creating them in
+    // increasing order.
+    // The oplog tracks its visibility through support from the storage engine.
+    return options.capped && !nss.isReplicated() && !options.clusteredIndex && !nss.isOplog();
+}
 }  // namespace
 
 std::unique_ptr<CollatorInterface> CollectionImpl::parseCollation(OperationContext* opCtx,
@@ -286,7 +294,8 @@ std::unique_ptr<CollatorInterface> CollectionImpl::parseCollation(OperationConte
     return std::move(collator.getValue());
 }
 
-CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
+CollectionImpl::SharedState::SharedState(OperationContext* opCtx,
+                                         CollectionImpl* collection,
                                          std::unique_ptr<RecordStore> recordStore,
                                          const CollectionOptions& options)
     : _recordStore(std::move(recordStore)),
@@ -297,7 +306,17 @@ CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
       _needCappedLock(_isCapped && collection->ns().isReplicated() && !options.clusteredIndex),
       // The record store will be null when the collection is instantiated as part of the repair
       // path.
-      _cappedObserver(_recordStore ? _recordStore->getIdent() : "") {}
+      _cappedObserver(_recordStore ? _recordStore->getIdent() : "") {
+
+    if (!_recordStore || !collUsesCappedSnapshots(collection->ns(), options)) {
+        return;
+    }
+
+    // Capped visibility must be initialized with the largest key in the store. All existing records
+    // when opening the collection should be visible. Concurrent writes will be past this key.
+    auto largestId = _recordStore->getLargestKey(opCtx);
+    _cappedObserver.setRecordImmediatelyVisible(largestId);
+}
 
 CollectionImpl::SharedState::~SharedState() {
     // The record store will be null when the collection is instantiated as part of the repair path.
@@ -316,7 +335,8 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
     : _ns(nss),
       _catalogId(std::move(catalogId)),
       _uuid(metadata->options.uuid.value()),
-      _shared(std::make_shared<SharedState>(this, std::move(recordStore), metadata->options)),
+      _shared(
+          std::make_shared<SharedState>(opCtx, this, std::move(recordStore), metadata->options)),
       _metadata(std::move(metadata)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>()) {}
 
@@ -926,12 +946,7 @@ long long CollectionImpl::getCappedMaxSize() const {
 }
 
 bool CollectionImpl::usesCappedSnapshots() const {
-    // Only use the behavior for non-replicated capped collections (which can accept concurrent
-    // writes). This behavior relies on RecordIds being allocated in increasing order. For clustered
-    // collections, users define their RecordIds and are not constrained to creating them in
-    // increasing order.
-    // The oplog tracks its visibility through support from the storage engine.
-    return isCapped() && !ns().isReplicated() && !ns().isOplog() && !isClustered();
+    return collUsesCappedSnapshots(ns(), getCollectionOptions());
 }
 
 CappedVisibilityObserver* CollectionImpl::getCappedVisibilityObserver() const {

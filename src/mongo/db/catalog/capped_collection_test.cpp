@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
@@ -157,7 +159,7 @@ Status _insertBSON(OperationContext* opCtx, const CollectionPtr& coll, RecordId 
     auto cappedObserver = coll->getCappedVisibilityObserver();
     cappedObserver->registerWriter(opCtx->recoveryUnit());
     coll->registerCappedInsert(opCtx, id);
-    return collection_internal::insertDocument(opCtx, coll, InsertStatement(obj), nullptr);
+    return collection_internal::insertDocument(opCtx, coll, InsertStatement(obj, id), nullptr);
 }
 
 TEST_F(CappedCollectionTest, SeekNear) {
@@ -537,6 +539,89 @@ TEST_F(CappedCollectionTest, OplogOrder) {
         ASSERT(cursor->next());
         ASSERT(cursor->next());
         ASSERT(!cursor->next());
+    }
+}
+
+TEST_F(CappedCollectionTest, VisibilityAfterRestart) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("local.non.oplog");
+    makeCapped(nss);
+
+    {
+        auto opCtx = newOperationContext();
+        ASSERT_OK(insertBSON(opCtx.get(), nss, RecordId(1)));
+        ASSERT_OK(insertBSON(opCtx.get(), nss, RecordId(2)));
+        ASSERT_OK(insertBSON(opCtx.get(), nss, RecordId(3)));
+        ASSERT_OK(insertBSON(opCtx.get(), nss, RecordId(4)));
+    }
+    const auto lastCommittedId = RecordId(4);
+
+    // Simulate restart / clean start. Force catalog close and reopen, causing in-memory catalog
+    // structures to be reset.
+    {
+        auto opCtx = newOperationContext();
+        auto stableTimestamp =
+            storageInterface()->getLastStableRecoveryTimestamp(getServiceContext());
+
+        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
+        auto catalogState = catalog::closeCatalog(opCtx.get());
+        catalog::openCatalog(opCtx.get(), catalogState, *stableTimestamp);
+    }
+
+    const auto uncommittedId = RecordId(5);
+
+    auto fp = globalFailPointRegistry().find("hangAfterEstablishCappedSnapshot");
+    fp->setMode(FailPoint::alwaysOn);
+    stdx::thread concurrentReader([&] {
+        // Instantiate AutoGetCollection before uncommitted write.
+        auto [c2, t2] = makeClientAndCtx("t2");
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        auto cursor = acr.getCollection()->getCursor(t2.get());
+        auto record = cursor->seekExact(lastCommittedId);
+        ASSERT(record);
+        ASSERT_EQ(lastCommittedId, record->id);
+        ASSERT(!cursor->next());
+    });
+
+    fp->waitForTimesEntered(1);
+
+    // Make uncommitted write (hole).
+    auto [c1, t1] = makeClientAndCtx("t1");
+    AutoGetCollection ac1(t1.get(), nss, MODE_IX);
+    WriteUnitOfWork w1(t1.get());
+    ASSERT_OK(_insertBSON(t1.get(), ac1.getCollection(), uncommittedId));
+    // do not commit yet
+
+    const auto pastHoleId = RecordId(6);
+    {  // Insert after hole.
+        auto t2 = newOperationContext();
+        AutoGetCollection ac2(t2.get(), nss, MODE_IX);
+        {
+            WriteUnitOfWork w2(t2.get());
+            ASSERT_OK(_insertBSON(t2.get(), ac2.getCollection(), pastHoleId));
+            w2.commit();
+        }
+    }
+
+    fp->setMode(FailPoint::off);
+    concurrentReader.join();
+
+    // Close the hole.
+    w1.commit();
+    {
+        auto [c2, t2] = makeClientAndCtx("t2");
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        auto cursor = acr.getCollection()->getCursor(t2.get());
+        auto record = cursor->seekExact(lastCommittedId);
+        ASSERT(record);
+        ASSERT_EQ(lastCommittedId, record->id);
+
+        auto next = cursor->next();
+        ASSERT(next);
+        ASSERT_EQ(uncommittedId, next->id);
+
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_EQ(pastHoleId, next->id);
     }
 }
 }  // namespace
