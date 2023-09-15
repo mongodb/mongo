@@ -85,6 +85,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             uassert(ErrorCodes::IllegalOperation,
                     "Can't reshard a collection in the config database",
