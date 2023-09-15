@@ -53,7 +53,6 @@ const BSONField<bool> ShardType::draining("draining");
 const BSONField<BSONArray> ShardType::tags("tags");
 const BSONField<ShardType::ShardState> ShardType::state("state");
 const BSONField<Timestamp> ShardType::topologyTime("topologyTime");
-const BSONField<long long> ShardType::replSetConfigVersion("replSetConfigVersion");
 
 ShardType::ShardType(std::string name, std::string host, std::vector<std::string> tags)
     : _name(std::move(name)), _host(std::move(host)), _tags(std::move(tags)) {}
@@ -143,20 +142,6 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
         }
     }
 
-    {
-        long long shardReplSetConfigVersion;
-        Status status = bsonExtractIntegerField(
-            source, replSetConfigVersion.name(), &shardReplSetConfigVersion);
-        if (status.isOK()) {
-            shard._replSetConfigVersion = shardReplSetConfigVersion;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // replSetConfigVersion field can be missing in which case it is presumed to be
-            // uninitialized.
-        } else {
-            return status;
-        }
-    }
-
     return shard;
 }
 
@@ -169,12 +154,6 @@ Status ShardType::validate() const {
     if (!_host.has_value() || _host->empty()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << host.name() << " field");
-    }
-
-    if (_replSetConfigVersion != kUninitializedReplSetConfigVersion &&
-        getReplSetConfigVersion() < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "replSetConfigVersion can't be negative");
     }
 
     return Status::OK();
@@ -195,8 +174,6 @@ BSONObj ShardType::toBSON() const {
         builder.append(state(), static_cast<std::underlying_type<ShardState>::type>(getState()));
     if (_topologyTime)
         builder.append(topologyTime(), getTopologyTime());
-    if (_replSetConfigVersion)
-        builder.append(replSetConfigVersion(), getReplSetConfigVersion());
 
     return builder.obj();
 }
@@ -231,11 +208,6 @@ void ShardType::setState(const ShardState state) {
 void ShardType::setTopologyTime(const Timestamp& topologyTime) {
     invariant(!_topologyTime);
     _topologyTime = topologyTime;
-}
-
-void ShardType::setReplSetConfigVersion(const long long replSetConfigVersion) {
-    invariant(replSetConfigVersion >= 0);
-    _replSetConfigVersion = replSetConfigVersion;
 }
 
 }  // namespace mongo

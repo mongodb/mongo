@@ -336,12 +336,11 @@ public:
     void reload(OperationContext* opCtx);
 
     /**
-     * To be used on mongod only. If the mongod is a primary, schedules a write to update the
-     * connection string in the config.shards document for the shard it corresponds to. Upon an
-     * error, retries if the mongod is still a primary.
+     * For use in mongos which needs notifications about changes to shard replset membership to
+     * update the config.shards collection.
      */
-    static void scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-        OperationContext* opCtx, const std::function<bool()>& isPrimaryFn) noexcept;
+    static void updateReplicaSetOnConfigServer(ServiceContext* serviceContex,
+                                               const ConnectionString& connStr) noexcept;
 
     /*
      * Returns true if the given host is part of the config server replica set.

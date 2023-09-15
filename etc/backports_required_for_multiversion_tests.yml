@@ -423,8 +423,6 @@ last-continuous:
     ticket: SERVER-71819
   - test_file: jstests/replsets/tenant_migration_recreate_timeseries_collection.js
     ticket: SERVER-80301
-  - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
-    ticket: SERVER-21185
   - test_file: jstests/noPassthrough/read_preference_metrics.js
     ticket: SERVER-66018
   - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
@@ -958,8 +956,6 @@ last-lts:
     ticket: SERVER-80301
   - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
     ticket: SERVER-79912
-  - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
-    ticket: SERVER-21185
   - test_file: jstests/noPassthrough/read_preference_metrics.js
     ticket: SERVER-66018
   - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js

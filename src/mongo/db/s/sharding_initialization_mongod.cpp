@@ -589,28 +589,13 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
     }
 }
 
-void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
-    _isPrimary.store(true);
-    if (Grid::get(opCtx)->isInitialized()) {
-        ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-            opCtx, [&]() -> bool { return _isPrimary.load(); });
-    }
-}
-
-void ShardingInitializationMongoD::onStepDown() {
-    _isPrimary.store(false);
-}
-
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        auto myConnectionString =
-            repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString();
-        Grid::get(opCtx)->shardRegistry()->initConfigShardIfNecessary(myConnectionString);
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        return;
     }
-    if (Grid::get(opCtx)->isInitialized()) {
-        ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-            opCtx, [&]() -> bool { return _isPrimary.load(); });
-    }
+
+    auto myConnectionString = repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString();
+    Grid::get(opCtx)->shardRegistry()->initConfigShardIfNecessary(myConnectionString);
 }
 
 void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,

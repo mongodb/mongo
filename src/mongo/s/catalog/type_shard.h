@@ -71,8 +71,6 @@ public:
     static const BSONField<BSONArray> tags;
     static const BSONField<ShardState> state;
     static const BSONField<Timestamp> topologyTime;
-    static const BSONField<long long> replSetConfigVersion;
-    static const long long kUninitializedReplSetConfigVersion = -1;
 
     ShardType() = default;
     ShardType(std::string name, std::string host, std::vector<std::string> tags = {});
@@ -129,11 +127,6 @@ public:
     }
     void setTopologyTime(const Timestamp& topologyTime);
 
-    long long getReplSetConfigVersion() const {
-        return _replSetConfigVersion;
-    }
-    void setReplSetConfigVersion(long long replSetConfigVersion);
-
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
@@ -149,8 +142,6 @@ private:
     boost::optional<ShardState> _state;
     // (O) topologyTime
     boost::optional<Timestamp> _topologyTime;
-    // (O) repl set config version.
-    long long _replSetConfigVersion = kUninitializedReplSetConfigVersion;
 };
 
 }  // namespace mongo
