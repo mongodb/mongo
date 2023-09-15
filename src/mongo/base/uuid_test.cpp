@@ -203,5 +203,37 @@ TEST(UUIDTest, toBSONUsingBSONMacro) {
     ASSERT_BSONOBJ_EQ(expectedBson, bson);
 }
 
+TEST(UUIDTest, allBitsFlipForHashes) {
+    // The Hash function is generated using bytes from the UUID itself, which are already randomly
+    // generated (except for two bytes, which are set to the same value for all UUIDs). This test
+    // ensures that each bit of the generated hashes is set and unset at least once.
+    UUID::Hash hashGenerator = UUID::Hash{};
+    auto startingHash = hashGenerator(UUID::gen());
+    size_t accumulator = 0;
+    size_t target = std::numeric_limits<uint32_t>::max();
+
+    // Running this test locally usually results in the loop terminating after about 7-10
+    // iterations, maxIterations is set to be about 50x this amount to give some wiggle room for
+    // tests.
+    int maxIterations = 500;
+    int counter = 0;
+
+    while (accumulator != target && counter++ < maxIterations) {
+        size_t difference = startingHash ^ hashGenerator(UUID::gen());
+        accumulator |= difference;
+    }
+    // Fail the test if all bits are not changed at least once after 'maxIterations'.
+    ASSERT_EQUALS(accumulator, target);
+}
+
+TEST(UUIDTest, UUIDConsistentHash) {
+    auto uuid = UUID::gen();
+    size_t hash = UUID::Hash{}(uuid);
+
+    // Note this may fail in the future if the hash is changed, but this test will serve as a
+    // safeguard to signal that the behavior has changed.
+    ASSERT_EQUALS(uuid.toCDR().read<BigEndian<uint32_t>>(), hash);
+}
+
 }  // namespace
 }  // namespace mongo
