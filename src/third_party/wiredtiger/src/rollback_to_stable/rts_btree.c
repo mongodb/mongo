@@ -263,7 +263,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     WT_DECL_ITEM(key_string);
     WT_DECL_RET;
     WT_PAGE *page;
-    WT_TIME_WINDOW *hs_tw;
+    WT_TIME_WINDOW *tw, *hs_tw;
     WT_UPDATE *tombstone, *upd;
     wt_timestamp_t hs_durable_ts, hs_start_ts, hs_stop_durable_ts, newer_hs_durable_ts, pinned_ts;
     uint64_t hs_counter, type_full;
@@ -326,7 +326,10 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     else
         WT_ERR(__wt_buf_set(session, full_value, full_value->data, full_value->size));
 
-    newer_hs_durable_ts = unpack->tw.durable_start_ts;
+    /* Retrieve the time window from the unpacked value cell. */
+    __wt_cell_get_tw(unpack, &tw);
+
+    newer_hs_durable_ts = tw->durable_start_ts;
 
     __wt_txn_pinned_timestamp(session, &pinned_ts);
 
@@ -391,7 +394,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * the written proper timestamp, so comparing against it with history store shouldn't have
          * any problem.
          */
-        if (hs_tw->start_ts <= unpack->tw.start_ts || unpack->tw.prepare) {
+        if (hs_tw->start_ts <= tw->start_ts || tw->prepare) {
             if (type == WT_UPDATE_MODIFY)
                 WT_ERR(__wt_modify_apply_item(
                   session, S2BT(session)->value_format, full_value, hs_value->data));
@@ -455,7 +458,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
               "history store update valid with time_window=%s, type=%s and stable_timestamp=%s",
               __wt_time_window_to_string(hs_tw, tw_string), __wt_update_type_str(type),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[0]));
-            WT_ASSERT(session, unpack->tw.prepare || hs_tw->start_ts <= unpack->tw.start_ts);
+            WT_ASSERT(session, tw->prepare || hs_tw->start_ts <= tw->start_ts);
             valid_update_found = true;
             break;
         }
@@ -487,8 +490,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     if (valid_update_found) {
         /* Retrieve the time window from the history cursor. */
         __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-        WT_ASSERT(session,
-          hs_tw->start_ts < unpack->tw.start_ts || hs_tw->start_txn < unpack->tw.start_txn);
+        WT_ASSERT(session, hs_tw->start_ts < tw->start_ts || hs_tw->start_txn < tw->start_txn);
         WT_ERR(__wt_upd_alloc(session, full_value, WT_UPDATE_STANDARD, &upd, NULL));
 
         /*
@@ -528,7 +530,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
              */
             WT_ASSERT(session,
               hs_stop_durable_ts == WT_TS_NONE || hs_stop_durable_ts < newer_hs_durable_ts ||
-                unpack->tw.prepare);
+                tw->prepare);
 
             WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
             /*
@@ -618,6 +620,7 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_PAGE *page;
+    WT_TIME_WINDOW *tw;
     WT_UPDATE *upd;
     uint8_t *memp;
     char time_string[WT_TIME_STRING_SIZE];
@@ -631,40 +634,42 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
     if (is_ondisk_stable != NULL)
         *is_ondisk_stable = false;
 
-    prepared = vpack->tw.prepare;
+    /* Retrieve the time window from the unpacked value cell. */
+    __wt_cell_get_tw(vpack, &tw);
+
+    prepared = tw->prepare;
     if (WT_IS_HS(session->dhandle)) {
         /*
          * Abort the history store update with stop durable timestamp greater than the stable
          * timestamp or the updates with max stop timestamp which implies that they are associated
          * with prepared transactions.
          */
-        if (vpack->tw.durable_stop_ts > rollback_timestamp || vpack->tw.stop_ts == WT_TS_MAX) {
+        if (tw->durable_stop_ts > rollback_timestamp || tw->stop_ts == WT_TS_MAX) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               WT_RTS_VERB_TAG_HS_ABORT_STOP
               "history store update aborted with start_durable/commit_timestamp=%s, %s, "
               "stop_durable/commit_timestamp=%s, %s and stable_timestamp=%s",
-              __wt_timestamp_to_string(vpack->tw.durable_start_ts, ts_string[0]),
-              __wt_timestamp_to_string(vpack->tw.start_ts, ts_string[1]),
-              __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[2]),
-              __wt_timestamp_to_string(vpack->tw.stop_ts, ts_string[3]),
+              __wt_timestamp_to_string(tw->durable_start_ts, ts_string[0]),
+              __wt_timestamp_to_string(tw->start_ts, ts_string[1]),
+              __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[2]),
+              __wt_timestamp_to_string(tw->stop_ts, ts_string[3]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[4]));
             WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_sweep_hs_keys);
         } else
             return (0);
-    } else if (vpack->tw.durable_start_ts > rollback_timestamp ||
-      !__wt_rts_visibility_txn_visible_id(session, vpack->tw.start_txn) ||
-      (!WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && prepared)) {
+    } else if (tw->durable_start_ts > rollback_timestamp ||
+      !__wt_rts_visibility_txn_visible_id(session, tw->start_txn) ||
+      (!WT_TIME_WINDOW_HAS_STOP(tw) && prepared)) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_ONDISK_ABORT_TW
           "on-disk update aborted with time_window=%s. "
           "Start durable_timestamp > stable_timestamp: %s, or txnid_not_visible=%s, "
           "or tw_has_no_stop_and_is_prepared=%s",
-          __wt_time_point_to_string(
-            vpack->tw.start_ts, vpack->tw.durable_start_ts, vpack->tw.start_txn, time_string),
-          vpack->tw.durable_start_ts > rollback_timestamp ? "true" : "false",
-          !__wt_rts_visibility_txn_visible_id(session, vpack->tw.start_txn) ? "true" : "false",
-          !WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && prepared ? "true" : "false");
+          __wt_time_point_to_string(tw->start_ts, tw->durable_start_ts, tw->start_txn, time_string),
+          tw->durable_start_ts > rollback_timestamp ? "true" : "false",
+          !__wt_rts_visibility_txn_visible_id(session, tw->start_txn) ? "true" : "false",
+          !WT_TIME_WINDOW_HAS_STOP(tw) && prepared ? "true" : "false");
         if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
             return (__rts_btree_ondisk_fixup_key(
               session, ref, rip, recno, row_key, vpack, rollback_timestamp));
@@ -678,17 +683,16 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
             WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_keys_removed);
         }
-    } else if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) &&
-      (vpack->tw.durable_stop_ts > rollback_timestamp ||
-        !__wt_rts_visibility_txn_visible_id(session, vpack->tw.stop_txn) || prepared)) {
+    } else if (WT_TIME_WINDOW_HAS_STOP(tw) &&
+      (tw->durable_stop_ts > rollback_timestamp ||
+        !__wt_rts_visibility_txn_visible_id(session, tw->stop_txn) || prepared)) {
         /*
          * For prepared transactions, it is possible that both the on-disk key start and stop time
          * windows can be the same. To abort these updates, check for any stable update from history
          * store or remove the key.
          */
-        if (vpack->tw.start_ts == vpack->tw.stop_ts &&
-          vpack->tw.durable_start_ts == vpack->tw.durable_stop_ts &&
-          vpack->tw.start_txn == vpack->tw.stop_txn) {
+        if (tw->start_ts == tw->stop_ts && tw->durable_start_ts == tw->durable_stop_ts &&
+          tw->start_txn == tw->stop_txn) {
             WT_ASSERT(session, prepared == true);
             if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
                 return (__rts_btree_ondisk_fixup_key(
@@ -721,9 +725,9 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
             if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
                 upd->txnid = WT_TXN_NONE;
             else
-                upd->txnid = vpack->tw.start_txn;
-            upd->durable_ts = vpack->tw.durable_start_ts;
-            upd->start_ts = vpack->tw.start_ts;
+                upd->txnid = tw->start_txn;
+            upd->durable_ts = tw->durable_start_ts;
+            upd->start_ts = tw->start_ts;
             F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
             WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_keys_restored);
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
@@ -735,8 +739,8 @@ __rts_btree_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
               __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
               __wt_timestamp_to_string(upd->durable_ts, ts_string[1]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[2]), upd->txnid,
-              __wt_timestamp_to_string(vpack->tw.stop_ts, ts_string[3]),
-              __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[4]), vpack->tw.stop_txn,
+              __wt_timestamp_to_string(tw->stop_ts, ts_string[3]),
+              __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[4]), tw->stop_txn,
               prepared ? "true" : "false");
         }
     } else {

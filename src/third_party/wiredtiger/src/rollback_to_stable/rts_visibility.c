@@ -78,6 +78,7 @@ __wt_rts_visibility_page_needs_abort(
     WT_CELL_UNPACK_ADDR vpack;
     WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
+    WT_TIME_AGGREGATE *ta;
     wt_timestamp_t durable_ts;
     uint64_t newest_txn;
     uint32_t i;
@@ -132,9 +133,11 @@ __wt_rts_visibility_page_needs_abort(
         tag = "on page cell";
         /* Check if the page is obsolete using the page disk address. */
         __wt_cell_unpack_addr(session, ref->home->dsk, (WT_CELL *)addr, &vpack);
-        durable_ts = __rts_visibility_get_ref_max_durable_timestamp(session, &vpack.ta);
-        prepared = vpack.ta.prepare;
-        newest_txn = vpack.ta.newest_txn;
+        /* Retrieve the time aggregate from the unpacked address cell. */
+        __wt_cell_get_ta(&vpack, &ta);
+        durable_ts = __rts_visibility_get_ref_max_durable_timestamp(session, ta);
+        prepared = ta->prepare;
+        newest_txn = ta->newest_txn;
         result = (durable_ts > rollback_timestamp) || prepared ||
           WT_CHECK_RECOVERY_FLAG_TXNID(session, newest_txn);
     } else if (addr != NULL) {
