@@ -14,8 +14,6 @@ selector:
   - jstests/core/**/profile*.js
   - jstests/core/comment_field.js
   - jstests/core/fsync.js
-  # TODO (SERVER-76497): Enable these when explain is supported in bulkWrite.
-  - jstests/core/**/explain*.js
   # Runs an update with illegal format (no 'updates'). We could work around this in the override
   # but it is very annoying.
   - jstests/core/write/insert/batch_write_command_insert.js
