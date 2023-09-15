@@ -1692,11 +1692,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
 
-    /*
-     * FIXME-WT-11297 Enable force_stop testing after this issue is fixed. We can set this value to
-     * 3 if we would like more frequent testing, but also something larger such as 5 would work too.
-     */
-    backup_force_stop_interval = 0;
+    backup_force_stop_interval = 3;
     backup_full_interval = 4;
     backup_granularity_kb = 1024;
     backup_verify_immediately = false;
@@ -1993,6 +1989,7 @@ main(int argc, char *argv[])
     if (ret == EXIT_SUCCESS && !opts->preserve)
         testutil_remove(home);
 
-    testutil_cleanup(opts);
+    if (ret == EXIT_SUCCESS)
+        testutil_cleanup(opts);
     return (ret);
 }
