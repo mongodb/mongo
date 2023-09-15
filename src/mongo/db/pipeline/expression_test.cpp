@@ -198,51 +198,39 @@ std::string applyHmacForTest(StringData s) {
 }
 
 /**
- * Generates a string representation of a random double with a variable number of decimal places
- * between 1 and 15 and no trailing zeros or decimal point.
+ * Generates a random double with a variable number of decimal places between 1 and 15.
  */
-std::string randomDoubleAsString() {
-    // Initialize random number generator.
+double randomDouble() {
+    // Create a random number generator engine.
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    // Generate a random number between 0 and 1.
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
+    // Create a distribution and generate a double between -1 and 1.
+    std::uniform_real_distribution<double> dis(-1.0, 1.0);
     double randomValue = dis(gen);
 
-    // Generate a random number of decimal places between 1 and 15.
-    std::uniform_int_distribution<int> decimalPlaces(1, 15);
-    int numDecimalPlaces = decimalPlaces(gen);
+    std::uniform_int_distribution<int> multiplier(0, 15);
+    int shift = multiplier(gen);
+    double factor = std::pow(10.0, shift);
 
-    // Convert the random double to a string with the specified decimal places.
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(numDecimalPlaces) << randomValue;
-
-    // Remove trailing zeros from the string.
-    std::string result = oss.str();
-    result.erase(result.find_last_not_of('0') + 1, std::string::npos);
-
-    // Remove the decimal point if it's the last character.
-    if (result.back() == '.') {
-        result.pop_back();
-    }
-
+    // Multiply the random number by the factor to set the decimal places
+    double result = randomValue * factor;
     return result;
 }
 
 /**
- * Verifies that a string representation of a double can be correctly round-tripped through
- * conversion to a double value and back to a string.
+ * Verifies that a double can correctly convert to a string and round-trip back to the original
+ * double.
  */
-void verifyStringDoubleConvertRoundtripsCorrectly(StringData doubleAsString) {
-    Value stringConvertedToDouble = evaluateExpression("$toDouble", {doubleAsString});
-    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::NumberDouble);
-
-    Value doubleConvertedToString = evaluateExpression("$toString", {stringConvertedToDouble});
+void verifyStringDoubleConvertRoundtripsCorrectly(double doubleToConvert) {
+    Value doubleConvertedToString = evaluateExpression("$toString", {doubleToConvert});
     ASSERT_EQ(doubleConvertedToString.getType(), BSONType::String);
 
+    Value stringConvertedToDouble = evaluateExpression("$toDouble", {doubleConvertedToString});
+    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::NumberDouble);
+
     // Verify the conversion round-trips correctly.
-    ASSERT_VALUE_EQ(doubleConvertedToString, Value(doubleAsString));
+    ASSERT_VALUE_EQ(stringConvertedToDouble, Value(doubleToConvert));
 }
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
@@ -4789,14 +4777,14 @@ TEST(ExpressionParseParenthesisExpressionObjTest, SingleExprSimplification) {
 }
 
 /**
- * Test case for round-trip conversion of random double strings using $convert.
+ * Test case for round-trip conversion of random double using $convert.
  *
- * Generates and verifies 1000 random double strings, ensuring they can be
- * correctly converted to double values and back to strings.
+ * Generates 1000 random doubles and verifies they can be correctly converted to string values and
+ * back to double.
  */
 TEST(ExpressionConvert, StringToDouble) {
     for (int i = 0; i < 1000; ++i) {
-        verifyStringDoubleConvertRoundtripsCorrectly(randomDoubleAsString());
+        verifyStringDoubleConvertRoundtripsCorrectly(randomDouble());
     }
 }
 
