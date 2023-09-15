@@ -239,6 +239,10 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     st.stop();
 }
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove tests below
+    quit();
+}
+
 {
     const rst = new ReplSetTest({
         name: jsTest.name() + "_non_multitenant",

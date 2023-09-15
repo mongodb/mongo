@@ -70,6 +70,10 @@ res = assert.commandWorked(testDB.runCommand({hello: 1, $clusterTime: res.$clust
 
 st.stop();
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete tests below
+    quit();
+}
+
 // A mongod from a non-sharded replica set does not return logicalTime.
 var replTest = new ReplSetTest({name: "logical_time_api_non_sharded_replset", nodes: 1});
 replTest.startSet();

@@ -30,7 +30,8 @@ s.stop({noCleanData: true});
 const configDbPath = s.c0.dbpath;
 
 // Start the config server in standalone restore mode.
-let conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath, restore: ""});
+let conn = MongoRunner.runMongod(
+    {noCleanData: true, dbpath: configDbPath, restore: "", maintenanceMode: "standalone"});
 assert(conn);
 
 assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, logLevel: 1}));

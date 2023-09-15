@@ -7,14 +7,16 @@
 // This test restarts a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-/*****************************************************************************
- * Unsharded mongod.
- ****************************************************************************/
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+    /*****************************************************************************
+     * Unsharded mongod.
+     ****************************************************************************/
 
-// cleanupOrphaned fails against unsharded mongod.
-var mongod = MongoRunner.runMongod();
-assert.commandFailed(mongod.getDB('admin').runCommand({cleanupOrphaned: 'foo.bar'}));
-MongoRunner.stopMongod(mongod);
+    // cleanupOrphaned fails against unsharded mongod.
+    var mongod = MongoRunner.runMongod();
+    assert.commandFailed(mongod.getDB('admin').runCommand({cleanupOrphaned: 'foo.bar'}));
+    MongoRunner.stopMongod(mongod);
+}
 
 /*****************************************************************************
  * Bad invocations of cleanupOrphaned command.

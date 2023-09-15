@@ -144,6 +144,9 @@ function runShardingTest() {
     st.stop();
 }
 
-runStandaloneTest();
-runReplicaSetTest();
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+    runStandaloneTest();
+    runReplicaSetTest();
+}
+
 runShardingTest();

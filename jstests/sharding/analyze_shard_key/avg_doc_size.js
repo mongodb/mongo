@@ -79,7 +79,7 @@ function testShardedCollection(st) {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();

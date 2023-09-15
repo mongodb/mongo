@@ -1116,11 +1116,13 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
                 {explicitRWC: true, explicitProvenance: true});
 }
 
-let rst = new ReplSetTest({nodes: 1});
-rst.startSet();
-rst.initiate();
-runTests(rst.getPrimary(), rst.getPrimary(), undefined, false);
-rst.stopSet();
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete block
+    let rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    runTests(rst.getPrimary(), rst.getPrimary(), undefined, false);
+    rst.stopSet();
+}
 
 let st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 1}}});
 runTests(st.s0, st.rs0.getPrimary(), st.configRS.getPrimary(), true);

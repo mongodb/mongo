@@ -192,7 +192,7 @@ async function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();

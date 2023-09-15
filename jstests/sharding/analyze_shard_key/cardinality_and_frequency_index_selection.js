@@ -152,7 +152,7 @@ const setParameterOpts = {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst =
         new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();

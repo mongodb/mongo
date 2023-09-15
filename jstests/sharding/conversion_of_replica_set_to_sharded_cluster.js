@@ -11,6 +11,12 @@
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
+// TODO: SERVER-80318 Convert test to connect to the shard port or delete completely if no longer
+// relevant.
+if (jsTestOptions().useAutoBootstrapProcedure) {
+    quit();
+}
+
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
 // therefore preventing orphans from being cleaned up.

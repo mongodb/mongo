@@ -621,7 +621,7 @@ const mongosSetParametersOpts = {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     jsTest.log("Verify that on a replica set the analyzeShardKey command returns correct read " +
                "and write distribution metrics");
 

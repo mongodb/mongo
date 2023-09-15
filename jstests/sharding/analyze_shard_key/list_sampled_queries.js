@@ -257,6 +257,10 @@ function runTest(conn, {rst, st}) {
     st.stop();
 }
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove tests below
+    quit();
+}
+
 {
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();

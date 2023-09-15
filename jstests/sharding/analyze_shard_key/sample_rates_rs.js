@@ -17,6 +17,10 @@ import {
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+    quit();
+}
+
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;

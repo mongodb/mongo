@@ -888,6 +888,11 @@ runNoAuthTests(shardConn);
 runNoAuthTests(mongosConn);
 runNoAuthTests(mongosConn, {localOps: true});
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete tests below
+    st.stop();
+    quit();
+}
+
 //
 // Replset specific tests.
 //

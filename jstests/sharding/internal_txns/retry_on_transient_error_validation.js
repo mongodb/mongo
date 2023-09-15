@@ -8,6 +8,10 @@ const kCollName = "testColl";
 const kNs = kDbName + "." + kCollName;
 
 (() => {
+    if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test case
+        return;
+    }
+
     const rst = new ReplSetTest({nodes: 1});
 
     rst.startSet();

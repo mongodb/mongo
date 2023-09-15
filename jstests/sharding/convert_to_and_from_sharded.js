@@ -5,6 +5,10 @@
  */
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+    quit();
+}
+
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
 // therefore preventing orphans from being cleaned up.

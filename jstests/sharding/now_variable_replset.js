@@ -2,6 +2,10 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a replica set.
  */
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+    quit();
+}
+
 var replTest = new ReplSetTest({name: "now_and_cluster_time", nodes: 1});
 replTest.startSet();
 replTest.initiate();

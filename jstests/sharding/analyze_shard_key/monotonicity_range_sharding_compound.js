@@ -81,7 +81,7 @@ const numDocsRange = {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: numNodesPerRS, oplogSize: 250});
     rst.startSet();
     rst.initiate();

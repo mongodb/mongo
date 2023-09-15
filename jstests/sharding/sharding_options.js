@@ -23,11 +23,13 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({shardsvr: "", replSet: "dummy"}, expectedResult);
 
-jsTest.log("Ensure starting a standalone with \"--shardsvr\" fails");
-testGetCmdLineOptsMongodFailed({shardsvr: ""});
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+    jsTest.log("Ensure starting a standalone with \"--shardsvr\" fails");
+    testGetCmdLineOptsMongodFailed({shardsvr: ""});
 
-jsTest.log("Ensure starting a standalone with \"--configsvr\" fails");
-testGetCmdLineOptsMongodFailed({configsvr: ""});
+    jsTest.log("Ensure starting a standalone with \"--configsvr\" fails");
+    testGetCmdLineOptsMongodFailed({configsvr: ""});
+}
 
 // Configuration file options
 

@@ -137,7 +137,7 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();

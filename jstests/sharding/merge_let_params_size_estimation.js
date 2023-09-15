@@ -131,15 +131,17 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
                                  ErrorCodes.BSONObjectTooLarge);
 }
 
-// Test against a replica set.
-const rst = new ReplSetTest({nodes: 2});
-rst.startSet();
-rst.initiate();
-rst.awaitSecondaryNodes();
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete block
+    // Test against a replica set.
+    const rst = new ReplSetTest({nodes: 2});
+    rst.startSet();
+    rst.initiate();
+    rst.awaitSecondaryNodes();
 
-runTest({testFixture: rst, conn: rst.getPrimary()});
+    runTest({testFixture: rst, conn: rst.getPrimary()});
 
-rst.stopSet();
+    rst.stopSet();
+}
 
 // Test against a sharded cluster.
 const st = new ShardingTest({shards: 2, mongos: 1});

@@ -42,6 +42,10 @@ assert(responseContainsTimestampOperationTime(res),
 
 st.stop();
 
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete tests below
+    quit();
+}
+
 // A mongod from a non-sharded replica set returns an operationTime that is a Timestamp.
 var replTest = new ReplSetTest({name: "operation_time_api_non_sharded_replset", nodes: 1});
 replTest.startSet();

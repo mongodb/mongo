@@ -282,6 +282,47 @@ function verifyDefaultRWCommandsFailWithCode(conn, {failureCode}) {
         failureCode);
 }
 
+jsTestLog("Testing sharded cluster with implicit default write concern majority...");
+{
+    let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+
+    // Mongos succeeds.
+    verifyDefaultState(st.s, true /* isImplicitDefaultWCMajority */);
+    verifyDefaultRWCommandsValidInputOnSuccess(st.s, true /* isImplicitDefaultWCMajority */);
+    verifyDefaultRWCommandsInvalidInput(st.s);
+
+    // Shard node fails.
+    verifyDefaultRWCommandsFailWithCode(st.rs1.getPrimary(), {failureCode: 51301});
+    assert.commandFailedWithCode(st.rs1.getSecondary().adminCommand({getDefaultRWConcern: 1}),
+                                 51301);
+    // Secondaries fail setDefaultRWConcern before executing the command.
+    assert.commandFailedWithCode(
+        st.rs1.getSecondary().adminCommand(
+            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+        ErrorCodes.NotWritablePrimary);
+
+    st.stop();
+    st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+    // Config server primary succeeds.
+    verifyDefaultState(st.configRS.getPrimary(), true /* isImplicitDefaultWCMajority */);
+    verifyDefaultRWCommandsValidInputOnSuccess(st.configRS.getPrimary(),
+                                               true /* isImplicitDefaultWCMajority */);
+    verifyDefaultRWCommandsInvalidInput(st.configRS.getPrimary());
+
+    // Config server secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
+    assert.commandWorked(st.configRS.getSecondary().adminCommand({getDefaultRWConcern: 1}));
+    assert.commandFailedWithCode(
+        st.configRS.getSecondary().adminCommand(
+            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
+        ErrorCodes.NotWritablePrimary);
+
+    st.stop();
+}
+
+if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete tests below
+    quit();
+}
+
 jsTestLog("Testing standalone mongod...");
 {
     const standalone = MongoRunner.runMongod();
@@ -336,41 +377,4 @@ jsTestLog("Testing standalone replica set with implicit default write concern {w
         ErrorCodes.NotWritablePrimary);
 
     rst.stopSet();
-}
-
-jsTestLog("Testing sharded cluster with implicit default write concern majority...");
-{
-    let st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-
-    // Mongos succeeds.
-    verifyDefaultState(st.s, true /* isImplicitDefaultWCMajority */);
-    verifyDefaultRWCommandsValidInputOnSuccess(st.s, true /* isImplicitDefaultWCMajority */);
-    verifyDefaultRWCommandsInvalidInput(st.s);
-
-    // Shard node fails.
-    verifyDefaultRWCommandsFailWithCode(st.rs1.getPrimary(), {failureCode: 51301});
-    assert.commandFailedWithCode(st.rs1.getSecondary().adminCommand({getDefaultRWConcern: 1}),
-                                 51301);
-    // Secondaries fail setDefaultRWConcern before executing the command.
-    assert.commandFailedWithCode(
-        st.rs1.getSecondary().adminCommand(
-            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
-        ErrorCodes.NotWritablePrimary);
-
-    st.stop();
-    st = new ShardingTest({shards: 1, rs: {nodes: 2}});
-    // Config server primary succeeds.
-    verifyDefaultState(st.configRS.getPrimary(), true /* isImplicitDefaultWCMajority */);
-    verifyDefaultRWCommandsValidInputOnSuccess(st.configRS.getPrimary(),
-                                               true /* isImplicitDefaultWCMajority */);
-    verifyDefaultRWCommandsInvalidInput(st.configRS.getPrimary());
-
-    // Config server secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
-    assert.commandWorked(st.configRS.getSecondary().adminCommand({getDefaultRWConcern: 1}));
-    assert.commandFailedWithCode(
-        st.configRS.getSecondary().adminCommand(
-            {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
-        ErrorCodes.NotWritablePrimary);
-
-    st.stop();
 }

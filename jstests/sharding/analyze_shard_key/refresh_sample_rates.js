@@ -326,7 +326,7 @@ function runTest(createConnFn, rst, samplerNames) {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 3, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();

@@ -183,7 +183,7 @@ const mongosSetParametersOpts = {
     st.stop();
 }
 
-{
+if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();
     rst.initiate();
