@@ -146,7 +146,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlanTieBreakingWithIndexHeuristics"
     cpp_vartype: AtomicWord<bool>
-    default: true
+    default: false
 
   internalQueryForceIntersectionPlans:
     description: "Gives a large ranking bonus to index intersection plans, forcing intersection
