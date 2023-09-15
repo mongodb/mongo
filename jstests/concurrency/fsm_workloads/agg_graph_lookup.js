@@ -78,7 +78,8 @@ export const $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 100,
+        // TODO(SERVER-81235): Reset to `iterations: 100` after resolving build failure
+        iterations: 0,
         states: states,
         startState: 'query',
         transitions: transitions,

@@ -226,7 +226,7 @@ export const workerThread = (function() {
                 args.latch.await();  // wait for all threads to start
 
                 Random.setRandomSeed(args.seed);
-                run(configs);
+                await run(configs);
                 return {ok: 1};
             } catch (e) {
                 args.errorLatch.countDown();
