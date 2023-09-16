@@ -223,9 +223,10 @@ BENCHMARK_DEFINE_F(ABTNodeLoweringFixture, BM_LowerEvalNodes)(benchmark::State& 
     const int64_t nEvals = state.range(0);
     ABT n = scanNode();
     for (int i = 0; i < nEvals; i++) {
-        n = make<EvaluationNode>(ProjectionName(str::stream() << "proj" << std::to_string(i)),
-                                 Constant::int32(1337),
-                                 _node(std::move(n)));
+        n = make<EvaluationNode>(
+            ProjectionName(std::string(str::stream() << "proj" << std::to_string(i))),
+            Constant::int32(1337),
+            _node(std::move(n)));
     }
     benchmarkLowering(state, _node(std::move(n)));
 }
@@ -240,11 +241,11 @@ BENCHMARK_DEFINE_F(ABTNodeLoweringFixture, BM_LowerEvalNodesUnderNLJs)(benchmark
     for (int i = 0; i < nNLJs; i++) {
         ABT leftChild = scanNode(str::stream() << "scan" << std::to_string(i + 1));
         for (int j = 0; j < nEvals; j++) {
-            leftChild =
-                make<EvaluationNode>(ProjectionName(str::stream() << "proj" << std::to_string(i)
-                                                                  << "-" << std::to_string(j)),
-                                     Constant::int32(1337),
-                                     _node(std::move(leftChild)));
+            leftChild = make<EvaluationNode>(
+                ProjectionName(std::string(str::stream() << "proj" << std::to_string(i) << "-"
+                                                         << std::to_string(j))),
+                Constant::int32(1337),
+                _node(std::move(leftChild)));
         }
         n = make<NestedLoopJoinNode>(JoinType::Inner,
                                      ProjectionNameSet{},
@@ -270,7 +271,7 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
     auto nLets = state.range(0);
     ABT n = Constant::boolean(true);
     for (int i = 0; i < nLets; i++) {
-        n = make<Let>(ProjectionName{str::stream() << "var" << std::to_string(i)},
+        n = make<Let>(ProjectionName{std::string(str::stream() << "var" << std::to_string(i))},
                       Constant::int32(i),
                       std::move(n));
     }

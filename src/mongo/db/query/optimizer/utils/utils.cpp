@@ -58,6 +58,7 @@
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/map_utils.h"
 
 
 namespace mongo::optimizer {
@@ -1141,7 +1142,7 @@ static void extendCompoundInterval(const IndexCollationSpec& indexCollationSpec,
                                    const size_t indexField,
                                    IntervalReqExpr::Node interval) {
     const bool reverse = indexCollationSpec.at(indexField)._op == CollationOp::Descending;
-    if (!combineCompoundIntervalsDNF(expr, std::move(interval), reverse)) {
+    if (!combineCompoundIntervalsDNF(expr, interval, reverse)) {
         uasserted(6624159, "Cannot combine compound interval with simple interval.");
     }
 }
@@ -1980,11 +1981,16 @@ ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(const PSR
     return std::move(*b.finish());
 }
 
+
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {
-    for (auto&& [targetProjName, sourceProjName] : projectionRenames) {
-        node = make<EvaluationNode>(
-            std::move(targetProjName), make<Variable>(std::move(sourceProjName)), std::move(node));
-    }
+    // "move" data out of map to avoid potential copies.
+    extractFromMap(std::move(projectionRenames),
+                   [&node](ProjectionName targetProjName, ProjectionName sourceProjName) {
+                       // Wrap given node in projection renames using evaluation nodes.
+                       node = make<EvaluationNode>(std::move(targetProjName),
+                                                   make<Variable>(std::move(sourceProjName)),
+                                                   std::move(node));
+                   });
 }
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
@@ -1999,17 +2005,19 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
 
         ResidualRequirements::visitDisjuncts(
             *residualReqs,
-            [&](const ResidualRequirements::Node& child,
-                const ResidualRequirements::VisitorContext&) {
+            // We pass the child as a non-const ref so we can std::move out of it. Even though
+            // `residualReqs` is used later on in this function we reassign `result` to it below, so
+            // we're not using after a move.
+            [&](ResidualRequirements::Node& child, const ResidualRequirements::VisitorContext&) {
                 newReqs.pushConj();
 
                 ResidualRequirements::visitConjuncts(
                     child,
-                    [&](const ResidualRequirements::Node& atom,
+                    [&](ResidualRequirements::Node& atom,
                         const ResidualRequirements::VisitorContext&) {
                         ResidualRequirements::visitAtom(
                             atom,
-                            [&](const ResidualRequirement& residReq,
+                            [&](ResidualRequirement& residReq,
                                 const ResidualRequirements::VisitorContext&) {
                                 auto& [key, req, ce] = residReq;
 
@@ -2042,8 +2050,7 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
 
                 newReqs.pop();
             });
-        auto result = newReqs.finish();
-        std::swap(result, residualReqs);
+        residualReqs = newReqs.finish();
     }
 
     // Remove unused projections from the field projection map.
@@ -2591,7 +2598,7 @@ public:
             for (size_t indexField = 0; indexField < _indexFieldCount; indexField++) {
                 const FieldNameType indexKey{encodeIndexKeyName(indexField)};
                 if (auto it = childFields.find(indexKey); it != childFields.end()) {
-                    const auto tempProjName =
+                    auto tempProjName =
                         _prefixId.getNextId(isConjunction ? "conjunction" : "disjunction");
                     it->second = tempProjName;
                     if (indexField < correlatedProjNames.size()) {

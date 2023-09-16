@@ -48,7 +48,7 @@ namespace mongo::optimizer {
 void FieldMapBuilder::integrateFieldPath(
     const FieldPath& fieldPath, const std::function<void(const bool, FieldMapEntry&)>& fn) {
     std::string path = kRootElement;
-    auto it = _fieldMap.emplace(path, FieldNameType{kRootElement});
+    auto it = _fieldMap.emplace(path, FieldNameType{StringData(kRootElement)});
     const size_t fieldPathLength = fieldPath.getPathLength();
 
     for (size_t i = 0; i < fieldPathLength; i++) {

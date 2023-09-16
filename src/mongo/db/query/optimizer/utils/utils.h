@@ -182,16 +182,16 @@ public:
         return {useDescriptiveVarNames};
     }
     static PrefixId createForTests() {
-        return {true /*useDescripriveVarNames*/};
+        return {true /*useDescriptiveVarNames*/};
     }
 
     template <size_t N>
     ProjectionName getNextId(const char (&prefix)[N]) {
         if (std::holds_alternative<IdType>(_ids)) {
-            return ProjectionName{str::stream() << "p" << std::get<IdType>(_ids)++};
+            return ProjectionName{StringData(str::stream() << "p" << std::get<IdType>(_ids)++)};
         } else {
-            return ProjectionName{str::stream()
-                                  << prefix << "_" << std::get<PrefixMapType>(_ids)[prefix]++};
+            return ProjectionName{StringData(
+                str::stream() << prefix << "_" << std::get<PrefixMapType>(_ids)[prefix]++)};
         }
     }
 

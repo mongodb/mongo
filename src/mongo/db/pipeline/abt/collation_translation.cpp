@@ -55,7 +55,7 @@ void generateCollationNode(AlgebrizerContext& ctx, const SortPattern& sortPatter
         if (!part.fieldPath.has_value()) {
             continue;
         }
-        const auto& sortProjName = ctx.getNextId("sort");
+        auto sortProjName = ctx.getNextId("sort");
         collationSpec.emplace_back(
             sortProjName, part.isAscending ? CollationOp::Ascending : CollationOp::Descending);
 

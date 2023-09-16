@@ -903,7 +903,7 @@ private:
     }
 
     ProjectionName generateVariableName(const Variables::Id varId) {
-        return ProjectionName{str::stream() << "var_" << varId};
+        return ProjectionName{std::string(str::stream() << "var_" << varId)};
     }
 
     void unsupportedExpression(const char* op) const {

@@ -82,9 +82,9 @@ ABTPrinter::ABTPrinter(Metadata metadata,
       _explainVersion(explainVersion) {}
 
 BSONObj ABTPrinter::explainBSON() const {
-    const auto explainPlanStr = [&](std::string planStr) {
+    const auto explainPlanStr = [&](const std::string& planStr) {
         BSONObjBuilder builder;
-        builder.append("plan", std::move(planStr));
+        builder.append("plan", planStr);
         return builder.done().getOwned();
     };
 

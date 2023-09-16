@@ -59,7 +59,13 @@ public:
     template <class TagType1 = TagType, class = typename std::enable_if_t<!TagType1::kAllowEmpty>>
     StrongStringAlias(const char (&value)[1]) = delete;
 
-    // Need to explicitly construct from StringData and const char*.
+    // Need to explicitly construct from StringData, const char*, or std::string.
+    explicit StrongStringAlias(std::string value) : _value(std::move(value)) {
+        if constexpr (!TagType::kAllowEmpty) {
+            invariant(!_value.empty());
+        }
+    }
+
     explicit StrongStringAlias(StringData value) : _value(value) {
         if constexpr (!TagType::kAllowEmpty) {
             invariant(!_value.empty());

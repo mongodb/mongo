@@ -359,7 +359,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                   filterNodeProps);
         runNodeVariation(ctx,
                          "Shard Filtering with Top Level Fields",
-                         std::move(filterNode),
+                         filterNode,
                          &runtimeEnv,
                          &ids,
                          boost::none,
@@ -408,7 +408,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                 filterNodeProps);
         runNodeVariation(ctx,
                          "Shard Filtering with Dotted Field Path",
-                         std::move(filterNode),
+                         filterNode,
                          &runtimeEnv,
                          &ids,
                          boost::none,
@@ -465,7 +465,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                   filterNodeProps);
         runNodeVariation(ctx,
                          "Shard Filtering with Inlined path",
-                         std::move(filterNode),
+                         filterNode,
                          &runtimeEnv,
                          &ids,
                          boost::none,

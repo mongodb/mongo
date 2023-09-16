@@ -51,13 +51,13 @@ namespace mongo::optimizer {
 /**
  * A simple helper that creates a vector of Sources and binds names.
  */
-static ABT buildSimpleBinder(const ProjectionNameVector& names) {
+static ABT buildSimpleBinder(ProjectionNameVector names) {
     ABTVector sources;
     for (size_t idx = 0; idx < names.size(); ++idx) {
         sources.emplace_back(make<Source>());
     }
 
-    return make<ExpressionBinder>(names, std::move(sources));
+    return make<ExpressionBinder>(std::move(names), std::move(sources));
 }
 
 /**
@@ -829,7 +829,7 @@ GroupByNode::GroupByNode(ProjectionNameVector groupByProjectionNames,
                          GroupNodeType type,
                          ABT child)
     : Base(std::move(child),
-           buildSimpleBinder(aggregationProjectionNames),
+           buildSimpleBinder(std::move(aggregationProjectionNames)),
            make<References>(std::move(aggregationExpressions)),
            buildSimpleBinder(groupByProjectionNames),
            make<References>(groupByProjectionNames)),
@@ -962,7 +962,7 @@ ABT& SpoolProducerNode::getChild() {
 SpoolConsumerNode::SpoolConsumerNode(const SpoolConsumerType type,
                                      const int64_t spoolId,
                                      ProjectionNameVector projections)
-    : Base(buildSimpleBinder(projections)), _type(type), _spoolId(spoolId) {
+    : Base(buildSimpleBinder(std::move(projections))), _type(type), _spoolId(spoolId) {
     tassert(
         6624125, "Spool consumer must have a non-empty projection list", !binder().names().empty());
 }
@@ -1031,7 +1031,7 @@ ABT& LimitSkipNode::getChild() {
     return get<0>();
 }
 
-ExchangeNode::ExchangeNode(const properties::DistributionRequirement distribution, ABT child)
+ExchangeNode::ExchangeNode(properties::DistributionRequirement distribution, ABT child)
     : Base(std::move(child), buildReferences(distribution.getAffectedProjectionNames())),
       _distribution(std::move(distribution)) {
     assertNodeSort(getChild());

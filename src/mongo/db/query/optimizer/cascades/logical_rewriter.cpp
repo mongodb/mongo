@@ -112,7 +112,7 @@ LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
 LogicalRewriter::LogicalRewriter(const Metadata& metadata,
                                  Memo& memo,
                                  PrefixId& prefixId,
-                                 const RewriteSet rewriteSet,
+                                 RewriteSet rewriteSet,
                                  const DebugInfo& debugInfo,
                                  const QueryHints& hints,
                                  const PathToIntervalFn& pathToInterval,
@@ -849,9 +849,8 @@ public:
             return {{simplified->negated, make<PathConstant>(std::move(simplified->newNode))}};
         } else if (negate) {
             // we can still negate the inner expression.
-            return {{true,
-                     make<PathConstant>(
-                         make<UnaryOp>(Operations::Not, std::move(constant.getConstant())))}};
+            return {
+                {true, make<PathConstant>(make<UnaryOp>(Operations::Not, constant.getConstant()))}};
         }
         return {};
     }
@@ -862,8 +861,7 @@ public:
         } else if (negate) {
             // We can still negate the inner expression.
             return {{true,
-                     make<PathDefault>(
-                         make<UnaryOp>(Operations::Not, std::move(pathDefault.getDefault())))}};
+                     make<PathDefault>(make<UnaryOp>(Operations::Not, pathDefault.getDefault()))}};
         }
         return {};
     }
@@ -1214,9 +1212,7 @@ struct SubstituteConvert<EvaluationNode> {
         PSRExpr::visitDNF(
             conversion->_reqMap, [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
                 auto& [key, req] = entry;
-                req = {evalNode.getProjectionName(),
-                       std::move(req.getIntervals()),
-                       req.getIsPerfOnly()};
+                req = {evalNode.getProjectionName(), req.getIntervals(), req.getIsPerfOnly()};
 
                 uassert(6624114,
                         "Eval partial schema requirement must contain a variable name.",
@@ -1614,13 +1610,13 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
     auto leftReqExpr = leftReqsBuilder.finish();
     auto rightReqExpr = rightReqsBuilder.finish();
     // Convert everything back to DNF.
-    leftReqExpr = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(std::move(*leftReqExpr),
-                                                                   {{._isDNF = true}});
+    leftReqExpr =
+        convertToDNF<PartialSchemaEntry, PSRExprBuilder>(*leftReqExpr, {{._isDNF = true}});
     if (!leftReqExpr) {
         return;
     }
-    rightReqExpr = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(std::move(*rightReqExpr),
-                                                                    {{._isDNF = true}});
+    rightReqExpr =
+        convertToDNF<PartialSchemaEntry, PSRExprBuilder>(*rightReqExpr, {{._isDNF = true}});
     if (!rightReqExpr) {
         return;
     }
@@ -1660,7 +1656,7 @@ static void splitSargableNodeToReduceFetching(IntervalReqSplitResult splitResult
         ProjectionNameVector{scanProjectionName, std::move(splitResult.boundProjectionName)},
         std::move(leftChild),
         std::move(rightChild));
-    const auto& result = ctx.addNode(std::move(newRoot), false /*substitute*/);
+    const auto& result = ctx.addNode(newRoot, false /*substitute*/);
     incrementSplitCount(result.second, ctx.getAboveNodeId(), ctx.getSargableSplitCountMap());
 }
 
@@ -1819,16 +1815,16 @@ struct ExploreConvert<SargableNode> {
             }
             // Convert everything back to DNF.
             if (!PSRExpr::isDNF(leftReqs)) {
-                auto conversion = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(
-                    std::move(leftReqs), {{._isDNF = true}});
+                auto conversion =
+                    convertToDNF<PartialSchemaEntry, PSRExprBuilder>(leftReqs, {{._isDNF = true}});
                 if (!conversion) {
                     continue;
                 }
                 leftReqs = std::move(*conversion);
             }
             if (!PSRExpr::isDNF(rightReqs)) {
-                auto conversion = convertToDNF<PartialSchemaEntry, PSRExprBuilder>(
-                    std::move(rightReqs), {{._isDNF = true}});
+                auto conversion =
+                    convertToDNF<PartialSchemaEntry, PSRExprBuilder>(rightReqs, {{._isDNF = true}});
                 if (!conversion) {
                     continue;
                 }

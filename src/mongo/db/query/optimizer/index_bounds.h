@@ -258,6 +258,7 @@ public:
     const boost::optional<ProjectionName>& getBoundProjectionName() const;
 
     const IntervalReqExpr::Node& getIntervals() const;
+    IntervalReqExpr::Node& getIntervals();
 
     bool getIsPerfOnly() const;
 

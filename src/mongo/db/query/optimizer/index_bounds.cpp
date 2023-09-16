@@ -197,6 +197,10 @@ const IntervalReqExpr::Node& PartialSchemaRequirement::getIntervals() const {
     return _intervals;
 }
 
+IntervalReqExpr::Node& PartialSchemaRequirement::getIntervals() {
+    return _intervals;
+}
+
 bool PartialSchemaRequirement::getIsPerfOnly() const {
     return _isPerfOnly;
 }

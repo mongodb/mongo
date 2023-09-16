@@ -46,14 +46,14 @@ optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slot) {
     constexpr StringData prefix = "__s"_sd;
     str::stream varName;
     varName << prefix << slot;
-    return optimizer::ProjectionName{varName};
+    return optimizer::ProjectionName{std::string(varName)};
 }
 
 optimizer::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId) {
     constexpr StringData prefix = "__l"_sd;
     str::stream varName;
     varName << prefix << frameId << "_" << slotId;
-    return optimizer::ProjectionName{varName};
+    return optimizer::ProjectionName{std::string(varName)};
 }
 
 boost::optional<sbe::value::SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var) {

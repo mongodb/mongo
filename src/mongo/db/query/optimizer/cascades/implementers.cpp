@@ -464,7 +464,7 @@ public:
 
         PhysProps newProps = _physProps;
         // Add projections we depend on to the requirement.
-        addProjectionsToProperties(newProps, std::move(references));
+        addProjectionsToProperties(newProps, references);
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
         ABT physicalFilter{n};
@@ -543,7 +543,7 @@ public:
         }
 
         addRemoveProjectionsToProperties(
-            newProps, std::move(references), ProjectionNameVector{projectionName});
+            newProps, references, ProjectionNameVector{projectionName});
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
         ABT physicalEval{n};
@@ -844,7 +844,7 @@ public:
                                                0 /*currentEqPrefixIndex*/,
                                                reverseOrder,
                                                candidateIndexEntry._correlatedProjNames.getVector(),
-                                               std::move(indexPredSelMap),
+                                               indexPredSelMap,
                                                currentGroupCE,
                                                scanGroupCE,
                                                usedSortedMerge);
@@ -869,7 +869,7 @@ public:
                 if (needsShardFilter) {
                     handleIndexScanRemoveOrphanRequirement(scanDef.shardingMetadata().shardKey(),
                                                            builder,
-                                                           std::move(shardKeyProjections),
+                                                           shardKeyProjections,
                                                            currentGroupCE);
                 }
 
@@ -1422,11 +1422,11 @@ public:
         }
 
         // TODO: consider hash join if the predicate is equality.
-        ABT nlj = make<NestedLoopJoinNode>(std::move(node.getJoinType()),
-                                           std::move(node.getCorrelatedProjectionNames()),
-                                           std::move(node.getFilter()),
-                                           std::move(node.getLeftChild()),
-                                           std::move(node.getRightChild()));
+        ABT nlj = make<NestedLoopJoinNode>(node.getJoinType(),
+                                           node.getCorrelatedProjectionNames(),
+                                           node.getFilter(),
+                                           node.getLeftChild(),
+                                           node.getRightChild());
         NestedLoopJoinNode& newNode = *nlj.cast<NestedLoopJoinNode>();
 
         optimizeChildren<NestedLoopJoinNode, PhysicalRewriteType::NLJ>(

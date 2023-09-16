@@ -262,7 +262,7 @@ boost::optional<CostType> PhysicalRewriter::optimizeChildren(const CostType node
 PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult()
     : _success(false), _index(0), _cost(CostType::kInfinity) {}
 
-PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult(const size_t index, const CostType cost)
+PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult(const size_t index, CostType cost)
     : _success(true), _index(index), _cost(std::move(cost)) {
     uassert(6624347,
             "Cannot have successful optimization with infinite cost",

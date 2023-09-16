@@ -140,7 +140,7 @@ inline auto _cempobj() {
 
 // Variable.
 inline auto operator"" _var(const char* c, size_t len) {
-    return ExprHolder{make<Variable>(ProjectionName{{c, len}})};
+    return ExprHolder{make<Variable>(ProjectionName{StringData{c, len}})};
 }
 
 // Vector of variable names.
@@ -296,8 +296,8 @@ inline auto _collation(std::vector<std::string> spec, NodeHolder input) {
     ProjectionCollationSpec pcspec;
     for (const auto& s : spec) {
         if (const auto pos = s.find(':'); pos < s.size() - 1) {
-            const auto& projName = s.substr(0, pos);
-            const auto& collSpec = s.substr(pos + 1);
+            std::string projName = s.substr(0, pos);
+            std::string collSpec = s.substr(pos + 1);
 
             CollationOp op;
             if (collSpec == "1") {

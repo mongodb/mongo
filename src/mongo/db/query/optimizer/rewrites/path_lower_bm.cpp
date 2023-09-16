@@ -64,8 +64,9 @@ ABT makePath(int64_t nGets, int64_t nAnds, ABT base) {
         auto branch = make<PathGet>(FieldNameType{"a"}, base);
 
         for (int j = 1; j < nGets; j++) {
-            branch = make<PathGet>(FieldNameType{str::stream() << "a" << std::to_string(i)},
-                                   std::move(branch));
+            branch =
+                make<PathGet>(FieldNameType{std::string(str::stream() << "a" << std::to_string(i))},
+                              std::move(branch));
         }
         return branch;
     };
