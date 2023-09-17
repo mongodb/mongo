@@ -82,7 +82,7 @@ DocumentSource::GetNextResult DocumentSourceOperationMetrics::doGetNext() {
     }
 
     if (_operationMetricsIter != _operationMetrics.end()) {
-        auto doc = Document(std::move(*_operationMetricsIter));
+        auto doc = Document(*_operationMetricsIter);
         _operationMetricsIter++;
         return doc;
     }

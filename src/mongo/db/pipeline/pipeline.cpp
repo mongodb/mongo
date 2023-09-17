@@ -820,7 +820,7 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const MakePipelineOptions opts) {
+    MakePipelineOptions opts) {
     auto pipeline = Pipeline::parse(rawPipeline, expCtx, opts.validator);
 
     if (opts.optimize) {
@@ -917,7 +917,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
     subPipelineExpCtx->ns = resolvedNs.ns;
 
     if (resolvedNs.pipeline.empty()) {
-        return Pipeline::makePipeline(std::move(currentPipeline), subPipelineExpCtx, opts);
+        return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
     auto resolvedPipeline = std::move(resolvedNs.pipeline);
 
@@ -931,7 +931,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
                             std::make_move_iterator(currentPipeline.begin()),
                             std::make_move_iterator(currentPipeline.end()));
 
-    return Pipeline::makePipeline(std::move(resolvedPipeline), subPipelineExpCtx, opts);
+    return Pipeline::makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
 }
 
 }  // namespace mongo

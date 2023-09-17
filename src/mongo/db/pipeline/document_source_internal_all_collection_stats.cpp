@@ -83,7 +83,7 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
 
         // Avoid computing stats for collections that do not match the absorbed filter on the 'ns'
         // field.
-        if (_absorbedMatch && !_absorbedMatch->getMatchExpression()->matchesBSON(std::move(obj))) {
+        if (_absorbedMatch && !_absorbedMatch->getMatchExpression()->matchesBSON(obj)) {
             continue;
         }
 

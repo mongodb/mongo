@@ -432,8 +432,7 @@ PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
     if (!_pipelines.empty()) {
         const LiteParsedPipeline& pipeline = _pipelines[0];
         Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges,
-            std::move(pipeline.requiredPrivileges(isMongos, bypassDocumentValidation)));
+            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
     }
 
     return requiredPrivileges;

@@ -91,7 +91,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
                                                    << NamespaceStringUtil::serialize(*nss))));
         }
         try {
-            _pipeline = Pipeline::makePipeline(std::move(stages), foreignExpCtx, opts);
+            _pipeline = Pipeline::makePipeline(stages, foreignExpCtx, opts);
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             LOGV2(7807800,
                   "Failed to create aggregation pipeline to list sampled queries",
@@ -101,7 +101,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
     }
 
     if (auto doc = _pipeline->getNext()) {
-        const auto queryDoc = SampledQueryDocument::parse(
+        auto queryDoc = SampledQueryDocument::parse(
             IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
         DocumentSourceListSampledQueriesResponse response;
         response.setSampledQueryDocument(std::move(queryDoc));

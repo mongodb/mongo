@@ -154,7 +154,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     }
     auto sbeCompatibility = std::min(expCtx->sbeWindowCompatibility, expCtx->sbeCompatibility);
 
-    return create(std::move(expCtx),
+    return create(expCtx,
                   std::move(partitionBy),
                   std::move(sortBy),
                   std::move(outputFields),
@@ -164,7 +164,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     optional<intrusive_ptr<Expression>> partitionBy,
-    const optional<SortPattern>& sortBy,
+    optional<SortPattern> sortBy,
     std::vector<WindowFunctionStatement> outputFields,
     SbeCompatibility sbeCompatibility) {
 
@@ -286,8 +286,8 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
         expCtx,
         simplePartitionByExpr,
-        sortBy,
-        outputFields,
+        std::move(sortBy),
+        std::move(outputFields),
         internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load(),
         sbeCompatibility));
 

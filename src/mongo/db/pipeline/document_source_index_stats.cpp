@@ -65,7 +65,7 @@ DocumentSource::GetNextResult DocumentSourceIndexStats::doGetNext() {
     }
 
     if (_indexStatsIter != _indexStats.cend()) {
-        Document doc{std::move(*_indexStatsIter)};
+        Document doc{*_indexStatsIter};
         ++_indexStatsIter;
         return doc;
     }

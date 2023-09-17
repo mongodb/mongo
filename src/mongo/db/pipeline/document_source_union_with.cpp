@@ -189,8 +189,7 @@ PrivilegeVector DocumentSourceUnionWith::LiteParsed::requiredPrivileges(
     if (!_pipelines.empty()) {
         const LiteParsedPipeline& pipeline = _pipelines[0];
         Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges,
-            std::move(pipeline.requiredPrivileges(isMongos, bypassDocumentValidation)));
+            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
     }
     return requiredPrivileges;
 }
@@ -223,7 +222,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
     return make_intrusive<DocumentSourceUnionWith>(
         expCtx,
         buildPipelineFromViewDefinition(
-            expCtx, expCtx->getResolvedNamespace(std::move(unionNss)), std::move(pipeline)));
+            expCtx, expCtx->getResolvedNamespace(unionNss), std::move(pipeline)));
 }
 
 DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {

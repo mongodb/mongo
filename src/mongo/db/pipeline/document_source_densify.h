@@ -336,14 +336,14 @@ public:
     static constexpr StringData kRangeFieldName = "range"_sd;
 
     DocumentSourceInternalDensify(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                  const FieldPath& field,
-                                  const std::list<FieldPath>& partitions,
-                                  const RangeStatement& range)
+                                  FieldPath field,
+                                  std::list<FieldPath> partitions,
+                                  RangeStatement range)
         : DocumentSource(kStageName, pExpCtx),
           _memTracker(
               MemoryUsageTracker(false, internalDocumentSourceDensifyMaxMemoryBytes.load())),
           _field(std::move(field)),
-          _partitions(partitions),
+          _partitions(std::move(partitions)),
           _range(std::move(range)),
           _partitionTable(pExpCtx->getValueComparator()
                               .makeUnorderedValueMap<MemoryTokenWith<DensifyValue>>()) {

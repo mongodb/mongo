@@ -85,7 +85,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
 std::list<boost::intrusive_ptr<DocumentSource>> create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
-    const boost::optional<SortPattern>& sortBy,
+    boost::optional<SortPattern> sortBy,
     std::vector<WindowFunctionStatement> outputFields,
     SbeCompatibility sbeCompatibility);
 
@@ -105,7 +105,7 @@ public:
     DocumentSourceInternalSetWindowFields(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
-        const boost::optional<SortPattern>& sortBy,
+        boost::optional<SortPattern> sortBy,
         std::vector<WindowFunctionStatement> outputFields,
         int64_t maxMemoryBytes,
         SbeCompatibility sbeCompatibility)

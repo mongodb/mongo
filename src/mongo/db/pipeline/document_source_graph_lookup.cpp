@@ -356,7 +356,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
                 shouldPerformAnotherQuery =
                     addToVisitedAndFrontier(*next, depth) || shouldPerformAnotherQuery;
-                addToCache(std::move(*next), queried);
+                addToCache(*next, queried);
             }
             checkMemoryUsage();
         }

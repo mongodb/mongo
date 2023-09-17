@@ -108,7 +108,7 @@ private:
      */
     DocumentSourceChangeStreamOplogMatch(BSONObj filter,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceMatch(std::move(filter), expCtx), _optimizedEndOfPipeline(true) {
+        : DocumentSourceMatch(filter, expCtx), _optimizedEndOfPipeline(true) {
         expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     }
 

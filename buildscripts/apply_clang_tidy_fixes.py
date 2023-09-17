@@ -53,9 +53,9 @@ def main():
 
         # perform the swap replacement of the binary data
         file_bytes = bytearray(file_bytes)
+        fixes[recorded_md5]['replacements'].sort(key=lambda r: r['Offset'])
         adjustments = 0
         for replacement in fixes[recorded_md5]['replacements']:
-
             file_bytes[replacement['Offset'] + adjustments:replacement['Offset'] + adjustments +
                        replacement['Length']] = replacement['ReplacementText'].encode()
 

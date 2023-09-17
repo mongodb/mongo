@@ -297,8 +297,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfEvalArgumentNotOfTypeStringOrCod
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentNotDocument) {
     std::string eval("function(key, values) { return Array.sum(values); };");
     auto argument = Value(Value(2));
-    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(
-        getExpCtx(), std::move(eval), argument, 31242);
+    assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), eval, argument, 31242);
 }
 
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentDoesNotContainExpectedFields) {

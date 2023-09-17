@@ -99,7 +99,7 @@ DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
     }
 
     if (!_catalogDocs->empty()) {
-        Document doc{std::move(_catalogDocs->front())};
+        Document doc{_catalogDocs->front()};
         _catalogDocs->pop_front();
         return doc;
     }

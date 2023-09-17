@@ -1156,7 +1156,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
 
     boost::intrusive_ptr<mongo::DocumentSourceGroup> newGroup =
         DocumentSourceGroup::create(pExpCtx,
-                                    std::move(rewrittenIdExpression),
+                                    rewrittenIdExpression,
                                     std::move(accumulationStatementsBucket),
                                     groupPtr->getMaxMemoryUsageBytes());
 

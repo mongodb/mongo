@@ -88,7 +88,7 @@ void DocumentSourceGroupBMFixture::runDocumentSourceGroup(int numGroups,
         auto mock = DocumentSourceMock::createForTest(expCtx);
         for (int i = 1; i <= numGroups; ++i) {
             BSONObj obj = BSON("a" << i << "b" << i + 1 << "c" << 10 << "x" << i << "y" << i * 10);
-            mock->push_back(Document{std::move(obj)}, countPerGroup);
+            mock->push_back(Document{obj}, countPerGroup);
         }
         group->setSource(mock.get());
         state.ResumeTiming();

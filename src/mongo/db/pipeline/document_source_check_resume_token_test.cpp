@@ -306,7 +306,7 @@ protected:
     void addOplogEntryOnTestNS(ResumeTokenData tokenData) {
         _mock->push_back(Document{{"ns", kTestNs},
                                   {"ts", tokenData.clusterTime},
-                                  {"_id", ResumeToken(std::move(tokenData)).toDocument()}});
+                                  {"_id", ResumeToken(tokenData).toDocument()}});
     }
 
     /**

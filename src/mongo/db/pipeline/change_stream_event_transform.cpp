@@ -250,16 +250,16 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 if (_changeStreamSpec.getShowRawUpdateDescription()) {
                     updateDescription = input[repl::OplogEntry::kObjectFieldName];
                 } else {
-                    const auto& deltaDesc = change_stream_document_diff_parser::parseDiff(
+                    auto deltaDesc = change_stream_document_diff_parser::parseDiff(
                         diffObj.getDocument().toBson());
 
                     updateDescription =
-                        Value(Document{{"updatedFields", deltaDesc.updatedFields},
+                        Value(Document{{"updatedFields", std::move(deltaDesc.updatedFields)},
                                        {"removedFields", std::move(deltaDesc.removedFields)},
                                        {"truncatedArrays", std::move(deltaDesc.truncatedArrays)},
                                        {"disambiguatedPaths",
                                         _changeStreamSpec.getShowExpandedEvents()
-                                            ? Value(deltaDesc.disambiguatedPaths)
+                                            ? Value(std::move(deltaDesc.disambiguatedPaths))
                                             : Value()}});
                 }
             } else if (!oplogVersion.missing() || id.missing()) {

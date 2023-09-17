@@ -2761,7 +2761,7 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
 
     VariablesParseState vpsSub(vpsIn);  // vpsSub gets our variable, vpsIn doesn't.
     // Parse "as". If "as" is not specified, then use "this" by default.
-    auto const varName = asElem.eoo() ? "this" : asElem.str();
+    auto varName = asElem.eoo() ? "this" : asElem.str();
 
     variableValidation::validateNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
@@ -2867,7 +2867,7 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
         variables->setValue(_varId, elem);
 
         if (_children[_kCond]->evaluate(root, variables).coerceToBool()) {
-            output.push_back(std::move(elem));
+            output.push_back(elem);
             if (remainingLimitCounter && --*remainingLimitCounter == 0) {
                 return Value(std::move(output));
             }
@@ -3635,7 +3635,7 @@ ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArg
 class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
 public:
     Optimized(ExpressionContext* const expCtx,
-              const ValueUnorderedMap<vector<int>>& indexMap,
+              ValueUnorderedMap<vector<int>> indexMap,
               const ExpressionVector& operands)
         : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
         _children = operands;
@@ -3696,7 +3696,7 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
             }
             indexMap[arr[i]].push_back(i);
         }
-        return new Optimized(getExpressionContext(), indexMap, _children);
+        return new Optimized(getExpressionContext(), std::move(indexMap), _children);
     }
     return this;
 }
@@ -4402,10 +4402,8 @@ intrusive_ptr<Expression> ExpressionPow::create(ExpressionContext* const expCtx,
                                                 Value base,
                                                 Value exp) {
     intrusive_ptr<ExpressionPow> expr(new ExpressionPow(expCtx));
-    expr->_children.push_back(
-        ExpressionConstant::create(expr->getExpressionContext(), std::move(base)));
-    expr->_children.push_back(
-        ExpressionConstant::create(expr->getExpressionContext(), std::move(exp)));
+    expr->_children.push_back(ExpressionConstant::create(expr->getExpressionContext(), base));
+    expr->_children.push_back(ExpressionConstant::create(expr->getExpressionContext(), exp));
     return expr;
 }
 

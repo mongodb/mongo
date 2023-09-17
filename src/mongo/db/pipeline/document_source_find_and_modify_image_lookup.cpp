@@ -105,7 +105,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
         NamespaceString::kConfigImagesNamespace,
         imageCollUUID,
         Document{BSON("_id" << sessionId.toBSON())},
-        std::move(readConcernBson));
+        readConcernBson);
 
     if (!imageDoc) {
         // If no image document with the corresponding 'sessionId' is found, we skip forging the
