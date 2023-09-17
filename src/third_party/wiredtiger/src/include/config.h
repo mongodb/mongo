@@ -17,9 +17,8 @@ struct __wt_config {
 };
 
 /*
- * We have jump tables that for each ASCII character, show
- * the offset in a lookup table that keys starting with that
- * character start at. All keys are 7 bit ASCII.
+ * We have jump tables that for each ASCII character, show the offset in a lookup table that keys
+ * starting with that character start at. All keys are 7 bit ASCII.
  */
 #define WT_CONFIG_JUMP_TABLE_SIZE 128
 
