@@ -2270,83 +2270,6 @@ __wt_btcur_bounds_early_exit(
 }
 
 /*
- * __wt_cbt_clear_all_deleted_items_flag --
- *     Reset the page all deleted items flag if it has any data other than deleted.
- */
-static inline void
-__wt_cbt_clear_all_deleted_items_flag(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *first_upd)
-{
-    if (WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
-        if (__wt_txn_upd_value_visible_all(session, cbt->upd_value))
-            ++cbt->page_obsolete_deleted_count;
-        /*
-         * There may be more recent updates in the update list that are either not committed or not
-         * visible to the current transaction if the selected tombstone differs from the most recent
-         * update in the update list. Consider that the page in this circumstance has non-deleted
-         * items.
-         */
-        else if (F_ISSET(cbt, WT_CBT_ALL_DELETED_ITEMS) && first_upd != NULL &&
-          (cbt->upd_value->tw.stop_txn != first_upd->txnid ||
-            cbt->upd_value->tw.stop_ts != first_upd->start_ts))
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
-    } else
-        F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
-}
-
-/*
- * __wt_cbt_evict_pages_with_deleted_items --
- *     Mark the page for eviction if it has a sufficient amount of globally visible deleted items,
- *     or if the page contains all deleted items according to the current session snapshot, in order
- *     to improve scan efficiency.
- */
-static inline int
-__wt_cbt_evict_pages_with_deleted_items(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool newpage, size_t total_skipped)
-{
-    WT_PAGE *page;
-
-    page = cbt->ref->page;
-
-    /*
-     * An obsolete visible stop timestamp could have been treated as a tombstone and accounted for
-     * in the deleted count. Such a page might not have any new updates and be clean, but could
-     * benefit from reconciliation getting rid of the obsolete content. Hence mark the page dirty to
-     * force it through reconciliation.
-     */
-    if (cbt->page_obsolete_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
-      (newpage && cbt->page_obsolete_deleted_count > 0)) {
-        WT_RET(__wt_page_dirty_and_evict_soon(session, cbt->ref));
-        WT_STAT_CONN_INCR(session, cache_eviction_force_obsolete_delete);
-    } else if (page->type != WT_PAGE_COL_FIX && newpage && total_skipped != 0 &&
-      F_ISSET(cbt, WT_CBT_ALL_DELETED_ITEMS) &&
-      session->txn->isolation != WT_ISO_READ_UNCOMMITTED) {
-        /*
-         * A visible stop timestamp could have been treated as a tombstone and accounted for page
-         * with no non-deleted updates. Evicting these pages could benefit search performance.
-         * Generally, tombstones are ignored while searching the history store, so we should not see
-         * any history store pages in this flow. Ignore the pages from fixed length column store
-         * tables as they don't get any search performance benefit and also sessions with READ
-         * UNCOMMITTED isolation, as their search can see the results of an uncommitted transaction.
-         *
-         * Verify whether any deleted keys were skipped throughout the scan to find empty pages.
-         * Pages that are empty have no keys on them. This prevents unnecessarily evicting empty
-         * pages.
-         *
-         * Due to all deleted items on the page that have not yet become obsolete, there is no need
-         * to mark the page dirty as in the case of obsolete updates. Reconciling the page
-         * forcefully might not be beneficial.
-         */
-        __wt_page_evict_soon(session, cbt->ref);
-        WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
-    }
-
-    cbt->page_obsolete_deleted_count = 0;
-    F_SET(cbt, WT_CBT_ALL_DELETED_ITEMS);
-    return (0);
-}
-
-/*
  * __wt_btcur_skip_page --
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
@@ -2405,7 +2328,6 @@ __wt_btcur_skip_page(
      */
     if (previous_state == WT_REF_DELETED && __wt_page_del_visible(session, ref->page_del, true)) {
         *skipp = true;
-        WT_STAT_CONN_DATA_INCR(session, cursor_tree_walk_del_page_skip);
         goto unlock;
     }
 
@@ -2420,7 +2342,6 @@ __wt_btcur_skip_page(
         /* If there's delete information in the disk address, we can use it. */
         if (addr.del_set && __wt_page_del_visible(session, &addr.del, true)) {
             *skipp = true;
-            WT_STAT_CONN_DATA_INCR(session, cursor_tree_walk_del_page_skip);
             goto unlock;
         }
 
@@ -2432,7 +2353,6 @@ __wt_btcur_skip_page(
           __wt_txn_snap_min_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
             addr.ta.newest_stop_durable_ts)) {
             *skipp = true;
-            WT_STAT_CONN_DATA_INCR(session, cursor_tree_walk_del_page_skip);
             goto unlock;
         }
     }

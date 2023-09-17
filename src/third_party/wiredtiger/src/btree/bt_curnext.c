@@ -188,16 +188,15 @@ restart_read:
 
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
             continue;
         }
         if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-            __wt_cbt_clear_all_deleted_items_flag(session, cbt, cbt->ins->upd);
+            if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
+              __wt_txn_upd_value_visible_all(session, cbt->upd_value))
+                ++cbt->page_deleted_count;
             ++*skippedp;
             continue;
         }
-
-        F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
         __wt_value_return(cbt, cbt->upd_value);
         return (0);
     }
@@ -280,12 +279,12 @@ restart_read:
             WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-                __wt_cbt_clear_all_deleted_items_flag(session, cbt, cbt->ins->upd);
+                if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
+                  __wt_txn_upd_value_visible_all(session, cbt->upd_value))
+                    ++cbt->page_deleted_count;
                 ++*skippedp;
                 continue;
             }
-
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
             __wt_value_return(cbt, cbt->upd_value);
             return (0);
         }
@@ -300,7 +299,6 @@ restart_read:
             F_SET(&cbt->iface, WT_CURSTD_VALUE_INT);
             cbt->iface.value.data = cbt->tmp->data;
             cbt->iface.value.size = cbt->tmp->size;
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
             return (0);
         }
 
@@ -345,19 +343,11 @@ restart_read:
          * the base update for a modify chain after rollback-to-stable, required for correctness.
          */
         WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins ? cbt->ins->upd : NULL));
-        if (cbt->upd_value->type == WT_UPDATE_INVALID) {
-            ++*skippedp;
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
-            continue;
-        }
-
-        if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-            __wt_cbt_clear_all_deleted_items_flag(session, cbt, cbt->ins ? cbt->ins->upd : NULL);
+        if (cbt->upd_value->type == WT_UPDATE_INVALID ||
+          cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
             ++*skippedp;
             continue;
         }
-
-        F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
         __wt_value_return(cbt, cbt->upd_value);
 
         /*
@@ -406,7 +396,6 @@ __cursor_row_next(
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
-    WT_UPDATE *first_upd;
 
     key = &cbt->iface.key;
     page = cbt->ref->page;
@@ -472,16 +461,15 @@ restart_read_insert:
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
-                F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
                 continue;
             }
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-                __wt_cbt_clear_all_deleted_items_flag(session, cbt, cbt->ins->upd);
+                if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
+                  __wt_txn_upd_value_visible_all(session, cbt->upd_value))
+                    ++cbt->page_deleted_count;
                 ++*skippedp;
                 continue;
             }
-
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
             __wt_value_return(cbt, cbt->upd_value);
             return (0);
         }
@@ -526,20 +514,19 @@ restart_read_page:
          * Read the on-disk value and/or history. Pass an update list: the update list may contain
          * the base update for a modify chain after rollback-to-stable, required for correctness.
          */
-        first_upd = WT_ROW_UPDATE(page, rip);
-        WT_RET(__wt_txn_read(session, cbt, &cbt->iface.key, WT_RECNO_OOB, first_upd));
+        WT_RET(
+          __wt_txn_read(session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip)));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
-            F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
             continue;
         }
         if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
-            __wt_cbt_clear_all_deleted_items_flag(session, cbt, first_upd);
+            if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
+              __wt_txn_upd_value_visible_all(session, cbt->upd_value))
+                ++cbt->page_deleted_count;
             ++*skippedp;
             continue;
         }
-
-        F_CLR(cbt, WT_CBT_ALL_DELETED_ITEMS);
         __wt_value_return(cbt, cbt->upd_value);
         return (0);
     }
@@ -722,9 +709,8 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
      */
     F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
-    /* Clear the count of globally visible deleted items. */
-    cbt->page_obsolete_deleted_count = 0;
-    F_SET(cbt, WT_CBT_ALL_DELETED_ITEMS);
+    /* Clear the count of deleted items on the page. */
+    cbt->page_deleted_count = 0;
 
     /* Clear saved iteration cursor position information. */
     cbt->cip_saved = NULL;
@@ -903,15 +889,24 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
                 continue;
             }
         }
-
         /*
          * If we saw a lot of deleted records on this page, or we went all the way through a page
          * and only saw deleted records, try to evict the page when we release it. Otherwise
-         * repeatedly searching from the beginning of a tree can have quadratic performance. Take
-         * care not to force eviction of genuinely empty pages, in new trees.
+         * repeatedly deleting from the beginning of a tree can have quadratic performance. Take
+         * care not to force eviction of pages that are genuinely empty, in new trees.
+         *
+         * A visible stop timestamp could have been treated as a tombstone and accounted in the
+         * deleted count. Such a page might not have any new updates and be clean, but could benefit
+         * from reconciliation getting rid of the obsolete content. Hence mark the page dirty to
+         * force it through reconciliation.
          */
-        if (page != NULL)
-            WT_ERR(__wt_cbt_evict_pages_with_deleted_items(session, cbt, newpage, total_skipped));
+        if (page != NULL &&
+          (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
+            (newpage && cbt->page_deleted_count > 0))) {
+            WT_ERR(__wt_page_dirty_and_evict_soon(session, cbt->ref));
+            WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
+        }
+        cbt->page_deleted_count = 0;
 
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
             LF_SET(WT_READ_WONT_NEED);

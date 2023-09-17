@@ -272,16 +272,14 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      *
      * A visible stop timestamp could have been treated as a tombstone and accounted in the deleted
      * count. Such a page might not have any new updates and be clean, but could benefit from
-     * reconciliation getting rid of obsolete content. Hence mark the page dirty to force it through
-     * reconciliation.
+     * reconciliation getting rid of the obsolete content. Hence mark the page dirty to force it
+     * through reconciliation.
      */
-    if (cbt->page_obsolete_deleted_count > WT_BTREE_DELETE_THRESHOLD) {
+    if (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD) {
         WT_RET(__wt_page_dirty_and_evict_soon(session, cbt->ref));
-        WT_STAT_CONN_INCR(session, cache_eviction_force_obsolete_delete);
+        WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
     }
-
-    cbt->page_obsolete_deleted_count = 0;
-    F_SET(cbt, WT_CBT_ALL_DELETED_ITEMS);
+    cbt->page_deleted_count = 0;
 
     /*
      * Release any page references we're holding. This can trigger eviction (for example, forced
