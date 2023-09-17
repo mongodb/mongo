@@ -217,16 +217,16 @@ AsioTransportLayer::Options defaultTLAOptions() {
     return opts;
 }
 
-std::unique_ptr<AsioTransportLayer> makeTLA(SessionManager* sessionManager,
+std::unique_ptr<AsioTransportLayer> makeTLA(std::unique_ptr<SessionManager> sessionManager,
                                             const AsioTransportLayer::Options& options) {
-    auto tla = std::make_unique<AsioTransportLayer>(options, sessionManager);
+    auto tla = std::make_unique<AsioTransportLayer>(options, std::move(sessionManager));
     ASSERT_OK(tla->setup());
     ASSERT_OK(tla->start());
     return tla;
 }
 
-std::unique_ptr<AsioTransportLayer> makeTLA(SessionManager* sessionManager) {
-    return makeTLA(sessionManager, defaultTLAOptions());
+std::unique_ptr<AsioTransportLayer> makeTLA(std::unique_ptr<SessionManager> sessionManager) {
+    return makeTLA(std::move(sessionManager), defaultTLAOptions());
 }
 
 /**
@@ -235,18 +235,21 @@ std::unique_ptr<AsioTransportLayer> makeTLA(SessionManager* sessionManager) {
  */
 class TestFixture {
 public:
-    TestFixture() : _tla{makeTLA(&_sessionManager)} {}
+    TestFixture() : TestFixture(defaultTLAOptions()) {}
 
-    explicit TestFixture(const AsioTransportLayer::Options& options)
-        : _tla{makeTLA(&_sessionManager, options)} {}
+    explicit TestFixture(const AsioTransportLayer::Options& options) {
+        auto sm = std::make_unique<test::MockSessionManager>();
+        _sessionManager = sm.get();
+        _tla = makeTLA(std::move(sm), options);
+    }
 
     ~TestFixture() {
-        _sessionManager.endAllSessions({});
+        _sessionManager->endAllSessions({});
         _tla->shutdown();
     }
 
     test::MockSessionManager& sessionManager() {
-        return _sessionManager;
+        return *_sessionManager;
     }
 
     AsioTransportLayer& tla() {
@@ -277,7 +280,7 @@ public:
 
 private:
     std::unique_ptr<AsioTransportLayer> _tla;
-    test::MockSessionManager _sessionManager;
+    test::MockSessionManager* _sessionManager;
 
     FailPoint& _hangBeforeAccept = asioTransportLayerHangBeforeAcceptCallback;
     FailPoint& _hangDuringAccept = asioTransportLayerHangDuringAcceptCallback;
@@ -770,16 +773,13 @@ public:
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
-        svcCtx->setSessionManager(std::make_unique<test::MockSessionManager>());
-        auto tl = makeTLA(svcCtx->getSessionManager());
+        auto tl = makeTLA(std::make_unique<test::MockSessionManager>());
         svcCtx->setTransportLayerManager(
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
     }
 
     void tearDown() override {
-        auto* svcCtx = getServiceContext();
-        svcCtx->getSessionManager()->shutdown(Seconds{1});
-        svcCtx->getTransportLayerManager()->shutdown();
+        getServiceContext()->getTransportLayerManager()->shutdown();
     }
 
     AsioTransportLayer& tla() {
@@ -1019,13 +1019,12 @@ public:
         auto sessionManager = std::make_unique<FirstSessionManager>(std::move(pf.promise));
         configureSessionManager(*sessionManager);
 
-        auto tl = makeTLA(sessionManager.get());
+        auto tl = makeTLA(std::move(sessionManager));
         const auto listenerPort = tl->listenerPort();
 
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
-        svcCtx->setSessionManager(std::move(sessionManager));
         svcCtx->setTransportLayerManager(
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
 
@@ -1035,9 +1034,7 @@ public:
 
     void tearDown() override {
         _connThread.reset();
-        auto* svcCtx = getServiceContext();
-        svcCtx->getSessionManager()->shutdown(Seconds{0});
-        svcCtx->getTransportLayerManager()->shutdown();
+        getServiceContext()->getTransportLayerManager()->shutdown();
     }
 
     Client& client() {

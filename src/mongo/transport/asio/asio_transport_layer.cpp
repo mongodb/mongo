@@ -99,6 +99,7 @@ using TcpUserTimeoutMillisOption = SocketOption<IPPROTO_TCP, TCP_USER_TIMEOUT, u
 #endif
 #endif  // __linux__
 
+const Seconds kSessionShutdownTimeout{10};
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
@@ -358,13 +359,17 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
 }
 
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
-                                       SessionManager* sessionManager)
+                                       std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
       _egressReactor(std::make_shared<AsioReactor>()),
       _acceptorReactor(std::make_shared<AsioReactor>()),
-      _sessionManager(sessionManager),
+      _sessionManager(std::move(sessionManager)),
       _listenerOptions(opts),
-      _timerService(std::make_unique<TimerService>()) {}
+      _timerService(std::make_unique<TimerService>()) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Unable to start AsioTransportLayer for ingress without a SessionManager",
+            _sessionManager || !_listenerOptions.isIngress());
+}
 
 AsioTransportLayer::~AsioTransportLayer() = default;
 
@@ -1207,7 +1212,12 @@ Status AsioTransportLayer::start() {
         return ShutdownStatus;
     }
 
+    if (_sessionManager) {
+        uassertStatusOK(_sessionManager->start());
+    }
+
     if (_listenerOptions.isIngress()) {
+        invariant(_sessionManager);
         _listener.thread = stdx::thread([this] { _runListener(); });
         _listener.cv.wait(lk, [&] { return _isShutdown || _listener.active; });
         return Status::OK();
@@ -1226,6 +1236,12 @@ void AsioTransportLayer::shutdown() {
     }
     lk.unlock();
     _timerService->stop();
+    if (_sessionManager) {
+        LOGV2(4784923, "Shutting down the ASIO transport SessionManager");
+        if (!_sessionManager->shutdown(kSessionShutdownTimeout)) {
+            LOGV2(20563, "SessionManager did not shutdown within the time limit");
+        }
+    }
     lk.lock();
 
     if (!_listenerOptions.isIngress()) {
@@ -1318,6 +1334,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session)](Status s) {
                         if (s.isOK()) {
+                            invariant(!!_sessionManager);
                             _sessionManager->startSession(std::move(session));
                         }
                     });

@@ -234,7 +234,6 @@ int dbtestsMain(int argc, char** argv) {
 
     const auto service = getGlobalServiceContext();
     service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
-    service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 
     auto fastClock = std::make_unique<ClockSourceMock>();
     // Timestamps are split into two 32-bit integers, seconds and "increments". Currently (but

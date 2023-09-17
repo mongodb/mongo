@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::transport::grpc {
@@ -42,7 +43,10 @@ class Server;
 
 class GRPCTransportLayerImpl : public GRPCTransportLayer {
 public:
-    GRPCTransportLayerImpl(ServiceContext* svcCtx, Options options);
+    // Note that passing `nullptr` for {sessionManager} will disallow ingress usage.
+    GRPCTransportLayerImpl(ServiceContext* svcCtx,
+                           Options options,
+                           std::unique_ptr<SessionManager> sessionManager);
 
     virtual Status registerService(std::unique_ptr<Service> svc) override;
 
@@ -68,6 +72,10 @@ public:
                               bool asyncOCSPStaple) override;
 #endif
 
+    SessionManager* getSessionManager() const override {
+        return _sessionManager.get();
+    }
+
 private:
     mutable stdx::mutex _mutex;
     bool _isShutdown = false;
@@ -78,6 +86,7 @@ private:
     // Invalidated after setup().
     std::vector<std::unique_ptr<Service>> _services;
     Options _options;
+    std::unique_ptr<SessionManager> _sessionManager;
 };
 
 }  // namespace mongo::transport::grpc

@@ -592,15 +592,6 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
-        // Shutdown the Session Mnager and its sessions and give it a grace period to complete.
-        if (auto mgr = serviceContext->getSessionManager()) {
-            if (!mgr->shutdown(Seconds(10))) {
-                LOGV2_OPTIONS(22844,
-                              {LogComponent::kNetwork},
-                              "SessionManager did not shutdown within the time limit");
-            }
-        }
-
         // Shutdown Full-Time Data Capture
         stopMongoSFTDC(serviceContext);
     }
@@ -767,27 +758,30 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
-    serviceContext->setSessionManager(std::make_unique<transport::SessionManagerCommon>(
-        serviceContext, std::make_unique<ClientTransportObserverMongos>()));
     serviceContext->getService(ClusterRole::RouterServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
-    const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
-    if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {
-        LOGV2_ERROR(6067901,
-                    "Load balancer port must be different from the normal ingress port.",
-                    "port"_attr = serverGlobalParams.port);
-        quickExit(ExitCode::badOptions);
-    }
+    {
+        const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
+        if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {
+            LOGV2_ERROR(6067901,
+                        "Load balancer port must be different from the normal ingress port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
 
-    auto tl = transport::TransportLayerManagerImpl::createWithConfig(
-        &serverGlobalParams, serviceContext, loadBalancerPort);
-    auto res = tl->setup();
-    if (!res.isOK()) {
-        LOGV2_ERROR(22856, "Error setting up listener", "error"_attr = res);
-        return ExitCode::netError;
+        auto tl = transport::TransportLayerManagerImpl::createWithConfig(
+            &serverGlobalParams,
+            serviceContext,
+            loadBalancerPort,
+            boost::none,
+            std::make_unique<ClientTransportObserverMongos>());
+        if (auto res = tl->setup(); !res.isOK()) {
+            LOGV2_ERROR(22856, "Error setting up listener", "error"_attr = res);
+            return ExitCode::netError;
+        }
+        serviceContext->setTransportLayerManager(std::move(tl));
     }
-    serviceContext->setTransportLayerManager(std::move(tl));
 
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
@@ -893,14 +887,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     transport::ServiceExecutor::startupAll(serviceContext);
 
-    status = serviceContext->getSessionManager()->start();
-    if (!status.isOK()) {
-        LOGV2_ERROR(22860, "Error starting session manager", "error"_attr = redact(status));
-        return ExitCode::netError;
-    }
-
-    status = serviceContext->getTransportLayerManager()->start();
-    if (!status.isOK()) {
+    if (auto status = serviceContext->getTransportLayerManager()->start(); !status.isOK()) {
         LOGV2_ERROR(22861, "Error starting transport layer", "error"_attr = redact(status));
         return ExitCode::netError;
     }

@@ -76,6 +76,10 @@ public:
     };
 #endif
 
+    SessionManager* getSessionManager() const {
+        return nullptr;
+    }
+
 private:
     std::shared_ptr<Client> _client;
     ServiceContext* const _svcCtx;

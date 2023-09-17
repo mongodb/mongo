@@ -27,29 +27,36 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/transport/grpc/grpc_session_manager.h"
 
-#include "mongo/transport/session_manager.h"
+#include "mongo/logv2/log.h"
+#include "mongo/transport/grpc/grpc_session.h"
+#include "mongo/transport/service_executor.h"
 
-namespace mongo {
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-class SessionManagerEmbedded final : public transport::SessionManager {
-public:
-    SessionManagerEmbedded() = default;
+namespace mongo::transport::grpc {
 
-    void startSession(std::shared_ptr<transport::Session> session) override {}
-    void endAllSessions(Client::TagMask tags) override {}
-    void endSessionByClient(Client* client) override {}
-    Status start() override {
-        return Status::OK();
+std::string GRPCSessionManager::getClientThreadName(const Session& session) const {
+    const auto* s = checked_cast<const GRPCSession*>(&session);
+    if (auto id = s->clientId()) {
+        return "grpc{}-{}"_format(id->toString(), session.id());
+    } else {
+        return "grpc{}"_format(session.id());
     }
-    bool shutdown(Milliseconds timeout) override {
-        return true;
-    }
-    void appendStats(BSONObjBuilder* bob) const override {}
-    std::size_t numOpenSessions() const override {
-        return 0;
-    }
-};
+}
 
-}  // namespace mongo
+void GRPCSessionManager::configureServiceExecutorContext(mongo::Client* client,
+                                                         bool isPrivilegedSession) const {
+    auto seCtx = std::make_unique<ServiceExecutorContext>();
+    seCtx->setThreadModel(seCtx->kInline);
+    stdx::lock_guard lk(*client);
+    ServiceExecutorContext::set(client, std::move(seCtx));
+}
+
+void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
+    // TODO SERVER-80769 GRPCSessionManager metrics
+    SessionManagerCommon::appendStats(bob);
+}
+
+}  // namespace mongo::transport::grpc

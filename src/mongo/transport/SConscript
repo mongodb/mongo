@@ -97,6 +97,7 @@ tlEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/third_party/shim_asio',
         'service_executor',
+        'session_manager',
     ],
 )
 
@@ -105,6 +106,7 @@ tlEnv.Library(
     source=[
         'asio/asio_networking_baton.cpp' if env.TargetOSIs('linux') else [],
         'asio/asio_session_impl.cpp',
+        'asio/asio_session_manager.cpp',
         'asio/asio_tcp_fast_open.cpp',
         'asio/asio_transport_layer.cpp',
         'asio/asio_utils.cpp',
@@ -127,6 +129,8 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_asio',
+        'service_executor',
+        'session_manager',
     ],
 )
 

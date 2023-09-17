@@ -67,6 +67,7 @@ enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 
 class Reactor;
 using ReactorHandle = std::shared_ptr<Reactor>;
+class SessionManager;
 
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
@@ -145,6 +146,11 @@ public:
     virtual BatonHandle makeBaton(OperationContext* opCtx) const {
         return opCtx->getServiceContext()->makeBaton(opCtx);
     }
+
+    /**
+     * Return the session manager, if any, associated with this TransportLayer.
+     */
+    virtual SessionManager* getSessionManager() const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */

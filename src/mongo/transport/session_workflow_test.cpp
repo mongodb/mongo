@@ -70,8 +70,11 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_test_util.h"
+#include "mongo/transport/test_fixtures.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -231,10 +234,9 @@ public:
         ServiceContextTest::setUp();
         auto sc = getServiceContext();
         sc->getService()->setServiceEntryPoint(_makeServiceEntryPoint());
-        sc->setSessionManager(_makeSessionManager(sc));
-        initializeNewSession();
-        invariant(sessionManager()->start());
         ServiceExecutor::startupAll(sc);
+        _initTransportLayer(sc);
+        initializeNewSession();
         _threadPool->startup();
     }
 
@@ -242,8 +244,7 @@ public:
         ScopeGuard guard = [&] {
             ServiceContextTest::tearDown();
         };
-        // Normal shutdown is a noop outside of ASAN.
-        invariant(sessionManager()->shutdownAndWait(Seconds{10}));
+        getServiceContext()->getTransportLayerManager()->shutdown();
         _threadPool->shutdown();
         _threadPool->join();
         ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
@@ -251,6 +252,9 @@ public:
 
     void initializeNewSession() {
         _session = std::make_shared<CustomMockSession>(this);
+        _session->getTransportLayerCb = [this] {
+            return _transportLayer;
+        };
     }
 
     /** Waits for the current Session and SessionWorkflow to end. */
@@ -270,7 +274,7 @@ public:
     }
 
     SessionManagerCommon* sessionManager() {
-        return checked_cast<SessionManagerCommon*>(getServiceContext()->getSessionManager());
+        return _sessionManager;
     }
 
     /**
@@ -390,6 +394,25 @@ private:
         return sep;
     }
 
+    class MockSessionManagerCommon : public SessionManagerCommon {
+    public:
+        using SessionManagerCommon::SessionManagerCommon;
+
+    protected:
+        std::string getClientThreadName(const Session& session) const override {
+            return "mock{}"_format(session.id());
+        }
+
+        void configureServiceExecutorContext(Client* client,
+                                             bool isPrivilegedSession) const override {
+            auto seCtx = std::make_unique<ServiceExecutorContext>();
+            seCtx->setThreadModel(gInitialUseDedicatedThread ? seCtx->kSynchronous : seCtx->kFixed);
+            seCtx->setCanUseReserved(isPrivilegedSession);
+            stdx::lock_guard lk(*client);
+            ServiceExecutorContext::set(client, std::move(seCtx));
+        }
+    };
+
     class SWTObserver : public ClientTransportObserver {
     public:
         explicit SWTObserver(SessionWorkflowTest* test) : _test(test) {}
@@ -404,8 +427,19 @@ private:
         SessionWorkflowTest* _test;
     };
 
-    std::unique_ptr<SessionManagerCommon> _makeSessionManager(ServiceContext* svcCtx) {
-        return std::make_unique<SessionManagerCommon>(svcCtx, std::make_unique<SWTObserver>(this));
+    void _initTransportLayer(ServiceContext* svcCtx) {
+        auto sm =
+            std::make_unique<MockSessionManagerCommon>(svcCtx, std::make_unique<SWTObserver>(this));
+        _sessionManager = sm.get();
+
+        auto tl = std::make_unique<test::TransportLayerMockWithReactor>(std::move(sm));
+        _transportLayer = tl.get();
+        svcCtx->setTransportLayerManager(
+            std::make_unique<TransportLayerManagerImpl>(std::move(tl)));
+
+        auto tlm = svcCtx->getTransportLayerManager();
+        invariant(tlm->setup());
+        invariant(tlm->start());
     }
 
     /**
@@ -422,6 +456,8 @@ private:
     MockExpectationSlot _expect;
     std::shared_ptr<CustomMockSession> _session;
     std::shared_ptr<ThreadPool> _threadPool = _makeThreadPool();
+    test::TransportLayerMockWithReactor* _transportLayer{nullptr};
+    SessionManagerCommon* _sessionManager{nullptr};
 };
 
 TEST_F(SessionWorkflowTest, StartThenEndSession) {

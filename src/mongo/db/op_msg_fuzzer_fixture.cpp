@@ -103,7 +103,6 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     _setAuthorizationManager();
     _serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointMongod>());
-    _serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(_serviceContext));
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));

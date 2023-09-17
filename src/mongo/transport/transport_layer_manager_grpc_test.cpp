@@ -37,6 +37,7 @@
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/grpc/grpc_session.h"
+#include "mongo/transport/grpc/grpc_session_manager.h"
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/session_manager.h"
@@ -72,12 +73,6 @@ public:
         svcCtx->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
-        svcCtx->setSessionManager(
-            std::make_unique<test::MockSessionManager>([this](test::SessionThread& sessionThread) {
-                if (_serverCb) {
-                    _serverCb(sessionThread.session());
-                }
-            }));
 
         std::vector<std::unique_ptr<TransportLayer>> layers;
         auto asioTl = _makeAsioTransportLayer();
@@ -99,7 +94,6 @@ public:
     }
 
     void tearDown() override {
-        getServiceContext()->getSessionManager()->endAllSessions({});
         getServiceContext()->getTransportLayerManager()->shutdown();
         sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_disabled);
         _monitor.reset();
@@ -140,9 +134,18 @@ public:
     }
 
 private:
+    std::unique_ptr<SessionManager> _makeSessionManager() {
+        return std::make_unique<test::MockSessionManager>(
+            [this](test::SessionThread& sessionThread) {
+                if (_serverCb) {
+                    _serverCb(sessionThread.session());
+                }
+            });
+    }
+
     std::unique_ptr<AsioTransportLayer> _makeAsioTransportLayer() {
         return std::make_unique<AsioTransportLayer>(AsioTransportLayer::Options{},
-                                                    getServiceContext()->getSessionManager());
+                                                    _makeSessionManager());
     }
 
     std::unique_ptr<grpc::GRPCTransportLayer> _makeGRPCTransportLayer() {
@@ -151,8 +154,10 @@ private:
         grpcOpts.maxServerThreads = grpc::CommandServiceTestFixtures::kMaxThreads;
         grpcOpts.enableEgress = true;
         grpcOpts.clientMetadata = grpc::makeClientMetadataDocument();
-        auto grpcLayer = std::make_unique<grpc::GRPCTransportLayerImpl>(getServiceContext(),
-                                                                        std::move(grpcOpts));
+        auto* svcCtx = getServiceContext();
+        auto sm = std::make_unique<grpc::GRPCSessionManager>(svcCtx);
+        auto grpcLayer = std::make_unique<grpc::GRPCTransportLayerImpl>(
+            svcCtx, std::move(grpcOpts), std::move(sm));
         uassertStatusOK(grpcLayer->registerService(std::make_unique<grpc::CommandService>(
             grpcLayer.get(),
             [&](auto session) { _serverCb(*session); },

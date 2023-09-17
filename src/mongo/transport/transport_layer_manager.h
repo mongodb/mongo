@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/client.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
@@ -73,6 +74,27 @@ public:
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                       bool asyncOCSPStaple) = 0;
 #endif
+
+    /**
+     * Append stats for any session managers attached to TransportLayers.
+     */
+    virtual void appendSessionManagerStats(BSONObjBuilder*) const = 0;
+
+    /**
+     * True if any of the TransportLayers has any active sessions.
+     */
+    virtual bool hasActiveSessions() const = 0;
+
+    /**
+     * Check that the total number of max open sessions across TransportLayers
+     * does not exceed system limits, and log a startup warning if not.
+     */
+    virtual void checkMaxOpenSessionsAtStartup() const = 0;
+
+    /**
+     * End all sessions that do not match the mask in tags.
+     */
+    virtual void endAllSessions(Client::TagMask tags) = 0;
 };
 
 }  // namespace mongo::transport

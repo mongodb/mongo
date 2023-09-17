@@ -43,7 +43,6 @@
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostname_canonicalization.h"
@@ -67,11 +66,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder bb;
-
-        auto sessionManager = opCtx->getServiceContext()->getSessionManager();
-        invariant(sessionManager);
-        sessionManager->appendStats(&bb);
-
+        opCtx->getServiceContext()->getTransportLayerManager()->appendSessionManagerStats(&bb);
         return bb.obj();
     }
 

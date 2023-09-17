@@ -74,7 +74,6 @@ class OpObserver;
 class ServiceEntryPoint;
 
 namespace transport {
-class SessionManager;
 class TransportLayerManager;
 }  // namespace transport
 
@@ -567,11 +566,6 @@ public:
     transport::TransportLayerManager* getTransportLayerManager() const;
 
     /**
-     * Get the SessionManager.
-     */
-    transport::SessionManager* getSessionManager() const;
-
-    /**
      * Waits for the ServiceContext to be fully initialized and for all TransportLayers to have been
      * added/started.
      *
@@ -647,11 +641,6 @@ public:
      * may be expensive to call.
      */
     void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
-
-    /**
-     * Binds the session manager implementation to the service context.
-     */
-    void setSessionManager(std::unique_ptr<transport::SessionManager> sm);
 
     /**
      * Binds the TransportLayerManager to the service context. The TransportLayerManager should have
@@ -745,11 +734,6 @@ private:
      * The periodic runner.
      */
     SyncUnique<PeriodicRunner> _runner;
-
-    /**
-     * The SessionManager.
-     */
-    SyncUnique<transport::SessionManager> _sessionManager;
 
     /**
      * The TransportLayer.

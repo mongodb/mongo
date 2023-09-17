@@ -30,14 +30,19 @@
 
 #include "mongo/transport/transport_layer_manager_impl.h"
 
+#ifdef __linux__
+#include <fstream>
+#endif
+
+#include "mongo/logv2/log.h"
+#include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
-namespace mongo {
-namespace transport {
+namespace mongo::transport {
 
 TransportLayerManagerImpl::TransportLayerManagerImpl(
     std::vector<std::unique_ptr<TransportLayer>> tls, TransportLayer* egressLayer)
@@ -115,15 +120,25 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     const ServerGlobalParams* config,
     ServiceContext* svcCtx,
     boost::optional<int> loadBalancerPort,
-    boost::optional<int> routerPort) {
-
-    transport::AsioTransportLayer::Options opts(config);
-    opts.loadBalancerPort = std::move(loadBalancerPort);
-    opts.routerPort = std::move(routerPort);
+    boost::optional<int> routerPort,
+    std::unique_ptr<ClientTransportObserver> asioObserver) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
-    retVector.push_back(
-        std::make_unique<transport::AsioTransportLayer>(opts, svcCtx->getSessionManager()));
+
+    {
+        AsioTransportLayer::Options opts(config);
+        opts.loadBalancerPort = std::move(loadBalancerPort);
+        opts.routerPort = std::move(routerPort);
+
+        std::vector<std::unique_ptr<ClientTransportObserver>> observers;
+        if (asioObserver) {
+            observers.push_back(std::move(asioObserver));
+        }
+        auto sm = std::make_unique<AsioSessionManager>(svcCtx, std::move(observers));
+        auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));
+        retVector.push_back(std::move(tl));
+    }
+
     auto egress = retVector[0].get();
     return std::make_unique<TransportLayerManagerImpl>(std::move(retVector), egress);
 }
@@ -163,5 +178,50 @@ Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerI
 }
 #endif
 
-}  // namespace transport
-}  // namespace mongo
+void TransportLayerManagerImpl::appendSessionManagerStats(BSONObjBuilder* builder) const {
+    std::for_each(_tls.cbegin(), _tls.cend(), [&](const auto& tl) {
+        tl->getSessionManager()->appendStats(builder);
+    });
+}
+
+bool TransportLayerManagerImpl::hasActiveSessions() const {
+    return std::any_of(_tls.cbegin(), _tls.cend(), [](const auto& tl) {
+        auto sm = tl->getSessionManager();
+        return sm && (sm->numOpenSessions() > 0);
+    });
+}
+
+void TransportLayerManagerImpl::checkMaxOpenSessionsAtStartup() const {
+#ifdef __linux__
+    // Check if vm.max_map_count is high enough, as per SERVER-51233
+    std::size_t maxConns = std::accumulate(
+        _tls.cbegin(), _tls.cend(), std::size_t{0}, [&](std::size_t acc, const auto& tl) {
+            return std::clamp(tl->getSessionManager()->maxOpenSessions(),
+                              std::size_t{0},
+                              std::numeric_limits<std::size_t>::max() - acc);
+        });
+
+    std::size_t requiredMapCount = 2 * maxConns;
+
+    std::fstream f("/proc/sys/vm/max_map_count", std::ios_base::in);
+    std::size_t val;
+    f >> val;
+
+    if (val < requiredMapCount) {
+        LOGV2_WARNING_OPTIONS(5123300,
+                              {logv2::LogTag::kStartupWarnings},
+                              "vm.max_map_count is too low",
+                              "currentValue"_attr = val,
+                              "recommendedMinimum"_attr = requiredMapCount,
+                              "maxConns"_attr = maxConns);
+    }
+#endif
+}
+
+void TransportLayerManagerImpl::endAllSessions(Client::TagMask tags) {
+    std::for_each(_tls.cbegin(), _tls.cend(), [&](const auto& tl) {
+        tl->getSessionManager()->endAllSessions(tags);
+    });
+}
+
+}  // namespace mongo::transport

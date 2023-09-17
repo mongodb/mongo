@@ -39,6 +39,7 @@
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/duration.h"
@@ -61,7 +62,9 @@ class TransportLayerMock : public TransportLayer {
     TransportLayerMock& operator=(const TransportLayerMock&) = delete;
 
 public:
-    TransportLayerMock() = default;
+    TransportLayerMock();
+    explicit TransportLayerMock(std::unique_ptr<SessionManager> sm)
+        : _sessionManager(std::move(sm)) {}
     ~TransportLayerMock();
 
     std::shared_ptr<Session> createSession();
@@ -105,6 +108,10 @@ public:
         const TransientSSLParams& transientSSLParams) override;
 #endif
 
+    SessionManager* getSessionManager() const {
+        return _sessionManager.get();
+    }
+
 private:
     friend class MockSession;
 
@@ -115,6 +122,8 @@ private:
     };
     stdx::unordered_map<Session::Id, Connection> _sessions;
     bool _shutdown = false;
+
+    std::unique_ptr<SessionManager> _sessionManager;
 };
 
 }  // namespace transport

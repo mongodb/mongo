@@ -199,7 +199,6 @@ public:
 
 private:
     Client* _client = nullptr;
-    SessionManager* _sessionManager = nullptr;
 
     bool _canUseReserved = false;
     bool _hasUsedSynchronous = false;

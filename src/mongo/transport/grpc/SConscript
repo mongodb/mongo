@@ -11,6 +11,7 @@ env.Library(
         'client.cpp',
         'client_cache.cpp',
         'grpc_parameters.idl',
+        'grpc_session_manager.cpp',
         'grpc_transport_layer_impl.cpp',
         'server.cpp',
         'service.cpp',
@@ -22,10 +23,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/transport/service_executor',
+        '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/net/ssl_util',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/third_party/shim_grpc',
     ],
 )

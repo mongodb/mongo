@@ -533,7 +533,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     initializeCommandHooks(serviceContext);
 
-    serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
     serviceContext->getService(ClusterRole::ShardServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
 
@@ -1113,18 +1112,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     transport::ServiceExecutor::startupAll(serviceContext);
 
-    auto start = serviceContext->getSessionManager()->start();
-    if (!start.isOK()) {
-        LOGV2_ERROR(20571, "Error starting transport session manager", "error"_attr = start);
-        return ExitCode::netError;
-    }
-
     if (!storageGlobalParams.repair) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Start transport layer",
                                                   &startupTimeElapsedBuilder);
-        start = serviceContext->getTransportLayerManager()->start();
-        if (!start.isOK()) {
+        if (auto start = serviceContext->getTransportLayerManager()->start(); !start.isOK()) {
             LOGV2_ERROR(20572, "Error starting listener", "error"_attr = start);
             return ExitCode::netError;
         }
@@ -1820,17 +1812,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-    // Shutdown the Session Manager and its sessions and give it a grace period to complete.
-    if (auto mgr = serviceContext->getSessionManager()) {
-        LOGV2_OPTIONS(
-            4784923, {LogComponent::kCommand}, "Shutting down the transport SessionManager");
-        if (!mgr->shutdown(Seconds(10))) {
-            LOGV2_OPTIONS(20563,
-                          {LogComponent::kNetwork},
-                          "SessionManager did not shutdown within the time limit");
-        }
-    }
-
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
         LOGV2(4784927, "Shutting down the HealthLog");
         healthLog->shutdown();
@@ -1966,7 +1947,6 @@ int mongod_main(int argc, char* argv[]) {
     setUpMultitenancyCheck(service, gMultitenancySupport);
     service->getService(ClusterRole::ShardServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
-    service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

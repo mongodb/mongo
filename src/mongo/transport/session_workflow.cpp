@@ -76,7 +76,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -390,7 +390,6 @@ public:
         : _workflow{workflow},
           _serviceContext{client->getServiceContext()},
           _sep{client->getService()->getServiceEntryPoint()},
-          _sessionManager{_serviceContext->getSessionManager()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
 
     Client* client() const {
@@ -547,7 +546,6 @@ private:
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
-    SessionManager* _sessionManager;
     RunnerAndSource _taskRunner;
 
     AtomicWord<bool> _isTerminated{false};
@@ -872,7 +870,7 @@ void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     }
     _cleanupExhaustResources();
     _taskRunner = {};
-    _sessionManager->endSessionByClient(client());
+    client()->session()->getTransportLayer()->getSessionManager()->endSessionByClient(client());
 }
 
 SessionWorkflow::SessionWorkflow(PassKeyTag, ServiceContext::UniqueClient client)

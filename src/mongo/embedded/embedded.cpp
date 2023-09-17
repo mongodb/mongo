@@ -96,7 +96,6 @@
 #include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
-#include "mongo/embedded/session_manager_embedded.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -104,6 +103,8 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -258,7 +259,8 @@ ServiceContext* initialize(const char* yaml_config) {
     auto serviceContext = getGlobalServiceContext();
     serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointEmbedded>());
-    serviceContext->setSessionManager(std::make_unique<SessionManagerEmbedded>());
+    serviceContext->setTransportLayerManager(std::make_unique<transport::TransportLayerManagerImpl>(
+        std::make_unique<transport::TransportLayerMock>()));
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(

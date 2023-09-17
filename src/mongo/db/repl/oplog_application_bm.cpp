@@ -142,7 +142,6 @@ public:
         _svcCtx = getGlobalServiceContext();
 
         _svcCtx->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
-        _svcCtx->setSessionManager(std::make_unique<SessionManagerMongod>(_svcCtx));
 
         auto fastClock = std::make_unique<ClockSourceMock>();
         // Timestamps are split into two 32-bit integers, seconds and "increments". Currently (but

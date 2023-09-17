@@ -67,15 +67,22 @@ public:
     bool shutdownAndWait(Milliseconds timeout);
     bool waitForNoSessions(Milliseconds timeout);
 
-    void appendStats(BSONObjBuilder* bob) const override;
+    void appendStats(BSONObjBuilder*) const override;
     std::size_t numOpenSessions() const override;
     std::size_t maxOpenSessions() const override {
         return _maxOpenSessions;
     }
 
 protected:
+    /** Generate a unique thread name for this session. */
+    virtual std::string getClientThreadName(const Session&) const = 0;
+
     /** Imbue the new Client with a ServiceExecutorContext. */
-    virtual void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const;
+    virtual void configureServiceExecutorContext(Client* client,
+                                                 bool isPrivilegedSession) const = 0;
+
+    /** Total number of sessions created. */
+    std::size_t numCreatedSessions() const;
 
     // We assume that this SessionManager instance will be owned by a ServiceContext
     // permanently until such time as the ServiceContext is destroyed at which point

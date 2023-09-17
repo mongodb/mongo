@@ -36,12 +36,16 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/transport/mock_session.h"
+#include "mongo/transport/session_manager_noop.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace transport {
+
+TransportLayerMock::TransportLayerMock()
+    : TransportLayerMock(std::make_unique<SessionManagerNoop>()) {}
 
 std::shared_ptr<Session> TransportLayerMock::createSession() {
     auto session = createSessionHook ? createSessionHook(this) : MockSession::create(this);

@@ -42,6 +42,7 @@
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -71,7 +72,8 @@ void incrThreadingModelStats(ServiceExecutorStats& stats, bool usesDedicatedThre
 // very quickly. We are not taking locks on the SessionManager, so we may chose to schedule
 // onto the ServiceExecutorReserved when it is no longer necessary. The upside is that we
 // will automatically shift to the ServiceExecutorSynchronous after the first command loop.
-bool shouldUseReserved(SessionManager* sm) {
+bool shouldUseReserved(Client* client) {
+    auto sm = client->session()->getTransportLayer()->getSessionManager();
     return sm->numOpenSessions() > sm->maxOpenSessions();
 }
 
@@ -106,7 +108,6 @@ void ServiceExecutorContext::set(Client* client,
     invariant(!serviceExecutorContext);
 
     seCtx._client = client;
-    seCtx._sessionManager = client->getServiceContext()->getSessionManager();
 
     {
         auto&& syncStats = *getServiceExecutorStats(client->getServiceContext());
@@ -182,8 +183,8 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() {
             return ServiceExecutorInline::get(_client->getServiceContext());
         case ThreadModel::kFixed:
             return ServiceExecutorFixed::get(_client->getServiceContext());
-        case ThreadModel::kSynchronous:
-            if (_canUseReserved && !_hasUsedSynchronous && shouldUseReserved(_sessionManager)) {
+        case ThreadModel::kSynchronous: {
+            if (_canUseReserved && !_hasUsedSynchronous && shouldUseReserved(_client)) {
                 if (auto exec = ServiceExecutorReserved::get(_client->getServiceContext())) {
                     // All conditions are met:
                     // * We are allowed to use the reserved
@@ -198,6 +199,7 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() {
             // ServiceExecutorReserved.
             _hasUsedSynchronous = true;
             return ServiceExecutorSynchronous::get(_client->getServiceContext());
+        }
     }
 
     MONGO_UNREACHABLE;

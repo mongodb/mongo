@@ -66,6 +66,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
+#include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
@@ -295,8 +296,6 @@ public:
                                      const Message& request) noexcept final;
 };
 
-using SessionManagerBridge = transport::SessionManagerCommon;
-
 Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCtx,
                                                           const Message& request) noexcept try {
     if (request.operation() == dbQuery) {
@@ -506,13 +505,9 @@ int bridgeMain(int argc, char** argv) {
         // depend on the prior execution of mongo initializers or the
         // existence of threads.
         if (hasGlobalServiceContext()) {
-            auto sc = getGlobalServiceContext();
-            if (sc->getTransportLayerManager())
-                sc->getTransportLayerManager()->shutdown();
-
-            if (auto mgr = sc->getSessionManager()) {
-                mgr->endAllSessions(Client::kEmptyTagMask);
-                mgr->shutdown(Seconds{10});
+            if (auto* tl = getGlobalServiceContext()->getTransportLayerManager()) {
+                tl->endAllSessions(Client::kEmptyTagMask);
+                tl->shutdown();
             }
         }
     });
@@ -526,26 +521,20 @@ int bridgeMain(int argc, char** argv) {
     auto serviceContext = getGlobalServiceContext();
 
     serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>());
-    serviceContext->setSessionManager(std::make_unique<SessionManagerBridge>(serviceContext));
 
     {
         transport::AsioTransportLayer::Options opts;
         opts.ipList.emplace_back("0.0.0.0");
         opts.port = mongoBridgeGlobalParams.port;
 
-        auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(
-            opts, serviceContext->getSessionManager());
+        auto sm = std::make_unique<transport::AsioSessionManager>(serviceContext);
+        auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(opts, std::move(sm));
 
         serviceContext->setTransportLayerManager(
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
     }
 
     transport::ServiceExecutor::startupAll(serviceContext);
-
-    if (auto status = serviceContext->getSessionManager()->start(); !status.isOK()) {
-        LOGV2(4907203, "Error starting session manager", "error"_attr = status);
-        return static_cast<int>(ExitCode::netError);
-    }
 
     if (auto status = serviceContext->getTransportLayerManager()->setup(); !status.isOK()) {
         LOGV2(22922, "Error setting up transport layer", "error"_attr = status);

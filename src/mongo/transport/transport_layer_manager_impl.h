@@ -47,6 +47,7 @@
 #endif
 
 namespace mongo::transport {
+class ClientTransportObserver;
 
 class TransportLayerManagerImpl final : public TransportLayerManager {
     TransportLayerManagerImpl(const TransportLayerManagerImpl&) = delete;
@@ -78,7 +79,8 @@ public:
         const ServerGlobalParams* config,
         ServiceContext* ctx,
         boost::optional<int> loadBalancerPort = {},
-        boost::optional<int> routerPort = {});
+        boost::optional<int> routerPort = {},
+        std::unique_ptr<ClientTransportObserver> asioObserver = nullptr);
 
     static std::unique_ptr<TransportLayerManager> makeAndStartDefaultEgressTransportLayer();
 
@@ -90,6 +92,12 @@ public:
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                               bool asyncOCSPStaple) override;
 #endif
+
+    void appendSessionManagerStats(BSONObjBuilder*) const override;
+    bool hasActiveSessions() const override;
+    void checkMaxOpenSessionsAtStartup() const override;
+    void endAllSessions(Client::TagMask tags) override;
+
 private:
     /**
      * Expects the following order of state transitions, or terminates the process:

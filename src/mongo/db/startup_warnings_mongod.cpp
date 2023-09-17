@@ -54,6 +54,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 
@@ -286,23 +287,8 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
                               "error"_attr = transparentHugePagesDefragResult.getStatus().reason());
     }
 
-    // Check if vm.max_map_count is high enough, as per SERVER-51233
-    {
-        size_t maxConns = svcCtx->getSessionManager()->maxOpenSessions();
-        size_t requiredMapCount = 2 * maxConns;
-
-        std::fstream f("/proc/sys/vm/max_map_count", ios_base::in);
-        size_t val;
-        f >> val;
-
-        if (val < requiredMapCount) {
-            LOGV2_WARNING_OPTIONS(5123300,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "vm.max_map_count is too low",
-                                  "currentValue"_attr = val,
-                                  "recommendedMinimum"_attr = requiredMapCount,
-                                  "maxConns"_attr = maxConns);
-        }
+    if (auto tlm = svcCtx->getTransportLayerManager()) {
+        tlm->checkMaxOpenSessionsAtStartup();
     }
 #endif  // __linux__
 

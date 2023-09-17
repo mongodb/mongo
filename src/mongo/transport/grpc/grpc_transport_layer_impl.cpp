@@ -38,6 +38,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
+namespace {
+const Seconds kSessionManagerShutdownTimeout{10};
+}  // namespace
 
 GRPCTransportLayerImpl::Options::Options(const ServerGlobalParams& params) {
     bindIpList = params.bind_ips;
@@ -47,8 +50,10 @@ GRPCTransportLayerImpl::Options::Options(const ServerGlobalParams& params) {
     maxServerThreads = params.grpcServerMaxThreads;
 }
 
-GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx, Options options)
-    : _svcCtx{svcCtx}, _options{std::move(options)} {}
+GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx,
+                                               Options options,
+                                               std::unique_ptr<SessionManager> sm)
+    : _svcCtx{svcCtx}, _options{std::move(options)}, _sessionManager(std::move(sm)) {}
 
 Status GRPCTransportLayerImpl::registerService(std::unique_ptr<Service> svc) {
     try {
@@ -96,6 +101,11 @@ Status GRPCTransportLayerImpl::setup() {
             if (!sslGlobalParams.sslPEMKeyFile.empty()) {
                 serverOptions.tlsPEMKeyFile = sslGlobalParams.sslPEMKeyFile;
             }
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "Unable to start GRPCTransportLayerImpl for ingress without SessionManager",
+                    _sessionManager);
+
             _server = std::make_unique<Server>(std::move(services), serverOptions);
         }
         if (_options.enableEgress) {
@@ -143,7 +153,12 @@ Status GRPCTransportLayerImpl::start() {
                 "tlsFIPSMode is not supported when gRPC mode is enabled",
                 !sslGlobalParams.sslFIPSMode);
 
+        if (_sessionManager) {
+            uassertStatusOK(_sessionManager->start());
+        }
+
         if (_server) {
+            invariant(_sessionManager);
             _server->start();
             if (_options.useUnixDomainSockets) {
                 setUnixDomainSocketPermissions(makeUnixSockPath(_options.bindPort),
@@ -200,6 +215,10 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+    }
+
+    if (_sessionManager) {
+        _sessionManager->shutdown(kSessionManagerShutdownTimeout);
     }
 }
 

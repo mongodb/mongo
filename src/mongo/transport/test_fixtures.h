@@ -40,7 +40,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/temp_dir.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -120,6 +120,56 @@ private:
     JoinThread _thread;  // Appears after the members _run uses.
 };
 
+class NoopReactor : public Reactor {
+public:
+    void run() noexcept override {}
+    void stop() override {}
+
+    void runFor(Milliseconds time) noexcept override {
+        MONGO_UNREACHABLE;
+    }
+
+    void drain() override {
+        MONGO_UNREACHABLE;
+    }
+
+    void schedule(Task) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void dispatch(Task) override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool onReactorThread() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<ReactorTimer> makeTimer() override {
+        MONGO_UNREACHABLE;
+    }
+
+    Date_t now() override {
+        MONGO_UNREACHABLE;
+    }
+
+    void appendStats(BSONObjBuilder&) const {
+        MONGO_UNREACHABLE;
+    }
+};
+
+class TransportLayerMockWithReactor : public TransportLayerMock {
+public:
+    using TransportLayerMock::TransportLayerMock;
+
+    ReactorHandle getReactor(WhichReactor) override {
+        return _mockReactor;
+    }
+
+private:
+    ReactorHandle _mockReactor = std::make_unique<NoopReactor>();
+};
+
 class MockSessionManager : public SessionManager {
 public:
     MockSessionManager() = default;
@@ -146,7 +196,7 @@ public:
         LOGV2(6109511, "started session");
     }
 
-    void endSessionByClient(Client*) override {}
+    void endSessionByClient(Client* client) override {}
 
     void appendStats(BSONObjBuilder*) const override {}
 

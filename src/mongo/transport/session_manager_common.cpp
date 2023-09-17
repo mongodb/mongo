@@ -37,19 +37,12 @@
 
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_reserved.h"
-#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_id.h"
 #include "mongo/transport/session_manager_common_gen.h"
 #include "mongo/transport/session_workflow.h"
 
@@ -217,6 +210,7 @@ SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx)
 SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx,
                                            std::unique_ptr<ClientTransportObserver> observer)
     : SessionManagerCommon(svcCtx) {
+    invariant(observer);
     _observers.push_back(std::move(observer));
 }
 
@@ -229,15 +223,6 @@ SessionManagerCommon::SessionManagerCommon(
 
 SessionManagerCommon::~SessionManagerCommon() = default;
 
-void SessionManagerCommon::configureServiceExecutorContext(Client* client,
-                                                           bool isPrivilegedSession) const {
-    auto seCtx = std::make_unique<ServiceExecutorContext>();
-    seCtx->setThreadModel(gInitialUseDedicatedThread ? seCtx->kSynchronous : seCtx->kFixed);
-    seCtx->setCanUseReserved(isPrivilegedSession);
-    stdx::lock_guard lk(*client);
-    ServiceExecutorContext::set(client, std::move(seCtx));
-}
-
 void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
@@ -246,7 +231,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         session->shouldOverrideMaxConns(serverGlobalParams.maxConnsOverride);
     const bool verbose = !quiet();
 
-    auto uniqueClient = _svcCtx->getService()->makeClient("conn{}"_format(session->id()), session);
+    auto uniqueClient = _svcCtx->getService()->makeClient(getClientThreadName(*session), session);
     auto client = uniqueClient.get();
 
     std::shared_ptr<transport::SessionWorkflow> workflow;
@@ -281,8 +266,6 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         observer->onClientConnect(client);
     }
 
-    // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
-    // instance of `ServiceEntryPoint`.
     workflow->start();
 }
 
@@ -347,38 +330,6 @@ bool SessionManagerCommon::waitForNoSessions(Milliseconds timeout) {
 }
 
 void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
-    auto sync = _sessions->sync();
-    const auto sessionCount = sync.size();
-    const auto sessionsCreated = sync.created();
-
-    const auto appendInt = [&](StringData n, auto v) {
-        bob->append(n, static_cast<int>(v));
-    };
-
-    appendInt("current", sessionCount);
-    appendInt("available", _maxOpenSessions - sessionCount);
-    appendInt("totalCreated", sessionsCreated);
-    appendInt("rejected", _rejectedSessions);
-
-    invariant(_svcCtx);
-    appendInt("active", _svcCtx->getActiveClientOperations());
-
-    const auto seStats = ServiceExecutorStats::get(_svcCtx);
-    appendInt("threaded", seStats.usesDedicated);
-    if (!serverGlobalParams.maxConnsOverride.empty()) {
-        appendInt("limitExempt", seStats.limitExempt);
-    }
-
-    auto&& hm = HelloMetrics::get(_svcCtx);
-    appendInt("exhaustIsMaster", hm->getNumExhaustIsMaster());
-    appendInt("exhaustHello", hm->getNumExhaustHello());
-    appendInt("awaitingTopologyChanges", hm->getNumAwaitingTopologyChanges());
-
-    if (auto adminExec = ServiceExecutorReserved::get(_svcCtx)) {
-        BSONObjBuilder section(bob->subobjStart("adminConnections"));
-        adminExec->appendStats(&section);
-    }
-
     for (auto&& observer : _observers) {
         observer->appendTransportServerStats(bob);
     }
@@ -387,6 +338,10 @@ void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
 std::size_t SessionManagerCommon::numOpenSessions() const {
     auto sync = _sessions->sync();
     return sync.size();
+}
+
+std::size_t SessionManagerCommon::numCreatedSessions() const {
+    return _sessions->created();
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {

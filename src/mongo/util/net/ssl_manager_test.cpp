@@ -595,15 +595,13 @@ TEST(SSLManager, RotateCertificatesFromFile) {
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
 
-    SessionManagerUtil smu;
-
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
         transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::AsioTransportLayer tla(options, &smu);
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
@@ -634,15 +632,13 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, false /* isSSLServer */);
 
-    SessionManagerUtil smu;
-
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
         transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::AsioTransportLayer tla(options, &smu);
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
@@ -702,15 +698,13 @@ TEST(SSLManager, TransientSSLParams) {
     params.sslCAFile = "jstests/libs/ca.pem";
     params.sslClusterFile = "jstests/libs/client.pem";
 
-    SessionManagerUtil smu;
-
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
         transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::AsioTransportLayer tla(options, &smu);
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
 
     TransientSSLParams transientSSLParams;
     transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
@@ -735,15 +729,13 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     params.sslCAFile = "jstests/libs/ca.pem";
 
-    SessionManagerUtil smu;
-
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
         transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::AsioTransportLayer tla(options, &smu);
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
 
     TransientSSLParams transientSSLParams;
     transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");

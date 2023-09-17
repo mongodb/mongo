@@ -140,6 +140,8 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -867,7 +869,7 @@ HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
 }
 
 void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-    _service->getSessionManager()->endAllSessions(Client::kKeepOpen);
+    _service->getTransportLayerManager()->endAllSessions(Client::kKeepOpen);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {

@@ -838,8 +838,8 @@ int mongo_main(int argc, char* argv[]) {
             transport::grpc::GRPCTransportLayer::Options grpcOpts;
             grpcOpts.enableEgress = true;
             grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
-            tl =
-                std::make_unique<transport::grpc::GRPCTransportLayerImpl>(serviceContext, grpcOpts);
+            tl = std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
+                serviceContext, grpcOpts, nullptr);
         } else
 #endif
         {
