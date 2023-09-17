@@ -1049,7 +1049,7 @@ __txn_search_prepared_op(
      * We cannot guarantee that we find an update when collators are being used as we cannot sort
      * modifications on collated b-trees.
      */
-    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL || op->btree->collator == NULL,
+    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL || op->btree->collator != NULL,
       WT_NOTFOUND, "unable to locate update associated with a prepared operation");
 
     return (0);
