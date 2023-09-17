@@ -201,6 +201,7 @@ conn_stats = [
     ##########################################
     BackgroundCompactStat('background_compact_fail', 'background compact failed calls', 'no_scale'),
     BackgroundCompactStat('background_compact_fail_cache_pressure', 'background compact failed calls due to cache pressure', 'no_scale'),
+    BackgroundCompactStat('background_compact_files_tracked', 'number of files tracked by background compaction', 'no_scale'),
     BackgroundCompactStat('background_compact_interrupted', 'background compact interrupted', 'no_scale'),
     BackgroundCompactStat('background_compact_running', 'background compact running', 'no_scale'),
     BackgroundCompactStat('background_compact_skipped', 'background compact skipped as process would not reduce file size', 'no_scale'),
