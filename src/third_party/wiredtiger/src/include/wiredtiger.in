@@ -2948,7 +2948,9 @@ struct __wt_connection {
  * names can appear in both this and the preload list\, but not in both this and the exclude list.
  * Duplicate names are allowed., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * storage_path, the absolute path to the file used as cache location., a string; default empty.}
+ * storage_path, the absolute path to the file used as cache location.  This should be on a
+ * filesystem that supports file truncation.  All filesystems in common use meet this criteria., a
+ * string; default empty.}
  * @config{ ),,}
  * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
  * version requires that there are no active operations for the duration of the call., a set of

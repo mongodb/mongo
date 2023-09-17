@@ -167,7 +167,6 @@ functions:
           ${HAVE_BUILTIN_EXTENSION_SNAPPY|} \
           ${HAVE_BUILTIN_EXTENSION_ZLIB|} \
           ${HAVE_BUILTIN_EXTENSION_ZSTD|} \
-          ${HAVE_FTRUNCATE|} \
           ${HAVE_UNITTEST} \
           ${NON_BARRIER_DIAGNOSTIC_YIELDS|} \
           ${HAVE_DIAGNOSTIC|} \
@@ -280,17 +279,6 @@ functions:
         echo "Ending 'make wiredtiger' step"
   "compile wiredtiger":
     - *configure_wiredtiger
-    - *make_wiredtiger
-  "compile wiredtiger no linux ftruncate":
-    - *configure_wiredtiger
-    - command: shell.exec
-      params:
-        working_dir: "wiredtiger/cmake_build"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-          echo '#undef HAVE_FTRUNCATE' >> config/wiredtiger_config.h
     - *make_wiredtiger
   "dump stacktraces": &dump_stacktraces
     command: shell.exec
@@ -1417,15 +1405,6 @@ tasks:
       - func: "upload artifact"
       - func: "cleanup"
 
-  - name: compile-linux-no-ftruncate
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          HAVE_FTRUNCATE: -DHAVE_FTRUNCATE=0
-      - func: "upload artifact"
-      - func: "cleanup"
-
   - name: compile-gcc
     tags: ["pull_request", "pull_request_compilers"]
     commands:
@@ -1498,14 +1477,6 @@ tasks:
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-      - func: "make check all"
-
-  - name: make-check-linux-no-ftruncate-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          HAVE_FTRUNCATE: -DHAVE_FTRUNCATE=0
       - func: "make check all"
 
   - name: make-check-nonstandalone
@@ -2636,16 +2607,6 @@ tasks:
         vars:
           unit_test_args: -v 2 --extra-long --hook nonstandalone
 
-  - name: unit-linux-no-ftruncate-test
-    tags: ["python"]
-    depends_on:
-    - name: compile-linux-no-ftruncate
-    commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-linux-no-ftruncate
-      - func: "unit test"
-
   # Run the tests that uses suite_random with a random starting seed
   - name: unit-test-random-seed
     tags: ["python"]
@@ -3464,14 +3425,6 @@ tasks:
         vars:
           format_test_script_args: -t 110 direct_io=1
 
-  - name: format-linux-no-ftruncate
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger no linux ftruncate"
-      - func: "format test"
-        vars:
-          times: 3
-
   - name: package
     commands:
       - func: "get project"
@@ -3943,24 +3896,6 @@ tasks:
               du -hs WT_TEST
               mv WT_TEST WT_TEST_$file
             done
-
-  - name: ftruncate-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          HAVE_FTRUNCATE: -DHAVE_FTRUNCATE=0
-      - func: "csuite test"
-        vars:
-          test_name: truncated_log
-      - func: "csuite smoke test"
-        vars:
-          test_args: cmake_build/test/csuite/random_abort/test_random_abort
-          test_binary: random_abort
-      - func: "csuite smoke test"
-        vars:
-          test_args: -b cmake_build/test/csuite/timestamp_abort/test_timestamp_abort
-          test_binary: timestamp_abort
 
   - name: long-test
     commands:
@@ -6145,7 +6080,6 @@ buildvariants:
     - name: test-prepare-hs03-hook-timestamp
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
-    - name: ftruncate-test
     - name: long-test
     - name: unit-test-extra-long
       distros: ubuntu2004-large
@@ -6368,20 +6302,6 @@ buildvariants:
   tasks:
     - name: package
 
-- name: linux-no-ftruncate
-  display_name: Linux no ftruncate
-  batchtime: 1440 # 1 day
-  run_on:
-  - ubuntu2004-test
-  expansions:
-    additional_env_vars: export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-  tasks:
-    - name: compile-linux-no-ftruncate
-    - name: make-check-linux-no-ftruncate-test
-    - name: unit-linux-no-ftruncate-test
-    - name: format-linux-no-ftruncate
-
 - name: rhel80
   display_name: RHEL 8.0
   run_on:
@@ -6406,7 +6326,6 @@ buildvariants:
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: wtperf-test
-    - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
 
@@ -6536,7 +6455,6 @@ buildvariants:
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: wtperf-test
-    - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test
@@ -6575,7 +6493,6 @@ buildvariants:
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: wtperf-test
-    - name: ftruncate-test
     - name: long-test
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
@@ -6617,7 +6534,6 @@ buildvariants:
     - name: unit-test-zstd
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
-    - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test
@@ -6645,7 +6561,6 @@ buildvariants:
     - name: unit-test-zstd
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
-    - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test

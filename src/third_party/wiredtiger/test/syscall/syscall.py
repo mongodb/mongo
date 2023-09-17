@@ -153,10 +153,10 @@ calls_returning_zero = [ 'close', 'ftruncate', 'fdatasync', 'rename' ]
 # When this program is run, we'll find out their actual values on
 # the host system.
 defines_used = [
-    'HAVE_FTRUNCATE', 'O_ACCMODE', 'O_APPEND', 'O_ASYNC',
-    'O_CLOEXEC', 'O_CREAT', 'O_EXCL', 'O_EXLOCK', 'O_NOATIME',
-    'O_NOFOLLOW', 'O_NONBLOCK', 'O_RDONLY', 'O_RDWR', 'O_SHLOCK',
-    'O_TRUNC', 'O_WRONLY', 'WT_USE_OPENAT' ]
+    'O_ACCMODE', 'O_APPEND', 'O_ASYNC', 'O_CLOEXEC', 'O_CREAT',
+    'O_EXCL', 'O_EXLOCK', 'O_NOATIME', 'O_NOFOLLOW', 'O_NONBLOCK',
+    'O_RDONLY', 'O_RDWR', 'O_SHLOCK', 'O_TRUNC', 'O_WRONLY',
+    'WT_USE_OPENAT' ]
 
 ################################################################
 

@@ -62,9 +62,6 @@
 /* Define to 1 if you have the `fdatasync' function. */
 #cmakedefine HAVE_FDATASYNC 1
 
-/* Define to 1 if you have the `ftruncate' function. */
-#cmakedefine HAVE_FTRUNCATE 1
-
 /* Define to 1 if you have the `gettimeofday' function. */
 #cmakedefine HAVE_GETTIMEOFDAY 1
 
