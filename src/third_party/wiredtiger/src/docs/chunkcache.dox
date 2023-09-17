@@ -1,0 +1,24 @@
+/*! @page chunkcache Chunkcache
+
+@section pinned Pinned Content
+
+This functionality allows users to provide a list of tables that should remain persistently cached, ensuring faster data access times and reducing the need to
+fetch data from potentially much slower block storage. If a user wishes to cache a table in the chunk cache (such that the cached chunks belonging to these tables
+are non-evictable), the pinned configuration is required.
+
+<b>Note:</b> It is crucial to assess the memory implications of pinning large tables. Ensure the chunkcache has enough capacity to cache the pinned tables.
+
+Example Configuration:
+@code
+chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=("table:chunkcache01", "table:chunkcache02")]
+@endcode
+
+In the configuration above, the pinned configuration array contains the names of tables to be pinned. In this example, the tables <b>chunkcache01</b> and <b>chunkcache02</b> are specified.
+By marking tables as pinned in the chunk cache, all chunks belonging to these tables (when read into chunkcache) remain in the cache. These chunks won't be evicted,
+regardless of how infrequently they might be accessed.
+
+<b>Note:</b> There could be circumstances when the pinned chunks can become unpinned (and evicted) for internal reasons.
+
+This ensures that the pinned tables are always relatively cheap to access, minimizing the performance overhead of accessing these tables.
+
+*/
