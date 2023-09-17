@@ -1887,14 +1887,13 @@ __rec_set_page_write_gen(WT_BTREE *btree, WT_PAGE_HEADER *dsk)
      * it's not as good anyway, because the internal page may not have been written after the leaf
      * page was updated. So, write generations it is.
      *
-     * Nothing is locked at this point but two versions of a page with the same generation is pretty
-     * unlikely, and if we did, they're going to be roughly identical for the purposes of salvage,
-     * anyway.
+     * The write generation number should be increased atomically to prevent it from moving backward
+     * when it is updated simultaneously.
      *
      * Other than salvage, the write generation number is used to reset the stale transaction id's
      * present on the page upon server restart.
      */
-    dsk->write_gen = ++btree->write_gen;
+    dsk->write_gen = __wt_atomic_add64(&btree->write_gen, 1);
 }
 
 /*
