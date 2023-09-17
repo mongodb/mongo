@@ -35,6 +35,7 @@ static void config_backward_compatible(void);
 static void config_cache(void);
 static void config_checkpoint(void);
 static void config_checksum(TABLE *);
+static void config_chunk_cache(void);
 static void config_compact(void);
 static void config_compression(TABLE *, const char *);
 static void config_directio(void);
@@ -501,6 +502,7 @@ config_run(void)
 
     /* Order can be important, don't shuffle without careful consideration. */
     config_tiered_storage();                         /* Tiered storage */
+    config_chunk_cache();                            /* Chunk cache */
     config_transaction();                            /* Transactions */
     config_backup_incr();                            /* Incremental backup */
     config_checkpoint();                             /* Checkpoints */
@@ -1468,6 +1470,86 @@ config_statistics(void)
 }
 
 /*
+ * config_chunk_cache --
+ *     Chunk cache configuration.
+ */
+static void
+config_chunk_cache(void)
+{
+    char buf[128];
+    const char *chunkcache_type;
+
+    chunkcache_type = NULL;
+
+    /* Chunkcache does not work unless tiered storage is configured. */
+    if (!g.tiered_storage_config) {
+        if (config_explicit(NULL, "chunk_cache") && GV(CHUNK_CACHE))
+            testutil_die(EINVAL,
+              "%s: chunkcache cannot be enabled unless tiered storage is configured.", progname);
+        return;
+    }
+
+    if (!config_explicit(NULL, "chunk_cache")) {
+        /*
+         * Make sure no configurations related to chunk caching are set if chunkcache is not
+         * enabled.
+         */
+        if (config_explicit(NULL, "chunk_cache.capacity") ||
+          config_explicit(NULL, "chunk_cache.chunk_size") ||
+          config_explicit(NULL, "chunk_cache.type") ||
+          config_explicit(NULL, "chunk_cache.storage_path"))
+            testutil_die(EINVAL,
+              "%s: Enable chunk caching (chunk_cache=on) to allow configuring other chunk cache "
+              "settings",
+              progname);
+
+        /* Enable chunkcache 50% of the time if not explicit set. */
+        testutil_snprintf(
+          buf, sizeof(buf), "chunk_cache=%s", mmrand(&g.data_rnd, 1, 100) <= 50 ? "on" : "off");
+        config_single(NULL, buf, false);
+    }
+
+    if (GV(CHUNK_CACHE)) {
+        if (config_explicit(NULL, "chunk_cache.type")) {
+            chunkcache_type = GVS(CHUNK_CACHE_TYPE);
+            if (strcmp(chunkcache_type, "FILE") != 0 && strcmp(chunkcache_type, "DRAM") != 0)
+                testutil_die(EINVAL, "illegal chunkcache.type configuration: %s", chunkcache_type);
+
+            if (GV(RUNS_IN_MEMORY) && strcmp(chunkcache_type, "FILE") == 0)
+                testutil_die(EINVAL,
+                  "%s: chunk caching cannot be enabled for in-memory runs as chunkcache.type is "
+                  "set to FILE.",
+                  progname);
+        } else {
+            if (GV(RUNS_IN_MEMORY))
+                config_single(NULL, "chunk_cache.type=DRAM", false);
+            else {
+                /*
+                 * Alternate between running chunk cache with the 'File' type and the 'DRAM' type.
+                 */
+                testutil_snprintf(buf, sizeof(buf), "chunk_cache.type=%s",
+                  mmrand(&g.data_rnd, 1, 100) <= 50 ? "DRAM" : "FILE");
+                config_single(NULL, buf, false);
+            }
+        }
+
+        if (strcmp(GVS(CHUNK_CACHE_TYPE), "DRAM") == 0 &&
+          config_explicit(NULL, "chunk_cache.storage_path"))
+            testutil_die(EINVAL,
+              "For chunk_cache.type=%s, passing in the chunk_cache.storage_path=%s is unnecessary.",
+              chunkcache_type, GVS(CHUNK_CACHE_STORAGE_PATH));
+
+        if (!config_explicit(NULL, "chunk_cache.capacity") &&
+          !config_explicit(NULL, "chunk_cache.chunk_size"))
+            if (GV(CHUNK_CACHE_CAPACITY) <= GV(CHUNK_CACHE_CHUNK_SIZE))
+                GV(CHUNK_CACHE_CHUNK_SIZE) = GV(CHUNK_CACHE_CAPACITY) / 10;
+
+        /* Always ensure that capacity greater than chunk_size. */
+        testutil_assert(GV(CHUNK_CACHE_CAPACITY) > GV(CHUNK_CACHE_CHUNK_SIZE));
+    }
+}
+
+/*
  * config_tiered_storage --
  *     Tiered storage configuration.
  */
@@ -1941,7 +2023,7 @@ config_single(TABLE *table, const char *s, bool explicit)
      * configuration option includes JSON characters.
      */
     for (t = (const u_char *)s; *t != '\0'; ++t)
-        if (!__wt_isalnum(*t) && !__wt_isspace(*t) && strchr("\"'()-.:=[]_,", *t) == NULL)
+        if (!__wt_isalnum(*t) && !__wt_isspace(*t) && strchr("\"'()-.:=[]_/,", *t) == NULL)
             testutil_die(
               EINVAL, "%s: configuration contains unexpected character %#x", progname, (u_int)*t);
 

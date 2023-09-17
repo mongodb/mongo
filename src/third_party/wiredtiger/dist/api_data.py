@@ -1072,7 +1072,7 @@ wiredtiger_open_chunk_cache_configuration = [
             size of cached chunks''',
             min='512KB', max='100GB'),
         Config('storage_path', '', r'''
-            the absolute path to the file used as cache location. This should be on a
+            the path (absolute or relative) to the file used as cache location. This should be on a
             filesystem that supports file truncation. All filesystems in common use
             meet this criteria.'''),
         Config('enabled', 'false', r'''
