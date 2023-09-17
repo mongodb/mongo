@@ -210,7 +210,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     block->allocsize = allocsize;
 
     WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
-    block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
+    block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len) ? 1 : 0;
 
     /* Configuration: optional OS buffer cache maximum size. */
     WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
