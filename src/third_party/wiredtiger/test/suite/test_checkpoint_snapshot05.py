@@ -112,10 +112,6 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         s.close()
 
     def test_checkpoint_snapshot(self):
-        # FIXME - WT-11492 Re-enable this test once WT-11492 is fixed.
-        if os.name == 'nt':
-            self.skipTest('Skip this test on Windows until WT-11492 is fixed')
-
         self.moresetup()
 
         ds = SimpleDataSet(self, self.uri, 0, \
@@ -147,7 +143,7 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
 
         # Create a checkpoint thread
         done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
+        ckpt = checkpoint_thread(self.conn, done, checkpoint_count_max=1)
         try:
             ckpt.start()
             
