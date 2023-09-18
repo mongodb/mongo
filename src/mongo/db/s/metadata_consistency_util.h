@@ -95,8 +95,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     OperationContext* opCtx,
     const ShardId& shardId,
     const ShardId& primaryShardId,
-    const std::vector<CollectionType>& catalogClientCollections,
-    const std::vector<CollectionPtr>& localCollections);
+    const std::vector<CollectionType>& shardingCatalogCollections,
+    const std::vector<CollectionPtr>& localCatalogCollections);
 
 /**
  * Check different types of inconsistencies from a given set of chunks owned by a collection.
@@ -117,6 +117,15 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
  */
 std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
     OperationContext* opCtx, const CollectionType& collection, const std::vector<TagsType>& zones);
+
+/*
+ * Return a list of inconsistencies within the sharding catalog collection metadata
+ *
+ * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
+ * there is no inconsistency, it is returned an empty vector.
+ */
+std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistency(
+    OperationContext* opCtx, const CollectionType& collection);
 
 }  // namespace metadata_consistency_util
 }  // namespace mongo

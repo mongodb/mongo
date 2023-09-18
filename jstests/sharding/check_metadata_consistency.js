@@ -349,4 +349,68 @@ function assertNoInconsistencies() {
     assertNoInconsistencies();
 })();
 
+(function testUnsplittableCollectionHas2Chunks() {
+    const db = getNewDb();
+    const kSourceCollName = "unsplittable_collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    // create a splittable collection with 2 chunks
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {_id: 1}}));
+    mongos.getCollection(kNss).insert({_id: 0});
+    mongos.getCollection(kNss).insert({_id: 2});
+    assert.commandWorked(mongos.adminCommand({split: kNss, middle: {_id: 1}}));
+
+    let no_inconsistency = db.checkMetadataConsistency().toArray();
+    assert.eq(no_inconsistency.length, 0);
+
+    // make the collection unsplittable
+    assert.commandWorked(st.config.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
+
+    let inconsistencies_chunks = db.checkMetadataConsistency().toArray();
+    assert.eq(inconsistencies_chunks.length, 1);
+    assert.eq("TrackedUnshardedCollectionHasMultipleChunks",
+              inconsistencies_chunks[0].type,
+              tojson(inconsistencies_chunks[0]));
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testUnsplittableHasInvalidKey() {
+    const db = getNewDb();
+    const kSourceCollName = "unsplittable_collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard1;
+
+    // set a primary shard
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // create a splittable collection with a key != {_id:1}
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+
+    let no_inconsistency = db.checkMetadataConsistency().toArray();
+    assert.eq(no_inconsistency.length, 0);
+
+    // make the collection unsplittable and catch the inconsistency
+    assert.commandWorked(st.config.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
+
+    let inconsistencies_key = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies_key.length);
+    assert.eq("TrackedUnshardedCollectionHasInvalidKey",
+              inconsistencies_key[0].type,
+              tojson(inconsistencies_key[0]));
+
+    // drop the collection on the primary and still catch the inconsistency
+    primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+    let inconsistencies_key2 = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies_key2.length);
+    assert.eq("TrackedUnshardedCollectionHasInvalidKey",
+              inconsistencies_key2[0].type,
+              tojson(inconsistencies_key2[0]));
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
 st.stop();

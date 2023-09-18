@@ -149,12 +149,12 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
         return;
     }
 
-    if (!optCollDescr->isSharded()) {
-        // The collection is registered as SHARDED in the sharding catalog. This shard has the
-        // collection locally but is marked as UNSHARDED.
+    if (!optCollDescr->hasRoutingTable()) {
+        // The collection is tracked by the config server in the sharding catalog. This shard has
+        // the collection locally but it is missing the routing informations
         inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
-            MetadataInconsistencyTypeEnum::kShardThinksCollectionIsUnsharded,
-            ShardThinksCollectionIsUnshardedDetails{localColl->ns(), localColl->uuid(), shardId}));
+            MetadataInconsistencyTypeEnum::kShardMissingCollectionRoutingInfo,
+            ShardMissingCollectionRoutingInfoDetails{localColl->ns(), localColl->uuid(), shardId}));
         return;
     }
 
@@ -291,24 +291,26 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     OperationContext* opCtx,
     const ShardId& shardId,
     const ShardId& primaryShardId,
-    const std::vector<CollectionType>& catalogClientCollections,
-    const std::vector<CollectionPtr>& localCollections) {
+    const std::vector<CollectionType>& shardingCatalogCollections,
+    const std::vector<CollectionPtr>& localCatalogCollections) {
     std::vector<MetadataInconsistencyItem> inconsistencies;
-    auto itLocalCollections = localCollections.begin();
-    auto itCatalogCollections = catalogClientCollections.begin();
-    while (itLocalCollections != localCollections.end() &&
-           itCatalogCollections != catalogClientCollections.end()) {
+    auto itLocalCollections = localCatalogCollections.begin();
+    auto itCatalogCollections = shardingCatalogCollections.begin();
+    while (itLocalCollections != localCatalogCollections.end() &&
+           itCatalogCollections != shardingCatalogCollections.end()) {
         const auto& localColl = *itLocalCollections;
         const auto& localUUID = localColl->uuid();
         const auto& localNss = localColl->ns();
         const auto& remoteNss = itCatalogCollections->getNss();
 
         const auto cmp = remoteNss.coll().compare(localNss.coll());
-        if (cmp < 0) {
-            // Case where we have found a collection in the catalog client that it is not in the
+        const bool isCollectionOnlyOnShardingCatalog = cmp < 0;
+        const bool isCollectionOnBothCatalogs = cmp == 0;
+        if (isCollectionOnlyOnShardingCatalog) {
+            // Case where we have found a collection in the sharding catalog that it is not in the
             // local catalog.
             itCatalogCollections++;
-        } else if (cmp == 0) {
+        } else if (isCollectionOnBothCatalogs) {
             const auto& nss = remoteNss;
             // Case where we have found same collection in the catalog client than in the local
             // catalog.
@@ -331,7 +333,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             itLocalCollections++;
             itCatalogCollections++;
         } else {
-            // Case where we have found a local collection that is not in the catalog client.
+            // Case where we have found a local collection that is not in the sharding catalog.
             const auto& nss = localNss;
 
             // TODO SERVER-59957 use function introduced in this ticket to decide if a namespace
@@ -346,9 +348,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     }
 
     if (shardId != primaryShardId) {
-        // Case where we have found more local collections than in the catalog client. It is a
+        // Case where we have found more local collections than in the sharding catalog. It is a
         // hidden unsharded collection inconsistency if we are not the db primary shard.
-        while (itLocalCollections != localCollections.end()) {
+        while (itLocalCollections != localCatalogCollections.end()) {
             const auto localColl = itLocalCollections->get();
             // TODO SERVER-59957 use function introduced in this ticket to decide if a namespace
             // should be ignored and stop using isNamepsaceAlwaysUntracked().
@@ -372,6 +374,13 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
     const auto shardKeyPattern = ShardKeyPattern{collection.getKeyPattern()};
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
+    if (collection.getUnsplittable() && chunks.size() > 1) {
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kTrackedUnshardedCollectionHasMultipleChunks,
+            TrackedUnshardedCollectionHasMultipleChunksDetails{
+                nss, collection.getUuid(), int(chunks.size())}));
+    }
+
     auto previousChunk = chunks.begin();
     for (auto it = chunks.begin(); it != chunks.end(); it++) {
         const auto& chunk = *it;
@@ -470,5 +479,21 @@ std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
     return inconsistencies;
 }
 
+std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistency(
+    OperationContext* opCtx, const CollectionType& collection) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+    if (collection.getUnsplittable()) {
+        const auto validKey = BSON("_id" << 1);
+        if (collection.getKeyPattern().toBSON().woCompare(validKey) != 0) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kTrackedUnshardedCollectionHasInvalidKey,
+                TrackedUnshardedCollectionHasInvalidKeyDetails{
+                    collection.getNss(),
+                    collection.getUuid(),
+                    collection.getKeyPattern().toBSON()}));
+        }
+    }
+    return inconsistencies;
+}
 }  // namespace metadata_consistency_util
 }  // namespace mongo

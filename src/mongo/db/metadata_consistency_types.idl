@@ -50,8 +50,11 @@ enums:
             kRoutingTableMissingMinKey: "RoutingTableMissingMinKey"
             kRoutingTableRangeGap: "RoutingTableRangeGap"
             kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
-            kShardThinksCollectionIsUnsharded: "ShardThinksCollectionIsUnsharded"
+            kShardMissingCollectionRoutingInfo: "ShardMissingCollectionRoutingInfo"
             kZonesRangeOverlap: "ZonesRangeOverlap"
+            kTrackedUnshardedCollectionHasMultipleChunks: "TrackedUnshardedCollectionHasMultipleChunks"
+            kTrackedUnshardedCollectionHasInvalidKey: "TrackedUnshardedCollectionHasInvalidKey"
+
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -69,8 +72,10 @@ enums:
             kRoutingTableMissingMinKey: "Routing table has a gap because first chunk does not start from MinKey"
             kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
             kRoutingTableRangeOverlap: "Found two overlapping consecutive chunks"
-            kShardThinksCollectionIsUnsharded: "Shard thinks collection is unsharded while instead is currently sharded"
+            kShardMissingCollectionRoutingInfo: "Shard is missing routing information for the collection"
             kZonesRangeOverlap: "Found two overlapping zones"
+            kTrackedUnshardedCollectionHasMultipleChunks: "Found tracked unsharded collection with more than one chunks"
+            kTrackedUnshardedCollectionHasInvalidKey: "Found tracked unsharded collection with invalid shard-key"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -273,7 +278,7 @@ structs:
                 type: uuid
                 description: "The UUID of the collection."
     
-    ShardThinksCollectionIsUnshardedDetails:
+    ShardMissingCollectionRoutingInfoDetails:
         description: "Details about shard that thinks collection is unsharded."
         strict: false
         fields:
@@ -306,6 +311,51 @@ structs:
                 type: object
                 description: "The second zone that overlaps with the first zone."
 
+    TrackedUnshardedCollectionHasMultipleChunksDetails: 
+        description: "Details about tracked unsharded collection with more then one chunks"
+        strict: false
+        fields:
+            namespace:
+                description: "The namespace of the collection."
+                cpp_name: nss
+                type: namespacestring
+            uuid:
+                description: "The UUID of the collection."
+                type: uuid
+            numChunks:
+                description: "The number of chunks found for the collection"
+                type: int 
+
+    TrackedUnshardedCollectionHasInvalidKeyDetails: 
+        description: "Details about tracked unsharded collection with an invalid shard key"
+        strict: false
+        fields:
+            namespace:
+                description: "The namespace of the collection."
+                cpp_name: nss
+                type: namespacestring
+            uuid:
+                description: "The UUID of the collection."
+                type: uuid
+            shardKey:
+                description: "The shard key of the collection."
+                type: object
+
+    TrackedUnshardedCollectionIsMissingLocally:
+        description: "Details about unsharded collection tracked on the csrs but not present locally on any shard"
+        strict: false 
+        fields:
+            namespace:
+                description: "The namespace of the collection."
+                cpp_name: nss
+                type: namespacestring
+            uuid:
+                description: "The UUID of the collection."
+                type: uuid
+            shard:
+                description: "The shard where the collection was supposed to be found"
+                type: shard_id
+                
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
         strict: false

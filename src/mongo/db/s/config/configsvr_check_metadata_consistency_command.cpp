@@ -187,6 +187,14 @@ public:
                                          std::make_move_iterator(chunksInconsistencies.begin()),
                                          std::make_move_iterator(chunksInconsistencies.end()));
 
+            auto collectionsInconsistencies =
+                metadata_consistency_util::checkCollectionShardingMetadataConsistency(opCtx, coll);
+
+            inconsistenciesMerged.insert(
+                inconsistenciesMerged.end(),
+                std::make_move_iterator(collectionsInconsistencies.begin()),
+                std::make_move_iterator(collectionsInconsistencies.end()));
+
             auto zonesInconsistencies = metadata_consistency_util::checkZonesInconsistencies(
                 opCtx, coll, _getCollectionZones(opCtx, coll.getNss()));
 

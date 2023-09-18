@@ -354,8 +354,8 @@ public:
             const MetadataConsistencyCommandLevelEnum& commandLevel,
             const ShardId& shardId,
             const ShardId& primaryShardId,
-            const std::vector<mongo::CollectionType>& catalogClientCollections) {
-            std::vector<CollectionPtr> localCollections;
+            const std::vector<mongo::CollectionType>& shardingCatalogCollections) {
+            std::vector<CollectionPtr> localCatalogCollections;
             auto collCatalogSnapshot = [&] {
                 switch (commandLevel) {
                     case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
@@ -374,10 +374,10 @@ public:
                             if (!coll) {
                                 continue;
                             }
-                            localCollections.emplace_back(CollectionPtr(coll));
+                            localCatalogCollections.emplace_back(CollectionPtr(coll));
                         }
-                        std::sort(localCollections.begin(),
-                                  localCollections.end(),
+                        std::sort(localCatalogCollections.begin(),
+                                  localCatalogCollections.end(),
                                   [](const CollectionPtr& prev, const CollectionPtr& next) {
                                       return prev->ns() < next->ns();
                                   });
@@ -404,7 +404,7 @@ public:
 
                         if (auto coll =
                                 collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
-                            localCollections.emplace_back(CollectionPtr(coll));
+                            localCatalogCollections.emplace_back(CollectionPtr(coll));
                         }
 
                         return collCatalogSnapshot;
@@ -416,7 +416,11 @@ public:
 
             // Check consistency between local metadata and configsvr metadata
             return metadata_consistency_util::checkCollectionMetadataInconsistencies(
-                opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
+                opCtx,
+                shardId,
+                primaryShardId,
+                shardingCatalogCollections,
+                localCatalogCollections);
         }
 
         NamespaceString ns() const override {
