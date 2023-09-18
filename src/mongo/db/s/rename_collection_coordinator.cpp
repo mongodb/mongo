@@ -196,13 +196,19 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 try {
                     {
                         // Make sure the source namespace is not a view
+                        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
+                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
+                        if (db) {
+                            uassert(ErrorCodes::CommandNotSupportedOnView,
+                                    str::stream() << "Can't rename source collection `" << fromNss
+                                                  << "` because it is a view.",
+                                    !ViewCatalog::get(db)->lookup(opCtx, fromNss.ns()));
+                        }
+                    }
+                    {
+                        // Make sure the source namespace is not a view
                         AutoGetCollection coll{
                             opCtx, fromNss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-
-                        uassert(ErrorCodes::CommandNotSupportedOnView,
-                                str::stream() << "Can't rename source collection `" << fromNss
-                                              << "` because it is a view.",
-                                !coll.getView());
 
                         uassert(ErrorCodes::NamespaceNotFound,
                                 str::stream() << "Collection " << fromNss << " doesn't exist.",
@@ -274,7 +280,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     sharding_ddl_util::checkCatalogConsistencyAcrossShardsForRename(
                         opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
-
                 } catch (const DBException&) {
                     auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
                     if (isCriticalSectionAcquired)
