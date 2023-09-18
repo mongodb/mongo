@@ -317,6 +317,13 @@ private:
 
     std::vector<std::unique_ptr<Group>> _groups;
 
+    struct Hasher {
+        size_t operator()(const std::pair<GroupIdType, PartialSchemaEntry>& entry) const;
+    };
+    // For every individually estimated sargable predicate, cache its CE. We also include the input
+    // groupId in the cache key.
+    opt::unordered_map<std::pair<GroupIdType, PartialSchemaEntry>, CEType, Hasher> _estimatesCache;
+
     // Used to find nodes using particular groups as inputs.
     InputGroupsToNodeIdMap _inputGroupsToNodeIdMap;
 
