@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
 namespace {
-const int64_t kDefaultHealthlogSize = 100'000'000;
-
-CollectionOptions getOptions(void) {
-    CollectionOptions options;
-    options.capped = true;
-    options.cappedSize = kDefaultHealthlogSize;
-    options.setNoIdIndex();
-    return options;
-}
+const auto getHealthLog = ServiceContext::declareDecoration<std::unique_ptr<HealthLogInterface>>();
 }  // namespace
 
-HealthLog::HealthLog()
-    : _writer(NamespaceString::kLocalHealthLogNamespace, getOptions(), kMaxBufferSize) {}
+void HealthLogInterface::set(ServiceContext* serviceContext,
+                             std::unique_ptr<HealthLogInterface> newHealthLog) {
+    auto& healthLog = getHealthLog(serviceContext);
+    invariant(!healthLog);
 
-void HealthLog::startup() {
-    _writer.startup(std::string("healthlog writer"));
+    healthLog = std::move(newHealthLog);
 }
 
-void HealthLog::shutdown() {
-    _writer.shutdown();
+HealthLogInterface* HealthLogInterface::get(ServiceContext* svcCtx) {
+    return getHealthLog(svcCtx).get();
 }
 
-bool HealthLog::log(const HealthLogEntry& entry) {
-    BSONObjBuilder builder;
-    OID oid;
-    oid.init();
-    builder.append("_id", oid);
-    entry.serialize(&builder);
-    return _writer.insertDocument(builder.obj());
+HealthLogInterface* HealthLogInterface::get(OperationContext* opCtx) {
+    return getHealthLog(opCtx->getServiceContext()).get();
 }
 }  // namespace mongo

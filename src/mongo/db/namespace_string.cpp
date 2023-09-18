@@ -135,6 +135,10 @@ const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::k
 // TODO (SERVER-66431): replace all usages of ShardType::ConfigNS by kConfigsvrShardsNamespace
 const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString::kConfigDb,
                                                                  "shards");
+
+const NamespaceString NamespaceString::kLocalHealthLogNamespace(NamespaceString::kLocalDb,
+                                                                "system.healthlog");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -166,7 +170,7 @@ bool NamespaceString::isLegalClientSystemNS(
     } else if (db() == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
-        if (coll() == "system.healthlog")
+        if (coll() == kLocalHealthLogNamespace.coll())
             return true;
     }
 
