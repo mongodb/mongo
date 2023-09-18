@@ -17,30 +17,20 @@ variables:
   _real_compile_amazon2: &_compile_amazon2
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_compile_rhel70: &_compile_rhel70
       - name: compile
         variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
       - name: compile
         variant: compile-amazon-linux2-arm64
       - name: compile_mongocrypt_shlib
         variant: compile-amazon-linux2-arm64-mongocrypt-shlib
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_compile_amazon2_streams: &_compile_amazon2_streams
       - name: compile
         variant: compile-amazon2-streams
-      - name: schedule_global_auto_tasks
-        variant: task_generation
 
   _real_expansions: &_expansion_updates
       []
@@ -582,12 +572,6 @@ tasks:
     priority: 5
     commands:
       - func: f_generate_all_variant_auto_tasks
-  - name: schedule_global_auto_tasks
-    priority: 5
-    commands:
-      - func: f_schedule_tasks
-        vars:
-          tasks: all_tasks
   - name: schedule_patch_auto_tasks
     priority: 5
     commands:
@@ -1771,16 +1755,16 @@ tasks:
 
 buildvariants:
   - name: task_generation
+    activate: true
     display_name: Task Generation
-    cron: "0 0 1 1 *"  # Every year starting 1/1 at 00:00
     modules: *modules
     expansions:
       platform: linux
       project_dir: dsi
     run_on:
-      - amazon2-build
+      - amazon2-small
     tasks:
-      - name: schedule_global_auto_tasks
+      - name: generate_all_variant_auto_tasks
 
   - &compile-amazon2
     name: compile-amazon2
@@ -2087,12 +2071,8 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: schedule_patch_auto_tasks
       - name: industry_benchmarks
@@ -2120,12 +2100,8 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: schedule_patch_auto_tasks
       - name: industry_benchmarks
@@ -2155,12 +2131,8 @@ buildvariants:
     run_on:
       - "rhel70-perf-atlas-large"
     depends_on:
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-amazon-linux2-arm64
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks:
       - name: locust_bulk_insert
 
@@ -2185,12 +2157,8 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
       - name: compile
         variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
     tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
       - name: schedule_patch_auto_tasks
       - name: industry_benchmarks
