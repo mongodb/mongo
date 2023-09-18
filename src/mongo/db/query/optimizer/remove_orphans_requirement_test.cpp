@@ -505,7 +505,10 @@ TEST(PhysRewriter, RemoveOrphansCovered) {
     ABT optimized = root;
     phaseManager.optimize(optimized);
 
-    ASSERT_BETWEEN(5, 11, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(  // NOLINT
+        5,
+        15,
+        phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // No seek required.
     ASSERT_EXPLAIN_V2_AUTO(

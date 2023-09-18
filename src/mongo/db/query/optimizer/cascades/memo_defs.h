@@ -101,6 +101,10 @@ private:
 struct PhysNodeInfo {
     ABT _node;
 
+    // Number of plan elements. Used to tie-break if we end up with the same cost. It is lazily
+    // computed (optional may be empty).
+    boost::optional<size_t> _numElements;
+
     // Total cost for the entire subtree.
     CostType _cost;
 

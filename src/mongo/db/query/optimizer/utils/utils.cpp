@@ -2796,4 +2796,24 @@ bool hasProperIntervals(const PSRExpr::Node& reqs) {
     });
 }
 
+class CountElementsTransport {
+public:
+    template <typename T, typename... Ts>
+    void transport(const T& /*node*/, Ts&&... /*args*/) {
+        _count++;
+    }
+
+    size_t doCount(const ABT& node) {
+        algebra::transport<false>(node, *this);
+        return _count;
+    }
+
+private:
+    size_t _count = 0;
+};
+
+size_t countElements(const ABT& node) {
+    return CountElementsTransport{}.doCount(node);
+}
+
 }  // namespace mongo::optimizer

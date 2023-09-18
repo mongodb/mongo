@@ -494,4 +494,10 @@ void handleScanNodeRemoveOrphansRequirement(const IndexCollationSpec& shardKey,
                                             IndexReqTarget indexReqTarget,
                                             CEType groupCE,
                                             PrefixId& prefixId);
+
+/**
+ * Computes the number of plan elements present in the tree.
+ */
+size_t countElements(const ABT& node);
+
 }  // namespace mongo::optimizer

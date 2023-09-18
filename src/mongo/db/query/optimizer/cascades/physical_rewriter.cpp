@@ -191,10 +191,30 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
         printCandidateInfo(*node, groupId, nodeCost, childProps, bestResult);
     }
 
-    const CostType childCostLimit =
-        bestResult._nodeInfo ? bestResult._nodeInfo->_cost : bestResult._costLimit;
+    auto& bestNode = bestResult._nodeInfo;
+    const CostType childCostLimit = bestNode ? bestNode->_cost : bestResult._costLimit;
     const auto cost = optimizeChildren(nodeCost, childProps, childCostLimit);
-    const bool improvement = cost && (!bestResult._nodeInfo || *cost < bestResult._nodeInfo->_cost);
+    boost::optional<size_t> numElements;
+
+    bool improvement = false;
+    if (cost) {
+        if (bestNode) {
+            if (*cost < bestNode->_cost) {
+                improvement = true;
+            } else if (bestNode->_cost < *cost) {
+                // No improvement.
+            } else {
+                // If the cost is identical, retain the plan which has fewer elements.
+                numElements = countElements(*node);
+                if (!bestNode->_numElements) {
+                    bestNode->_numElements = countElements(bestNode->_node);
+                }
+                improvement = numElements < bestNode->_numElements;
+            }
+        } else {
+            improvement = true;
+        }
+    }
 
     if (_debugInfo.hasDebugLevel(3)) {
         std::cout << (cost ? (improvement ? "Improved" : "Did not improve") : "Failed optimizing")
@@ -206,6 +226,7 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
             "Retaining node with uninitialized rewrite rule",
             rule != cascades::PhysicalRewriteType::Uninitialized);
     PhysNodeInfo candidateNodeInfo{std::move(*node),
+                                   numElements,
                                    cost.value_or(CostType::kInfinity),
                                    nodeCost,
                                    nodeCostAndCE._ce,
@@ -213,10 +234,10 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
                                    std::move(nodeCEMap)};
     const bool keepRejectedPlans = _hints._keepRejectedPlans;
     if (improvement) {
-        if (keepRejectedPlans && bestResult._nodeInfo) {
-            bestResult._rejectedNodeInfo.push_back(std::move(*bestResult._nodeInfo));
+        if (keepRejectedPlans && bestNode) {
+            bestResult._rejectedNodeInfo.push_back(std::move(*bestNode));
         }
-        bestResult._nodeInfo = std::move(candidateNodeInfo);
+        bestNode = std::move(candidateNodeInfo);
     } else if (keepRejectedPlans) {
         bestResult._rejectedNodeInfo.push_back(std::move(candidateNodeInfo));
     }

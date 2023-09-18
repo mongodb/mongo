@@ -930,48 +930,49 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         "interval: {=Const [1]}]\n",
         optimized);
 
-    std::vector<LogicalRewriteType> logicalRules = {
-        LogicalRewriteType::Root,
-        LogicalRewriteType::Root,
-        LogicalRewriteType::SargableSplit,
-        LogicalRewriteType::SargableSplit,
-        LogicalRewriteType::EvaluationRIDIntersectReorder,
-        LogicalRewriteType::Root,
-        LogicalRewriteType::FilterRIDIntersectReorder,
-        LogicalRewriteType::Root,
-        LogicalRewriteType::SargableSplit,
-        LogicalRewriteType::EvaluationRIDIntersectReorder,
-        LogicalRewriteType::FilterRIDIntersectReorder};
-    std::vector<PhysicalRewriteType> physicalRules = {PhysicalRewriteType::Seek,
-                                                      PhysicalRewriteType::Seek,
-                                                      PhysicalRewriteType::IndexFetch,
-                                                      PhysicalRewriteType::Evaluation,
-                                                      PhysicalRewriteType::IndexFetch,
-                                                      PhysicalRewriteType::Root,
-                                                      PhysicalRewriteType::SargableToIndex,
-                                                      PhysicalRewriteType::SargableToIndex,
-                                                      PhysicalRewriteType::Evaluation,
-                                                      PhysicalRewriteType::Evaluation,
-                                                      PhysicalRewriteType::Filter};
-    int logicalRuleIndex = 0;
-    int physicalRuleIndex = 0;
+
+    // Verify which rules are used in different groups.
+    str::stream logicalRuleStr;
+    str::stream physicalRuleStr;
     const Memo& memo = phaseManager.getMemo();
     for (size_t groupId = 0; groupId < memo.getGroupCount(); groupId++) {
         for (const auto rule : memo.getRules(groupId)) {
-            ASSERT(rule == logicalRules[logicalRuleIndex]);
-            logicalRuleIndex++;
+            logicalRuleStr << toStringData(rule) << "\n";
         }
         for (const auto& physOptResult : memo.getPhysicalNodes(groupId)) {
-            if (!physOptResult->_nodeInfo) {
-                continue;
+            if (physOptResult->_nodeInfo) {
+                physicalRuleStr << toStringData(physOptResult->_nodeInfo->_rule) << "\n";
             }
-
-            const auto rule = physOptResult->_nodeInfo->_rule;
-            ASSERT(rule == physicalRules[physicalRuleIndex]);
-            physicalRuleIndex++;
         }
     }
-    ASSERT_EQ(physicalRules.size(), physicalRuleIndex);
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "Root\n"
+        "Root\n"
+        "SargableSplit\n"
+        "SargableSplit\n"
+        "EvaluationRIDIntersectReorder\n"
+        "Root\n"
+        "FilterRIDIntersectReorder\n"
+        "Root\n"
+        "SargableSplit\n"
+        "EvaluationRIDIntersectReorder\n"
+        "FilterRIDIntersectReorder\n",
+        logicalRuleStr);
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "Seek\n"
+        "Seek\n"
+        "IndexFetch\n"
+        "IndexFetch\n"
+        "IndexFetch\n"
+        "Root\n"
+        "SargableToIndex\n"
+        "SargableToIndex\n"
+        "Evaluation\n"
+        "Evaluation\n"
+        "Filter\n",
+        physicalRuleStr);
 }
 
 TEST(PhysRewriter, FilterIndexing3) {
