@@ -581,30 +581,31 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
-    auto status = handlePlanStageYield(
-        expCtx(),
-        "TimeseriesModifyStage restoreState",
-        [&] {
-            child()->restoreState(&collectionPtr());
-            return PlanStage::NEED_TIME;
-        },
-        // yieldHandler
-        // Note we don't need to retry anything in this case since the write already was committed.
-        // However, we still need to return the affected measurement (if it was requested). We don't
-        // need to rely on the storage engine to return the affected document since we already have
-        // it in memory.
-        [&] { /* noop */ });
+    //
+    // If this stage is already exhausted it won't use its children stages anymore and therefore
+    // there's no need to restore them. Avoid restoring them so that there's no possibility of
+    // requiring yielding at this point. Restoring from yield could fail due to a sharding
+    // placement change. Throwing a StaleConfig error is undesirable after an "single write"
+    // operation has already performed a write because the router would retry.
+    if (!isEOF()) {
+        auto status = handlePlanStageYield(
+            expCtx(),
+            "TimeseriesModifyStage restoreState",
+            [&] {
+                child()->restoreState(&collectionPtr());
+                return PlanStage::NEED_TIME;
+            },
+            // yieldHandler
+            // Note we don't need to retry anything in this case since the write already was
+            // committed. However, we still need to return the affected measurement (if it was
+            // requested). We don't need to rely on the storage engine to return the affected
+            // document since we already have it in memory.
+            [&] { /* noop */ });
 
-    if (status == NEED_YIELD && isEOF()) {
-        // If this stage is already exhausted it won't use its children stages anymore and therefore
-        // it's okay if we failed to restore them. Avoid requesting a yield to the plan executor.
-        // Restoring from yield could fail due to a sharding placement change. Throwing a
-        // StaleConfig error is undesirable after an "update one" operation has already performed a
-        // write because the router would retry.
-        status = PlanStage::NEED_TIME;
+        return {true, status, getMeasurementToReturn()};
+    } else {
+        return {true, PlanStage::NEED_TIME, getMeasurementToReturn()};
     }
-
-    return {true, status, getMeasurementToReturn()};
 }
 
 template <typename F>
