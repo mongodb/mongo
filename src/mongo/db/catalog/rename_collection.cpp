@@ -885,6 +885,10 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.views collection or renaming to system.views is not allowed",
             !source.isSystemDotViews() && !target.isSystemDotViews());
 
+    uassert(ErrorCodes::IllegalOperation,
+            "renaming system.users collection or renaming to system.users is not allowed",
+            !source.isSystemDotUsers() && !target.isSystemDotUsers());
+
     if (source.isTimeseriesBucketsCollection()) {
         uassert(ErrorCodes::IllegalOperation,
                 "Renaming system.buckets collections is not allowed",
