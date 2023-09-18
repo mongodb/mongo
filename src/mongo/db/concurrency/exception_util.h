@@ -47,6 +47,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 namespace mongo {
 
 extern FailPoint skipWriteConflictRetries;
@@ -149,7 +151,8 @@ template <typename F>
 auto writeConflictRetry(OperationContext* opCtx,
                         StringData opStr,
                         const NamespaceStringOrUUID& nssOrUUID,
-                        F&& f) {
+                        F&& f,
+                        boost::optional<size_t> retryLimit = boost::none) {
     invariant(opCtx);
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
@@ -180,6 +183,11 @@ auto writeConflictRetry(OperationContext* opCtx,
             logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
+            if (MONGO_unlikely(retryLimit && writeConflictAttempts > *retryLimit)) {
+                LOGV2_ERROR(7677402,
+                            "Got too many write conflicts, the server may run into problems.");
+                fassert(7677401, !getTestCommandsEnabled());
+            }
         } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
             handleTemporarilyUnavailableException(
                 opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID, e, writeConflictAttempts);
@@ -191,3 +199,5 @@ auto writeConflictRetry(OperationContext* opCtx,
 }
 
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

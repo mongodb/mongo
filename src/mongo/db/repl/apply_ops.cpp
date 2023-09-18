@@ -115,7 +115,7 @@ Status _applyOps(OperationContext* opCtx,
         Status status = Status::OK();
 
         try {
-            status = writeConflictRetry(
+            status = writeConflictRetryWithLimit(
                 opCtx,
                 "applyOps",
                 nss,

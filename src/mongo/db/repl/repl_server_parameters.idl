@@ -774,6 +774,17 @@ server_parameters:
         validator:
             gt: 0 
 
+    writeConflictRetryLimit:
+        description: >-
+            The number of retries that be made by writeConflictRetry(). It is used in secondary
+            oplog application to catch unexpected behavior.
+        set_at: [ startup, runtime ]
+        cpp_vartype: int
+        cpp_varname: writeConflictRetryLimit
+        default: 10000
+        validator:
+            gte: 0
+
 feature_flags:
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.

@@ -320,5 +320,13 @@ using ApplyImportCollectionFn = std::function<void(OperationContext*,
 
 void registerApplyImportCollectionFn(ApplyImportCollectionFn func);
 
+template <typename F>
+auto writeConflictRetryWithLimit(OperationContext* opCtx,
+                                 StringData opStr,
+                                 const NamespaceStringOrUUID& nssOrUUID,
+                                 F&& f) {
+    return writeConflictRetry(opCtx, opStr, nssOrUUID, f, repl::writeConflictRetryLimit);
+}
+
 }  // namespace repl
 }  // namespace mongo

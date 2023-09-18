@@ -1485,7 +1485,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     "mode should be in initialSync or recovering",
                     mode == OplogApplication::Mode::kInitialSync ||
                         OplogApplication::inRecovering(mode));
-            writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss(), [&] {
+            writeConflictRetryWithLimit(opCtx, "applyOps_imageInvalidation", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 writeToImageCollection(opCtx,
                                        op.getSessionId().value(),
@@ -1769,7 +1769,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     request.setUpsert();
                     request.setFromOplogApplication(true);
 
-                    writeConflictRetry(opCtx, "applyOps_upsert", op.getNss(), [&] {
+                    writeConflictRetryWithLimit(opCtx, "applyOps_upsert", op.getNss(), [&] {
                         WriteUnitOfWork wuow(opCtx);
                         // If `haveWrappingWriteUnitOfWork` is true, do not timestamp the write.
                         if (assignOperationTimestamp && timestamp != Timestamp::min()) {
@@ -1882,7 +1882,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // the logical session ID being written is checked out when we do the write.
             // We can still get a write conflict on the primary as a delete done as part of expired
             // session cleanup can race with a use of the expired session.
-            auto status = writeConflictRetry(opCtx, "applyOps_update", op.getNss(), [&] {
+            auto status = writeConflictRetryWithLimit(opCtx, "applyOps_update", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
@@ -1905,9 +1905,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     if (collection && collection->isCapped() &&
                         mode == OplogApplication::Mode::kSecondary) {
                         // We can't assume there was a problem when the collection is capped,
-                        // because the item may have been deleted by the cappedDeleter.  This only
-                        // matters for steady-state mode, because all errors on missing updates are
-                        // ignored at a higher level for recovery and initial sync.
+                        // because the item may have been deleted by the cappedDeleter.  This
+                        // only matters for steady-state mode, because all errors on missing
+                        // updates are ignored at a higher level for recovery and initial sync.
                         LOGV2_DEBUG(2170003,
                                     2,
                                     "couldn't find doc in capped collection",
@@ -1923,10 +1923,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         }
 
                         // Need to check to see if it isn't present so we can exit early with a
-                        // failure. Note that adds some overhead for this extra check in some cases,
-                        // such as an updateCriteria of the form
-                        // { _id:..., { x : {$size:...} }
-                        // thus this is not ideal.
+                        // failure. Note that adds some overhead for this extra check in some
+                        // cases, such as an updateCriteria of the form { _id:..., { x :
+                        // {$size:...} } thus this is not ideal.
                         if (!collection ||
                             (indexCatalog->haveIdIndex(opCtx) &&
                              Helpers::findById(opCtx, collection, updateCriteria).isNull()) ||
@@ -1940,12 +1939,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                               << msg << ": " << redact(op.toBSONForLogging()));
                         }
 
-                        // Otherwise, it's present; zero objects were updated because of additional
-                        // specifiers in the query for idempotence
+                        // Otherwise, it's present; zero objects were updated because of
+                        // additional specifiers in the query for idempotence
                     } else {
                         // this could happen benignly on an oplog duplicate replay of an upsert
-                        // (because we are idempotent), if a regular non-mod update fails the item
-                        // is (presumably) missing.
+                        // (because we are idempotent), if a regular non-mod update fails the
+                        // item is (presumably) missing.
                         if (!upsert) {
                             static constexpr char msg[] = "Update of non-mod failed";
                             LOGV2_ERROR(21260, msg, "op"_attr = redact(op.toBSONForLogging()));
@@ -1968,8 +1967,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                 opObj,
                                                 boost::none /* status */);
 
-                    // We shouldn't be doing upserts in secondary mode when enforcing steady state
-                    // constraints.
+                    // We shouldn't be doing upserts in secondary mode when enforcing steady
+                    // state constraints.
                     invariant(!oplogApplicationEnforcesSteadyStateConstraints);
                 }
 
@@ -2040,7 +2039,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // Determine if a change stream pre-image has to be recorded for the oplog entry.
             const bool recordChangeStreamPreImage = shouldRecordChangeStreamPreImage();
 
-            writeConflictRetry(opCtx, "applyOps_delete", op.getNss(), [&] {
+            writeConflictRetryWithLimit(opCtx, "applyOps_delete", op.getNss(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
                     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
@@ -2058,18 +2057,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 if (recordChangeStreamPreImage) {
-                    // Request loading of the document version before delete operation to be used as
-                    // change stream pre-image.
+                    // Request loading of the document version before delete operation to be
+                    // used as change stream pre-image.
                     request.setReturnDeleted(true);
                 }
 
                 DeleteResult result = deleteObject(opCtx, collectionAcquisition, request);
                 if (op.getNeedsRetryImage()) {
                     // Even if `result.nDeleted` is 0, we want to perform a write to the
-                    // imageCollection to advance the txnNumber/ts and invalidate the image. This
-                    // isn't strictly necessary for correctness -- the `config.transactions` table
-                    // is responsible for whether to retry. The motivation here is to simply reduce
-                    // the number of states related documents in the two collections can be in.
+                    // imageCollection to advance the txnNumber/ts and invalidate the image.
+                    // This isn't strictly necessary for correctness -- the
+                    // `config.transactions` table is responsible for whether to retry. The
+                    // motivation here is to simply reduce the number of states related
+                    // documents in the two collections can be in.
                     writeToImageCollection(opCtx,
                                            op.getSessionId().value(),
                                            op.getTxnNumber().value(),
@@ -2095,33 +2095,33 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 << requestNss.toStringForErrorMsg() << ")"
                                     : "Applied a delete which did not delete anything."s);
                 }
-                // It is legal for a delete operation on the pre-images collection to delete zero
-                // documents - pre-image collections are not guaranteed to contain the same set of
-                // documents at all times. The same holds for change-collections as they both rely
-                // on unreplicated deletes when "featureFlagUseUnreplicatedTruncatesForDeletions" is
-                // enabled.
+                // It is legal for a delete operation on the pre-images collection to delete
+                // zero documents - pre-image collections are not guaranteed to contain the same
+                // set of documents at all times. The same holds for change-collections as they
+                // both rely on unreplicated deletes when
+                // "featureFlagUseUnreplicatedTruncatesForDeletions" is enabled.
                 //
                 // TODO SERVER-70591: Remove feature flag requirement in comment above.
                 //
-                // It is also legal for a delete operation on the config.image_collection (used for
-                // find-and-modify retries) to delete zero documents.  Since we do not write updates
-                // to this collection which are in the same batch as later deletes, a rollback to
-                // the middle of a batch with both an update and a delete may result in a missing
-                // document, which may be later deleted.
+                // It is also legal for a delete operation on the config.image_collection (used
+                // for find-and-modify retries) to delete zero documents.  Since we do not write
+                // updates to this collection which are in the same batch as later deletes, a
+                // rollback to the middle of a batch with both an update and a delete may result
+                // in a missing document, which may be later deleted.
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
                     !requestNss.isChangeStreamPreImagesCollection() &&
                     !requestNss.isChangeCollection() && !requestNss.isConfigImagesCollection()) {
                     // In FCV 4.4, each node is responsible for deleting the excess documents in
-                    // capped collections. This implies that capped deletes may not be synchronized
-                    // between nodes at times. When upgraded to FCV 5.0, the primary will generate
-                    // delete oplog entries for capped collections. However, if any secondary was
-                    // behind in deleting excess documents while in FCV 4.4, the primary would have
-                    // no way of knowing and it would delete the first document it sees locally.
-                    // Eventually, when secondaries step up and start deleting capped documents,
-                    // they will first delete previously missed documents that may already be
-                    // deleted on other nodes. For this reason we skip returning NoSuchKey for
-                    // capped collections when oplog application is enforcing steady state
-                    // constraints.
+                    // capped collections. This implies that capped deletes may not be
+                    // synchronized between nodes at times. When upgraded to FCV 5.0, the
+                    // primary will generate delete oplog entries for capped collections.
+                    // However, if any secondary was behind in deleting excess documents while
+                    // in FCV 4.4, the primary would have no way of knowing and it would delete
+                    // the first document it sees locally. Eventually, when secondaries step up
+                    // and start deleting capped documents, they will first delete previously
+                    // missed documents that may already be deleted on other nodes. For this
+                    // reason we skip returning NoSuchKey for capped collections when oplog
+                    // application is enforcing steady state constraints.
                     bool isCapped = false;
                     const auto& opObj = redact(op.toBSONForLogging());
                     if (collection) {
@@ -2145,8 +2145,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
 
                     if (!isCapped) {
-                        // This error is fatal when we are enforcing steady state constraints for
-                        // non-capped collections.
+                        // This error is fatal when we are enforcing steady state constraints
+                        // for non-capped collections.
                         uassert(collection ? ErrorCodes::NoSuchKey : ErrorCodes::NamespaceNotFound,
                                 str::stream()
                                     << "Applied a delete which did not delete anything in "
@@ -2171,20 +2171,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
-            writeConflictRetry(opCtx, "applyOps_insertGlobalIndexKey", collection->ns(), [&] {
-                WriteUnitOfWork wuow(opCtx);
-                if (timestamp != Timestamp::min()) {
-                    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
-                }
+            writeConflictRetryWithLimit(
+                opCtx, "applyOps_insertGlobalIndexKey", collection->ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    if (timestamp != Timestamp::min()) {
+                        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                    }
 
-                global_index::insertKey(
-                    opCtx,
-                    collectionAcquisition,
-                    op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
-                    op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
+                    global_index::insertKey(
+                        opCtx,
+                        collectionAcquisition,
+                        op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
+                        op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
 
-                wuow.commit();
-            });
+                    wuow.commit();
+                });
             break;
         }
         case OpTypeEnum::kDeleteGlobalIndexKey: {
@@ -2195,20 +2196,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 timestamp = op.getTimestamp();
             }
 
-            writeConflictRetry(opCtx, "applyOps_deleteGlobalIndexKey", collection->ns(), [&] {
-                WriteUnitOfWork wuow(opCtx);
-                if (timestamp != Timestamp::min()) {
-                    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
-                }
+            writeConflictRetryWithLimit(
+                opCtx, "applyOps_deleteGlobalIndexKey", collection->ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    if (timestamp != Timestamp::min()) {
+                        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
+                    }
 
-                global_index::deleteKey(
-                    opCtx,
-                    collectionAcquisition,
-                    op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
-                    op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
+                    global_index::deleteKey(
+                        opCtx,
+                        collectionAcquisition,
+                        op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
+                        op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
 
-                wuow.commit();
-            });
+                    wuow.commit();
+                });
             break;
         }
         default: {
