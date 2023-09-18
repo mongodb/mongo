@@ -157,7 +157,7 @@ boost::optional<std::vector<StmtId>> _getCommittedStmtIds(const LogicalSessionId
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
 Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       const std::vector<OplogEntry>& txnOps,
-                                      repl::OplogApplication::Mode oplogApplicationMode) noexcept {
+                                      repl::OplogApplication::Mode oplogApplicationMode) {
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : txnOps) {
         try {
@@ -185,6 +185,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             if (!status.isOK()) {
                 return status;
             }
+        } catch (const StorageUnavailableException&) {
+            // Retriable error.
+            throw;
         } catch (const DBException& ex) {
             // Ignore NamespaceNotFound errors if we are in initial sync or recovering mode.
             // During recovery we reconsutuct prepared transactions at the end after applying all
@@ -671,14 +674,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         if (MONGO_unlikely(applyPrepareTxnOpsFailsWithWriteConflict.shouldFail())) {
             LOGV2(4947101, "Hit applyPrepareTxnOpsFailsWithWriteConflict failpoint");
-            status = Status(ErrorCodes::WriteConflict,
-                            "Prepare transaction apply ops failed due to write conflict");
+            throwWriteConflictException(
+                "Prepare transaction apply ops failed due to write conflict");
         }
 
-        if (status == ErrorCodes::WriteConflict) {
-            throwWriteConflictException(
-                "Conflict encountered when applying a prepare transaction.");
-        }
         fassert(31137, status);
 
         if (MONGO_unlikely(applyOpsHangBeforePreparingTransaction.shouldFail())) {
