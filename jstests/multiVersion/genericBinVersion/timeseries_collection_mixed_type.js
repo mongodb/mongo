@@ -1,6 +1,10 @@
 /**
  * Test that variable-type fields are found correctly in upgraded timeseries collections with dirty
  * data.
+ *
+ * Specifically, tests handling of the 'TimeseriesBucketsMayHaveMixedSchemaData' metadata flag that
+ * is set in the 5.0 -> 6.0 upgrade. The test inserts data into a timeseries collection on 5.0, then
+ * upgrades through every following version to ensure that the data is still queryable.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
@@ -69,6 +73,10 @@ function runTest(docs, query, results, path, bounds) {
                 assert.commandWorked(res);
             }
             rst.awaitReplication();
+            // We need to ensure that the FCV is committed to the oplog before we shut down.
+            // Otherwise the nodes may start up post-upgrade and check FCV before reconstructing the
+            // journal, which will raise an invalid version error because they will see the old FCV.
+            rst.awaitLastOpCommitted();
         }
 
         tsColl = db.getCollection(jsTestName());
