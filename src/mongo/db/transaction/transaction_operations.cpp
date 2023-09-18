@@ -160,15 +160,22 @@ void TransactionOperations::clear() {
 
 Status TransactionOperations::addOperation(const TransactionOperation& operation,
                                            boost::optional<std::size_t> transactionSizeLimitBytes) {
-    auto stmtIdsToInsert = operation.getStatementIds();
-    auto newTransactionStmtIds = _transactionStmtIds;
-    for (auto stmtId : stmtIdsToInsert) {
-        auto [_, inserted] = newTransactionStmtIds.insert(stmtId);
-        if (inserted) {
-            continue;
+    const auto& stmtIdsToInsert = operation.getStatementIds();
+    auto nextStmtIdToInsert = stmtIdsToInsert.begin();
+
+    // If the addOperation fails, we need to remove any statement IDs inserted.
+    ScopeGuard stmtIdRemover([&] {
+        for (auto iter = stmtIdsToInsert.begin(); iter != nextStmtIdToInsert; iter++)
+            _transactionStmtIds.erase(*iter);
+    });
+
+    for (; nextStmtIdToInsert != stmtIdsToInsert.end(); ++nextStmtIdToInsert) {
+        auto stmtId = *nextStmtIdToInsert;
+        auto [_, inserted] = _transactionStmtIds.insert(stmtId);
+        if (!inserted) {
+            return Status(ErrorCodes::Error(5875600),
+                          fmt::format("Found two operations using the same stmtId of {}", stmtId));
         }
-        return Status(static_cast<ErrorCodes::Error>(5875600),
-                      fmt::format("Found two operations using the same stmtId of {}", stmtId));
     }
 
     auto opSize = repl::DurableOplogEntry::getDurableReplOperationSize(operation);
@@ -198,9 +205,9 @@ Status TransactionOperations::addOperation(const TransactionOperation& operation
     }
 
     _transactionOperations.push_back(operation);
-    _transactionStmtIds = std::move(newTransactionStmtIds);
     _totalOperationBytes += opSize;
     _numberOfPrePostImagesToWrite += numberOfPrePostImagesToWrite;
+    stmtIdRemover.dismiss();
 
     return Status::OK();
 }
