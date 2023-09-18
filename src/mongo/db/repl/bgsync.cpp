@@ -781,8 +781,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OplogInterfaceLocal localOplog(opCtx);
 
-    const int messagingPortTags = 0;
-    ConnectionPool connectionPool(messagingPortTags);
+    ConnectionPool connectionPool;
     std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
     auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
         if (!connection.get()) {

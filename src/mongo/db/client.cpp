@@ -94,7 +94,8 @@ Client::Client(std::string desc, Service* service, std::shared_ptr<transport::Se
       _desc(std::move(desc)),
       _connectionId(_session ? _session->id() : 0),
       _prng(generateSeed(_desc)),
-      _uuid(UUID::gen()) {}
+      _uuid(UUID::gen()),
+      _tags(kPending) {}
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());
@@ -193,6 +194,29 @@ ThreadClient::~ThreadClient() {
 
 Client* ThreadClient::get() const {
     return &cc();
+}
+
+void Client::setTags(TagMask tagsToSet) {
+    mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
+}
+
+void Client::unsetTags(TagMask tagsToUnset) {
+    mutateTags([tagsToUnset](TagMask originalTags) { return (originalTags & ~tagsToUnset); });
+}
+
+void Client::mutateTags(const std::function<TagMask(TagMask)>& mutateFunc) {
+    TagMask oldValue, newValue;
+    do {
+        oldValue = _tags.load();
+        newValue = mutateFunc(oldValue);
+
+        // Any change to the Client tags automatically clears kPending status.
+        newValue &= ~kPending;
+    } while (!_tags.compareAndSwap(&oldValue, newValue));
+}
+
+Client::TagMask Client::getTags() const {
+    return _tags.load();
 }
 
 }  // namespace mongo

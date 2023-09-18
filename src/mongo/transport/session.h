@@ -74,18 +74,7 @@ public:
      */
     using Id = SessionId;
 
-    /**
-     * Tags for groups of connections.
-     */
-    using TagMask = uint32_t;
-
     static const Status ClosedStatus;
-
-    static constexpr TagMask kEmptyTagMask = 0;
-    static constexpr TagMask kKeepOpen = 1;
-    static constexpr TagMask kLatestVersionInternalClientKeepOpen = 4;
-    static constexpr TagMask kExternalClientKeepOpen = 8;
-    static constexpr TagMask kPending = 1 << 31;
 
     virtual ~Session() = default;
 
@@ -177,37 +166,6 @@ public:
     virtual const SockAddr& remoteAddr() const = 0;
     virtual const SockAddr& localAddr() const = 0;
 
-    /**
-     * Atomically set all of the session tags specified in the 'tagsToSet' bit field. If the
-     * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
-     * function also clears that tag as part of the same atomic operation.
-     *
-     * The 'kPending' tag is only for new sessions; callers should not set it directly.
-     */
-    void setTags(TagMask tagsToSet);
-
-    /**
-     * Atomically clears all of the session tags specified in the 'tagsToUnset' bit field. If the
-     * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
-     * function also clears that tag as part of the same atomic operation.
-     */
-    void unsetTags(TagMask tagsToUnset);
-
-    /**
-     * Loads the session tags, passes them to 'mutateFunc' and then stores the result of that call
-     * as the new session tags, all in one atomic operation.
-     *
-     * In order to ensure atomicity, 'mutateFunc' may get called multiple times, so it should not
-     * perform expensive computations or operations with side effects.
-     *
-     * If the 'kPending' tag is set originally, mutateTags() will unset it regardless of the result
-     * of the 'mutateFunc' call. The 'kPending' tag is only for new sessions; callers should never
-     * try to set it.
-     */
-    void mutateTags(const std::function<TagMask(TagMask)>& mutateFunc);
-
-    TagMask getTags() const;
-
 #ifdef MONGO_CONFIG_SSL
     /**
      * Get the SSL manager associated with this session.
@@ -220,8 +178,6 @@ protected:
 
 private:
     const Id _id;
-
-    AtomicWord<TagMask> _tags;
 };
 
 }  // namespace transport

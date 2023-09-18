@@ -125,15 +125,8 @@ public:
         ConnectionList::iterator _connInfo;
     };
 
-    /**
-     * Instantiates a new connection pool with the specified tags to be applied to the
-     * messaging ports that it opens.
-     *
-     * @param messagingPortTags tags to be applied to the messaging ports for each of the
-     *      connections. If no tags are required, use 0.
-     */
-    ConnectionPool(int messagingPortTags, std::unique_ptr<executor::NetworkConnectionHook> hook);
-    ConnectionPool(int messagingPortTags);
+    ConnectionPool(std::unique_ptr<executor::NetworkConnectionHook> hook);
+    ConnectionPool();
     ~ConnectionPool();
 
     /**
@@ -190,10 +183,6 @@ private:
      * Destroys the connection associated with "iter" and removes "iter" fron connList.
      */
     static void _destroyConnection_inlock(ConnectionList* connList, ConnectionList::iterator iter);
-
-
-    // Flags to apply to the opened connections
-    const int _messagingPortTags;
 
     // Mutex guarding members of the connection pool
     Mutex _mutex = MONGO_MAKE_LATCH("ClientConnectionPool::_mutex");

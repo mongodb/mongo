@@ -353,10 +353,11 @@ void VectorClock::gossipIn(OperationContext* opCtx,
     }
 
     auto isInternal = defaultIsInternalClient;
-    if (opCtx && opCtx->getClient()) {
-        const auto session = opCtx->getClient()->session();
-        if (session && !(session->getTags() & transport::Session::kPending)) {
-            isInternal = opCtx->getClient()->isInternalClient();
+    if (opCtx) {
+        if (const auto client = opCtx->getClient()) {
+            if (client->session() && !(client->getTags() & Client::kPending)) {
+                isInternal = client->isInternalClient();
+            }
         }
     }
 

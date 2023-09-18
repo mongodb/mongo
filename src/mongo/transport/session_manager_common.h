@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/client.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/net/cidr.h"
 
@@ -51,7 +52,7 @@ public:
     ~SessionManagerCommon() override;
 
     void startSession(std::shared_ptr<Session> session) override;
-    void endAllSessions(Session::TagMask tags) override;
+    void endAllSessions(Client::TagMask tags) override;
     void endAllSessionsNoTagMask();
 
     Status start() override;

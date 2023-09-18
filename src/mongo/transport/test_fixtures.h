@@ -143,7 +143,7 @@ public:
 
     void appendStats(BSONObjBuilder*) const override {}
 
-    void endAllSessions(transport::Session::TagMask tags) override {
+    void endAllSessions(Client::TagMask tags) override {
         _join();
     }
 

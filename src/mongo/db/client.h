@@ -77,6 +77,32 @@ typedef long long ConnectionId;
  */
 class Client final : public Decorable<Client> {
 public:
+    /**
+     * These tags classify the connections associated with Clients and reasons to keep them open.
+     * When closing connections, these tags can be used to filter out the type of connections that
+     * should be kept open.
+     *
+     * Clients that are not yet classified yet are marked as kPending. The classification occurs
+     * during the processing of "hello" commands.
+     */
+    using TagMask = uint32_t;
+
+    // Client's connections should be closed.
+    static constexpr TagMask kEmptyTagMask = 0;
+
+    // Client's connection should be kept open on replication member rollback or removal.
+    static constexpr TagMask kKeepOpen = 1;
+
+    // Client is internal and their max wire version is not less than the max wire version of
+    // this server. Connection should be kept open.
+    static constexpr TagMask kLatestVersionInternalClientKeepOpen = 2;
+
+    // Client is external and connection should be kept open.
+    static constexpr TagMask kExternalClientKeepOpen = 4;
+
+    // Client has not been classified yet and should be kept open.
+    static constexpr TagMask kPending = 1 << 31;
+
     /** Used as a placeholder argument to avoid specifying a session. */
     static std::shared_ptr<transport::Session> noSession() {
         return {};
@@ -325,6 +351,37 @@ public:
         _isInternalClient = isInternalClient;
     }
 
+    /**
+     * Atomically set all of the connection tags specified in the 'tagsToSet' bit field. If the
+     * 'kPending' tag is set, indicating that no tags have yet been specified for the connection,
+     * this function also clears that tag as part of the same atomic operation.
+     *
+     * The 'kPending' tag is only for new connections; callers should not set it directly.
+     */
+    void setTags(TagMask tagsToSet);
+
+    /**
+     * Atomically clears all of the connection tags specified in the 'tagsToUnset' bit field. If
+     * the 'kPending' tag is set, indicating that no tags have yet been specified for the session,
+     * this function also clears that tag as part of the same atomic operation.
+     */
+    void unsetTags(TagMask tagsToUnset);
+
+    /**
+     * Loads the connection tags, passes them to 'mutateFunc' and then stores the result of that
+     * call as the new connection tags, all in one atomic operation.
+     *
+     * In order to ensure atomicity, 'mutateFunc' may get called multiple times, so it should not
+     * perform expensive computations or operations with side effects.
+     *
+     * If the 'kPending' tag is set originally, mutateTags() will unset it regardless of the result
+     * of the 'mutateFunc' call. The 'kPending' tag is only for new connections; callers should
+     * never try to set it.
+     */
+    void mutateTags(const std::function<TagMask(TagMask)>& mutateFunc);
+
+    TagMask getTags() const;
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;
@@ -370,6 +427,8 @@ private:
 
     // Indicates that this client is internal to the cluster.
     bool _isInternalClient{false};
+
+    AtomicWord<TagMask> _tags;
 };
 
 /**

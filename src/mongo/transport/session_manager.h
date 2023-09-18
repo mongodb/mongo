@@ -33,11 +33,11 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
-class Client;
 class BSONObjBuilder;
 
 namespace transport {
@@ -65,9 +65,9 @@ public:
     virtual void startSession(std::shared_ptr<Session> session) = 0;
 
     /**
-     * End all sessions that do not match the mask in tags.
+     * End all sessions associated with this SessionManager that do not match the mask in tags.
      */
-    virtual void endAllSessions(Session::TagMask tags) = 0;
+    virtual void endAllSessions(Client::TagMask tags) = 0;
 
     /**
      * Starts the session manager.

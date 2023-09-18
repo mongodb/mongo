@@ -99,8 +99,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         // Close all incoming connections from internal clients with binary versions lower than
         // ours.
         opCtx->getServiceContext()->getSessionManager()->endAllSessions(
-            transport::Session::kLatestVersionInternalClientKeepOpen |
-            transport::Session::kExternalClientKeepOpen);
+            Client::kLatestVersionInternalClientKeepOpen | Client::kExternalClientKeepOpen);
         // Close all outgoing connections to servers with binary versions lower than ours.
         pauseBeforeCloseCxns.pauseWhileSet();
 

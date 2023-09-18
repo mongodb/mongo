@@ -963,7 +963,7 @@ public:
             invariant(_allowMultipleSessions, "Unexpected multiple ingress sessions");
         }
 
-        void endAllSessions(Session::TagMask) override {
+        void endAllSessions(Client::TagMask tags) override {
             _join();
         }
 

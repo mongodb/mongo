@@ -65,7 +65,7 @@ public:
         _cv.notify_one();
     }
 
-    void endAllSessions(transport::Session::TagMask tags) override {
+    void endAllSessions(Client::TagMask tags) override {
         LOGV2(2303302, "end all sessions");
         std::vector<std::shared_ptr<transport::Session>> old_sessions;
         {

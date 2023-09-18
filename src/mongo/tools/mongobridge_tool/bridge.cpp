@@ -516,7 +516,7 @@ int bridgeMain(int argc, char** argv) {
                 sc->getTransportLayer()->shutdown();
 
             if (auto mgr = sc->getSessionManager()) {
-                mgr->endAllSessions(transport::Session::kEmptyTagMask);
+                mgr->endAllSessions(Client::kEmptyTagMask);
                 mgr->shutdown(Seconds{10});
             }
         }

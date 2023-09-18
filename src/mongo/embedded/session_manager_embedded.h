@@ -38,7 +38,7 @@ public:
     SessionManagerEmbedded() = default;
 
     void startSession(std::shared_ptr<transport::Session> session) override {}
-    void endAllSessions(transport::Session::TagMask tags) override {}
+    void endAllSessions(Client::TagMask tags) override {}
     Status start() override {
         return Status::OK();
     }

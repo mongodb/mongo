@@ -84,13 +84,13 @@ public:
     void terminate();
 
     /*
-     * Terminates the associated transport Session if its tags don't match the supplied tags.
-     * If the session is in a pending state, before any tags have been set, it will not be
-     * terminated.
+     * Terminates the associated transport Session if the connection tags in the client don't match
+     * the supplied tags.  If the connection tags indicate a pending state, before any tags have
+     * been set, it will not be terminated.
      *
      * This will not block on the session terminating cleaning itself up, it returns immediately.
      */
-    void terminateIfTagsDontMatch(transport::Session::TagMask tags);
+    void terminateIfTagsDontMatch(Client::TagMask tags);
 
 private:
     std::unique_ptr<Impl> _impl;

@@ -40,30 +40,7 @@ AtomicWord<unsigned long long> sessionIdCounter(0);
 
 }  // namespace
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kPending) {}
-
-void Session::setTags(TagMask tagsToSet) {
-    mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
-}
-
-void Session::unsetTags(TagMask tagsToUnset) {
-    mutateTags([tagsToUnset](TagMask originalTags) { return (originalTags & ~tagsToUnset); });
-}
-
-void Session::mutateTags(const std::function<TagMask(TagMask)>& mutateFunc) {
-    TagMask oldValue, newValue;
-    do {
-        oldValue = _tags.load();
-        newValue = mutateFunc(oldValue);
-
-        // Any change to the session tags automatically clears kPending status.
-        newValue &= ~kPending;
-    } while (!_tags.compareAndSwap(&oldValue, newValue));
-}
-
-Session::TagMask Session::getTags() const {
-    return _tags.load();
-}
+Session::Session() : _id(sessionIdCounter.addAndFetch(1)) {}
 
 }  // namespace transport
 }  // namespace mongo

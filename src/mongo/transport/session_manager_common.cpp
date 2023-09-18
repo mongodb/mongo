@@ -312,7 +312,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     workflow->start();
 }
 
-void SessionManagerCommon::endAllSessions(Session::TagMask tags) {
+void SessionManagerCommon::endAllSessions(Client::TagMask tags) {
     _sessions->sync().forEach([&](auto&& workflow) { workflow.terminateIfTagsDontMatch(tags); });
 }
 

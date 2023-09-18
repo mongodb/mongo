@@ -118,9 +118,6 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
         transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
         _socketTimeout.value_or(Milliseconds(5000)),
         transientSSLParams);
-    if (swSession.isOK()) {
-        swSession.getValue()->setTags(_tagMask);
-    }
     return swSession;
 }
 
@@ -186,13 +183,6 @@ rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string&
         }
         throw;
     }
-}
-
-void DBClientConnection::setTags(transport::Session::TagMask tags) {
-    _tagMask = tags;
-    if (!_session)
-        return;
-    _session->setTags(tags);
 }
 
 void DBClientConnection::_ensureSession() {

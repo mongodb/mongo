@@ -101,8 +101,6 @@ public:
     rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
                                               const Message& replyMsg) override;
 
-    void setTags(transport::Session::TagMask tag);
-
     static int getNumConnections() {
         return _numConnections.load();
     }
@@ -126,8 +124,6 @@ public:
 
 protected:
     void _auth(const BSONObj& params) override;
-
-    transport::Session::TagMask _tagMask = transport::Session::kEmptyTagMask;
 
     Backoff _autoReconnectBackoff;
 
