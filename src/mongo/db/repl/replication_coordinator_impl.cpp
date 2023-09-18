@@ -913,10 +913,14 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
-    const auto needsInitialSync =
-        lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
+    const auto isInitialSyncFlagSet = _externalState->isInitialSyncFlagSet(opCtx);
+
+    const auto needsInitialSync = lastOpTime.isNull() || isInitialSyncFlagSet;
     if (!needsInitialSync) {
-        LOGV2(4280512, "No initial sync required. Attempting to begin steady replication");
+        LOGV2(4280512,
+              "No initial sync required. Attempting to begin steady replication",
+              "lastOpTime"_attr = lastOpTime,
+              "isInitialSyncFlagSet"_attr = isInitialSyncFlagSet);
         // Start steady replication, since we already have data.
         // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
         auto memberState = getMemberState();
@@ -929,7 +933,10 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
         return;
     }
 
-    LOGV2(4280513, "Initial sync required. Attempting to start initial sync...");
+    LOGV2(4280513,
+          "Initial sync required. Attempting to start initial sync...",
+          "lastOpTime"_attr = lastOpTime,
+          "isInitialSyncFlagSet"_attr = isInitialSyncFlagSet);
     // Do initial sync.
     if (!_externalState->getTaskExecutor()) {
         LOGV2(21323, "Not running initial sync during test");
