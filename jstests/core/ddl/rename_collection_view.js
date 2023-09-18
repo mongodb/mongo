@@ -68,19 +68,13 @@ jsTest.log("Rename coll to existing view should fail with NamespaceExists");
 
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: srcColl.getFullName(), to: dstView.getFullName()}),
-        [
-            ErrorCodes.NamespaceExists,
-            ErrorCodes.CommandNotSupportedOnView,  // TODO SERVER-78721 remove this error code
-        ],
+        ErrorCodes.NamespaceExists,
         "rename collection to existing view should fail with NamespaceExists");
 
     assert.commandFailedWithCode(
         db.adminCommand(
             {renameCollection: srcColl.getFullName(), to: dstView.getFullName(), dropTarget: true}),
-        [
-            ErrorCodes.NamespaceExists,
-            ErrorCodes.CommandNotSupportedOnView,  // TODO SERVER-78721 remove this error code
-        ],
+        ErrorCodes.NamespaceExists,
         "rename collection to existing view should fail with NamespaceExists even if dropTarget is true");
 }
 })();
