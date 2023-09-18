@@ -34,7 +34,6 @@
 #include <memory>
 #include <ostream>
 #include <string>
-#include <variant>
 
 #include <boost/optional/optional.hpp>
 
@@ -108,27 +107,27 @@ TEST(TransactionOperationsTest, Basic) {
 TEST(TransactionOperationsTest, AddTransactionFailsOnDuplicateStatementIds) {
     TransactionOperations::TransactionOperation op1;
     std::vector<StmtId> stmtIds1 = {1, 2, 3};
-    op1.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds1));
+    op1.setStatementIds(stmtIds1);
 
     TransactionOperations::TransactionOperation op2;
     std::vector<StmtId> stmtIds2 = {3, 4, 5};
-    op2.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds2));
+    op2.setStatementIds(stmtIds2);
 
     TransactionOperations::TransactionOperation op3;
     std::vector<StmtId> stmtIds3 = {3};
-    op3.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds3));
+    op3.setStatementIds(stmtIds3);
 
     TransactionOperations::TransactionOperation op4;
     std::vector<StmtId> stmtIds4 = {4, 5, 7, 8};
-    op4.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds4));
+    op4.setStatementIds(stmtIds4);
 
     TransactionOperations::TransactionOperation op5;
     std::vector<StmtId> stmtIds5 = {6, 7, 8, 9};
-    op5.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds5));
+    op5.setStatementIds(stmtIds5);
 
     TransactionOperations::TransactionOperation op6;
     std::vector<StmtId> stmtIds6 = {6, 9};
-    op6.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds6));
+    op6.setStatementIds(stmtIds6);
 
     TransactionOperations ops;
     ASSERT_OK(ops.addOperation(op1));
@@ -551,7 +550,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
     op.setObject(BSON("_id" << 1 << "x" << 1));
     op.setTid(tenant);
     std::vector<StmtId> stmtIds = {1};
-    op.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds));
+    op.setStatementIds(stmtIds);
     ASSERT_OK(ops.addOperation(op));
 
     std::vector<OplogSlot> oplogSlots;
@@ -615,7 +614,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     op1.setObject(BSON("_id" << 1 << "x" << 1));
     op1.setTid(tenant);
     std::vector<StmtId> stmtIds1 = {1};
-    op1.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds1));
+    op1.setStatementIds(stmtIds1);
     ASSERT_OK(ops.addOperation(op1));
 
     TransactionOperations::TransactionOperation op2;
@@ -624,7 +623,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     op2.setObject(BSON("_id" << 2 << "x" << 2));
     op2.setTid(tenant);
     std::vector<StmtId> stmtIds2 = {2};
-    op2.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds2));
+    op2.setStatementIds(stmtIds2);
     ASSERT_OK(ops.addOperation(op2));
 
     TransactionOperations::TransactionOperation op3;
@@ -633,7 +632,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
     op3.setObject(BSON("_id" << 3 << "x" << 3));
     op3.setTid(tenant);
     std::vector<StmtId> stmtIds3 = {3};
-    op3.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds3));
+    op3.setStatementIds(stmtIds3);
     ASSERT_OK(ops.addOperation(op3));
 
     std::vector<OplogSlot> oplogSlots;
@@ -737,7 +736,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
     op1.setObject(BSON("_id" << 1 << "x" << 1));
     op1.setTid(tenant);
     std::vector<StmtId> stmtIds1 = {1};
-    op1.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds1));
+    op1.setStatementIds(stmtIds1);
     ASSERT_OK(ops.addOperation(op1));
 
     TransactionOperations::TransactionOperation op2;
@@ -746,7 +745,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
     op2.setObject(BSON("_id" << 2 << "x" << 2));
     op2.setTid(tenant);
     std::vector<StmtId> stmtIds2 = {2};
-    op2.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds2));
+    op2.setStatementIds(stmtIds2);
     ASSERT_OK(ops.addOperation(op2));
 
     TransactionOperations::TransactionOperation op3;
@@ -755,7 +754,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
     op3.setObject(BSON("_id" << 3 << "x" << 3));
     op3.setTid(tenant);
     std::vector<StmtId> stmtIds3 = {3};
-    op3.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds3));
+    op3.setStatementIds(stmtIds3);
     ASSERT_OK(ops.addOperation(op3));
 
     std::vector<OplogSlot> oplogSlots;

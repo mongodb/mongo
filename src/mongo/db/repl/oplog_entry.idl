@@ -30,6 +30,8 @@
 
 global:
     cpp_namespace: "mongo::repl"
+    cpp_includes:
+        - "mongo/db/repl/oplog_entry_serialization.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -60,6 +62,16 @@ enums:
             kPreImage: "preImage"
             kPostImage: "postImage"
 
+types:
+    zeroOneManyStmtId:
+        bson_serialization_type: any
+        description: >-
+            May be absent, a single StmtId, or an array(size > 1) of StmtIds.  Serialized
+            as appropriate depending on the array size.
+        cpp_type: std::vector<StmtId>
+        default: std::vector<StmtId>()
+        serializer: ::mongo::repl::zeroOneManyStmtIdAppend
+        deserializer: ::mongo::repl::parseZeroOneManyStmtId
 structs:
     DurableReplOperation:
         description: "A document that represents an operation. Should never be used directly in
@@ -124,9 +136,7 @@ structs:
                               Only included when a resharding operation is in progress."
             stmtId:
                 cpp_name: statementIds
-                type:
-                    variant: [StmtId, array<StmtId>]
-                optional: true
+                type: zeroOneManyStmtId
                 description: "Identifier of the transaction statement(s) which generated this oplog
                               entry"
             fromMigrate:

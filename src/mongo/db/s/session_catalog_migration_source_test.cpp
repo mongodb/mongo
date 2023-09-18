@@ -248,9 +248,9 @@ repl::DurableReplOperation makeDurableReplOp(
     op.setObject2(object2);
     if (stmtIds.size() == 1) {
         // This is required for making BSON equality check in the tests below work.
-        op.setStatementIds({{stmtIds.front()}});
+        op.setStatementIds({stmtIds.front()});
     } else if (!stmtIds.empty()) {
-        op.setStatementIds({{stmtIds}});
+        op.setStatementIds({stmtIds});
     }
     op.setNeedsRetryImage(needsRetryImage);
     op.setPreImageOpTime(preImageOpTime);
@@ -1292,12 +1292,11 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
         const auto expectedSessionId = *getParentSessionId(sessionId);
         const auto expectedTxnNumber = *sessionId.getTxnNumber();
-        const auto expectedImageOpForOp2 =
-            makeDurableReplOp(repl::OpTypeEnum::kNoop,
-                              kNs,
-                              imageEntryForOp2.getImage(),
-                              boost::none,
-                              repl::variant_util::toVector<StmtId>(op2.getStatementIds()));
+        const auto expectedImageOpForOp2 = makeDurableReplOp(repl::OpTypeEnum::kNoop,
+                                                             kNs,
+                                                             imageEntryForOp2.getImage(),
+                                                             boost::none,
+                                                             op2.getStatementIds());
         const std::vector<repl::DurableReplOperation> expectedOps{
             op3, expectedImageOpForOp2, op2, op1};
 
@@ -2060,12 +2059,11 @@ TEST_F(
 
             const auto expectedSessionId = *getParentSessionId(sessionId);
             const auto expectedTxnNumber = *sessionId.getTxnNumber();
-            const auto expectedImageOpForOp2 =
-                makeDurableReplOp(repl::OpTypeEnum::kNoop,
-                                  kNs,
-                                  imageEntryForOp2.getImage(),
-                                  boost::none,
-                                  repl::variant_util::toVector<StmtId>(op2.getStatementIds()));
+            const auto expectedImageOpForOp2 = makeDurableReplOp(repl::OpTypeEnum::kNoop,
+                                                                 kNs,
+                                                                 imageEntryForOp2.getImage(),
+                                                                 boost::none,
+                                                                 op2.getStatementIds());
             const std::vector<repl::DurableReplOperation> expectedOps{
                 op3, expectedImageOpForOp2, op2, op1};
 

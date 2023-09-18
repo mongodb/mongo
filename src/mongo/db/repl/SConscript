@@ -598,6 +598,7 @@ env.Library(
     target='oplog_entry',
     source=[
         'oplog_entry.cpp',
+        'oplog_entry_serialization.cpp',
         'oplog_entry.idl',
     ],
     LIBDEPS=[
@@ -611,6 +612,16 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Benchmark(
+    target='oplog_entry_bm',
+    source=[
+        'oplog_entry_bm.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_entry',
     ],
 )
 

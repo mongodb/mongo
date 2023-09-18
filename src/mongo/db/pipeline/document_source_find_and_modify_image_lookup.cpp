@@ -144,9 +144,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
     forgedNoop.setWallClockTime(oplogEntry.getWallClockTime());
     forgedNoop.setNss(innerOp ? innerOp->getNss() : oplogEntry.getNss());
     forgedNoop.setUuid(innerOp ? innerOp->getUuid() : *oplogEntry.getUuid());
-    forgedNoop.setStatementIds(
-        innerOp ? repl::variant_util::toVector<StmtId>(innerOp->getStatementIds())
-                : oplogEntry.getStatementIds());
+    forgedNoop.setStatementIds(innerOp ? innerOp->getStatementIds() : oplogEntry.getStatementIds());
 
     // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
     // collisions because we always reserve an extra oplog slot when writing the retryable

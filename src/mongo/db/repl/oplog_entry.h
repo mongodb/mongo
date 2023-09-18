@@ -68,20 +68,6 @@
 namespace mongo {
 namespace repl {
 
-namespace variant_util {
-template <typename T>
-std::vector<T> toVector(boost::optional<stdx::variant<T, std::vector<T>>> optVals) {
-    if (!optVals) {
-        return {};
-    }
-    return stdx::visit(OverloadedVisitor{[](T val) { return std::vector<T>{val}; },
-                                         [](const std::vector<T>& vals) {
-                                             return vals;
-                                         }},
-                       *optVals);
-}
-}  // namespace variant_util
-
 /**
  * The first oplog entry is a no-op with this message in its "msg" field.
  */
@@ -208,15 +194,11 @@ public:
         if (std::count(stmtIds.begin(), stmtIds.end(), kUninitializedStmtId) > 0) {
             return;
         }
-        if (stmtIds.size() > 1) {
-            DurableReplOperation::setStatementIds({{stmtIds}});
-        } else if (stmtIds.size() == 1) {
-            DurableReplOperation::setStatementIds({{stmtIds.front()}});
-        }
+        DurableReplOperation::setStatementIds(stmtIds);
     }
 
-    std::vector<StmtId> getStatementIds() const {
-        return variant_util::toVector<StmtId>(DurableReplOperation::getStatementIds());
+    const std::vector<StmtId>& getStatementIds() const {
+        return DurableReplOperation::getStatementIds();
     }
 
     void setFromMigrateIfTrue(bool value) & {
@@ -323,17 +305,11 @@ public:
     }
 
     void setStatementIds(const std::vector<StmtId>& stmtIds) & {
-        if (stmtIds.empty()) {
-            getDurableReplOperation().setStatementIds(boost::none);
-        } else if (stmtIds.size() == 1) {
-            getDurableReplOperation().setStatementIds({{stmtIds.front()}});
-        } else {
-            getDurableReplOperation().setStatementIds({{stmtIds}});
-        }
+        getDurableReplOperation().setStatementIds(stmtIds);
     }
 
-    std::vector<StmtId> getStatementIds() const {
-        return variant_util::toVector<StmtId>(OplogEntryBase::getStatementIds());
+    const std::vector<StmtId>& getStatementIds() const {
+        return getDurableReplOperation().getStatementIds();
     }
 
     void setTxnNumber(boost::optional<std::int64_t> value) & {
@@ -810,7 +786,7 @@ public:
 
     // Wrapper methods for DurableOplogEntry
     const boost::optional<mongo::Value>& get_id() const&;
-    std::vector<StmtId> getStatementIds() const&;
+    const std::vector<StmtId>& getStatementIds() const&;
     const OperationSessionInfo& getOperationSessionInfo() const;
     const boost::optional<mongo::LogicalSessionId>& getSessionId() const;
     boost::optional<std::int64_t> getTxnNumber() const;

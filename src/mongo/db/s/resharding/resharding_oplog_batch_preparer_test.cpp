@@ -101,7 +101,7 @@ protected:
             if (lsid && isInternalSessionForRetryableWrite(*lsid)) {
                 if (document.hasField("_id")) {
                     auto id = document.getIntField("_id");
-                    insertOp.setStatementIds({{id}});
+                    insertOp.setStatementIds({id});
                 }
             }
             ops.emplace_back(insertOp);
@@ -455,7 +455,7 @@ TEST_F(ReshardingOplogBatchPreparerTest,
     auto op =
         repl::DurableReplOperation(repl::OpTypeEnum::kNoop, {}, kWouldChangeOwningShardSentinel);
     op.setObject2(BSONObj());
-    op.setStatementIds({{0}});
+    op.setStatementIds({0});
     batch.emplace_back(makeApplyOpsOplogEntry(
         {op}, lsid, txnNumber, false /* isPrepare */, false /* isPartial */));
 
