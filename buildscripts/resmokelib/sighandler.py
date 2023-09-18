@@ -157,7 +157,7 @@ def _analyze_pids(logger, pids):
         'hang-analyzer', '-o', 'file', '-o', 'stdout', '-k', '-d', ','.join([str(p) for p in pids])
     ]
 
-    if not os.getenv('ASAN_OPTIONS'):
+    if not os.getenv('ASAN_OPTIONS') and not os.getenv('TSAN_OPTIONS'):
         hang_analyzer_args.append('-c')
     _hang_analyzer = parser.parse_command_line(hang_analyzer_args, logger=logger)
 
