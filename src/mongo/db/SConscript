@@ -1184,6 +1184,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'catalog/database_holder',
+        'catalog/health_log_interface',
         'commands/server_status_core',
         'kill_sessions',
     ],

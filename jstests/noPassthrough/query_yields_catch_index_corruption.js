@@ -48,6 +48,11 @@ function createDanglingIndexEntry(doc) {
     });
     assert.eq(error.code, ErrorCodes.DataCorruptionDetected);
     session.abortTransaction_forTesting();
+
+    // Ensure the health log entry is written out after data corruption is detected.
+    assert.soon(() => {
+        return primary.getDB("local").getCollection("system.healthlog").count() > 0;
+    }, "Health log entry was not written out");
 }
 
 createDanglingIndexEntry({a: 1});
