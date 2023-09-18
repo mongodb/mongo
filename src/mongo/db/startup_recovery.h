@@ -33,6 +33,15 @@
 
 namespace mongo {
 namespace startup_recovery {
+/**
+ * After unclean shutdown, change stream collections which utilize truncates may unexpectedly
+ * surface parts of previously truncated data.
+ *
+ * Defines a range where all entries within
+ * 'kChangeStreamPostUncleanShutdownExpiryExtensionSeconds' seconds of expiry are truncated after
+ * unclean shutdown to guarantee consistent data post recovery.
+ */
+static constexpr int64_t kChangeStreamPostUncleanShutdownExpiryExtensionSeconds{10};
 
 /**
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error

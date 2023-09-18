@@ -61,19 +61,10 @@
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForCheckingMarkers);
-
-Date_t getWallTimeToUse(OperationContext* opCtx) {
-    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
-    injectCurrentWallTimeForCheckingMarkers.execute(
-        [&](const BSONObj& data) { now = data.getField("currentWallTime").date(); });
-    return now;
-}
-
 bool hasMarkerWallTimeExpired(OperationContext* opCtx,
                               Date_t markerWallTime,
                               const TenantId& tenantId) {
-    auto now = getWallTimeToUse(opCtx);
+    auto now = change_stream_serverless_helpers::getCurrentTimeForChangeCollectionRemoval(opCtx);
     auto expireAfterSeconds =
         Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(tenantId)};
     auto expirationTime = now - expireAfterSeconds;

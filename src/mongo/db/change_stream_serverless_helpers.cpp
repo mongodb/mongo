@@ -62,8 +62,10 @@
 
 
 namespace mongo {
-namespace change_stream_serverless_helpers {
 
+MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForChangeCollectionRemoval);
+
+namespace change_stream_serverless_helpers {
 namespace {
 bool isServerlessChangeStreamFeatureFlagEnabled() {
     return feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
@@ -153,5 +155,11 @@ int64_t getExpireAfterSeconds(const TenantId& tenantId) {
     return expireAfterSeconds;
 }
 
+Date_t getCurrentTimeForChangeCollectionRemoval(OperationContext* opCtx) {
+    auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+    injectCurrentWallTimeForChangeCollectionRemoval.execute(
+        [&](const BSONObj& data) { now = data.getField("currentWallTime").date(); });
+    return now;
+}
 }  // namespace change_stream_serverless_helpers
 }  // namespace mongo

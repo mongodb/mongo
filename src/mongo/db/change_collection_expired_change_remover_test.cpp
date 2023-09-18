@@ -66,6 +66,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -459,5 +460,35 @@ TEST_F(ChangeCollectionTruncateExpirationTest, TruncatesAreOnlyAfterAllDurable) 
     const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
     ASSERT_EQ(changeCollectionEntries.size(), 21);
     ASSERT_BSONOBJ_EQ(changeCollectionEntries[0].getObject(), BSON("_id" << 100));
+}
+
+TEST_F(ChangeCollectionTruncateExpirationTest, StartupRecoveryTruncates) {
+    const auto opCtx = operationContext();
+    dropAndRecreateChangeCollection(opCtx, _tenantId);
+
+    clockSource()->advance(Seconds(100));
+
+    const auto numEntries = 20;
+    for (int i = 0; i < numEntries; ++i) {
+        auto doc = BSON("_id" << i);
+        insertDocumentToChangeCollection(opCtx, _tenantId, doc);
+        clockSource()->advance(Seconds(1));
+    }
+
+    // Only the first entry is expired by the current wall time.
+    setExpireAfterSeconds(opCtx, Seconds(numEntries));
+
+    auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
+    ASSERT_EQ(changeCollectionEntries.size(), numEntries);
+
+    startup_recovery::recoverChangeStreamCollections(
+        opCtx, false, StorageEngine::LastShutdownState::kUnclean);
+
+    // All entries within 'startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds'
+    // seconds of expiry should be truncated.
+    changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
+    ASSERT_LT(static_cast<int64_t>(changeCollectionEntries.size()),
+              numEntries -
+                  startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
 }
 }  // namespace mongo

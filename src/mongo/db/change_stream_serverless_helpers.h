@@ -87,5 +87,6 @@ TenantSet getConfigDbTenants(OperationContext* opCtx);
  */
 int64_t getExpireAfterSeconds(const TenantId& tenantId);
 
+Date_t getCurrentTimeForChangeCollectionRemoval(OperationContext* opCtx);
 }  // namespace change_stream_serverless_helpers
 }  // namespace mongo

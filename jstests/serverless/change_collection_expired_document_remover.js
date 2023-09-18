@@ -263,10 +263,7 @@ assertChangeCollectionDocuments(citiesChangeCollectionSecondary,
 // 'currentWallTime' < first-non-expired-document.
 const currentWallTime =
     new Date(lastExpiredDocumentTime + kExpireAfterSeconds * 1000 + kSafetyMarginMillis);
-const failpointName =
-    FeatureFlagUtil.isPresentAndEnabled(stocksTestDb, "UseUnreplicatedTruncatesForDeletions")
-    ? "injectCurrentWallTimeForCheckingMarkers"
-    : "injectCurrentWallTimeForRemovingExpiredDocuments";
+const failpointName = "injectCurrentWallTimeForChangeCollectionRemoval";
 const fpInjectWallTimePrimary = configureFailPoint(primary, failpointName, {currentWallTime});
 const fpInjectWallTimeSecondary = configureFailPoint(secondary, failpointName, {currentWallTime});
 

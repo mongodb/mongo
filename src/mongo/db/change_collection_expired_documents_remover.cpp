@@ -81,10 +81,6 @@ namespace mongo {
 // Hangs the change collection remover job before initiating the deletion process of documents.
 MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingExpiredChanges);
 
-// Injects the provided ISO date to currentWallTime which is used to determine if the change
-// collection document is expired or not.
-MONGO_FAIL_POINT_DEFINE(injectCurrentWallTimeForRemovingExpiredDocuments);
-
 namespace {
 
 change_stream_serverless_helpers::TenantSet getConfigDbTenants(OperationContext* opCtx) {
@@ -104,20 +100,14 @@ bool usesUnreplicatedTruncates() {
 }
 
 void removeExpiredDocuments(Client* client) {
-    hangBeforeRemovingExpiredChanges.pauseWhileSet();
-
     bool useUnreplicatedTruncates = usesUnreplicatedTruncates();
 
     try {
         auto opCtx = client->makeOperationContext();
+        hangBeforeRemovingExpiredChanges.pauseWhileSet(opCtx.get());
         const auto clock = client->getServiceContext()->getFastClockSource();
-        auto currentWallTime = clock->now();
-
-        // If the fail point 'injectCurrentWallTimeForRemovingDocuments' is enabled then set the
-        // 'currentWallTime' with the provided wall time.
-        injectCurrentWallTimeForRemovingExpiredDocuments.execute([&](const BSONObj& data) {
-            currentWallTime = data.getField("currentWallTime").date();
-        });
+        auto currentWallTime =
+            change_stream_serverless_helpers::getCurrentTimeForChangeCollectionRemoval(opCtx.get());
 
         // Number of documents removed in the current pass.
         size_t removedCount = 0;

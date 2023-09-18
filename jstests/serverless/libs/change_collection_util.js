@@ -74,13 +74,8 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
                             config));
 
         // A dictionary of parameters required for multitenancy.
-        this._multitenancyParameters = {
-            featureFlagServerlessChangeStreams: true,
-            multitenancySupport: true,
-            featureFlagSecurityToken: true,
-            featureFlagRequireTenantID: true,
-            testOnlyValidatedTenancyScopeKey: ChangeStreamMultitenantReplicaSetTest.getTokenKey(),
-        };
+        this._multitenancyParameters =
+            ChangeStreamMultitenantReplicaSetTest.multitenancyParameters();
 
         const nodeOptions = config.nodeOptions || {};
         const setParameter =
@@ -117,6 +112,16 @@ export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     // Exposed as a method because linter does not yet support static properties.
     static getTokenKey() {
         return "secret";
+    }
+
+    static multitenancyParameters() {
+        return {
+            featureFlagServerlessChangeStreams: true,
+            multitenancySupport: true,
+            featureFlagSecurityToken: true,
+            featureFlagRequireTenantID: true,
+            testOnlyValidatedTenancyScopeKey: ChangeStreamMultitenantReplicaSetTest.getTokenKey(),
+        };
     }
 
     // Returns a connection to the 'hostAddr' with 'tenantId' stamped to it for the created user.
