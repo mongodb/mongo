@@ -125,6 +125,9 @@ public:
     // Namespace used for storing retryable findAndModify images.
     static const NamespaceString kConfigImagesNamespace;
 
+    // Namespace used for the health log.
+    static const NamespaceString kLocalHealthLogNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -95,18 +95,32 @@ env.Library(
 )
 
 env.Library(
+    target='health_log_interface',
+    source=[
+        'health_log.idl',
+        'health_log_interface.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
     target='health_log',
     source=[
         "health_log.cpp",
-        "health_log.idl",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
+        "$BUILD_DIR/mongo/db/namespace_string",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/idl/idl_parser",
     ],
-);
+    LIBDEPS_PRIVATE=[
+        "health_log_interface",
+    ],
+)
 
 env.Library(
     target='index_builds_manager',
@@ -342,7 +356,7 @@ env.Library(
         'collection',
         'collection_options',
         'database_holder',
-        'health_log',
+        'health_log_interface',
         'index_catalog',
         'index_catalog_entry',
         'index_key_validate',

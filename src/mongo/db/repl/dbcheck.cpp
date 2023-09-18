@@ -33,7 +33,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/health_log.h"
+#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -366,7 +366,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                                   "dbCheck failed",
                                                   OplogEntriesEnum::Batch,
                                                   BSON("success" << false << "info" << msg));
-            HealthLog::get(opCtx).log(*logEntry);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
             return Status::OK();
         }
 
@@ -394,13 +394,13 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             (batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
             // On debug builds, health-log every batch result; on release builds, health-log
             // every N batches.
-            HealthLog::get(opCtx).log(*logEntry);
+            HealthLogInterface::get(opCtx)->log(*logEntry);
         }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
         auto logEntry = dbCheckErrorHealthLogEntry(
             entry.getNss(), msg, OplogEntriesEnum::Batch, exception.toStatus(), entry.toBSON());
-        HealthLog::get(opCtx).log(*logEntry);
+        HealthLogInterface::get(opCtx)->log(*logEntry);
         return Status::OK();
     }
 
@@ -440,7 +440,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             const auto entry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/, SeverityEnum::Info, "", type, boost::none /*data*/
             );
-            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+            HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*entry);
             return Status::OK();
     }
 

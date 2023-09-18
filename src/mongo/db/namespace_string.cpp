@@ -90,6 +90,9 @@ const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString:
 const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
                                                               "image_collection");
 
+const NamespaceString NamespaceString::kLocalHealthLogNamespace(NamespaceString::kLocalDb,
+                                                                "system.healthlog");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -114,6 +117,9 @@ bool NamespaceString::isLegalClientSystemNS() const {
         if (ns() == "config.system.sessions")
             return true;
         if (ns() == kIndexBuildEntryNamespace.ns())
+            return true;
+    } else if (db() == kLocalDb) {
+        if (coll() == kLocalHealthLogNamespace.coll())
             return true;
     }
 

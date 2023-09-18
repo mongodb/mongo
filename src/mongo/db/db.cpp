@@ -494,7 +494,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     // Start up health log writer thread.
-    HealthLog::get(startupOpCtx.get()).startup();
+    HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
+    HealthLogInterface::get(startupOpCtx.get())->startup();
 
     auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
     uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
@@ -1268,8 +1269,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 #endif
 
-    LOGV2(4784927, "Shutting down the HealthLog");
-    HealthLog::get(serviceContext).shutdown();
+    if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
+        LOGV2(4784927, "Shutting down the HealthLog");
+        healthLog->shutdown();
+    }
 
     // We should always be able to acquire the global lock at shutdown.
     //
