@@ -216,18 +216,10 @@ CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& r
 }
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(PSRExpr::Node reqMap)
-    : _bound(),
-      _reqMap(std::move(reqMap)),
-      _hasIntersected(false),
-      _hasTraversed(false),
-      _retainPredicate(false) {}
+    : _bound(), _reqMap(std::move(reqMap)), _retainPredicate(false) {}
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
-    : _bound(std::move(bound)),
-      _reqMap(psr::makeNoOp()),
-      _hasIntersected(false),
-      _hasTraversed(false),
-      _retainPredicate(false) {}
+    : _bound(std::move(bound)), _reqMap(psr::makeNoOp()), _retainPredicate(false) {}
 
 /**
  * Helper class that builds PartialSchemaRequirements property from an EvalFilter or an EvalPath.
@@ -339,7 +331,6 @@ public:
                     "Cannot detect empty intervals without providing a constant folder",
                     !hasEmptyInterval);
 
-            leftResult->_hasIntersected = true;
             return leftResult;
         }
         // From this point on we only handle additive composition.
@@ -441,6 +432,10 @@ public:
                 });
 
             leftReqMap = std::move(*resultReqs.finish());
+            // If either argument is an over-approximation, then so is the result.
+            if (rightResult->_retainPredicate) {
+                leftResult->_retainPredicate = true;
+            }
             return leftResult;
         }
         // Left and right don't all use the same key.
@@ -624,11 +619,7 @@ public:
             // disjunctions.
         }
 
-        auto result = prependGetOrTraverse<PathTraverse>(n, std::move(inputResult));
-        if (result) {
-            result->_hasTraversed = true;
-        }
-        return result;
+        return prependGetOrTraverse<PathTraverse>(n, std::move(inputResult));
     }
 
     /**

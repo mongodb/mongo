@@ -257,12 +257,6 @@ struct PartialSchemaReqConversion {
     // Requirements we have built so far. May be trivially true.
     PSRExpr::Node _reqMap;
 
-    // Have we added a PathComposeM.
-    bool _hasIntersected;
-
-    // Have we added a PathTraverse.
-    bool _hasTraversed;
-
     // If true, retain original predicate after the conversion. In this case, the requirement map
     // might capture only a part of the predicate.
     // TODO: consider generalizing to retain only a part of the predicate.
