@@ -6,6 +6,9 @@
  *   cqf_experimental_incompatible,
  * ]
  */
+
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
+
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB('test');
 const coll1 = db.query_metrics1;
@@ -25,11 +28,6 @@ const sortObj = {
     c: -1
 };
 
-function getPlanCacheSize() {
-    const serverStatus = assert.commandWorked(db.serverStatus());
-    return serverStatus.metrics.query.planCacheTotalSizeEstimateBytes;
-}
-
 function assertCacheLength(coll, length) {
     assert.eq(coll.aggregate([{$planCacheStats: {}}]).itcount(), length);
 }
@@ -42,7 +40,7 @@ function verifyPlanCacheSizeIncrease(coll) {
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
 
-    let prevCacheSize = getPlanCacheSize();
+    let prevCacheSize = getPlanCacheSize(db);
     // Populate plan cache.
     assert.eq(
         1, coll.find(queryObj, projectionObj).sort(sortObj).itcount(), 'unexpected document count');
@@ -51,30 +49,30 @@ function verifyPlanCacheSizeIncrease(coll) {
     assertCacheLength(coll, 1);
 
     // Verify that the plan cache size increased.
-    assert.gt(getPlanCacheSize(), prevCacheSize);
-    prevCacheSize = getPlanCacheSize();
+    assert.gt(getPlanCacheSize(db), prevCacheSize);
+    prevCacheSize = getPlanCacheSize(db);
 
     // Verify that the total plan cache memory consumption estimate increases when 'projection'
     // plan cache entry is added.
     assert.eq(1, coll.find(queryObj, projectionObj).itcount(), 'unexpected document count');
-    assert.gt(getPlanCacheSize(), prevCacheSize);
+    assert.gt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate increases when 'sort' plan
     // cache entry is added.
-    prevCacheSize = getPlanCacheSize();
+    prevCacheSize = getPlanCacheSize(db);
     assert.eq(1, coll.find(queryObj).sort(sortObj).itcount(), 'unexpected document count');
-    assert.gt(getPlanCacheSize(), prevCacheSize);
+    assert.gt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate increases when 'query' plan
     // cache entry is added.
-    prevCacheSize = getPlanCacheSize();
+    prevCacheSize = getPlanCacheSize(db);
     assert.eq(1, coll.find(queryObj).itcount(), 'unexpected document count');
-    assert.gt(getPlanCacheSize(), prevCacheSize);
+    assert.gt(getPlanCacheSize(db), prevCacheSize);
     assertCacheLength(coll, 4);
 }
 
 function verifyPlanCacheSizeDecrease(coll) {
-    let prevCacheSize = getPlanCacheSize();
+    let prevCacheSize = getPlanCacheSize(db);
     assertCacheLength(coll, 4);
 
     // Verify that the total plan cache memory consumption estimate decreases when 'projection'
@@ -82,24 +80,24 @@ function verifyPlanCacheSizeDecrease(coll) {
     const planCache = coll.getPlanCache();
     planCache.clearPlansByQuery(queryObj, projectionObj);
     assertCacheLength(coll, 3);
-    assert.lt(getPlanCacheSize(), prevCacheSize);
+    assert.lt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate decreases when 'sort' plan
     // cache entry is cleared.
-    prevCacheSize = getPlanCacheSize();
+    prevCacheSize = getPlanCacheSize(db);
     planCache.clearPlansByQuery(queryObj, undefined, sortObj);
     assertCacheLength(coll, 2);
-    assert.lt(getPlanCacheSize(), prevCacheSize);
+    assert.lt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate decreases when all the
     // entries for a collection are cleared.
-    prevCacheSize = getPlanCacheSize();
+    prevCacheSize = getPlanCacheSize(db);
     planCache.clear();
     assertCacheLength(coll, 0);
-    assert.lt(getPlanCacheSize(), prevCacheSize);
+    assert.lt(getPlanCacheSize(db), prevCacheSize);
 }
 
-const originalPlanCacheSize = getPlanCacheSize();
+const originalPlanCacheSize = getPlanCacheSize(db);
 
 // Test plan cache size estimates using multiple collections.
 
@@ -114,7 +112,7 @@ verifyPlanCacheSizeDecrease(coll2);
 verifyPlanCacheSizeDecrease(coll1);
 
 // Verify that cache size gets reset to original size after clearing all the cache entires.
-assert.eq(getPlanCacheSize(), originalPlanCacheSize);
+assert.eq(getPlanCacheSize(db), originalPlanCacheSize);
 
 // Test by dropping collection.
 
@@ -126,7 +124,7 @@ verifyPlanCacheSizeIncrease(coll);
 
 // Verify that cache size gets reset to original size after dropping the collection.
 coll.drop();
-assert.eq(getPlanCacheSize(), originalPlanCacheSize);
+assert.eq(getPlanCacheSize(db), originalPlanCacheSize);
 
 // Test by dropping indexes.
 
@@ -138,6 +136,6 @@ verifyPlanCacheSizeIncrease(coll);
 
 // Verify that cache size gets reset to original size after dropping indexes.
 assert.commandWorked(coll.dropIndexes());
-assert.eq(getPlanCacheSize(), originalPlanCacheSize);
+assert.eq(getPlanCacheSize(db), originalPlanCacheSize);
 
 MongoRunner.stopMongod(conn);

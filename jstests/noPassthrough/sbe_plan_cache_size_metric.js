@@ -1,5 +1,5 @@
 /**
- * Tests that planCacheTotalSizeEstimateBytes metric is updated when entries are added or evicted
+ * Tests that planCache.totalSizeEstimateBytes metric is updated when entries are added or evicted
  * from SBE and Classic Plan Cache entries.
  *
  * @tags: [
@@ -14,6 +14,7 @@
  */
 
 import {getQueryHashFromExplain} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -30,13 +31,6 @@ function getCacheEntriesByQueryHashKey(coll, queryHash) {
     return coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash}}]).toArray();
 }
 
-function getPlanCacheSize() {
-    return db.serverStatus().metrics.query.planCacheTotalSizeEstimateBytes;
-}
-
-function getPlanCacheNumEntries() {
-    return db.serverStatus().metrics.query.planCacheTotalQueryShapes;
-}
 function assertQueryInPlanCache(coll, query) {
     const explainResult = assert.commandWorked(coll.explain().find(query).finish());
     const queryHash = getQueryHashFromExplain(explainResult, db);
@@ -55,9 +49,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({c: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-const initialPlanCacheSize = getPlanCacheSize();
+const initialPlanCacheSize = getPlanCacheSize(db);
 // Plan cache must be empty.
-assert.eq(0, getPlanCacheNumEntries());
+assert.eq(0, getPlanCacheNumEntries(db));
 
 const sbeQuery = {
     a: 1
@@ -71,10 +65,10 @@ const classicQuery = {
 assert.eq(1, coll.find(sbeQuery).itcount());
 assertQueryInPlanCache(coll, sbeQuery);
 // Plan Cache must contain exactly 1 entry.
-assert.eq(1, getPlanCacheNumEntries());
+assert.eq(1, getPlanCacheNumEntries(db));
 
 // Assert metric is incremented for new cache entry.
-const afterSbePlanCacheSize = getPlanCacheSize();
+const afterSbePlanCacheSize = getPlanCacheSize(db);
 assert.gt(afterSbePlanCacheSize, initialPlanCacheSize);
 
 // Step 2. Insert an entry to Classic Plan Cache.
@@ -84,17 +78,17 @@ assert.commandWorked(
 assert.eq(1, coll.find(classicQuery).itcount());
 assertQueryInPlanCache(coll, classicQuery);
 // Plan Cache must contain exactly 2 entries.
-assert.eq(2, getPlanCacheNumEntries());
+assert.eq(2, getPlanCacheNumEntries(db));
 
 // Assert metric is incremented for new cache entry.
-const afterClassicPlanCacheSize = getPlanCacheSize();
+const afterClassicPlanCacheSize = getPlanCacheSize(db);
 assert.gt(afterClassicPlanCacheSize, afterSbePlanCacheSize);
 
 // Step 3. Remove the entry from Classic Plan Cache.
 // Clean up Classic Plan Cache.
 assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: classicQuery}));
 // Assert metric is decremented back to values before insering classic plan cache entry.
-assert.eq(afterSbePlanCacheSize, getPlanCacheSize());
+assert.eq(afterSbePlanCacheSize, getPlanCacheSize(db));
 
 // Step 4. Remove the entry from SBE Plan Cache.
 // Move back to SBE plan cache.
@@ -103,6 +97,6 @@ assert.commandWorked(
 // Clean up SBE Plan Cache
 assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: sbeQuery}));
 // Assert metric is decremented back to initial value.
-assert.eq(initialPlanCacheSize, getPlanCacheSize());
+assert.eq(initialPlanCacheSize, getPlanCacheSize(db));
 
 MongoRunner.stopMongod(conn);

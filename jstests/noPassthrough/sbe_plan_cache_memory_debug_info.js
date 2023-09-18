@@ -10,6 +10,7 @@
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
@@ -55,23 +56,19 @@ function assertCacheEntryIsMissingDebugInfo(coll, queryShape) {
     }
 }
 
-function getPlanCacheSize() {
-    return db.runCommand({serverStatus: 1}).metrics.query.planCacheTotalSizeEstimateBytes;
-}
-
 // Set a large value to internalQueryCacheMaxSizeBytesBeforeStripDebugInfo to make sure that Debug
 // Info wouldn't be stripped off.
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 536870912}));
 
-const initialPlanCacheSize = getPlanCacheSize();
+const initialPlanCacheSize = getPlanCacheSize(db);
 
 // Add some entries to SBE Plan Cache and make sure that the global planCacheSize metric is affected
 // by the inserted entries.
 const sbeColl = createTestCollection("sbe");
 assert.eq(0, sbeColl.find({a: 0}).itcount());
 assert.eq(0, sbeColl.find({a: 2, b: 4}).itcount());
-const planCacheSizeAfterSbeStep = getPlanCacheSize();
+const planCacheSizeAfterSbeStep = getPlanCacheSize(db);
 assert.lt(initialPlanCacheSize, planCacheSizeAfterSbeStep);
 
 // Force classic plan cache.
@@ -85,7 +82,7 @@ const classicColl = createTestCollection("classic");
 // affected by the inserted entry as well as the entry contains DebugInfo.
 assert.eq(0, classicColl.find({a: 0}).itcount());
 assertCacheEntryHasDebugInfo(classicColl, {a: 0});
-const planCacheSizeAfterClassicStep = getPlanCacheSize();
+const planCacheSizeAfterClassicStep = getPlanCacheSize(db);
 assert.lt(planCacheSizeAfterSbeStep, planCacheSizeAfterClassicStep);
 
 // Set a smaller internalQueryCacheMaxSizeBytesBeforeStripDebugInfo to make sure that next inserted

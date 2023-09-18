@@ -7,17 +7,11 @@
  * ]
  */
 
+import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
+
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_invalidation");
-
-function getPlanCacheSize() {
-    return db.runCommand({serverStatus: 1}).metrics.query.planCacheTotalSizeEstimateBytes;
-}
-
-function getGlobalPlanCacheNumEntries() {
-    return db.runCommand({serverStatus: 1}).metrics.query.planCacheTotalQueryShapes;
-}
 
 /**
  * Helper class that creates a collection, indexes on it, and makes a few queries to add entries to
@@ -36,7 +30,7 @@ class TestCollection {
         assert.eq(0, this.coll.find({a: 1, b: 2}).itcount());
         assert.eq(0, this.coll.find({a: 1, c: 3, b: 2}).itcount());
 
-        assert.gt(getPlanCacheSize(), 0);
+        assert.gt(getPlanCacheSize(db), 0);
 
         this.nCacheEntries = this.getNumberOfCollectionPlanCacheEntries();
         assert.eq(2, this.nCacheEntries);
@@ -57,70 +51,70 @@ class TestCollection {
 }
 
 (function cacheEntriesRemovedIfTheCollectionDropped() {
-    const initialPlanCacheSize = getPlanCacheSize();
+    const initialPlanCacheSize = getPlanCacheSize(db);
     const test = new TestCollection();
 
-    assert.gt(getPlanCacheSize(), initialPlanCacheSize);
-    assert.eq(getGlobalPlanCacheNumEntries(), 2);
+    assert.gt(getPlanCacheSize(db), initialPlanCacheSize);
+    assert.eq(getPlanCacheNumEntries(db), 2);
 
     assert(test.coll.drop());
-    assert.eq(getPlanCacheSize(), initialPlanCacheSize);
-    assert.eq(getGlobalPlanCacheNumEntries(), 0);
+    assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
+    assert.eq(getPlanCacheNumEntries(db), 0);
 }());
 
 (function cacheEntriesNotRemovedIfAnotherCollectedDropped() {
     const test = new TestCollection("coll1");
-    const cacheSizeForOneTestCollection = getPlanCacheSize();
-    assert.eq(getGlobalPlanCacheNumEntries(), 2);
+    const cacheSizeForOneTestCollection = getPlanCacheSize(db);
+    assert.eq(getPlanCacheNumEntries(db), 2);
 
     const anotherTest = new TestCollection("coll2");
-    const cacheSizeForTwoTestCollections = getPlanCacheSize();
-    assert.eq(getGlobalPlanCacheNumEntries(), 4);
+    const cacheSizeForTwoTestCollections = getPlanCacheSize(db);
+    assert.eq(getPlanCacheNumEntries(db), 4);
     assert.gt(cacheSizeForTwoTestCollections, cacheSizeForOneTestCollection);
     assert(anotherTest.coll.drop());
 
-    assert.eq(cacheSizeForOneTestCollection, getPlanCacheSize());
+    assert.eq(cacheSizeForOneTestCollection, getPlanCacheSize(db));
     // Entries associated with anotherTest.coll are booted from the plan cache.
-    assert.eq(getGlobalPlanCacheNumEntries(), 2);
+    assert.eq(getPlanCacheNumEntries(db), 2);
     test.assertCollectionCacheEntriesNotRemoved();
 }());
 
 (function cacheEntriesRemovedIfANewIndexCreated() {
     const test = new TestCollection();
-    const planCacheSize = getPlanCacheSize();
+    const planCacheSize = getPlanCacheSize(db);
 
     assert.commandWorked(test.coll.createIndex({hi: 1}));
 
-    assert.lt(getPlanCacheSize(), planCacheSize);
+    assert.lt(getPlanCacheSize(db), planCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
 }());
 
 (function cacheEntriesRemovedIfAnyIndexDropped() {
     const test = new TestCollection();
-    const initialPlanCacheSize = getPlanCacheSize();
+    const initialPlanCacheSize = getPlanCacheSize(db);
 
     assert.commandWorked(test.coll.dropIndex(test.indexNames[0]));
 
-    assert.lt(getPlanCacheSize(), initialPlanCacheSize);
+    assert.lt(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
 }());
 
 (function cacheEntriesNotRemovedIfCallModCalled() {
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
-    const initialPlanCacheSize = getPlanCacheSize();
+    const initialPlanCacheSize = getPlanCacheSize(db);
 
     assert.commandWorked(
         db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}));
 
-    assert.eq(getPlanCacheSize(), initialPlanCacheSize);
+    assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertCollectionCacheEntriesNotRemoved();
 }());
 
 (function cacheEntriesRemovedIfIndexChanged() {
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
-    const initialPlanCacheSize = getPlanCacheSize();
+    const initialPlanCacheSize = getPlanCacheSize(db);
     assert.commandWorked(db.runCommand({
         collMod: collectionName,
         index: {
@@ -128,36 +122,36 @@ class TestCollection {
             hidden: true,
         }
     }));
-    assert.lt(getPlanCacheSize(), initialPlanCacheSize);
+    assert.lt(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
 }());
 
 (function cacheEntriesRemovedOnClearPlanCacheCommand() {
     const collectionName = "coll";
-    const initialPlanCacheSize = getPlanCacheSize();
+    const initialPlanCacheSize = getPlanCacheSize(db);
 
     const test = new TestCollection(collectionName);
-    assert.gt(getPlanCacheSize(), initialPlanCacheSize);
+    assert.gt(getPlanCacheSize(db), initialPlanCacheSize);
 
     assert.commandWorked(db.runCommand({planCacheClear: collectionName}));
 
-    assert.eq(getPlanCacheSize(), initialPlanCacheSize);
+    assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
 }());
 
 (function oneCacheEntryRemovedOnClearPlanCacheWithQueryCommand() {
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
-    const numberOfCacheEntries = getGlobalPlanCacheNumEntries();
+    const numberOfCacheEntries = getPlanCacheNumEntries(db);
 
     test.coll.find({a: 1, b: 2, c: 3, d: 4}).itcount();
-    assert.eq(numberOfCacheEntries + 1, getGlobalPlanCacheNumEntries());
-    const planCacheSize = getPlanCacheSize();
+    assert.eq(numberOfCacheEntries + 1, getPlanCacheNumEntries(db));
+    const planCacheSize = getPlanCacheSize(db);
 
     assert.commandWorked(
         db.runCommand({planCacheClear: collectionName, query: {a: 1, b: 2, c: 3, d: 4}}));
-    assert.lt(getPlanCacheSize(), planCacheSize);
-    assert.eq(numberOfCacheEntries, getGlobalPlanCacheNumEntries());
+    assert.lt(getPlanCacheSize(db), planCacheSize);
+    assert.eq(numberOfCacheEntries, getPlanCacheNumEntries(db));
 }());
 
 MongoRunner.stopMongod(conn);

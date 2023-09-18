@@ -6,6 +6,7 @@
  *   cqf_experimental_incompatible,
  * ]
  */
+import {getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 /**
@@ -15,11 +16,6 @@ import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 function createIndexesForColl(coll) {
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.createIndex({b: 1}));
-}
-
-function totalPlanCacheSize() {
-    const serverStatus = assert.commandWorked(db.serverStatus());
-    return serverStatus.metrics.query.planCacheTotalSizeEstimateBytes;
 }
 
 function planCacheContents(coll) {
@@ -96,9 +92,9 @@ const smallQuery = {
 };
 
 // Create a plan cache entry, and verify that the estimated plan cache size has increased.
-let oldPlanCacheSize = totalPlanCacheSize();
+let oldPlanCacheSize = getPlanCacheSize(db);
 assert.eq(0, coll.find(smallQuery).itcount());
-let newPlanCacheSize = totalPlanCacheSize();
+let newPlanCacheSize = getPlanCacheSize(db);
 assert.gt(newPlanCacheSize, oldPlanCacheSize);
 
 // Verify that the cache now has a single entry whose estimated size explains the increase in the
@@ -125,9 +121,9 @@ const largeQuery = {
 
 // Create a new cache entry using the query with the large $in predicate. Verify that the estimated
 // total plan cache size has increased again, and check that there are now two entries in the cache.
-oldPlanCacheSize = totalPlanCacheSize();
+oldPlanCacheSize = getPlanCacheSize(db);
 assert.eq(0, coll.find(largeQuery).itcount());
-newPlanCacheSize = totalPlanCacheSize();
+newPlanCacheSize = getPlanCacheSize(db);
 assert.gt(newPlanCacheSize, oldPlanCacheSize);
 cacheContents = planCacheContents(coll);
 assert.eq(cacheContents.length, 2, cacheContents);
@@ -158,9 +154,9 @@ createIndexesForColl(secondColl);
 
 // Introduce a new cache entry in the second collection's cache and verify that the cumulative plan
 // cache size has increased.
-oldPlanCacheSize = totalPlanCacheSize();
+oldPlanCacheSize = getPlanCacheSize(db);
 assert.eq(0, secondColl.find(smallQuery).itcount());
-newPlanCacheSize = totalPlanCacheSize();
+newPlanCacheSize = getPlanCacheSize(db);
 assert.gt(newPlanCacheSize, oldPlanCacheSize);
 
 // Ensure that the second collection's cache now has one entry, and that entry's debug info is
@@ -187,9 +183,9 @@ const smallQuery2 = {
     b: 1,
     c: 1,
 };
-oldPlanCacheSize = totalPlanCacheSize();
+oldPlanCacheSize = getPlanCacheSize(db);
 assert.eq(0, coll.find(smallQuery2).itcount());
-newPlanCacheSize = totalPlanCacheSize();
+newPlanCacheSize = getPlanCacheSize(db);
 assert.gt(newPlanCacheSize, oldPlanCacheSize);
 
 // Verify that there are now three cache entries.
@@ -205,7 +201,7 @@ assertCacheEntryIsMissingDebugInfo(getPlanCacheEntryForFilter(secondColl, smallQ
 // Clear the cache entry for 'largeQuery' and regenerate it. The cache should grow larger, since the
 // regenerated cache entry should now contain debug info. Also, check that the size of the new cache
 // entry is estimated to be at least 10kb, since the query itself is known to be at least 10kb.
-oldPlanCacheSize = totalPlanCacheSize();
+oldPlanCacheSize = getPlanCacheSize(db);
 assert.commandWorked(coll.runCommand("planCacheClear", {query: largeQuery}));
 cacheContents = planCacheContents(coll);
 assert.eq(cacheContents.length, 2, cacheContents);
@@ -214,7 +210,7 @@ assert.eq(0, coll.find(largeQuery).itcount());
 cacheContents = planCacheContents(coll);
 assert.eq(cacheContents.length, 3, cacheContents);
 
-newPlanCacheSize = totalPlanCacheSize();
+newPlanCacheSize = getPlanCacheSize(db);
 assert.gt(newPlanCacheSize, oldPlanCacheSize);
 
 largeQueryCacheEntry = getPlanCacheEntryForFilter(coll, largeQuery);
