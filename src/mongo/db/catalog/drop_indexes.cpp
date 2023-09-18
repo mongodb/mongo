@@ -46,7 +46,9 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/overloaded_visitor.h"
 
@@ -310,12 +312,24 @@ void dropReadyIndexes(OperationContext* opCtx,
                     if (desc->isIdIndex()) {
                         return false;
                     }
-
+                    // For any index that is compatible with the shard key, if
+                    // gFeatureFlagShardKeyIndexOptionalHashedSharding is enabled and
+                    // the shard key is hashed, allow users to drop the hashed index. Note
+                    // skipDroppingHashedShardKeyIndex is used in some tests to prevent dropIndexes
+                    // from dropping the hashed shard key index so we can continue to test chunk
+                    // migration with hashed sharding. Otherwise, dropIndexes with '*' would drop
+                    // the index and prevent chunk migration from running.
+                    const auto& shardKey = collDescription.getShardKeyPattern();
+                    const bool skipDropIndex = skipDroppingHashedShardKeyIndex ||
+                        !(gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
+                              serverGlobalParams.featureCompatibility) &&
+                          shardKey.isHashedPattern());
                     if (isCompatibleWithShardKey(opCtx,
                                                  CollectionPtr(collection),
                                                  desc->getEntry(),
-                                                 collDescription.getKeyPattern(),
-                                                 false /* requiresSingleKey */)) {
+                                                 shardKey.toBSON(),
+                                                 false /* requiresSingleKey */) &&
+                        skipDropIndex) {
                         return false;
                     }
 
@@ -350,7 +364,7 @@ void dropReadyIndexes(OperationContext* opCtx,
             uassert(
                 ErrorCodes::CannotDropShardKeyIndex,
                 "Cannot drop the only compatible index for this collection's shard key",
-                !isLastNonHiddenShardKeyIndex(
+                !isLastNonHiddenRangedShardKeyIndex(
                     opCtx, CollectionPtr(collection), indexName, collDescription.getKeyPattern()));
         }
 
@@ -525,10 +539,10 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                 if (collDesc.isSharded()) {
                     uassert(ErrorCodes::CannotDropShardKeyIndex,
                             "Cannot drop the only compatible index for this collection's shard key",
-                            !isLastNonHiddenShardKeyIndex(opCtx,
-                                                          collection->getCollection(),
-                                                          indexName,
-                                                          collDesc.getKeyPattern()));
+                            !isLastNonHiddenRangedShardKeyIndex(opCtx,
+                                                                collection->getCollection(),
+                                                                indexName,
+                                                                collDesc.getKeyPattern()));
                 }
 
                 auto writableEntry = indexCatalog->getWritableEntryByName(
