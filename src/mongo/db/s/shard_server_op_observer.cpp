@@ -361,7 +361,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         // primary, blocking behind the critical section.
 
         // Extract which database was updated
-        // TODO SERVER-67789 Change to extract DatabaseName obj, and use when locking db below.
         std::string db;
         fassert(40478,
                 bsonExtractStringField(
@@ -585,7 +584,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         }
 
         // Extract which database entry is being deleted from the _id field.
-        // TODO SERVER-67789 Change to extract DatabaseName obj, and use when locking db below.
         std::string deletedDatabase;
         fassert(50772,
                 bsonExtractStringField(
