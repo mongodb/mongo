@@ -405,7 +405,8 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         QueryTargetingInfo* info) {
+                         QueryTargetingInfo* info,
+                         bool bypassIsFieldHashedCheck) {
     if (info) {
         invariant(info->chunkRanges.empty());
     }
@@ -435,7 +436,8 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
     auto shardKeyToFind = extractShardKeyFromQuery(cm.getShardKeyPattern(), *cq);
     if (!shardKeyToFind.isEmpty()) {
         try {
-            auto chunk = cm.findIntersectingChunk(shardKeyToFind, collation);
+            auto chunk =
+                cm.findIntersectingChunk(shardKeyToFind, collation, bypassIsFieldHashedCheck);
             shardIds->insert(chunk.getShardId());
             if (info) {
                 info->desc = QueryTargetingInfo::Description::kSingleKey;

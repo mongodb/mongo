@@ -124,13 +124,14 @@ struct QueryTargetingInfo {
  * collation is empty, it uses the collection default collation for targeting. If 'info' is not
  * null, populates it with the ChunkRanges that the query targets and a description about whether
  * the query targets a single shard key value, multiple but not all shard key values or all shard
- * key values.
+ * key values. If 'bypassIsFieldHashedCheck' is true, it skips checking if the shard key was hashed
+ * and assumes that any non-collatable shard key was not hashed from a collatable type.
  */
 void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& query,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr);
-
+                         shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr,
+                         bool bypassIsFieldHashedCheck = false);
 }  // namespace mongo

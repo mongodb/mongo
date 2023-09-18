@@ -288,17 +288,8 @@ profileFilter = {
 };
 verifyProfilerEntryOnCorrectShard(1, profileFilter);
 
-// Sharded deleteOnes that do not directly target a shard can now use the two phase write
-// protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    assert.commandWorked(coll.runCommand(
-        {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}));
-} else {
-    // Test to verify that delete with limit:1, without full shard key in query fails.
-    assert.commandFailedWithCode(
-        coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}),
-        ErrorCodes.ShardKeyNotFound);
-}
+assert.commandWorked(
+    coll.runCommand({delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}], ordered: false}));
 
 st.stop();
 })();

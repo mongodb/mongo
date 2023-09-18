@@ -183,7 +183,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 }
 
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s) ||
-    jsTestOptions().mongosBinVersion === "last-lts") {
+    jsTestOptions().mongosBinVersion !== "last-continuous") {
     assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
     let res = assert.commandWorked(sessionDB.runCommand(
         {findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}));
@@ -193,9 +193,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s) ||
     docsArr = mongos.getCollection(kNsName).find({a: 2}).toArray();
     assert.eq(1, docsArr.length);
 } else {
-    // When the updateOneWithouShardKey feature flag is not enabled or when mongos is not "last-lts"
-    // (as SERVER-44422 is only backported to "last-lts"), findAndModify operations require
-    // the entire shard key to be specified in the query.
+    // When the updateOneWithouShardKey feature flag is not enabled or when mongos is
+    // "last-continuous" (as SERVER-44422 is only backported to "last-lts" and "7.0"), findAndModify
+    // operations require the entire shard key to be specified in the query.
     assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
     assert.commandFailedWithCode(sessionDB.runCommand({
         findAndModify: kCollName,
