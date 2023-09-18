@@ -82,6 +82,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeFileImporterThreadExit);
 MONGO_FAIL_POINT_DEFINE(skipCloneFiles);
 MONGO_FAIL_POINT_DEFINE(hangBeforeVoteImportedFiles);
 MONGO_FAIL_POINT_DEFINE(skipImportFiles);
+MONGO_FAIL_POINT_DEFINE(hangBeforeImportingFiles);
 
 namespace mongo::repl {
 
@@ -504,6 +505,11 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
                 continue;
             }
             case eventType::kLearnedAllFilenames: {
+                if (MONGO_unlikely(hangBeforeImportingFiles.shouldFail())) {
+                    LOGV2(8101400, "'hangBeforeImportingFiles' failpoint enabled");
+                    hangBeforeImportingFiles.pauseWhileSet();
+                }
+
                 // This step prevents accidental deletion of committed donor data during startup and
                 // rollback recovery.
                 //

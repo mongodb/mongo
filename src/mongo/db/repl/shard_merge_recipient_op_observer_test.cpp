@@ -191,7 +191,7 @@ TEST_F(ShardMergeRecipientOpObserverTest, TransitionToAbortedDropsImportedCollec
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     auto updatedDoc = recipientDoc.toBSON();
 
     const NamespaceString importedDonorCollNss1 =
@@ -256,7 +256,7 @@ TEST_F(ShardMergeRecipientOpObserverTest,
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     recipientDoc.setExpireAt(opCtx()->getServiceContext()->getFastClockSource()->now());
     auto updatedDoc = recipientDoc.toBSON();
 
@@ -407,7 +407,7 @@ TEST_F(ShardMergeRecipientOpObserverTest,
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     auto updatedDoc = recipientDoc.toBSON();
 
     const NamespaceString importedDonorCollNss1 =
@@ -478,7 +478,7 @@ TEST_F(
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     recipientDoc.setExpireAt(opCtx()->getServiceContext()->getFastClockSource()->now());
     auto updatedDoc = recipientDoc.toBSON();
 
@@ -626,7 +626,7 @@ TEST_F(ShardMergeRecipientOpObserverTest,
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     auto updatedDoc = recipientDoc.toBSON();
 
     const NamespaceString importedDonorCollNss1 =
@@ -697,7 +697,7 @@ TEST_F(
     auto preImageDoc = recipientDoc.toBSON();
 
     recipientDoc.setState(ShardMergeRecipientStateEnum::kAborted);
-    recipientDoc.setAbortOpTime(OpTime(Timestamp(1, 1), 1));
+    recipientDoc.setAbortOpTime(OpTime(Timestamp::max(), 1));
     recipientDoc.setExpireAt(opCtx()->getServiceContext()->getFastClockSource()->now());
     auto updatedDoc = recipientDoc.toBSON();
 
