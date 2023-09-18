@@ -1,8 +1,12 @@
 /*
  * Test that query plans involving sort and project are correct.
+ * @tags: [
+ *   requires_fcv_72,
+ * ]
  */
 (function() {
 const coll = db.sort_project_queries;
+coll.drop();
 
 assert.commandWorked(coll.insert({_id: 0, a: 1, b: 2, foo: 1001, bar: 2001}));
 assert.commandWorked(coll.insert({_id: 1, a: 1, b: 22, foo: 1002, bar: 2002}));
