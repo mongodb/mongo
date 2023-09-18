@@ -225,6 +225,9 @@ public:
     // Namespace used for storing the list of sharded collections on the CSRS.
     static const NamespaceString kConfigsvrCollectionsNamespace;
 
+    // Namespace used for the health log.
+    static const NamespaceString kLocalHealthLogNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
