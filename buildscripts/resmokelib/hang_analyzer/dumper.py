@@ -1,6 +1,6 @@
 """Tools to dump debug info for each OS."""
 
-import collections
+import concurrent.futures
 import glob
 import itertools
 import logging
@@ -45,11 +45,7 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str):
 
 
 def find_files(file_name: str, path: str) -> List[str]:
-    found_files = glob.glob(f"{path}/**/{file_name}", recursive=True)
-    if not found_files:
-        raise RuntimeError(f"No file with the name {file_name} found in {path}")
-
-    return found_files
+    return glob.glob(f"{path}/**/{file_name}", recursive=True)
 
 
 class Dumper(metaclass=ABCMeta):
@@ -218,7 +214,10 @@ class WindowsDumper(Dumper):
 
     def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
         install_dir = os.path.abspath(install_dir)
-        for filename in find_files(f"*.{self.get_dump_ext()}", core_file_dir):
+        core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
+        if not core_files:
+            raise RuntimeError(f"No core dumps found in {core_file_dir}")
+        for filename in core_files:
             file_path = os.path.abspath(filename)
             try:
                 self.analyze_core(file_path, install_dir)
@@ -240,6 +239,10 @@ class WindowsDumper(Dumper):
         binary_files = find_files(binary_name, install_dir)
         logger = _get_process_logger(self._dbg_output, binary_name, pid)
         logger.info("analyzing %s", filename)
+
+        if not binary_files:
+            logger.warn("Binary %s not found, cannot process %s", binary_name, filename)
+            return
 
         if len(binary_files) > 1:
             logger.error("More than one file found in %s matching %s", install_dir, binary_name)
@@ -570,65 +573,78 @@ class GDBDumper(Dumper):
                                str(pinfo.pidv))
 
     def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+        core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
+        if not core_files:
+            raise RuntimeError(f"No core dumps found in {core_file_dir}")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = []
+            for filename in core_files:
+                core_file_path = os.path.abspath(filename)
+                futures.append(
+                    executor.submit(self.analyze_core, core_file_path=core_file_path,
+                                    install_dir=install_dir, analysis_dir=analysis_dir))
+
+            concurrent.futures.wait(futures)
+
+    def analyze_core(self, core_file_path: str, install_dir: str, analysis_dir: str):
         cmds = []
         dbg = self._find_debugger()
+        basename = os.path.basename(core_file_path)
         if dbg is None:
-            self._root_logger.error("Debugger not found, skipping dumping of %s", filename)
-            raise RuntimeError(f"Debugger not found, skipping dumping of {filename}")
+            self._root_logger.error("Debugger not found, skipping dumping of %s", basename)
+            raise RuntimeError(f"Debugger not found, skipping dumping of {basename}")
 
         # ensure debugger version is loggged
         call([dbg, "--version"], self._root_logger)
-
-        binaries = {}
-        core_dumps = {}
         lib_dir = None
-        for filename in find_files(f"*.{self.get_dump_ext()}", core_file_dir):
-            file_path = os.path.abspath(filename)
-            basename = os.path.basename(file_path)
-            regex = re.search(fr"dump_(.+)\.([0-9]+)\.{self.get_dump_ext()}", basename)
 
-            if not regex:
-                self._root_logger.error(
-                    f"Core dump could not be processed because the name did not match the expected pattern: {basename}"
-                )
-                continue
+        regex = re.search(fr"dump_(.+)\.([0-9]+)\.{self.get_dump_ext()}", basename)
 
-            binary_name = regex.group(1)
-            if binary_name not in binaries:
-                binary_files = find_files(binary_name, install_dir)
+        if not regex:
+            self._root_logger.error(
+                f"Core dump could not be processed because the name did not match the expected pattern: {basename}"
+            )
+            return
+        binary_name = regex.group(1)
+        binary_files = find_files(binary_name, install_dir)
 
-                if len(binary_files) > 1:
-                    self._root_logger.error("More than one file found in %s matching %s",
-                                            install_dir, binary_name)
-                    raise RuntimeError(
-                        f"More than one file found in {install_dir} matching {binary_name}")
+        if not binary_files:
+            # This can sometimes happen because coredumps can appear from non-mongo processes
+            self._root_logger.warn("Binary %s not found, cannot process %s", binary_name, basename)
+            return
 
-                binaries[binary_name] = binary_files[0]
-                lib_dir = os.path.abspath(
-                    os.path.join(os.path.dirname(binary_files[0]), "..", "lib"))
-                core_dumps[binary_name] = []
+        if len(binary_files) > 1:
+            self._root_logger.error("More than one file found in %s matching %s", install_dir,
+                                    binary_name)
+            raise RuntimeError(f"More than one file found in {install_dir} matching {binary_name}")
 
-            core_dumps[binary_name].append(file_path)
+        binary_path = binary_files[0]
+        lib_dir = os.path.abspath(os.path.join(os.path.dirname(binary_files[0]), "..", "lib"))
 
-        cmds += [f"set solib-search-path {lib_dir}"]
-        for binary in core_dumps:
-            cmds += [f"file {binaries[binary]}"]
-            for core_dump in core_dumps[binary]:
-                basename = os.path.basename(core_dump)
-                logging_dir = os.path.join(analysis_dir, basename)
-                os.makedirs(logging_dir, exist_ok=True)
-                raw_stacks_filename = os.path.join(logging_dir, "raw_stacks.txt")
-                cmds += [
-                    f"core-file {core_dump}",
-                    f'echo \\nWriting raw stacks to {raw_stacks_filename}.\\n',
-                    # This sends output to log file rather than stdout until we turn logging off.
-                    'set logging redirect on',
-                    f'set logging file {raw_stacks_filename}',
-                    'set logging enabled on',
-                    'thread apply all bt',
-                    'set logging enabled off',
-                    'set logging redirect off',
-                ]
+        basename = os.path.basename(core_file_path)
+        logging_dir = os.path.join(analysis_dir, basename)
+        os.makedirs(logging_dir, exist_ok=True)
+
+        def get_file_name(process_type: str) -> str:
+            return os.path.join(logging_dir, f"{basename}.{process_type}.txt")
+
+        raw_stacks_filename = get_file_name("stacks")
+        cmds += [
+            f"set solib-search-path {lib_dir}",
+            "set index-cache directory /tmp/index-cache",
+            "set index-cache enabled on",
+            f"file {binary_path}",
+            f"core-file {core_file_path}",
+            f"echo \\nWriting raw stacks to {raw_stacks_filename}.\\n",
+            # This sends output to log file rather than stdout until we turn logging off.
+            "set logging redirect on",
+            f"set logging file {raw_stacks_filename}",
+            "set logging enabled on",
+            "thread apply all bt",
+            "set logging enabled off",
+            "set logging redirect off",
+            "show index-cache stats"
+        ]
 
         cmds = self._prefix() + cmds + self._postfix()
 

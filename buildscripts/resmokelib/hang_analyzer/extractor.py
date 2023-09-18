@@ -4,7 +4,11 @@ import glob
 import gzip
 from logging import Logger
 import os
+from pathlib import Path
+import re
 import shutil
+import subprocess
+import sys
 import tarfile
 import time
 from typing import Callable
@@ -19,6 +23,7 @@ from buildscripts.resmokelib.symbolizer import Symbolizer
 from evergreen.task import Task
 
 _DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
+TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v4"
 
 
 def run_with_retries(root_logger: Logger, func: Callable[..., bool], timeout_secs: int,
@@ -89,14 +94,132 @@ def download_multiversion_artifact(root_logger: Logger, task: Task,
                                               buildvariant_name=task.build_variant)
         install_dir = os.path.join(download_dir, "install")
         os.makedirs(install_dir, exist_ok=True)
-        multiversion_setup.download_and_extract_from_urls(urlinfo.urls, bin_suffix=None,
-                                                          install_dir=install_dir)
+        multiversion_setup.download_and_extract_from_urls(
+            urlinfo.urls, bin_suffix=None, install_dir=install_dir, skip_symlinks=True)
         root_logger.info("Downloaded %s", name)
         return True
     except Exception as ex:
         root_logger.error("An error occured while trying to download %s", name)
         root_logger.error(ex)
         return False
+
+
+def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
+    def add_index(file_path: str):
+        """Generate and add gdb-index to ELF binary."""
+        start_time = time.time()
+        process = subprocess.run([f"{TOOLCHAIN_ROOT}/bin/llvm-dwarfdump", "-r", "0", file_path],
+                                 capture_output=True, text=True)
+
+        # it is normal for non debug binaries to fail this command
+        # there also can be some python files in the bin dir that will fail
+        if process.returncode != 0:
+            return
+
+        # find dwarf version from output, it should always be present
+        regex = re.search("version = 0x([0-9]{4}),", process.stdout)
+        if not regex:
+            raise RuntimeError(f"Could not find dwarf version in file {file_path}")
+
+        version = int(regex.group(1))
+        target_dir = os.path.dirname(file_path)
+
+        # logic copied from https://sourceware.org/gdb/onlinedocs/gdb/Index-Files.html
+        if version == 5:
+            subprocess.run([
+                f"{TOOLCHAIN_ROOT}/bin/gdb", "--batch-silent", "--quiet", "--nx", "--eval-command",
+                f"save gdb-index -dwarf-5 {target_dir}", file_path
+            ], check=True)
+            subprocess.run([
+                f"{TOOLCHAIN_ROOT}/bin/objcopy", "--dump-section",
+                f".debug_str={file_path}.debug_str.new", file_path
+            ])
+            with open(f"{file_path}.debug_str", "r") as file1:
+                with open(f"{file_path}.debug_str.new", "a") as file2:
+                    file2.write(file1.read())
+            subprocess.run([
+                f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-section",
+                f".debug_names={file_path}.debug_names", "--set-section-flags",
+                ".debug_names=readonly", "--update-section",
+                f".debug_str={file_path}.debug_str.new", file_path, file_path
+            ], check=True)
+            os.remove(f"{file_path}.debug_str.new")
+            os.remove(f"{file_path}.debug_str")
+            os.remove(f"{file_path}.debug_names")
+
+        elif version == 4:
+            subprocess.run([
+                f"{TOOLCHAIN_ROOT}/bin/gdb", "--batch-silent", "--quiet", "--nx", "--eval-command",
+                f"save gdb-index {target_dir}", file_path
+            ], check=True)
+            subprocess.run([
+                f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-section",
+                f".gdb_index={file_path}.gdb-index", "--set-section-flags", ".gdb_index=readonly",
+                file_path, file_path
+            ], check=True)
+            os.remove(f"{file_path}.gdb-index")
+        else:
+            raise RuntimeError(f"Does not support dwarf version {version}")
+
+        root_looger.debug("Finished creating gdb-index for %s in %s", file_path,
+                          (time.time() - start_time))
+
+    def recalc_debuglink(file_path: str):
+        """
+        Recalcuate the debuglink for ELF binaries.
+        
+        After creating the index file in a separate debug file, the debuglink CRC
+        is no longer valid, this will simply recreate the debuglink and therefore
+        update the CRC to match.
+        """
+        process = subprocess.run([f"{TOOLCHAIN_ROOT}/bin/eu-readelf", "-S", file_path],
+                                 capture_output=True, text=True)
+        if process.returncode != 0:
+            return
+
+        if ".gnu_debuglink" not in process.stdout:
+            return
+
+        subprocess.run(
+            [f"{TOOLCHAIN_ROOT}/bin/objcopy", "--remove-section", ".gnu_debuglink", file_path],
+            check=True)
+        subprocess.run([
+            f"{TOOLCHAIN_ROOT}/bin/objcopy", "--add-gnu-debuglink",
+            f"{os.path.abspath(file_path)}.debug", file_path
+        ], check=True)
+
+        root_looger.debug("Finished recalculating the debuglink for %s", file_path)
+
+    install_dir = os.path.join(download_dir, "install")
+    bin_dir = os.path.join(install_dir, "dist-test", "bin")
+    lib_dir = os.path.join(install_dir, "dist-test", "lib")
+    binary_files = [os.path.join(bin_dir, file_path) for file_path in os.listdir(bin_dir)]
+    all_files = binary_files + [
+        os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)
+    ]
+    binary_files = set(binary_files)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+        for file_path in all_files:
+
+            # When we add the .gdb_index section to binaries being ran with gdb
+            # it makes gdb not longer recognize them as the binary that generated
+            # the core dumps
+            if file_path in binary_files:
+                continue
+            futures.append(executor.submit(add_index, file_path=file_path))
+
+        concurrent.futures.wait(futures)
+        futures = []
+        for file_path in all_files:
+            # There will be no debuglinks in the separate debug files
+            # We do not want to edit any of the binary files that gdb might directly run
+            # so we skip the bin directory
+            if file_path.endswith(".debug") or file_path in binary_files:
+                continue
+            futures.append(executor.submit(recalc_debuglink, file_path=file_path))
+        concurrent.futures.wait(futures)
 
 
 def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str,
@@ -141,6 +264,9 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
                 root_logger.error("Errors occured while fetching artifacts")
                 all_downloaded = False
                 break
+
+    if all_downloaded and sys.platform.startswith("linux"):
+        post_install_gdb_optimization(download_dir, root_logger)
 
     return all_downloaded
 

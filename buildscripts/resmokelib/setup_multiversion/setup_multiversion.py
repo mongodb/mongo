@@ -257,7 +257,7 @@ class SetupMultiversion(Subcommand):
         if self.evg_versions_file:
             self._write_evg_versions_file(self, self.evg_versions_file, downloaded_versions)
 
-    def download_and_extract_from_urls(self, urls, bin_suffix, install_dir):
+    def download_and_extract_from_urls(self, urls, bin_suffix, install_dir, skip_symlinks=False):
         """Download and extract values indicated in `urls`."""
         artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
         binaries_url = urls.get("Binaries", "") if self.download_binaries else None
@@ -289,7 +289,8 @@ class SetupMultiversion(Subcommand):
 
         self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, python_venv_url,
                            install_dir, bin_suffix, link_dir=self.link_dir,
-                           install_dir_list=self._windows_bin_install_dirs)
+                           install_dir_list=self._windows_bin_install_dirs,
+                           skip_symlinks=skip_symlinks)
 
     def _write_windows_install_paths(self, paths):
         with open(config.WINDOWS_BIN_PATHS_FILE, "a") as out:
@@ -392,7 +393,7 @@ class SetupMultiversion(Subcommand):
         return EvgURLInfo(urls=urls, evg_version_id=evg_version.version_id)
 
     def setup_mongodb(self, artifacts_url, binaries_url, symbols_url, python_venv_url, install_dir,
-                      bin_suffix=None, link_dir=None, install_dir_list=None):
+                      bin_suffix=None, link_dir=None, install_dir_list=None, skip_symlinks=False):
         """Download, extract and symlink."""
 
         for url in [artifacts_url, binaries_url, symbols_url, python_venv_url]:
@@ -411,7 +412,7 @@ class SetupMultiversion(Subcommand):
                     time.sleep(1)
                     try_download(url)
 
-        if binaries_url is not None:
+        if binaries_url is not None and not skip_symlinks:
             if not link_dir:
                 raise ValueError("link_dir must be specified if downloading binaries")
 

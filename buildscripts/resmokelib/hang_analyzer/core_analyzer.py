@@ -18,19 +18,30 @@ class CoreAnalyzer(Subcommand):
         base_dir = self.options.working_dir
 
         if self.task_id:
-            if not download_task_artifacts(self.root_logger, self.task_id, base_dir):
+            skip_download = False
+            task_id_file = os.path.join(base_dir, "task-id")
+            if os.path.exists(task_id_file):
+                with open(task_id_file, "r") as file:
+                    if file.read().strip() == self.task_id:
+                        skip_download = True
+                        self.root_logger.info(
+                            "Files from task id provided were already on disk, skipping download.")
+
+            if not skip_download and not download_task_artifacts(self.root_logger, self.task_id,
+                                                                 base_dir):
                 self.root_logger.error("Artifacts were not found.")
                 raise RuntimeError(
                     "Artifacts were not found for specified task. Could not analyze cores.")
 
+            with open(task_id_file, "w") as file:
+                file.write(self.task_id)
+
             core_dump_dir = os.path.join(base_dir, "core-dumps")
             install_dir = os.path.join(base_dir, "install")
         else:  # if a task id was not specified, look for input files on the current machine
-            if not self.options.install_dir:
-                install_dir = os.path.join(os.path.curdir, "build", "install")
-
-            if not self.options.core_dir:
-                core_dump_dir = os.path.curdir
+            install_dir = self.options.install_dir or os.path.join(os.path.curdir, "build",
+                                                                   "install")
+            core_dump_dir = self.options.core_dir or os.path.curdir
 
         analysis_dir = os.path.join(base_dir, "analysis")
         dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)

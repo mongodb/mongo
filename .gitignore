@@ -285,3 +285,6 @@ buildscripts/antithesis/base_images/mongo_binaries/libvoidstar.so
 buildscripts/antithesis/base_images/workload/src
 buildscripts/antithesis/base_images/workload/mongo
 buildscripts/antithesis/base_images/workload/libvoidstar.so
+
+# default download location for resmoke core-analyzer
+core-analyzer
