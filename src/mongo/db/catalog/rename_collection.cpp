@@ -898,6 +898,10 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.js collection or renaming to system.js is not allowed",
             !source.isSystemDotJavascript() && !target.isSystemDotJavascript());
 
+    uassert(ErrorCodes::IllegalOperation,
+            "renaming system.users collection or renaming to system.users is not allowed",
+            !source.isSystemDotUsers() && !target.isSystemDotUsers());
+
     if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection()) {
         uassert(ErrorCodes::IllegalOperation,
                 "Renaming system.buckets collections is not allowed",

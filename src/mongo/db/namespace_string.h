@@ -513,6 +513,9 @@ public:
     bool isSystemDotJavascript() const {
         return coll() == kSystemDotJavascriptCollectionName;
     }
+    bool isSystemDotUsers() const {
+        return coll() == kSystemUsers;
+    }
     bool isServerConfigurationCollection() const {
         return isAdminDB() && (coll() == "system.version");
     }
