@@ -908,9 +908,6 @@ void NetworkInterfaceTL::RequestManager::trySend(
             return;
         }
 
-        ServiceContext* sc =
-            getCurrentServiceContext() ? getCurrentServiceContext() : getGlobalServiceContext();
-
         auto currentSentIdx = sentIdx++;
 
         requestState = std::make_shared<RequestState>(this, cmdState->shared_from_this());
@@ -926,7 +923,8 @@ void NetworkInterfaceTL::RequestManager::trySend(
         request = &requestState->request.value();
         if (requestState->isHedge) {
             invariant(request->options.hedgeOptions.isHedgeEnabled);
-            invariant(WireSpec::getWireSpec(sc).get()->isInternalClient);
+            invariant(cmdState->interface->_svcCtx &&
+                      WireSpec::getWireSpec(cmdState->interface->_svcCtx).get()->isInternalClient);
 
             hedgingMaxTimeMS = Milliseconds(request->options.hedgeOptions.maxTimeMSForHedgedReads);
             if (request->timeout == RemoteCommandRequest::kNoTimeout ||
@@ -936,8 +934,8 @@ void NetworkInterfaceTL::RequestManager::trySend(
             }
         }
 
-        if (request->timeout != RemoteCommandRequest::kNoTimeout &&
-            WireSpec::getWireSpec(sc).get()->isInternalClient) {
+        if (cmdState->interface->_svcCtx && request->timeout != RemoteCommandRequest::kNoTimeout &&
+            WireSpec::getWireSpec(cmdState->interface->_svcCtx).get()->isInternalClient) {
             logSetMaxTimeMS = true;
             BSONObjBuilder updatedCmdBuilder;
             updatedCmdBuilder.appendElements(request->cmdObj);
