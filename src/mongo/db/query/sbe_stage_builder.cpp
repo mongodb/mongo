@@ -1823,10 +1823,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const MatchNode* mn = static_cast<const MatchNode*>(root);
 
-    // The child must produce all of the slots required by the parent of this MatchNode. In addition
-    // to that, if there is the filter (the most common case), the child must produce 'kResult'
-    // because it's needed by the filter logic below.
-    PlanStageReqs childReqs = reqs.copy().setIf(kResult, mn->filter.get());
+    bool needChildResultDoc = false;
 
     std::vector<std::string> fields = reqs.getFields();
     if (mn->filter) {
@@ -1838,18 +1835,29 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (!filterDeps.needWholeDocument) {
             fields = appendVectorUnique(std::move(fields), getTopLevelFields(filterDeps.fields));
         }
+
+        needChildResultDoc = filterDeps.needWholeDocument;
     }
+
+    // The child must produce all of the slots required by the parent of this MatchNode. Also, if
+    // the filter needs the whole document, the child must produce 'kResult' as well.
+    PlanStageReqs childReqs = reqs.copy().setIf(kResult, needChildResultDoc);
+
     childReqs.setFields(std::move(fields));
 
     auto [stage, outputs] = build(mn->children[0].get(), childReqs);
     if (mn->filter) {
-        SbExpr filterExpr =
-            generateFilter(_state, mn->filter.get(), outputs.get(kResult), &outputs);
+        auto childResultSlot =
+            needChildResultDoc ? boost::make_optional(outputs.get(kResult)) : boost::none;
+
+        SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
+
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(_state).expr, root->nodeId());
         }
     }
+
     outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
@@ -2104,10 +2112,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto orn = static_cast<const OrNode*>(root);
 
-    // Children must produce all of the slots required by the parent of this OrNode. In addition
-    // to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true, and
-    // children must always produce a 'resultSlot' if 'filter' is non-null.
-    auto childReqs = reqs.copy().setIf(kResult, orn->filter.get()).setIf(kRecordId, orn->dedup);
+    bool needChildResultDoc = false;
 
     auto fields = reqs.getFields();
 
@@ -2119,7 +2124,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (!deps.needWholeDocument) {
             fields = appendVectorUnique(std::move(fields), getTopLevelFields(deps.fields));
         }
+
+        needChildResultDoc = deps.needWholeDocument;
     }
+
+    // Children must produce all of the slots required by the parent of this OrNode. In addition
+    // to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true, and
+    // children must produce a 'resultSlot' if 'filter' needs the whole document.
+    auto childReqs = reqs.copy().setIf(kResult, needChildResultDoc).setIf(kRecordId, orn->dedup);
 
     childReqs.setFields(std::move(fields));
 
@@ -2149,8 +2161,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (orn->filter) {
-        auto resultSlot = outputs.get(kResult);
+        auto resultSlot = outputs.getIfExists(kResult);
+
         auto filterExpr = generateFilter(_state, orn->filter.get(), resultSlot, &outputs);
+
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(_state).expr, root->nodeId());
