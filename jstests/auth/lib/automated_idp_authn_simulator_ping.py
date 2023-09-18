@@ -9,6 +9,7 @@ will simulate automatically logging in as a human would.
 """
 import argparse
 import json
+import traceback
 
 import geckodriver_autoinstaller
 from pathlib import Path
@@ -94,6 +95,8 @@ def main():
     with open(Path.home() / args.setupFile) as setup_file:
         setup_information = json.load(setup_file)
         assert args.username in setup_information
+        assert setup_information[args.username]
+
         authenticate_ping(args.activationEndpoint, args.userCode, args.username, setup_information)
 
 if __name__ == '__main__':
