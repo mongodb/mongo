@@ -13,43 +13,13 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    forgetMigrationAsync,
-} from "jstests/replsets/libs/tenant_migration_util.js";
-import {createRstArgs} from "jstests/replsets/rslib.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 // Disabling featureFlagRequireTenantID to allow using a tenantId prefix (instead of $tenant) and
 // reusing the same code to test garbage collection with and without multitenancy support.
 delete TestData.setParameters.featureFlagRequireTenantID;
-
-function collectionExists(node, dbName, collName, tenant) {
-    const res =
-        assert.commandWorked(node.getDB(tenant.str + "_" + dbName)
-                                 .runCommand({listCollections: 1, filter: {name: collName}}));
-    return res.cursor.firstBatch.length == 1;
-}
-
-function getDatabasesForTenant(node) {
-    return assert.commandWorked(node.getDB("admin").runCommand(
-        {listDatabases: 1, nameOnly: true, filter: {"name": /^[0-9a-z]+_db[0-9]/}}));
-}
-
-function assertDatabasesDroppedForTenant(node) {
-    const dbs = getDatabasesForTenant(node);
-    assert.eq(0, dbs.databases.length);
-}
-
-function loadDummyData() {
-    const numDocs = 20;
-    const testData = [];
-    for (let i = 0; i < numDocs; ++i) {
-        testData.push({_id: i, x: i});
-    }
-    return testData;
-}
 
 function runTest({multitenancySupport}) {
     const setParameter = {
@@ -60,93 +30,94 @@ function runTest({multitenancySupport}) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), sharedOptions: {setParameter}});
-    const tenantId = ObjectId();
 
-    configureFailPoint(tenantMigrationTest.getDonorPrimary(),
-                       "abortTenantMigrationBeforeLeavingBlockingState");
-    const fp =
-        configureFailPoint(tenantMigrationTest.getRecipientPrimary(),
-                           "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable");
-    const dataSyncFp = configureFailPoint(tenantMigrationTest.getDonorPrimary(),
-                                          "pauseTenantMigrationBeforeLeavingDataSyncState");
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
+    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const kTenantId = ObjectId().str;
+
+    configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
+    const dataSyncFp =
+        configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
     const dbNamesNoPrefix = ["db0", "db1", "db2"];
-    const dbNames = dbNamesNoPrefix.map(entry => tenantId.str + "_" + entry);
+    const dbNames = dbNamesNoPrefix.map(entry => makeTenantDB(kTenantId, entry));
     const collNames = ["coll0", "coll1"];
 
+    // Create regular collection on donor.
     for (const dbName of [...dbNames]) {
-        for (const coll of collNames) {
-            const db = tenantMigrationTest.getDonorPrimary().getDB(dbName);
-            assert.commandWorked(db.runCommand(
-                {insert: coll, documents: loadDummyData(), writeConcern: {w: 'majority'}}));
-            const viewCollName = coll + "GreaterThanView";
-            assert.commandWorked(db.runCommand(
-                {create: viewCollName, viewOn: coll, pipeline: [{$match: {x: {$gt: 8}}}]}));
-            const indexName = coll + "IndexOnX";
-            assert.commandWorked(
-                db.runCommand({createIndexes: coll, indexes: [{key: {x: 1}, name: indexName}]}));
+        for (const collName of collNames) {
+            tenantMigrationTest.insertDonorDB(dbName, collName);
         }
     }
 
-    const tsDB = tenantId.str + "_db4";
-    const tsColl = "tsColl";
-    const db = tenantMigrationTest.getDonorPrimary().getDB(tsDB);
-    assert.commandWorked(db.runCommand({create: tsDB, timeseries: {timeField: "ts"}}));
-    const testData = [];
-    for (let i = 0; i < 20; ++i) {
-        testData.push({ts: new Date(i * 1000), x: i});
-    }
-    assert.commandWorked(
-        db.runCommand({insert: tsDB, documents: testData, writeConcern: {w: 'majority'}}));
+    // Create view on donor.
+    const viewDB = makeTenantDB(kTenantId, "db3");
+    const viewCollName = "dummyView";
+    assert.commandWorked(donorPrimary.getDB(viewDB).createView(
+        viewCollName, "nonExistentCollection", [{$match: {x: {$gte: 8}}}]));
+    dbNames.push(viewDB);
 
-    assert.neq(getDatabasesForTenant(tenantMigrationTest.getDonorPrimary()).databases.length, 0);
+    // Create timeseries on donor.
+    const tsDB = makeTenantDB(kTenantId, "db4");
+    const tsCollName = "tsColl";
+    assert.commandWorked(
+        donorPrimary.getDB(tsDB).createCollection(tsCollName, {timeseries: {timeField: "ts"}}));
+    dbNames.push(tsDB);
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: tenantId.str,
+        tenantIds: [ObjectId(kTenantId)],
     };
 
+    // Start migration.
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-    // Insert collection during oplog catchup.
     dataSyncFp.wait();
-    const dataSyncDB = tenantId.str + "_db5";
+
+    // Create regular collection on donor during oplog catchup.
+    const dataSyncDB = makeTenantDB(kTenantId, "db5");
     const dataSyncColl = "baz";
-    assert.commandWorked(tenantMigrationTest.getDonorPrimary().getDB(dataSyncDB).runCommand({
-        insert: dataSyncColl,
-        documents: loadDummyData(),
-        writeConcern: {w: 'majority'}
-    }));
+    tenantMigrationTest.insertDonorDB(dataSyncDB, dataSyncColl);
+    dbNames.push(dataSyncDB);
+
     dataSyncFp.off();
 
     TenantMigrationTest.assertAborted(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, false /* retryOnRetryableErrors */, false /* forgetMigration */));
 
-    const forgetMigrationThread = new Thread(forgetMigrationAsync,
-                                             migrationOpts.migrationIdString,
-                                             createRstArgs(tenantMigrationTest.getDonorRst()),
-                                             false /* retryOnRetryableErrors */);
+    // Verify that all tenant collections on donor exists on recipient before forget migration.
+    tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
+        dbNames.forEach((dbName) => {
+            const donorListCollRes =
+                assert.commandWorked(donorPrimary.getDB(dbName).runCommand({listCollections: 1}))
+                    .cursor.firstBatch;
+            const recipientListCollRes =
+                assert
+                    .commandWorked(recipientPrimary.getDB(dbName).runCommand({listCollections: 1}))
+                    .cursor.firstBatch;
+            assert(donorListCollRes);
+            assert.neq(donorListCollRes.length, 0);
+            assert(recipientListCollRes);
+            const errorMsg = "Recipient list collections for dbName: " + dbName +
+                " not matching with donor:: donorCollectionResult: " + tojson(donorListCollRes) +
+                ", recipientCollectionResult: " + tojson(recipientListCollRes);
+            assert(bsonBinaryEqual(donorListCollRes, recipientListCollRes), errorMsg);
+        });
+    });
 
-    forgetMigrationThread.start();
-    fp.wait();
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
-    for (const node of tenantMigrationTest.getRecipientRst().nodes) {
-        for (const dbName of [...dbNames]) {
-            for (const coll of collNames) {
-                collectionExists(node, dbName, coll, tenantId);
-            }
-        }
-        collectionExists(node, dataSyncDB, dataSyncColl, tenantId);
-        collectionExists(node, tsDB, tsColl, tenantId);
-    }
-
-    fp.off();
-    forgetMigrationThread.join();
-
-    for (var node of tenantMigrationTest.getRecipientRst().nodes) {
-        assertDatabasesDroppedForTenant(node, tenantId);
-    }
+    // Forgetting migration should have dropped all donor tenant collections on recipient.
+    tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
+        dbNames.forEach((dbName) => {
+            const recipientListCollRes =
+                assert
+                    .commandWorked(recipientPrimary.getDB(dbName).runCommand({listCollections: 1}))
+                    .cursor.firstBatch;
+            assert.eq(recipientListCollRes.length, 0);
+        });
+    });
 
     tenantMigrationTest.stop();
 }
