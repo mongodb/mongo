@@ -30,8 +30,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
 #include <boost/preprocessor/control/iif.hpp>
 
@@ -46,13 +44,39 @@
 
 namespace mongo::optimizer {
 
-struct CollectedInfo {
-    using VarRefsMap = ProjectionNameMap<opt::unordered_map<const Variable*, bool>>;
+/**
+ * A Variable is 'resolved' when it is associated with a Definition.
+ */
+struct ResolvedVariable {
+    const Variable* var;
+    const Definition def;
+};
 
+/**
+ * While analyzing an ABT tree via the Collector transport class, there is a need
+ * for state that is 'global' for the duration of the analysis and is accessible to
+ * all Collector::transport methods. This class represents such a state.
+ * Notice:
+ * This is a struct instead of simple 'using' because at least one more future task
+ * will add more state to it - namely, SERVER-80954.
+ */
+struct CollectorState {
     /**
-     * All resolved variables so far, regardless of visibility in the ABT.
+     * All resolved variables, regardless of visibility in the ABT.
      */
-    opt::unordered_map<const Variable*, Definition> useMap;
+    std::unique_ptr<ResolvedVariablesMap> resolvedVariablesMap;
+};
+
+/**
+ * Information collected by each Collector::transport method for each ABT node in a tree.
+ * The Collector passes the CollectedInfo of a node's children to the parent's node
+ * transport method, where the child/children CollectedInfo is typically merged into
+ * the parent's CollectedInfo.
+ */
+struct CollectedInfo {
+    CollectedInfo(CollectorState& collr) : collector(collr){};
+
+    using VarRefsMap = ProjectionNameMap<opt::unordered_map<const Variable*, bool>>;
 
     /**
      * Current definitions available for use in ancestor nodes (projections).
@@ -62,7 +86,7 @@ struct CollectedInfo {
     /**
      * All free variables (i.e. so far not resolved) seen so far, regardless of visibility in the
      * ABT. Maps from projection name to all Variable instances referencing that name. Variables
-     * move from 'freeVars' to 'useMap' when they are resolved.
+     * move from 'freeVars' to 'Collector::resolvedVariables' when they are resolved.
      */
     ProjectionNameMap<std::vector<std::reference_wrapper<const Variable>>> freeVars;
 
@@ -71,6 +95,15 @@ struct CollectedInfo {
      */
     opt::unordered_map<const Node*, DefinitionsMap> nodeDefs;
 
+    /**
+     * The collector transport class stores global information that is updated by some
+     * CollectedInfo methods. Hence we need a pointer to the collector.
+     */
+    CollectorState& collector;
+
+    /**
+     * This is a destructive merge, the 'other' will be siphoned out.
+     */
     template <bool resolveFreeVarsWithOther = true>
     void merge(CollectedInfo&& other) {
         if constexpr (resolveFreeVarsWithOther) {
@@ -89,11 +122,6 @@ struct CollectedInfo {
                 }
             }
         }
-
-        // It should be impossible to have duplicate Variable pointer so every Variable should be
-        // moved from other.
-        useMap.merge(other.useMap);
-        tassert(6624024, "Found a duplicate Variable pointer", other.useMap.empty());
 
         // There should not be two projections of the same name propagated up by a single operator,
         // so every definition should be moved from other.
@@ -151,7 +179,7 @@ struct CollectedInfo {
     void resolveFreeVars(const ProjectionName& name, const Definition& def) {
         if (auto it = freeVars.find(name); it != freeVars.end()) {
             for (const Variable& var : it->second) {
-                useMap.emplace(&var, def);
+                collector.resolvedVariablesMap->emplace(&var, def);
             }
             freeVars.erase(it);
         }
@@ -198,7 +226,9 @@ private:
 
 struct Collector {
     explicit Collector(const cascades::MemoGroupBinderInterface* memoInterface)
-        : _memoInterface(memoInterface) {}
+        : _memoInterface(memoInterface) {
+        collectorState.resolvedVariablesMap = std::make_unique<ResolvedVariablesMap>();
+    }
 
     template <typename T, typename... Ts>
     CollectedInfo transport(const ABT&, const T& op, Ts&&... ts) {
@@ -206,14 +236,14 @@ struct Collector {
 
         // The default behavior resolves free variables, merges known definitions and propagates
         // them up unmodified.
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
         (result.merge(std::forward<Ts>(ts)), ...);
 
         return result;
     }
 
     CollectedInfo transport(const ABT& n, const Variable& variable) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // Every variable starts as a free variable until it is resolved.
         result.freeVars[variable.name()].push_back(variable);
@@ -225,7 +255,7 @@ struct Collector {
                             const Let& let,
                             CollectedInfo bindResult,
                             CollectedInfo inResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(bindResult));
 
@@ -238,7 +268,7 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n, const LambdaAbstraction& lam, CollectedInfo inResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // Local variables are not part of projections (i.e. we do not track them in defs) so
         // resolve any free variables manually.
@@ -252,7 +282,7 @@ struct Collector {
                                         const Node& node,
                                         const ExpressionBinder& binder,
                                         CollectedInfo refs) {
-        CollectedInfo result{};
+        CollectedInfo result{refs.collector};
 
         // 'refs' should just track references to projections from any children of a Scan/Seek.
         result.mergeNoDefs(std::move(refs));
@@ -266,21 +296,21 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n, const ScanNode& node, CollectedInfo /*bindResult*/) {
-        return collectForScan(n, node, node.binder(), {});
+        return collectForScan(n, node, node.binder(), {collectorState});
     }
 
     CollectedInfo transport(const ABT& n, const ValueScanNode& node, CollectedInfo /*bindResult*/) {
-        return collectForScan(n, node, node.binder(), {});
+        return collectForScan(n, node, node.binder(), {collectorState});
     }
 
     CollectedInfo transport(const ABT& n,
                             const PhysicalScanNode& node,
                             CollectedInfo /*bindResult*/) {
-        return collectForScan(n, node, node.binder(), {});
+        return collectForScan(n, node, node.binder(), {collectorState});
     }
 
     CollectedInfo transport(const ABT& n, const IndexScanNode& node, CollectedInfo /*bindResult*/) {
-        return collectForScan(n, node, node.binder(), {});
+        return collectForScan(n, node, node.binder(), {collectorState});
     }
 
     CollectedInfo transport(const ABT& n,
@@ -291,14 +321,14 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n, const CoScanNode& node) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
         result.nodeDefs[&node] = result.defs;
         return result;
     }
 
     CollectedInfo transport(const ABT& n,
                             const MemoLogicalDelegatorNode& memoLogicalDelegatorNode) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         tassert(6624029, "Uninitialized memo interface", _memoInterface);
         const auto& binder =
@@ -323,7 +353,7 @@ struct Collector {
                             const FilterNode& filterNode,
                             CollectedInfo childResult,
                             CollectedInfo exprResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
         result.merge(std::move(childResult));
         result.mergeNoDefs(std::move(exprResult));
         result.nodeDefs[&filterNode] = result.defs;
@@ -334,7 +364,7 @@ struct Collector {
                             const EvaluationNode& evaluationNode,
                             CollectedInfo childResult,
                             CollectedInfo exprResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         tassert(6624030,
                 str::stream() << "Cannot overwrite project " << evaluationNode.getProjectionName(),
@@ -357,7 +387,7 @@ struct Collector {
                             CollectedInfo childResult,
                             CollectedInfo bindResult,
                             CollectedInfo /*refResult*/) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(childResult));
         result.mergeNoDefs(std::move(bindResult));
@@ -377,7 +407,7 @@ struct Collector {
                             const RIDIntersectNode& node,
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // This is a special case where both children of 'node' have a definition for the scan
         // projection. Remove the definition from one side to avoid running into the conflict of two
@@ -399,7 +429,7 @@ struct Collector {
                                            CollectedInfo bindResult,
                                            CollectedInfo refsResult,
                                            const ExpressionBinder& binder) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         refsResult.assertEmptyDefs();
 
@@ -416,7 +446,8 @@ struct Collector {
                 tassert(7858802,
                         str::stream() << "Union projection does not exist:  " << name,
                         u.defs.count(name) != 0);
-                u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
+                collectorState.resolvedVariablesMap->emplace(
+                    &refsResult.freeVars[name][counter].get(), u.defs[name]);
             }
             u.defs.clear();
             result.merge(std::move(u));
@@ -467,7 +498,7 @@ struct Collector {
                                                 CollectedInfo leftChildResult,
                                                 CollectedInfo rightChildResult,
                                                 CollectedInfo filterResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // Note correlated projections might be coming either from the left child or from the
         // parent.
@@ -523,7 +554,7 @@ struct Collector {
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(leftChildResult));
         // Do not resolve further free variables.
@@ -540,7 +571,7 @@ struct Collector {
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(leftChildResult));
         // Do not resolve further free variables.
@@ -557,7 +588,7 @@ struct Collector {
                             std::vector<CollectedInfo> childResults,
                             CollectedInfo bindResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         const auto& names = node.binder().names();
 
@@ -575,7 +606,8 @@ struct Collector {
                 tassert(7063706,
                         str::stream() << "SortedMerge projection does not exist: " << name,
                         u.defs.count(name) != 0);
-                u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
+                collectorState.resolvedVariablesMap->emplace(
+                    &refsResult.freeVars[name][counter].get(), u.defs[name]);
             }
             u.defs.clear();
             result.merge(std::move(u));
@@ -620,7 +652,7 @@ struct Collector {
                             CollectedInfo refsAggResult,
                             CollectedInfo bindGbResult,
                             CollectedInfo refsGbResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // First resolve all variables from the inside point of view; i.e. agg expressions and group
         // by expressions reference variables from the input child.
@@ -664,7 +696,7 @@ struct Collector {
                             CollectedInfo childResult,
                             CollectedInfo bindResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         // First resolve all variables from the inside point of view.
         result.mergeNoDefs(std::move(refsResult));
@@ -692,7 +724,7 @@ struct Collector {
                             const UniqueNode& uniqueNode,
                             CollectedInfo childResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(refsResult));
         result.merge(std::move(childResult));
@@ -712,7 +744,7 @@ struct Collector {
                             const CollationNode& collationNode,
                             CollectedInfo childResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
@@ -731,7 +763,7 @@ struct Collector {
     CollectedInfo transport(const ABT& n,
                             const LimitSkipNode& limitSkipNode,
                             CollectedInfo childResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
         result.merge(std::move(childResult));
         result.nodeDefs[&limitSkipNode] = result.defs;
         return result;
@@ -741,7 +773,7 @@ struct Collector {
                             const ExchangeNode& exchangeNode,
                             CollectedInfo childResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
@@ -760,7 +792,7 @@ struct Collector {
                             const RootNode& rootNode,
                             CollectedInfo childResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
@@ -782,7 +814,7 @@ struct Collector {
                             CollectedInfo filterResult,
                             CollectedInfo bindResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
+        CollectedInfo result{collectorState};
 
         result.merge(std::move(refsResult));
         result.merge(std::move(childResult));
@@ -807,12 +839,18 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n, const SpoolConsumerNode& node, CollectedInfo bindResult) {
-        return collectForScan(n, node, node.binder(), {});
+        return collectForScan(n, node, node.binder(), {collectorState});
     }
 
     CollectedInfo collect(const ABT& n) {
         return algebra::transport<true>(n, *this);
     }
+    /**
+     * The collector transport class stores here global information that is updated by
+     * some CollectedInfo methods. This object is passed to each CollectedInfo, so that
+     * it can update the collectorState.
+     */
+    CollectorState collectorState;
 
 private:
     const cascades::MemoGroupBinderInterface* _memoInterface;
@@ -1013,33 +1051,42 @@ VariableEnvironment VariableEnvironment::build(
         lrt.collect(root);
     }
 
-    return VariableEnvironment{std::move(info), std::move(lastRefs), memoInterface};
+    return VariableEnvironment{std::move(info),
+                               std::move(lastRefs),
+                               std::move(c.collectorState.resolvedVariablesMap),
+                               memoInterface};
 }
 
 void VariableEnvironment::rebuild(const ABT& root) {
-    _info = std::make_unique<CollectedInfo>(Collector{_memoInterface}.collect(root));
+    Collector c(_memoInterface);
+    _info = std::make_unique<CollectedInfo>(c.collect(root));
 
     if (_lastRefs) {
         _lastRefs->clear();
         LastRefsTransporter lrt(*_lastRefs);
         lrt.collect(root);
     }
+
+    // Reset the Variable map to the newly computed one.
+    _resolvedVariablesMap = std::move(c.collectorState.resolvedVariablesMap);
 }
 
 VariableEnvironment::VariableEnvironment(std::unique_ptr<CollectedInfo> info,
                                          boost::optional<LastRefsSet> lastRefs,
+                                         std::unique_ptr<ResolvedVariablesMap> resVarMap,
                                          const cascades::MemoGroupBinderInterface* memoInterface)
-    : _info(std::move(info)), _lastRefs(std::move(lastRefs)), _memoInterface(memoInterface) {}
+    : _info(std::move(info)),
+      _lastRefs(std::move(lastRefs)),
+      _resolvedVariablesMap(std::move(resVarMap)),
+      _memoInterface(memoInterface) {}
 
 VariableEnvironment::~VariableEnvironment() {}
 
 Definition VariableEnvironment::getDefinition(const Variable& var) const {
-    auto it = _info->useMap.find(&var);
-    if (it == _info->useMap.end()) {
-        return Definition();
+    if (auto it = _resolvedVariablesMap->find(&var); it != _resolvedVariablesMap->cend()) {
+        return it->second;
     }
-
-    return it->second;
+    return {};
 }
 
 const DefinitionsMap& VariableEnvironment::getDefinitions(const Node& node) const {

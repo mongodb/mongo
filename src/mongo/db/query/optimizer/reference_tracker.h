@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -39,7 +40,6 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-
 
 namespace mongo::optimizer {
 
@@ -62,6 +62,7 @@ struct Definition {
 
 struct CollectedInfo;
 using DefinitionsMap = ProjectionNameMap<Definition>;
+using ResolvedVariablesMap = absl::node_hash_map<const Variable*, Definition>;
 
 /**
  * Describes Variable references that are safe to move-from in SBE.
@@ -80,6 +81,7 @@ using LastRefsSet = opt::unordered_set<const Variable*>;
 class VariableEnvironment {
     VariableEnvironment(std::unique_ptr<CollectedInfo> info,
                         boost::optional<LastRefsSet> lastRefs,
+                        std::unique_ptr<ResolvedVariablesMap> resVarMap,
                         const cascades::MemoGroupBinderInterface* memoInterface);
 
 public:
@@ -153,11 +155,17 @@ public:
      */
     bool isLastRef(const Variable& var) const;
 
+
 private:
     std::unique_ptr<CollectedInfo> _info;
+
     // When '_lastRefs' is boost::none it means we did not collect that information,
     // and don't need to invalidate it on rebuild.
     boost::optional<LastRefsSet> _lastRefs;
+
+    // A searchable map of Variables that is used by VariableEnvironment in order to
+    // answer efficiently optimizer queries about Variables.
+    std::unique_ptr<ResolvedVariablesMap> _resolvedVariablesMap;
 
     // '_memoInterface' is required to track references in an ABT containing
     // MemoLogicalDelegatorNodes.
