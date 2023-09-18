@@ -436,30 +436,38 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
 }
 
-DEATH_TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUnsafe, "Fatal assertion") {
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSecondaryReadSource) {
     auto opCtx = client1.second.get();
-    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
 
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kNoTimestamp);
 
-    // Non-user read on a replicated collection should fail because we are reading on a secondary
-    // without a timestamp.
     AutoGetCollectionForRead autoColl(opCtx, nss);
+
+    // The AutoGetCollectionForRead changes the read source to be last applied.
+    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kLastApplied);
 }
 
-TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSafe) {
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSecondaryReadSourceNotEnforcingConstraints) {
     auto opCtx = client1.second.get();
-    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
 
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kNoTimestamp);
 
-    // Non-user read on a replicated collection should not fail because of the last applied
-    // timestamp.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
-
+    opCtx->setEnforceConstraints(false);
     AutoGetCollectionForRead autoColl(opCtx, nss);
+
+    // The AutoGetCollectionForRead does not change the read source since we are not enforcing
+    // constraints.
+    ASSERT_EQ(opCtx->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kNoTimestamp);
 }
 
 }  // namespace

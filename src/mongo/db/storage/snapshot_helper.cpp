@@ -57,19 +57,12 @@ namespace {
 bool canReadAtLastApplied(OperationContext* opCtx) {
     // Local and available are the only ReadConcern levels that allow their ReadSource to be
     // overridden to read at lastApplied. They read without a timestamp by default, but this check
-    // allows user secondary reads from conflicting with oplog batch application by reading at a
-    // consistent point in time.
-    // Internal operations use DBDirectClient as a loopback to perform local operations, and they
-    // expect the same level of consistency guarantees as any user operation. For that reason,
-    // DBDirectClient should be able to change the owning operation's ReadSource in order to serve
-    // consistent data.
+    // allows secondary reads to read at a consistent point in time. However if an operation is not
+    // enforcing constraints, then it is choosing to see the most up-to-date data.
     const auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
-    if ((opCtx->getClient()->isFromUserConnection() || opCtx->getClient()->isInDirectClient()) &&
+    return opCtx->isEnforcingConstraints() &&
         (readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
-         readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern)) {
-        return true;
-    }
-    return false;
+         readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern);
 }
 
 bool shouldReadAtLastApplied(OperationContext* opCtx,

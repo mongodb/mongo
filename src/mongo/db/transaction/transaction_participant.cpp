@@ -283,15 +283,6 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
             std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
         ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
-        // It's possible that this no-timestamp read may occur as the node is in the process of
-        // transitioning to secondary. This is safe as no writes based on this read will be able to
-        // occur. Thus, skip enforcing constraints in order to satisfy the assertion about
-        // performing reads on a secondary with no timestamp.
-        ON_BLOCK_EXIT([opCtx, enforceConstraints = opCtx->isEnforcingConstraints()] {
-            opCtx->setEnforceConstraints(enforceConstraints);
-        });
-        opCtx->setEnforceConstraints(false);
-
         AutoGetCollectionForRead autoRead(opCtx,
                                           NamespaceString::kSessionTransactionsTableNamespace);
 
