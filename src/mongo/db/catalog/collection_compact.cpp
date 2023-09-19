@@ -71,22 +71,16 @@ using logv2::LogComponent;
 
 namespace {
 
-CollectionPtr getCollectionForCompact(OperationContext* opCtx,
-                                      const NamespaceString& collectionNss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
+CollectionPtr getCollectionForCompact(OperationContext* opCtx, const NamespaceString& resolvedNss) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(resolvedNss, MODE_IX));
 
-    NamespaceString resolvedNs = collectionNss;
-    if (auto timeseriesOptions = timeseries::getTimeseriesOptions(
-            opCtx, collectionNss, /*convertToBucketsNamespace=*/true)) {
-        resolvedNs = collectionNss.makeTimeseriesBucketsNamespace();
-    }
-
+    // Hold reference to the catalog for collection lookup without locks to be safe.
     auto collectionCatalog = CollectionCatalog::get(opCtx);
-    CollectionPtr collection(collectionCatalog->lookupCollectionByNamespace(opCtx, resolvedNs));
+    CollectionPtr collection(collectionCatalog->lookupCollectionByNamespace(opCtx, resolvedNss));
 
     if (!collection) {
         std::shared_ptr<const ViewDefinition> view =
-            collectionCatalog->lookupView(opCtx, resolvedNs);
+            collectionCatalog->lookupView(opCtx, resolvedNss);
         uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
         uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
     }
@@ -102,17 +96,23 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     Database* database = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
 
+    // If we're dealing with a time-series collection, we need to lock the buckets namespace.
+    NamespaceString resolvedNss = collectionNss;
+    if (timeseries::getTimeseriesOptions(
+            opCtx, collectionNss, /*convertToBucketsNamespace=*/true)) {
+        resolvedNss = collectionNss.makeTimeseriesBucketsNamespace();
+    }
+
     // The collection lock will be upgraded to an exclusive lock if the record store does not
     // support online compaction.
     boost::optional<Lock::CollectionLock> collLk;
-    collLk.emplace(opCtx, collectionNss, MODE_IX);
+    collLk.emplace(opCtx, resolvedNss, MODE_IX);
 
-    CollectionPtr collection = getCollectionForCompact(opCtx, collectionNss);
+    CollectionPtr collection = getCollectionForCompact(opCtx, resolvedNss);
     DisableDocumentValidation validationDisabler(opCtx);
 
     auto recordStore = collection->getRecordStore();
-
-    OldClientContext ctx(opCtx, collectionNss);
+    OldClientContext ctx(opCtx, resolvedNss);
 
     if (!recordStore->compactSupported())
         return Status(ErrorCodes::CommandNotSupported,
@@ -121,18 +121,14 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     if (!recordStore->supportsOnlineCompaction()) {
         // Storage engines that disallow online compaction should compact under an exclusive lock.
-        collLk.emplace(opCtx, collectionNss, MODE_X);
+        collLk.emplace(opCtx, resolvedNss, MODE_X);
 
         // Ensure the collection was not dropped during the re-lock.
-        collection = getCollectionForCompact(opCtx, collectionNss);
+        collection = getCollectionForCompact(opCtx, resolvedNss);
         recordStore = collection->getRecordStore();
     }
 
-    LOGV2_OPTIONS(20284,
-                  {LogComponent::kCommand},
-                  "compact {namespace} begin",
-                  "Compact begin",
-                  logAttrs(collectionNss));
+    LOGV2_OPTIONS(20284, {LogComponent::kCommand}, "Compact begin", logAttrs(collectionNss));
 
     auto bytesBefore = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
