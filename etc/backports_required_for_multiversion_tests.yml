@@ -915,7 +915,7 @@ last-lts:
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-77506
   - test_file: jstests/sharding/fsync_lock_unlock.js
-    ticket: SERVER-78149
+    ticket: SERVER-73685
   - test_file: jstests/sharding/fsync_lock_ddl_lock.js
     ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
