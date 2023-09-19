@@ -4,7 +4,7 @@
  * versioning are included for good measure.
  * @tags: [requires_fcv_71]
  */
-import {getQueryStats} from "jstests/libs/query_stats_utils.js";
+import {getLatestQueryStatsEntry, getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 const replTest = new ReplSetTest({name: 'reindexTest', nodes: 2});
 
@@ -48,11 +48,11 @@ let commandObj = {
 };
 const replSetConn = new Mongo(replTest.getURL());
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-let stats = getQueryStats(replSetConn, {collName: collName});
-delete stats[0].key["collectionType"];
-confirmCommandFieldsPresent(stats[0].key, commandObj);
+let stats = getLatestQueryStatsEntry(replSetConn, {collName: collName});
+delete stats.key["collectionType"];
+confirmCommandFieldsPresent(stats.key, commandObj);
 // check that readConcern afterClusterTime is normalized.
-assert.eq(stats[0].key.readConcern.afterClusterTime, "?timestamp");
+assert.eq(stats.key.readConcern.afterClusterTime, "?timestamp", stats.key.readConcern);
 
 // check that readPreference not populated and readConcern just has an afterClusterTime field.
 commandObj["readConcern"] = {
@@ -60,11 +60,11 @@ commandObj["readConcern"] = {
 };
 delete commandObj["$readPreference"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-stats = getQueryStats(replSetConn, {collName});
+stats = getLatestQueryStatsEntry(replSetConn, {collName});
 // We're not concerned with this field here.
-delete stats[0].key["collectionType"];
-confirmCommandFieldsPresent(stats[0].key, commandObj);
-assert.eq(stats[0].key["readConcern"], {"afterClusterTime": "?timestamp"});
+delete stats.key["collectionType"];
+confirmCommandFieldsPresent(stats.key, commandObj);
+assert.eq(stats.key["readConcern"], {"afterClusterTime": "?timestamp"});
 
 // check that readConcern has no afterClusterTime and fields related to api usage are not present.
 commandObj["readConcern"] = {
@@ -74,10 +74,10 @@ delete commandObj["apiDeprecationErrors"];
 delete commandObj["apiVersion"];
 delete commandObj["apiStrict"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-stats = getQueryStats(replSetConn, {collName: collName});
-assert.eq(stats[1].key["readConcern"], {level: "local"});
+stats = getLatestQueryStatsEntry(replSetConn, {collName: collName});
+assert.eq(stats.key["readConcern"], {level: "local"});
 // We're not concerned with this field here.
-delete stats[1].key["collectionType"];
-confirmCommandFieldsPresent(stats[1].key, commandObj);
+delete stats.key["collectionType"];
+confirmCommandFieldsPresent(stats.key, commandObj);
 
 replTest.stopSet();

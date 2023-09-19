@@ -41,10 +41,6 @@
 
 namespace mongo::query_stats {
 
-extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
-
-const auto kKeySize = sizeof(std::size_t);
-
 /**
  * The value stored in the query stats store. It contains a KeyGenerator representing this "kind" of
  * query, and some metrics about that shape. This class is responsible for knowing its size and
@@ -52,29 +48,11 @@ const auto kKeySize = sizeof(std::size_t);
  * time of this writing, the LRUCache utility does not easily expose its size in a way we could use
  * as server status metrics.
  */
-class QueryStatsEntry {
-public:
-    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
-        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {}
+struct QueryStatsEntry {
+    QueryStatsEntry(std::unique_ptr<const KeyGenerator> keyGenerator_)
+        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator_)) {}
 
     BSONObj toBSON() const;
-
-    int64_t size() {
-        return sizeof(*this) + (keyGenerator ? keyGenerator->size() : 0);
-    }
-
-    /**
-     * Generate the queryStats key for this entry's request. If algorithm is not
-     * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
-     * anonymized.
-     */
-    BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 TransformAlgorithmEnum algorithm,
-                                 std::string hmacKey) const;
-
-    BSONObj getRepresentativeQueryShapeForDebug() const {
-        return keyGenerator->getRepresentativeQueryShapeForDebug();
-    }
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -111,7 +89,7 @@ public:
     /**
      * The KeyGenerator that can generate the query stats key for this request.
      */
-    const std::shared_ptr<const KeyGenerator> keyGenerator;
+    std::shared_ptr<const KeyGenerator> keyGenerator;
 };
 
 }  // namespace mongo::query_stats

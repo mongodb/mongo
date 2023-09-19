@@ -1759,6 +1759,7 @@ env.Library(
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
+        'query/cmd_with_let_shape.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -1800,7 +1801,6 @@ env.Library(
 env.Library(
     target='query_shape_common', source=[
         'query/query_shape.idl',
-        'query/shape_helpers.cpp',
         'query/serialization_options.cpp',
     ], LIBDEPS=[
         '$BUILD_DIR/mongo/base',

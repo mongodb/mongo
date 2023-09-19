@@ -40,6 +40,8 @@ env.Library(
         'canonical_query.cpp',
         'canonical_query_encoder.cpp',
         'parsed_find_command.cpp',
+        'find_cmd_shape.cpp',
+        'query_stats/find_key_generator.cpp',
         'query_utils.cpp',
     ],
     LIBDEPS=[
@@ -452,25 +454,14 @@ env.Library(
 )
 
 env.Library(
-    target='query_shape',
-    source=[
-        'query_shape.cpp',
-        'query_stats/find_key_generator.cpp',
-        'query_stats/aggregate_key_generator.cpp',
-    ],
-    LIBDEPS=[
+    target='query_shape', source=['query_shape.cpp', 'shape_helpers.cpp'], LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'canonical_query',
-    ],
-    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/pipeline/field_path',
         '$BUILD_DIR/mongo/db/query_shape_common',
-        'projection_ast',
-        'sort_pattern',
-    ],
-)
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ])
 
 env.CppUnitTest(
     target="db_query_test",
@@ -482,6 +473,7 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
+        "find_cmd_shape_test.cpp",
         "find_common_test.cpp",
         "get_executor_test.cpp",
         "getmore_request_test.cpp",

@@ -169,6 +169,11 @@ public:
         return _uuid >= rhs._uuid;
     }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const UUID& uuid) {
+        return H::combine(std::move(h), uuid._uuid);
+    }
+
     /**
      * Returns true only if the UUID is the RFC 4122 variant, v4 (random).
      */

@@ -227,12 +227,7 @@ public:
                     [&]() {
                         // This callback is either never invoked or invoked immediately within
                         // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        BSONObj queryShape = query_shape::extractQueryShape(
-                            *parsedFind,
-                            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                            expCtx);
-                        return std::make_unique<query_stats::FindKeyGenerator>(
-                            expCtx, *parsedFind, std::move(queryShape));
+                        return std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind);
                     },
                     /*requiresFullQueryStatsFeatureFlag*/ false);
             }

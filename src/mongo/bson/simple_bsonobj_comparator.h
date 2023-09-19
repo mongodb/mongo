@@ -98,6 +98,10 @@ public:
     };
 };
 
+inline auto simpleHash(const BSONObj& obj) {
+    return SimpleBSONObjComparator::kInstance.hash(obj);
+}
+
 /**
  * A set of BSONObjs that performs comparisons with simple binary semantics.
  */

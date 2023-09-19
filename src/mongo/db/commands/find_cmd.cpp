@@ -214,13 +214,11 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
         if (opDebug.queryStatsKeyGenerator) {
-            return opDebug.queryStatsKeyGenerator->getQueryShapeHash();
+            return opDebug.queryStatsKeyGenerator->getQueryShapeHash(opCtx);
         }
 
-        return query_shape::hash(query_shape::extractQueryShape(
-            parsedRequest,
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-            expCtx));
+        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
+            ->sha256Hash(opCtx);
     };
 
     // Return the found query settings or an empty one.
@@ -267,17 +265,8 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             opCtx,
             nss,
             [&]() {
-                // This callback is either never invoked or invoked immediately within
-                // registerRequest, so use-after-move of parsedRequest isn't an issue.
-                BSONObj queryShape = query_shape::extractQueryShape(
-                    *parsedRequest,
-                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                    expCtx);
                 return std::make_unique<query_stats::FindKeyGenerator>(
-                    expCtx,
-                    *parsedRequest,
-                    std::move(queryShape),
-                    collOrViewAcquisition.getCollectionType());
+                    expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
             },
             /*requiresFullQueryStatsFeatureFlag*/ false);
     }

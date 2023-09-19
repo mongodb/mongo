@@ -29,36 +29,24 @@
 
 #pragma once
 
+#include <absl/hash/hash.h>
+#include <boost/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/shape_helpers.h"
 
-namespace mongo::shape_helpers {
-
-int64_t inline optionalObjSize(boost::optional<BSONObj> optionalObj) {
-    if (!optionalObj)
-        return 0;
-    return optionalObj->objsize();
-}
-
-template <typename T>
-int64_t optionalSize(boost::optional<T> optionalVal) {
-    if (!optionalVal)
-        return 0;
-    return optionalVal->size();
-}
+namespace mongo::query_stats {
 
 /**
- * Serializes the given 'hintObj' in accordance with the options. Assumes the hint is correct and
- * contains field names. It is possible that this hint doesn't actually represent an index, but we
- * can't detect that here.
+ * An abseil compatible hash function for BSONObjects. Note that this hasher ignores any collation
+ * and uses the "simple" comparisons. This is fine and correct for query stats, but this is
+ * intentionally placed within the 'query_stats' namespace to avoid polluting the whole codebase
+ * with this helper which could cause an accidental bug where we ignore the request's collation.
  */
-BSONObj extractHintShape(BSONObj hintObj, const SerializationOptions& opts);
-BSONObj extractMinOrMaxShape(BSONObj obj, const SerializationOptions& opts);
+template <typename H>
+H AbslHashValue(H h, const BSONObj& obj) {
+    return H::combine(std::move(h), simpleHash(obj));
+}
 
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
-void appendNamespaceShape(BSONObjBuilder& bob,
-                          const NamespaceString& nss,
-                          const SerializationOptions& opts);
-
-}  // namespace mongo::shape_helpers
+}  // namespace mongo::query_stats

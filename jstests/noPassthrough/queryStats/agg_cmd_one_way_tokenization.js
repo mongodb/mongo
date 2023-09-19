@@ -5,6 +5,7 @@
 import {
     asFieldPath,
     asVarRef,
+    getQueryStats,
     getQueryStatsAggCmd,
     kShellApplicationName
 } from "jstests/libs/query_stats_utils.js";
@@ -17,7 +18,6 @@ const kHashedFieldB = "m1xtUkfSpZNxXjNZYKwo86vGD37Zxmd2gtt+TXDO558=";
 function verifyConsistentFields(key) {
     assert.eq({"db": `${kHashedDbName}`, "coll": `${kHashedCollName}`}, key.queryShape.cmdNs);
     assert.eq("aggregate", key.queryShape.command);
-    assert.eq({batchSize: "?number"}, key.cursor);
     assert.eq(kShellApplicationName, key.client.application.name);
 }
 
@@ -43,7 +43,9 @@ function runTest(conn) {
 
         const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
-        assert.eq(1, stats.length);
+        assert.eq(1,
+                  stats.length,
+                  {allStats: getQueryStats(admin), metrics: db.serverStatus().metrics.queryStats});
         const key = stats[0].key;
         verifyConsistentFields(key);
         // Make sure there is no otherNss field when there are no secondary namespaces.
@@ -121,7 +123,8 @@ function runTest(conn) {
         const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
         assert.eq(3, stats.length);
-        const key = stats[0].key;
+        // This one will sort last because of the 'let' parameters.
+        const key = stats[2].key;
         verifyConsistentFields(key);
         assert.eq(
             [

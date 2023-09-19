@@ -127,6 +127,11 @@ private:
     boost::optional<bool> _value;
 };
 
+template <typename H>
+H AbslHashValue(H h, const OptionalBool& optBool) {
+    return H::combine(std::move(h), optBool.has_value(), bool(optBool));
+}
+
 /**
  * Class to represent a BSON element with any type from IDL. The caller must ensure that the backing
  * BSON stays alive while this type is in use.

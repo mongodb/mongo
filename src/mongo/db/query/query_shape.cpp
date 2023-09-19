@@ -42,11 +42,14 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/agg_cmd_shape.h"
+#include "mongo/db/query/find_cmd_shape.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/projection.h"
@@ -62,130 +65,7 @@
 
 namespace mongo::query_shape {
 
-BSONObj debugPredicateShape(const MatchExpression* predicate) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    return predicate->serialize(opts);
-}
-BSONObj representativePredicateShape(const MatchExpression* predicate) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    return predicate->serialize(opts);
-}
-
-BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> transformIdentifiersCallback) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.transformIdentifiersCallback = transformIdentifiersCallback;
-    opts.transformIdentifiers = true;
-    return predicate->serialize(opts);
-}
-
-BSONObj representativePredicateShape(
-    const MatchExpression* predicate,
-    std::function<std::string(StringData)> transformIdentifiersCallback) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    opts.transformIdentifiersCallback = transformIdentifiersCallback;
-    opts.transformIdentifiers = true;
-    return predicate->serialize(opts);
-}
-
-BSONObj extractSortShape(const BSONObj& sortSpec,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const SerializationOptions& opts) {
-    if (sortSpec.isEmpty()) {
-        return sortSpec;
-    }
-    auto natural = sortSpec[query_request_helper::kNaturalSortField];
-
-    if (!natural) {
-        return SortPattern{sortSpec, expCtx}
-            .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
-            .toBson();
-    }
-    // This '$natural' will fail to parse as a valid SortPattern since it is not a valid field
-    // path - it is usually considered and converted into a hint. For the query shape, we'll
-    // keep it unmodified.
-    BSONObjBuilder bob;
-    for (auto&& elem : sortSpec) {
-        if (elem.isABSONObj()) {
-            // We expect this won't work or parse on the main command path, but for shapification we
-            // don't really care, just treat it as a literal and don't bother parsing.
-            opts.appendLiteral(
-                &bob, opts.serializeFieldPathFromString(elem.fieldNameStringData()), elem);
-        } else if (elem.fieldNameStringData() == natural.fieldNameStringData()) {
-            bob.append(elem);
-        } else {
-            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldNameStringData()));
-        }
-    }
-    return bob.obj();
-}
-
-void addShapeLiterals(BSONObjBuilder* bob,
-                      const FindCommandRequest& findCommand,
-                      const SerializationOptions& opts) {
-    if (auto limit = findCommand.getLimit()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
-    }
-    if (auto skip = findCommand.getSkip()) {
-        opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
-    }
-}
-
-static std::vector<
-    std::pair<StringData, std::function<const OptionalBool(const FindCommandRequest&)>>>
-    boolArgMap = {
-        {FindCommandRequest::kSingleBatchFieldName, &FindCommandRequest::getSingleBatch},
-        {FindCommandRequest::kAllowDiskUseFieldName, &FindCommandRequest::getAllowDiskUse},
-        {FindCommandRequest::kReturnKeyFieldName, &FindCommandRequest::getReturnKey},
-        {FindCommandRequest::kShowRecordIdFieldName, &FindCommandRequest::getShowRecordId},
-        {FindCommandRequest::kTailableFieldName, &FindCommandRequest::getTailable},
-        {FindCommandRequest::kAwaitDataFieldName, &FindCommandRequest::getAwaitData},
-        {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
-        {FindCommandRequest::kOplogReplayFieldName, &FindCommandRequest::getOplogReplay},
-};
-std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
-    objArgMap = {
-        {FindCommandRequest::kCollationFieldName, &FindCommandRequest::getCollation},
-
-};
-
-void addRemainingFindCommandFields(BSONObjBuilder* bob,
-                                   const FindCommandRequest& findCommand,
-                                   const SerializationOptions& opts) {
-    for (auto [fieldName, getterFunction] : boolArgMap) {
-        auto optBool = getterFunction(findCommand);
-        optBool.serializeToBSON(fieldName, bob);
-    }
-    auto collation = findCommand.getCollation();
-    if (!collation.isEmpty()) {
-        bob->append(FindCommandRequest::kCollationFieldName, collation);
-    }
-}
-
-
-/**
- * In a let specification all field names are variable names, and all values are either expressions
- * or constants.
- */
-BSONObj extractLetSpecShape(BSONObj letSpec,
-                            const SerializationOptions& opts,
-                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
-    BSONObjBuilder bob;
-    for (BSONElement elem : letSpec) {
-        auto expr = Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
-        auto redactedValue = expr->serialize(opts);
-        // Note that this will throw on deeply nested let variables.
-        redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
-    }
-    return bob.obj();
-}
-
+namespace {
 void appendCmdNs(BSONObjBuilder& bob,
                  const NamespaceString& nss,
                  const SerializationOptions& opts) {
@@ -193,118 +73,54 @@ void appendCmdNs(BSONObjBuilder& bob,
     shape_helpers::appendNamespaceShape(nsObj, nss, opts);
     nsObj.doneFast();
 }
+}  // namespace
 
-BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& findCmd = *findRequest.findCommandRequest;
+Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
+    : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {}
+
+
+BSONObj Shape::toBson(OperationContext* opCtx, const SerializationOptions& opts) const {
     BSONObjBuilder bob;
-    // Serialize the namespace as part of the query shape.
-    {
-        auto ns = findCmd.getNamespaceOrUUID();
-        if (ns.isNamespaceString()) {
-            appendCmdNs(bob, ns.nss(), opts);
-        } else {
-            BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
-            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
-            cmdNs.append("db",
-                         opts.serializeIdentifier(DatabaseNameUtil::serialize(
-                             ns.dbName(), findCmd.getSerializationContext())));
-            cmdNs.doneFast();
-        }
+    appendCmdNsOrUUID(bob, opts);
+    if (!collation.isEmpty()) {
+        // Collation is never shapified. We use find command's collation name definition, but it
+        // should be the same for all requests.
+        bob.append(FindCommandRequest::kCollationFieldName, collation);
     }
-
-    bob.append("command", "find");
-    std::unique_ptr<MatchExpression> filterExpr;
-    // Filter.
-    bob.append(FindCommandRequest::kFilterFieldName, findRequest.filter->serialize(opts));
-    // Let Spec.
-    if (auto letSpec = findCmd.getLet()) {
-        auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
-        auto ownedObj = redactedObj.getOwned();
-        bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
-    }
-
-    if (findRequest.proj) {
-        bob.append(FindCommandRequest::kProjectionFieldName,
-                   projection_ast::serialize(*findRequest.proj->root(), opts));
-    }
-
-    if (!findCmd.getMax().isEmpty()) {
-        bob.append(FindCommandRequest::kMaxFieldName,
-                   shape_helpers::extractMinOrMaxShape(findCmd.getMax(), opts));
-    }
-    if (!findCmd.getMin().isEmpty()) {
-        bob.append(FindCommandRequest::kMinFieldName,
-                   shape_helpers::extractMinOrMaxShape(findCmd.getMin(), opts));
-    }
-
-    // Sort.
-    if (findRequest.sort) {
-        bob.append(
-            FindCommandRequest::kSortFieldName,
-            findRequest.sort
-                ->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
-                .toBson());
-    }
-
-    // Fields for literal redaction. Adds limit and skip.
-    addShapeLiterals(&bob, findCmd, opts);
-
-    // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCmd, opts);
-
+    appendCmdSpecificShapeComponents(bob, opCtx, opts);
     return bob.obj();
 }
 
-BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const Pipeline& pipeline,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const NamespaceString& nss) {
-    BSONObjBuilder bob;
-
-    // namespace
-    appendCmdNs(bob, nss, opts);
-    bob.append("command", "aggregate");
-
-    // pipeline
-    {
-        BSONArrayBuilder pipelineBab(
-            bob.subarrayStart(AggregateCommandRequest::kPipelineFieldName));
-        auto serializedPipeline = pipeline.serializeToBson(opts);
-        for (const auto& stage : serializedPipeline) {
-            pipelineBab.append(stage);
-        }
-        pipelineBab.doneFast();
-    }
-
-    // explain
-    if (aggregateCommand.getExplain().has_value()) {
-        bob.append(AggregateCommandRequest::kExplainFieldName, true);
-    }
-
-    // allowDiskUse
-    if (auto param = aggregateCommand.getAllowDiskUse(); param.has_value()) {
-        bob.append(AggregateCommandRequest::kAllowDiskUseFieldName, param.value_or(false));
-    }
-
-    // collation
-    if (auto param = aggregateCommand.getCollation()) {
-        bob.append(AggregateCommandRequest::kCollationFieldName, param.get());
-    }
-
-    // let
-    if (auto letSpec = aggregateCommand.getLet()) {
-        auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
-        auto ownedObj = redactedObj.getOwned();
-        bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
-    }
-    return bob.obj();
+int64_t Shape::size() const {
+    return sizeof(this) + shape_helpers::optionalObjSize(collation) + specificComponents().size();
 }
 
-QueryShapeHash hash(const BSONObj& queryShape) {
-    return QueryShapeHash::computeHash(reinterpret_cast<const uint8_t*>(queryShape.objdata()),
-                                       queryShape.objsize());
+QueryShapeHash Shape::sha256Hash(OperationContext* opCtx) const {
+    // The Query Shape Hash should use the representative query shape.
+    auto serialized =
+        toBson(opCtx, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    return SHA256Block::computeHash((const uint8_t*)serialized.sharedBuffer().get(),
+                                    serialized.objsize());
 }
+
+void Shape::appendCmdNsOrUUID(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+    if (nssOrUUID.isNamespaceString()) {
+        appendCmdNs(bob, nssOrUUID.nss(), opts);
+    } else {
+        BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
+        cmdNs.append("uuid", opts.serializeIdentifier(nssOrUUID.uuid().toString()));
+        cmdNs.append("db",
+                     opts.serializeIdentifier(DatabaseNameUtil::serialize(nssOrUUID.dbName())));
+        cmdNs.doneFast();
+    }
+}
+
+void Shape::appendCmdNs(BSONObjBuilder& bob,
+                        const NamespaceString& nss,
+                        const SerializationOptions& opts) const {
+    BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
+    shape_helpers::appendNamespaceShape(nsObj, nss, opts);
+    nsObj.doneFast();
+}
+
 }  // namespace mongo::query_shape

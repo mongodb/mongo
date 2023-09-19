@@ -51,165 +51,77 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/shape_helpers.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/decorable.h"
 
-namespace mongo {
-
-int64_t inline optionalObjSize(boost::optional<BSONObj> optionalObj) {
-    if (!optionalObj)
-        return 0;
-    return optionalObj->objsize();
-}
-
-template <typename T>
-int64_t optionalSize(boost::optional<T> optionalVal) {
-    if (!optionalVal)
-        return 0;
-    return optionalVal->size();
-}
-
-namespace query_stats {
+namespace mongo::query_stats {
 
 /**
- * An abstract base class to handle generating the query stats key for a given request.
+ * A struct holding pieces of the command request that are a component of the query stats store key
+ * and are options/arguments to all supported query stats commands.
+ *
+ * This struct (and the SpecificKeyComponents) are split out as a separate inheritence hierarchy to
+ * make it easier to ensure each piece is hashed without sub-classes needing to enumerate the parent
+ * class's member variables.
  */
-class KeyGenerator {
-public:
-    virtual ~KeyGenerator() = default;
+struct UniversalKeyComponents {
+    // TODO SERVER-78429 it feels like maxTimeMS and readConcern are missing from here - at least?
+    UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
+                           const ClientMetadata* clientMetadata,
+                           boost::optional<BSONObj> commentObj,
+                           boost::optional<BSONObj> hint,
+                           std::unique_ptr<APIParameters> apiParams,
+                           boost::optional<BSONObj> readPreference,
+                           query_shape::CollectionType collectionType);
 
-    /**
-     * Generate the query stats key with the given tokenization strategy.
-     */
-    virtual BSONObj generate(
-        OperationContext* opCtx,
-        boost::optional<SerializationOptions::TokenizeIdentifierFunc>) const = 0;
+    int64_t size() const;
 
-    /**
-     * Compute the query stats key hash by combining the hash components for this specific command
-     * with the pre-computed query shape hash.
-     */
-    size_t hash() const {
-        BSONObjBuilder bob;
-        // Rather than the query shape itself, insert its hash into the key.
-        _queryShapeHash.appendAsBinData(bob, "queryShape");
-        appendImmediateComponents(bob,
-                                  SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
-        bob.doneFast();
-        return absl::hash_internal::CityHash64(bob.bb().buf(), bob.bb().len());
-    }
+    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
 
-    int64_t size() const {
-        return doGetSize() +
-            _parseableQueryShape.objsize() + /* _collectionType is not owned here */
-            (_apiParams ? sizeof(*_apiParams) + optionalSize(_apiParams->getAPIVersion()) : 0) +
-            (_hasField.clientMetaData ? _clientMetaData.objsize() : 0) + _commentObj.objsize() +
-            (_hasField.readPreference ? _readPreference.objsize() : 0) + _hintObj.objsize();
-    }
+    // Avoid using boost::optional here because it creates extra padding at the beginning of the
+    // struct. Since each QueryStatsEntry has its own KeyGenerator subclass, it's better to minimize
+    // the struct's size as much as possible.
 
-    BSONObj getRepresentativeQueryShapeForDebug() const {
-        return _parseableQueryShape;
-    }
+    std::unique_ptr<query_shape::Shape> _queryShape;
+    BSONObj _clientMetaData;  // Preserve this value.
+    BSONObj _commentObj;      // Shapify this value.
+    BSONObj _hintObj;         // Preserve this value.
+    BSONObj _readPreference;  // Preserve this value.
 
-    query_shape::QueryShapeHash getQueryShapeHash() const {
-        return _queryShapeHash;
-    }
+    // Separate the possibly-enormous BSONObj from the remaining members
 
-protected:
-    KeyGenerator(OperationContext* opCtx,
-                 BSONObj parseableQueryShape,
-                 boost::optional<BSONObj> hint,
-                 query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown,
-                 boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
-        : _parseableQueryShape(parseableQueryShape.getOwned()),
-          _hintObj(hint.value_or(BSONObj())),
-          _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))),
-          _collectionType(collectionType) {
-        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-            _clientMetaData = metadata->getDocument();
-            _hasField.clientMetaData = true;
-        }
+    std::unique_ptr<APIParameters> _apiParams;  // Preserve this value in the query shape.
+    BSONElement _comment;
 
-        if (auto comment = opCtx->getCommentOwnedCopy()) {
-            _commentObj = std::move(comment.value());
-            _comment = _commentObj.firstElement();
-            _hasField.comment = true;
-        }
+    // This value is not known when run a query is run on mongos over an unsharded collection, so it
+    // is not set through that code path.
+    query_shape::CollectionType _collectionType;
 
-        _apiParams = std::make_unique<APIParameters>(APIParameters::get(opCtx));
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
+    struct HasField {
+        bool clientMetaData : 1 = false;
+        bool comment : 1 = false;
+        bool hint : 1 = false;
+        bool readPreference : 1 = false;
+    } _hasField;
+};
 
-        if (!ReadPreferenceSetting::get(opCtx).toInnerBSON().isEmpty() &&
-            !ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()) {
-            _readPreference = ReadPreferenceSetting::get(opCtx).toInnerBSON();
-            _hasField.readPreference = true;
-        }
-    }
+/**
+ * A base class for sub-classes to derive from to expose the hashing ability for all of their
+ * sub-components.
+ *
+ * This struct (and the UniversalKeyComponents) are split out as a separate inheritence hierarchy to
+ * make it easier to ensure each piece is hashed without sub-classes needing to enumerate the parent
+ * class's member variables.
+ */
+struct SpecificKeyComponents {
+    virtual ~SpecificKeyComponents() {}
 
-    /**
-     * With a given BSONObjBuilder, append the command-specific components of the query stats key.
-     */
-    virtual void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                 const SerializationOptions& opts) const = 0;
-
-    /**
-     * Helper function to generate the Query Stats Key, using the passed-in query shape as the
-     * `queryShape` sub-object.
-     */
-    BSONObj generateWithQueryShape(BSONObj queryShape, const SerializationOptions& opts) const {
-        BSONObjBuilder bob;
-        bob.append("queryShape", queryShape);
-        appendImmediateComponents(bob, opts);
-        return bob.obj();
-    }
-
-    /**
-     * Append all non-query shape components of the query stats key to the passed-in BSONObj
-     * builder.
-     */
-    void appendImmediateComponents(BSONObjBuilder& bob, const SerializationOptions& opts) const {
-        appendCommandSpecificComponents(bob, opts);
-        appendUniversalComponents(bob, opts);
-    }
-
-    // TODO: SERVER-76330 make everything below this line private once the aggregate key generator
-    // is properly using this interface.
-    /**
-     * Specifies the serialization of the query stats key components which apply to all commands.
-     */
-    void appendUniversalComponents(BSONObjBuilder& bob, const SerializationOptions& opts) const {
-        if (_hasField.comment) {
-            opts.appendLiteral(&bob, "comment", _comment);
-        }
-
-        if (const auto& apiVersion = _apiParams->getAPIVersion()) {
-            bob.append("apiVersion", apiVersion.value());
-        }
-
-        if (const auto& apiStrict = _apiParams->getAPIStrict()) {
-            bob.append("apiStrict", apiStrict.value());
-        }
-
-        if (const auto& apiDeprecationErrors = _apiParams->getAPIDeprecationErrors()) {
-            bob.append("apiDeprecationErrors", apiDeprecationErrors.value());
-        }
-
-        if (_hasField.readPreference) {
-            bob.append("$readPreference", _readPreference);
-        }
-
-        if (_hasField.clientMetaData) {
-            bob.append("client", _clientMetaData);
-        }
-        if (_collectionType != query_shape::CollectionType::kUnknown) {
-            bob.append("collectionType", toStringData(_collectionType));
-        }
-
-        if (!_hintObj.isEmpty()) {
-            bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
-        }
-    }
+    virtual void HashValue(absl::HashState state) const = 0;
 
     /**
      * Sub-classes should implement this to report how much memory is used. This is important to do
@@ -217,55 +129,152 @@ protected:
      * accounting. Implementers should include sizeof(*derivedThis) and be sure to also include the
      * size of any owned pointer-like objects such as BSONObj or NamespaceString which are
      * indirectly using memory elsehwhere.
+     *
+     * We cannot just use sizeof() because there are some variable size data members (like BSON
+     * objects) which depend on the particular instance.
      */
-    virtual int64_t doGetSize() const = 0;
-
-    // Avoid using boost::optional here because it creates extra padding at the beginning of the
-    // struct. Since each QueryStatsEntry can have its own KeyGenerator subclass, it's better to
-    // minimize the struct's size as much as possible.
-
-    BSONObj _parseableQueryShape;
-    // Preserve this value.
-    BSONObj _clientMetaData;
-    // Shapify this value.
-    BSONObj _commentObj;
-    // Preserve this value.
-    BSONObj _readPreference;
-    // Preserve this value. Possibly empty.
-    // In the future a hint may not be part of every single type of request, but it is possibly
-    // set on a find, aggregate, distinct, and update, so this is going to be a "common" element
-    // for a while. It may not make sense on an insert request.
-    BSONObj _hintObj;
-
-    // Separate the possibly-enormous BSONObj from the remaining members
-
-    // Preserve this value in the query shape.
-    std::unique_ptr<APIParameters> _apiParams;
-
-    BSONElement _comment;
-
-    // This value is not known when run a query is run on mongos over an unsharded collection, so it
-    // is not set through that code path.
-    query_shape::QueryShapeHash _queryShapeHash;
-    query_shape::CollectionType _collectionType;
-
-    // This anonymous struct represents the presence of the member variables as C++ bit fields.
-    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
-    struct {
-        bool clientMetaData : 1 = false;
-        bool comment : 1 = false;
-        bool readPreference : 1 = false;
-    } _hasField;
+    virtual int64_t size() const = 0;
 };
+
+template <typename H>
+H AbslHashValue(H state, const SpecificKeyComponents& value) {
+    value.HashValue(absl::HashState::Create(&state));
+    return std::move(state);
+}
+
+template <typename H>
+H AbslHashValue(H h, const UniversalKeyComponents& components) {
+    return H::combine(std::move(h),
+                      *components._queryShape,
+                      simpleHash(components._clientMetaData),
+                      // Note we use the comment's type in the hash function.
+                      components._comment.type(),
+                      simpleHash(components._hintObj),
+                      simpleHash(components._readPreference),
+                      components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
+                      components._collectionType,
+                      components._hasField);
+}
+
+template <typename H>
+H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
+    return H::combine(std::move(h),
+                      hasField.clientMetaData,
+                      hasField.comment,
+                      hasField.hint,
+                      hasField.readPreference);
+}
+
 
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    sizeof(KeyGenerator) <= 5 * sizeof(BSONObj) + sizeof(BSONElement) +
-            2 * sizeof(std::unique_ptr<APIParameters>) + sizeof(query_shape::CollectionType) +
-            sizeof(query_shape::QueryShapeHash) + sizeof(int64_t),
+    sizeof(UniversalKeyComponents) <= sizeof(query_shape::Shape) + 4 * sizeof(BSONObj) +
+            sizeof(BSONElement) + sizeof(std::unique_ptr<APIParameters>) +
+            sizeof(query_shape::CollectionType) + sizeof(query_shape::QueryShapeHash) +
+            sizeof(int64_t),
     "Size of KeyGenerator is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new value.");
-}  // namespace query_stats
-}  // namespace mongo
+
+/**
+ * An abstract base class to handle generating the query stats store key for a given request. All
+ * query stats store entries should include some common elements, tracked in `_universalComponents`.
+ * For example, everything tracked must have a `query_shape::Shape`.
+ *
+ * Subclasses can add more components to include as discriminating factors in which entries should
+ * be tracked separately. For example, two find commands which are identical except in their read
+ * concern should be tracked differently. Maybe they will have quite different performance
+ * characteristics or help us determine when the read concern was changed by the client.
+ *
+ * The interface to do this is to split out the state/memory for these components as a separate
+ * struct which can indpendently hash itself and compute its size (both of which are important for
+ * the query stats store). Subclasses of KeyGenerator itself should not have any meaningfully sized
+ * state other than the 'specificComponents().'
+ */
+class KeyGenerator {
+public:
+    virtual ~KeyGenerator() = default;
+
+    /**
+     * All KeyGenerators will share these characteristics as part of their query stats store key.
+     * Returns an unowned reference so the caller must ensure the result does not outlive this
+     * KeyGenerator instance.
+     */
+    const auto& universalComponents() const {
+        return _universalComponents;
+    }
+
+    /**
+     * Different commands will have different components they want to be included in the query stats
+     * store key. This interface allows them to do so and easily have those components incorporated
+     * into this key generation and hashing.
+     */
+    virtual const SpecificKeyComponents& specificComponents() const = 0;
+
+    /**
+     * Materializes the query stats store key. Not expected to be used on ingestion, since we should
+     * store this object and its components directly in their native C++ data structures - we can
+     * use the absl::HashOf() API to look them up. Instead, this may be useful to display the key
+     * (as it is used for $queryStats) or perhaps one day persist it to storage.
+     */
+    BSONObj generate(OperationContext* opCtx, const SerializationOptions& opts) const;
+
+    /**
+     * Convenience function.
+     */
+    query_shape::QueryShapeHash getQueryShapeHash(OperationContext* opCtx) const {
+        // TODO (future ticket?) should we cache this somewhere else?
+        return _universalComponents._queryShape->sha256Hash(opCtx);
+    }
+
+    int64_t size() const {
+        return specificComponents().size() + _universalComponents.size();
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const KeyGenerator& keyGenerator) {
+        return H::combine(
+            std::move(h), keyGenerator._universalComponents, keyGenerator.specificComponents());
+    }
+
+    // The default implementation of hashing for smart pointers is not a good one for our purposes.
+    // Here we overload them to actually take the hash of the object, rather than hashing the
+    // pointer itself.
+    template <typename H>
+    friend H AbslHashValue(H h, const std::unique_ptr<const KeyGenerator>& keyGenerator) {
+        return H::combine(std::move(h), *keyGenerator);
+    }
+    template <typename H>
+    friend H AbslHashValue(H h, const std::shared_ptr<const KeyGenerator>& keyGenerator) {
+        return H::combine(std::move(h), *keyGenerator);
+    }
+
+protected:
+    /**
+     * Sub-classes can use this to instantiate a 'real' KeyGenerator. 'queryShape' must not be null,
+     * but is tracked as a pointer since it is a virtual class and we want to own it here.
+     */
+    KeyGenerator(
+        OperationContext* opCtx,
+        std::unique_ptr<query_shape::Shape> queryShape,
+        boost::optional<BSONObj> hint,
+        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
+
+    /**
+     * With a given BSONObjBuilder, append the command-specific components of the query stats key.
+     *
+     * You may be wondering why this API is here rather than as a virtual method on
+     * CmdSpecificComponents - and that would be because many implementations can involve a re-parse
+     * of the request if it needs to serialize with different serialization options. This re-parsing
+     * process often needs the context of things tracked in _universalComponents, which is hard to
+     * access from the specific components.
+     */
+    virtual void appendCommandSpecificComponents(BSONObjBuilder& bob,
+                                                 const SerializationOptions& opts) const = 0;
+
+private:
+    UniversalKeyComponents _universalComponents;
+};
+
+}  // namespace mongo::query_stats

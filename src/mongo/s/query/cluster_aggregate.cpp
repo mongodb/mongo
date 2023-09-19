@@ -71,7 +71,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/agg_key_generator.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
@@ -326,7 +326,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(opCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggregateKeyGenerator>(
+            return std::make_unique<query_stats::AggKeyGenerator>(
                 request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
     }
@@ -499,7 +499,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // query_stats::registerRequest.
             query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                return std::make_unique<query_stats::AggKeyGenerator>(
                     request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
             });
         }

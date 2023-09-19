@@ -104,6 +104,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/query_settings_utils',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
         '$BUILD_DIR/mongo/db/query/query_shape',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
@@ -113,6 +114,7 @@ env.Library(
     target='query_settings_utils', source=[
         "query_settings_utils.cpp",
     ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
         '$BUILD_DIR/mongo/db/query/query_shape',
     ])

@@ -38,29 +38,6 @@
 
 namespace mongo::query_stats {
 
-CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
-
-namespace {
-
-std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
-    auto hashed = SHA256Block::computeHmac(
-        (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
-    return hashed.toString();
-}
-
-}  // namespace
-
-BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithmEnum algorithm,
-                                              std::string hmacKey) const {
-    return keyGenerator->generate(
-        opCtx,
-        algorithm == TransformAlgorithmEnum::kHmacSha256
-            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
-                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
-            : boost::none);
-}
-
 BSONObj QueryStatsEntry::toBSON() const {
     BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
     builder.append("lastExecutionMicros", (long long)lastExecutionMicros);
@@ -72,5 +49,6 @@ BSONObj QueryStatsEntry::toBSON() const {
     builder.append("latestSeenTimestamp", latestSeenTimestamp);
     return builder.obj();
 }
+
 
 }  // namespace mongo::query_stats

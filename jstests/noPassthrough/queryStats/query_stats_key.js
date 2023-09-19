@@ -133,6 +133,6 @@ confirmAllFieldsPresent(stats);
 // $hint can only be string(index name) or object (index spec).
 assert.throwsWithCode(() => {
     coll.find({v: {$eq: 2}}).hint({'v': 60, $hint: -128}).itcount();
-}, ErrorCodes.FailedToParse);
+}, ErrorCodes.BadValue);
 
 MongoRunner.stopMongod(conn);

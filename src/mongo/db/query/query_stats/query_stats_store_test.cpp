@@ -58,7 +58,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/agg_key_generator.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -80,26 +80,38 @@ std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
-std::size_t hash(const BSONObj& obj) {
-    return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
+int countAllEntries(const QueryStatsStore& store) {
+    int numKeys = 0;
+    store.forEach([&](auto&& key, auto&& entry) { numKeys++; });
+    return numKeys;
 }
 
+static const NamespaceStringOrUUID kDefaultTestNss =
+    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
+    static std::unique_ptr<const KeyGenerator> makeFindKeyGeneratorFromQuery(BSONObj filter) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
+        return std::make_unique<FindKeyGenerator>(expCtx, *parsedFind, collectionType);
+    }
+
     static constexpr auto collectionType = query_shape::CollectionType::kCollection;
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
-        auto queryShape = query_shape::extractQueryShape(
-            *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
-        FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, queryShape, collectionType);
-        return findKeyGenerator.generate(
-            expCtx->opCtx,
-            applyHmac
-                ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(applyHmacForTest)
-                : boost::none);
+        FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, collectionType);
+        SerializationOptions opts;
+        opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+        if (applyHmac) {
+            opts.transformIdentifiers = true;
+            opts.transformIdentifiersCallback = applyHmacForTest;
+        }
+        return findKeyGenerator.generate(expCtx->opCtx, opts);
     }
 
     BSONObj makeTelemetryKeyAggregateRequest(
@@ -108,38 +120,41 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool applyHmac = false,
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
-        AggregateKeyGenerator aggKeyGenerator(acr,
-                                              pipeline,
-                                              expCtx,
-                                              pipeline.getInvolvedCollections(),
-                                              acr.getNamespace(),
-                                              collectionType);
+        auto aggKeyGenerator = std::make_unique<AggKeyGenerator>(acr,
+                                                                 pipeline,
+                                                                 expCtx,
+                                                                 pipeline.getInvolvedCollections(),
+                                                                 acr.getNamespace(),
+                                                                 collectionType);
 
         SerializationOptions opts{.literalPolicy = literalPolicy};
         if (applyHmac) {
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;
         }
-        return aggKeyGenerator.makeQueryStatsKeyForTest(opts, expCtx);
+        return aggKeyGenerator->generate(expCtx->opCtx, opts);
     }
 };
 
 TEST_F(QueryStatsStoreTest, BasicUsage) {
     QueryStatsStore queryStatsStore{5000000, 1000};
 
-    auto getMetrics = [&](const BSONObj& key) {
-        auto lookupResult = queryStatsStore.lookup(hash(key));
+    auto getMetrics = [&](BSONObj query) {
+        auto key = makeFindKeyGeneratorFromQuery(query);
+        auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+        ASSERT_OK(lookupResult);
         return *lookupResult.getValue();
     };
 
-    auto collectMetrics = [&](BSONObj& key) {
-        std::shared_ptr<QueryStatsEntry> metrics;
-        auto lookupResult = queryStatsStore.lookup(hash(key));
+    auto collectMetrics = [&](BSONObj query) {
+        auto key = makeFindKeyGeneratorFromQuery(query);
+        auto lookupHash = absl::HashOf(key);
+        auto lookupResult = queryStatsStore.lookup(lookupHash);
         if (!lookupResult.isOK()) {
-            queryStatsStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr));
-            lookupResult = queryStatsStore.lookup(hash(key));
+            queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+            lookupResult = queryStatsStore.lookup(lookupHash);
         }
-        metrics = *lookupResult.getValue();
+        auto metrics = lookupResult.getValue();
         metrics->execCount += 1;
         metrics->lastExecutionMicros += 123456;
     };
@@ -154,101 +169,95 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     collectMetrics(query1x);
     collectMetrics(query2);
 
-    ASSERT_EQ(getMetrics(query1)->execCount, 3);
-    ASSERT_EQ(getMetrics(query1x)->execCount, 3);
-    ASSERT_EQ(getMetrics(query2)->execCount, 1);
+    ASSERT_EQ(getMetrics(query1).execCount, 3);
+    ASSERT_EQ(getMetrics(query1x).execCount, 3);
+    ASSERT_EQ(getMetrics(query2).execCount, 1);
 
-    auto collectMetricsWithLock = [&](BSONObj& key) {
-        auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(hash(key));
-        auto metrics = *lookupResult.getValue();
-        metrics->execCount += 1;
-        metrics->lastExecutionMicros += 123456;
+    auto collectMetricsWithLock = [&](BSONObj& filter) {
+        auto key = makeFindKeyGeneratorFromQuery(filter);
+        auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(absl::HashOf(key));
+        ASSERT_OK(lookupResult);
+        auto& metrics = *lookupResult.getValue();
+        metrics.execCount += 1;
+        metrics.lastExecutionMicros += 123456;
     };
 
     collectMetricsWithLock(query1x);
     collectMetricsWithLock(query2);
 
-    ASSERT_EQ(getMetrics(query1)->execCount, 4);
-    ASSERT_EQ(getMetrics(query1x)->execCount, 4);
-    ASSERT_EQ(getMetrics(query2)->execCount, 2);
+    ASSERT_EQ(getMetrics(query1).execCount, 4);
+    ASSERT_EQ(getMetrics(query1x).execCount, 4);
+    ASSERT_EQ(getMetrics(query2).execCount, 2);
 
-    int numKeys = 0;
-
-    queryStatsStore.forEach(
-        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
-
-    ASSERT_EQ(numKeys, 2);
+    ASSERT_EQ(2, countAllEntries(queryStatsStore));
 }
 
 TEST_F(QueryStatsStoreTest, EvictionTest) {
     // This creates a queryStats store with a single partition to specifically test the eviction
     // behavior with very large queries.
-    const auto cacheSize = 500;
+    // Add an entry that is smaller than the max partition size.
+    auto query = BSON("query" << 1 << "xEquals" << 42);
+    auto keyGenerator = makeFindKeyGeneratorFromQuery(query);
+
+    const size_t cacheSize = keyGenerator->size() + sizeof(QueryStatsEntry) + 100;
     const auto numPartitions = 1;
     QueryStatsStore queryStatsStore{cacheSize, numPartitions};
 
-    // Add an entry that is smaller than the max partition size.
-    auto query = BSON("query" << 1 << "xEquals" << 42);
-    queryStatsStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr));
-    int numKeys = 0;
-    queryStatsStore.forEach(
-        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
-    ASSERT_EQ(numKeys, 1);
-    // Add an entry that is larger than the max partition size to the non-empty partition. This
-    // should evict both entries, the first small entry written to the partition and the current too
-    // large entry we wish to write to the partition. The reason is because entries are evicted from
-    // the partition in order of least recently used. Thus, the small entry will be evicted first
-    // but the partition will still be over budget so the final, too large entry will also be
-    // evicted.
-    auto opCtx = makeOperationContext();
-    auto fcr = std::make_unique<FindCommandRequest>(
-        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
-    fcr->setLet(BSON("var" << 2));
-    fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
-    fcr->setProjection(fromjson("{varIs: '$$var'}"));
-    fcr->setLimit(5);
-    fcr->setSkip(2);
-    fcr->setBatchSize(25);
-    fcr->setMaxTimeMS(1000);
-    fcr->setNoCursorTimeout(false);
-    opCtx->setComment(BSON("comment"
-                           << " foo"));
-    fcr->setSingleBatch(false);
-    fcr->setAllowDiskUse(false);
-    fcr->setAllowPartialResults(true);
-    fcr->setAllowDiskUse(false);
-    fcr->setShowRecordId(true);
-    fcr->setMirrored(true);
-    fcr->setHint(BSON("z" << 1 << "c" << 1));
-    fcr->setMax(BSON("z" << 25));
-    fcr->setMin(BSON("z" << 80));
-    fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
+    auto hash = absl::HashOf(keyGenerator);
+    queryStatsStore.put(hash, QueryStatsEntry{std::move(keyGenerator)});
+    ASSERT_EQ(countAllEntries(queryStatsStore), 1);
 
-    auto&& [expCtx, parsedFind] =
-        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
-    auto queryShape = query_shape::extractQueryShape(
-        *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
-    QueryStatsEntry testMetrics{std::make_unique<query_stats::FindKeyGenerator>(
-        expCtx, *parsedFind, queryShape, collectionType)};
-    queryStatsStore.put(hash(testMetrics.computeQueryStatsKey(
-                            opCtx.get(), TransformAlgorithmEnum::kNone, std::string{})),
-                        std::make_shared<QueryStatsEntry>(testMetrics));
-    numKeys = 0;
-    queryStatsStore.forEach(
-        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
-    ASSERT_EQ(numKeys, 0);
+    // We'll do this again later so save this as a helper function.
+    auto addLargeEntry = [&](auto& queryStatsStore) {
+        // Add an entry that is larger than the max partition size to the non-empty partition. This
+        // should evict both entries, the first small entry written to the partition and the current
+        // too large entry we wish to write to the partition. The reason is because entries are
+        // evicted from the partition in order of least recently used. Thus, the small entry will be
+        // evicted first but the partition will still be over budget so the final, too large entry
+        // will also be evicted.
+        auto opCtx = makeOperationContext();
+        auto fcr = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(
+            NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+        fcr->setLet(BSON("var" << 2));
+        fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
+        fcr->setProjection(fromjson("{varIs: '$$var'}"));
+        fcr->setLimit(5);
+        fcr->setSkip(2);
+        fcr->setBatchSize(25);
+        fcr->setMaxTimeMS(1000);
+        fcr->setNoCursorTimeout(false);
+        opCtx->setComment(BSON("comment"
+                               << " foo"));
+        fcr->setSingleBatch(false);
+        fcr->setAllowDiskUse(false);
+        fcr->setAllowPartialResults(true);
+        fcr->setAllowDiskUse(false);
+        fcr->setShowRecordId(true);
+        fcr->setMirrored(true);
+        fcr->setHint(BSON("z" << 1 << "c" << 1));
+        fcr->setMax(BSON("z" << 25));
+        fcr->setMin(BSON("z" << 80));
+        fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
+        auto&& [expCtx, parsedFind] =
+            uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
+
+        keyGenerator =
+            std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind, collectionType);
+        auto lookupHash = absl::HashOf(keyGenerator);
+        QueryStatsEntry testMetrics{std::move(keyGenerator)};
+        queryStatsStore.put(lookupHash, testMetrics);
+    };
+
+    addLargeEntry(queryStatsStore);
+    ASSERT_EQ(countAllEntries(queryStatsStore), 0);
 
     // This creates a queryStats store where each partition has a max size of 500 bytes.
-    QueryStatsStore queryStatsStoreTwo{/*cacheSize*/ 1500, /*numPartitions*/ 3};
-    // Adding a queryStats store entry that is smaller than the overal cache size but larger than a
-    // single partition max size, will cause an eviction. testMetrics is larger than 500 bytes and
-    // thus over budget for the partitions of this cache.
-    queryStatsStoreTwo.put(hash(testMetrics.computeQueryStatsKey(
-                               opCtx.get(), TransformAlgorithmEnum::kNone, std::string{})),
-                           std::make_shared<QueryStatsEntry>(testMetrics));
-    queryStatsStoreTwo.forEach(
-        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
-    ASSERT_EQ(numKeys, 0);
+    QueryStatsStore queryStatsStoreTwo{/*cacheSize*/ cacheSize * 3, /*numPartitions*/ 3};
+    // Adding a queryStats store entry that is smaller than the overal cache size but larger
+    // than a single partition max size, will cause an eviction. testMetrics is larger than 500
+    // bytes and thus over budget for the partitions of this cache.
+    addLargeEntry(queryStatsStoreTwo);
+    ASSERT_EQ(countAllEntries(queryStatsStoreTwo), 0);
 }
 
 TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
@@ -275,21 +284,16 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
     globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
 
-    // The shapification process will bloat the input query over the 16 MB memory limit. Assert that
-    // calling registerRequest() doesn't throw and that the opDebug isn't registered with a key hash
-    // (thus metrics won't be tracked for this query).
+    // The shapification process will bloat the input query over the 16 MB memory limit. Assert
+    // that calling registerRequest() doesn't throw and that the opDebug isn't registered with a
+    // key hash (thus metrics won't be tracked for this query).
     ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
         opCtx.get(),
         nss,
         [&]() {
-            BSONObj queryShape = query_shape::extractQueryShape(
-                *parsedFindPair.second,
-                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                parsedFindPair.first);
             return std::make_unique<query_stats::FindKeyGenerator>(
                 parsedFindPair.first,
                 *parsedFindPair.second,
-                std::move(queryShape),
                 query_shape::CollectionType::kCollection);
         },
         /*requiresFullQueryStatsFeatureFlag*/ false));
@@ -299,8 +303,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    FindCommandRequest fcr(
-        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+    FindCommandRequest fcr(kDefaultTestNss);
 
     fcr.setFilter(BSON("a" << 1));
 
@@ -390,15 +393,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "let": {
+                    "HASH<var1>": "?number",
+                    "HASH<var2>": "?string"
+                },
                 "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
                     }
-                },
-                "let": {
-                    "HASH<var1>": "?number",
-                    "HASH<var2>": "?string"
                 },
                 "projection": {
                     "HASH<e>": true,
@@ -426,15 +429,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "let": {
+                    "HASH<var1>": "?number",
+                    "HASH<var2>": "?string"
+                },
                 "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
                     }
-                },
-                "let": {
-                    "HASH<var1>": "?number",
-                    "HASH<var2>": "?string"
                 },
                 "projection": {
                     "HASH<e>": true,
@@ -476,15 +479,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "let": {
+                    "HASH<var1>": "?number",
+                    "HASH<var2>": "?string"
+                },
                 "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
                     }
-                },
-                "let": {
-                    "HASH<var1>": "?number",
-                    "HASH<var2>": "?string"
                 },
                 "projection": {
                     "HASH<e>": true,
@@ -504,13 +507,14 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "limit": "?number",
                 "skip": "?number"
             },
-            "maxTimeMS": "?number",
-            "batchSize": "?number",
             "collectionType": "collection",
             "hint": {
                 "HASH<z>": 1,
                 "HASH<c>": 1
-            }
+            },
+            "noCursorTimeout": "?bool",
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
         })",
         key);
 
@@ -530,15 +534,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "let": {
+                    "HASH<var1>": "?number",
+                    "HASH<var2>": "?string"
+                },
                 "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
                     }
-                },
-                "let": {
-                    "HASH<var1>": "?number",
-                    "HASH<var2>": "?string"
                 },
                 "projection": {
                     "HASH<e>": true,
@@ -562,14 +566,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "showRecordId": true,
                 "mirrored": true
             },
-            "allowPartialResults": true,
-            "maxTimeMS": "?number",
-            "batchSize": "?number",
             "collectionType": "collection",
             "hint": {
                 "HASH<z>": 1,
                 "HASH<c>": 1
-            }
+            },
+            "allowPartialResults": true,
+            "noCursorTimeout": "?bool",
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
         })",
         key);
 
@@ -583,15 +588,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "let": {
+                    "HASH<var1>": "?number",
+                    "HASH<var2>": "?string"
+                },
                 "command": "find",
                 "filter": {
                     "HASH<a>": {
                         "$eq": "?number"
                     }
-                },
-                "let": {
-                    "HASH<var1>": "?number",
-                    "HASH<var2>": "?string"
                 },
                 "projection": {
                     "HASH<e>": true,
@@ -615,14 +620,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "showRecordId": true,
                 "mirrored": true
             },
-            "allowPartialResults": false,
-            "maxTimeMS": "?number",
-            "batchSize": "?number",
             "collectionType": "collection",
             "hint": {
                 "HASH<z>": 1,
                 "HASH<c>": 1
-            }
+            },
+            "allowPartialResults": false,
+            "noCursorTimeout": "?bool",
+            "maxTimeMS": "?number",
+            "batchSize": "?number"
         })",
         key);
 
@@ -810,8 +816,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
 }
 
 TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
-    // Test that the expression context we use to apply hmac will understand the 'let' part of the
-    // find command while parsing the other pieces of the command.
+    // Test that the expression context we use to apply hmac will understand the 'let' part of
+    // the find command while parsing the other pieces of the command.
 
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeQueryStatsKey' call to do that.
@@ -822,23 +828,18 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
     fcr->setProjection(fromjson("{varIs: '$$var'}"));
 
-    const auto cmdObj = fcr->toBSON(BSON("$db"
-                                         << "testDB"));
-    auto&& [expCtx, parsedFind] =
-        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
-    auto queryShape = query_shape::extractQueryShape(
-        *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
-    QueryStatsEntry testMetrics{std::make_unique<query_stats::FindKeyGenerator>(
-        expCtx, *parsedFind, queryShape, collectionType)};
-
-    auto hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithmEnum::kNone, std::string{});
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
+    expCtx->variables.seedVariablesWithLetParameters(expCtx.get(), *fcr->getLet());
+    auto hmacApplied = makeQueryStatsKeyFindRequest(*fcr, expCtx, false);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
                 "cmdNs": {
                     "db": "testDB",
                     "coll": "testColl"
+                },
+                "let": {
+                    "var": "?number"
                 },
                 "command": "find",
                 "filter": {
@@ -851,9 +852,6 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                         }
                     ]
                 },
-                "let": {
-                    "var": "?number"
-                },
                 "projection": {
                     "varIs": "$$var",
                     "_id": true
@@ -863,35 +861,31 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         })",
         hmacApplied);
 
-    // Now be sure hmac is applied to variable names. We don't currently expose a different way to
-    // do the hashing, so we'll just stick with the big long strings here for now.
-    hmacApplied = testMetrics.computeQueryStatsKey(
-        opCtx.get(), TransformAlgorithmEnum::kHmacSha256, std::string{});
+    hmacApplied = makeQueryStatsKeyFindRequest(*fcr, expCtx, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
                 "cmdNs": {
-                    "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
-                    "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "let": {
+                    "HASH<var>": "?number"
                 },
                 "command": "find",
                 "filter": {
                     "$expr": [
                         {
                             "$eq": [
-                                "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
-                                "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
+                                "$HASH<a>",
+                                "$$HASH<var>"
                             ]
                         }
                     ]
                 },
-                "let": {
-                    "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
-                },
                 "projection": {
-                    "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=":
-                    "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
-                    "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+                    "HASH<varIs>": "$$HASH<var>",
+                    "HASH<_id>": true
                 }
             },
             "collectionType": "collection"
@@ -969,7 +963,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     {
                         "$out": {
                             "coll": "outColl",
-                            "db": "test"
+                            "db": "testDB"
                         }
                     }
                 ]
@@ -1027,7 +1021,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     {
                         "$out": {
                             "coll": "HASH<outColl>",
-                            "db": "HASH<test>"
+                            "db": "HASH<testDB>"
                         }
                     }
                 ]
@@ -1051,6 +1045,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "collation": {
+                    "locale": "simple"
+                },
                 "command": "aggregate",
                 "pipeline": [
                     {
@@ -1091,15 +1088,12 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     {
                         "$out": {
                             "coll": "HASH<outColl>",
-                            "db": "HASH<test>"
+                            "db": "HASH<testDB>"
                         }
                     }
                 ],
                 "explain": true,
-                "allowDiskUse": false,
-                "collation": {
-                    "locale": "simple"
-                }
+                "allowDiskUse": false
             },
             "collectionType": "collection",
             "hint": {
@@ -1110,10 +1104,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         shapified);
 
     // Add let.
-    acr.setLet(BSON("var1"
-                    << "$foo"
-                    << "var2"
-                    << "bar"));
+    acr.setLet(BSON("var1" << BSON("$literal"
+                                   << "$foo")
+                           << "var2"
+                           << "bar"));
     shapified = makeTelemetryKeyAggregateRequest(
         acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1122,6 +1116,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "cmdNs": {
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
+                },
+                "collation": {
+                    "locale": "simple"
+                },
+                "let": {
+                    "HASH<var1>": "?string",
+                    "HASH<var2>": "?string"
                 },
                 "command": "aggregate",
                 "pipeline": [
@@ -1163,19 +1164,12 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     {
                         "$out": {
                             "coll": "HASH<outColl>",
-                            "db": "HASH<test>"
+                            "db": "HASH<testDB>"
                         }
                     }
                 ],
                 "explain": true,
-                "allowDiskUse": false,
-                "collation": {
-                    "locale": "simple"
-                },
-                "let": {
-                    "HASH<var1>": "$HASH<foo>",
-                    "HASH<var2>": "?string"
-                }
+                "allowDiskUse": false
             },
             "collectionType": "collection",
             "hint": {
@@ -1202,6 +1196,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     "db": "HASH<testDB>",
                     "coll": "HASH<testColl>"
                 },
+                "collation": {
+                    "locale": "simple"
+                },
+                "let": {
+                    "HASH<var1>": "?string",
+                    "HASH<var2>": "?string"
+                },
                 "command": "aggregate",
                 "pipeline": [
                     {
@@ -1242,31 +1243,24 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                     {
                         "$out": {
                             "coll": "HASH<outColl>",
-                            "db": "HASH<test>"
+                            "db": "HASH<testDB>"
                         }
                     }
                 ],
                 "explain": true,
-                "allowDiskUse": false,
-                "collation": {
-                    "locale": "simple"
-                },
-                "let": {
-                    "HASH<var1>": "$HASH<foo>",
-                    "HASH<var2>": "?string"
-                }
+                "allowDiskUse": false
             },
-            "cursor": {
-                "batchSize": "?number"
-            },
-            "maxTimeMS": "?number",
-            "bypassDocumentValidation": "?bool",
             "comment": "?string",
             "collectionType": "collection",
             "hint": {
                 "HASH<z>": 1,
                 "HASH<c>": 1
-            }
+            },
+            "cursor": {
+                "batchSize": "?number"
+            },
+            "maxTimeMS": "?number",
+            "bypassDocumentValidation": "?bool"
         })",
         shapified);
 }
@@ -1345,13 +1339,13 @@ TEST_F(QueryStatsStoreTest,
                     }
                 ]
             },
+            "collectionType": "collection",
             "otherNss": [
                 {
                     "db": "HASH<test>",
                     "coll": "HASH<otherColl>"
                 }
-            ],
-            "collectionType": "collection"
+            ]
         })",
         shapified);
 }

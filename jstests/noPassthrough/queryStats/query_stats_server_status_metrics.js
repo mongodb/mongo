@@ -2,6 +2,9 @@
  * Test the telemetry related serverStatus metrics.
  * @tags: [featureFlagQueryStats]
  */
+(function() {
+"use strict";
+
 function runTestWithMongodOptions(mongodOptions, test, testOptions) {
     const conn = MongoRunner.runMongod(mongodOptions);
     const testDB = conn.getDB('test');
@@ -65,7 +68,7 @@ function evictionTest(conn, testDB, coll, testOptions) {
     addApprox2MBOfStatsData(testDB, coll);
     if (!testOptions.resetCacheSize) {
         const evictedAfter = testDB.serverStatus().metrics.queryStats.numEvicted;
-        assert.gt(evictedAfter, 0);
+        assert.gt(evictedAfter, 0, testDB.serverStatus().metrics.queryStats);
         return;
     }
     // Make sure number of evicted entries increases when the cache size is reset, which forces out
@@ -261,3 +264,4 @@ runTestWithMongodOptions({
     setParameter: {internalQueryStatsCacheSize: "2MB", internalQueryStatsRateLimit: -1},
 },
                          queryStatsAggregationStageTest);
+}());

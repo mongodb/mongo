@@ -58,16 +58,18 @@
 
 namespace mongo::query_stats {
 
+extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
+
 struct QueryStatsPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
-    std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
-        return k % nPartitions;
+    std::size_t operator()(const std::size_t hash, const std::size_t nPartitions) const {
+        return hash % nPartitions;
     }
 };
 
 struct QueryStatsStoreEntryBudgetor {
-    size_t operator()(const std::size_t key, const std::shared_ptr<QueryStatsEntry>& value) {
-        return sizeof(decltype(key)) + value->size();
+    size_t operator()(const std::size_t hash, const QueryStatsEntry& value) {
+        return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.keyGenerator->size();
     }
 };
 
@@ -76,15 +78,11 @@ struct QueryStatsStoreEntryBudgetor {
  * 'queryStatsStoreSize' serverStatus metric when entries are inserted or evicted.
  */
 struct QueryStatsStoreInsertionEvictionListener {
-    void onInsert(const std::size_t&,
-                  const std::shared_ptr<QueryStatsEntry>&,
-                  size_t estimatedSize) {
+    void onInsert(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize) {
         queryStatsStoreSizeEstimateBytesMetric.increment(estimatedSize);
     }
 
-    void onEvict(const std::size_t&,
-                 const std::shared_ptr<QueryStatsEntry>&,
-                 size_t estimatedSize) {
+    void onEvict(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize) {
         queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
     }
 
@@ -93,7 +91,7 @@ struct QueryStatsStoreInsertionEvictionListener {
     }
 };
 using QueryStatsStore = PartitionedCache<std::size_t,
-                                         std::shared_ptr<QueryStatsEntry>,
+                                         QueryStatsEntry,
                                          QueryStatsStoreEntryBudgetor,
                                          QueryStatsPartitioner,
                                          QueryStatsStoreInsertionEvictionListener>;

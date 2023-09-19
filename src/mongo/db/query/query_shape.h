@@ -47,46 +47,126 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/shape_helpers.h"
 
 namespace mongo::query_shape {
+
+/**
+ * Each type of "query" command likely has different fields/options that are considered important
+ * for the shape. For example, a find command has a skip and a limit, and an aggregate command has a
+ * pipeline. This interface is used to allow different sub-commands to diverge in this way but still
+ * ensure we can appropriately hash them to compare their shapes, and properly account for their
+ * size.
+ *
+ * This struct is split out as a separate inheritence hierarchy from 'Shape' to make it easier to
+ * ensure each piece is hashed without sub-classes needing to enumerate the parent class's member
+ * variables.
+ */
+struct CmdSpecificShapeComponents {
+    virtual ~CmdSpecificShapeComponents() {}
+
+    /**
+     * Sub-classes should implement this in a way which includes all shape-relevant state. If two
+     * shapes should compare equal, they should result in the same hash value. For example for the
+     * find command - we would include the _shapified_ filter and projection here, but we will not
+     * include the comment - which is not part of the shape.
+     */
+    virtual void HashValue(absl::HashState state) const = 0;
+
+    /**
+     * It is important for shape components to accurately report their size, and to make a
+     * reasonable effort to maintain a minimal size. We use the query shape in memory-constrained
+     * data structures, so a bigger shape means we can have fewer different shapes stored (for
+     * example in the query stats store).
+     *
+     * We cannot just use sizeof() because there are some variable size data members (like BSON
+     * objects) which depend on the particular instance.
+     */
+    virtual int64_t size() const = 0;
+
+    // Some template boilerplate to allow sub-classes to overload the hash implementation.
+    template <typename H>
+    friend H AbslHashValue(H state, const CmdSpecificShapeComponents& value) {
+        value.HashValue(absl::HashState::Create(&state));
+        return std::move(state);
+    }
+};
 
 using QueryShapeHash = SHA256Block;
 
 /**
- * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
- * purposes of collecting queryStats.
+ * A query "shape" is a version of a command with literal values abstracted so that two instances of
+ * the command may compare/hash equal even if they use slightly different literal values. This
+ * concept exists not just the find command, but planned for many of the CRUD commands + aggregate.
+ * It also includes most (but not all) components of these commands, not just the query predicate
+ * (MatchExpresssion). In these ways, "query" is meant more generally.
  *
- * For example, if the MatchExpression represents {a: 2}, it will return the same BSONObj as the
- * MatchExpression for {a: 1}, {a: 10}, and {a: {$eq: 2}} (identical bits but not sharing memory)
- * because they are considered to be the same shape.
+ * A "Query Shape" can vary depending on the command (e.g. find, aggregate, or distinct). This
+ * abstract struct is the API we must implement for each command which we want to have a "shape"
+ * concept.
  *
- * Note that the shape of a MatchExpression is only part of the overall query shape - which should
- * include other options like the sort and projection.
- *
- * TODO better consider how this interacts with persistent query settings project, and document it.
- * TODO (TODO SERVER ticket) better distinguish this from a plan cache or CQ 'query shape'.
+ * In order to properly account for the size of a query shape, the CmdSpecificShapeComponents should
+ * include all meaningful memory consumption, and be sure to report it in 'size()'. Subclasses of
+ * 'Shape' are not expected to have any meaningful memory usage outside of that struct.
  */
-BSONObj debugPredicateShape(const MatchExpression* predicate);
-BSONObj representativePredicateShape(const MatchExpression* predicate);
+class Shape {
+public:
+    virtual ~Shape() {}
 
-BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> transformIdentifiersCallback);
-BSONObj representativePredicateShape(
-    const MatchExpression* predicate,
-    std::function<std::string(StringData)> transformIdentifiersCallback);
+    /**
+     * Sub-classes are expected to implement this as a mechanism for plugging in their command
+     * specific shape components.
+     */
+    virtual const CmdSpecificShapeComponents& specificComponents() const = 0;
 
-BSONObj extractSortShape(const BSONObj& sortSpec,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const SerializationOptions& opts);
+    /**
+     * Note this may involve re-parsing command BSON and so is not necessarily cheap.
+     */
+    BSONObj toBson(OperationContext*, const SerializationOptions&) const;
 
-BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
-BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const Pipeline& pipeline,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const NamespaceString& nss);
+    /**
+     * The Query Shape Hash is defined to be the SHA256 Hash of the representatice query shape. This
+     * helper computes that.
+     */
+    QueryShapeHash sha256Hash(OperationContext*) const;
 
-QueryShapeHash hash(const BSONObj& queryShape);
+    /**
+     * The size of a query shape is important, since we store these in space-constrained
+     * environments like the query stats store.
+     */
+    int64_t size() const;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const Shape& shape) {
+        h = H::combine(std::move(h), shape.nssOrUUID, shape.specificComponents());
+        if (!shape.collation.isEmpty())
+            h = H::combine(std::move(h), simpleHash(shape.collation));
+        return h;
+    }
+
+
+    // Not shapified but it is an identifier so it may be transformed.
+    NamespaceStringOrUUID nssOrUUID;
+
+    // Never shapified. If it's empty, leave it off.
+    BSONObj collation;
+
+protected:
+    Shape(NamespaceStringOrUUID, BSONObj collation_);
+
+    /**
+     * Along with the hash implementation, this is the main way that shapes are 'shapified' -
+     * sub-classes should implement this to add the shapified versions of their literals to an
+     * object. Depending on 'opts', this may be eligible to be used for output in $queryStats or as
+     * the object to compute the QueryShapeHash.
+     */
+    virtual void appendCmdSpecificShapeComponents(BSONObjBuilder&,
+                                                  OperationContext*,
+                                                  const SerializationOptions& opts) const = 0;
+
+private:
+    void appendCmdNsOrUUID(BSONObjBuilder&, const SerializationOptions&) const;
+    void appendCmdNs(BSONObjBuilder&, const NamespaceString&, const SerializationOptions&) const;
+};
+
 }  // namespace mongo::query_shape

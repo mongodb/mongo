@@ -29,121 +29,118 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
 #include <memory>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/basic_types.h"
-#include "mongo/db/collection_type.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/find_cmd_shape.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/find_command_gen.h"
-#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_stats/key_generator.h"
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::query_stats {
+
+struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
+    FindCmdQueryStatsStoreKeyComponents(const FindCommandRequest* findCmd)
+        : _shapifiedReadConcern(shapifyReadConcern(findCmd->getReadConcern().value_or(BSONObj()))),
+          _allowPartialResults(findCmd->getAllowPartialResults().value_or(false)),
+          _hasField{
+              .readConcern = findCmd->getReadConcern().has_value(),
+              .batchSize = findCmd->getBatchSize().has_value(),
+              .maxTimeMS = findCmd->getMaxTimeMS().has_value(),
+              .allowPartialResults = findCmd->getAllowPartialResults().has_value(),
+              .noCursorTimeout = findCmd->getNoCursorTimeout().has_value(),
+          } {}
+
+    /**
+     * Returns a copy of the read concern object. If there is an "afterClusterTime" component, the
+     * timestamp is shapified according to 'opts'.
+     */
+    static BSONObj shapifyReadConcern(
+        const BSONObj& readConcern,
+        const SerializationOptions& opts =
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+
+    std::int64_t size() const {
+        return _hasField.readConcern ? _shapifiedReadConcern.objsize() : 0;
+    }
+
+    void HashValue(absl::HashState state) const final {
+        absl::HashState::combine(
+            std::move(state), _hasField, simpleHash(_shapifiedReadConcern), _allowPartialResults);
+    }
+
+    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
+
+    // Avoid using boost::optional here because it creates extra padding at the beginning of the
+    // struct. Since each QueryStatsEntry can have its own FindKeyGenerator, it's better to
+    // minimize the struct's size as much as possible.
+
+    // Preserved literal except afterClusterTime is shapified.
+    BSONObj _shapifiedReadConcern;
+
+    // Preserved literal.
+    bool _allowPartialResults;
+
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
+    struct HasField {
+        bool readConcern : 1 = false;
+        bool batchSize : 1 = false;
+        bool maxTimeMS : 1 = false;
+        bool allowPartialResults : 1 = false;
+        bool noCursorTimeout : 1 = false;
+
+        bool operator==(const HasField& other) const = default;
+
+    } _hasField;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const HasField& hasField) {
+        return H::combine(std::move(h),
+                          hasField.readConcern,
+                          hasField.batchSize,
+                          hasField.maxTimeMS,
+                          hasField.noCursorTimeout,
+                          hasField.allowPartialResults);
+    }
+};
+
+// This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
+// or otherwise changing the members, this assert may be updated with care.
+static_assert(
+    // expecting a BSONObj and one word for the allowPartialResults and another word for the
+    // _hasField.
+    sizeof(FindCmdQueryStatsStoreKeyComponents) <= sizeof(BSONObj) + 8 + 8,
+    "Size of FindCmdQueryStatsStoreKeyComponents is too large! "
+    "Make sure that the struct has been align- and padding-optimized. "
+    "If the struct's members have changed, this assert may need to be updated with a new "
+    "value.");
 
 class FindKeyGenerator final : public KeyGenerator {
 public:
     FindKeyGenerator(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ParsedFindCommand& request,
-        BSONObj parseableQueryShape,
         query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
         : KeyGenerator(expCtx->opCtx,
-                       parseableQueryShape,
+                       std::make_unique<query_shape::FindCmdShape>(request, expCtx),
                        request.findCommandRequest->getHint(),
                        collectionType),
-          _readConcern(request.findCommandRequest->getReadConcern().has_value()
-                           ? request.findCommandRequest->getReadConcern()->copy()
-                           : BSONObj()),
-          _batchSize(request.findCommandRequest->getBatchSize().value_or(0)),
-          _maxTimeMS(request.findCommandRequest->getMaxTimeMS().value_or(0)),
-          _allowPartialResults(
-              request.findCommandRequest->getAllowPartialResults().value_or(false)),
-          _noCursorTimeout(request.findCommandRequest->getNoCursorTimeout().value_or(false)),
-          _hasField{
-              .readConcern = request.findCommandRequest->getReadConcern().has_value(),
-              .batchSize = request.findCommandRequest->getBatchSize().has_value(),
-              .maxTimeMS = request.findCommandRequest->getMaxTimeMS().has_value(),
-              .allowPartialResults =
-                  request.findCommandRequest->getAllowPartialResults().has_value(),
-              .noCursorTimeout = request.findCommandRequest->getNoCursorTimeout().has_value(),
-          } {}
-
-
-    BSONObj generate(OperationContext* opCtx,
-                     boost::optional<SerializationOptions::TokenizeIdentifierFunc>) const final;
+          _components(request.findCommandRequest.get()) {}
 
 protected:
-    int64_t doGetSize() const final {
-        return sizeof(*this) + (_hasField.readConcern ? _readConcern.objsize() : 0);
+    const SpecificKeyComponents& specificComponents() const {
+        return _components;
     }
 
 private:
-    BSONObj makeQueryStatsKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const ParsedFindCommand& parsedRequest,
-                              const SerializationOptions& opts) const;
-
-
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const final override;
+                                         const SerializationOptions& opts) const final {
+        _components.appendTo(bob, opts);
+    }
 
     std::unique_ptr<FindCommandRequest> reparse(OperationContext* opCtx) const;
 
-    boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(
-        OperationContext* opCtx, const FindCommandRequest& request) const {
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, request, nullptr /* collator doesn't matter here.*/, false /* mayDbProfile */);
-        expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
-        // Expression counters are reported in serverStatus to indicate how often clients use
-        // certain expressions/stages, so it's a side effect tied to parsing. We must stop
-        // expression counters before re-parsing to avoid adding to the counters more than once per
-        // a given query.
-        expCtx->stopExpressionCounters();
-        return expCtx;
-    }
-
-    // Avoid using boost::optional here because it creates extra padding at the beginning of the
-    // struct. Since each QueryStatsEntry can have its own FindKeyGenerator, it's better to
-    // minimize the struct's size as much as possible.
-
-    // Preserved literal.
-    BSONObj _readConcern;
-
-    // Shape.
-    int64_t _batchSize;
-
-    // Shape.
-    int32_t _maxTimeMS;
-
-    // Preserved literal.
-    bool _allowPartialResults;
-
-    // Shape.
-    bool _noCursorTimeout;
-
-    // This anonymous struct represents the presence of the member variables as C++ bit fields.
-    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
-    struct {
-        bool readConcern : 1 = false;
-        bool batchSize : 1 = false;
-        bool maxTimeMS : 1 = false;
-        bool allowPartialResults : 1 = false;
-        bool noCursorTimeout : 1 = false;
-    } _hasField;
+    FindCmdQueryStatsStoreKeyComponents _components;
 };
 
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
@@ -153,4 +150,5 @@ static_assert(
     "Size of FindKeyGenerator is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new value.");
+
 }  // namespace mongo::query_stats

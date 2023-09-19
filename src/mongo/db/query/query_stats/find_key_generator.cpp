@@ -29,87 +29,36 @@
 
 #include "mongo/db/query/query_stats/find_key_generator.h"
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/find_command_gen.h"
-#include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/assert_util.h"
-
 namespace mongo::query_stats {
 
-std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* opCtx) const {
-    // TODO: SERVER-76330 factor out building the parseable cmdObj into a helper function in
-    // query_shape.h.
-    BSONObjBuilder cmdBuilder;
-    NamespaceStringOrUUID nss = shape_helpers::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
-    nss.serialize(&cmdBuilder, FindCommandRequest::kCommandName);
-    cmdBuilder.append("$db", DatabaseNameUtil::serialize(nss.dbName()));
+BSONObj FindCmdQueryStatsStoreKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
+                                                                const SerializationOptions& opts) {
+    // Read concern should not be considered a literal.
+    // afterClusterTime is distinct for every operation with causal consistency enabled. We
+    // normalize it in order not to blow out the telemetry store cache.
+    if (readConcern["afterClusterTime"].eoo()) {
+        return readConcern.copy();
+    } else {
+        BSONObjBuilder bob;
 
-    for (BSONElement e : _parseableQueryShape) {
-        if (e.fieldNameStringData() == "cmdNs" || e.fieldNameStringData() == "command") {
-            continue;
+        if (auto levelElem = readConcern["level"]) {
+            bob.append(levelElem);
         }
-
-        cmdBuilder.append(e);
+        opts.appendLiteral(&bob, "afterClusterTime", readConcern["afterClusterTime"]);
+        return bob.obj();
     }
-
-    auto cmdObj = cmdBuilder.obj();
-    return std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
-        IDLParserContext("Query Stats Key", false /* apiStrict */, boost::none), cmdObj));
 }
 
-BSONObj FindKeyGenerator::generate(
-    OperationContext* opCtx,
-    boost::optional<SerializationOptions::TokenizeIdentifierFunc> hmacPolicy) const {
-    auto request = reparse(opCtx);
-    auto expCtx = makeDummyExpCtx(opCtx, *request);
-    auto parsedRequest = uassertStatusOK(
-        parsed_find_command::parse(expCtx,
-                                   std::move(request),
-                                   ExtensionsCallbackNoop(),
-                                   MatchExpressionParser::kAllowAllSpecialFeatures));
-    expCtx->setUserRoles();
-    auto opts = hmacPolicy ? SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString,
-                                                  /*transformIdentifiersBool*/ true,
-                                                  *hmacPolicy,
-                                                  /*includePath*/ true,
-                                                  /*verbosity*/ boost::none,
-                                                  /*inMatchExprSortAndDedupElements*/ false}
-                           : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
-
-    return generateWithQueryShape(query_shape::extractQueryShape(*parsedRequest, opts, expCtx),
-                                  opts);
-}
-
-void FindKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                       const SerializationOptions& opts) const {
+void FindCmdQueryStatsStoreKeyComponents::appendTo(BSONObjBuilder& bob,
+                                                   const SerializationOptions& opts) const {
     if (_hasField.readConcern) {
-        // Read concern should not be considered a literal.
-        // afterClusterTime is distinct for every operation with causal consistency enabled. We
-        // normalize it in order not to blow out the telemetry store cache.
-        if (_readConcern["afterClusterTime"]) {
-            BSONObjBuilder subObj = bob.subobjStart(FindCommandRequest::kReadConcernFieldName);
-
-            if (auto levelElem = _readConcern["level"]) {
-                subObj.append(levelElem);
-            }
-            opts.appendLiteral(&subObj, "afterClusterTime", _readConcern["afterClusterTime"]);
-            subObj.doneFast();
-        } else {
-            bob.append(FindCommandRequest::kReadConcernFieldName, _readConcern);
+        auto readConcernToAppend = _shapifiedReadConcern;
+        if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+            // The options aren't the same as the first time we shapified, so re-computation is
+            // necessary (e.g. use "?timestamp" instead of the representative Timestamp(0, 0)).
+            readConcernToAppend = shapifyReadConcern(_shapifiedReadConcern, opts);
         }
+        bob.append(FindCommandRequest::kReadConcernFieldName, readConcernToAppend);
     }
 
     if (_hasField.allowPartialResults) {
@@ -118,20 +67,37 @@ void FindKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
 
     // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
 
-    if (_noCursorTimeout) {
-        // Capture whether noCursorTimeout was specified in the query, do not distinguish between
-        // true or false.
+    if (_hasField.noCursorTimeout) {
+        // Capture whether noCursorTimeout was specified in the query, do not distinguish
+        // between true or false.
         opts.appendLiteral(
             &bob, FindCommandRequest::kNoCursorTimeoutFieldName, _hasField.noCursorTimeout);
     }
 
+    // We don't store the specified maxTimeMS or batch size values since they don't matter.
+    // Provide an arbitrary literal long here.
+    tassert(7973602,
+            "Serialization policy not supported - original values have been discarded",
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
     if (_hasField.maxTimeMS) {
-        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, _maxTimeMS);
+        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, 0ll);
     }
-
     if (_hasField.batchSize) {
-        opts.appendLiteral(
-            &bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(_batchSize));
+        opts.appendLiteral(&bob, FindCommandRequest::kBatchSizeFieldName, 0ll);
     }
+}
+std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* opCtx) const {
+    auto fcr =
+        static_cast<const query_shape::FindCmdShape*>(universalComponents()._queryShape.get())
+            ->toFindCommandRequest();
+    if (_components._hasField.readConcern)
+        fcr->setReadConcern(_components._shapifiedReadConcern);
+    if (_components._hasField.allowPartialResults)
+        fcr->setAllowPartialResults(_components._allowPartialResults);
+    if (_components._hasField.batchSize)
+        fcr->setBatchSize(1ll);
+    if (_components._hasField.maxTimeMS)
+        fcr->setMaxTimeMS(1ll);
+    return fcr;
 }
 }  // namespace mongo::query_stats

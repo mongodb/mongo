@@ -110,16 +110,37 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
  * vector of pairs that contain the cache key and a corresponding QueryStatsEntry. This ensures
  * that the partition mutex is only held for the duration of copying.
  */
-std::vector<std::pair<size_t, QueryStatsEntry>> copyPartition(
-    QueryStatsStore::Partition&& partition) {
-    std::vector<std::pair<size_t, QueryStatsEntry>> currKeyMetrics;
-    for (auto&& [key, metrics] : *partition) {
-        currKeyMetrics.push_back(std::make_pair(*key, QueryStatsEntry(*metrics)));
+std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& partition) {
+    // Note the intentional copy of QueryStatsEntry and intentional additional shared pointer
+    // reference to the key generator. This will give us a snapshot of all the metrics we want to
+    // report, and keep the keyGenerator around even if the entry gets evicted.
+    std::vector<QueryStatsEntry> currKeyMetrics;
+    for (auto&& [hash, metrics] : *partition) {
+        currKeyMetrics.push_back(metrics);
     }
     return currKeyMetrics;
 }
 
 }  // namespace
+
+BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
+    std::shared_ptr<const KeyGenerator> keyGenerator) const {
+    static const auto sha256HmacStringDataHasher = [](std::string key, const StringData& sd) {
+        auto hashed = SHA256Block::computeHmac(
+            (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
+        return hashed.toString();
+    };
+
+    auto opts = SerializationOptions{};
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    if (_algorithm == TransformAlgorithmEnum::kHmacSha256) {
+        opts.transformIdentifiers = true;
+        opts.transformIdentifiersCallback = [&](StringData sd) {
+            return sha256HmacStringDataHasher(_hmacKey, sd);
+        };
+    }
+    return keyGenerator->generate(pExpCtx->opCtx, opts);
+}
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
@@ -227,31 +248,33 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
 
-        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
         // We only keep the partition (which holds a lock) for the time needed to collect the key
         // and metric pairs
-        auto currKeyMetrics = copyPartition(std::move(partition));
+        auto currKeyMetrics = copyPartition(_queryStatsStore.getPartition(_currentPartition));
 
-        for (auto&& [key, metrics] : currKeyMetrics) {
+        for (auto&& metrics : currKeyMetrics) {
+            const auto& keyGenerator = metrics.keyGenerator;
+            const auto& hash = absl::HashOf(keyGenerator);
             try {
-                auto queryStatsKey =
-                    metrics.computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
+                auto queryStatsKey = computeQueryStatsKey(keyGenerator);
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics.toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
                 queryStatsHmacApplicationErrors.increment();
+                const auto queryShape = keyGenerator->universalComponents()._queryShape->toBson(
+                    pExpCtx->opCtx,
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = key,
-                            "representativeQueryShape"_attr =
-                                metrics.getRepresentativeQueryShapeForDebug());
+                            "hash"_attr = hash,
+                            "debugQueryShape"_attr = queryShape);
+
                 if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-                    auto keyString = std::to_string(key);
-                    auto queryShape = metrics.getRepresentativeQueryShapeForDebug();
+                    auto keyString = std::to_string(hash);
                     tasserted(7349401,
                               str::stream() << "Was not able to re-parse queryStats key when "
                                                "reading queryStats.Status "

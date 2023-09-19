@@ -115,7 +115,7 @@
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/agg_key_generator.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
@@ -1092,7 +1092,7 @@ Status runAggregate(OperationContext* opCtx,
                     auto&& [expCtx, pipeline] = parsePipeline(
                         *collatorToUse == nullptr ? nullptr : (*collatorToUse)->clone());
 
-                    return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    return std::make_unique<query_stats::AggKeyGenerator>(
                         request,
                         *pipeline,
                         expCtx,
@@ -1154,13 +1154,12 @@ Status runAggregate(OperationContext* opCtx,
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
             query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
-                return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request,
-                    *pipeline,
-                    expCtx,
-                    pipelineInvolvedNamespaces,
-                    request.getNamespace(),
-                    collectionType);
+                return std::make_unique<query_stats::AggKeyGenerator>(request,
+                                                                      *pipeline,
+                                                                      expCtx,
+                                                                      pipelineInvolvedNamespaces,
+                                                                      request.getNamespace(),
+                                                                      collectionType);
             });
         }
 

@@ -48,6 +48,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_cmd_shape.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/parsed_find_command.h"
@@ -78,8 +79,8 @@ QueryShapeConfiguration makeQueryShapeConfiguration(
         parsed_find_command::parse(expCtx, std::move(findCommandRequest));
     ASSERT_OK(parsedFindCommandResult);
     return QueryShapeConfiguration(
-        query_shape::hash(query_shape::extractQueryShape(
-            *parsedFindCommandResult.getValue(), SerializationOptions(), expCtx)),
+        std::make_unique<query_shape::FindCmdShape>(*parsedFindCommandResult.getValue(), expCtx)
+            ->sha256Hash(expCtx->opCtx),
         settings,
         query);
 }

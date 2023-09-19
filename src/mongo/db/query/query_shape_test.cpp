@@ -54,9 +54,9 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
-namespace {
+namespace mongo::query_shape {
 
+namespace {
 /**
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
@@ -64,18 +64,21 @@ std::string applyHmacForTest(StringData sd) {
     return "REDACT_" + sd.toString();
 }
 
-static const SerializationOptions literalAndFieldRedactOpts{
+static const SerializationOptions debugShapeWTransformedIdentifiers{
     LiteralSerializationPolicy::kToDebugTypeString, true, applyHmacForTest};
 
-
+BSONObj predicateShape(const MatchExpression* expr) {
+    return expr->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
+}
 BSONObj predicateShape(std::string filterJson) {
-    ParsedMatchExpressionForTest expr(filterJson);
-    return query_shape::debugPredicateShape(expr.get());
+    return predicateShape(ParsedMatchExpressionForTest(filterJson).get());
 }
 
+BSONObj predicateShapeRedacted(const MatchExpression* expr) {
+    return expr->serialize(debugShapeWTransformedIdentifiers);
+}
 BSONObj predicateShapeRedacted(std::string filterJson) {
-    ParsedMatchExpressionForTest expr(filterJson);
-    return query_shape::debugPredicateShape(expr.get(), applyHmacForTest);
+    return predicateShapeRedacted(ParsedMatchExpressionForTest(filterJson).get());
 }
 
 #define ASSERT_SHAPE_EQ_AUTO(expected, actual) \
@@ -84,7 +87,6 @@ BSONObj predicateShapeRedacted(std::string filterJson) {
 #define ASSERT_REDACTED_SHAPE_EQ_AUTO(expected, actual) \
     ASSERT_BSONOBJ_EQ_AUTO(expected, predicateShapeRedacted(actual))
 
-}  // namespace
 
 TEST(QueryPredicateShape, Equals) {
     ASSERT_SHAPE_EQ_AUTO(  // Implicit equals
@@ -177,14 +179,11 @@ TEST(QueryPredicateShape, Comparisons) {
 
 namespace {
 void assertShapeIs(std::string filterJson, BSONObj expectedShape) {
-    ParsedMatchExpressionForTest expr(filterJson);
-    ASSERT_BSONOBJ_EQ(expectedShape, query_shape::debugPredicateShape(expr.get()));
+    ASSERT_BSONOBJ_EQ(expectedShape, predicateShape(filterJson));
 }
 
 void assertRedactedShapeIs(std::string filterJson, BSONObj expectedShape) {
-    ParsedMatchExpressionForTest expr(filterJson);
-    ASSERT_BSONOBJ_EQ(expectedShape,
-                      query_shape::debugPredicateShape(expr.get(), applyHmacForTest));
+    ASSERT_BSONOBJ_EQ(expectedShape, predicateShapeRedacted(filterJson));
 }
 }  // namespace
 
@@ -391,7 +390,7 @@ TEST(QueryPredicateShape, NotMatchExpression) {
     // Test the special case where NotMatchExpression::serialize() reduces to $alwaysFalse.
     auto emptyAnd = std::make_unique<AndMatchExpression>();
     const MatchExpression& notExpr = NotMatchExpression(std::move(emptyAnd));
-    auto serialized = notExpr.serialize(literalAndFieldRedactOpts);
+    auto serialized = notExpr.serialize(debugShapeWTransformedIdentifiers);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$alwaysFalse":"?number"})",
         serialized);
@@ -415,14 +414,14 @@ TEST(QueryPredicateShape, TextMatchExpression) {
                 "$diacriticSensitive": "?bool"
             }
         })",
-        expr->serialize(literalAndFieldRedactOpts));
+        expr->serialize(debugShapeWTransformedIdentifiers));
 }
 
 TEST(QueryPredicateShape, TwoDPtInAnnulusExpression) {
     const MatchExpression& expr = TwoDPtInAnnulusExpression({}, {});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$TwoDPtInAnnulusExpression":true})",
-        expr.serialize(literalAndFieldRedactOpts));
+        expr.serialize(debugShapeWTransformedIdentifiers));
 }
 
 TEST(QueryPredicateShape, WhereMatchExpression) {
@@ -438,7 +437,7 @@ BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {
     // the computation on any MatchExpression, and this is the easiest way we can create this type
     // of MatchExpression node.
     auto optimized = MatchExpression::optimize(expr.release());
-    return query_shape::debugPredicateShape(optimized.get());
+    return predicateShape(optimized.get());
 }
 
 TEST(QueryPredicateShape, OptimizedExprPredicates) {
@@ -541,69 +540,6 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             ]
         })",
         queryShapeForOptimizedExprExpression("{$expr: {$gte: ['$a', 2]}}"));
-}
-
-TEST(SortPatternShape, NormalSortPattern) {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx = make_intrusive<ExpressionContextForTest>();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"a.b.c":1,"foo":-1})",
-        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"),
-                                      expCtx,
-                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
-}
-
-TEST(SortPatternShape, NaturalSortPattern) {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx = make_intrusive<ExpressionContextForTest>();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$natural: 1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: 1})"),
-                                      expCtx,
-                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$natural: -1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: -1})"),
-                                      expCtx,
-                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
-}
-
-TEST(SortPatternShape, NaturalSortPatternWithMeta) {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx = make_intrusive<ExpressionContextForTest>();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$natural: 1, x: '?object'})",
-        query_shape::extractSortShape(fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"),
-                                      expCtx,
-                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
-}
-
-TEST(SortPatternShape, MetaPatternWithoutNatural) {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx = make_intrusive<ExpressionContextForTest>();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"normal":1,"$computed1":{"$meta":"textScore"}})",
-        query_shape::extractSortShape(fromjson(R"({normal: 1, x: {$meta: "textScore"}})"),
-                                      expCtx,
-                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
-}
-
-// Here we have one test to ensure that the redaction policy is accepted and applied in the
-// query_shape utility, but there are more extensive redaction tests in sort_pattern_test.cpp
-TEST(SortPatternShape, RespectsRedactionPolicy) {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
-    opts.transformIdentifiers = true;
-    opts.transformIdentifiersCallback = applyHmacForTest;
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"REDACT_normal":1,"REDACT_y":1})",
-        query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
-
-    // No need to redact $natural.
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$natural":1,"REDACT_y":1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: 1, y: 1})"), expCtx, opts));
 }
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
@@ -759,5 +695,6 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
         })",
         parent.toBSON(options));
 }
+}  // namespace
 
-}  // namespace mongo
+}  // namespace mongo::query_shape
