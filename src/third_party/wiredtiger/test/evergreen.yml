@@ -608,7 +608,7 @@ functions:
         source venv/bin/activate
         pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0
         mkdir -p ../coverage_report
-        GCOV=/opt/mongodbtoolchain/v4/bin/gcov gcovr -r .. -f ../src -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' -e 'bench' -e 'examples' -e 'test' -e 'ext' -e 'dist' -e 'tools' -j 4 --html-self-contained --html-details ../coverage_report/2_coverage_report.html --json-summary-pretty --json-summary ../coverage_report/1_coverage_report_summary.json
+        GCOV=/opt/mongodbtoolchain/v4/bin/gcov gcovr -r .. -f ../src -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' -e 'bench' -e 'examples' -e 'test' -e 'ext' -e 'dist' -e 'tools' -j 4 --html-self-contained --html-details ../coverage_report/2_coverage_report.html --json-summary-pretty --json-summary ../coverage_report/1_coverage_report_summary.json --json ../coverage_report/full_coverage_report.json
         python3 ../test/evergreen/code_coverage_analysis.py -s ../coverage_report/1_coverage_report_summary.json -t ../time.txt
 
         # Generate Atlas compatible format report.
