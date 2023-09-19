@@ -91,9 +91,7 @@ public:
      * and returns it. If the database was not in cache, all the sharded collections will be in the
      * 'needsRefresh' state.
      */
-    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx,
-                                               StringData dbName,
-                                               bool allowLocks = false);
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
      * Blocking method to get the routing information for a specific collection at a given cluster
@@ -275,6 +273,13 @@ private:
 
         void _updateRefreshesStats(const bool isIncremental, const bool add);
     };
+
+    // Callers of this internal function that are passing allowLocks must handle allowLocks failures
+    // by checking for ErrorCodes::ShardCannotRefreshDueToLocksHeld and addint the full namespace to
+    // the exception.
+    StatusWith<CachedDatabaseInfo> _getDatabase(OperationContext* opCtx,
+                                                StringData dbName,
+                                                bool allowLocks = false);
 
     StatusWith<ChunkManager> _getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                          const NamespaceString& nss,
