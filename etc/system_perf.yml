@@ -14,9 +14,9 @@ parameters:
 variables:
   ###
   # Leave this section uncommented to enable compile.
-  #_real_compile_amazon2: &_compile_amazon2
-  #    - name: compile
-  #      variant: compile-amazon2
+  _real_compile_amazon2: &_compile_amazon2
+      - name: compile
+        variant: compile-amazon2
   _real_compile_rhel70: &_compile_rhel70
       - name: compile
         variant: compile-rhel70
