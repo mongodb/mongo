@@ -1321,7 +1321,7 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
  * corresponding sort key for that path.
  */
 std::unique_ptr<sbe::EExpression> generateSortTraverse(
-    boost::optional<sbe::EVariable> inputVar,
+    std::unique_ptr<sbe::EVariable> inputVar,
     bool isAscending,
     boost::optional<sbe::value::SlotId> collatorSlot,
     const FieldPath& fp,
@@ -1334,14 +1334,14 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
 
     tassert(8102001,
             "Expected either 'inputVar' or 'fieldSlot' to be defined",
-            inputVar.has_value() || fieldSlot.has_value());
+            inputVar || fieldSlot.has_value());
 
     StringData helperFn = isAscending ? "_internalLeast"_sd : "_internalGreatest"_sd;
 
     // Generate an expression to read a sub-field at the current nested level.
     auto fieldExpr = fieldSlot
         ? makeVariable(*fieldSlot)
-        : makeFunction("getField"_sd, inputVar->clone(), makeStrConstant(fp.getFieldName(level)));
+        : makeFunction("getField"_sd, std::move(inputVar), makeStrConstant(fp.getFieldName(level)));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
@@ -1372,14 +1372,14 @@ std::unique_ptr<sbe::EExpression> generateSortTraverse(
 
     // Prepare a lambda expression that will navigate to the next component of the field path.
     auto lambdaFrameId = frameIdGenerator->generate();
-    auto lambdaExpr =
-        sbe::makeE<sbe::ELocalLambda>(lambdaFrameId,
-                                      generateSortTraverse(sbe::EVariable{lambdaFrameId, 0},
-                                                           isAscending,
-                                                           collatorSlot,
-                                                           fp,
-                                                           level + 1,
-                                                           frameIdGenerator));
+    auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+        lambdaFrameId,
+        generateSortTraverse(std::make_unique<sbe::EVariable>(lambdaFrameId, 0),
+                             isAscending,
+                             collatorSlot,
+                             fp,
+                             level + 1,
+                             frameIdGenerator));
 
     // Generate the traverse expression for the current nested level.
     // Be sure to invoke the least/greatest fold expression only if the current nested level is an
@@ -1537,7 +1537,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 outputs.get(std::make_pair(PlanStageSlots::kField, part.fieldPath->getFieldName(0)))
                     .slotId;
 
-            std::unique_ptr<sbe::EExpression> sortExpr = generateSortTraverse(boost::none,
+            std::unique_ptr<sbe::EExpression> sortExpr = generateSortTraverse(nullptr,
                                                                               part.isAscending,
                                                                               collatorSlot,
                                                                               *part.fieldPath,

@@ -71,22 +71,7 @@ public:
      */
     using Vector = absl::InlinedVector<std::unique_ptr<EExpression>, 2>;
 
-    EExpression() noexcept = default;
-
     virtual ~EExpression() = default;
-
-    EExpression(EExpression&& other) noexcept : _nodes(std::move(other._nodes)) {}
-
-    EExpression(const EExpression&) = delete;
-
-    EExpression& operator=(EExpression&& other) noexcept {
-        if (this != &other) {
-            _nodes = std::move(other._nodes);
-        }
-        return *this;
-    }
-
-    EExpression& operator=(const EExpression&) = delete;
 
     /**
      * The idiomatic C++ pattern of object cloning. Expressions must be fully copyable as every

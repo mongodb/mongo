@@ -101,16 +101,8 @@ public:
         return isLocalVar() ? boost::make_optional(std::pair(*_frameId, _slotId)) : boost::none;
     }
 
-    sbe::EVariable getEVariable() const {
-        return _frameId ? sbe::EVariable(*_frameId, _slotId) : sbe::EVariable(_slotId);
-    }
-
     optimizer::ProjectionName getABTName() const {
         return _frameId ? getABTLocalVariableName(*_frameId, _slotId) : getABTVariableName(_slotId);
-    }
-
-    operator sbe::EVariable() const {
-        return getEVariable();
     }
 
     operator optimizer::ProjectionName() const {
