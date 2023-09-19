@@ -90,7 +90,8 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                                                     donorStateDoc.getId());
     if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
         MigrationProtocolEnum::kMultitenantMigrations) {
-        const auto tenantId = TenantId::parseFromString(donorStateDoc.getTenantId());
+        invariant(donorStateDoc.getTenantId());
+        const auto tenantId = TenantId::parseFromString(*donorStateDoc.getTenantId());
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
     } else {
         tassert(6448702,

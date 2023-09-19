@@ -619,10 +619,10 @@ DEATH_TEST_REGEX_F(RecoverAccessBlockerTest,
 }
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAbortingIndex) {
-    TenantMigrationDonorDocument donorDoc(kMigrationId,
-                                          kDefaultRecipientConnStr,
-                                          mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "");
+    TenantMigrationDonorDocument donorDoc(
+        kMigrationId,
+        kDefaultRecipientConnStr,
+        mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     donorDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
     donorDoc.setTenantIds(_tenantIds);
@@ -652,10 +652,10 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAbortingIndex) {
 }
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeDonorBlocking) {
-    TenantMigrationDonorDocument donorDoc(kMigrationId,
-                                          kDefaultRecipientConnStr,
-                                          mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "");
+    TenantMigrationDonorDocument donorDoc(
+        kMigrationId,
+        kDefaultRecipientConnStr,
+        mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     donorDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
     donorDoc.setTenantIds(_tenantIds);
@@ -693,10 +693,10 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorBlocking) {
 }
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeDonorCommitted) {
-    TenantMigrationDonorDocument donorDoc(kMigrationId,
-                                          kDefaultRecipientConnStr,
-                                          mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "");
+    TenantMigrationDonorDocument donorDoc(
+        kMigrationId,
+        kDefaultRecipientConnStr,
+        mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     donorDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
     donorDoc.setTenantIds(_tenantIds);
@@ -738,10 +738,10 @@ TEST_F(RecoverAccessBlockerTest, ShardMergeDonorCommitted) {
 }
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeDonorAborted) {
-    TenantMigrationDonorDocument donorDoc(kMigrationId,
-                                          kDefaultRecipientConnStr,
-                                          mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                          "");
+    TenantMigrationDonorDocument donorDoc(
+        kMigrationId,
+        kDefaultRecipientConnStr,
+        mongo::ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     donorDoc.setProtocol(MigrationProtocolEnum::kShardMerge);
     donorDoc.setTenantIds(_tenantIds);

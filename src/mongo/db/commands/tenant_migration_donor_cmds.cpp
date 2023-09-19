@@ -130,8 +130,8 @@ public:
             // tenantId will be set to empty string for the "shard merge" protocol.
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
-                                                  cmd.getReadPreference(),
-                                                  tenantId.value_or("").toString());
+                                                  cmd.getReadPreference());
+            stateDoc.setTenantId(tenantId);
             stateDoc.setTenantIds(tenantIds);
             stateDoc.setProtocol(migrationProtocol);
 

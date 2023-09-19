@@ -161,8 +161,8 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
     TenantMigrationDonorDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
-        kTenantId.toString());
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+    initialStateDocument.setTenantId(boost::make_optional<StringData>(kTenantId.toString()));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
 
     // Create and start the instance.

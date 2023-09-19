@@ -174,7 +174,7 @@ public:
         void onReceiveDonorForgetMigration();
 
         StringData getTenantId() const {
-            return _stateDoc.getTenantId();
+            return _tenantId;
         }
 
         StringData getRecipientConnectionString() const {

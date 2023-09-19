@@ -176,7 +176,8 @@ bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
     auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
     switch (protocol) {
         case MigrationProtocolEnum::kMultitenantMigrations: {
-            const auto tenantId = TenantId::parseFromString(doc.getTenantId());
+            invariant(doc.getTenantId());
+            const auto tenantId = TenantId::parseFromString(*doc.getTenantId());
             registry.add(tenantId, mtabVector.back());
         } break;
         case MigrationProtocolEnum::kShardMerge:
