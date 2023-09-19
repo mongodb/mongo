@@ -1,6 +1,6 @@
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
 
-MONGO_DEFAULT_COPTS = []
+MONGO_DEFAULT_COPTS = ["-Isrc"]
 
 def mongo_cc_library(
         name,
@@ -41,7 +41,5 @@ def mongo_cc_library(
         data = data,
         tags = tags,
         linkstatic = linkstatic,
-        includes = [
-            "src"
-        ]
+        includes = []
     )

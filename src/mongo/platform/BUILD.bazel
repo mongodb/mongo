@@ -12,6 +12,4 @@ mongo_cc_library(
     srcs=[
         "visibility_test_libcommon.cpp",
     ],
-    # Since Mongo's c++ files' #include directives are `src`-relative, we need to include `src` in the include path.
-    copts = ["-Isrc"],
 )

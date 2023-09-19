@@ -6,6 +6,4 @@ mongo_cc_library(
     name = "fsync_locked",
     srcs = ["fsync_locked.cpp"],
     hdrs = ["fsync_locked.h"],
-    # Since Mongo's c++ files' #include directives are `src`-relative, we need to include `src` in the include path.
-    copts = ["-Isrc"],
 )
