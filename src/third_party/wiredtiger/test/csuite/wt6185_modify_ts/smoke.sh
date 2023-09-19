@@ -20,4 +20,3 @@ fi
 
 $TEST_WRAPPER $test_bin
 $TEST_WRAPPER $test_bin -C
-

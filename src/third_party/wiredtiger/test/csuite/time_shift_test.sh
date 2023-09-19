@@ -22,7 +22,6 @@ RUN_OS=$(uname -s)
 CPU_SET=0-1
 echo "test read write lock for time shifting using libfaketime"
 
-
 # check for program arguements, if not present, print usage
 if [ -z $1 ]
 then
@@ -92,7 +91,7 @@ echo "-$DIFF1""s" >| ~/.faketimerc
 
 wait $PID
 
-#kept echo statement here so as not to loose in cluster of test msgs. 
+#kept echo statement here so as not to loose in cluster of test msgs.
 echo "after sleeping for 5 seconds set ~/.faketimerc value as -ve $DIFF1 seconds"
 rm ~/.faketimerc
 
@@ -104,7 +103,7 @@ fi
 SEC3=`date +%s`
 DIFF2=$((SEC3 - SEC2))
 
-PERC=$((((DIFF2 - DIFF1)*100)/DIFF1)) 
+PERC=$((((DIFF2 - DIFF1)*100)/DIFF1))
 echo "execution time difference : $PERC %, less than 20% is ok"
 echo "normal execution time : $DIFF1 seconds"
 echo "fake time reduction by : $DIFF1 seconds"

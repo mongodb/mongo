@@ -6,7 +6,7 @@
 # each wtperf test several times.  We throw away the min and max
 # number and average the remaining values.  That is the number we
 # give to Jenkins for plotting.  We write these values to a
-# test.average file in the current directory (which is 
+# test.average file in the current directory (which is
 # build_posix/bench/wtperf).
 #
 # This script should be invoked with the pathname of the wtperf test

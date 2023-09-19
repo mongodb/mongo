@@ -24,7 +24,6 @@ fi
 backup=$home.backup
 recovery=$home.recovery
 
-
 #./t -t r -W 3 -D -X -n 100000 -k 100000 -C cache_size=100MB -h $home > $home.out 2>&1 &
 ./${bin} ${config} -h ${home} > $home.out 2>&1 &
 pid=$!

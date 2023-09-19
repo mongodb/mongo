@@ -263,7 +263,6 @@ cd $format_bin_dir || exit 1
 [[ -x ${format_binary##* } ]] ||
 	fatal_msg "format program \"${format_binary##* }\" not found"
 
-
 # Find the wt binary (required for abort/recovery testing).
 wt_binary="../../wt"
 [[ -x $wt_binary ]] ||

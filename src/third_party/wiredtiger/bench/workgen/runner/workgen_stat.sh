@@ -8,7 +8,7 @@ Usage: $0 [ options ]
 Options:
     -h <WT_home_directory>     # set the WiredTiger home directory
     -e <analyzer_name>         # run analyzer on the combined files
-    -o <output_file>           # output file for result 
+    -o <output_file>           # output file for result
 
 At least one of '-t2' or '-o' must be selected.
 EOF

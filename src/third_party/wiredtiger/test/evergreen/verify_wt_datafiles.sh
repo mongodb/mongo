@@ -103,4 +103,4 @@ fi
 
 # If reaching here, the testing result is positive
 echo -e "\nAll data files under 'WT_TEST' directories are verified successfully!"
-exit 0 
+exit 0

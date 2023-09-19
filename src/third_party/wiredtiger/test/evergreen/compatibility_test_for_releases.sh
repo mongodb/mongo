@@ -70,7 +70,6 @@ build_branch()
     echo "Building branch: \"$1\""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-
     # Check if the branch directory exists, if not then clone
     if [ ! -d "$1" ]; then
         git clone --quiet https://github.com/wiredtiger/wiredtiger.git "$1"

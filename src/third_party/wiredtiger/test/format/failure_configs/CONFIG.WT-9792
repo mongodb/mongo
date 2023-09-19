@@ -154,4 +154,3 @@ table3.ops.truncate=1
 table3.runs.mirror=0
 table3.runs.source=table
 table3.runs.type=row-store
-

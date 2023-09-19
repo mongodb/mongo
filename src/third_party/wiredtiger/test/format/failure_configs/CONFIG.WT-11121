@@ -204,4 +204,3 @@ table5.ops.pct.write=0
 table5.ops.truncate=1
 table5.runs.source=table
 table5.runs.type=row-store
-

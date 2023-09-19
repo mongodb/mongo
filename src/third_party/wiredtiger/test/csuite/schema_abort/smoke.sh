@@ -4,7 +4,6 @@ set -e
 
 # Smoke-test schema-abort as part of running "make check".
 
-
 if [ -n "$1" ]
 then
     # If the test binary is passed in manually.

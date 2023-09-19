@@ -1,7 +1,7 @@
 #!/bin/sh
 set -o errexit
 
-# Install dependencies for the GCP SDK. This method is being used instead of having them installed 
+# Install dependencies for the GCP SDK. This method is being used instead of having them installed
 # on system to reduce any versioning problems in the future if the GCP SDK requirements were to
 # change. The installation of the libraries were followed from GCP SDK's documentation:
 # https://github.com/googleapis/google-cloud-cpp/blob/main/doc/packaging.md
