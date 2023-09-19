@@ -965,15 +965,18 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
             return wildcardSpecStatus;
         }
     } else if (pluginName == IndexNames::COLUMN) {
+        // Be careful to only read the FCV one time to avoid race conditions.
+        auto fcv = serverGlobalParams.featureCompatibility.getVersionMustVerifyInitialized();
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << pluginName
                               << " indexes are under development and cannot be used without "
                                  "enabling the feature flag",
                 // With our testing failpoint we may try to run this code before we've initialized
-                // the FCV.
-                !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                // the FCV. We also relax this check when a secondary is initial syncing, which may
+                // temporarily unset the FCV. In this case, the primary should have already checked
+                // that the feature flag is enabled.
+                fcv == multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior ||
+                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabledOnVersion(fcv));
         if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
             !columnSpecStatus.isOK()) {
             return columnSpecStatus;
