@@ -96,7 +96,13 @@ public:
             return false;
         }
 
-        void doCheckAuthorization(OperationContext*) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
+        }
 
         /**
          * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".
