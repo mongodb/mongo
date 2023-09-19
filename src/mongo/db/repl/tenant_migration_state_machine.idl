@@ -98,6 +98,7 @@ structs:
                 type: string
                 description: >-
                     The tenantId for the migration, when protocol is 'multitenant migrations'.
+                optional: true
             state:
                 type: TenantMigrationDonorState
                 description: "The state of the tenant migration."

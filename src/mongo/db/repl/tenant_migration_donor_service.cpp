@@ -292,7 +292,8 @@ void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
                 existingIsAborted);
 
         // Any existing migration for this tenant must be aborted and garbage-collectable.
-        if (existingTypedInstance->getTenantId() == stateDoc.getTenantId()) {
+        if (stateDoc.getTenantId() &&
+            existingTypedInstance->getTenantId() == *stateDoc.getTenantId()) {
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "tenant " << stateDoc.getTenantId() << " is already migrating",
                     existingIsAborted);
@@ -391,7 +392,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _instanceName(kServiceName + "-" + _stateDoc.getId().toString()),
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))),
-      _tenantId(_stateDoc.getTenantId()),
+      _tenantId(_stateDoc.getTenantId() ? *_stateDoc.getTenantId() : ""),
       _tenantIds(_stateDoc.getTenantIds() ? *_stateDoc.getTenantIds() : std::vector<TenantId>()),
       _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _recipientConnectionString(_stateDoc.getRecipientConnectionString()),
@@ -491,7 +492,8 @@ void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj
                 invariant(stateDoc.getTenantIds());
                 return *stateDoc.getTenantIds() == _tenantIds;
             case MigrationProtocolEnum::kMultitenantMigrations:
-                return stateDoc.getTenantId() == _tenantId;
+                invariant(stateDoc.getTenantId());
+                return *stateDoc.getTenantId() == _tenantId;
         }
         MONGO_UNREACHABLE;
     };
