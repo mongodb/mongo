@@ -128,7 +128,7 @@ public:
     /**
      * Move constructor to enable storing cursors in vectors.
      */
-    TaskExecutorCursor(TaskExecutorCursor&& other);
+    TaskExecutorCursor(TaskExecutorCursor&& other) noexcept;
 
     /**
      * Asynchronously kills async ops and kills the underlying cursor on destruction.

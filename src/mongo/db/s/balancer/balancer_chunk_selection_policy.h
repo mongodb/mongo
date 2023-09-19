@@ -55,8 +55,7 @@ class BalancerChunkSelectionPolicy {
     BalancerChunkSelectionPolicy& operator=(const BalancerChunkSelectionPolicy&) = delete;
 
 public:
-    BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats);
-    ~BalancerChunkSelectionPolicy();
+    explicit BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats);
 
     /**
      * Potentially blocking method, which gives out a set of chunks, which need to be split because

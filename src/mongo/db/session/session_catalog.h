@@ -295,9 +295,10 @@ public:
         }
     }
 
-    ScopedCheckedOutSession(ScopedCheckedOutSession&& other)
+    ScopedCheckedOutSession(ScopedCheckedOutSession&& other) noexcept
         : _catalog(other._catalog),
-          _clientTxnNumberStartedAndProvenance(other._clientTxnNumberStartedAndProvenance),
+          _clientTxnNumberStartedAndProvenance(
+              std::move(other._clientTxnNumberStartedAndProvenance)),
           _sri(other._sri),
           _session(other._session),
           _killToken(std::move(other._killToken)) {

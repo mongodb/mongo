@@ -324,8 +324,6 @@ void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
 BalancerChunkSelectionPolicy::BalancerChunkSelectionPolicy(ClusterStatistics* clusterStats)
     : _clusterStats(clusterStats) {}
 
-BalancerChunkSelectionPolicy::~BalancerChunkSelectionPolicy() = default;
-
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::selectChunksToSplit(
     OperationContext* opCtx) {
     auto shardStatsStatus = _clusterStats->getStats(opCtx);

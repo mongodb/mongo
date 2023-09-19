@@ -77,10 +77,6 @@ const auto shardingLogging = ServiceContext::declareDecoration<ShardingLogging>(
 
 }  // namespace
 
-ShardingLogging::ShardingLogging() = default;
-
-ShardingLogging::~ShardingLogging() = default;
-
 ShardingLogging* ShardingLogging::get(ServiceContext* serviceContext) {
     return &shardingLogging(serviceContext);
 }

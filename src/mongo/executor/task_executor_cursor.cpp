@@ -93,12 +93,12 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
     _processResponse(rcr.opCtx, std::move(response));
 }
 
-TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
+TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other) noexcept
     : _executor(std::move(other._executor)),
       _underlyingExecutor(std::move(other._underlyingExecutor)),
-      _rcr(other._rcr),
+      _rcr(other._rcr),  // NOLINT
       _options(std::move(other._options)),
-      _lsid(other._lsid),
+      _lsid(other._lsid),  // NOLINT
       _cmdState(std::move(other._cmdState)),
       _cursorId(other._cursorId),
       _millisecondsWaiting(other._millisecondsWaiting),

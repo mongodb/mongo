@@ -48,11 +48,7 @@ namespace mongo {
  * Diagnostic logging of sharding metadata events (changelog and actionlog).
  */
 class ShardingLogging {
-
 public:
-    ShardingLogging();
-    ~ShardingLogging();
-
     /**
      * Retrieves the ShardingLogging instance associated with the current service/operation context.
      */
