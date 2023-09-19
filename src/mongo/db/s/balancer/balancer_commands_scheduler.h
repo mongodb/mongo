@@ -62,6 +62,9 @@ public:
      */
     virtual void stop() = 0;
 
+    virtual void disableBalancerForCollection(OperationContext* opCtx,
+                                              const NamespaceString& nss) = 0;
+
     virtual SemiFuture<void> requestMergeChunks(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const ShardId& shardId,

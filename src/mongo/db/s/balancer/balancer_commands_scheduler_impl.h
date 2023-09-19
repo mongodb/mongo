@@ -36,6 +36,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/merge_chunk_request_gen.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -111,6 +112,10 @@ private:
     boost::optional<ExternalClientInfo> _clientInfo;
 };
 
+/**
+ * Set of command-specific subclasses of CommandInfo.
+ */
+
 class MoveRangeCommandInfo : public CommandInfo {
 public:
     MoveRangeCommandInfo(const ShardsvrMoveRange& request,
@@ -137,9 +142,32 @@ private:
     const WriteConcernOptions _wc;
 };
 
-/**
- * Set of command-specific subclasses of CommandInfo.
- */
+class DisableBalancerCommandInfo : public CommandInfo {
+public:
+    DisableBalancerCommandInfo(const NamespaceString& nss, const ShardId& shardId)
+        : CommandInfo(shardId, nss, boost::none) {}
+
+    BSONObj serialise() const override {
+        BSONObjBuilder updateCmd;
+        updateCmd.append("$set", BSON("noBalance" << true));
+
+        const auto updateOp = BatchedCommandRequest::buildUpdateOp(
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(getNameSpace())) /* query */,
+            updateCmd.obj() /* update */,
+            false /* upsert */,
+            false /* multi */);
+        BSONObjBuilder cmdObj(updateOp.toBSON());
+        cmdObj.append(WriteConcernOptions::kWriteConcernField,
+                      WriteConcernOptions::kInternalWriteDefault);
+        return cmdObj.obj();
+    }
+
+    std::string getTargetDb() const override {
+        return DatabaseName::kConfig.toString();
+    }
+};
 
 class MergeChunksCommandInfo : public CommandInfo {
 public:
@@ -360,6 +388,8 @@ public:
     void start(OperationContext* opCtx) override;
 
     void stop() override;
+
+    void disableBalancerForCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
     SemiFuture<void> requestMoveRange(OperationContext* opCtx,
                                       const ShardsvrMoveRange& request,

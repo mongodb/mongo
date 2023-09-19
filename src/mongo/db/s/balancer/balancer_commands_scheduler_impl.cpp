@@ -148,6 +148,17 @@ void BalancerCommandsSchedulerImpl::stop() {
     _workerThreadHandle.join();
 }
 
+void BalancerCommandsSchedulerImpl::disableBalancerForCollection(OperationContext* opCtx,
+                                                                 const NamespaceString& nss) {
+    auto commandInfo = std::make_shared<DisableBalancerCommandInfo>(nss, ShardId::kConfigServerId);
+
+    _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
+        })
+        .getAsync([](auto) {});
+}
+
 SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveRange(
     OperationContext* opCtx,
     const ShardsvrMoveRange& request,
