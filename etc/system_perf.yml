@@ -567,8 +567,17 @@ tasks:
     priority: 5
     commands:
       - func: f_generate_all_variant_auto_tasks
+  - name: schedule_global_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: all_tasks
   - name: schedule_patch_auto_tasks
     priority: 5
+    depends_on:
+      - name: schedule_global_auto_tasks
+        variant: task_generation
     commands:
       - func: f_schedule_tasks
         vars:
@@ -1750,8 +1759,8 @@ tasks:
 
 buildvariants:
   - name: task_generation
-    activate: true
     display_name: Task Generation
+    cron: "0 0 1 1 *"  # Every year starting 1/1 at 00:00
     modules: *modules
     expansions:
       platform: linux
@@ -1760,6 +1769,8 @@ buildvariants:
       - amazon2-small
     tasks:
       - name: generate_all_variant_auto_tasks
+        activate: true
+      - name: schedule_global_auto_tasks
 
   - &compile-amazon2
     name: compile-amazon2
