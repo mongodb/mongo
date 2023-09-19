@@ -94,15 +94,20 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     const auto shardKeyIdx =
         findShardKeyPrefixedIndex(opCtx, collection, keyPattern, /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
-        LOGV2_ERROR(
-            23765, "Unable to find shard key index", "keyPattern"_attr = keyPattern, logAttrs(nss));
+        // Do not log that the shard key is missing for hashed shard key patterns.
+        if (!ShardKeyPattern::isHashedPatternEl(keyPattern.firstElement())) {
+            LOGV2_ERROR(23765,
+                        "Unable to find range shard key index",
+                        "keyPattern"_attr = keyPattern,
+                        logAttrs(nss));
 
-        // When a shard key index is not found, the range deleter gets stuck and indefinitely logs
-        // an error message. This sleep is aimed at avoiding logging too aggressively in order to
-        // prevent log files to increase too much in size.
-        opCtx->sleepFor(Seconds(5));
+            // When a shard key index is not found, the range deleter moves the task to the bottom
+            // of the range deletion queue. This sleep is aimed at avoiding logging too aggressively
+            // in order to prevent log files to increase too much in size.
+            opCtx->sleepFor(Seconds(5));
+        }
 
-        uasserted(ErrorCodes::IndexNotFound,
+        iasserted(ErrorCodes::IndexNotFound,
                   str::stream() << "Unable to find shard key index"
                                 << " for " << nss.ns() << " and key pattern `"
                                 << keyPattern.toString() << "'");
@@ -409,6 +414,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
             if (errorCode ==
                     ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
                 errorCode == ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
+                errorCode == ErrorCodes::IndexNotFound ||
                 errorCode == ErrorCodes::KeyPatternShorterThanBound ||
                 ErrorCodes::isShutdownError(errorCode) ||
                 ErrorCodes::isNotPrimaryError(errorCode) ||
