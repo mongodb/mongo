@@ -310,7 +310,8 @@ functions:
           python -m pip install "poetry==1.5.1"
           # See BF-29897 / https://github.com/python-poetry/poetry/issues/7584
           poetry config installer.max-workers 10
-          python -m poetry install --no-root --sync
+          # Trying poetry install due to https://github.com/python-poetry/poetry/issues/7611
+          python -m poetry install --no-root --sync || python -m poetry install --no-root --sync
     - command: expansions.write
       params:
          file: expansions.yml
