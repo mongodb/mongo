@@ -38,11 +38,101 @@ Stream& streamInsertionImpl(Stream& s, const DeblockedTagVals& deblocked) {
     }
     return s;
 }
+
 std::ostream& operator<<(std::ostream& stream, const DeblockedTagVals& vals) {
     return streamInsertionImpl(stream, vals);
 }
+
 str::stream& operator<<(str::stream& stream, const DeblockedTagVals& vals) {
     return streamInsertionImpl(stream, vals);
+}
+
+void DeblockedTagValStorage::copyValuesFrom(const DeblockedTagValStorage& other) {
+    if (other.owned) {
+        owned = true;
+        tags.reserve(other.tags.size());
+        vals.reserve(other.vals.size());
+
+        for (size_t i = 0; i < other.tags.size(); ++i) {
+            auto [cpyTag, cpyVal] = copyValue(other.tags[i], other.vals[i]);
+            tags.push_back(cpyTag);
+            vals.push_back(cpyVal);
+        }
+    } else {
+        owned = false;
+        tags = other.tags;
+        vals = other.vals;
+    }
+}
+
+void DeblockedTagValStorage::release() {
+    if (owned) {
+        owned = false;
+        for (size_t i = 0; i < tags.size(); ++i) {
+            releaseValue(tags[i], vals[i]);
+        }
+    }
+}
+
+std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) const {
+    return defaultMapImpl(op);
+}
+
+std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) const {
+    boost::optional<DeblockedTagValStorage> st;
+    auto extracted = deblock(st);
+
+    if (extracted.count == 0) {
+        return std::make_unique<HeterogeneousBlock>();
+    }
+
+    std::vector<TypeTags> tags(extracted.count, TypeTags::Nothing);
+    std::vector<Value> vals(extracted.count, Value{0u});
+
+    op.processBatch(extracted.tags, extracted.vals, tags.data(), vals.data(), extracted.count);
+
+    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
+}
+
+std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) const {
+    auto outBlock = std::make_unique<HeterogeneousBlock>();
+
+    size_t numElems = _vals.size();
+
+    if (numElems > 0) {
+        const TypeTags* inTags = _tags.data();
+        const Value* inVals = _vals.data();
+
+        outBlock->_tags.resize(numElems, TypeTags::Nothing);
+        outBlock->_vals.resize(numElems, Value{0u});
+
+        TypeTags* outTags = outBlock->_tags.data();
+        Value* outVals = outBlock->_vals.data();
+
+        op.processBatch(inTags, inVals, outTags, outVals, numElems);
+    }
+
+    return outBlock;
+}
+
+void HeterogeneousBlock::push_back(TypeTags t, Value v) {
+    constexpr auto maxSizeT = std::numeric_limits<size_t>::max();
+
+    ValueGuard guard(t, v);
+
+    size_t cap = std::min<size_t>(_vals.capacity(), _tags.capacity());
+    if (_vals.size() == cap) {
+        size_t newCap = cap < maxSizeT / 2 ? (cap ? cap * 2 : 1) : maxSizeT;
+        newCap = std::max<size_t>(newCap, cap + 1);
+
+        _vals.reserve(newCap);
+        _tags.reserve(newCap);
+    }
+
+    _vals.push_back(v);
+    _tags.push_back(t);
+
+    guard.reset();
 }
 
 }  // namespace mongo::sbe::value

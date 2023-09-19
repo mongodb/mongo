@@ -100,18 +100,15 @@ public:
     // them until we have one.
     TsBlock(const TsBlock& other) = delete;
     TsBlock(TsBlock&& other) = delete;
-    TsBlock& operator=(const TsBlock& other) = delete;
-    TsBlock& operator=(TsBlock&& other) = delete;
 
     ~TsBlock() override;
 
     std::unique_ptr<ValueBlock> clone() const override;
 
-    DeblockedTagVals extract() override {
-        // Lazily deblocks the values, meaning that each value in this block is decoded into a
-        // separate tag and val pair so that it can be processed as a separate unit of value.
-        ensureDeblocked();
-        return {_deblockedTags.size(), &_deblockedTags[0], &_deblockedVals[0]};
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override {
+        ensureDeblocked(storage);
+
+        return DeblockedTagVals{storage->vals.size(), storage->tags.data(), storage->vals.data()};
     }
 
     boost::optional<size_t> tryCount() const override {
@@ -119,15 +116,18 @@ public:
     }
 
 private:
-    void ensureDeblocked() {
-        if (_deblockedTags.empty()) {
-            _deblockedTags.reserve(_count);
-            _deblockedVals.reserve(_count);
+    void ensureDeblocked(boost::optional<DeblockedTagValStorage>& storage) const {
+        if (!storage) {
+            storage = DeblockedTagValStorage{};
+
+            storage->owned = true;
+            storage->tags.reserve(_count);
+            storage->vals.reserve(_count);
 
             if (_blockTag == TypeTags::bsonObject) {
-                deblockFromBsonObj();
+                deblockFromBsonObj(storage->tags, storage->vals);
             } else {
-                deblockFromBsonColumn();
+                deblockFromBsonColumn(storage->tags, storage->vals);
             }
         }
     }
@@ -135,12 +135,14 @@ private:
     /**
      * Deblocks the values from a BSON object block.
      */
-    void deblockFromBsonObj();
+    void deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
+                            std::vector<Value>& deblockedVals) const;
 
     /**
      * Deblocks the values from a BSON column block.
      */
-    void deblockFromBsonColumn();
+    void deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
+                               std::vector<Value>& deblockedVals) const;
 
     // TsBlock owned by the TsCellBlock which in turn is owned by the TsBucketToCellBlockStage can
     // be in a special unowned state of '_blockVal', where it is merely a view on the BSON provided
@@ -156,11 +158,6 @@ private:
 
     // The number of values in this block.
     size_t _count;
-
-    // Deblocked values may be examined on tags only for certain column operations, so we have two
-    // separate vectors for tags and vals to facilitate such operations.
-    std::vector<TypeTags> _deblockedTags;
-    std::vector<Value> _deblockedVals;
 };
 
 /**

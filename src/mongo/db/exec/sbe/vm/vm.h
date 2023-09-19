@@ -1360,6 +1360,8 @@ class ByteCode {
     static_assert(std::is_trivially_copyable_v<FastTuple<bool, value::TypeTags, value::Value>>);
 
 public:
+    struct InvokeLambdaFunctor;
+
     ByteCode() {
         _argStack = reinterpret_cast<uint8_t*>(mongoMalloc(sizeOfElement * 4));
         _argStackEnd = _argStack + sizeOfElement * 4;
@@ -2136,6 +2138,26 @@ private:
 
     // Expression execution stack of (owned, tag, value) tuples each of 'sizeOfElement' bytes.
     uint8_t* _argStack{nullptr};
+};
+
+struct ByteCode::InvokeLambdaFunctor {
+    InvokeLambdaFunctor(ByteCode& bytecode, const CodeFragment* code, int64_t lamPos)
+        : bytecode(bytecode), code(code), lamPos(lamPos) {}
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        // Invoke the lambda.
+        bytecode.pushStack(false, tag, val);
+        bytecode.runLambdaInternal(code, lamPos);
+        // Move the result off the stack, make sure it's owned, and return it.
+        auto result = bytecode.moveOwnedFromStack(0);
+        bytecode.popStack();
+        return result;
+    }
+
+    ByteCode& bytecode;
+    const CodeFragment* const code;
+    const int64_t lamPos;
 };
 }  // namespace vm
 }  // namespace sbe

@@ -166,14 +166,10 @@ TsBlock::~TsBlock() {
         // The underlying buffer is owned by this TsBlock and so this releases it.
         releaseValue(_blockTag, _blockVal);
     }
-
-    // Deblocked values are owned by this TsBlock and so this releases them.
-    for (size_t i = 0; i < _deblockedTags.size(); ++i) {
-        releaseValue(_deblockedTags[i], _deblockedVals[i]);
-    }
 }
 
-void TsBlock::deblockFromBsonObj() {
+void TsBlock::deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
+                                 std::vector<Value>& deblockedVals) const {
     ObjectEnumerator enumerator(TypeTags::bsonObject, _blockVal);
     for (size_t i = 0; i < _count; ++i) {
         auto [tag, val] = [&] {
@@ -196,13 +192,14 @@ void TsBlock::deblockFromBsonObj() {
         }();
 
         ValueGuard guard(tag, val);
-        _deblockedTags.push_back(tag);
-        _deblockedVals.push_back(val);
+        deblockedTags.push_back(tag);
+        deblockedVals.push_back(val);
         guard.reset();
     }
 }
 
-void TsBlock::deblockFromBsonColumn() {
+void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
+                                    std::vector<Value>& deblockedVals) const {
     tassert(7796401,
             "Invalid BinDataType for BSONColumn",
             getBSONBinDataSubtype(TypeTags::bsonBinData, _blockVal) == BinDataType::Column);
@@ -218,8 +215,8 @@ void TsBlock::deblockFromBsonColumn() {
         ++it;
 
         ValueGuard guard(tag, val);
-        _deblockedTags.push_back(tag);
-        _deblockedVals.push_back(val);
+        deblockedTags.push_back(tag);
+        deblockedVals.push_back(val);
         guard.reset();
     }
 }
@@ -231,19 +228,9 @@ std::unique_ptr<ValueBlock> TsBlock::clone() const {
     auto cpy = std::make_unique<TsBlock>(_count, /*owned*/ true, cpyTag, cpyVal);
     guard.reset();
 
-    if (!_deblockedTags.empty()) {
-        // If the block has been deblocked, then we need to copy the deblocked values too to
-        // avoid deblocking overhead again. The new copy must own the copied deblocked values.
-        cpy->_deblockedTags.reserve(_deblockedTags.size());
-        cpy->_deblockedVals.reserve(_deblockedVals.size());
-        for (size_t i = 0; i < _deblockedTags.size(); ++i) {
-            auto [cpyTag, cpyVal] = copyValue(_deblockedTags[i], _deblockedVals[i]);
-            ValueGuard deblockedValueGuard(cpyTag, cpyVal);
-            cpy->_deblockedTags.push_back(cpyTag);
-            cpy->_deblockedVals.push_back(cpyVal);
-            deblockedValueGuard.reset();
-        }
-    }
+    // If the block has been deblocked, then we need to copy the deblocked values too to
+    // avoid deblocking overhead again.
+    cpy->_deblockedStorage = _deblockedStorage;
 
     return cpy;
 }

@@ -34,11 +34,87 @@
 #include <memory>
 
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+#include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::value {
-struct DeblockedTagVals;
+/**
+ * Deblocked tags and values for a ValueBlock.
+ *
+ * Note: Deblocked values are read-only and must not be modified.
+ */
+struct DeblockedTagVals {
+    // 'tags' and 'vals' point to an array of 'count' elements respectively.
+    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
+        : count(count), tags(tags), vals(vals) {
+        tassert(7949501, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
+    }
+
+    std::pair<TypeTags, Value> operator[](size_t idx) const {
+        return {tags[idx], vals[idx]};
+    }
+
+    const size_t count;
+    const TypeTags* const tags;
+    const Value* const vals;
+};
+
+std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked);
+str::stream& operator<<(str::stream& str, const DeblockedTagVals& deblocked);
+
+struct DeblockedTagValStorage {
+    DeblockedTagValStorage() = default;
+
+    DeblockedTagValStorage(const DeblockedTagValStorage& other) {
+        copyValuesFrom(other);
+    }
+
+    DeblockedTagValStorage(DeblockedTagValStorage&& other)
+        : tags(std::move(other.tags)), vals(std::move(other.vals)), owned(other.owned) {
+        other.tags = {};
+        other.vals = {};
+        other.owned = false;
+    }
+
+    ~DeblockedTagValStorage() {
+        release();
+    }
+
+    DeblockedTagValStorage& operator=(const DeblockedTagValStorage& other) {
+        if (this != &other) {
+            release();
+
+            tags.clear();
+            vals.clear();
+            copyValuesFrom(other);
+        }
+        return *this;
+    }
+
+    DeblockedTagValStorage& operator=(DeblockedTagValStorage&& other) {
+        if (this != &other) {
+            release();
+
+            tags = std::move(other.tags);
+            vals = std::move(other.vals);
+            owned = other.owned;
+
+            other.tags = {};
+            other.vals = {};
+            other.owned = false;
+        }
+        return *this;
+    }
+
+    void copyValuesFrom(const DeblockedTagValStorage& other);
+
+    void release();
+
+    std::vector<TypeTags> tags;
+    std::vector<Value> vals;
+    bool owned{false};
+};
 
 /**
  * Interface for accessing a sequence of SBE Values independent of their backing storage.
@@ -48,7 +124,22 @@ struct DeblockedTagVals;
  * underlying format or take advantage of precomputed summaries.
  */
 struct ValueBlock {
+    ValueBlock() = default;
+
+    // When copy-constructing a ValueBlock, if o's deblocked storage is owned then we will copy it.
+    // If o's deblocked storage is not owned, then it's not permissible for this block to copy it
+    // (because the deblocked storage contains views of SBE values whose lifetimes are not managed
+    // this ValueBlock), so we ignore it.
+    ValueBlock(const ValueBlock& o)
+        : _deblockedStorage(o._deblockedStorage && o._deblockedStorage->owned ? o._deblockedStorage
+                                                                              : boost::none) {}
+
+    ValueBlock(ValueBlock&&) = default;
+
     virtual ~ValueBlock() = default;
+
+    ValueBlock& operator=(const ValueBlock&) = delete;
+    ValueBlock& operator=(ValueBlock&&) = delete;
 
     /**
      * Returns the unowned deblocked values. The return value is only valid as long as the block
@@ -56,7 +147,9 @@ struct ValueBlock {
      * number of values as the count() of this block. The 'DeblockedTagVals.count' must always be
      * equal to this block's count().
      */
-    virtual DeblockedTagVals extract() = 0;
+    DeblockedTagVals extract() {
+        return deblock(_deblockedStorage);
+    }
 
     /**
      * Returns a copy of this block.
@@ -67,30 +160,16 @@ struct ValueBlock {
      * Returns the number of values in this block in O(1) time, otherwise returns boost::none.
      */
     virtual boost::optional<size_t> tryCount() const = 0;
+
+    virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op) const;
+
+protected:
+    virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const = 0;
+
+    std::unique_ptr<ValueBlock> defaultMapImpl(const ColumnOp& op) const;
+
+    boost::optional<DeblockedTagValStorage> _deblockedStorage;
 };
-
-/**
- * Deblocked tags and values for a ValueBlock.
- *
- * Note: Deblocked values are read-only and must not be modified.
- */
-struct DeblockedTagVals {
-    // 'tags' and 'vals' point to an array of 'count' elements respectively.
-    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
-        : count(count), tags(tags), vals(vals) {
-        tassert(7888701, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
-    }
-
-    std::pair<TypeTags, Value> operator[](size_t idx) const {
-        return {tags[idx], vals[idx]};
-    }
-
-    size_t count;
-    const TypeTags* tags;
-    const Value* vals;
-};
-std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked);
-str::stream& operator<<(str::stream& str, const DeblockedTagVals& deblocked);
 
 /**
  * A block that is a run of repeated values.
@@ -99,17 +178,19 @@ class MonoBlock final : public ValueBlock {
 public:
     MonoBlock(size_t count, TypeTags tag, Value val) : _count(count) {
         tassert(7962102, "The number of values must be > 0", count > 0);
-        std::tie(_tag, _val) = value::copyValue(tag, val);
+        std::tie(_tag, _val) = copyValue(tag, val);
     }
-    MonoBlock(const MonoBlock& o) : _count(o._count) {
-        std::tie(_tag, _val) = value::copyValue(o._tag, o._val);
+
+    MonoBlock(const MonoBlock& o) : ValueBlock(o), _count(o._count) {
+        std::tie(_tag, _val) = copyValue(o._tag, o._val);
     }
-    MonoBlock(MonoBlock&& o) : _tag(o._tag), _val(o._val), _count(o._count) {
+
+    MonoBlock(MonoBlock&& o)
+        : ValueBlock(std::move(o)), _tag(o._tag), _val(o._val), _count(o._count) {
         o._tag = TypeTags::Nothing;
         o._val = 0;
     }
-    MonoBlock& operator=(const MonoBlock&) = delete;
-    MonoBlock& operator=(MonoBlock&&) = delete;
+
     ~MonoBlock() {
         releaseValue(_tag, _val);
     }
@@ -118,17 +199,28 @@ public:
         return std::make_unique<MonoBlock>(*this);
     }
 
-    DeblockedTagVals extract() override {
-        if (_deblockedTags.size() != _count) {
-            _deblockedTags.resize(_count, _tag);
-            _deblockedVals.resize(_count, _val);
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override {
+        if (!storage) {
+            storage = DeblockedTagValStorage{};
         }
 
-        return {_count, _deblockedTags.data(), _deblockedVals.data()};
+        if (storage->tags.size() != _count) {
+            storage->tags.clear();
+            storage->vals.clear();
+            storage->tags.resize(_count, _tag);
+            storage->vals.resize(_count, _val);
+        }
+
+        return {_count, storage->tags.data(), storage->vals.data()};
     }
 
     boost::optional<size_t> tryCount() const override {
         return _count;
+    }
+
+    std::unique_ptr<ValueBlock> map(const ColumnOp& op) const override {
+        auto [tag, val] = op.processSingle(_tag, _val);
+        return std::make_unique<MonoBlock>(_count, tag, val);
     }
 
 private:
@@ -139,21 +231,31 @@ private:
     // To lazily extract the values, we need to remember the number of values which is supposed
     // to exist in this block.
     size_t _count;
-
-    // These are always a view onto '_tag' and '_val', materialized lazily if the caller
-    // requests it.
-    std::vector<TypeTags> _deblockedTags;
-    std::vector<Value> _deblockedVals;
 };
 
-/**
- * The most general type of block that can hold any assortment of tags/values with no
- * commonality.
- */
-struct HeterogeneousBlock : public ValueBlock {
+class HeterogeneousBlock : public ValueBlock {
+public:
     HeterogeneousBlock() = default;
-    HeterogeneousBlock(std::vector<sbe::value::TypeTags> tag, std::vector<sbe::value::Value> val)
-        : _vals(std::move(val)), _tags(std::move(tag)) {}
+
+    HeterogeneousBlock(const HeterogeneousBlock& o) : ValueBlock(o) {
+        _vals.resize(o._vals.size(), Value{0u});
+        _tags.resize(o._tags.size(), TypeTags::Nothing);
+
+        for (size_t i = 0; i < o._vals.size(); ++i) {
+            auto [copyTag, copyVal] = copyValue(o._tags[i], o._vals[i]);
+            _vals[i] = copyVal;
+            _tags[i] = copyTag;
+        }
+    }
+
+    HeterogeneousBlock(HeterogeneousBlock&& o)
+        : ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
+        o._vals = {};
+        o._tags = {};
+    }
+
+    HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals)
+        : _vals(std::move(vals)), _tags(std::move(tags)) {}
 
     ~HeterogeneousBlock() {
         release();
@@ -174,16 +276,7 @@ struct HeterogeneousBlock : public ValueBlock {
         return _tags.size();
     }
 
-    void push_back(TypeTags t, Value v) {
-        ValueGuard guard(t, v);
-        if (_tags.capacity() == _tags.size()) {
-            auto newSize = std::max(size_t{1}, _tags.size() * 2);
-            reserve(newSize);
-        }
-        _tags.push_back(t);
-        _vals.push_back(v);
-        guard.reset();
-    }
+    void push_back(TypeTags t, Value v);
 
     void push_back(std::pair<TypeTags, Value> tv) {
         push_back(tv.first, tv.second);
@@ -193,21 +286,15 @@ struct HeterogeneousBlock : public ValueBlock {
         return _vals.size();
     }
 
-
-    DeblockedTagVals extract() override {
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override {
         return {_vals.size(), _tags.data(), _vals.data()};
     }
 
     std::unique_ptr<ValueBlock> clone() const override {
-        std::vector<Value> newVals(_vals.size(), 0);
-        std::vector<TypeTags> newTags(_vals.size(), value::TypeTags::Nothing);
-        for (size_t i = 0; i < _vals.size(); ++i) {
-            auto [cpyTag, cpyVal] = value::copyValue(_tags[i], _vals[i]);
-            newTags[i] = cpyTag;
-            newVals[i] = cpyVal;
-        }
-        return std::make_unique<HeterogeneousBlock>(std::move(newTags), std::move(newVals));
+        return std::make_unique<HeterogeneousBlock>(*this);
     }
+
+    std::unique_ptr<ValueBlock> map(const ColumnOp& op) const override;
 
 private:
     void release() noexcept {

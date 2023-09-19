@@ -40,6 +40,19 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::sbe::vm {
+using ColumnOpType = value::ColumnOpType;
+
+static constexpr auto existsOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
+                                                  value::TypeTags::Nothing,
+                                                  value::TypeTags::Boolean,
+                                                  ColumnOpType::ReturnBoolOnMissing{}};
+
+static const auto existsOp =
+    value::makeColumnOp<existsOpType>([](value::TypeTags tag, value::Value val) {
+        return std::pair(value::TypeTags::Boolean,
+                         value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
+    });
+
 /*
  * Given a ValueBlock as input, returns a ValueBlock of true/false values indicating whether
  * each value in the input was non-Nothing (true) or Nothing (false).
@@ -47,30 +60,15 @@ namespace mongo::sbe::vm {
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists(ArityType arity) {
     invariant(arity == 1);
     auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+
     invariant(inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
-    auto extracted = valueBlockIn->extract();
 
-    // TODO: This should be rewritten in terms of the ValueBlock::map() function.
+    auto out = valueBlockIn->map(existsOp);
 
-    std::vector<value::Value> blockBoolsOut;
-    for (size_t i = 0; i < extracted.count; ++i) {
-        if (extracted.tags[i] == value::TypeTags::Nothing) {
-            blockBoolsOut.push_back(value::bitcastFrom<bool>(false));
-        } else {
-            blockBoolsOut.push_back(value::bitcastFrom<bool>(true));
-        }
-    }
-
-    std::vector<value::TypeTags> tags(blockBoolsOut.size(), value::TypeTags::Boolean);
-
-    // TODO: Use HomogeneousBlock once it's available.
-    auto out =
-        std::make_unique<value::HeterogeneousBlock>(std::move(tags), std::move(blockBoolsOut));
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
-
 
 /*
  * TODO: Comment.
@@ -148,6 +146,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombin
     MONGO_UNREACHABLE;
 }
 
+static constexpr auto invokeLambdaOpType = ColumnOpType{ColumnOpType::kNoFlags,
+                                                        value::TypeTags::Nothing,
+                                                        value::TypeTags::Nothing,
+                                                        ColumnOpType::OnMissingInput{}};
+
+static const auto invokeLambdaOp =
+    value::makeColumnOpWithParams<invokeLambdaOpType, ByteCode::InvokeLambdaFunctor>();
+
 /**
  * Implementation of the valueBlockApplyLambda instruction. This instruction takes a block and an
  * SBE lambda f(), and produces a new block with the result of f() applied to each element of
@@ -173,23 +179,10 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     }
 
     const auto lamPos = value::bitcastTo<int64_t>(lamVal);
-    auto outBlock = std::make_unique<value::HeterogeneousBlock>();
-
     auto* block = value::getValueBlock(blockVal);
-    auto extracted = block->extract();
-    for (size_t i = 0; i < extracted.count; ++i) {
-        pushStack(false, extracted.tags[i], extracted.vals[i]);
-        runLambdaInternal(code, lamPos);
 
-        auto [retOwn, retTag, retVal] = moveFromStack(0);
+    auto outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos));
 
-        if (!retOwn) {
-            std::tie(retTag, retVal) = value::copyValue(retTag, retVal);
-        }
-        popStack();
-
-        outBlock->push_back(retTag, retVal);
-    }
     pushStack(true,
               value::TypeTags::valueBlock,
               value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
