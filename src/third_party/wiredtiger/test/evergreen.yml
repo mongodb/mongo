@@ -3764,7 +3764,6 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-
             ${test_env_vars|} ./run_format_configs.sh ${smp_command|}
 
   - name: static-wt-build-test
