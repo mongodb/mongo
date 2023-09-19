@@ -178,11 +178,11 @@ BSONColumn::ElementStorage::ContiguousBlock::~ContiguousBlock() {
     }
 }
 
-const char* BSONColumn::ElementStorage::ContiguousBlock::done() {
+std::pair<const char*, int> BSONColumn::ElementStorage::ContiguousBlock::done() {
     auto ptr = _storage.contiguous();
-    _storage._endContiguous();
+    int size = _storage._endContiguous();
     _finished = true;
-    return ptr;
+    return std::make_pair(ptr, size);
 }
 
 char* BSONColumn::ElementStorage::allocate(int bytes) {
@@ -232,8 +232,9 @@ void BSONColumn::ElementStorage::_beginContiguous() {
     _contiguousEnabled = true;
 }
 
-void BSONColumn::ElementStorage::_endContiguous() {
+int BSONColumn::ElementStorage::_endContiguous() {
     _contiguousEnabled = false;
+    return _pos - _contiguousPos;
 }
 
 BSONColumn::ElementStorage::Element BSONColumn::ElementStorage::allocate(BSONType type,
@@ -489,13 +490,16 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     uassert(6067605, "Invalid BSON Column interleaved encoding", stateIt == stateEnd);
 
     // Store built BSONObj in the decompressed list
-    const char* objdata = contiguous.done();
-    BSONElement obj(objdata);
+    auto [objdata, objsize] = contiguous.done();
 
-    // If no data was added, use a EOO literal instead of an empty object.
-    if (obj.objsize() == 0) {
-        obj = BSONElement();
+    // If no data was added, use a EOO literal. As buffer size is 0 we cannot interpret it as BSON.
+    if (objsize == 0) {
+        _decompressed = BSONElement();
+        return;
     }
+
+    // Root objects always have an empty field name and we already know the total object size.
+    BSONElement obj(objdata, 1, objsize);
 
     _decompressed = obj;
 }

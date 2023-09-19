@@ -5921,6 +5921,40 @@ TEST_F(BSONColumnTest,
     verifyDecompression(expected, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
+    BSONColumnBuilder cb;
+
+    // This test makes sure we're not leaking the skip from the 'yyyyyy' field into the next
+    // measurement. 'yyyyyy' will be written into the buffer for the second item before we realize
+    // that it only contain skips. We must not attempt to interpret this memory when the next
+    // measurement is all skips.
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("x" << 1 << "yyyyyy" << BSON("z" << 2))),
+        createElementObj(BSON("x" << 1)),
+        BSONElement()};
+
+    for (auto elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd]),
+                            boost::none},
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues, boost::none, boost::none}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
     BSONColumnBuilder cb;
 
