@@ -1046,8 +1046,12 @@ __txn_search_prepared_op(
     F_SET(txn, txn_flags);
     F_CLR(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
     WT_RET(ret);
-    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL, WT_NOTFOUND,
-      "unable to locate update associated with a prepared operation");
+    /*
+     * We cannot guarantee that we find an update when collators are being used as we cannot sort
+     * modifications on collated b-trees.
+     */
+    WT_RET_ASSERT(session, WT_DIAGNOSTIC_PREPARED, *updp != NULL || op->btree->collator != NULL,
+      WT_NOTFOUND, "unable to locate update associated with a prepared operation");
 
     return (0);
 }
@@ -1466,6 +1470,29 @@ err:
 }
 
 /*
+ * __txn_mod_sortable_key --
+ *     Given an operation return a boolean indicating if it has a sortable key.
+ */
+static inline bool
+__txn_mod_sortable_key(WT_TXN_OP *opt)
+{
+    switch (opt->type) {
+    case (WT_TXN_OP_NONE):
+    case (WT_TXN_OP_REF_DELETE):
+    case (WT_TXN_OP_TRUNCATE_COL):
+    case (WT_TXN_OP_TRUNCATE_ROW):
+        return (false);
+    case (WT_TXN_OP_BASIC_COL):
+    case (WT_TXN_OP_BASIC_ROW):
+    case (WT_TXN_OP_INMEM_COL):
+    case (WT_TXN_OP_INMEM_ROW):
+        return (true);
+    }
+    __wt_abort(NULL);
+    return (false);
+}
+
+/*
  * __txn_mod_compare --
  *     Qsort comparison routine for transaction modify list.
  */
@@ -1473,24 +1500,62 @@ static int WT_CDECL
 __txn_mod_compare(const void *a, const void *b)
 {
     WT_TXN_OP *aopt, *bopt;
+    bool a_has_sortable_key;
+    bool b_has_sortable_key;
 
     aopt = (WT_TXN_OP *)a;
     bopt = (WT_TXN_OP *)b;
 
-    /* If the files are different, order by ID. */
-    if (aopt->btree->id != bopt->btree->id)
-        return (aopt->btree->id < bopt->btree->id);
+    /*
+     * We want to sort on two things:
+     *  - B-tree ID
+     *  - Key
+     * However, there are a number of modification types that don't have a key to be sorted on. This
+     * requires us to add a stage between sorting on B-tree ID and key. At this intermediate stage,
+     * we sort on whether the modifications have a key.
+     *
+     * We need to uphold the contract that all modifications on the same key are contiguous in the
+     * final modification array. Technically they could be separated by non key modifications,
+     * but for simplicity's sake we sort them apart.
+     *
+     * Qsort comparators are expected to return -1 if the first argument is smaller than the second,
+     * 1 if the second argument is smaller than the first, and 0 if both arguments are equal.
+     */
+
+    /* Order by b-tree ID. */
+    if (aopt->btree->id < bopt->btree->id)
+        return (-1);
+    if (aopt->btree->id > bopt->btree->id)
+        return (1);
 
     /*
-     * If the files are the same, order by the key. Row-store collators require WT_SESSION pointers,
-     * and we don't have one. Compare the keys if there's no collator, otherwise return equality.
-     * Column-store is always easy.
+     * Order by whether the given operation has a key. We don't want to call key compare incorrectly
+     * especially given that u is a union which would create undefined behavior.
      */
-    if (aopt->type == WT_TXN_OP_BASIC_ROW || aopt->type == WT_TXN_OP_INMEM_ROW)
+    a_has_sortable_key = __txn_mod_sortable_key(aopt);
+    b_has_sortable_key = __txn_mod_sortable_key(bopt);
+    if (a_has_sortable_key && !b_has_sortable_key)
+        return (-1);
+    if (!a_has_sortable_key && b_has_sortable_key)
+        return (1);
+    /*
+     * In the case where both arguments don't have a key they are considered to be equal, we don't
+     * care exactly how they get sorted.
+     */
+    if (!a_has_sortable_key && !b_has_sortable_key)
+        return (0);
+
+    /* Finally, order by key. We cannot sort if there is a collator as we need a session pointer. */
+    if (aopt->btree->type == BTREE_ROW) {
         return (aopt->btree->collator == NULL ?
             __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key) :
             0);
-    return (aopt->u.op_col.recno < bopt->u.op_col.recno);
+    }
+    if (aopt->u.op_col.recno < bopt->u.op_col.recno)
+        return (-1);
+    if (aopt->u.op_col.recno > bopt->u.op_col.recno)
+        return (1);
+    return (0);
 }
 
 /*
@@ -1666,6 +1731,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  */
                 if (!F_ISSET(op, WT_TXN_OP_KEY_REPEATED))
                     WT_ERR(__txn_resolve_prepared_op(session, op, true, &cursor));
+
+                /* Sleep between resolving prepared operations when configured. */
+                __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION, NULL);
 #ifdef HAVE_DIAGNOSTIC
                 ++prepare_count;
 #endif
