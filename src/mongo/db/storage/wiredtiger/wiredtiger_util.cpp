@@ -101,9 +101,13 @@ namespace mongo {
 
 namespace {
 
+// TODO SERVER-81069: Remove this.
+MONGO_FAIL_POINT_DEFINE(allowEncryptionOptionsInCreationString);
+
 const std::string kTableChecksFileName = "_wt_table_checks";
 const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
+const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
 
 /**
  * Removes the 'kTableChecksFileName' file in the dbpath, if it exists.
@@ -486,6 +490,13 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 
     if (config.find("type=lsm") != std::string::npos) {
         return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
+    }
+
+    if (encryptionOptsRegex->matchView(config) &&
+        MONGO_likely(!allowEncryptionOptionsInCreationString.shouldFail())) {
+        return {ErrorCodes::IllegalOperation,
+                "Manual configuration of encryption options as part of 'configString' is not "
+                "supported"};
     }
 
     Status status = wtRCToStatus(
@@ -1320,7 +1331,6 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
 }
 
 void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString) {
-    static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
     encryptionOptsRegex->substitute("", configString, pcre::SUBSTITUTE_GLOBAL);
 }
 

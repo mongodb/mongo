@@ -21,18 +21,25 @@ assert.commandWorked(db[collNamePrefix].source.createIndex({a: 1}, {name: 'a_1'}
 var collStats = db.runCommand({collStats: collNamePrefix + '.source'});
 assert.commandWorked(collStats);
 
-assert.commandWorked(db.runCommand({
-    create: collNamePrefix + '.dest',
-    storageEngine: {wiredTiger: {configString: collStats.wiredTiger.creationString}}
-}),
-                     'unable to create collection using the creation string of another collection');
+const encryptionRegex = /,encryption=\(?[^)]*,?\),/;
+const sanitisedCollConfigString = collStats.wiredTiger.creationString.replace(encryptionRegex, ",");
+
+assert.commandWorked(
+    db.runCommand({
+        create: collNamePrefix + '.dest',
+        storageEngine: {wiredTiger: {configString: sanitisedCollConfigString}}
+    }),
+    'unable to create collection using the sanitised creation string of another collection');
+
+const sanitisedIndexConfigString =
+    collStats.indexDetails.a_1.creationString.replace(encryptionRegex, ",");
 
 assert.commandWorked(db.runCommand({
     createIndexes: collNamePrefix + '.dest',
     indexes: [{
         key: {b: 1},
         name: 'b_1',
-        storageEngine: {wiredTiger: {configString: collStats.indexDetails.a_1.creationString}}
+        storageEngine: {wiredTiger: {configString: sanitisedIndexConfigString}}
     }]
 }),
-                     'unable to create index using the creation string of another index');
+                     'unable to create index using the sanitised creation string of another index');
