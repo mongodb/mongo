@@ -6,6 +6,8 @@
  *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
+ *   # TODO SERVER-80796 Timeseries unordered error handling incompatible with proxy simulation.
+ *   simulate_atlas_proxy_incompatible,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
  * ]
@@ -41,8 +43,8 @@ assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 
 // Test ordered timeseries inserts with failed operations.
 docs = [
-    {_id: 3, [timeFieldName]: ISODate(), num: 3},
     {_id: 99, num: 99},  // Missing 'time' field.
+    {_id: 3, [timeFieldName]: ISODate(), num: 3},
     {_id: 4, [timeFieldName]: ISODate(), num: 4},
 ];
 res = db.adminCommand({
@@ -52,15 +54,14 @@ res = db.adminCommand({
     ordered: true,
 });
 assert.eq(res.numErrors, 1);
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1})
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 2, n: 0})
-assert.eq(res.cursor.firstBatch.length, 2);
-assert.eq(coll.countDocuments({}), 4);
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
+assert.eq(res.cursor.firstBatch.length, 1);
+assert.eq(coll.countDocuments({}), 3);
 
 // Test unordered timeseries inserts with failed operations.
 docs = [
-    {_id: 4, [timeFieldName]: ISODate(), num: 4},
     {_id: 99, num: 99},  // Missing 'time' field.
+    {_id: 4, [timeFieldName]: ISODate(), num: 4},
     {_id: 5, [timeFieldName]: ISODate(), num: 5},
 ];
 res = db.adminCommand({
@@ -70,30 +71,30 @@ res = db.adminCommand({
     ordered: false,
 });
 assert.eq(res.numErrors, 1);
-cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1})
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 2, n: 0})
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1})
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1})
-assert.eq(coll.countDocuments({}), 6);
+assert.eq(coll.countDocuments({}), 5);
 
 // Test unordered inserts to 2 collections - 1 timeseries collection and 1 non-timeseries
 // collections.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
+        {insert: 0, document: {_id: 99, num: 99}},  // Missing 'time' field.
         {insert: 0, document: {_id: 6, [timeFieldName]: ISODate(), num: 6}},
         {insert: 0, document: {_id: 7, [timeFieldName]: ISODate(), num: 7}},
         {insert: 1, document: {_id: 0, num: 0}},
         {insert: 1, document: {_id: 0, num: 1}},  // Duplicate key.
         {insert: 0, document: {_id: 8, [timeFieldName]: ISODate(), num: 8}},
-        {insert: 0, document: {_id: 99, num: 99}},  // Missing 'time' field.
     ],
     nsInfo: [{ns: coll.getFullName()}, {ns: nonTSColl.getFullName()}],
     ordered: false,
 });
 assert.eq(res.numErrors, 2);
-cursorEntryValidator(res.cursor.firstBatch[3], {ok: 0, idx: 3, code: 11000, n: 0})
-cursorEntryValidator(res.cursor.firstBatch[5], {ok: 0, idx: 5, code: 2, n: 0})
-assert.eq(coll.countDocuments({}), 9);
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
+cursorEntryValidator(res.cursor.firstBatch[4], {ok: 0, idx: 4, code: 11000, n: 0})
+assert.eq(coll.countDocuments({}), 8);
 assert.eq(nonTSColl.countDocuments({}), 1);
 
 // Test ordered inserts to 2 collections - 1 timeseries collection and 1 non-timeseries collections.
@@ -101,8 +102,8 @@ res = db.adminCommand({
     bulkWrite: 1,
     ops: [
         {insert: 1, document: {_id: 1, num: 1}},
-        {insert: 0, document: {_id: 10, [timeFieldName]: ISODate(), num: 10}},
         {insert: 0, document: {_id: 99, num: 99}},  // Missing 'time' field.
+        {insert: 0, document: {_id: 10, [timeFieldName]: ISODate(), num: 10}},
         {insert: 1, document: {_id: 2, num: 2}},
     ],
     nsInfo: [{ns: coll.getFullName()}, {ns: nonTSColl.getFullName()}],
@@ -110,7 +111,7 @@ res = db.adminCommand({
 });
 jsTestLog(tojson(res));
 assert.eq(res.numErrors, 1);
-cursorEntryValidator(res.cursor.firstBatch[2], {ok: 0, idx: 2, code: 2, n: 0})
-assert.eq(res.cursor.firstBatch.length, 3);
-assert.eq(coll.countDocuments({}), 10);
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 2, n: 0})
+assert.eq(res.cursor.firstBatch.length, 2);
+assert.eq(coll.countDocuments({}), 8);
 assert.eq(nonTSColl.countDocuments({}), 2);
