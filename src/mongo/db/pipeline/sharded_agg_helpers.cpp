@@ -291,9 +291,9 @@ std::vector<RemoteCursor> establishShardCursors(
         for (const auto& shardId : shardIds) {
             requests.emplace_back(shardId, cmdObj);
         }
-    } else if (cri->cm.isSharded()) {
-        // The collection is sharded. Use the routing table to decide which shards to target
-        // based on the query and collation, and build versioned requests for them.
+    } else if (cri->cm.hasRoutingTable()) {
+        // The collection has a routing table. Use it to decide which shards to target based on the
+        // query and collation, and build versioned requests for them.
         for (const auto& shardId : shardIds) {
             auto versionedCmdObj = appendShardVersion(cmdObj, cri->getShardVersion(shardId));
 
@@ -305,8 +305,8 @@ std::vector<RemoteCursor> establishShardCursors(
             requests.emplace_back(shardId, std::move(versionedCmdObj));
         }
     } else {
-        // The collection is unsharded. Target only the primary shard for the database.
-        // Don't append shard version info when contacting a fixed db collection.
+        // The collection does not have a routing table. Target only the primary shard for the
+        // database. Don't append shard version info when contacting a fixed db collection.
         auto versionedCmdObj = !cri->cm.dbVersion().isFixed()
             ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
             : cmdObj;
@@ -877,12 +877,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
 
     auto versionedCmdObj = [&] {
-        if (cri.cm.isSharded()) {
+        if (cri.cm.hasRoutingTable()) {
             return appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                       cri.getShardVersion(shardId));
         } else {
-            // The collection is unsharded. Don't append shard version info when contacting a fixed
-            // db collection.
+            // The collection does not have a routing table. Don't append shard version info when
+            // contacting a fixed db collection.
             auto cmdObjWithShardVersion = !cri.cm.dbVersion().isFixed()
                 ? appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                      ShardVersion::UNSHARDED())
