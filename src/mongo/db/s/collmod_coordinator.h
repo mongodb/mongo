@@ -93,6 +93,8 @@ private:
     struct ShardingInfo {
         // The primary shard for the collection, only set if the collection is sharded.
         ShardId primaryShard;
+        // Flag that tells if the primary db shard has chunks for the collection.
+        bool isPrimaryOwningChunks;
         // The participant shards owning chunks for the collection, only set if the collection is
         // sharded.
         std::vector<ShardId> participantsOwningChunks;

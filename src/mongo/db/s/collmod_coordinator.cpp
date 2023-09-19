@@ -180,6 +180,7 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         6522700, "Sharding information must be gathered after collection information", _collInfo);
     if (!_shardingInfo && _collInfo->isSharded) {
         ShardingInfo info;
+        info.isPrimaryOwningChunks = false;
         const auto [chunkManager, _] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, _collInfo->nsForTargeting));
@@ -194,6 +195,8 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         for (const auto& shard : shardIdsSet) {
             if (shard != info.primaryShard) {
                 shardIdsVec.push_back(shard);
+            } else {
+                info.isPrimaryOwningChunks = true;
             }
         }
 
@@ -226,7 +229,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPri
                                                    opts,
                                                    {_shardingInfo->primaryShard},
                                                    getNewSession(opCtx),
-                                                   false /* ignoreResponses */);
+                                                   !_shardingInfo->isPrimaryOwningChunks);
 }
 
 std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToParticipantShards(
@@ -239,8 +242,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPar
         **executor, token, request, async_rpc::GenericArgs());
 
     // The collMod command targets all shards, regardless of whether they have chunks. The shards
-    // that have no chunks for the collection will not throw nor will be included in the responses,
-    // except for the primary.
+    // that have no chunks for the collection will not throw nor will be included in the responses.
 
     sendAuthenticatedCommandWithOsiToShards(opCtx,
                                             opts,
@@ -327,7 +329,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             blockCRUDOperationsRequest,
                             async_rpc::GenericArgs());
                     std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
-                    shards.push_back(_shardingInfo->primaryShard);
+                    if (_shardingInfo->isPrimaryOwningChunks) {
+                        shards.push_back(_shardingInfo->primaryShard);
+                    }
                     sendAuthenticatedCommandWithOsiToShards(
                         opCtx, opts, shards, getNewSession(opCtx), false /* ignoreResponses */);
                 }
@@ -408,27 +412,29 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
                                 **executor, token, dryRunRequest, args);
                             std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
-                            shards.push_back(_shardingInfo->primaryShard);
+                            if (_shardingInfo->isPrimaryOwningChunks) {
+                                shards.push_back(_shardingInfo->primaryShard);
+                            }
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
                                 opCtx, optsDryRun, shards);
                         }
 
                         std::vector<AsyncRequestsSender::Response> responses;
 
-                        // Regardless if the primary shard contains chunks or not, it is necessary
-                        // to send a request to the primary shard and validate its response because
-                        // it must has a local copy of the collection.
-                        auto primaryResponse =
-                            _sendCollModToPrimaryShard(opCtx, request, executor, token);
-                        responses.insert(responses.end(),
-                                         std::make_move_iterator(primaryResponse.begin()),
-                                         std::make_move_iterator(primaryResponse.end()));
-
                         // In the case of the participants, we are broadcasting the collMod to all
                         // the shards. On one hand, if the shard contains chunks for the
                         // collections, we parse all the responses. On the other hand, if the shard
                         // does not contain chunks, we make a best effort to not process the
                         // returned responses or throw any errors.
+
+                        auto primaryResponse =
+                            _sendCollModToPrimaryShard(opCtx, request, executor, token);
+                        if (_shardingInfo->isPrimaryOwningChunks) {
+                            responses.insert(responses.end(),
+                                             std::make_move_iterator(primaryResponse.begin()),
+                                             std::make_move_iterator(primaryResponse.end()));
+                        }
+
                         auto participantsResponses =
                             _sendCollModToParticipantShards(opCtx, request, executor, token);
                         responses.insert(responses.end(),
