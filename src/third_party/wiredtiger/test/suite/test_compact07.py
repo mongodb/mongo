@@ -194,8 +194,9 @@ class test_compact07(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         
         # The tables should get removed from the tracking list once they exceed the max idle time 
-        # after they're dropped.
-        while self.get_bg_compaction_files_tracked() > 1:
+        # after they're dropped. Only two tables are expected to be present: the small table and the
+        # HS file.
+        while self.get_bg_compaction_files_tracked() > 2:
             time.sleep(1)
         
         # Stop the background compaction server.
