@@ -333,7 +333,8 @@ private:
             ContiguousBlock(ElementStorage& storage);
             ~ContiguousBlock();
 
-            const char* done();
+            // Return pointer to contigous block and the block size
+            std::pair<const char*, int> done();
 
         private:
             ElementStorage& _storage;
@@ -385,8 +386,8 @@ private:
         // Starts contiguous mode
         void _beginContiguous();
 
-        // Ends contiguous mode
-        void _endContiguous();
+        // Ends contiguous mode, returns size of block
+        int _endContiguous();
 
         // Full memory blocks that are kept alive.
         std::vector<std::unique_ptr<char[]>> _blocks;
