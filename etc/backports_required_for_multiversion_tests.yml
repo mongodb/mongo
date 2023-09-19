@@ -849,7 +849,7 @@ last-lts:
   - test_file: jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
     ticket: SERVER-78157
   - test_file: jstests/sharding/fsync_lock_unlock.js
-    ticket: SERVER-78149
+    ticket: SERVER-73685
   - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
     ticket: SERVER-79912
   - test_file: jstests/core/timeseries/nondefault_collation.js
