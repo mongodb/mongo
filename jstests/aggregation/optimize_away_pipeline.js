@@ -774,6 +774,26 @@ pipeline = [{$project: {x: 0}}];
 assertPipelineDoesNotUseAggregation(
     {pipeline: pipeline, expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN"]});
 
+// Test that $replaceRoot can be pushed down.
+pipeline = [
+    {
+        $addFields:
+            {replacementDoc: {double: {$multiply: [2, "$x"]}, square: {$multiply: ["$x", "$x"]}}}
+    },
+    {$replaceRoot: {newRoot: "$replacementDoc"}}
+];
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: pipeline,
+        expectedStages: ["REPLACE_ROOT", "PROJECTION_DEFAULT", "PROJECTION_SIMPLE", "COLLSCAN"]
+    });
+} else {
+    assertPipelineUsesAggregation({
+        pipeline: pipeline,
+        expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN", "$addFields", "$replaceRoot"]
+    });
+}
+
 // getMore cases.
 
 // Test getMore on a collection with an optimized away pipeline.

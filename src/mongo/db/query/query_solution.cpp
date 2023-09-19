@@ -1313,6 +1313,29 @@ std::unique_ptr<QuerySolutionNode> MatchNode::clone() const {
 }
 
 //
+// ReplaceRootNode
+//
+
+void ReplaceRootNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "REPLACE_ROOT\n";
+    if (nullptr != newRoot) {
+        addIndent(ss, indent + 1);
+        *ss << "newRoot:\n";
+
+        *ss << newRoot->serialize(SerializationOptions{}).toString();
+    }
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+std::unique_ptr<QuerySolutionNode> ReplaceRootNode::clone() const {
+    return std::make_unique<ReplaceRootNode>(children[0]->clone(), newRoot ? newRoot : nullptr);
+}
+
+//
 // ProjectionNode
 //
 

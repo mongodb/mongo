@@ -1863,6 +1863,64 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
+/**
+ * Create a ProjectStage that evalutes the "newRoot" expression from a $replaceRoot pipeline stage
+ * and append it to the root of the SBE plan.
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildReplaceRoot(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+
+    const ReplaceRootNode* rrn = static_cast<const ReplaceRootNode*>(root);
+
+    DepsTracker newRootDeps;
+    expression::addDependencies(rrn->newRoot.get(), &newRootDeps);
+
+    // The $replaceRoot operation only ever needs 'kResult' if there are operations in the 'newRoot'
+    // expression that need the whole document.
+    PlanStageReqs childReqs = newRootDeps.needWholeDocument
+        ? reqs.copy().clearAllFields().set(kResult)
+        : reqs.copy().clearAllFields().clear(kResult).setFields(
+              getTopLevelFields(newRootDeps.fields));
+
+    auto [stage, outputs] = build(rrn->children[0].get(), childReqs);
+
+    // MQL semantics require $replaceRoot to fail if newRoot expression does not evaluate to an
+    // object. We fill empty results with null and wrap the generated expression in an if statement
+    // that fails if it does not evaluate to an object.
+    auto newRootVar = getABTLocalVariableName(_state.frameId(), 0);
+    auto newRootABT = abt::unwrap(
+        generateExpression(_state, rrn->newRoot.get(), outputs.getIfExists(kResult), &outputs)
+            .extractABT());
+    auto validatedNewRootABT = optimizer::make<optimizer::Let>(
+        newRootVar,
+        makeFillEmptyNull(std::move(newRootABT)),
+        optimizer::make<optimizer::If>(
+            generateABTNonObjectCheck(newRootVar),
+            makeABTFail(ErrorCodes::Error{8105800},
+                        "Expression in $replaceRoot/$replaceWith must evaluate to an object"_sd),
+            makeVariable(newRootVar)));
+    auto validatedNewRootExpression = abtToExpr(validatedNewRootABT, _state);
+
+    // The wrapper checks that we add to 'validatedNewRootExpression' ensure that we will only ever
+    // output a result with an object type, even if the type checker does not narrow down the set of
+    // possible types that far.
+    auto newRootType =
+        validatedNewRootExpression.typeSignature.intersect(TypeSignature::kObjectType);
+    tassert(8105801,
+            str::stream() << "Invalid type deduction from lowered $replaceRoot expression: "
+                          << validatedNewRootExpression.typeSignature.typesMask,
+            newRootType.typesMask != 0);
+
+    auto resultSlot = _state.slotId();
+    stage = makeProjectStage(
+        std::move(stage), rrn->nodeId(), resultSlot, std::move(validatedNewRootExpression.expr));
+
+    outputs.set(kResult, {resultSlot, newRootType});
+    outputs.clearAllFields();
+    outputs.clearNonRequiredSlots(reqs);
+    return {std::move(stage), std::move(outputs)};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
                                              const PlanStageReqs& reqs) {
@@ -4302,6 +4360,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
         {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
         {STAGE_MATCH, &SlotBasedStageBuilder::buildMatch},
+        {STAGE_REPLACE_ROOT, &SlotBasedStageBuilder::buildReplaceRoot},
         {STAGE_SKIP, &SlotBasedStageBuilder::buildSkip},
         {STAGE_SORT_SIMPLE, &SlotBasedStageBuilder::buildSort},
         {STAGE_SORT_DEFAULT, &SlotBasedStageBuilder::buildSort},

@@ -468,7 +468,7 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
     }
 
     if (op.name() == "isObject" && arity == 1) {
-        return evaluateTypeTest(n, argTypes[0], TypeSignature::kDateTimeType);
+        return evaluateTypeTest(n, argTypes[0], TypeSignature::kObjectType);
     }
 
     if (op.name() == "isString" && arity == 1) {

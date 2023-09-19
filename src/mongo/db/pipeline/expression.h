@@ -3267,12 +3267,16 @@ class ExpressionInternalFindAllValuesAtPath final
     : public ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1> {
 public:
     explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx)
-        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     explicit ExpressionInternalFindAllValuesAtPath(ExpressionContext* expCtx,
                                                    ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionInternalFindAllValuesAtPath, 1>(expCtx,
-                                                                         std::move(children)) {}
+                                                                         std::move(children)) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const {
         return "$_internalFindAllValuesAtPath";

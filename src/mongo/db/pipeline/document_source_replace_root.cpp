@@ -79,6 +79,10 @@ REGISTER_DOCUMENT_SOURCE(replaceWith,
 intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     const auto stageName = elem.fieldNameStringData();
+
+    SbeCompatibility originalSbeCompatibility =
+        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::fullyCompatible);
+    ON_BLOCK_EXIT([&] { expCtx->sbeCompatibility = originalSbeCompatibility; });
     auto newRootExpression = [&]() {
         if (stageName == kAliasNameReplaceWith) {
             return Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
@@ -111,7 +115,8 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
         std::make_unique<ReplaceRootTransformation>(
             expCtx,
             newRootExpression,
-            (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' "),
+            (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' ",
+            expCtx->sbeCompatibility),
         kStageName.rawData(),
         isIndependentOfAnyCollection);
 }
@@ -119,12 +124,15 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
 boost::intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<Expression>& newRootExpression,
-    std::string errMsgContextForNonObjects) {
+    std::string errMsgContextForNonObjects,
+    SbeCompatibility sbeCompatibility) {
     const bool isIndependentOfAnyCollection = false;
     return new DocumentSourceSingleDocumentTransformation(
         expCtx,
-        std::make_unique<ReplaceRootTransformation>(
-            expCtx, newRootExpression, std::move(errMsgContextForNonObjects)),
+        std::make_unique<ReplaceRootTransformation>(expCtx,
+                                                    newRootExpression,
+                                                    std::move(errMsgContextForNonObjects),
+                                                    expCtx->sbeCompatibility),
         kStageName.rawData(),
         isIndependentOfAnyCollection);
 }

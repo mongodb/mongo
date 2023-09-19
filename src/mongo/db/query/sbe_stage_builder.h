@@ -543,6 +543,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildMatch(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReplaceRoot(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionSimple(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 

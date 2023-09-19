@@ -61,10 +61,13 @@ public:
 
     ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               boost::intrusive_ptr<Expression> newRootExpression,
-                              std::string errMsgContextForNonObject)
+                              std::string errMsgContextForNonObject,
+                              SbeCompatibility sbeCompatibility)
         : _expCtx(expCtx),
           _newRoot(std::move(newRootExpression)),
-          _errMsgContextForNonObject(std::move(errMsgContextForNonObject)) {}
+          _errMsgContextForNonObject(std::move(errMsgContextForNonObject)) {
+        _sbeCompatibility = sbeCompatibility;
+    }
 
     TransformerType getType() const final {
         return TransformerType::kReplaceRoot;
@@ -74,7 +77,17 @@ public:
 
     // Optimize the newRoot expression.
     void optimize() final {
+        // Optimization can sometimes modify a previously compatible expression so that it can no
+        // longer be executed in SBE. When that happens, the expression optimizer updates the
+        // 'sbeCompatibility' value in the ExpressionContext, which we can use to update the
+        // '_sbeCompatibility' value for this $replaceRoot operation.
+        SbeCompatibility originalSbeCompatibility =
+            std::exchange(_expCtx->sbeCompatibility, _sbeCompatibility);
+        ON_BLOCK_EXIT([&] { this->_expCtx->sbeCompatibility = originalSbeCompatibility; });
+
         _newRoot = _newRoot->optimize();
+
+        _sbeCompatibility = _expCtx->sbeCompatibility;
     }
 
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
@@ -106,6 +119,10 @@ public:
         expression::addVariableRefs(_newRoot.get(), refs);
     }
 
+    SbeCompatibility sbeCompatibility() const {
+        return _sbeCompatibility;
+    }
+
 private:
     const boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::intrusive_ptr<Expression> _newRoot;
@@ -117,6 +134,8 @@ private:
     static constexpr StringData kErrorTemplate =
         "{} must evaluate to an object, but resulting value was: {}. Type of resulting value: "
         "'{}'. Input document: {}"_sd;
+
+    SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 };
 
 /*
@@ -143,7 +162,8 @@ public:
     static boost::intrusive_ptr<DocumentSource> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& newRootExpression,
-        std::string errMsgContextForNonObjects);
+        std::string errMsgContextForNonObjects,
+        SbeCompatibility sbeCompatibility);
 
 private:
     // It is illegal to construct a DocumentSourceReplaceRoot directly, use createFromBson()

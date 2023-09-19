@@ -75,7 +75,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceDocuments::createFromBson
         DocumentSourceReplaceRoot::create(expCtx,
                                           ExpressionFieldPath::createPathFromString(
                                               expCtx.get(), genField, expCtx->variablesParseState),
-                                          "elements within the array passed to $documents")};
+                                          "elements within the array passed to $documents",
+                                          SbeCompatibility::fullyCompatible)};
 }
 
 }  // namespace mongo

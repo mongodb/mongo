@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
+#include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
@@ -1791,6 +1792,14 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         if (projectionStage) {
             solnForAgg = std::make_unique<ProjectionNodeDefault>(
                 std::move(solnForAgg), nullptr, projectionStage->projection());
+            continue;
+        }
+
+        auto replaceRootStage =
+            dynamic_cast<DocumentSourceInternalReplaceRoot*>(innerStage->documentSource());
+        if (replaceRootStage) {
+            solnForAgg = std::make_unique<ReplaceRootNode>(std::move(solnForAgg),
+                                                           replaceRootStage->newRootExpression());
             continue;
         }
 

@@ -90,9 +90,11 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
+#include "mongo/db/pipeline/document_source_internal_replace_root.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
@@ -204,6 +206,28 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
     return projectionStage;
 }
 
+/**
+ * Helper for findSbeCompatibleStagesForPushdown() that creates a
+ * 'DocumentSourceInternalReplaceRoot' from 'stage' if 'stage' is a '$replaceRoot' that can be
+ * pushed down to SBE or returns nullptr otherwise.
+ */
+boost::intrusive_ptr<DocumentSource> sbeCompatibleReplaceRootStage(
+    DocumentSourceSingleDocumentTransformation* replaceRootStage,
+    SbeCompatibility minRequiredCompatibility) {
+    if (replaceRootStage->getType() != TransformerInterface::TransformerType::kReplaceRoot) {
+        return nullptr;
+    }
+
+    const auto& replaceRootTransformation =
+        dynamic_cast<const ReplaceRootTransformation&>(replaceRootStage->getTransformer());
+    if (replaceRootTransformation.sbeCompatibility() < minRequiredCompatibility) {
+        return nullptr;
+    }
+
+    return make_intrusive<DocumentSourceInternalReplaceRoot>(
+        replaceRootStage->getContext(), replaceRootTransformation.getExpression());
+}
+
 // A bit field with a bool flag for each aggregation pipeline stage that can be translated to SBE.
 // The flags can be used to indicate which translations are enabled and/or supported in a particular
 // context.
@@ -257,16 +281,18 @@ bool pushDownPipelineStageIfCompatible(
         if (!allowedStages.transform) {
             return false;
         }
-
-        auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
-            *transformStage, minRequiredCompatibility);
-        if (!projectionStage) {
-            return false;
+        if (auto replaceRoot =
+                sbeCompatibleReplaceRootStage(transformStage, minRequiredCompatibility)) {
+            stagesForPushdown.emplace_back(
+                std::make_unique<InnerPipelineStageImpl>(replaceRoot, isLastSource));
+            return true;
+        } else if (auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
+                       *transformStage, minRequiredCompatibility)) {
+            stagesForPushdown.emplace_back(
+                std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
+            return true;
         }
-
-        stagesForPushdown.emplace_back(
-            std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
-        return true;
+        return false;
     } else if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
         if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
