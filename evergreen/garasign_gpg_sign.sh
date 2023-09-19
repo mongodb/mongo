@@ -1,6 +1,9 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}
+GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}
+
 set -o errexit
 set -o verbose
 
@@ -55,8 +58,7 @@ sign mongodb-cryptd-$push_name-$push_arch-$suffix.$ext
 EOF
 
 podman run \
-  -e GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70} \
-  -e GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70} \
+  --env-host \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
   ${garasign_gpg_image} \
