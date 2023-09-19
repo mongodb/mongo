@@ -708,6 +708,15 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                     "error"_attr = status);
                 return;
             }
+            case ErrorCodes::LDAPRoleAcquisitionError: {
+                LOGV2_WARNING(
+                    7785501,
+                    "Could not fetch updated user authorization rights via LDAP, continuing "
+                    "to use old information",
+                    "user"_attr = name,
+                    "error"_attr = redact(status));
+                return;
+            }
             default:
                 // Unrecognized error; assume that it's transient, and continue working with the
                 // out-of-date privilege data.

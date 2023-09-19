@@ -531,6 +531,8 @@ error_codes:
 
     - {code: 403, name: UnsupportedShardingEventNotification}
 
+    - {code: 404, name: LDAPRoleAcquisitionError}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
