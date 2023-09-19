@@ -133,7 +133,8 @@ __rts_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
     ref = NULL;
     while (
       (ret = __wt_tree_walk_custom_skip(session, &ref, __rts_btree_walk_page_skip,
-         &rollback_timestamp, WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED)) == 0 &&
+         &rollback_timestamp,
+         WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED)) == 0 &&
       ref != NULL) {
         __wt_rts_progress_msg(session, &timer, 0, &msg_count, true);
 

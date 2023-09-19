@@ -854,12 +854,12 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     }
 
     /*
-     * The endpoint for append is global; read the last page with global visibility to make sure
-     * that if the end of the tree is truncated we don't start appending in the truncated space
-     * unless the truncation has become globally visible. (Note that this path does not examine the
-     * visibility of individual data items; it only checks whether whole pages are deleted.)
+     * The endpoint for append is global; read the last page with global visibility (even if it's
+     * deleted) to make sure that if the end of the tree is truncated, the tree walk finds the
+     * correct page. (Note that this path does not examine the visibility of individual data items;
+     * it only checks whether whole pages are deleted.)
      */
-    flags = WT_READ_PREV | WT_READ_VISIBLE_ALL;
+    flags = WT_READ_PREV | WT_READ_VISIBLE_ALL | WT_READ_SEE_DELETED;
 
     next_walk = NULL;
     WT_RET(__wt_tree_walk(session, &next_walk, flags));
