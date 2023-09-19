@@ -6,8 +6,7 @@
  *   requires_timeseries,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   # Update on a sharded timeseries collection is supported since 7.1
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  *   # TODO SERVER-76583: Remove following two tags.
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,

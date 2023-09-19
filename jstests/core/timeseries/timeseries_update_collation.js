@@ -8,7 +8,7 @@
  *   # Test explicitly relies on multi-updates.
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 

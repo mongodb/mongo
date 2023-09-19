@@ -4,8 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # To avoid multiversion tests
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
  *   # TODO SERVER-78683: Remove this tag.

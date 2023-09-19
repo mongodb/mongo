@@ -18,6 +18,8 @@ selector:
   - featureFlagFLE2CleanupCommand
   # TODO: SERVER-71537 Remove Feature Flag for PM-412.
   - featureFlagQuerySettings
+  # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
+  - featureFlagTimeseriesUpdatesSupport
   # Transactions are aborted upon fcv upgrade or downgrade.
   - uses_transactions
   # Exclude tests that require a specific fcv.

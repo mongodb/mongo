@@ -221,8 +221,7 @@ feature_flags:
     featureFlagTimeseriesUpdatesSupport:
         description: "Enable support for arbitrary updates on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport
-        default: true
-        version: 7.1
+        default: false
         shouldBeFCVGated: true
     featureFlagIndexBuildGracefulErrorHandling:
         description: "Enable index build error handling improvements"

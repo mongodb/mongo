@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_timeseries,
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 const rst = new ReplSetTest({nodes: 1});

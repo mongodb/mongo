@@ -5,7 +5,7 @@
  * @tags: [
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 

@@ -6,8 +6,7 @@
  *   requires_timeseries,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   # 'NamespaceNotSharded' error is supported since 7.1
- *   requires_fcv_72,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 
