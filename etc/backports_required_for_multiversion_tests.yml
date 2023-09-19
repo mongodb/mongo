@@ -401,6 +401,10 @@ last-continuous:
     ticket: SERVER-73685
   - test_file: jstests/core/timeseries/timeseries_buckets_oplog_update.js
     ticket: SERVER-79912
+  - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
+    ticket: SERVER-80947
+  - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
+    ticket: SERVER-80947
   suites: null
 last-lts:
   all:
@@ -850,4 +854,8 @@ last-lts:
     ticket: SERVER-79912
   - test_file: jstests/core/timeseries/nondefault_collation.js
     ticket: SERVER-81013
+  - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
+    ticket: SERVER-80947
+  - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
+    ticket: SERVER-80947
   suites: null
